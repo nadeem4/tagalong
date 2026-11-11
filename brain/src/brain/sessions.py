@@ -199,9 +199,19 @@ class Session:
         approvals = self.approvals = Approvals(memory, work, notify, now, guards=self.guards)
         # Scout's look before an ask reaches the person; shares the session's model and budget.
         side_check = SideCheck(model, budget, memory, work, guards=self.guards)
+        items = OpenItems(memory.db, now)
+        items.expire_live_only()  # what a last run left tied to a process can no longer run
         # Scout's offer to approve a repeated kind of ask; one service for tools and experts.
-        offer = Offers(
-            model, budget, memory, self._asks, approvals, offers, now, guards=self.guards
+        offer = self._offers = Offers(
+            model,
+            budget,
+            memory,
+            self._asks,
+            items,
+            approvals,
+            offers,
+            now,
+            guards=self.guards,
         )
 
         def modes() -> dict[str, str]:
@@ -245,7 +255,7 @@ class Session:
             rerun=self._rerun_step,
             notify=notify,
         )
-        choices = Choices(self._asks, self.scheduler.emit)
+        choices = Choices(self._asks, self.scheduler.emit, items)
         tools = (
             brain_tools(memory, notify)
             + home_tools(budget, lambda: self.toolbox, keys)
@@ -563,6 +573,7 @@ class Session:
         body = self._bodies.body(body_id)
         if body is not None and body.display is not False:
             self.ask_runner.rejoined()  # open asks whose card is not up are shown again
+            self._offers.resume()  # offers the last run left unanswered are shown again
 
     def _on_job_finished(self, job: Job) -> None:
         self._emit_job_event(

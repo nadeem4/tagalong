@@ -1782,7 +1782,8 @@ async def test_session_passes_the_turn_timeout():
     session = Session(Stall(), Open(), bodies, 10, Memory(":memory:"), turn_timeout=0.05)
     session.say("desktop", say("hi"))
     await idle(session)
-    assert any(m == "reply" and "too long" in p.get("delta", "") for m, p in sent)
+    assert sent[-1][1]["state"] == "ended" and sent[-1][1]["reason"] == "error"
+    assert not any(m == "reply" for m, _ in sent)  # the loop adds no words of its own
 
 
 async def test_a_question_cannot_close_the_fence():

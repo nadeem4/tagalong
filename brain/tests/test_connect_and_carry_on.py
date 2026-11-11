@@ -57,7 +57,7 @@ def rig(steps, memory=None):
         bodies,
         10,
         memory or Memory(":memory:"),
-        now=lambda: datetime.datetime(2026, 1, 1, 9, 0),
+        now=lambda: datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC),
         kinds=KINDS,
         extra_tools=[(spec, install_app)],
     )

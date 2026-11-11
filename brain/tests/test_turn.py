@@ -440,17 +440,16 @@ class Stalled:
         yield None
 
 
-async def test_stalled_model_ends_the_turn_with_error_and_a_message():
+async def test_stalled_model_ends_the_turn_with_error_and_no_words_of_its_own():
     sent = []
     history = [{"role": "user", "content": "go"}]
     reason = await start(Stalled(), history, sent, turn_timeout=0.05)
     assert reason == "error"
-    replies = [p for m, p in sent if m == "reply" and "delta" in p]
-    assert len(replies) == 1 and "too long" in replies[0]["delta"]
-    assert len(dones(sent)) == 1
+    assert [p for m, p in sent if m == "reply" and "delta" in p] == []
+    assert dones(sent) == []
 
 
-async def test_timeout_note_starts_on_its_own_line_after_a_partial_reply():
+async def test_timeout_after_a_partial_reply_adds_nothing_to_it():
     class SpeaksThenStalls:
         model_id = "claude-sonnet-5-5"
 
@@ -463,8 +462,7 @@ async def test_timeout_note_starts_on_its_own_line_after_a_partial_reply():
     reason = await start(SpeaksThenStalls(), history, sent, turn_timeout=0.05)
     assert reason == "error"
     replies = [p for m, p in sent if m == "reply" and "delta" in p]
-    assert replies[0]["delta"] == "Part of an answer"
-    assert replies[1]["delta"].startswith("\n\n") and "too long" in replies[1]["delta"]
+    assert [r["delta"] for r in replies] == ["Part of an answer"]
     assert len(dones(sent)) == 1
 
 

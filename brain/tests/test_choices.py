@@ -4,12 +4,14 @@ arrives later as a `choice` event. Asks run on a fake Bodies; emit is a recordin
 
 import asyncio
 import json
+from datetime import UTC, datetime
 
 import pytest
 from job_rows import fresh_work
 
 from brain.asks import Asks
 from brain.choices import Choices
+from brain.open_items import OpenItems
 from brain.store.memory import MemoryRefused
 from brain.tools import choice_tools
 
@@ -37,7 +39,13 @@ async def settle():
 def rig(online=("desktop",), timeout=600.0):
     bodies = FakeBodies(online)
     events = []
-    choices = Choices(Asks(bodies, fresh_work()), events.append, timeout)
+    work = fresh_work()
+    choices = Choices(
+        Asks(bodies, work),
+        events.append,
+        OpenItems(work.db, lambda: datetime.now(UTC)),
+        timeout,
+    )
     return bodies, events, choices
 
 
@@ -88,25 +96,50 @@ async def test_empty_options_need_free_text():
     assert bodies.opened()[0]["free_text"] is True
 
 
-async def test_a_timed_out_choice_emits_nothing_and_leaves_no_task():
+async def test_choice_timeout_expires_item_not_silent_drop():
     bodies, events, choices = rig(timeout=0.01)
-    choices.ask("Which?", ["a"], None, True)
+    ask_id = choices.ask("Which?", ["a"], None, True)
     await asyncio.sleep(0.05)
-    assert events == []
+    item = choices._items.get(ask_id)
+    assert (item.state, item.reason) == ("expired", "no_answer")
+    (event,) = events  # Scout hears that nobody answered
+    assert event.kind == "choice" and event.facts["expired"] == "yes"
+    assert event.facts["option"] == "" and event.facts["question"] == "Which?"
     assert choices._tasks == set()
     assert bodies.sent[-1]["reason"] == "timeout"
+
+
+async def test_a_choice_timeout_leaves_other_kinds_of_open_items_alone():
+    _, _, choices = rig(timeout=0.01)
+    items = choices._items
+    other_ask = items.open("ask", "desktop", ttl_s=0)  # already past its deadline
+    offer = items.open("offer", "brain", ttl_s=0)
+    choices.ask("Which?", ["a"], None, True)
+    await asyncio.sleep(0.05)
+    assert items.get(other_ask.id).state == "open"
+    assert items.get(offer.id).state == "open"
+
+
+async def test_an_answered_choice_closes_its_item():
+    _, _, choices = rig()
+    ask_id = choices.ask("Which?", ["a", "b"], None, False)
+    await settle()
+    assert choices._items.get(ask_id).state == "open"
+    choices._asks.answer(ask_id, "b", "desktop")
+    await settle()
+    item = choices._items.get(ask_id)
+    assert (item.state, item.answer) == ("answered", "b")
 
 
 async def test_a_late_answer_is_not_found():
     from brain.protocol import ErrorCode, RpcError
 
-    _, events, choices = rig(timeout=0.01)
+    _, _, choices = rig(timeout=0.01)
     ask_id = choices.ask("Which?", ["a"], None, True)
     await asyncio.sleep(0.05)
     with pytest.raises(RpcError) as err:
         choices._asks.answer(ask_id, "a", "desktop")
     assert err.value.code == ErrorCode.not_found
-    assert events == []
 
 
 async def test_nobody_online_refuses_and_emits_nothing():

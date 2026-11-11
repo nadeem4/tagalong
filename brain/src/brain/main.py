@@ -37,9 +37,11 @@ from brain.mind.turn import AnthropicModel
 from brain.models import chosen as chosen_model
 from brain.models import model_name
 from brain.offers import OfferSettings
+from brain.open_items import OpenItems
 from brain.server import start_server
 from brain.sessions import Session
 from brain.setup.apps import app_setup_tools
+from brain.setup.events import SetupEvents
 from brain.setup.expert_tools import expert_setup_tools, login_tools
 from brain.setup.facts import inspect, real_run_cmd
 from brain.setup.home_tools import (
@@ -155,7 +157,13 @@ async def _run() -> None:
         handler.addFilter(SecretLogFilter(masker))
     registry = Registry(config.data_dir)
     inspect_machine = partial(inspect, config.data_dir)
-    emit_event = lambda event: session.scheduler.emit(event)  # noqa: E731 - session exists later
+    # Setup news is saved as open items until Scout's wake turn starts; the session exists later.
+    setup_events = SetupEvents(
+        OpenItems(memory.db, lambda: datetime.now(UTC)),
+        lambda event, **hooks: session.scheduler.emit(event, **hooks),
+        lambda: datetime.now(UTC),
+    )
+    emit_event = setup_events.emit
     logins = LoginDriver(
         config.data_dir, experts, real_open_terminal, emit_event, notify=bodies.notify
     )
@@ -293,6 +301,7 @@ async def _run() -> None:
     )
     session.voice = voice
     session.loops = loops  # focus and tab events also surface loops
+    setup_events.resume()  # news of an install or login the last run never told
     loops.start()  # wakes Scout for a loop already due, and arms the next one
     try:
         try:

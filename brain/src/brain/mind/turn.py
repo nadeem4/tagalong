@@ -3,8 +3,8 @@
 History is append-only and always valid: a half-streamed message is never stored and a
 tool_use never goes unanswered, even when the turn is cancelled. A cancelled step keeps the
 words the person already saw as its reply, so the cut-off request counts as answered and the
-next turn does not resume it. The loop writes no words of its own; it only reports why it stopped.
-The one exception is the turn timeout: a stalled model gets one plain message so it is never silent.
+next turn does not resume it. The loop writes no words of its own; it only reports why it stopped
+(a timeout ends the turn with `error`; the body says so).
 """
 
 import asyncio
@@ -19,8 +19,6 @@ from brain.guards import Guards, Hook, ModelCallCtx
 from brain.telemetry import TIMINGS, timed
 
 log = logging.getLogger(__name__)
-
-TIMEOUT_MESSAGE = "Sorry, I took too long on that and had to stop. Ask me again?"
 
 
 @dataclass(frozen=True)
@@ -245,10 +243,6 @@ async def _run_turn(
             if not limit.expired():
                 raise  # a TimeoutError from inside the loop, not our clock
             log.warning("turn %s ran past %s s", turn_id, turn_timeout)
-            # On its own line when Scout was mid-reply, so it is not glued onto the sentence.
-            note = "\n\n" + TIMEOUT_MESSAGE if spoke else TIMEOUT_MESSAGE
-            notify("reply", {"turn": turn_id, "body": body_id, "delta": note})
-            spoke = True
             _close_dangling_tool_use(history)
             reason = "error"
     except BaseException as err:
