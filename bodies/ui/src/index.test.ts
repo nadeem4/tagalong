@@ -26,6 +26,7 @@ describe('ui package surface', () => {
         'Slider',
         'SpentLine',
         'MoneyField',
+        'ModelField',
         'Button',
         'Keycap',
         'Shortcut',

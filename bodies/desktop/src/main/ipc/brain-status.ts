@@ -161,6 +161,7 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
         `Process ID: ${c.pid ?? 'unknown'}`,
         `Address: ${c.addr}`,
         `Data folder: ${c.dataDir}`,
+        `Model: ${c.model ?? 'unknown'}`,
         `Started by: ${c.startedBy ?? 'unknown'}`,
       ].join('\n'),
     );

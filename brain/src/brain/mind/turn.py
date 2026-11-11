@@ -88,6 +88,10 @@ class AnthropicModel:
         applies from the next turn, never halfway through a running one."""
         self._pinned = self._choose()
 
+    def end_turn(self) -> None:
+        """Let go of the pin: until the next turn the model is read live."""
+        self._pinned = None
+
     @property
     def ready(self) -> bool:
         return self._client is not None
@@ -257,6 +261,9 @@ async def run_turn(
                 {"turn": turn_id, "call": call, "name": name, "state": "ended", "ok": False},
             )
         reason = "cancelled" if cancelled else "error"
+    finally:
+        if end := getattr(model, "end_turn", None):
+            end()  # between turns the model is read live again (side checks, offers)
     _drop_unanswered_server_tool_use(history)
     if spoke:
         notify("reply", {"turn": turn_id, "body": body_id, "done": True})

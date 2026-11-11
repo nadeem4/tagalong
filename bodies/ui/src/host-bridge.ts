@@ -405,7 +405,7 @@ export interface HostBridge {
   restartBrainAfterWork(): Promise<void>;
   openBrainFolder(): Promise<void>;
   openBrainLog(): Promise<void>;
-  /** Copies version, build, process id, address, data folder and who started it. */
+  /** Copies version, build, process id, address, data folder, model and who started it. */
   copyBrainDetails(): Promise<void>;
   /**
    * The brain changed something Home shows (`memory`, `permissions`; `link` when the connection

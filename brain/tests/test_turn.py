@@ -327,7 +327,7 @@ async def test_model_id_is_read_at_turn_start():
     model = _chosen_model(client, choice)
     assert model.model_id == "claude-sonnet-5-5"
     choice["id"] = "claude-haiku-5-5"
-    assert model.model_id == "claude-haiku-5-5"  # read live between turns
+    assert model.model_id == "claude-haiku-5-5"  # no turn running: read live
     await start(model, [{"role": "user", "content": "go"}], [])
     assert client.requested == ["claude-haiku-5-5"]
 
@@ -349,6 +349,14 @@ async def test_set_model_applies_to_the_next_turn_not_the_running_one():
     await start(model, [{"role": "user", "content": "b"}], [], budget=budget)
     assert client.requested == ["claude-sonnet-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]
     assert budget.spent == ["m", "m", "m"]  # the Final's own model wins; the pin is only a request
+
+
+async def test_model_id_is_live_again_after_the_turn_ends():
+    choice = {"id": "claude-sonnet-5-5"}
+    model = _chosen_model(_RecordingClient([_msg("end_turn", [])]), choice)
+    await start(model, [{"role": "user", "content": "a"}], [])
+    choice["id"] = "claude-haiku-5-5"  # picked between turns, read by side checks and offers
+    assert model.model_id == "claude-haiku-5-5"
 
 
 async def test_reader_model_ignores_the_setting():

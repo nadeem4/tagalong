@@ -223,6 +223,7 @@ describe('details and folders', () => {
     expect(copied[0]).toContain('127.0.0.1:47321');
     expect(copied[0]).toContain('C:/Users/me/.tagalong');
     expect(copied[0]).toContain('desktop');
+    expect(copied[0]).toContain('Model: Claude Opus 5.5');
   });
 
   it('opens the data folder and the log from the card', async () => {
