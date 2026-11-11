@@ -105,7 +105,7 @@ export function LoopsPanel() {
     return failed ? (
       <section className="home-card loops" aria-labelledby={headingId}>
         <h2 id={headingId} className="home-card__label">
-          READ MY MAIL FOR LOOPS
+          Read my mail for loops
         </h2>
         <p role="alert">Tagalong could not read this. It loads again when Home reopens.</p>
       </section>
@@ -117,7 +117,7 @@ export function LoopsPanel() {
   return (
     <section className="home-card loops" aria-labelledby={headingId}>
       <h2 id={headingId} className="home-card__label">
-        READ MY MAIL FOR LOOPS
+        Read my mail for loops
       </h2>
       <p>
         Scout can notice what is waiting on you in your mail, and bring it up when it matters. It

@@ -387,7 +387,7 @@ The nav lists six pages (`HomePage`), the companion's name filling in where it a
   `homePageEvent`, through `homeTarget`, which also splits `settings#<section>` for a Fix it and
   scrolls to that Settings section, trying every 100 ms up to 30 times). `onPage` reports each move.
 - **Approvals.** `ApprovalsView` (`home/approvals-view.tsx`) has two halves. `PreferencesList`
-  (`preferences-list.tsx`) lists "STANDING PREFERENCES", the built-in default first: each card shows
+  (`preferences-list.tsx`) lists "Standing preferences", the built-in default first: each card shows
   the sentence, "Agreed {day}", "Used {n} times" and "Last used" once used, with **Edit** (an inline
   field with **Save** and **Cancel**; an empty sentence is refused) and **Remove**. A refusal from
   the brain shows as an alert in the brain's own words (Electron's "Error invoking remote method"

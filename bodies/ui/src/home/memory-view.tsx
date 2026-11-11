@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { MemoryEntry } from '../shapes';
 import { useHostBridge } from '../host-bridge';
 import { Button } from '../controls/button';
-import { themeTokens as t } from '../theme/tokens';
+import { themeTokens as t, typeCss } from '../theme/tokens';
 
 const KIND_LABELS: Record<MemoryEntry['kind'], string> = {
   fact: 'Fact',
@@ -35,8 +35,8 @@ const CSS = `
   gap: ${t.space.lg}px; padding: ${t.space.lg}px 0; border-top: 1px solid ${t.color.panelLine};
   color: ${t.color.panelText};
 }
-.memory-row__text { font-size: ${t.fontSize.field}px; overflow-wrap: anywhere; min-width: 0; }
-.memory-row__date { padding-top: 3px; font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; }
+.memory-row__text { ${typeCss('bodyLead')}; overflow-wrap: anywhere; min-width: 0; }
+.memory-row__date { padding-top: 3px; ${typeCss('small')}; color: ${t.color.panelMuted}; }
 .memory-row .tg-chip { justify-self: start; white-space: nowrap; }
 `;
 
@@ -86,7 +86,7 @@ export function MemoryView({ name }: { name: string }) {
         <p>Kept until you delete them. Deleting one is for good.</p>
       </div>
       <section className="home-card" aria-label="Memories">
-        <h2 className="home-card__label">MEMORIES</h2>
+        <h2 className="home-card__label">Memories</h2>
         {failed && memories === null && (
           <p role="alert">Tagalong could not read these memories. Reopen Home to try again.</p>
         )}

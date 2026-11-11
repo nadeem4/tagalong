@@ -61,7 +61,7 @@ export function PreferencesList({ preferences, onRemove, onEdit }: Props) {
   return (
     <section aria-labelledby="apv-prefs" className="apv-section">
       <h2 className="home-card__label" id="apv-prefs">
-        STANDING PREFERENCES
+        Standing preferences
       </h2>
       {preferences !== null && shown.length === 0 && (
         <p className="tg-note">
