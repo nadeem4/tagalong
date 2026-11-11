@@ -6,7 +6,7 @@
 message Scout from your phone; the bridge says it to the brain over contract v1 and sends Scout's
 finished answer back to the same chat. It holds no brain of its own and adds no frame to the
 contract: it is an ordinary body whose `kind` is `whatsapp`. This page covers the bridge core
-(webhook, send, window) and asks answered from the phone. Home's Bodies card and the one-time Meta setup are below.
+(webhook, send, window) and asks answered from the phone. Home's Places page and the one-time Meta setup are below.
 
 ## Flow
 
@@ -139,10 +139,9 @@ pnpm --filter @tagalong/whatsapp test
 brain socket, a fake `fetch` for the Graph API, a movable clock and locally signed webhook requests.
 No Meta or network call is made.
 
-## Home: Connections > Bodies
+## Home: Places
 
-The Bodies card (`bodies/ui/src/home/bodies-panel.tsx`) shows Desktop, Browser and WhatsApp as
-Connected or Not connected, then the WhatsApp setup:
+The Places page (`bodies/ui/src/home/places-view.tsx`) shows This PC, the Chrome add-on and WhatsApp, each with a purpose line and Connected, Not set up or Offline (WhatsApp is Offline when its five values are saved but it is not connected). Press **Set up** on the WhatsApp row (or **Settings** once it is connected) to open the setup under it:
 
 - Five fields: access token, app secret and verify token (password inputs), phone number ID and your
   number. A saved value shows only the word Saved and is never shown again; type a new one to
@@ -152,7 +151,7 @@ Connected or Not connected, then the WhatsApp setup:
   or Node failed.
 - The values stay on this PC (`<TAGALONG_HOME>/.env`). They are never returned by a tool or by IPC.
 
-The card uses the Home tools `bodies_status`, `whatsapp_status` and `whatsapp_set`
+The page uses the Home tools `bodies_status`, `whatsapp_status` and `whatsapp_set`
 ([brain.md](brain.md#whatsapp-setup-tools)) through `ipc/bodies.ts` ([desktop.md](desktop.md)).
 Saving or switching makes the brain start, stop or restart the bridge at once.
 
@@ -167,7 +166,7 @@ Meta's screens change, so this is the shape, not a script. Meta's free test numb
    day).
 5. Copy the **app secret** from the app's settings.
 6. Invent a **verify token**: any phrase. Meta echoes it back when it checks the webhook.
-7. Enter the five values in Home > Connections > Bodies (access token, app secret, verify token, phone
+7. Enter the five values in Home > Places > WhatsApp (access token, app secret, verify token, phone
    number ID, your number) and press Save.
 8. Install Tailscale and run Funnel on the bridge's port, `47322` by default, so only `/webhook` is
    public. The brain's own port stays on `127.0.0.1:47321`.

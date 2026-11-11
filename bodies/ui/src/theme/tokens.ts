@@ -40,6 +40,7 @@ export const themeTokens = {
     /** Status chips and messages on the light panel: done, needs attention, failed. */
     okFill: '#E3F1E6',
     okInk: '#1F5A2E',
+    okDot: '#2F9E44',
     warnFill: '#FFF4D6',
     warnInk: '#5C4600',
     /** The border of a warning chip or message. */

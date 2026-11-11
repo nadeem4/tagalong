@@ -481,6 +481,8 @@ installed app the folder is `resources/extension`; in development it is `bodies/
 open `chrome://extensions` (or `edge://extensions`), switch on Developer mode and choose **Load
 unpacked**.
 
+Home's Places page (Home > Places) shows whether the add-on is connected to the brain (Connected or Not set up). While it is not, its row has **Get the add-on**, which opens the tour at its Browser step (step 7) with the same folder and steps.
+
 ## Failure handling
 
 | Situation                        | What happens                                                              |
