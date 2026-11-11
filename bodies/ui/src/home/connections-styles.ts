@@ -53,6 +53,12 @@ export const CONNECTIONS_CSS = `
   color: ${t.color.okInk}; white-space: nowrap;
 }
 .home .cx-status--off { color: ${t.color.panelMuted}; }
+.home .cx-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.home .cx-card-tools { display: flex; align-items: center; gap: 8px; }
+.home .cx-auto { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 10px; background: ${t.color.panel}; }
+.home .cx-auto__row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.home .cx-auto__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.home .cx-auto__text > span:first-child { ${typeCss('body')}; font-weight: 600; color: ${t.color.panelText}; }
 .home .cx-panel { display: flex; flex-direction: column; gap: 20px; }
 .home .cx-quiet { display: inline-flex; align-items: center; gap: 2px; }
 .home .cx-quiet .tg-button { padding: 0 8px; }

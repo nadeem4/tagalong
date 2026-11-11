@@ -43,6 +43,9 @@ import type {
   LoopsState,
   ModelState,
   TimerRow,
+  UpdateKind,
+  UpdateResult,
+  UpdatesState,
   WhatsAppChange,
 } from '@tagalong/ui/shapes';
 import { IPC } from '../shared/ipc';
@@ -82,6 +85,13 @@ const bridge: PreloadBridge = {
     ipcRenderer.invoke(IPC.setupExpert, id, approved, communityOk) as Promise<SetupResult>,
   setupApp: (id: string, approved: boolean, query?: string, communityOk?: boolean) =>
     ipcRenderer.invoke(IPC.setupApp, id, approved, query, communityOk) as Promise<SetupResult>,
+  updatesState: () => ipcRenderer.invoke(IPC.updatesState) as Promise<UpdatesState>,
+  updatesCheck: () => ipcRenderer.invoke(IPC.updatesCheck) as Promise<UpdatesState>,
+  updateItem: (kind: UpdateKind, id: string) =>
+    ipcRenderer.invoke(IPC.updateItem, kind, id) as Promise<UpdateResult>,
+  updateAll: (kind: UpdateKind) => ipcRenderer.invoke(IPC.updateAll, kind) as Promise<UpdateResult>,
+  setAutoUpdate: (kind: UpdateKind, official: boolean, on: boolean) =>
+    ipcRenderer.invoke(IPC.setAutoUpdate, kind, official, on) as Promise<void>,
   addConnection: (params: AppAddParams) =>
     ipcRenderer.invoke(IPC.addConnection, params) as Promise<{ id: string }>,
   setConnectionEnabled: (id: string, enabled: boolean) =>

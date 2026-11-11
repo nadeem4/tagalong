@@ -12,6 +12,14 @@ import { DEFAULT_EXPERT_JOB, EXPERT_JOB } from '../jobs-kinds';
 import { Icon } from '../setup/icons';
 import { OutcomeText, Tile } from './app-group-row';
 import type { Outcome } from './outcome';
+import {
+  UpdateSide,
+  UpdatesBar,
+  rowUpdate,
+  updateVersion,
+  updateWaits,
+  type UpdatesControls,
+} from './updates-bar';
 
 const STATE_WORDS: Record<SetupExpert['state'], string> = {
   ready: 'Ready',
@@ -79,7 +87,10 @@ export function ExpertsGroup({
   outcomes,
   failedId,
   onAct,
+  updates,
 }: {
+  /** The brain's updates, null when it could not say: needs_update then keeps its own Update. */
+  updates: UpdatesControls | null;
   experts: SetupExpert[];
   progress: SetupOverview['progress'];
   /** Ids waiting on the person's answer to an Allow card. */
@@ -91,8 +102,12 @@ export function ExpertsGroup({
 }) {
   const row = (expert: SetupExpert) => {
     const working = progress?.expert === expert.id || asking.has(expert.id);
-    const action = ACTION[expert.state];
+    // With the updates state the Update button and the version words come from it, not the state.
+    const update = rowUpdate(updates, 'expert', expert.id);
+    const state = update !== undefined && expert.state === 'needs_update' ? 'ready' : expert.state;
+    const action = ACTION[state];
     const outcome = outcomes.get(expert.id);
+    const versionWords = update === undefined ? null : updateVersion(update);
     return (
       <li key={expert.id} className="cx-item">
         <section className="cx-row" aria-label={expert.name}>
@@ -105,8 +120,9 @@ export function ExpertsGroup({
               )}
             </span>
             <span className="cx-meta">
-              {expert.version === '' ? 'Your own command' : `v${expert.version}`} ·{' '}
-              {EXPERT_JOB[expert.id] ?? DEFAULT_EXPERT_JOB}
+              {expert.version === '' ? 'Your own command' : (versionWords ?? `v${expert.version}`)}{' '}
+              · {EXPERT_JOB[expert.id] ?? DEFAULT_EXPERT_JOB}
+              {update !== undefined && updateWaits(update) && ' · Waits for you'}
             </span>
           </div>
           <div className="cx-row__side">
@@ -115,7 +131,13 @@ export function ExpertsGroup({
               <ProgressBlock progress={progress} />
             ) : (
               <>
-                <span className="cx-status">{STATE_WORDS[expert.state]}</span>
+                <span className="cx-status">{STATE_WORDS[state]}</span>
+                {update !== undefined && (
+                  <UpdateSide
+                    row={update}
+                    onUpdate={() => updates?.onUpdate('expert', expert.id)}
+                  />
+                )}
                 {action !== undefined && (
                   <Button
                     variant="primary"
@@ -139,7 +161,11 @@ export function ExpertsGroup({
   const community = experts.filter((expert) => !expert.official);
   return (
     <section className="home-card" aria-label="Your experts">
-      <h2 className="home-card__label">Your experts</h2>
+      {updates === null ? (
+        <h2 className="home-card__label">Your experts</h2>
+      ) : (
+        <UpdatesBar title="Your experts" kind="expert" controls={updates} />
+      )}
       {experts.length === 0 && <p className="tg-note">No experts yet. Add one below.</p>}
       {official.length > 0 && (
         <>
