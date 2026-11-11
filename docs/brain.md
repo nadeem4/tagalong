@@ -2261,30 +2261,35 @@ brain sends and falls back to the system voice for a text-only `speech` frame.
   and bare URLs are left out, list markers and Markdown dropped, nothing is added or cut. The
   first complete sentence goes out at once. Short sentences (under 40 characters) that are
   already waiting are said together, because the voice clips a very short line.
-- **`Mouth`** (`voice/mouth.py`) keeps one task per spoken turn. It synthesises each sentence
-  with `asyncio.to_thread`, so a slow voice never stalls the websocket or the ears, and sends
+- **`Mouth`** (`voice/mouth.py`) keeps one queue of sentences for all turns and one worker task
+  that says them in order. It synthesises each sentence with `asyncio.to_thread` and awaits it, so
+  a slow voice never stalls the websocket or the ears, and sends
   `speech {turn, n, text, pcm, sample_rate}` with `Bodies.send_live` (24 kHz int16 little endian,
   base64; `n` is the 1-based sentence number within the turn). After the last sentence it sends
   `speech {turn, done: true}`. `Mouth.sentences(turn)` returns what was sent for the newest three
-  turns (frame `n` is index `n - 1`), then the sentences made but not yet sent; it survives a hush.
+  turns (frame `n` is index `n - 1`), then the sentences made but not yet sent; it survives a clear.
+  `Mouth.unsaid(turn)` is only the made-but-unsent part. `Mouth.state` (`talking`,
+  `sentence_break`, `paused`, `idle`) and `on_state` report what the mouth is doing.
 - **No voice yet.** The Kokoro voice loads on the first spoken turn, not at start. Until it is
   ready (first run downloads about 120 MB), and when it fails to load, sentences go out as `speech
 {turn, text}` with no `pcm`, so the body says them with its system voice. The mouth sends no
   `voice` frame: that channel is the ears' alone, and text without `pcm` already means "use your
   own voice". A failed load is tried again on the next spoken turn.
-- **One synth at a time.** A lock in `Mouth` serialises every synthesis (turns and Preview),
-  because the espeak phonemizer is not thread-safe.
-- **Hush.** `hush` from a body stops every turn spoken on that body: queued sentences are
-  dropped, later deltas of those turns are ignored and no more `speech` is sent (not even
-  `done`). The text reply still shows. Other bodies' turns go on. `Session` calls
-  `voice.spoken` on every spoken `say`, and `Mouth` ignores it only for a live, unhushed turn,
-  so a spoken `say` that joins the turn after a hush speaks again (from the next delta). `unlisten`
-  does not hush (a held-mode reply goes on being spoken) and `cancel` does not hush, so a body
-  sends `hush` on Stop.
+- **One synth at a time.** One worker makes and sends one sentence at a time, and a lock keeps
+  Preview's `sample` from overlapping it, because the espeak phonemizer is not thread-safe.
+- **Pause, resume, clear.** `Mouth.pause()` takes effect after the sentence in flight is sent;
+  what is queued stays and `resume()` carries on in order. `clear(turn)` (every turn when `None`)
+  drops that turn's queued sentences, ignores its later deltas and sends no more `speech` for it
+  (not even `done`); what was made but not yet sent moves to the sentence log. The text reply
+  still shows. `hush` from a body clears every turn spoken on that body (`VoiceService.hush`);
+  other bodies' turns go on. `Session` calls `voice.spoken` on every spoken `say`, and `Mouth`
+  ignores it only for a turn it is still speaking, so a spoken `say` that joins the turn after a
+  clear speaks again (from the next delta). `unlisten` does not hush (a held-mode reply goes on
+  being spoken) and `cancel` does not hush, so a body sends `hush` on Stop.
 - **Spoken over.** A `say` with `interrupted {turn, heard}` means the owner spoke over Scout (see
   [Voice](voice.md#talking-over-scout)). `Session.say` asks `Session.voice.sentences(turn)`;
   the first `heard` sentences were said, the rest are the unsaid. The running turn is cancelled
-  (and the mouth hushed; it keeps the turn's sentence log through the hush, since a body's own
+  (and the mouth hushed; it keeps the turn's sentence log through the clear, since a body's own
   `hush` usually arrives first), and the new turn waits for it to wind down so history stays valid. The
   saved history keeps only the spoken sentences, ending with `[interrupted: the owner spoke over
 this]` (`Memory.replace_last_message` rewrites the cut turn's message), never the unsaid. The

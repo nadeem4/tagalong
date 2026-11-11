@@ -1,9 +1,9 @@
 """Mouth: a spoken reply, sentence by sentence, as `speech` frames to the body that shows it.
 
-One task per spoken turn pulls sentences from a queue and synthesises each in a thread, so a
-slow voice never stalls the websocket or the ears. While the voice is loading or has failed the
-sentences go out as text only, and the body says them in its own system voice. Audio is live-only
-and never stored.
+One worker pulls sentences from one queue and synthesises each in a thread, so a slow voice
+never stalls the websocket or the ears and two syntheses never overlap. While the voice is
+loading or has failed the sentences go out as text only, and the body says them in its own system
+voice. Audio is live-only and never stored.
 """
 
 import asyncio
@@ -11,8 +11,9 @@ import base64
 import io
 import logging
 import wave
+from collections import deque
 from collections.abc import Awaitable, Callable
-from typing import Protocol
+from typing import Literal, Protocol
 
 import numpy as np
 
@@ -23,6 +24,7 @@ log = logging.getLogger("brain")
 
 DEFAULT_VOICE = "bm_george"
 DEFAULT_SPEED = 1.0
+State = Literal["talking", "sentence_break", "paused", "idle"]
 KEPT_TURNS = 3  # sentence logs kept, so a late interruption can still be answered
 
 
@@ -38,34 +40,38 @@ class _Sender(Protocol):
 
 class _Turn:
     def __init__(
-        self, turn: str, body_id: str, voice: str, speed: float, system_voice: bool
+        self, turn: str, body_id: str, voice: str, speed: float, system_voice: bool, enqueue
     ) -> None:
         self.turn = turn
         self.body_id = body_id
         self.system_voice = system_voice
         self.voice = voice
         self.speed = speed
-        self.queue: asyncio.Queue[str | None] = asyncio.Queue()  # None: no more sentences
         self.unsent: list[str] = []  # sentences made but not yet sent: still Scout's to say
-        self.stream = SpokenStream(self._queued)
+        self.stream = SpokenStream(lambda line: enqueue(self, line))
         self.ended = False
-        self.hushed = False
-        self.task: asyncio.Task | None = None
-
-    def _queued(self, line: str) -> None:
-        self.unsent.append(line)
-        self.queue.put_nowait(line)
 
 
 class Mouth:
+    """One queue of sentences for every body and one worker that says them in order, so two
+    syntheses never overlap (the phonemizer is not thread-safe) and a pause or clear never has
+    to cancel a synth thread it cannot stop."""
+
     def __init__(self, bodies: _Sender, load_tts: Callable[[], Awaitable[Tts]]) -> None:
         self._bodies = bodies
         self._load_tts = load_tts
         self._tts: Tts | None = None
         self._loading: asyncio.Task | None = None
         self._failed = False  # until the next spoken turn, which tries again
-        self._synth = asyncio.Lock()  # the phonemizer is not thread-safe: one synth at a time
+        self._synth = asyncio.Lock()  # Preview's sample shares the one synth with the worker
         self._turns: dict[str, _Turn] = {}
+        self._queue: deque[tuple[str, str | None]] = deque()  # (turn, sentence); None: turn done
+        self._go = asyncio.Event()  # set while the worker may take the next item
+        self._worker: asyncio.Task | None = None
+        self._paused = False
+        self._saying = False
+        self.state: State = "idle"
+        self.on_state: Callable[[str], None] | None = None
         # What each turn sent, in order. Apart from `_turns` because a turn is dropped once its
         # frames are out while the body may still be playing them.
         self._sent: dict[str, list[str]] = {}
@@ -73,8 +79,15 @@ class Mouth:
     def sentences(self, turn: str) -> list[str]:
         """The sentences sent to the body for `turn` (frame `n` is index `n - 1`), then those
         made but not yet sent, so a speaker cut off mid-reply still knows what was left."""
+        return [*self._sent.get(turn, []), *self.unsaid(turn)]
+
+    def unsaid(self, turn: str) -> list[str]:
+        """Sentences of a live `turn` made but not yet sent, in order."""
         live = self._turns.get(turn)
-        return [*self._sent.get(turn, []), *(live.unsent if live is not None else [])]
+        return list(live.unsent) if live is not None else []
+
+    def turns_on(self, body_id: str) -> list[str]:
+        return [t for t, st in self._turns.items() if st.body_id == body_id]
 
     def spoken(
         self,
@@ -86,18 +99,20 @@ class Mouth:
     ) -> None:
         """The turn's reply will be read aloud on `body_id`, the body showing it. With
         `system_voice` the body speaks it itself: text only, and the voice is never loaded."""
-        live = self._turns.get(turn)
-        if body_id is None or (live is not None and not live.hushed):
-            return  # already speaking this turn; a hushed one is replaced below
+        if body_id is None or turn in self._turns:
+            return  # already speaking this turn; a cleared one is replaced
         self._failed = False
-        st = _Turn(turn, body_id, voice or DEFAULT_VOICE, speed or DEFAULT_SPEED, system_voice)
-        st.task = asyncio.get_running_loop().create_task(self._run(turn, st))
-        self._turns[turn] = st
+        voice = voice or DEFAULT_VOICE
+        speed = speed or DEFAULT_SPEED
+        self._turns[turn] = _Turn(turn, body_id, voice, speed, system_voice, self._enqueue)
+        if self._worker is None:
+            self._worker = asyncio.get_running_loop().create_task(self._work())
+        self._refresh()
 
     def reply(self, turn: str, params: dict) -> None:
         """A `reply` notification's params: a delta, or done."""
         st = self._turns.get(turn)
-        if st is None or st.ended or st.hushed:
+        if st is None or st.ended:
             return
         if params.get("done"):
             self._finish(st)
@@ -107,21 +122,29 @@ class Mouth:
     def end_turn(self, turn: str) -> None:
         """No more deltas will come (idempotent), so the speech can end."""
         st = self._turns.get(turn)
-        if st is not None and not st.ended and not st.hushed:
+        if st is not None and not st.ended:
             self._finish(st)
 
-    def hush(self, body_id: str) -> None:
-        """Barge-in: stop every turn spoken on this body and drop what is queued."""
-        for st in self._turns.values():
-            if st.body_id == body_id and not st.hushed:
-                st.hushed = True
-                # The task is cancelled and drops the turn: what was made but not yet sent
-                # moves to the log first, so the interruption can still hand it over.
-                if st.unsent:
-                    self._sent.setdefault(st.turn, []).extend(st.unsent)
-                    st.unsent.clear()
-                if st.task is not None:
-                    st.task.cancel()
+    def pause(self) -> None:
+        """Stop after the sentence being made is sent; what is queued waits for `resume`."""
+        self._paused = True
+        self._poke()
+
+    def resume(self) -> None:
+        self._paused = False
+        self._poke()
+
+    def clear(self, turn: str | None = None) -> None:
+        """Drop what is queued for `turn` (every turn when None) and ignore its later deltas.
+        What was made but not yet sent moves to the log first, so an interruption can still
+        hand it over. The sentence being made is dropped when its synth ends."""
+        for name in [turn] if turn is not None else list(self._turns):
+            st = self._turns.pop(name, None)
+            if st is not None:
+                self._sent.setdefault(name, []).extend(st.unsent)
+                st.unsent.clear()
+        self._queue = deque(item for item in self._queue if item[0] in self._turns)
+        self._poke()
 
     async def sample(self, text: str, voice: str | None, speed: float | None) -> bytes:
         """One WAV for Settings' Preview. Waits for the voice to load; raises if it cannot."""
@@ -139,32 +162,69 @@ class Mouth:
     def _finish(self, st: _Turn) -> None:
         st.ended = True
         st.stream.end()
-        st.queue.put_nowait(None)
+        self._queue.append((st.turn, None))
+        self._poke()
 
-    async def _run(self, turn: str, st: _Turn) -> None:
-        try:
-            while True:
-                line = await st.queue.get()
-                if line is None:
-                    break
-                taken = 1
-                # Short lines already waiting are said together; one alone would come out clipped.
-                while len(line) < SHORT_LINE and not st.queue.empty():
-                    nxt = st.queue.get_nowait()
-                    if nxt is None:
-                        st.queue.put_nowait(None)
-                        break
-                    line = f"{line} {nxt}"
-                    taken += 1
-                await self._say(turn, st, line)
-                del st.unsent[:taken]
-            self._send(st, {"turn": turn, "done": True})
-        finally:
-            if self._turns.get(turn) is st:  # a re-armed turn of the same id is not ours
+    def _enqueue(self, st: _Turn, line: str) -> None:
+        st.unsent.append(line)
+        self._queue.append((st.turn, line))
+        self._poke()
+
+    def _poke(self) -> None:
+        if self._queue and not self._paused:
+            self._go.set()
+        else:
+            self._go.clear()
+        self._refresh()
+
+    def _refresh(self) -> None:
+        if self._paused:
+            state: State = "paused"
+        elif self._saying or self._queue:
+            state = "talking"
+        elif any(not st.ended for st in self._turns.values()):
+            state = "sentence_break"
+        else:
+            state = "idle"
+        if state != self.state:
+            self.state = state
+            if self.on_state is not None:
+                self.on_state(state)
+
+    async def _work(self) -> None:
+        while True:
+            await self._go.wait()
+            turn, line = self._queue.popleft()
+            st = self._turns.get(turn)
+            if st is None:
+                self._poke()
+                continue
+            if line is None:
+                self._send(st, {"turn": turn, "done": True})
                 del self._turns[turn]
+                self._poke()
+                continue
+            taken = 1
+            # Short lines already waiting are said together; one alone would come out clipped.
+            while len(line) < SHORT_LINE and self._queue and self._queue[0][0] == turn:
+                nxt = self._queue[0][1]
+                if nxt is None:
+                    break
+                self._queue.popleft()
+                line = f"{line} {nxt}"
+                taken += 1
+            self._saying = True
+            self._poke()
+            try:
+                await self._say(st, line)
+            finally:
+                self._saying = False
+            if self._turns.get(turn) is st:
+                del st.unsent[:taken]
+            self._poke()
 
-    async def _say(self, turn: str, st: _Turn, line: str) -> None:
-        frame: dict = {"turn": turn, "text": line}
+    async def _say(self, st: _Turn, line: str) -> None:
+        frame: dict = {"turn": st.turn, "text": line}
         tts = None if st.system_voice else self._tts_now()
         if tts is not None:
             try:
@@ -175,10 +235,10 @@ class Mouth:
                 frame |= {"pcm": base64.b64encode(pcm).decode("ascii"), "sample_rate": rate}
             except Exception:
                 log.warning("speech synthesis failed", exc_info=True)  # the body says it instead
-        if st.hushed:
-            return
+        if self._turns.get(st.turn) is not st:
+            return  # cleared while it was being made
         # Logged only once sent, so frame `n` and the log index agree; the log outlives the turn.
-        lines = self._sent.setdefault(turn, [])
+        lines = self._sent.setdefault(st.turn, [])
         lines.append(line)
         while len(self._sent) > KEPT_TURNS:
             del self._sent[next(iter(self._sent))]
@@ -207,8 +267,7 @@ class Mouth:
             self._failed = True
 
     def _send(self, st: _Turn, params: dict) -> None:
-        if not st.hushed:
-            self._bodies.send_live(st.body_id, "speech", params)
+        self._bodies.send_live(st.body_id, "speech", params)
 
 
 def _wav(samples: np.ndarray, rate: int) -> bytes:

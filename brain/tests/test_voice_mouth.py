@@ -184,7 +184,7 @@ async def test_two_turns_never_synthesise_at_once():
     assert tts.max_active == 1
 
 
-async def test_a_turn_hushed_then_spoken_again_speaks_again():
+async def test_a_turn_cleared_then_spoken_again_speaks_again():
     sent = Sent()
     m, _ = mouth(sent, FakeTts(sleep=0.03))
     await ready(m)
@@ -192,7 +192,7 @@ async def test_a_turn_hushed_then_spoken_again_speaks_again():
     m.spoken("t", "d", None, None)
     m.reply("t", {"delta": f"{ONE} {TWO} "})
     await asyncio.sleep(0.01)
-    m.hush("d")
+    m.clear("t")
     m.spoken("t", "d", None, None)  # a joined spoken say after the barge-in
     m.reply("t", {"delta": "Back again with more words. "})
     m.reply("t", {"done": True})
@@ -215,7 +215,7 @@ async def test_spoken_twice_on_a_live_turn_is_one_turn():
     assert [p.get("done") for p in sent.speech() if "text" not in p].count(True) == 1
 
 
-async def test_hush_stops_that_bodys_speech_only():
+async def test_clear_drops_only_that_turn():
     sent = Sent()
     m, _ = mouth(sent, FakeTts(sleep=0.05))
     await ready(m)
@@ -225,15 +225,80 @@ async def test_hush_stops_that_bodys_speech_only():
     for turn in ("a", "b"):
         m.reply(turn, {"delta": f"{ONE} {TWO} {ONE} "})
     await asyncio.sleep(0.02)
-    m.hush("d")
+    m.clear("a")
     m.reply("a", {"delta": "Late words here. "})
     m.reply("a", {"done": True})
     await asyncio.sleep(0.4)
     assert len(sent.speech("d")) <= 1  # at most the one already being made
     assert not any(p.get("done") for p in sent.speech("d"))
     m.reply("b", {"done": True})
-    await asyncio.sleep(0.4)
+    await asyncio.sleep(0.5)
     assert [p.get("text") for p in sent.speech("e")][-1] is None
+
+
+async def test_never_two_synths_at_once():
+    sent = Sent()
+    m, tts = mouth(sent, FakeTts(sleep=0.03))
+    await ready(m)
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": f"{ONE} {TWO} {ONE} "})
+    await asyncio.sleep(0.01)
+    m.clear()  # a hush mid-synth
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": f"{TWO} {ONE} "})
+    m.reply("t", {"done": True})
+    await asyncio.sleep(0.4)
+    assert tts.max_active == 1
+
+
+async def test_pause_keeps_unsaid_sentences():
+    sent = Sent()
+    m, _ = mouth(sent, FakeTts(sleep=0.05))
+    await ready(m)
+    sent.frames.clear()
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": f"{ONE} {TWO} Third one is here too. "})
+    await asyncio.sleep(0.02)
+    m.pause()
+    await asyncio.sleep(0.3)
+    assert [p.get("text") for p in sent.speech()] == [ONE]  # the one in flight was sent
+    assert m.unsaid("t") == [TWO, "Third one is here too."]
+
+
+async def test_resume_continues_in_order():
+    sent = Sent()
+    m, _ = mouth(sent, FakeTts(sleep=0.03))
+    await ready(m)
+    sent.frames.clear()
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": f"{ONE} {TWO} "})
+    m.reply("t", {"done": True})
+    await asyncio.sleep(0.01)
+    m.pause()
+    await asyncio.sleep(0.2)
+    m.resume()
+    await asyncio.sleep(0.3)
+    assert [p.get("text") for p in sent.speech()] == [ONE, TWO, None]
+    assert m.unsaid("t") == []
+
+
+async def test_state_callback_sequence():
+    sent = Sent()
+    m, _ = mouth(sent, FakeTts(sleep=0.03))
+    await ready(m)
+    seen: list[str] = []
+    m.on_state = seen.append
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": f"{ONE} Then"})
+    await asyncio.sleep(0.15)  # the first sentence is out and the reply is still open
+    m.pause()
+    m.resume()
+    m.reply("t", {"delta": " more."})
+    m.reply("t", {"done": True})
+    await asyncio.sleep(0.3)
+    assert seen == ["sentence_break", "talking", "sentence_break", "paused", "sentence_break",
+                    "talking", "idle"]  # fmt: skip
+    assert m.state == "idle"
 
 
 async def test_no_displaying_body_sends_nothing():
@@ -319,7 +384,7 @@ async def test_sentences_returns_what_was_sent_in_order():
     assert m.sentences("t") == [ONE, TWO]
 
 
-async def test_sentences_survive_hush():
+async def test_sentences_survive_clear():
     sent = Sent()
     m, _ = mouth(sent)
     await ready(m)
@@ -327,8 +392,7 @@ async def test_sentences_survive_hush():
     m.reply("t", {"delta": f"{ONE} {TWO}"})
     m.reply("t", {"done": True})
     await settle()
-    m.hush("d")
-    await settle()  # the cancelled task has ended and dropped the turn
+    m.clear()
     assert m.sentences("t") == [ONE, TWO]
 
 
@@ -359,10 +423,10 @@ async def test_sentences_include_those_made_but_not_yet_sent():
     await asyncio.sleep(0.01)
     assert m.sentences("t")[:2] == [ONE, TWO]
     assert len(m.sentences("t")) == 3
-    m.hush("d")
+    m.clear()
 
 
-async def test_unsent_sentences_survive_hush_once_the_cancelled_task_ended():
+async def test_unsent_sentences_survive_clear():
     sent = Sent()
     m, _ = mouth(sent, FakeTts(sleep=0.05))
     await ready(m)
@@ -371,6 +435,6 @@ async def test_unsent_sentences_survive_hush_once_the_cancelled_task_ended():
     await asyncio.sleep(0.01)
     before = m.sentences("t")
     assert len(before) == 3
-    m.hush("d")
+    m.clear()
     await settle()
     assert m.sentences("t") == before  # sent and unsent alike, each once

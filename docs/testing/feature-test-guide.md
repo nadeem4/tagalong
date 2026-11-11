@@ -1085,7 +1085,7 @@ popup); the answer is text only.
 4. **Action:** ask by voice for a long answer ("explain how a CPU cache works, in detail").
 5. **Expected:** Scout starts speaking within a second or two of the answer showing, says all of
    it a sentence at a time, and the bubble stays responsive throughout; pressing the stop key
-   cuts it at once, and the brain stops sending sentences (the desktop sends `hush`).
+   cuts it at once, and the brain stops sending sentences (the desktop sends `hush`, which clears the mouth's queue; the sentence already being made is dropped, never played over the next reply).
 
 ### V.3b. Kokoro from the first line
 
