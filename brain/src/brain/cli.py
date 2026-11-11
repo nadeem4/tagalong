@@ -157,13 +157,18 @@ def _perf(home: Path, since: str, now: float, out) -> None:
         kind = line.split(" ", 1)[0]
         if kind not in ("perf", "ask.closed"):
             continue
-        f = dict(_FIELDS.findall(line))
-        if float(f.get("t", 0)) < start:
+        try:  # a truncated or junk line is skipped, not fatal
+            f = dict(_FIELDS.findall(line))
+            if float(f["t"]) < start:
+                continue
+            if kind == "perf":
+                for key in ("step", "n", "p50", "p95", "max"):
+                    f[key]
+                steps[f["step"]] = f
+            elif f.get("why") == "cancelled":
+                cancelled += 1
+        except (KeyError, ValueError):
             continue
-        if kind == "perf":
-            steps[f["step"]] = f
-        elif f.get("why") == "cancelled":
-            cancelled += 1
     out(f"{'step':<12}{'n':>6}{'p50 s':>9}{'p95 s':>9}{'max s':>9}")
     for step, f in sorted(steps.items()):
         out(f"{step:<12}{f['n']:>6}{f['p50']:>9}{f['p95']:>9}{f['max']:>9}")

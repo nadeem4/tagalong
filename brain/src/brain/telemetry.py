@@ -123,9 +123,13 @@ def ask_event(event: str, ask_id: str, by: str, why: str = "") -> None:
 async def dump_timings(every: float = PERF_EVERY_S) -> None:
     """Write the current timings to the log, one `perf` line per step, every `every` seconds."""
     log = logging.getLogger("brain.perf")
+    last: dict[str, StepStats] = {}  # brain.log is never rotated: write a step only when it moved
     while True:
         await asyncio.sleep(every)
         for step, st in TIMINGS.summary().items():
+            if last.get(step) == st:
+                continue
+            last[step] = st
             log.info(
                 "perf t=%d step=%s n=%d p50=%.3f p95=%.3f max=%.3f",
                 time.time(),

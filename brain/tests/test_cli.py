@@ -484,3 +484,15 @@ def test_perf_without_a_log_says_so(tmp_path):
     rig = Rig(tmp_path)
     assert rig.go("perf", now=lambda: 1.0) == 1
     assert "brain.log" in rig.text
+
+
+def test_perf_skips_junk_lines(tmp_path):
+    (tmp_path / "brain.log").write_text(
+        "perf t=900 step=turn n=1\n"
+        "perf t=abc step=turn n=1 p50=1 p95=1 max=1\n"
+        "ask.closed t=\n"
+        "perf t=950 step=tool n=2 p50=0.100 p95=0.200 max=0.300\n"
+    )
+    rig = Rig(tmp_path)
+    assert rig.go("perf", now=lambda: 1000.0) == 0
+    assert "tool" in rig.text and "0.300" in rig.text
