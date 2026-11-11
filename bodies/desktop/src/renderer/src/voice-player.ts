@@ -1,9 +1,10 @@
 /**
  * Scout's voice in a renderer window: SpeechPlayer plays the sentences the brain speaks (its
  * Kokoro audio, or the system voice for text only), pauses and resumes it when the person
- * speaks over Scout, and knows how much of a turn was heard.
+ * speaks over Scout, clears it on the brain's word, and reports each sentence started or
+ * ended (the brain's `speech_state`) and how much of a turn was heard.
  */
-import type { SpeechChunk } from '../../shared/ipc';
+import type { SpeechChunk, SpeechControl, SpeechEvent } from '../../shared/ipc';
 
 /** Names of British male system voices, after George, the one Windows ships. */
 const BRITISH_MALE = /\b(ryan|thomas|oliver|arthur|alfie|elliot|ethan|noah)\b/i;
@@ -143,8 +144,10 @@ interface PlayerOptions {
   mouth: () => 'kokoro' | 'system';
   /** The system voice's speed. */
   rate?: () => number;
-  /** Tells the brain to stop speaking. */
+  /** Tells the brain to stop speaking, when the person cuts Scout off. */
   hush: () => void;
+  /** A sentence started or ended, the player paused, or it ran dry or was cleared. */
+  onSpeech: (event: SpeechEvent) => void;
   /** Speaking: a sentence is playing or waiting. Answering: the turn's speech is not done yet. */
   onState: (state: { speaking: boolean; answering: boolean }) => void;
 }
@@ -165,6 +168,12 @@ export class SpeechPlayer {
   private silenced: string | null = null;
   private last = { speaking: false, answering: false };
   private paused = false;
+  /** Holds the pump between sentences while paused; resume() or clear() lets it go. */
+  private release: (() => void) | null = null;
+  private gate: Promise<void> = Promise.resolve();
+  /** The sentence playing now, and whether the last thing the brain heard was idle. */
+  private current: SpeechChunk | null = null;
+  private idle = true;
   /** The turn last spoken: its sentences' words, and how many played to the end. */
   private record: { turn: string | null; texts: string[]; played: number } = {
     turn: null,
@@ -198,9 +207,14 @@ export class SpeechPlayer {
 
   /** The person spoke over Scout: the sound holds where it is, and nothing is lost. */
   pause(): void {
-    if (this.paused || !this.playing) return;
+    if (this.paused) return;
+    // Between sentences counts too: the next one waits at the pump's gate.
+    const turn = this.current?.turn ?? this.answeringTurn ?? this.queue[0]?.turn ?? null;
+    if (turn === null) return;
     this.paused = true;
+    this.gate = new Promise<void>((resolve) => (this.release = resolve));
     (this.options.output ?? speakers).pause();
+    this.tell({ turn, state: 'paused' });
   }
 
   /** It was noise or Scout's own echo: carry on from the same spot. */
@@ -208,6 +222,12 @@ export class SpeechPlayer {
     if (!this.paused) return;
     this.paused = false;
     (this.options.output ?? speakers).resume();
+    this.release?.();
+    // The held sentence carries on from where it stopped, so the brain hears it sounding again.
+    if (this.current !== null) this.sentence(this.current, 'started');
+    // Held between sentences with nothing left to say: the brain must not stay on "paused".
+    else if (!this.running && this.queue.length === 0)
+      this.tell({ turn: this.lastTurn, state: 'idle' });
   }
 
   /**
@@ -229,44 +249,110 @@ export class SpeechPlayer {
     return texts.slice(Math.max(0, played - 1), played + 1).join(' ');
   }
 
-  /** Silences Scout now: this sentence, the rest, and the brain's. */
-  stop(): void {
+  /** The person cut Scout off: tell the brain to stop speaking, then clear the player. */
+  cutOff(): void {
+    this.options.hush();
+    this.clear();
+  }
+
+  /**
+   * Drops this sentence and the rest, for the brain's `clear` or a cut-off. With a `turn`, only
+   * that turn's sentences go (playing or queued); other turns carry on. The brain is not told
+   * to hush: it asked, or cutOff did.
+   */
+  clear(turn?: string): void {
+    if (turn !== undefined) {
+      this.clearTurn(turn);
+      return;
+    }
+    const active = this.current?.turn ?? this.queue[0]?.turn ?? this.answeringTurn;
     if (this.paused) {
       // The sound is held: let it go, or the next sentence would start frozen.
       this.paused = false;
       (this.options.output ?? speakers).resume();
+      this.release?.();
     }
     this.silenced = this.answeringTurn ?? this.queue[0]?.turn ?? this.silenced;
     this.queue = [];
     this.answeringTurn = null;
     this.playing = false;
+    this.current = null;
     this.record = { turn: null, texts: [], played: 0 };
     this.abort.abort();
     this.abort = new AbortController();
-    this.options.hush();
     this.emit();
+    if (active !== null) this.tell({ turn: active, state: 'idle' });
+  }
+
+  private clearTurn(turn: string): void {
+    const playing = this.current?.turn === turn;
+    const known = playing || this.answeringTurn === turn || this.queue.some((c) => c.turn === turn);
+    if (!known) return;
+    this.queue = this.queue.filter((c) => c.turn !== turn);
+    this.silenced = turn;
+    if (this.answeringTurn === turn) this.answeringTurn = null;
+    if (this.record.turn === turn) this.record = { turn: null, texts: [], played: 0 };
+    // Nothing else is sounding: a pause held between sentences must not outlive the turn it held.
+    if ((playing || this.current === null) && this.paused) {
+      this.paused = false;
+      (this.options.output ?? speakers).resume();
+      this.release?.();
+    }
+    if (playing) {
+      this.playing = false;
+      this.current = null;
+      this.abort.abort();
+      this.abort = new AbortController();
+    }
+    this.emit();
+    // A queued turn's removal is silent while another turn is still sounding.
+    if (playing || this.current === null) this.tell({ turn, state: 'idle' });
   }
 
   private async pump(): Promise<void> {
     if (this.running) return;
     this.running = true;
     try {
-      for (let chunk = this.queue.shift(); chunk !== undefined; chunk = this.queue.shift()) {
+      for (;;) {
+        // Paused between sentences: the unplayed ones wait here, none is dropped.
+        if (this.paused) await this.gate;
+        const chunk = this.queue.shift();
+        if (chunk === undefined) break;
         this.playing = true;
+        this.current = chunk;
         this.emit();
+        this.sentence(chunk, 'started');
         try {
           const signal = this.abort.signal;
           await this.play(chunk, signal);
-          if (!signal.aborted) this.record.played += 1;
+          if (!signal.aborted) {
+            this.record.played += 1;
+            this.sentence(chunk, 'ended');
+          }
         } catch {
           // A sentence that cannot play is skipped; the next one still speaks.
         }
+        if (this.current === chunk) this.current = null;
       }
     } finally {
       this.running = false;
       this.playing = false;
       this.emit();
+      // Ran dry: nothing is left to say. A clear has already told the brain.
+      if (!this.idle) this.tell({ turn: this.lastTurn, state: 'idle' });
     }
+  }
+
+  private lastTurn = '';
+
+  private sentence(chunk: SpeechChunk, state: 'started' | 'ended'): void {
+    this.tell({ turn: chunk.turn, ...(chunk.n === undefined ? {} : { n: chunk.n }), state });
+  }
+
+  private tell(event: SpeechEvent): void {
+    this.idle = event.state === 'idle';
+    this.lastTurn = event.turn;
+    this.options.onSpeech(event);
   }
 
   private play(chunk: SpeechChunk, signal: AbortSignal): Promise<void> {
@@ -284,6 +370,16 @@ export class SpeechPlayer {
     this.last = next;
     this.options.onState(next);
   }
+}
+
+/** Does what the brain's `speech_control` says to the player. */
+export function applySpeechControl(
+  player: Pick<SpeechPlayer, 'pause' | 'resume' | 'clear'>,
+  control: SpeechControl,
+): void {
+  if (control.action === 'pause') player.pause();
+  else if (control.action === 'resume') player.resume();
+  else player.clear(control.turn);
 }
 
 /**

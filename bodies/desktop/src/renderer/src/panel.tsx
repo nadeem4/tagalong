@@ -13,7 +13,7 @@ import '@fontsource/onest/latin-400.css';
 import '@fontsource/onest/latin-600.css';
 import './app.css';
 import '../../shared/ipc';
-import { SpeechPlayer } from './voice-player';
+import { applySpeechControl, SpeechPlayer } from './voice-player';
 import { DEFAULT_TALK_KEY, panelSettings } from './panel-settings';
 import type { PanelSettings } from './panel-settings';
 import { useTalk } from './talk';
@@ -59,6 +59,7 @@ function Panel() {
         mouth: () => mouthRef.current,
         rate: () => speedRef.current,
         hush: () => void window.tagalongHost.hush(),
+        onSpeech: (event) => window.tagalongHost.speechState(event),
         onState: ({ speaking: now, answering: streaming }) => {
           setSpeaking(now);
           setAnswering(streaming);
@@ -95,7 +96,7 @@ function Panel() {
     answering,
     player,
     onBegin: () => {
-      player.stop();
+      player.cutOff();
       clearRemark();
     },
   });
@@ -110,7 +111,7 @@ function Panel() {
     () =>
       window.tagalongHost.onStopVoice(() => {
         hush();
-        player.stop();
+        player.cutOff();
       }),
     [player, hush],
   );
@@ -118,9 +119,12 @@ function Panel() {
   useEffect(() => {
     const offChunk = window.tagalongHost.onSpeechChunk((chunk) => player.enqueue(chunk));
     const offDone = window.tagalongHost.onSpeechDone((turn) => player.done(turn));
+    // The brain pauses, resumes or clears what is being said.
+    const offControl = window.tagalongHost.onSpeechControl((c) => applySpeechControl(player, c));
     return () => {
       offChunk();
       offDone();
+      offControl();
     };
   }, [player]);
   // Transparent around the bubble's rounded corners; the window itself is transparent.
@@ -268,7 +272,7 @@ function Panel() {
               holdMs={12_000}
               onDone={() => {
                 clearRemark();
-                player.stop();
+                player.cutOff();
                 void window.tagalongHost.hidePanel();
               }}
               onOpen={(text) => {
@@ -285,7 +289,7 @@ function Panel() {
               onOpenChat={() => setMode('chat')}
               onCollapse={() => setMode('bubble')}
               onClose={() => {
-                player.stop();
+                player.cutOff();
                 cancelTalk();
                 void window.tagalongHost.hidePanel();
               }}
@@ -295,7 +299,7 @@ function Panel() {
               speaking={speaking}
               onStopSpeaking={() => {
                 hush();
-                player.stop();
+                player.cutOff();
               }}
               {...(snapshot !== null ? { snapshot } : {})}
               {...(drop !== null ? { drop } : {})}

@@ -56,19 +56,20 @@ Request means a JSON-RPC request that gets a result or an error. Notification me
 
 ### Body → brain
 
-| Method     | Kind         | Params                                                                                        | Result                                                                |
-| ---------- | ------------ | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `hello`    | request      | `{ protocol, body: Body, tools: Tool[], last_seq? }`                                          | `{ protocol, session, tools: Tool[], seq, resync, version?, build? }` |
-| `tools`    | request      | `{ tools: Tool[] }`                                                                           | `{}`                                                                  |
-| `say`      | request      | `{ text?, parts?: Part[], context?, spoken?, voice?, speed?, interrupted?: { turn, heard } }` | `{ turn, joined }`                                                    |
-| `event`    | notification | `{ name, data? }`                                                                             |                                                                       |
-| `call`     | request      | `{ tool, input }`                                                                             | `{ output: Part[] }`                                                  |
-| `answer`   | request      | `{ ask, option, text?, apps? }`                                                               | `{}`                                                                  |
-| `cancel`   | notification | `{ turn }`                                                                                    |                                                                       |
-| `listen`   | request      | `{ mode: "held" \| "always" }`                                                                | `{}`                                                                  |
-| `mic`      | notification | `{ pcm }`                                                                                     |                                                                       |
-| `unlisten` | notification | `{}`                                                                                          |                                                                       |
-| `hush`     | notification | `{}`                                                                                          |                                                                       |
+| Method         | Kind         | Params                                                                                        | Result                                                                |
+| -------------- | ------------ | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `hello`        | request      | `{ protocol, body: Body, tools: Tool[], last_seq? }`                                          | `{ protocol, session, tools: Tool[], seq, resync, version?, build? }` |
+| `tools`        | request      | `{ tools: Tool[] }`                                                                           | `{}`                                                                  |
+| `say`          | request      | `{ text?, parts?: Part[], context?, spoken?, voice?, speed?, interrupted?: { turn, heard } }` | `{ turn, joined }`                                                    |
+| `event`        | notification | `{ name, data? }`                                                                             |                                                                       |
+| `call`         | request      | `{ tool, input }`                                                                             | `{ output: Part[] }`                                                  |
+| `answer`       | request      | `{ ask, option, text?, apps? }`                                                               | `{}`                                                                  |
+| `cancel`       | notification | `{ turn }`                                                                                    |                                                                       |
+| `listen`       | request      | `{ mode: "held" \| "always" }`                                                                | `{}`                                                                  |
+| `mic`          | notification | `{ pcm }`                                                                                     |                                                                       |
+| `unlisten`     | notification | `{}`                                                                                          |                                                                       |
+| `hush`         | notification | `{}`                                                                                          |                                                                       |
+| `speech_state` | notification | `{ turn, n?, state: "started" \| "ended" \| "paused" \| "idle" }` (no `seq`)                  |                                                                       |
 
 - **hello.** Opens the connection. `tools` are the body's tools. The result carries the brain's own tools (the ones a body may `call`; the Home tools, listed in the Home tools table of docs/brain.md), the shared `session` id, the latest `seq` in this body's outbox, and `resync` (see Replay). `version` and `build` are optional: the brain's own version and build id (the app version when packaged, a hash of its source in a dev checkout). The desktop compares them with its own to tell whether the brain is from an older version; a brain that omits them is treated as older. They add no version bump. A second `hello` on the same connection gets `invalid_request`.
 - **tools.** The body's tool list changed; it replaces the whole list.
@@ -80,19 +81,20 @@ Request means a JSON-RPC request that gets a result or an error. Notification me
 
 ### Brain → body
 
-| Method     | Kind         | Params                                                                                                                                                                  | Result               |
-| ---------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| `use`      | request      | `{ call, tool, input }`                                                                                                                                                 | `{ output: Part[] }` |
-| `cancel`   | notification | `{ call }`                                                                                                                                                              |                      |
-| `reply`    | notification | `{ seq, turn, body, delta }` or `{ seq, turn, body, done: true }`                                                                                                       |                      |
-| `turn`     | notification | `{ seq, turn, body, state: "started" \| "ended", reason?, started_by? }`                                                                                                |                      |
-| `tool`     | notification | `{ seq, turn, call, name, state: "started" \| "ended", ok?, summary? }`                                                                                                 |                      |
-| `ask`      | notification | `{ seq, id, state: "open", turn?, text, options: string[], confirm?, tool?, input?, free_text?, recommended? }` or `{ seq, id, state: "closed", reason, option?, by? }` |                      |
-| `changed`  | notification | `{ seq, what }`                                                                                                                                                         |                      |
-| `approved` | notification | `{ seq, tool, text, preference }`                                                                                                                                       |                      |
-| `heard`    | notification | `{ event: "speech_start" \| "partial" \| "final" \| "turn_end", text? }` (no `seq`)                                                                                     |                      |
-| `voice`    | notification | `{ status: "loading" \| "ready" \| "failed", message?, progress? }` (no `seq`)                                                                                          |                      |
-| `speech`   | notification | `{ turn, n?, text, pcm?, sample_rate? }` or `{ turn, done: true }` (no `seq`)                                                                                           |                      |
+| Method           | Kind         | Params                                                                                                                                                                  | Result               |
+| ---------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `use`            | request      | `{ call, tool, input }`                                                                                                                                                 | `{ output: Part[] }` |
+| `cancel`         | notification | `{ call }`                                                                                                                                                              |                      |
+| `reply`          | notification | `{ seq, turn, body, delta }` or `{ seq, turn, body, done: true }`                                                                                                       |                      |
+| `turn`           | notification | `{ seq, turn, body, state: "started" \| "ended", reason?, started_by? }`                                                                                                |                      |
+| `tool`           | notification | `{ seq, turn, call, name, state: "started" \| "ended", ok?, summary? }`                                                                                                 |                      |
+| `ask`            | notification | `{ seq, id, state: "open", turn?, text, options: string[], confirm?, tool?, input?, free_text?, recommended? }` or `{ seq, id, state: "closed", reason, option?, by? }` |                      |
+| `changed`        | notification | `{ seq, what }`                                                                                                                                                         |                      |
+| `approved`       | notification | `{ seq, tool, text, preference }`                                                                                                                                       |                      |
+| `heard`          | notification | `{ event: "speech_start" \| "partial" \| "final" \| "turn_end", text? }` (no `seq`)                                                                                     |                      |
+| `voice`          | notification | `{ status: "loading" \| "ready" \| "failed", message?, progress? }` (no `seq`)                                                                                          |                      |
+| `speech`         | notification | `{ turn, n?, text, pcm?, sample_rate? }` or `{ turn, done: true }` (no `seq`)                                                                                           |                      |
+| `speech_control` | notification | `{ action: "pause" \| "resume" \| "clear", turn? }` (no `seq`)                                                                                                          |                      |
 
 - **use.** Run one of this body's tools. `tool` is the plain name the body declared. On failure the body returns an error: `tool_failed`, `cancelled`, `timeout` or `invalid_params`.
 - **cancel.** Stop that `use`. The body answers the `use` with `cancelled`, or with its result if it had already finished.
@@ -105,13 +107,15 @@ Request means a JSON-RPC request that gets a result or an error. Notification me
 
 ## Voice
 
-The brain hears and speaks; a body only handles sound. Audio rides in the same JSON text frames as everything else (base64), so there is one frame type and no binary transport. The seven voice messages are live-only: they carry no `seq`, are never stored in the outbox and never replayed, and go only to the current connection, so a reconnect cannot bring back old audio.
+The brain hears and speaks; a body only handles sound. Audio rides in the same JSON text frames as everything else (base64), so there is one frame type and no binary transport. The nine voice messages are live-only: they carry no `seq`, are never stored in the outbox and never replayed, and go only to the current connection, so a reconnect cannot bring back old audio.
 
 - **pcm.** Base64 of little-endian int16 samples, mono. `mic.pcm` is 16 kHz; `speech.pcm` is at its `sample_rate`. A `mic` frame decodes to at most 64 KB (see Limits); an oversize or malformed frame is dropped silently, never answered.
 - **listen.** The body starts streaming its mic. `mode` is `held` (the user holds a key) or `always`. A new `listen` replaces the earlier one, from this body or any other: the brain keeps one listening session at a time. A brain without voice answers `method_not_found`; the body treats that as "voice unavailable" and falls back to typing and its own system voice.
 - **mic.** One audio frame. Frames from a body that has not sent `listen`, or that has sent `unlisten`, are dropped with no error.
 - **unlisten.** The mic closed. In `held` mode the brain finishes what it already has first. A disconnect counts as `unlisten`.
 - **hush.** The user cut Scout off: the brain stops speaking the current reply for this body. The text reply still shows.
+- **speech_state.** What the body's speaker is doing, so the brain knows whether Scout is talking. `started` and `ended` come once per sentence, with `n` the sentence's `speech.n`; `paused` when the speaker holds (the person talked over Scout, or `speech_control` said so); `idle` when it has nothing left to say or was cleared. After a `resume` the held sentence reports `started` again. `n` is absent on `paused` and `idle`. A brain that does not act on it ignores it.
+- **speech_control.** The brain asks the speaker to `pause` (hold where it is and keep the unplayed sentences), `resume` (carry on from the held sentence) or `clear` (drop the sentence playing and the queue; with `turn`, drop only that turn's sentences, playing or queued, and leave other turns to speak). Sent to the body that shows the turn. A body without a speaker ignores it. Unlike `hush`, `clear` is not the person cutting Scout off, so the body does not answer it with a `hush`.
 - **heard.** What the brain heard, sent to the listening body: `speech_start`, `partial` (running text), `final` (text of one stretch of speech), `turn_end` (the person finished). The body decides what to send as a spoken `say`.
 - **voice.** The state of the brain's listening models (the ears only), sent to the listening body. `loading` may carry `progress` (0 to 1) while models download, `failed` carries a plain `message`. The body keeps working while it loads or after it fails; the next `listen` retries.
 - **speech.** Scout's reply read aloud, sentence by sentence, sent to the body that shows the turn (`turn.body`). `n` numbers a turn's spoken sentences from 1 (absent on `done`). `pcm` and `sample_rate` come together; a `speech` with `text` and no `pcm` means "say this with your own voice" (used while the brain's voice loads or after it fails; the brain sends no `voice` frame for the speaking voice). `{ turn, done: true }` ends that turn's speech.
@@ -126,7 +130,7 @@ The brain hears and speaks; a body only handles sound. Audio rides in the same J
 
 ## Seq, outbox and replay
 
-- Every brain → body notification except `cancel` and the live-only voice notifications (`heard`, `voice`, `speech`) carries `seq`: an integer that rises by one per notification in that body's outbox, starting at 1. Bodies process notifications in `seq` order.
+- Every brain → body notification except `cancel` and the live-only voice notifications (`heard`, `voice`, `speech`, `speech_control`) carries `seq`: an integer that rises by one per notification in that body's outbox, starting at 1. Bodies process notifications in `seq` order.
 - The brain keeps an outbox per body id (the replay window in Limits). A body that reconnects sends `last_seq` in `hello`.
 - If every notification after `last_seq` is still in the outbox, the brain answers `hello` with `resync: false` and then sends them in order before anything new.
 - If some are gone (too old, too many, the brain restarted, or `last_seq` is higher than the brain's latest `seq`), the brain answers `resync: true`. The body drops what it was showing for open turns and asks. The brain then sends only what is still live: an `ask` (`open`) for every open ask and a `turn` (`started`) for every turn that has not ended. These are new notifications with fresh `seq` numbers after the one in the `hello` result.
@@ -168,7 +172,7 @@ JSON-RPC error objects: `{ code, message, data? }`. `message` is a plain sentenc
 
 - **`body`** (`{ id, kind, name }`): sent in hello as given; its id prefixes the client's request ids.
 - **`seqStore`** (`{ load(): Promise<number | null>, save(seq) }`): where the body keeps the last seq it saw, so a restart sends `last_seq`. Without it the client keeps `last_seq` in memory only. The browser keeps it in `chrome.storage.session`, which survives a worker restart but not a browser restart.
-- **Voice calls.** `listen(mode)` resolves when the brain accepts and rejects with its error (`method_not_found` when it has no voice). `mic(pcm: Int16Array)` returns whether the frame was sent, `unlisten()` and `hush()` are fire and forget; all are dropped while offline. `heard`, `voice` and `speech` reach `onNotification` without touching `last_seq`.
+- **Voice calls.** `listen(mode)` resolves when the brain accepts and rejects with its error (`method_not_found` when it has no voice). `mic(pcm: Int16Array)` returns whether the frame was sent, `unlisten()`, `hush()` and `speechState(params)` are fire and forget; all are dropped while offline. `heard`, `voice`, `speech` and `speech_control` reach `onNotification` without touching `last_seq`.
 - **`keepalive`** (`{ everyMs, tool }`): while online, the client calls one of the brain's own tools every `everyMs` so a sleepy host (a Chrome service worker) stays awake. The browser uses `{ everyMs: 20_000, tool: 'spend_today' }`.
 
 ## Examples

@@ -1,6 +1,12 @@
 /** Tests for the system-voice pick, and the speech player. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { pickSystemVoice, previewVoice, SpeechPlayer, speakWithSystem } from './voice-player';
+import {
+  applySpeechControl,
+  pickSystemVoice,
+  previewVoice,
+  SpeechPlayer,
+  speakWithSystem,
+} from './voice-player';
 
 const voice = (name: string, lang: string) => ({ name, lang });
 
@@ -57,14 +63,16 @@ function player(mouth: 'kokoro' | 'system' = 'kokoro') {
   const states: { speaking: boolean; answering: boolean }[] = [];
   const hush = vi.fn();
   const outputs: string[] = [];
+  const speech: { turn: string; n?: number; state: string }[] = [];
   const p = new SpeechPlayer({
     engines: fake.engines,
     mouth: () => mouth,
     output: { pause: () => void outputs.push('pause'), resume: () => void outputs.push('resume') },
     hush,
     onState: (state) => states.push(state),
+    onSpeech: (event) => speech.push(event),
   });
-  return { ...fake, p, states, hush, outputs };
+  return { ...fake, p, states, hush, outputs, speech };
 }
 
 describe('SpeechPlayer', () => {
@@ -99,12 +107,12 @@ describe('SpeechPlayer', () => {
     expect(played).toEqual(['system:Hi.']);
   });
 
-  it('stop silences the line, drops the rest, tells the brain, and ignores that turn’s late sentences', async () => {
+  it('cutOff silences the line, drops the rest, tells the brain, and ignores that turn’s late sentences', async () => {
     const { p, played, states, hush } = player();
     p.enqueue({ turn: 't1', text: 'One.', pcm: 'AA==', sampleRate: 24000 });
     p.enqueue({ turn: 't1', text: 'Two.', pcm: 'AA==', sampleRate: 24000 });
     await tick();
-    p.stop();
+    p.cutOff();
     await tick();
     expect(hush).toHaveBeenCalledOnce();
     expect(played).toEqual(['pcm@24000']);
@@ -151,7 +159,7 @@ describe('SpeechPlayer', () => {
       await tick();
       p.pause();
       expect(p.interruption()).toEqual({ turn: 't1', heard: 1 });
-      p.stop();
+      p.cutOff();
       await tick();
       expect(p.interruption()).toBeNull();
     });
@@ -173,12 +181,12 @@ describe('SpeechPlayer', () => {
       expect(p.text()).toBe('Fresh.');
     });
 
-    it('stop clears the pause so the next sentence plays', async () => {
+    it('cutOff clears the pause so the next sentence plays', async () => {
       const { p, outputs, played } = player();
       p.enqueue(sentence('t1', 1, 'One.'));
       await tick();
       p.pause();
-      p.stop();
+      p.cutOff();
       expect(outputs).toEqual(['pause', 'resume']);
       p.enqueue(sentence('t2', 1, 'Next.'));
       await tick();
@@ -189,6 +197,193 @@ describe('SpeechPlayer', () => {
     it('has nothing to report when nothing was spoken', () => {
       expect(player().p.interruption()).toBeNull();
     });
+  });
+  describe('pause, resume, clear and the states the brain hears', () => {
+    const sentence = (n: number) => ({
+      turn: 't1',
+      n,
+      text: `S${n}.`,
+      pcm: 'AA==',
+      sampleRate: 24000,
+    });
+
+    it('player emits started and ended per sentence, then idle when it runs dry', async () => {
+      const { p, finish, speech } = player();
+      p.enqueue(sentence(1));
+      p.enqueue(sentence(2));
+      await tick();
+      expect(speech).toEqual([{ turn: 't1', n: 1, state: 'started' }]);
+      finish();
+      await tick();
+      finish();
+      await tick();
+      expect(speech).toEqual([
+        { turn: 't1', n: 1, state: 'started' },
+        { turn: 't1', n: 1, state: 'ended' },
+        { turn: 't1', n: 2, state: 'started' },
+        { turn: 't1', n: 2, state: 'ended' },
+        { turn: 't1', state: 'idle' },
+      ]);
+    });
+
+    it('pause keeps unplayed sentences: none starts, none is lost', async () => {
+      const { p, played, finish, speech } = player();
+      p.enqueue(sentence(1));
+      p.enqueue(sentence(2));
+      p.enqueue(sentence(3));
+      await tick();
+      p.pause();
+      expect(speech.at(-1)).toEqual({ turn: 't1', state: 'paused' });
+      finish();
+      await tick();
+      expect(played).toHaveLength(1);
+      p.resume();
+      await tick();
+      expect(played).toHaveLength(2);
+      finish();
+      await tick();
+      expect(played).toHaveLength(3);
+    });
+
+    it('resume continues from the paused sentence without replaying it', async () => {
+      const { p, played, finish, outputs, speech } = player();
+      p.enqueue(sentence(1));
+      p.enqueue(sentence(2));
+      await tick();
+      p.pause();
+      p.resume();
+      expect(outputs).toEqual(['pause', 'resume']);
+      expect(played).toHaveLength(1);
+      expect(speech.at(-1)).toEqual({ turn: 't1', n: 1, state: 'started' });
+      finish();
+      await tick();
+      expect(played).toHaveLength(2);
+    });
+
+    it('clear drops the rest and says idle, without telling the brain to hush', async () => {
+      const { p, played, speech, hush, outputs } = player();
+      p.enqueue(sentence(1));
+      p.enqueue(sentence(2));
+      await tick();
+      p.pause();
+      p.clear();
+      await tick();
+      expect(hush).not.toHaveBeenCalled();
+      expect(outputs).toEqual(['pause', 'resume']);
+      expect(played).toHaveLength(1);
+      expect(speech.at(-1)).toEqual({ turn: 't1', state: 'idle' });
+      expect(p.interruption()).toBeNull();
+    });
+
+    it('a pause between sentences holds the next one that arrives until resume', async () => {
+      const { p, played, finish, speech } = player();
+      p.enqueue(sentence(1));
+      await tick();
+      finish();
+      await tick();
+      p.pause();
+      expect(speech.at(-1)).toEqual({ turn: 't1', state: 'paused' });
+      p.enqueue(sentence(2));
+      await tick();
+      expect(played).toHaveLength(1);
+      p.resume();
+      await tick();
+      expect(played).toHaveLength(2);
+    });
+
+    it('pause with nothing spoken or waiting does nothing and sends no state', () => {
+      const { p, outputs, speech } = player();
+      p.pause();
+      expect(outputs).toEqual([]);
+      expect(speech).toEqual([]);
+    });
+
+    it('a new turn’s sentence arriving while paused stays held and sends no state', async () => {
+      const { p, played, finish, speech } = player();
+      p.enqueue(sentence(1));
+      await tick();
+      p.pause();
+      const told = speech.length;
+      p.enqueue({ turn: 't2', n: 1, text: 'New.', pcm: 'AA==', sampleRate: 24000 });
+      await tick();
+      expect(speech).toHaveLength(told);
+      expect(played).toHaveLength(1);
+      p.resume();
+      finish();
+      await tick();
+      expect(played).toHaveLength(2);
+    });
+
+    it('clear of a queued turn drops only that turn and keeps the one playing', async () => {
+      const { p, played, finish, speech } = player();
+      p.enqueue(sentence(1));
+      p.enqueue({ turn: 't2', n: 1, text: 'Two.', pcm: 'AA==', sampleRate: 24000 });
+      await tick();
+      p.clear('t2');
+      p.enqueue({ turn: 't2', n: 2, text: 'Late.', pcm: 'AA==', sampleRate: 24000 });
+      finish();
+      await tick();
+      expect(played).toHaveLength(1);
+      expect(speech.some((e) => e.turn === 't2')).toBe(false);
+    });
+
+    it('clear of the playing turn leaves a queued other turn to speak', async () => {
+      const { p, played, speech } = player();
+      p.enqueue(sentence(1));
+      p.enqueue({ turn: 't2', n: 1, text: 'Two.', pcm: 'AA==', sampleRate: 24000 });
+      await tick();
+      p.clear('t1');
+      await tick();
+      expect(played).toHaveLength(2);
+      expect(speech).toContainEqual({ turn: 't1', state: 'idle' });
+      expect(speech).toContainEqual({ turn: 't2', n: 1, state: 'started' });
+    });
+
+    it('clear of a turn while paused between sentences lets the next turn speak', async () => {
+      const { p, played, finish } = player();
+      p.enqueue(sentence(1));
+      await tick();
+      finish();
+      await tick();
+      p.pause();
+      p.clear('t1');
+      p.enqueue({ turn: 't2', n: 1, text: 'Two.', pcm: 'AA==', sampleRate: 24000 });
+      await tick();
+      expect(played).toHaveLength(2);
+    });
+
+    it('a clear that races a sentence still playing says idle once', async () => {
+      const { p, finish, speech } = player();
+      p.enqueue(sentence(1));
+      await tick();
+      p.clear();
+      finish();
+      await tick();
+      expect(speech.filter((e) => e.state === 'idle')).toHaveLength(1);
+    });
+
+    it('clear of another turn leaves the playing one alone', async () => {
+      const { p, played } = player();
+      p.enqueue(sentence(1));
+      await tick();
+      p.clear('t9');
+      p.enqueue(sentence(2));
+      await tick();
+      expect(played).toHaveLength(1);
+      expect(p.speaking).toBe(true);
+    });
+  });
+});
+
+describe('applySpeechControl', () => {
+  it('maps each action to the player call, passing the turn to clear', () => {
+    const player = { pause: vi.fn(), resume: vi.fn(), clear: vi.fn() };
+    applySpeechControl(player, { action: 'pause' });
+    applySpeechControl(player, { action: 'resume' });
+    applySpeechControl(player, { action: 'clear', turn: 't1' });
+    expect(player.pause).toHaveBeenCalledOnce();
+    expect(player.resume).toHaveBeenCalledOnce();
+    expect(player.clear).toHaveBeenCalledWith('t1');
   });
 });
 

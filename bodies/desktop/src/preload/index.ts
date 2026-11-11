@@ -59,6 +59,7 @@ import type {
   ListeningState,
   SpeakSample,
   SpeechChunk,
+  SpeechControl,
   TagalongHostApi,
   VoiceModels,
 } from '../shared/ipc';
@@ -244,6 +245,12 @@ const host: TagalongHostApi = {
   speakSample: (text, voice, speed) =>
     ipcRenderer.invoke(IPC.speakSample, text, voice, speed) as Promise<SpeakSample | null>,
   hush: () => ipcRenderer.invoke(IPC.hush) as Promise<void>,
+  speechState: (event) => ipcRenderer.send(IPC.speechState, event),
+  onSpeechControl: (handler) => {
+    const listener = (_event: IpcRendererEvent, control: SpeechControl): void => handler(control);
+    ipcRenderer.on(IPC.speechControl, listener);
+    return () => void ipcRenderer.off(IPC.speechControl, listener);
+  },
   onSpeechChunk: (handler) => {
     const listener = (_event: IpcRendererEvent, chunk: SpeechChunk): void => handler(chunk);
     ipcRenderer.on(IPC.speechChunk, listener);

@@ -156,7 +156,7 @@ pairing or TLS yet (single user).
 4. **Voice.** A question asked by voice carries `spoken: true`, so the brain speaks the answer with
    Kokoro and sends `speech` frames. Main relays them as `IPC.speechChunk` and the panel's
    `SpeechPlayer` (`renderer/src/voice-player.ts`) plays them, or speaks a text-only frame with the
-   system voice. Stop sends `hush`. See [voice.md](voice.md).
+   system voice. Stop sends `hush`; the player reports `speech_state` and obeys `speech_control`. See [voice.md](voice.md).
 
 ## Boot and shutdown
 

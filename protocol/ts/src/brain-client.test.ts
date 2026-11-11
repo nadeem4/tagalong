@@ -773,6 +773,25 @@ describe('voice', () => {
     ]);
   });
 
+  it('speechState sends a live notification with no seq and is dropped while offline', async () => {
+    const offline = setup();
+    offline.client.start();
+    offline.client.speechState({ turn: 't1', n: 1, state: 'started' });
+    expect(offline.sockets[0]!.sent).toEqual([]);
+    const { client, s } = await online();
+    client.speechState({ turn: 't1', state: 'paused' });
+    expect(s.sent.slice(1)).toEqual([
+      { jsonrpc: '2.0', method: 'speech_state', params: { turn: 't1', state: 'paused' } },
+    ]);
+  });
+
+  it('passes speech_control to onNotification without touching last_seq', async () => {
+    const { s, notes } = await online();
+    s.receive({ jsonrpc: '2.0', method: 'speech_control', params: { action: 'pause' } });
+    s.receive({ jsonrpc: '2.0', method: 'speech_control', params: { action: 'stop' } });
+    expect(notes).toEqual([['speech_control', { action: 'pause' }]]);
+  });
+
   it('listen sends a request and resolves on the empty result', async () => {
     const { client, s } = await online();
     const p = client.listen('held');

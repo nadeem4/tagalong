@@ -95,6 +95,8 @@ export const IPC = {
   hush: 'tagalong:voice:hush',
   speechChunk: 'tagalong:voice:speech-chunk',
   speechDone: 'tagalong:voice:speech-done',
+  speechState: 'tagalong:voice:speech-state',
+  speechControl: 'tagalong:voice:speech-control',
   stopVoiceEvent: 'tagalong:voice:stop',
   talkEvent: 'tagalong:voice:talk',
   talkReleaseEvent: 'tagalong:voice:talk-release',
@@ -183,6 +185,19 @@ export interface EarsStatus {
   message?: string;
   /** 0..1 while a download runs. */
   progress?: number;
+}
+
+/** What the speaker is doing, as the brain's `speech_state` has it. */
+export interface SpeechEvent {
+  turn: string;
+  n?: number;
+  state: 'started' | 'ended' | 'paused' | 'idle';
+}
+
+/** The brain's `speech_control`: hold, carry on, or drop Scout's speech (one turn's, if named). */
+export interface SpeechControl {
+  action: 'pause' | 'resume' | 'clear';
+  turn?: string;
 }
 
 /** One sentence of Scout's spoken reply, from the brain: audio (24 kHz int16, base64) or only text. */
@@ -327,6 +342,10 @@ export interface TagalongHostApi {
   speakSample(text: string, voice: string, speed: number): Promise<SpeakSample | null>;
   /** Scout stops speaking at once: tells the brain too. */
   hush(): Promise<void>;
+  /** The player started or ended a sentence, paused, or went idle: told to the brain. */
+  speechState(event: SpeechEvent): void;
+  /** The brain holds, resumes or clears Scout's speech. */
+  onSpeechControl(handler: (control: SpeechControl) => void): () => void;
   /** One sentence of a spoken reply, from the brain. */
   onSpeechChunk(handler: (chunk: SpeechChunk) => void): () => void;
   /** The brain has no more to say for this turn. */
