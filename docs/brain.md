@@ -1042,7 +1042,7 @@ words what the person reads (guidance in `mind/soul.md`).
   `percent`) plus `changed {what: "setup"}`, and one waking `setup_done` event when it ends:
   `expert`, `ok`, and either `installed` (the expert as JSON) or `error` and `detail`. A waking
   `setup_done` or `setup_login` is saved as a `setup` open item (`setup/events.py`) until Scout's
-  wake turn has finished, so a restart, a cancelled turn or a budget-dropped wake does not lose it; at start the saved
+  wake turn has ended, so a restart or a budget-dropped wake does not lose it (a cancelled wake turn still ends it); at start the saved
   ones are sent again, and a newer event for the same expert or app replaces the older. Brain
   shutdown cancels running installs, each of which cleans up what it staged.
   An `npx` entry runs `npm install --prefix tools/<id>.part <package>@<version>` (the card shows that same version; an unpinned package gets the entry's) with a system

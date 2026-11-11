@@ -1,8 +1,8 @@
 """Setup events that wake Scout (an install or a login finished) saved as `setup` open items.
 
-The item stays open until Scout's wake turn has finished, so a restart, a cancelled turn, or a
-wake dropped because the budget was spent, no longer loses the news: `resume` sends the saved
-ones again at start. A newer event for the same expert or app replaces the saved one.
+The item stays open until Scout's wake turn has ended, so a restart or a wake dropped because
+the budget was spent no longer loses the news: `resume` sends the saved ones again at start.
+A cancelled wake turn still ends it (F11 keeps news through a cancel). A newer event for the same expert or app replaces the saved one.
 """
 
 from collections.abc import Callable
