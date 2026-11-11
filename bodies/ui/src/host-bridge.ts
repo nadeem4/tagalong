@@ -194,6 +194,23 @@ export interface BrainLink {
   setup: 'idle' | 'installing' | 'failed';
 }
 
+/** Scout's brain card on Home: the brain's own facts, or what the desktop knows while it is offline. */
+export interface BrainCard {
+  status: 'running' | 'offline';
+  /** Ready: the brain is older than the app and can be restarted here. Terminal: the person started it. */
+  update: 'none' | 'ready' | 'terminal';
+  version: string | null;
+  /** ISO, UTC. */
+  startedAt: string | null;
+  startedBy: 'desktop' | 'person' | null;
+  addr: string;
+  pid: number | null;
+  dataDir: string;
+  logPath: string;
+  places: { id: string; kind: string; name: string }[];
+  workRunning: boolean;
+}
+
 export interface AskInput {
   petId: string;
   /** The conversation to continue. Absent opens a new one; turn.started reports its id. */
@@ -369,6 +386,16 @@ export interface HostBridge {
   brainLink(): Promise<BrainLink>;
   /** Runs the first-run install again after it failed. */
   retryBrainSetup(): Promise<void>;
+  /** Scout's brain card: version, who started it, where it keeps things, who is connected. */
+  brainCard(): Promise<BrainCard>;
+  /** Stops the brain and starts it again; rejects for a brain the person started. */
+  restartBrain(): Promise<void>;
+  /** Restarts the brain once no job is running. */
+  restartBrainAfterWork(): Promise<void>;
+  openBrainFolder(): Promise<void>;
+  openBrainLog(): Promise<void>;
+  /** Copies version, build, process id, address, data folder and who started it. */
+  copyBrainDetails(): Promise<void>;
   /**
    * The brain changed something Home shows (`memory`, `permissions`; `link` when the connection
    * to the brain goes up or down): read it again. Returns an

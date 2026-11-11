@@ -41,7 +41,7 @@ export interface LaunchOptions {
 }
 
 /** The brain's own data folder rule (config.py): TAGALONG_HOME, else ~/.tagalong. */
-function dataDir(env: NodeJS.ProcessEnv, home: string): string {
+export function dataDir(env: NodeJS.ProcessEnv, home: string): string {
   return env.TAGALONG_HOME || join(home, '.tagalong');
 }
 
@@ -101,14 +101,25 @@ export interface RealLaunch {
   env?: NodeJS.ProcessEnv;
 }
 
-export function realLaunch({
-  brainDir,
-  packaged,
-  appVersion,
-  onSetup = () => undefined,
-  env: base = process.env,
-}: RealLaunch): Promise<void> {
-  const env = packaged ? packagedEnv(base, homedir(), appVersion) : base;
+/** The env the brain runs with: the packaged one carries uv's folders and the build id. */
+function brainEnv({ packaged, appVersion, env = process.env }: RealLaunch): NodeJS.ProcessEnv {
+  return packaged ? packagedEnv(env, homedir(), appVersion) : env;
+}
+
+/** `stopBrain` with the app's real spawn and the same env the launch used. */
+export function realStop(real: RealLaunch): Promise<boolean> {
+  return stopBrain({
+    env: brainEnv(real),
+    brainDir: real.brainDir,
+    uv: real.packaged?.uv ?? 'uv',
+    sync: real.packaged !== undefined,
+    spawn: nodeSpawn,
+  });
+}
+
+export function realLaunch(real: RealLaunch): Promise<void> {
+  const { brainDir, packaged, onSetup = () => undefined } = real;
+  const env = brainEnv(real);
   return launchBrain({
     env,
     brainDir,

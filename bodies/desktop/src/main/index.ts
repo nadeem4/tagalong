@@ -9,7 +9,17 @@ import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { IpcMainInvokeEvent } from 'electron';
-import { BrowserWindow, Menu, Tray, app, dialog, ipcMain, powerMonitor, shell } from 'electron';
+import {
+  BrowserWindow,
+  Menu,
+  Tray,
+  app,
+  clipboard,
+  dialog,
+  ipcMain,
+  powerMonitor,
+  shell,
+} from 'electron';
 import { ContextSnapshot } from '@tagalong/ui/shapes';
 import { TALK_KEY_LABELS, TALK_KEY_RIGHT_CTRL } from '../shared/settings';
 import type { Settings } from '../shared/settings';
@@ -28,7 +38,15 @@ import { captureActiveWindow, captureAskSnapshot } from './context';
 import type { TurnEvent } from '@tagalong/ui/shapes';
 import { createTurnEvents } from './brain/turn-events';
 import { startBrain } from './brain/start';
-import { realLaunch } from './brain/launch';
+import { homedir } from 'node:os';
+import { ownBuild } from './brain/build-id';
+import {
+  brainLogPath,
+  dataDir as brainDataDir,
+  realLaunch,
+  realStop,
+} from './brain/launch';
+import type { RealLaunch } from './brain/launch';
 import { saveAvatarSpot } from './avatar-spot';
 import { offlineWatch } from './brain/offline-watch';
 import {
@@ -80,6 +98,8 @@ import { registerMemoryIpc } from './ipc/memory';
 import { registerApprovalsIpc } from './ipc/approvals';
 import { registerJobsIpc } from './ipc/jobs';
 import { createBrainSetup, registerBrainLinkIpc } from './ipc/brain-link';
+import { createBrainStatus, registerBrainStatusIpc } from './ipc/brain-status';
+import type { BrainStatusControl } from './ipc/brain-status';
 import { registerBodiesIpc } from './ipc/bodies';
 import { registerLoopsIpc } from './ipc/loops';
 import { registerTimersIpc } from './ipc/timers';
@@ -139,22 +159,23 @@ let desktop: Desktop | null = null;
 /** The brain link as last reported, for the ask handler's choice of words. */
 let brainStatus: BrainStatus = 'connecting';
 /** Starts the brain (installing it first when packaged) and holds the setup state Home shows. */
+const brainRun = (): RealLaunch => ({
+  brainDir: app.isPackaged
+    ? join(process.resourcesPath, 'brain')
+    : resolve(app.getAppPath(), '..', '..', 'brain'),
+  packaged: app.isPackaged ? { uv: join(process.resourcesPath, 'uv', 'uv.exe') } : undefined,
+  appVersion: app.getVersion(),
+});
 const brainSetup = createBrainSetup(
-  (onSetup) =>
-    realLaunch({
-      brainDir: app.isPackaged
-        ? join(process.resourcesPath, 'brain')
-        : resolve(app.getAppPath(), '..', '..', 'brain'),
-      packaged: app.isPackaged ? { uv: join(process.resourcesPath, 'uv', 'uv.exe') } : undefined,
-      appVersion: app.getVersion(),
-      onSetup,
-    }),
+  (onSetup) => realLaunch({ ...brainRun(), onSetup }),
   () => {
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send(IPC.brainChangedEvent, 'link');
     }
   },
 );
+/** Scout's brain card and the version check; set once the brain client exists. */
+let brainControl: BrainStatusControl | null = null;
 /** Makes a wake turn the person spoke into visible; start() points it at the turn mapper. */
 let claimTurn: (turnId: string) => void = () => undefined;
 /** The confirm cards still open, for a window that opened after their ask arrived. */
@@ -288,6 +309,8 @@ async function start(): Promise<void> {
         const { what } = params as { what: string };
         forwardConnectionsChanged(what, forwardToRenderers);
         if (what === 'key') void refreshKeyMark();
+        // A job moved: a restart waiting for the running work to finish may go now.
+        if (what === 'jobs') void brainControl?.jobsChanged();
         for (const window of BrowserWindow.getAllWindows()) {
           if (!window.isDestroyed()) window.webContents.send(IPC.brainChangedEvent, what);
         }
@@ -308,6 +331,8 @@ async function start(): Promise<void> {
       turnEvents.map(method, params).forEach(forwardTurn);
     },
     onResync: () => turnEvents.resync().forEach(forwardTurn),
+    // Every hello names the brain's version and build: an older one is restarted or flagged.
+    onHello: (hello) => void brainControl?.check(hello),
     onStatus: (status) => {
       brainStatus = status;
       markBrainLink(statusMarks, status);
@@ -322,6 +347,30 @@ async function start(): Promise<void> {
       }
       watchOffline(status);
       // Home's "Where things run" shows the link; it reads it again when it changes.
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) window.webContents.send(IPC.brainChangedEvent, 'link');
+      }
+    },
+  });
+
+  const run = brainRun();
+  brainControl = createBrainStatus({
+    brain,
+    ours: ownBuild({
+      packaged: run.packaged !== undefined,
+      appVersion: run.appVersion,
+      brainDir: run.brainDir,
+    }),
+    fallback: {
+      dataDir: brainDataDir(process.env, homedir()),
+      logPath: brainLogPath(process.env, homedir()),
+    },
+    stop: () => realStop(run),
+    relaunch: () => brainSetup.retry(),
+    openPath: async (path) => void (await shell.openPath(path)),
+    copy: (text) => clipboard.writeText(text),
+    log: (line) => console.warn(line),
+    onChange: () => {
       for (const window of BrowserWindow.getAllWindows()) {
         if (!window.isDestroyed()) window.webContents.send(IPC.brainChangedEvent, 'link');
       }
@@ -932,6 +981,7 @@ function registerIpc(): void {
   registerJobsIpc(handle, { brain: required().brain });
   registerApprovalsIpc(handle, { brain: required().brain });
   registerBrainLinkIpc(handle, { brain: required().brain, setup: brainSetup });
+  if (brainControl !== null) registerBrainStatusIpc(handle, brainControl);
   registerSettingsIpc(handle, {
     settingsStore: () => required().settingsStore,
     problem: () => {

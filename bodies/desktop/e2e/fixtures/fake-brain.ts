@@ -33,6 +33,10 @@ export interface FakeBrainOptions {
   environment?: boolean;
   /** Listen here instead of on a free port, so a spec can start the brain after the app. */
   port?: number;
+  /** What hello says of the brain's version and build (default: nothing, like an old brain). */
+  hello?: { version: string; build: string };
+  /** The `brain_status` answer (snake_case, as the real tool); absent: the tool is unknown, as on an old brain. */
+  brainStatus?: Record<string, unknown>;
 }
 
 export interface FakeBrain {
@@ -477,7 +481,14 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         notify('reply', { ...base, done: true });
         notify('turn', { ...base, state: 'ended', reason: 'done' });
       } else if (msg.method === 'hello') {
-        const result = { protocol: 1, session: 's1', tools: [], seq, resync: false };
+        const result = {
+          protocol: 1,
+          session: 's1',
+          tools: [],
+          seq,
+          resync: false,
+          ...options.hello,
+        };
         socket.send(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result }));
       } else if (msg.method === 'listen') {
         mode = String(msg.params?.mode);
@@ -777,6 +788,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           const at = preferences.findIndex((p) => p.id === params.input?.id);
           if (at >= 0) preferences.splice(at, 1);
           notify('changed', { what: 'approvals' });
+        } else if (params.tool === 'brain_status' && options.brainStatus !== undefined) {
+          value = options.brainStatus;
         } else if (params.tool === 'reading_status') value = { rows: readingRows };
         else if (params.tool === 'timers_state') value = { timers };
         else if (params.tool === 'timer_cancel') {

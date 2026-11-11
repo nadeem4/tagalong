@@ -4,6 +4,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Tool } from './shapes.js';
+import type { HelloResult } from './messages.js';
 import {
   BrainClient,
   BrainOffline,
@@ -123,7 +124,7 @@ describe('BrainClient', () => {
   });
 
   it('calls onHello with the hello result', async () => {
-    const hellos: { version?: string; build?: string }[] = [];
+    const hellos: HelloResult[] = [];
     const ctx = setup(undefined, { onHello: (r) => hellos.push(r) });
     ctx.client.start();
     const s = ctx.sockets[0]!;
@@ -147,7 +148,7 @@ describe('BrainClient', () => {
   });
 
   it('an old brain without version still connects', async () => {
-    const hellos: { version?: string; build?: string }[] = [];
+    const hellos: HelloResult[] = [];
     const { statuses } = await online(undefined, { onHello: (r) => hellos.push(r) });
     expect(statuses.at(-1)).toBe('online');
     expect(hellos).toHaveLength(1);
