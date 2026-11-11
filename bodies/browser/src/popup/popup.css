@@ -28,7 +28,8 @@ body {
   margin: 0;
   padding: 16px;
   font:
-    14px/1.5 system-ui,
+    14px/21px 'Onest',
+    system-ui,
     sans-serif;
   color: var(--text);
   background: var(--bg);
@@ -36,11 +37,13 @@ body {
 h1 {
   margin: 0 0 4px;
   font-size: 16px;
+  line-height: 22px;
   font-weight: 600;
 }
 h2 {
   margin: 16px 0 4px;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 21px;
   font-weight: 600;
 }
 p {
@@ -52,16 +55,19 @@ p {
 .muted {
   color: var(--muted);
   font-size: 13px;
+  line-height: 20px;
 }
 .error {
   color: var(--err);
   font-size: 13px;
+  line-height: 20px;
   margin-top: -8px;
 }
 label {
   display: block;
   margin-bottom: 4px;
   font-size: 13px;
+  line-height: 20px;
   color: var(--muted);
 }
 input {
@@ -91,10 +97,14 @@ input {
 .grants button {
   font: inherit;
   font-size: 13px;
+  line-height: 20px;
   color: var(--link);
   background: none;
   border: 0;
   cursor: pointer;
+}
+button {
+  font: inherit;
 }
 #mic {
   margin: 4px 0 4px;

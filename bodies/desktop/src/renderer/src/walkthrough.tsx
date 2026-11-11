@@ -6,12 +6,9 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HostBridgeProvider, Walkthrough } from '@tagalong/ui';
 import type { WalkthroughHost } from '@tagalong/ui';
-// Bundled, not fetched: the same two typefaces as Home, Latin subset only.
+// Bundled, not fetched: the same typeface as Home, Latin subset only.
 import '@fontsource/onest/latin-400.css';
 import '@fontsource/onest/latin-600.css';
-import '@fontsource/pixelify-sans/latin-400.css';
-import '@fontsource/pixelify-sans/latin-600.css';
-import '@fontsource/pixelify-sans/latin-700.css';
 import '../../shared/ipc';
 import type { SettingsPatch } from '../../shared/settings';
 import { FIGURE } from './bean-assets';

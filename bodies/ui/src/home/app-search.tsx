@@ -95,7 +95,7 @@ export function AppSearch({
 
       {!typing && popular.length > 0 && (
         <section aria-label="Popular">
-          <h3 className="home-card__label">POPULAR</h3>
+          <h3 className="home-card__label">Popular</h3>
           <ul className="home-list home-conns__list">
             {popular.map((app) => (
               <AppGroupRow

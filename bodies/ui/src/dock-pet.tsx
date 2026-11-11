@@ -191,9 +191,9 @@ export function DockPet({
             background: tag.color,
             color: t.color.goldInk,
             fontFamily: t.font.ui,
-            fontSize: 9,
-            lineHeight: '11px',
-            fontWeight: 600,
+            fontSize: t.dockTag,
+            lineHeight: `${t.dockTag + 2}px`,
+            fontWeight: t.fontWeight.semibold,
             whiteSpace: 'nowrap',
           }}
         >
@@ -212,8 +212,9 @@ export function DockPet({
             borderRadius: 999,
             background: '#6B7290',
             color: t.color.text,
-            fontSize: 11,
-            fontWeight: 600,
+            fontSize: t.type.caption.size,
+            lineHeight: `${t.type.caption.line}px`,
+            fontWeight: t.fontWeight.semibold,
           }}
         >
           Paused

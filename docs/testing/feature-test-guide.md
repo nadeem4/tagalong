@@ -2231,14 +2231,14 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
    Gmail), asked once per job. A saved app that is not signed in reads "Finish Gmail in Home.", not
    connected. A job whose app the registry lacks shows no button. Steps 1 to 6 never say "Claude
    Code" until the expert line is opened. Home's **Connections** page lists experts
-   under **FOR LONG JOBS**, each led by the kind of job ("Fix code and other long jobs") with the
+   under **For long jobs**, each led by the kind of job ("Fix code and other long jobs") with the
    product and version underneath.
    Then press the quiet line **For long jobs, Scout can also use an expert**: Claude Code's card and
    the hand-off preview open. Press **Set up Claude Code**. **Expected:** the stage words move on
    (checking, Node, installing), then "Claude Code is set up." With the login missing the button
    reads **Log in to Claude Code**; pressing it opens the login window and the card then says "Finish logging in in the window that opened." until the login ends, then it reads "Claude Code is set up." by itself (already logged in: it goes straight to set up); with the brain stopped the card says it can't check and
-   offers **Check again**. The opened line shows a hand-off card. On Home's **Connections** page the **FOR LONG JOBS** card lists Claude Code with its
-   state; the **Experts** tab's **ADD AN EXPERT** offers more (an Official one has **Add** and opens an Allow card first; a community one shows the check card first, and **Connect anyway** is that approval, so it opens no further Allow card) (Log in on a Claude Code you already logged into elsewhere opens no card: it says "Already logged in." and the chip turns ready).
+   offers **Check again**. The opened line shows a hand-off card. On Home's **Connections** page the **For long jobs** card lists Claude Code with its
+   state; the **Experts** tab's **Add an expert** offers more (an Official one has **Add** and opens an Allow card first; a community one shows the check card first, and **Connect anyway** is that approval, so it opens no further Allow card) (Log in on a Claude Code you already logged into elsewhere opens no card: it says "Already logged in." and the chip turns ready).
 2. **Action:** on step 7 press **Copy chrome://extensions**, paste it somewhere; press **Show
    folder** and **Copy folder path**. **Expected:** the address and the add-on folder path are
    what you pasted; the folder opens.
@@ -2516,6 +2516,12 @@ button`; a tap on a closed, unknown or refused ask replies `That question is clo
 3. Press **Connect** on a community version. **Expected:** the check card opens (maker, where it runs, sign-in, licence, "Reviewed: Not yet audited by anyone", **See its code**, which opens your own browser); **Back** closes it and connects nothing. **Connect anyway** connects it.
 4. Clear the box. **Expected:** a **Popular** row (the curated apps only; see D2 below). Disconnect from the network and search: one plain line says Scout could not reach the registry.
 5. Settings > **Where Scout looks for apps** lists the two registries, read only. Home > Jobs now holds the **Read my mail for loops** card.
+
+## One type system on Onest (D3)
+
+1. Automated: `cd bodies/ui && pnpm exec vitest run src/type-audit.test.ts src/theme/tokens.test.ts src/wordmark.test.ts` (every size on one of seven roles, weights 400 or 600, no capitals, no letter spacing, no pixel font); `cd bodies/browser && pnpm exec vitest run src/popup/popup-font.test.ts`; `cd bodies/desktop && pnpm exec playwright test e2e/smoke.spec.ts` (Onest 400 and 600 load, nothing is bundled as Pixelify Sans).
+2. By hand, open Home, Settings, the bubble, the tour and the browser popup. **Expected:** one typeface everywhere; card headings and labels read "Permissions", "Spend", "Read my mail for loops" in sentence case, never in capitals; money and counts line up their digits.
+3. Tab through Home on a light page and through the nav. **Expected:** the focus ring is navy on the light page and gold only on the navy side menu.
 
 ## Setup fixes: curated lists, installable experts, kept trust (D2)
 

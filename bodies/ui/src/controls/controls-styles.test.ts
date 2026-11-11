@@ -15,7 +15,7 @@ describe('CONTROLS_CSS', () => {
 
   it('sets no text below the 11px floor', () => {
     const sizes = [...CONTROLS_CSS.matchAll(/font-size:\s*(\d+)px/g)].map((m) => Number(m[1]));
-    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(t.fontSize.min);
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(t.type.caption.size);
   });
 
   it('takes every colour from the design tokens', () => {

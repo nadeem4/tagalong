@@ -118,7 +118,7 @@ its result.
 - Voice: **warm and playful**. A companion with personality, friendly and a little fun, never
   childish. Anything about privacy, keys, cost or errors stays plain and exact.
 - Look: Scout is **Bean**, a soft clay-like 3D figure, moving on the dock and still everywhere else;
-  pixel type for names and titles. No logo yet.
+  Onest at 600 for names and titles. No logo yet.
 
 ## Evidence on Hand
 
