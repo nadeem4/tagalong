@@ -26,6 +26,8 @@ ACP_URL = "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json"
 MCP_BASE = "https://registry.modelcontextprotocol.io/v0.1/servers"
 MCP_URL = f"{MCP_BASE}?limit=30&version=latest"
 TTL_S = 86400
+# Gemini CLI: Google refuses it for personal accounts, so signing in never works.
+_NOT_OFFERED = frozenset({"gemini"})
 _LATEST = "io.modelcontextprotocol.registry/official"
 
 Kind = Literal["npx", "uvx", "binary", "remote"]
@@ -215,7 +217,8 @@ class Registry:
 
     async def acp_agents(self, refresh: bool = False) -> Listing:
         data, stale, at = await self._load("acp", ACP_URL, refresh)
-        return Listing(_parse(data.get("agents"), _acp_entry), stale, _iso(at))
+        entries = [e for e in _parse(data.get("agents"), _acp_entry) if e.id not in _NOT_OFFERED]
+        return Listing(entries, stale, _iso(at))
 
     async def mcp_servers(
         self, query: str | None, refresh: bool = False, cursor: str | None = None

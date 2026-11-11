@@ -157,7 +157,7 @@ The saved chat, so a restart picks the conversation back up.
 
 - Written by: `store/conversation.py` `save_messages`, `replace_last_message` (through `Memory`,
   called from `sessions.py`).
-- Read by: `store/conversation.py` `load_messages` (skips `cut` rows; via `mind/resume.py` `rebuild_history`) and `search`.
+- Read by: `store/conversation.py` `load_messages` (skips `cut` rows; via `mind/resume.py` `rebuild_history`, which also says whether it added a cancelled tool_result) and `search`.
 - Retention: kept forever.
 - Upgrade: migration `0026_message_body` adds `body`; every old row reads `desktop`.
 - Upgrade: migration `0027_message_cut` adds `cut` (0 or 1): a request cancelled before any

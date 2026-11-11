@@ -63,6 +63,10 @@ class Open:
 NO_WAIT = {"job_ended": EventKind("job_ended", batch_seconds=0, max_per_hour=10)}
 
 
+def rebuild(messages):
+    return rebuild_history(messages)[0]
+
+
 def make(model, memory=None, kinds=NO_WAIT, now=None, bodies=None, masker=None):
     sent = []
     bodies = bodies or Bodies()
@@ -570,7 +574,7 @@ async def test_cancelled_reply_stays_answered_after_restart(tmp_path):
     session.cancel(first.turn)
     await finish_quietly(session)
     assert [m["role"] for m in memory.load_messages()] == ["user", "assistant"]
-    assert rebuild_history(memory.load_messages())[-1]["content"][0]["text"] == "Once upon"
+    assert rebuild(memory.load_messages())[-1]["content"][0]["text"] == "Once upon"
     session.say("desktop", say("hi in 3 words"))
     await finish_quietly(session)
     assert [m["role"] for m in model.seen[1]] == ["user", "assistant", "user"]
@@ -828,7 +832,7 @@ async def test_nested_structural_names_in_tool_input_are_masked(tmp_path):
     assert saved[1]["content"][0]["id"] == "t1"
 
 
-async def test_thinking_only_message_saves_a_placeholder_and_resumes(tmp_path):
+async def test_thinking_only_message_saves_empty_and_resumes_without_withheld(tmp_path):
     turn = Final(
         [{"type": "thinking", "thinking": f"key {SECRET}", "signature": "s"}],
         "end_turn",
@@ -839,9 +843,9 @@ async def test_thinking_only_message_saves_a_placeholder_and_resumes(tmp_path):
     session.say("desktop", say("hi"))
     await finish_quietly(session)
     saved = memory.load_messages()
-    assert saved[-1]["content"] == [{"type": "text", "text": "[withheld]"}]
+    assert saved[-1]["content"] == []
     resumed, _ = make(Gate(["ok"]), memory, masker=secret_masker())
-    assert resumed.history[-1]["content"]
+    assert "[withheld]" not in json.dumps(resumed.history)
 
 
 async def test_restarts_after_a_thinking_reply_do_not_save_it_twice(tmp_path):
@@ -1019,7 +1023,7 @@ async def test_cancelled_result_added_on_resume_is_stored(tmp_path):
     session, _ = make(Gate(["one"]), memory)
     session.say("desktop", say("b"))
     await finish_quietly(session)
-    rebuilt = rebuild_history(file_memory(tmp_path).load_messages())
+    rebuilt = rebuild(file_memory(tmp_path).load_messages())
     for i, m in enumerate(rebuilt):
         if m["role"] == "assistant" and isinstance(m["content"], list):
             ids = [b["id"] for b in m["content"] if b.get("type") == "tool_use"]
@@ -1128,7 +1132,7 @@ async def test_wake_held_while_busy_runs_after_the_turn_ends():
     assert states(sent) == ["started", "ended", "started", "ended"]
     assert "Event: job_ended" in model.seen[-1][-1]["content"][-1]["text"]
     assert records_for(memory).get_job("j1").parts[-1].reported
-    assert rebuild_history(memory.load_messages()) == session.history
+    assert rebuild(memory.load_messages()) == session.history
 
 
 async def test_wake_goes_to_the_body_the_user_last_talked_to():
@@ -3211,3 +3215,25 @@ async def test_a_say_joining_a_whatsapp_turn_keeps_every_row_whatsapp():
     assert session.say("desktop", say("also")).joined is True
     await finish(session)
     assert _saved_bodies(session) == ["whatsapp"]
+
+
+async def test_silent_reply_after_a_tool_round_resumes_without_a_duplicate_tool_result(tmp_path):
+    memory = file_memory(tmp_path)
+    use = {"type": "tool_use", "id": "t1", "name": "recall", "input": {}}
+    result = {"type": "tool_result", "tool_use_id": "t1", "content": "found"}
+    memory.save_messages(
+        [
+            {"role": "user", "content": [{"type": "text", "text": "q"}]},
+            {"role": "assistant", "content": [use]},
+            {"role": "user", "content": [result]},
+            {"role": "assistant", "content": []},  # a silent reply after the tool round
+        ]
+    )
+    session, _ = make(Gate(["ok"]), memory)
+    session.say("desktop", say("next"))
+    await finish_quietly(session)
+    saved = memory.load_messages()
+    ids = [b["tool_use_id"] for m in saved for b in m["content"] if b.get("type") == "tool_result"]
+    assert ids == ["t1"]
+    resumed, _ = make(Gate(["ok"]), memory)
+    assert [m["role"] for m in resumed.history][-2:] == ["user", "assistant"]

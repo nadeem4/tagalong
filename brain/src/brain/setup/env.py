@@ -15,13 +15,6 @@ _KEYS = {
         "CLAUDE_CODE_USE_VERTEX",
     ),
     "codex-acp": ("CODEX_API_KEY", "OPENAI_API_KEY"),
-    "gemini": (
-        "GEMINI_API_KEY",
-        "GOOGLE_API_KEY",
-        "GOOGLE_GENAI_USE_VERTEXAI",
-        "GOOGLE_APPLICATION_CREDENTIALS",
-        "GOOGLE_CLOUD_PROJECT",
-    ),
 }
 # Every expert loses this pair: Anthropic keys in our environment are never an expert's to use.
 _ANTHROPIC_PAIR = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")

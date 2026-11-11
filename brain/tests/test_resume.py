@@ -8,6 +8,10 @@ from brain.masking import WITHHELD
 from brain.mind.resume import RESUME_MAX_MESSAGES, rebuild_history
 
 
+def rebuild(messages):
+    return rebuild_history(messages)[0]
+
+
 def test_orphaned_server_result_blocks_are_dropped_on_resume():
     poisoned = {
         "role": "assistant",
@@ -21,7 +25,7 @@ def test_orphaned_server_result_blocks_are_dropped_on_resume():
             {"type": "tool_search_tool_result", "tool_use_id": "srvtoolu_02", "content": {}},
         ],
     }
-    history = rebuild_history([u("q"), poisoned, u("next")])
+    history = rebuild([u("q"), poisoned, u("next")])
     assert history[1]["content"] == [{"type": "text", "text": "Found it."}]
 
 
@@ -30,9 +34,9 @@ def test_an_assistant_message_emptied_by_stripping_keeps_alternation_valid():
         "role": "assistant",
         "content": [{"type": "code_execution_tool_result", "tool_use_id": "s", "content": {}}],
     }
-    history = rebuild_history([u("q"), only, u("next")])
+    history = rebuild([u("q0"), a("r0"), u("q"), only, u("next")])
     assert [m["role"] for m in history] == ["user", "assistant", "user"]
-    assert history[1]["content"] == [{"type": "text", "text": WITHHELD}]
+    assert WITHHELD not in str(history)  # the silent reply goes with the message it answered
 
 
 def test_resume_strips_citations_and_mcp_tool_use_like_the_save_path():
@@ -42,7 +46,7 @@ def test_resume_strips_citations_and_mcp_tool_use_like_the_save_path():
         "citations": [{"type": "web_search_result_location", "url": "https://x.example"}],
     }
     mcp = {"type": "mcp_tool_use", "id": "m1", "name": "n", "server_name": "s", "input": {}}
-    history = rebuild_history([u("q"), {"role": "assistant", "content": [cited, mcp]}, u("n")])
+    history = rebuild([u("q"), {"role": "assistant", "content": [cited, mcp]}, u("n")])
     assert history[1]["content"] == [{"type": "text", "text": "From X."}]
 
 
@@ -74,22 +78,23 @@ def test_resume_keeps_no_thinking_anywhere_so_the_dropped_run_is_a_prefix():
         u("q3"),
         {"role": "assistant", "content": [_think("c"), {"type": "text", "text": "r3"}]},
     ]
-    history = rebuild_history(messages)
+    history = rebuild(messages)
     assert "thinking" not in str(history)
     assert history[1]["content"] == [{"type": "text", "text": "r1"}]
-    assert history[3]["content"] == [{"type": "text", "text": WITHHELD}]
-    assert history[5]["content"] == [{"type": "text", "text": "r3"}]
+    assert WITHHELD not in str(history)
+    assert [m["role"] for m in history] == ["user", "assistant", "user", "assistant"]
+    assert history[3]["content"] == [{"type": "text", "text": "r3"}]
 
 
 def test_resume_leaves_a_history_without_thinking_as_it_was():
     messages = [u("q"), a("r")]
-    history = rebuild_history(messages)
+    history = rebuild(messages)
     assert history[0] is messages[0] and history[1] is messages[1]
 
 
 def test_resume_adds_no_message_when_the_last_reply_only_lost_its_thinking():
     messages = [u("q"), {"role": "assistant", "content": [_think("a"), a("r")["content"][0]]}]
-    history = rebuild_history(messages)
+    history = rebuild(messages)
     assert len(history) == len(messages)
     assert history[-1]["role"] == "assistant"
 
@@ -136,24 +141,24 @@ def assert_valid(history):
 
 
 def test_empty_history_stays_empty():
-    assert rebuild_history([]) == []
+    assert rebuild([]) == []
 
 
 def test_short_history_unchanged():
     msgs = [u("hi"), call("1"), result("1"), a("done")]
-    assert rebuild_history(msgs) == msgs
+    assert rebuild(msgs) == msgs
 
 
 def test_starts_at_turn_start_of_latest_compaction():
     msgs = [u("1"), compaction("old"), u("2"), a("x"), u("3"), compaction("new"), u("4")]
-    out = rebuild_history(msgs)
+    out = rebuild(msgs)
     assert out == msgs[4:]
     assert out[0]["role"] == "user" and is_turn_start(out[0])
 
 
 def test_compaction_mid_turn_starts_at_that_turn_start():
     msgs = [u("old"), a("x"), u("go"), call("1"), result("1"), compaction(), a("end")]
-    assert rebuild_history(msgs) == msgs[2:]
+    assert rebuild(msgs) == msgs[2:]
 
 
 def test_cap_trims_front_to_whole_turns():
@@ -161,7 +166,7 @@ def test_cap_trims_front_to_whole_turns():
     for i in range(60):
         msgs += [u(f"q{i}"), a(f"a{i}")]
     assert len(msgs) == 120
-    out = rebuild_history(msgs)
+    out = rebuild(msgs)
     assert len(out) <= RESUME_MAX_MESSAGES
     assert is_turn_start(out[0])
     assert_valid(out)
@@ -172,7 +177,7 @@ def test_cap_skips_mid_turn_cut_points():
     for i in range(30):
         msgs += [call(str(i)), result(str(i))]
     msgs += [a("end"), u("q2"), a("a2")]
-    out = rebuild_history(msgs)
+    out = rebuild(msgs)
     assert out == msgs[-2:]
 
 
@@ -182,7 +187,7 @@ def test_cap_with_one_huge_turn_keeps_the_whole_turn():
         msgs += [call(str(i)), result(str(i))]
     msgs.append(a("end"))
     assert len(msgs) == 60
-    out = rebuild_history(msgs)
+    out = rebuild(msgs)
     assert out == msgs
     assert out[0] == u("q")
 
@@ -190,7 +195,7 @@ def test_cap_with_one_huge_turn_keeps_the_whole_turn():
 def test_failed_compaction_block_is_not_a_cut_point():
     failed = {"role": "assistant", "content": [{"type": "compaction", "content": None}]}
     msgs = [u("one"), a("x"), u("two"), failed, a("y")]
-    assert rebuild_history(msgs) == msgs
+    assert rebuild(msgs) == msgs
 
 
 def test_dangling_tool_use_is_closed():
@@ -204,7 +209,7 @@ def test_dangling_tool_use_is_closed():
             ],
         },
     ]
-    out = rebuild_history(msgs)
+    out = rebuild(msgs)
     assert out[:2] == msgs
     assert out[2] == {
         "role": "user",
@@ -218,12 +223,12 @@ def test_dangling_tool_use_is_closed():
 
 def test_final_lone_user_message_is_kept():
     msgs = [u("a"), a("b"), u("c")]
-    assert rebuild_history(msgs) == msgs
+    assert rebuild(msgs) == msgs
 
 
 def test_does_not_mutate_input():
     msgs = [u("go"), call("1")]
-    rebuild_history(msgs)
+    rebuild(msgs)
     assert len(msgs) == 2
 
 
@@ -235,7 +240,7 @@ def test_every_tool_use_has_its_result():
         [u("q"), a("a")] * 40 + [u("go"), call("1")],
     ]
     for msgs in cases:
-        assert_valid(rebuild_history(msgs))
+        assert_valid(rebuild(msgs))
 
 
 def test_resume_heals_a_saved_reply_whose_thinking_lost_its_search_blocks():
@@ -260,5 +265,5 @@ def test_resume_heals_a_saved_reply_whose_thinking_lost_its_search_blocks():
             saved["content"][2],
         ],
     }
-    history = rebuild_history([old[0], with_search])
+    history = rebuild([old[0], with_search])
     assert history[-1]["content"] == [{"type": "text", "text": "Found."}]

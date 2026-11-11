@@ -44,7 +44,7 @@ from brain.experts import ExpertHosts, ExpertRun
 from brain.job_records import Job, JobRecords
 from brain.jobs import Jobs
 from brain.loops.service import LoopService
-from brain.masking import WITHHELD, Masker, mask_json, mask_message, mask_secrets
+from brain.masking import Masker, mask_json, mask_message, mask_secrets
 from brain.memory import Memory
 from brain.mind.capabilities import AppCaps, BodyCaps, ExpertCaps, capability_picture
 from brain.mind.prompt import (
@@ -301,12 +301,11 @@ class Session:
             make_run.bridge = ExpertApps(apps, lambda: self.toolbox, self.guards)
         self._now = now
         loaded = memory.load_messages()
-        self.history: list = rebuild_history(loaded)
+        self.history, added = rebuild_history(loaded)
         self._saved = len(self.history)  # history[:_saved] is already in the database
-        if self.history and self.history[-1]["role"] != loaded[-1]["role"]:
-            # rebuild_history added a cancelled tool_result after a dangling tool_use; store it
-            # with the next save so the stored chat stays valid. By role, not identity: resume
-            # rebuilds a reply that only lost its thinking as a new object.
+        if added:
+            # resume added a cancelled tool_result after a dangling tool_use; store it with the
+            # next save so the stored chat stays valid.
             self._saved -= 1
         self._inbox: list = []
         # True when the last turn was cancelled before any word and its request is still last in
@@ -973,8 +972,8 @@ class Session:
         if message["role"] == "assistant" and isinstance(content, list):
             if any(self._thinking_changes(b) for b in content):
                 content = without_thinking(content)
-            # an empty content list would not rebuild into valid history
-            message = {**message, "content": content or [{"type": "text", "text": WITHHELD}]}
+            # an emptied reply stays empty: resume drops it with the message it answered
+            message = {**message, "content": content}
         return mask_message(self.guards, "chat", message)
 
     def _thinking_changes(self, block: Any) -> bool:

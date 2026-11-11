@@ -165,6 +165,10 @@ desktop app. You need `uv` and an Anthropic key.
 10. **Action:** `say` with `We are planning a trip to Lisbon.`, stop the brain, start it, say hello, then
     `say` with `What were we just talking about?`
     **Expected:** Scout answers about the Lisbon trip; the chat was picked up after the restart.
+    10b. **Action:** let Scout answer a wake with no words (a quiet event, so the reply is only thinking),
+    stop the brain, start it, then `say` hello.
+    **Expected:** no `[withheld]` text in the chat, in Scout's answer or in the saved messages; the
+    silent reply was dropped with the wake it answered.
 11. **Action:** `say` with `Search our chat for Lisbon.`
     **Expected:** a `recall` tool call that finds the old message.
 12. **Action:** hold a long chat until the model compacts it (hard to trigger by hand; skip it if the
@@ -434,10 +438,10 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
 14. **Action:** open Home → Settings → Permissions, then open **Jobs and experts**.
     **Expected:** the groups start collapsed, each with a count and a summary such as "13 · 2 Ask, 11 Auto"; the groups are named in plain words (Memory, This computer, your browser, each app) and each tool has a plain name and one line, with no code names. Opening Jobs and experts shows Claude Code's tool "Hand work to an expert" with an "Always asks" chip and only **Off** and **Ask**, no **Auto**. Press ⓘ beside a tool: its longer text opens below the row; Escape closes it. A risky tool on Auto shows an amber "N risky tool(s) on Auto" chip on its group; type part of a tool's name in **Find a permission**: only groups with a match show, opened, and clearing the box restores the collapsed groups.
 15. **Action:** with two experts installed, ask Scout to hand a task to Claude Code, then to
-    "hand this to Codex" (and Gemini). Ask "which experts do you have?" and hand off without
+    "hand this to Codex". Ask "which experts do you have?" and hand off without
     naming one.
     **Expected:** each named expert runs the job and Home → Tasks → Jobs shows its id as the agent; Scout
-    lists the experts with login state and whether each is tested (Claude, Codex and Gemini are;
+    lists the experts with login state and whether each is tested (Claude and Codex are;
     any other registry expert is "untested"); an unnamed hand-off with two installed makes Scout
     ask which. With no expert installed, Scout says so and offers to set one up. Automated tests
     cover all three on the fake agent with their own stripped env; this pass is the only real one.
@@ -2336,7 +2340,6 @@ trimmed copies of the live responses.
 | MCP Registry   | `https://registry.modelcontextprotocol.io/v0.1/servers?limit=30&version=latest` | tested (fetched, shape recorded) |
 | Claude adapter | `initialize`                                                                    | tested; login untested           |
 | Codex adapter  | `initialize`                                                                    | tested; login untested           |
-| Gemini adapter | `initialize`                                                                    | tested; login untested           |
 
 ## Scout looks for an expert or app (setup facts and registries)
 
@@ -2583,7 +2586,7 @@ button`; a tap on a closed, unknown or refused ask replies `That question is clo
 ## Setup fixes: curated lists, installable experts, kept trust (D2)
 
 1. Automated, one file at a time from `brain/`: `uv run pytest tests/test_setup_trust.py -q`, then `tests/test_setup_install.py`, `tests/test_setup_home_tools.py`, `tests/test_setup_apps.py`, `tests/test_migrate_app_trust.py`, `tests/test_store_db.py`, and `uv run pytest tests/test_experts.py -q -k auth_status`.
-2. By hand, with the box empty: **Expected:** only the curated apps (Notion first; Linear, Jira and Confluence behind "Show more"), never a raw page of the registry. Experts list Claude Code first (Recommended, Tested with Scout), then Gemini CLI and Codex. Gmail, Google Calendar, Google Drive, Slack, GitHub and Asana are absent: the registry has no Official one-click entry for them.
+2. By hand, with the box empty: **Expected:** only the curated apps (Notion first; Linear, Jira and Confluence behind "Show more"), never a raw page of the registry. Experts list Claude Code first (Recommended, Tested with Scout), then Codex (Gemini CLI is never offered: Google refuses it for personal accounts). Gmail, Google Calendar, Google Drive, Slack, GitHub and Asana are absent: the registry has no Official one-click entry for them.
 3. An expert whose registry entry has a download but no checksum is not listed, and Scout's `find_experts` does not show it.
 4. Connect an Official app (Notion), restart the brain, open Home > Connections. **Expected:** it still shows as Official. A command added by hand shows as Community.
 5. Make an install fail (switch the network off during an expert install). **Expected:** `brain.log` has one WARNING naming the expert and the reason; a Claude Code login logs no `auth/status_update` error.

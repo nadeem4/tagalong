@@ -896,7 +896,7 @@ without an error and the rest stay. The ids were checked against the live regist
 Linear as `app.linear/linear`, Jira and Confluence as `com.atlassian/atlassian-mcp-server`);
 Gmail, Google Calendar, Google Drive, Slack, GitHub and Asana publish no Official one-click entry
 there, so they are not listed until one appears. `browse_experts` is ordered with
-`trust.POPULAR_EXPERTS` first (Claude Code, Gemini CLI, Codex), then the rest; each row has
+`trust.POPULAR_EXPERTS` first (Claude Code, Codex), then the rest; each row has
 `recommended` (Claude Code), `tested` (`env.is_tested`), `account` (the curated claim that it
 signs in with the person's own account; the registry is silent), `added`, and the registry's
 `licence` and `repo` (its `repository`, else `website`) for the check card. `show_more_from` is the
@@ -919,7 +919,7 @@ on its own domain for another service (`com.mcparmory/notion`, `ai.smithery/smit
 domain on another TLD (`io.notion/mcp`) can still read Official under this rule, but groups are
 keyed by the whole namespace, so it never joins or heads `com.notion`. Community entries join a
 group by whole word (`ai` does not pull in `openai-tools`). An
-expert is Official when its id is one of eight vendors (claude-acp, codex-acp, gemini,
+expert is Official when its id is one of seven vendors (claude-acp, codex-acp,
 github-copilot-cli, cursor, junie, goose, kimi). Grouping never marks anything Official: a
 community entry joins a service's group by name but never heads it.
 
@@ -1098,7 +1098,7 @@ words what the person reads (guidance in `mind/soul.md`).
   `new_session` in a scratch folder and sends no prompt (a scratch folder the adapter still holds, as on Windows, never changes the answer: cleanup errors are ignored): success is logged in, an auth-required
   error is not logged in (with the advertised methods), anything else is unknown. `start` picks a
   subscription method: the terminal `claude-ai-login`, else the one terminal method, else a
-  browser one (`chat-gpt`, `oauth-personal`); never an API-key method. A terminal method opens a
+  browser one (`chat-gpt`); never an API-key method. A terminal method opens a
   visible window (the `OpenTerminal` seam; `real_open_terminal` is Windows only: `cmd` with
   `CREATE_NEW_CONSOLE`) running the adapter's own command plus the method's args, with the
   expert's env, wrapped so the exit code lands in a done file, `cache/login-<id>-<random>.done`, new for every
@@ -1113,7 +1113,7 @@ words what the person reads (guidance in `mind/soul.md`).
   window leaves the first running); the card says `unknown` when the check could not tell; shutdown cancels
   them all; every adapter process tree is killed on the way out. No link or code passes through
   Scout or the brain, so nothing is masked. `env.py` holds the per-expert table of keys that would
-  switch an expert to an API key (Claude, Codex, Gemini; an unknown expert loses all of them; every expert also loses
+  switch an expert to an API key (Claude, Codex; an unknown expert loses all of them; every expert also loses
   `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN`), used
   for the login child and the check, and by expert runs later.
 - `apps.py`: `install_app` (Scout, `change`, `person_only` like `install_expert`: the
@@ -1326,11 +1326,10 @@ grant's `sent` flag is set by `keep_apps`; until then the bridge lists tools but
 What the three adapters in the ACP Registry need, read from `initialize` and the packages (the
 machine was not clean, so clean-machine login was read from `authMethods` and source, not run):
 
-| Expert                | Install command                                    | Bundles the agent                 | Node floor    | load_session | Login kind                                                                                                                                                                                                                                                                      | Env to strip                                                                                                              |
-| --------------------- | -------------------------------------------------- | --------------------------------- | ------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Claude (`claude-acp`) | `npx @agentclientprotocol/claude-agent-acp@0.99.1` | Yes (Agent SDK and native binary) | 22            | yes          | terminal: the client runs the adapter exe with `--cli auth login --claudeai` (or `--console`); methods appear only if the client sends `clientCapabilities.auth.terminal: true`; one `claude-login` (`claude /login`) when `NO_BROWSER`, `SSH_*` or `CLAUDE_CODE_REMOTE` is set | `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`                          |
-| Codex (`codex-acp`)   | `npx @agentclientprotocol/codex-acp@2.5.0`         | Yes (`@openai/codex`)             | none declared | yes          | browser (`chat-gpt`) via ACP `authenticate`; or `api-key`                                                                                                                                                                                                                       | `CODEX_API_KEY`, `OPENAI_API_KEY`                                                                                         |
-| Gemini (`gemini`)     | `npx @google/gemini-cli@0.66.0 --acp`              | It is the agent                   | 20            | yes          | browser (`oauth-personal`) via ACP `authenticate`; or `gemini-api-key`, `vertex-ai`                                                                                                                                                                                             | `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT` |
+| Expert                | Install command                                    | Bundles the agent                 | Node floor    | load_session | Login kind                                                                                                                                                                                                                                                                      | Env to strip                                                                                     |
+| --------------------- | -------------------------------------------------- | --------------------------------- | ------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Claude (`claude-acp`) | `npx @agentclientprotocol/claude-agent-acp@0.99.1` | Yes (Agent SDK and native binary) | 22            | yes          | terminal: the client runs the adapter exe with `--cli auth login --claudeai` (or `--console`); methods appear only if the client sends `clientCapabilities.auth.terminal: true`; one `claude-login` (`claude /login`) when `NO_BROWSER`, `SSH_*` or `CLAUDE_CODE_REMOTE` is set | `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX` |
+| Codex (`codex-acp`)   | `npx @agentclientprotocol/codex-acp@2.5.0`         | Yes (`@openai/codex`)             | none declared | yes          | browser (`chat-gpt`) via ACP `authenticate`; or `api-key`                                                                                                                                                                                                                       | `CODEX_API_KEY`, `OPENAI_API_KEY`                                                                |
 
 The registries: ACP `https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json`, MCP
 `https://registry.modelcontextprotocol.io/v0.1/servers?limit=30&version=latest` (plus `&search=`
@@ -1387,7 +1386,7 @@ and ends it in `_end`; updates are keyed by the run found from the session id, s
 sharing one adapter each get only their own steps. All parts of a job write into one log: the
 `seq` counter continues from the job's highest (`Memory.max_seq`), each entry carries its `part`
 (and a `source`, empty for now), and the caps apply to the job as a whole. The wake summary
-(`activity_summary`) tags a step with its expert, `[gemini] make`, only when the job has more
+(`activity_summary`) tags a step with its expert, `[codex-acp] make`, only when the job has more
 than one part, and keys a step's output by part and step id, since two experts can reuse an id.
 
 ```mermaid
@@ -1440,7 +1439,7 @@ command entry's `exit`: `0` gives `done`, any other code `failed` with `exit` se
 (at most `OUTPUT_CAP` plus `CARRY` characters per delta step, released at exit) lives in memory
 only, and each write masks the whole accumulated text, then drops the carry and caps it, so a cut
 never lands inside a secret and a trimmed output always starts with the cut marker. An exit for an unknown terminal id is dropped; output goes to the update's own tool call. An adapter that ignores the
-opt-in (Codex and Gemini untested) keeps the console text block, whose `console` fence is
+opt-in (Codex untested) keeps the console text block, whose `console` fence is
 stripped, so the page shows the same text, with no `exit`.
 
 **Serving the log.** Home reads it with the Home-only tool `job_activity` (it rides `call`, so the
@@ -1577,7 +1576,7 @@ flowchart TD
 | Tool             | Audience    | Effect | Gate                          | Does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ---------------- | ----------- | ------ | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `hand_off`       | scout       | change | tier `auto` (asks for itself) | `{task, folder, expert?, continue_job?, fresh?, title?, job?}`. `title` names a new job; `job` adds a part to that open job (title ignored; a closed or unknown job is a plain refusal). Returns JSON `{job, part, title, session, why_fresh, parent_job}` (`title` is the saved, masked one; null when attaching to a job), or the plain reason it did not start                                                                                                                                                                  |
-| `list_experts`   | scout, home | read   | `auto`                        | `{"experts": [{id, name, version, logged_in, tested, can_resume}]}`; `tested` is true for `claude-acp`, `codex-acp`, `gemini` only, `can_resume` is null until sessions can resume                                                                                                                                                                                                                                                                                                                                                 |
+| `list_experts`   | scout, home | read   | `auto`                        | `{"experts": [{id, name, version, logged_in, tested, can_resume}]}`; `tested` is true for `claude-acp`, `codex-acp` only, `can_resume` is null until sessions can resume                                                                                                                                                                                                                                                                                                                                                           |
 | `tell_expert`    | scout       | change | `ask`, free on an owner turn  | `{job, note, part?}`. `part` names which running part when the job has several. Queues a follow-up prompt for a running job; Scout-started nudges follow the preference rule (see Follow-ups under the preference rule)                                                                                                                                                                                                                                                                                                            |
 | `close_job`      | scout       | change | `auto`                        | `{job}`. Scout's judgement that the work is done: sets `closed_at`, state stays the last outcome. Refused (plain line) for an unknown or closed job or one with a running part                                                                                                                                                                                                                                                                                                                                                     |
 | `set_job_result` | scout       | change | `auto`                        | `{job, text}`. Scout's own result for the whole job (`Job.scout_result`): masked, replaceable, allowed on a closed job; stored up to 20,000 characters, no template or length rule. Unknown job: a plain refusal line. `list_jobs` rows carry it as `scout_result` (clipped to 1,000 characters). With none, nothing is invented                                                                                                                                                                                                   |
@@ -2054,11 +2053,12 @@ search blocks the save keeps one short text note (`[Searched the web for "q". Re
 Title (url); ...]`, from the `web_search` / `web_fetch` `server_tool_use` input and the
 `web_search_tool_result` content; at most 5 queries, pages and sources, 120 characters each), so a
 restarted Scout still knows it searched. The note is saved text, so it is masked too. A message
-with only server blocks and no search or fetch among them is saved as the withheld placeholder. A server block is `server_tool_use` or any
+with only server blocks and no search or fetch among them is saved with empty content. A server block is `server_tool_use` or any
 `*_tool_result` (web_search, web_fetch, code_execution, tool_search ...; `web_tools.is_server_block`),
-so new tool versions need no list edit. `rebuild_history` drops them too, which heals chats saved
+so new tool versions need no list edit. `rebuild_history` (returns the history and whether it added a cancelled `tool_result` that is not yet saved) drops them too, which heals chats saved
 before this rule (an orphaned result makes the API reject every request); an assistant message left
-empty becomes the withheld placeholder so the roles still alternate.
+empty (a silent reply) is dropped together with the turn-start message it answered, never given a
+stand-in text the model would copy; roles still alternate.
 
 Ask is meaningless for them (they never reach the gate): `Toolbox.set_mode` refuses `ask` for a
 spec with `server_tool`, `list_permissions` rows carry `server_tool`, and Home shows only Off and
@@ -2095,7 +2095,7 @@ guard that raises or blocks stores `[withheld]` instead of the raw text, but `ma
 the values of structural keys (`role`, `type`, `id`, `tool_use_id`, `name`, `signature`) alone on
 a message, its content blocks and the blocks inside a tool result's content (a `name` or `id` inside a
 tool's input is still masked), so a saved chat always rebuilds. `Session._persist` also drops a `thinking` block from the saved copy
-when masking would change it (a message left empty saves `[withheld]` text); `redacted_thinking`
+when masking would change it (a message left empty is saved with empty content); `redacted_thinking`
 blocks are kept. The log filter calls the
 masker directly, not the runner, because the runner logs. Scout's live turn and the side-check
 prompt are not masked. See [privacy](privacy.md#what-is-masked-on-disk-what-is-not).

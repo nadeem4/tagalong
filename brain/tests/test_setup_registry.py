@@ -57,13 +57,18 @@ async def test_parses_acp_sample(tmp_path):
     )
     assert claude.requires == {}
     assert claude.repo == "https://github.com/agentclientprotocol/claude-agent-acp"
-    gem = by_id["gemini"].distributions[0]
-    assert gem.package == "@google/gemini-cli" and gem.args == ["--acp"]
     binary = by_id["fake-binary-agent"].distributions
     assert {d.platforms for d in binary} == {("windows-x86_64",), ("linux-x86_64",)}
     first = binary[0]
     assert first.url.endswith(".zip") and first.sha256 and first.cmd == ["./fake-binary-agent.exe"]
     assert not listing.stale
+
+
+async def test_find_experts_never_offers_gemini_cli(tmp_path):
+    # Google refuses Gemini CLI for personal accounts, so Scout never offers it.
+    listing = await registry(tmp_path).acp_agents()
+    assert "gemini" in [a["id"] for a in json.loads(ACP)["agents"]]  # the feed has it
+    assert "gemini" not in [e.id for e in listing.entries]
 
 
 async def test_unknown_fields_ignored_and_malformed_entry_skipped(tmp_path):
@@ -114,7 +119,7 @@ async def test_offline_with_cache_is_stale(tmp_path):
     clock.now += 999_999
     net.offline = True
     listing = await reg.acp_agents()
-    assert listing.stale and len(listing.entries) == 4
+    assert listing.stale and len(listing.entries) == 3
 
 
 async def test_offline_without_cache_raises(tmp_path):
