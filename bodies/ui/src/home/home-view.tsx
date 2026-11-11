@@ -27,7 +27,8 @@ import { BrainCard } from './brain-card';
 import { UpdateBanner } from './update-banner';
 import { LINK, WhereThingsRun } from './where-things-run';
 
-export type HomePage = 'overview' | 'tasks' | 'connections' | 'places' | 'approvals' | 'memory' | 'settings';
+export type HomePage =
+  'overview' | 'tasks' | 'connections' | 'places' | 'approvals' | 'memory' | 'settings';
 
 const PAGES: readonly { id: HomePage; label: (name: string) => string }[] = [
   { id: 'overview', label: () => 'Overview' },

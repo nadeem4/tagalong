@@ -2260,30 +2260,30 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
    connect your tools later in Home, under Connections. Step 10 has no Skip: **I’ll do this later**
    and **Finish** both end the tour. On Home's **Connections** page **Your experts** lists
    Claude Code with its state; the **Experts** tab's **Add an expert** offers more (an Official one has **Add** and opens an Allow card first; a community one shows the check card first, and **Add anyway** is that approval, so it opens no further Allow card) (Log in on a Claude Code you already logged into elsewhere opens no card: it says "Already logged in." and the chip turns ready).
-2. **Action:** on step 7 press **Copy chrome://extensions**, paste it somewhere; press **Show
+3. **Action:** on step 7 press **Copy chrome://extensions**, paste it somewhere; press **Show
    folder** and **Copy folder path**. **Expected:** the address and the add-on folder path are
    what you pasted; the folder opens.
-3. **Action:** on step 8 ("Scout asks first, and you set the limit") press **+** on the limit,
+4. **Action:** on step 8 ("Scout asks first, and you set the limit") press **+** on the limit,
    set it to 0, then 8, press **Next**. **Expected:** **+** raises it by 1; 0 shows "Enter
    an amount above $0." and stays; 8 is saved (Home's Spend card shows it). **Skip**
    with no key goes to step 9 and leaves the limit alone.
-4. **Action:** on step 9 with no key, paste a wrong key, then a real one. **Expected:** "That key
+5. **Action:** on step 9 with no key, paste a wrong key, then a real one. **Expected:** "That key
    was not accepted." with the field kept and **Next** off; then the field empties, "A key is
    already set." shows and **Next** turns on. With the network off the line reads "Scout could
    not reach Anthropic. Try again." and Next stays off.
-5. **Action:** stop the brain on step 9. **Expected:** "Scout's brain is not running.", Check and
+6. **Action:** stop the brain on step 9. **Expected:** "Scout's brain is not running.", Check and
    Next off; start the brain and Check turns on by itself. The step never says to edit a file;
    it shows where the machine running Scout's brain saved the key, under four notes ("Only sent to
    Anthropic", "Never written to Scout's history or logs", and so on).
-6. **Action:** with a real `ANTHROPIC_API_KEY` in the environment (developers). **Expected:**
+7. **Action:** with a real `ANTHROPIC_API_KEY` in the environment (developers). **Expected:**
    step 9 reads "Set by your environment" and Next is on.
-7. **Action:** on step 10 press **Finish** (or **I’ll do this later**). **Expected:** the card "Scout is on your screen" shows the ask
+8. **Action:** on step 10 press **Finish** (or **I’ll do this later**). **Expected:** the card "Scout is on your screen" shows the ask
    and talk keys as keycaps (never "CommandOrControl"), three things to try and, if you connected
    anything on step 10, a "Ready to use" list (Connected / "Still installing…" / "Needs sign-in…"), and the tour is
    marked seen at once. **Done** (or **Open Home**) closes the
    window and the pet appears; closing the card with the window's X does the same. Either way the
    tour does not open at the next launch (closing part-way, before Finish, brings it back).
-8. **Action:** on step 9 press **Where do I get one?**. **Expected:** the browser opens the
+9. **Action:** on step 9 press **Where do I get one?**. **Expected:** the browser opens the
    Anthropic Console API keys page.
 
 ## Companion chat window

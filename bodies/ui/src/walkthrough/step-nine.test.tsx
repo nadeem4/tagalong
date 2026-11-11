@@ -195,7 +195,6 @@ describe('FinishCard', () => {
     render(<FinishCard {...props} />);
     expect(screen.getByRole('heading', { name: 'Scout is on your screen' })).toBeVisible();
     expect(screen.getByText(/Look for Scout at the bottom right/)).toBeInTheDocument();
-    expect(screen.getByText(/what Scout remembers are in Home/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open Home' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Done' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();

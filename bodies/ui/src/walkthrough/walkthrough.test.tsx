@@ -180,7 +180,9 @@ describe('Walkthrough, the end', () => {
     const host = makeWalkthroughHost({ key: HAS_KEY });
     host.setupOverview.mockImplementation(() =>
       Promise.resolve({
-        experts: [{ id: 'claude-acp', name: 'Claude Code', version: '2', state: 'ready', tested: true }],
+        experts: [
+          { id: 'claude-acp', name: 'Claude Code', version: '2', state: 'ready', tested: true },
+        ],
         apps: [{ id: 'com.google/gmail', name: 'Gmail', state: 'connected' }],
         browseExperts: [],
         browseApps: [],
@@ -199,6 +201,14 @@ describe('Walkthrough, the end', () => {
     const list = await screen.findByRole('list', { name: 'Ready to use' });
     expect(list).toHaveTextContent('Gmail');
     expect(list).toHaveTextContent('Claude Code');
+  });
+
+  it('on the finish card every step in the side list is ticked and none is current', async () => {
+    open(makeWalkthroughHost({ key: HAS_KEY }), 10);
+    fireEvent.click(await screen.findByRole('button', { name: 'Finish' }));
+    await screen.findByRole('heading', { name: 'Scout is on your screen' });
+    expect(sideButton('Connect your tools')).not.toHaveAttribute('aria-current');
+    expect(sideButton('Connect your tools')).toHaveAttribute('data-done', 'true');
   });
 
   it('"I’ll do this later" finishes the tour like Finish does', async () => {

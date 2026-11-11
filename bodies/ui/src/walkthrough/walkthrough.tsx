@@ -28,6 +28,7 @@ import type { Save } from './use-step-save';
 import type { WalkthroughHost } from './walkthrough-host';
 import { useKeyStatus } from '../key/use-key-status';
 import { CONTROLS_CSS } from '../controls/controls-styles';
+import { CONNECTIONS_CSS } from '../home/connections-styles';
 import { WALKTHROUGH_CSS } from './walkthrough-styles';
 
 interface WalkthroughProps {
@@ -176,9 +177,10 @@ export function Walkthrough({ host, scout, initialStep = 1 }: WalkthroughProps) 
     <div className="wt">
       <style>{CONTROLS_CSS}</style>
       <style>{WALKTHROUGH_CSS}</style>
+      <style>{CONNECTIONS_CSS}</style>
       <SidePanel
         scout={scout}
-        current={current}
+        current={finishKeysShown !== null ? STEPS.length + 1 : current}
         reached={reached}
         onJump={go}
         keySet={keyFacts !== null && keyFacts !== 'offline' && keyFacts.hasKey}

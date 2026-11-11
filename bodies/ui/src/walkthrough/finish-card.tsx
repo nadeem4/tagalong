@@ -84,7 +84,15 @@ export function FinishCard({
                 {ready.map((item) => (
                   <li key={item.name}>
                     <span>{item.name}</span>
-                    <span className={item.state === 'connected' ? 'wt-ok' : 'wt-pending'}>
+                    <span
+                      className={`cx-status${item.state === 'connected' ? '' : ' cx-status--off'}`}
+                    >
+                      {item.state === 'connected' && (
+                        <span className="home-dot" aria-hidden="true" />
+                      )}
+                      {item.state === 'installing' && (
+                        <span className="cx-spin" aria-hidden="true" />
+                      )}
                       {READY_WORDS[item.state]}
                     </span>
                   </li>
@@ -92,9 +100,6 @@ export function FinishCard({
               </ul>
             </div>
           )}
-          <p className="wt-note">
-            Connected apps, timers and what Scout remembers are in Home whenever you want them.
-          </p>
         </section>
       </div>
       <footer className="wt-footer">

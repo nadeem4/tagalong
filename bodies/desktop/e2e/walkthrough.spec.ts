@@ -277,8 +277,9 @@ test('step 6 only explains: no Connect or Set up buttons', async () => {
   const tour = await windowFor('walkthrough');
   await nextTo(tour, 6);
   await expect(tour.getByRole('heading', { name: 'Scout does the everyday jobs' })).toBeVisible();
-  await expect(tour.getByRole('button', { name: /Connect|Set up/ })).toHaveCount(0);
-  await expect(tour.getByText('Claude Code')).toHaveCount(0);
+  const page = tour.locator('main');
+  await expect(page.getByRole('button', { name: /Connect|Set up/ })).toHaveCount(0);
+  await expect(page.getByText('Claude Code')).toHaveCount(0);
 });
 
 test('step 10 installs Claude Code on the fake brain and shows it ready', async () => {

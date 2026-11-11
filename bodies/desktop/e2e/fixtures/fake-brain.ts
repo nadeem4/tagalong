@@ -898,28 +898,6 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             failed: null,
             ...setupPatch,
           };
-        } else if (params.tool === 'bodies_status') {
-          value = {
-            bodies: [
-              { kind: 'desktop', name: 'Desktop', connected: true },
-              { kind: 'browser', name: 'Browser', connected: true },
-              { kind: 'whatsapp', name: 'WhatsApp', connected: false },
-            ],
-          };
-        } else if (params.tool === 'whatsapp_status') {
-          value = {
-            enabled: false,
-            set: {
-              access_token: false,
-              app_secret: false,
-              verify_token: false,
-              phone_number_id: false,
-              allowed_number: false,
-            },
-            complete: false,
-            state: 'off',
-            port: 8080,
-          };
         } else if (params.tool === 'setup_app') {
           appSetups.push(String(params.input?.id));
           appFlags.push({

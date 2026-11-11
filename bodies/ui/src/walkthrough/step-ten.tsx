@@ -55,13 +55,18 @@ export function readyOf(overview: SetupOverview): ReadyItem[] {
   const expert = overview.experts.find((e) => e.id === EXPERT);
   if (overview.progress?.expert === EXPERT) list.push({ name: EXPERT_NAME, state: 'installing' });
   else if (expert !== undefined)
-    list.push({ name: EXPERT_NAME, state: expert.state === 'needs_login' ? 'signin' : 'connected' });
+    list.push({
+      name: EXPERT_NAME,
+      state: expert.state === 'needs_login' ? 'signin' : 'connected',
+    });
   return list;
 }
 
 /** Every row the overview offers for a search, the Official one of a service first. */
 function rowsOf(overview: SetupOverview): AppRow[] {
-  const grouped = overview.appGroups.flatMap((g) => (g.official ? [g.official, ...g.others] : g.others));
+  const grouped = overview.appGroups.flatMap((g) =>
+    g.official ? [g.official, ...g.others] : g.others,
+  );
   return [...overview.popular, ...grouped];
 }
 
@@ -82,7 +87,15 @@ function Waiting() {
   );
 }
 
-function Group({ title, note, children }: { title: string; note: string; children: React.ReactNode }) {
+function Group({
+  title,
+  note,
+  children,
+}: {
+  title: string;
+  note: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="wt-group">
       <div className="wt-group__head">
@@ -193,7 +206,9 @@ export function StepTen({
           <div className="cx-row__main">
             <span className="cx-row__name">
               <span>{name}</span>
-              {row?.official === true && <span className="cx-chip cx-chip--official">Official</span>}
+              {row?.official === true && (
+                <span className="cx-chip cx-chip--official">Official</span>
+              )}
             </span>
             <span className="cx-meta">{meta}</span>
           </div>

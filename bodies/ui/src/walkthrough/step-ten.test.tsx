@@ -20,6 +20,7 @@ const ROW = {
   signIn: 'browser' as const,
   licence: 'MIT',
   repo: 'https://github.com/x/y',
+  added: false,
 };
 
 const row = (id: string, name: string) => ({ ...ROW, id, name });
@@ -30,6 +31,8 @@ const BASE: SetupOverview = {
   browseExperts: [],
   browseApps: [],
   popular: [row('com.google/gmail', 'Gmail'), row('com.notion/mcp', 'Notion')],
+  popularMore: [],
+  showMoreFrom: null,
   appGroups: [
     { service: 'calendar', official: row('com.google/calendar', 'Google Calendar'), others: [] },
   ],
@@ -59,7 +62,9 @@ describe('StepTen', () => {
       'Plan my day around my calendar · Browser sign-in',
     );
     expect(itemOf('Notion')).toHaveTextContent('Popular · Browser sign-in');
-    expect(itemOf('Claude Code')).toHaveTextContent('Fix this code, and other long, many-step jobs');
+    expect(itemOf('Claude Code')).toHaveTextContent(
+      'Fix this code, and other long, many-step jobs',
+    );
     expect(itemOf('Claude Code')).toHaveTextContent('Recommended');
     expect(itemOf('Gmail')).toHaveTextContent('Official');
   });
@@ -88,7 +93,11 @@ describe('StepTen', () => {
   });
 
   it('shows Connected for an app the brain already has', async () => {
-    open({ apps: [{ id: 'com.google/calendar', name: 'Google Calendar', state: 'connected' }] });
+    open({
+      apps: [
+        { id: 'com.google/calendar', name: 'Google Calendar', state: 'connected', official: true },
+      ],
+    });
     await screen.findByText('Gmail');
     await waitFor(() => expect(itemOf('Google Calendar')).toHaveTextContent('Connected'));
     expect(
@@ -177,8 +186,8 @@ describe('readyOf', () => {
     const list = readyOf({
       ...BASE,
       apps: [
-        { id: 'com.google/calendar', name: 'Google Calendar', state: 'connected' },
-        { id: 'other', name: 'Slack', state: 'connected' },
+        { id: 'com.google/calendar', name: 'Google Calendar', state: 'connected', official: true },
+        { id: 'other', name: 'Slack', state: 'connected', official: true },
       ],
       progress: { expert: 'claude-acp', stage: 'node', percent: 10 },
     });
