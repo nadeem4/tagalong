@@ -788,6 +788,10 @@ async def test_list_permissions_shape_unchanged(home):
         "online",
         "source",
         "source_name",
+        "title",
+        "line",
+        "info",
+        "group",
     }
     assert by_name["remember"]["source_name"] == "Built in"
     assert by_name["remember"]["self_asks"] is False
@@ -1632,3 +1636,104 @@ async def test_list_permissions_names_each_body_by_what_it_declared(home):
 def test_list_timers_description_asks_for_ids_to_be_shown(trun):
     text = trun.specs["list_timers"].description.lower()
     assert "id" in text and "cancel" in text
+
+
+class FakeAppSource:
+    """An app's tools as the toolbox sees them: names `<app>__<tool>`, grouped as an app."""
+
+    approval_source = "app"
+
+    def __init__(self):
+        self._specs = [
+            ToolSpec(
+                "gmail__send_mail",
+                "Send a mail. Needs a signed-in account. Never sends twice.",
+                {"type": "object"},
+            ),
+            ToolSpec("gmail__read", "Read mail", {"type": "object"}, effect="read"),
+        ]
+
+    def specs(self):
+        return self._specs
+
+    def known_specs(self):
+        return self._specs
+
+    def label(self, owner):
+        return "Gmail"
+
+    def unavailable(self, name):
+        return None
+
+
+async def _rows(home):
+    return {t["name"]: t for t in json.loads(await home.run("list_permissions"))["tools"]}
+
+
+async def test_list_permissions_rows_carry_words(home):
+    rows = await _rows(home)
+    remember = rows["remember"]
+    assert (remember["title"], remember["group"]) == ("Remember things", "memory")
+    assert remember["line"] == "Saves facts and instructions you want kept."
+    assert remember["info"].startswith("Scout writes down things worth keeping")
+
+
+async def test_app_rows_use_their_own_text_split(home):
+    home.box.sources.insert(0, FakeAppSource())
+    tools = json.loads(await home.run("list_permissions"))
+    rows = {t["name"]: t for t in tools["tools"]}
+    mail = rows["gmail__send_mail"]
+    assert (mail["title"], mail["line"], mail["group"]) == (
+        "send_mail",
+        "Send a mail.",
+        "app:gmail",
+    )
+    assert mail["info"] == "Needs a signed-in account. Never sends twice."
+    assert rows["gmail__read"]["line"] == "Read mail"
+    assert {"id": "app:gmail", "title": "Gmail", "note": "From Gmail"} in tools["groups"]
+
+
+async def test_desktop_tools_land_in_this_computer_group(home):
+    declare(
+        home.bodies, "desktop", ("list_windows", "read", None), ("delete_file", "change", "always")
+    )
+    reply = json.loads(await home.run("list_permissions"))
+    rows = {t["name"]: t for t in reply["tools"]}
+    assert rows["desktop__list_windows"]["group"] == "computer"
+    assert rows["desktop__delete_file"]["title"] == "Delete files"
+    computer = [g for g in reply["groups"] if g["id"] == "computer"]
+    assert computer == [
+        {
+            "id": "computer",
+            "title": "This computer",
+            "note": "Windows and files. File tools only work inside folders you allowed.",
+        }
+    ]
+
+
+async def test_browser_group_is_titled_by_the_browser_body(home):
+    declare(home.bodies, "chrome", ("tabs", "read", None))
+    reply = json.loads(await home.run("list_permissions"))
+    assert [g for g in reply["groups"] if g["id"] == "browser"][0]["title"] == "chrome"
+
+
+async def test_groups_come_in_wording_order_and_only_when_they_have_tools(home):
+    reply = json.loads(await home.run("list_permissions"))
+    ids = [g["id"] for g in reply["groups"]]
+    assert ids == ["memory", "jobs"]  # the fixture wires memory and expert tools only
+    assert "computer" not in ids and "browser" not in ids  # no body connected
+    assert set(ids) == {t["group"] for t in reply["tools"]}
+
+
+async def test_unknown_body_tool_falls_back(home):
+    declare(home.bodies, "desktop", ("brand_new", "read", None))
+    reply = json.loads(await home.run("list_permissions"))
+    row = {t["name"]: t for t in reply["tools"]}["desktop__brand_new"]
+    assert (row["title"], row["line"], row["info"]) == ("brand_new", "brand_new d", "")
+    assert row["group"] == "body:desktop"
+    assert {"id": "body:desktop", "title": "desktop", "note": "From desktop"} in reply["groups"]
+
+
+async def test_description_unchanged(home):
+    rows = await _rows(home)
+    assert rows["remember"]["description"].startswith("Save something worth keeping")

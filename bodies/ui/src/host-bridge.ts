@@ -65,6 +65,19 @@ export interface PermissionRow {
   source: string;
   /** The heading to group under: the body's declared name or the app's name. */
   source_name: string;
+  /** What the person reads: a plain name, one line, and the longer text behind the info button. */
+  title: string;
+  line: string;
+  info: string;
+  /** The id of the `PermissionGroup` this row is listed under. */
+  group: string;
+}
+
+/** One collapsible group in the Permissions list, in the order the brain sends them. */
+export interface PermissionGroup {
+  id: string;
+  title: string;
+  note: string;
 }
 
 /** One Claude Code job in Home's Jobs panel, as the brain's list_jobs sends it. */
@@ -337,7 +350,7 @@ export interface HostBridge {
    */
   askScout(text: string): Promise<void>;
   /** Home's Permissions: each tool Scout can use and whether it asks first. */
-  listPermissions(): Promise<PermissionRow[]>;
+  listPermissions(): Promise<{ groups: PermissionGroup[]; rows: PermissionRow[] }>;
   /** Sets one tool to off, ask or auto; rejects when the brain refuses (a locked tool, say). */
   setPermission(tool: string, mode: 'off' | 'ask' | 'auto'): Promise<void>;
   /** Home's Jobs panel: recent Claude Code jobs, newest first. */

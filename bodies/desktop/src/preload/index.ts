@@ -31,6 +31,7 @@ import type {
   JobRow,
   RunningStep,
   PreferenceRow,
+  PermissionGroup,
   PermissionRow,
   SpendToday,
   KeyStatus,
@@ -86,7 +87,11 @@ const bridge: PreloadBridge = {
     ipcRenderer.invoke(IPC.removeConnection, id) as Promise<unknown>,
   listMemories: () => ipcRenderer.invoke(IPC.listMemories) as Promise<MemoryEntry[]>,
   deleteMemory: (id: string) => ipcRenderer.invoke(IPC.deleteMemory, id) as Promise<boolean>,
-  listPermissions: () => ipcRenderer.invoke(IPC.listPermissions) as Promise<PermissionRow[]>,
+  listPermissions: () =>
+    ipcRenderer.invoke(IPC.listPermissions) as Promise<{
+      groups: PermissionGroup[];
+      rows: PermissionRow[];
+    }>,
   loopsState: () => ipcRenderer.invoke(IPC.loopsState) as Promise<LoopsState>,
   setLoopsOn: (app: string, on: boolean) =>
     ipcRenderer.invoke(IPC.loopsSet, app, on) as Promise<void>,

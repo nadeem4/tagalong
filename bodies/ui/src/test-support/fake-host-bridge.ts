@@ -27,6 +27,7 @@ import type {
   JobRow,
   RunningStep,
   WatchItem,
+  PermissionGroup,
   PermissionRow,
   PreferenceRow,
   KeyResult,
@@ -44,6 +45,8 @@ export interface FakeHostBridge extends HostBridge {
   memories: MemoryEntry[];
   /** Home's Permissions rows; setPermission edits them, a test may swap them. */
   permissions: PermissionRow[];
+  /** Home's Permissions groups, in order; derived from the rows' `group` when a test sets none. */
+  permissionGroups: PermissionGroup[] | null;
   /** The brain's key facts, and how the next key check ends; a test swaps either. */
   key: KeyStatus | 'offline';
   keyResult: KeyResult;
@@ -177,6 +180,8 @@ export function createFakeHostBridge(
     memories?: MemoryEntry[];
     /** Home's Permissions rows. */
     permissions?: PermissionRow[];
+    /** The groups those rows sit in; one per distinct `group`, titled by it, when left out. */
+    permissionGroups?: PermissionGroup[];
     /** Home's loops state. */
     loops?: LoopsState;
     /** Home's timers. */
@@ -450,9 +455,14 @@ export function createFakeHostBridge(
       return Promise.resolve();
     },
     permissions: (options.permissions ?? []).map((row) => ({ ...row })),
+    permissionGroups: options.permissionGroups ?? null,
     permissionSets,
     listPermissions() {
-      return Promise.resolve(fake.permissions.map((row) => ({ ...row })));
+      const rows = fake.permissions.map((row) => ({ ...row }));
+      const groups =
+        fake.permissionGroups ??
+        [...new Set(rows.map((row) => row.group))].map((id) => ({ id, title: id, note: '' }));
+      return Promise.resolve({ groups, rows });
     },
     setPermission(tool, mode) {
       permissionSets.push({ tool, mode });

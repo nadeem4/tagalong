@@ -18,6 +18,7 @@ export type {
   ApprovalRow,
   ApprovalCounts,
   PreferenceRow,
+  PermissionGroup,
   PermissionRow,
   SpendToday,
   KeyStatus,
