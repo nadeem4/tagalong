@@ -1,9 +1,9 @@
 /**
- * Home's Connections page, two tabs. Apps: the ones the brain keeps over MCP, then a registry
- * search (Official first, a check card before community) and Add one by hand. Experts: the
- * installed coding agents and the registry's. The brain owns every list and the keys; this page
- * only asks and reads again. Contains ConnectionsPanel; the tabs are apps-tab.tsx and
- * experts-tab.tsx, the add form add-form.tsx.
+ * Home's Connections page, two tabs. Apps: "Your apps", then a registry search (Official first, a
+ * check card before community) and Add it yourself. Experts: the installed coding agents and the
+ * registry's. The brain owns every list and the keys; this page only asks and reads again, and
+ * hands each add's outcome back to the row that was pressed. Contains ConnectionsPanel; the tabs
+ * are apps-tab.tsx and experts-tab.tsx, the add form add-form.tsx.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -14,6 +14,7 @@ import { Button } from '../controls/button';
 import { AppsTab } from './apps-tab';
 import { ExpertsTab } from './experts-tab';
 import { JobTabs, panelId, tabId } from './job-tabs';
+import type { Outcome } from './outcome';
 
 type Status = { text: string; error: boolean } | null;
 type Tab = 'apps' | 'experts';
@@ -26,23 +27,24 @@ const BRAIN_OFFLINE = 'brain offline';
 
 // The page's own words for what the brain answers with a short token. A refusal that is not a
 // problem (the person said no, it is already done) is a note; the rest are errors.
-const SETUP_REFUSALS: Record<string, Status & object> = {
+type Words = { text: string; error: boolean };
+const SETUP_REFUSALS: Record<string, Words> = {
   denied: { text: 'Okay, nothing was changed.', error: false },
   already_installing: { text: 'That is already being set up.', error: false },
   already_ready: { text: 'That is already set up.', error: false },
   already_added: { text: 'That app is already added.', error: false },
   already_logged_in: { text: 'Already logged in.', error: false },
   version_changed: {
-    text: 'The registry changed while you were deciding. Look at it again, then try once more.',
+    text: 'The list changed while you were deciding. Have another look, then try again.',
     error: true,
   },
   registry_unavailable: {
-    text: 'Scout couldn’t reach the registry. Check your connection and try again.',
+    text: "Scout couldn't load the app list. Check your internet and try again.",
     error: true,
   },
 };
 const LOGIN_WAITING = 'Finish logging in in the window that opened.';
-const SETUP_FAILED: Status & object = { text: 'Setting that up didn’t work.', error: true };
+const SETUP_FAILED: Words = { text: 'Setting that up didn’t work.', error: true };
 
 /**
  * Home's Connections page. Scout reads with an app on its own and asks before every change;
@@ -125,16 +127,27 @@ export function ConnectionsPanel() {
     }
   };
 
-  // The call returns once the person has answered the Allow card; until then the row waits.
-  const setUp = (id: string, call: () => Promise<SetupResult>, added?: string): void => {
+  // The call returns once the person has answered the Allow card; until then the row waits. How it
+  // ended goes back to the row that was pressed, not to the top of the page.
+  const setUp = async (
+    id: string,
+    call: () => Promise<SetupResult>,
+    added?: string,
+  ): Promise<Outcome | null> => {
     setAsking((now) => new Set(now).add(id));
-    void act(async () => {
+    let outcome: Outcome | null = null;
+    await act(async () => {
       try {
         const { error, state } = await call();
-        if (error !== undefined) setStatus(SETUP_REFUSALS[error] ?? SETUP_FAILED);
-        else if (state === 'waiting') setStatus({ text: LOGIN_WAITING, error: false });
-        else if (state === 'logged_in') setStatus({ text: 'Already logged in.', error: false });
-        else if (added !== undefined) setStatus({ text: added, error: false });
+        if (error !== undefined) {
+          outcome = { ...(SETUP_REFUSALS[error] ?? SETUP_FAILED), added: false };
+        } else if (state === 'waiting') {
+          outcome = { text: LOGIN_WAITING, error: false, added: false };
+        } else if (state === 'logged_in') {
+          outcome = { text: 'Already logged in.', error: false, added: false };
+        } else if (added !== undefined) {
+          outcome = { text: added, error: false, added: true };
+        }
       } finally {
         setAsking((now) => {
           const next = new Set(now);
@@ -143,11 +156,11 @@ export function ConnectionsPanel() {
         });
       }
     });
+    return outcome;
   };
 
-  const nameOf = (expert: string): string =>
-    [...(setup?.experts ?? []), ...(setup?.browseExperts ?? [])].find((e) => e.id === expert)
-      ?.name ?? expert;
+  const officialIds =
+    setup === null ? null : new Set(setup.apps.filter((app) => app.official).map((app) => app.id));
 
   const add = (params: AppAddParams): Promise<boolean> =>
     act(() => bridge.addConnection(params), `${params.name} added.`);
@@ -156,7 +169,7 @@ export function ConnectionsPanel() {
     <>
       <div className="home-head">
         <h1 className="home-title">Connections</h1>
-        <p>The apps Scout can use for you. Turn one off to stop Scout using it.</p>
+        <p>Apps and experts Scout can use for you. Turn one off and Scout stops using it.</p>
       </div>
       {offline && (
         <p className="tg-note" role="status">
@@ -186,6 +199,7 @@ export function ConnectionsPanel() {
         {tab === 'apps' && (
           <AppsTab
             apps={apps}
+            officialIds={officialIds}
             offline={offline}
             busy={asking}
             refresh={refresh}
@@ -195,21 +209,21 @@ export function ConnectionsPanel() {
             onRemove={(app) =>
               void act(() => bridge.removeConnection(app.id), `${app.name} removed.`)
             }
-            onConnect={(row: AppRow, query) =>
+            onAdd={(row: AppRow, query) =>
               setUp(
                 row.id,
                 () => bridge.setupApp(row.id, true, query || undefined),
                 `${row.name} added.`,
               )
             }
-            onConnectAnyway={(row: AppRow, query) =>
+            onAddAnyway={(row: AppRow, query) =>
               setUp(
                 row.id,
                 () => bridge.setupApp(row.id, true, query || undefined, true),
                 `${row.name} added.`,
               )
             }
-            onAdd={add}
+            onAddApp={add}
           />
         )}
         {tab === 'experts' && setup === null && setupFailed && !offline && (
@@ -221,7 +235,6 @@ export function ConnectionsPanel() {
           <ExpertsTab
             setup={setup}
             asking={asking}
-            failedName={setup.failed === null ? null : nameOf(setup.failed.expert)}
             onAct={(id) => setUp(id, () => bridge.setupExpert(id, false))}
             onAdd={(id) => setUp(id, () => bridge.setupExpert(id, false))}
             onAddAnyway={(id) => setUp(id, () => bridge.setupExpert(id, true, true))}

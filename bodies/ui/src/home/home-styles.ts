@@ -10,7 +10,7 @@ export const HOME_CSS = `
   background: ${t.color.panel}; color: ${t.color.panelText}; font-family: ${t.font.ui};
 }
 .home :focus-visible {
-  outline: ${t.size.focusRing}px solid ${t.color.gold}; outline-offset: ${t.size.focusOffset}px;
+  outline: ${t.size.focusRing}px solid ${t.color.focusOnLight}; outline-offset: ${t.size.focusOffset}px;
 }
 .home-nav {
   width: 232px; flex: none; display: flex; flex-direction: column; gap: ${t.space.xs}px;
@@ -35,6 +35,7 @@ export const HOME_CSS = `
   margin-left: ${t.space.md}px; padding: 1px ${t.space.md}px; border-radius: 999px;
   background: ${t.color.gold}; color: ${t.color.goldInk}; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold};
 }
+.home-nav :focus-visible { outline-color: ${t.color.focusOnNavy}; }
 .home-nav__item:hover { color: ${t.color.text}; }
 .home-nav__item[aria-current='page'] { background: #1E2442; color: ${t.color.text}; font-weight: ${t.fontWeight.semibold}; }
 .home-main {
@@ -110,36 +111,10 @@ export const HOME_CSS = `
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .home-danger { margin-left: auto; display: flex; gap: ${t.space.md}px; }
-.home-conns__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.home-conns__list > li:last-child .home-conn { border-bottom: 0; padding-bottom: 0; }
-.home-conn {
-  display: flex; flex-direction: column; gap: ${t.space.md}px;
-  padding: ${t.space.lg}px 0; border-bottom: 1px solid ${t.color.panelLine};
-}
-.home-conn__head { display: flex; align-items: center; gap: ${t.space.lg}px; }
 .home-conn__initial {
   width: 36px; height: 36px; flex: none; display: flex; align-items: center; justify-content: center;
   border-radius: ${t.radius.row}px; background: ${t.color.panelTile}; font-weight: ${t.fontWeight.semibold};
 }
-.home-conn__head .home-entry__title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.home-conn__head .tg-chip { flex: none; }
-.home-conn__head .tg-error { font-weight: 400; }
-.home-conn__actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: ${t.space.md}px; }
-.home-conn__form { display: flex; flex-direction: column; padding-top: ${t.space.md}px; }
-.home-conns details > summary { cursor: pointer; margin: 0; }
-.home-conns__form-host.tg-panel { padding: 0; background: transparent; }
-/* App search: a service group, its tags and the check card before a community app. */
-.conn-group { display: flex; flex-direction: column; gap: ${t.space.md}px; padding: ${t.space.lg}px 0; border-bottom: 1px solid ${t.color.panelLine}; }
-.conn-group__others { padding-left: ${t.space.xl}px; }
-.conn-tag { margin-left: ${t.space.sm}px; }
-.conn-tag--official { background: ${t.color.okFill}; color: ${t.color.okInk}; }
-.conn-check {
-  display: flex; flex-direction: column; gap: ${t.space.md}px; padding: ${t.space.lg}px;
-  border-radius: ${t.radius.row}px; background: ${t.color.warnFill}; color: ${t.color.warnInk};
-}
-.conn-check__facts { margin: 0; padding-left: ${t.space.xl}px; display: flex; flex-direction: column; gap: ${t.space.xxs}px; }
-.conn-check .tg-note { color: ${t.color.warnInk}; }
-.conn-check__link { color: ${t.color.warnInk}; margin-right: auto; text-decoration: underline; }
 .perm-group { margin-top: ${t.space.xl}px; }
 .perm-group__title { margin: 0 0 ${t.space.xs}px; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; letter-spacing: ${t.letterSpacing.pixel}px; text-transform: uppercase; color: ${t.color.panelMuted}; }
 .perm-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }

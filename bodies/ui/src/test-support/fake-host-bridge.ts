@@ -279,6 +279,8 @@ export function createFakeHostBridge(
       browseExperts: [],
       browseApps: [],
       popular: [],
+      popularMore: [],
+      showMoreFrom: null,
       appGroups: [],
       nextCursor: null,
       sources: null,

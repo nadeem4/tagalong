@@ -1,40 +1,59 @@
 /**
- * Searching the registry for apps on Home's Connections page: the search box (read 300 ms after
- * typing stops), the Popular row while it is empty, results grouped per service and Load more.
- * The brain does the finding, tagging and grouping; this only asks and shows. Only the newest
- * request may write results. Contains AppSearch.
+ * "Add an app" on Home's Connections page: the search box (read 300 ms after typing stops), the
+ * curated Popular list with Show more, results grouped per service with Load more, the empty
+ * state and "Add it yourself". The brain does the finding, tagging and grouping; this only asks
+ * and shows. Only the newest request may write results. Contains AppSearch.
  */
 import { useEffect, useRef, useState } from 'react';
-import type { AppGroup, AppRow } from '../shapes';
+import type { AppAddParams, AppGroup, AppRow } from '../shapes';
 import { Button } from '../controls/button';
 import { useHostBridge } from '../host-bridge';
+import { Icon } from '../setup/icons';
+import { SearchField } from '../setup/search-field';
+import { AddForm } from './add-form';
 import { AppGroupRow } from './app-group-row';
+import { useOutcomes, type Outcome } from './outcome';
 
 const DEBOUNCE_MS = 300;
-const UNREACHABLE = 'Scout couldn’t reach the registry. Check your connection and try again.';
+const UNREACHABLE = "Scout couldn't load the app list. Check your internet and try again.";
 
 export function AppSearch({
   busy,
   refresh,
-  onConnect,
-  onConnectAnyway,
+  offline,
+  onAdd,
+  onAddAnyway,
+  onAddApp,
 }: {
-  /** Ids whose call is running; their Connect is disabled. */
+  /** The brain is away: the page already says so once, so the list error stays quiet. */
+  offline: boolean;
+  /** Ids whose call is running; they show "Waiting for you…". */
   busy: ReadonlySet<string>;
-  /** Changes when the apps changed (a connect finished): search again, the list has moved on. */
+  /** Changes when the apps changed (an add finished): search again, the list has moved on. */
   refresh: number;
-  onConnect: (row: AppRow, query: string) => void;
-  onConnectAnyway: (row: AppRow, query: string) => void;
+  onAdd: (row: AppRow, query: string) => Promise<Outcome | null>;
+  onAddAnyway: (row: AppRow, query: string) => Promise<Outcome | null>;
+  onAddApp: (params: AppAddParams) => Promise<boolean>;
 }) {
   const bridge = useHostBridge();
   const [text, setText] = useState('');
   const [term, setTerm] = useState('');
   const [popular, setPopular] = useState<AppRow[]>([]);
+  const [popularMore, setPopularMore] = useState<AppRow[]>([]);
+  const [showMore, setShowMore] = useState(false);
   const [groups, setGroups] = useState<AppGroup[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [unreachable, setUnreachable] = useState(false);
   const [settled, setSettled] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [byHand, setByHand] = useState(false);
+  const { outcomes, track, clear } = useOutcomes();
   const latest = useRef(0);
+  // While an outcome is on a row, the brain no longer lists that app; keep the list as it is.
+  const frozen = useRef(false);
+  useEffect(() => {
+    frozen.current = outcomes.size > 0;
+  }, [outcomes]);
 
   useEffect(() => {
     const timer = setTimeout(() => setTerm(text.trim()), DEBOUNCE_MS);
@@ -42,18 +61,24 @@ export function AppSearch({
   }, [text]);
 
   useEffect(() => {
+    if (frozen.current) return;
     const mine = ++latest.current;
+    setLoading(true);
     bridge.setupOverview(term === '' ? undefined : term).then(
       (overview) => {
         if (mine !== latest.current) return;
         setUnreachable(false);
         setSettled(true);
+        setLoading(false);
         setPopular(overview.popular);
+        setPopularMore(overview.popularMore);
         setGroups(overview.appGroups);
         setCursor(overview.nextCursor);
       },
       () => {
-        if (mine === latest.current) setUnreachable(true);
+        if (mine !== latest.current) return;
+        setUnreachable(true);
+        setLoading(false);
       },
     );
   }, [bridge, term, refresh]);
@@ -74,68 +99,100 @@ export function AppSearch({
   };
 
   const typing = text.trim() !== '';
+  const searching = loading && term !== '';
+  const rowFor = (app: AppRow) => (
+    <AppGroupRow
+      key={app.id}
+      group={{
+        service: app.name,
+        official: app.official ? app : null,
+        others: app.official ? [] : [app],
+      }}
+      busy={busy}
+      outcomes={outcomes}
+      onAdd={(chosen) => void track(chosen.id, onAdd(chosen, term))}
+      onAddAnyway={(chosen) => void track(chosen.id, onAddAnyway(chosen, term))}
+    />
+  );
+  const empty = term !== '' && settled && !unreachable && groups.length === 0;
+
   return (
     <>
-      <label>
-        <span className="tg-note">Search the app registry</span>
-        <input
-          type="search"
-          aria-label="Search apps"
-          placeholder="Notion, Linear, a calendar…"
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-        />
-      </label>
+      <SearchField
+        label="Search apps"
+        placeholder="Notion, Linear, a calendar…"
+        value={text}
+        onChange={(value) => {
+          setText(value);
+          clear();
+        }}
+        loading={searching}
+      />
 
-      {unreachable && (
-        <p className="tg-note" role="status">
+      {unreachable && !offline && (
+        <p className="tg-error" role="alert">
           {UNREACHABLE}
         </p>
       )}
 
-      {!typing && popular.length > 0 && (
-        <section aria-label="Popular">
-          <h3 className="home-card__label">POPULAR</h3>
-          <ul className="home-list home-conns__list">
-            {popular.map((app) => (
-              <AppGroupRow
-                key={app.id}
-                group={{
-                  service: app.name,
-                  official: app.official ? app : null,
-                  others: app.official ? [] : [app],
-                }}
-                busy={busy}
-                onConnect={(chosen) => onConnect(chosen, term)}
-                onConnectAnyway={(chosen) => onConnectAnyway(chosen, term)}
-              />
-            ))}
-          </ul>
-        </section>
-      )}
+      {byHand ? (
+        <AddForm onAdd={onAddApp} onCancel={() => setByHand(false)} />
+      ) : (
+        <>
+          {!typing && popular.length > 0 && (
+            <section aria-label="Popular">
+              <p className="cx-group-label">Popular</p>
+              <ul className="cx-list">
+                {popular.map(rowFor)}
+                {showMore && popularMore.map(rowFor)}
+              </ul>
+            </section>
+          )}
 
-      {groups.length > 0 && (
-        <ul aria-label="Results" className="home-list home-conns__list">
-          {groups.map((group) => (
-            <AppGroupRow
-              key={group.service}
-              group={group}
-              busy={busy}
-              onConnect={(chosen) => onConnect(chosen, term)}
-              onConnectAnyway={(chosen) => onConnectAnyway(chosen, term)}
-            />
-          ))}
-        </ul>
-      )}
+          {groups.length > 0 && (
+            <ul aria-label="Results" className={searching ? 'cx-list cx-stale' : 'cx-list'}>
+              {groups.map((group) => (
+                <AppGroupRow
+                  key={group.service}
+                  group={group}
+                  busy={busy}
+                  outcomes={outcomes}
+                  onAdd={(chosen) => void track(chosen.id, onAdd(chosen, term))}
+                  onAddAnyway={(chosen) => void track(chosen.id, onAddAnyway(chosen, term))}
+                />
+              ))}
+            </ul>
+          )}
 
-      {term !== '' && settled && !unreachable && groups.length === 0 && (
-        <p className="tg-note">Nothing found. Try another word, or add one by hand.</p>
-      )}
+          {empty && (
+            <div className="cx-empty">
+              <p className="cx-empty__lead">No apps match &quot;{term}&quot;.</p>
+              <p>Try another word, or add it yourself.</p>
+            </div>
+          )}
 
-      {cursor !== null && (
-        <Button variant="secondary" onClick={loadMore}>
-          Load more
-        </Button>
+          <div className="cx-foot">
+            {!typing && !showMore && popularMore.length > 0 && (
+              <span className="cx-foot__more">
+                <Button variant="secondary" onClick={() => setShowMore(true)}>
+                  Show more
+                </Button>
+                <span className="cx-meta">
+                  {popularMore.map((app) => app.name).join(', ')}…
+                </span>
+              </span>
+            )}
+            {cursor !== null && (
+              <Button variant="secondary" onClick={loadMore}>
+                Load more
+              </Button>
+            )}
+            <button type="button" className="cx-linkbtn" onClick={() => setByHand(true)}>
+              Can&apos;t find it? Add it yourself
+              <Icon name="chevRight" />
+            </button>
+          </div>
+        </>
       )}
     </>
   );

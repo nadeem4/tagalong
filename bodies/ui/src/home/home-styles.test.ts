@@ -1,14 +1,15 @@
-/** Tests for HOME_CSS: the gold focus ring. */
+/** Tests for HOME_CSS: the dark focus ring on light surfaces and the shared page rules. */
 
 import { describe, expect, it } from 'vitest';
 import { themeTokens as t } from '../theme/tokens';
 import { HOME_CSS } from './home-styles';
 
 describe('HOME_CSS', () => {
-  it('rings keyboard focus in gold across Home, as Settings does', () => {
+  it('rings keyboard focus in dark ink on Home’s light surfaces, and gold on the navy nav', () => {
     expect(HOME_CSS).toContain(
-      `.home :focus-visible {\n  outline: ${t.size.focusRing}px solid ${t.color.gold}; outline-offset: ${t.size.focusOffset}px;`,
+      `.home :focus-visible {\n  outline: ${t.size.focusRing}px solid ${t.color.focusOnLight}; outline-offset: ${t.size.focusOffset}px;`,
     );
+    expect(HOME_CSS).toContain(`.home-nav :focus-visible { outline-color: ${t.color.focusOnNavy}; }`);
   });
 
   it('shows the where-things-run status dots and keeps the wrap rule to that card', () => {
@@ -45,13 +46,5 @@ describe('HOME_CSS', () => {
     expect(HOME_CSS).toMatch(
       /prefers-reduced-motion: reduce\)\s*\{[^}]*\.job-log__glyph--running[^}]*animation: none/,
     );
-  });
-
-  it('styles the app search group, tags and check card from tokens', () => {
-    for (const name of ['.conn-group', '.conn-tag--official', '.conn-check']) {
-      expect(HOME_CSS).toContain(`${name} {`);
-    }
-    expect(HOME_CSS).toContain('.conn-tag {');
-    expect(HOME_CSS).toMatch(new RegExp(`\\.conn-check \\{[^}]*${t.color.warnFill}`));
   });
 });

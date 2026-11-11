@@ -1,6 +1,6 @@
 /**
- * "Add one by hand" on Home's Connections page: the form for any MCP server, an address on the
- * web or a command on this PC. The key is sent once and cleared. Contains AddForm.
+ * "Add it yourself" on Home's Connections page: the form for any MCP server, a web address or a
+ * command on this PC. The key is sent once and cleared. Contains AddForm.
  */
 
 import { useId, useState } from 'react';
@@ -51,7 +51,13 @@ function SecretField({
 
 type SignIn = 'oauth' | 'token' | 'none';
 
-export function AddForm({ onAdd }: { onAdd: (params: AppAddParams) => Promise<boolean> }) {
+export function AddForm({
+  onAdd,
+  onCancel,
+}: {
+  onAdd: (params: AppAddParams) => Promise<boolean>;
+  onCancel: () => void;
+}) {
   const [kind, setKind] = useState<'remote' | 'local'>('remote');
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
@@ -105,9 +111,11 @@ export function AddForm({ onAdd }: { onAdd: (params: AppAddParams) => Promise<bo
   };
 
   return (
-    <div className="home-conn__form">
-      <p className="tg-note">
-        Any MCP server: an address on the web, or a command that runs on this PC.
+    <div className="cx-form">
+      <h3 className="cx-form__title">Add it yourself</h3>
+      <p className="cx-form__lead">
+        For apps that aren&apos;t listed. You&apos;ll need its web address, or the command that
+        starts it on this PC.
       </p>
       <div className="tg-choices" role="radiogroup" aria-label="Kind of app">
         <label className="tg-choice">
@@ -117,7 +125,7 @@ export function AddForm({ onAdd }: { onAdd: (params: AppAddParams) => Promise<bo
             checked={kind === 'remote'}
             onChange={() => setKind('remote')}
           />
-          <span>An address on the web</span>
+          <span>A web address</span>
         </label>
         <label className="tg-choice">
           <input
@@ -165,12 +173,13 @@ export function AddForm({ onAdd }: { onAdd: (params: AppAddParams) => Promise<bo
             />
           </label>
           <label>
-            <span>
-              Environment (NAME=value, one per line; {'${NAME}'} takes the value from your own
-              environment)
-            </span>
+            <span>Settings it needs (one NAME=value per line)</span>
             <textarea rows={2} value={env} onChange={(event) => setEnv(event.target.value)} />
           </label>
+          <p className="cx-form__hint">
+            Write {'${NAME}'} to use a value already set on this PC, so the secret is not typed
+            here.
+          </p>
         </>
       )}
       {problem !== null && (
@@ -178,9 +187,12 @@ export function AddForm({ onAdd }: { onAdd: (params: AppAddParams) => Promise<bo
           {problem}
         </p>
       )}
-      <div className="home-conn__actions">
+      <div className="cx-form__actions">
+        <Button variant="quiet" onClick={onCancel}>
+          Cancel
+        </Button>
         <Button variant="primary" onClick={() => void submit()}>
-          Add
+          Add app
         </Button>
       </div>
     </div>

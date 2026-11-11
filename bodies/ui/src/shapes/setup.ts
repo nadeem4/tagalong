@@ -14,6 +14,9 @@ const Choice = z.object({
   description: z.string(),
   // Old brains do not send it; an expert row is Official only when the brain says so.
   official: z.boolean().default(false),
+  // The curated experts: one is Recommended; Tested means Scout ran it. Old brains send neither.
+  recommended: z.boolean().default(false),
+  tested: z.boolean().default(false),
 });
 
 const AppRowWire = z.object({
@@ -49,10 +52,21 @@ const Wire = z
         official: z.boolean().default(false),
       }),
     ),
-    apps: z.array(z.object({ id: z.string().min(1), name: z.string(), state: z.string() })),
+    apps: z.array(
+      z.object({
+        id: z.string().min(1),
+        name: z.string(),
+        state: z.string(),
+        // The trust kept at install; an old brain does not say, so it reads as Community.
+        official: z.boolean().default(false),
+      }),
+    ),
     browse_experts: z.array(Choice),
     browse_apps: z.array(Choice),
     popular: z.array(AppRow).default([]),
+    popular_more: z.array(AppRow).default([]),
+    // Where "Show more" starts in browse_experts; null (an old brain) means nothing is hidden.
+    show_more_from: z.number().nullable().default(null),
     app_groups: z
       .array(
         z.object({
@@ -74,13 +88,25 @@ const Wire = z
       .nullable(),
     failed: z.object({ expert: z.string(), error: z.string() }).nullable(),
   })
-  .transform(({ browse_experts, browse_apps, app_groups, next_cursor, ...rest }) => ({
-    ...rest,
-    browseExperts: browse_experts,
-    browseApps: browse_apps,
-    appGroups: app_groups,
-    nextCursor: next_cursor,
-  }));
+  .transform(
+    ({
+      browse_experts,
+      browse_apps,
+      app_groups,
+      next_cursor,
+      popular_more,
+      show_more_from,
+      ...rest
+    }) => ({
+      ...rest,
+      browseExperts: browse_experts,
+      browseApps: browse_apps,
+      appGroups: app_groups,
+      nextCursor: next_cursor,
+      popularMore: popular_more,
+      showMoreFrom: show_more_from,
+    }),
+  );
 
 export type SetupOverview = z.infer<typeof Wire>;
 export type SetupExpert = SetupOverview['experts'][number];
