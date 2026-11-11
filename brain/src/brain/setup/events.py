@@ -2,7 +2,8 @@
 
 The item stays open until Scout's wake turn has ended, so a restart or a wake dropped because
 the budget was spent no longer loses the news: `resume` sends the saved ones again at start.
-A cancelled wake turn still ends it (F11 keeps news through a cancel). A newer event for the same expert or app replaces the saved one.
+A cancelled wake turn still ends it. A newer event for the same expert or app replaces
+the saved one.
 """
 
 from collections.abc import Callable
