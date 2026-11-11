@@ -94,10 +94,13 @@ class AskRunner:
         self._spawn(self._answer(ask_id, option, body_id))
 
     async def _answer(self, ask_id: str, option: str, body_id: str) -> None:
+        before = self._items.get(ask_id)
         try:
             item = self._items.answer(ask_id, option, body_id)
-        except OpenItemRefused:
-            return  # it ended first; its card is already closed
+        except OpenItemRefused as refused:
+            if refused.reason == "expired" and before is not None and before.state == "open":
+                self._expired(self._items.get(ask_id))  # this answer found it past its deadline
+            return  # otherwise it ended first; its card is already closed
         try:
             await self._carry_out(item, option)
         except Exception:
@@ -162,6 +165,11 @@ class AskRunner:
         closed and told, never run twice; asks that came due while the brain was away end."""
         for item in self._items.list_answered(KIND):
             self._end(item, "failed", "the brain restarted, so it is not known if it ran")
+        # A notice already due was sent before the restart (or is moot): never send it again.
+        now = self._now()
+        for item in self._items.list_open(kind=KIND):
+            if now >= _notice_at(item):
+                self._noticed.add(item.id)
         self.fire_due()
 
     def changed(self) -> None:
@@ -185,20 +193,7 @@ class AskRunner:
 
     def fire_due(self) -> None:
         for item in self._items.expire_due(self._now(), KIND):
-            self._raw.pop(item.id, None)
-            self._noticed.discard(item.id)
-            self._asks.expire(item.id, "no answer")
-            call = _call(item)
-            summary = summarise(call.text, call.name, call.input)
-            self._record_ask(item, "expired", "none", "no answer")
-            facts: dict[str, str | int] = {
-                "ask": item.id,
-                "tool": call.name,
-                "summary": summary,
-                "outcome": "expired",
-                "reason": "no answer",
-            }
-            self._emit(Event("ask_ended", facts, key=f"ask:{item.id}"))
+            self._expired(item)
         now = self._now()
         for item in self._items.list_open(kind=KIND):
             if item.id not in self._noticed and now >= _notice_at(item):
@@ -213,6 +208,23 @@ class AskRunner:
                 }
                 self._emit(Event("ask_notice", facts, key=f"ask:{item.id}"))
         self.changed()
+
+    def _expired(self, item: OpenItem) -> None:
+        """An ask ended unanswered: forget its extras, close the card, log it, tell Scout."""
+        self._raw.pop(item.id, None)
+        self._noticed.discard(item.id)
+        self._asks.expire(item.id, "no answer")
+        call = _call(item)
+        summary = summarise(call.text, call.name, call.input)
+        self._record_ask(item, "expired", "none", "no answer")
+        facts: dict[str, str | int] = {
+            "ask": item.id,
+            "tool": call.name,
+            "summary": summary,
+            "outcome": "expired",
+            "reason": "no answer",
+        }
+        self._emit(Event("ask_ended", facts, key=f"ask:{item.id}"))
 
     def _record_ask(self, item: OpenItem, outcome: str, by: str, reason: str) -> None:
         call = _call(item)

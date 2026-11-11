@@ -730,13 +730,13 @@ query and cursor together, so each page has its own file. `why-registry.json` ma
 
 These are lost when the brain restarts.
 
-| State                | Where                           | What a restart means                                                                                                                                      |
-| -------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| State                | Where                           | What a restart means                                                                                                                                                             |
+| -------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Open asks            | `asks.py` `Asks`                | The waiting is gone. A job's ask or card row is expired ("brain restarted"); a Scout ask is an `ask` open item that stays open and its card returns when a displaying body joins |
-| Expert questions     | `questions.py` `ScoutQuestions` | The waiting is gone; its `question` row is expired ("brain restarted")                                                                                    |
-| Scheduler wakes      | `scheduler.py` `Scheduler`      | Held wake batches and the rolling hour's wake count start empty                                                                                           |
-| Outboxes             | `bodies.py` `Outbox`            | The replay buffer (500 frames, 24 hours per body) is empty, so a reconnecting body gets a fresh start                                                     |
-| Running jobs         | `jobs.py`, `experts.py`         | The expert processes end; their rows become `cancelled`                                                                                                   |
-| Live history         | `sessions.py` `history`         | Rebuilt from `messages`                                                                                                                                   |
-| App connection state | `apps.py`                       | Each enabled app reconnects; state and tool lists are rebuilt                                                                                             |
-| Voice session        | `voice/service.py`              | The listening session ends; the body starts a new `listen`                                                                                                |
+| Expert questions     | `questions.py` `ScoutQuestions` | The waiting is gone; its `question` row is expired ("brain restarted")                                                                                                           |
+| Scheduler wakes      | `scheduler.py` `Scheduler`      | Held wake batches and the rolling hour's wake count start empty                                                                                                                  |
+| Outboxes             | `bodies.py` `Outbox`            | The replay buffer (500 frames, 24 hours per body) is empty, so a reconnecting body gets a fresh start                                                                            |
+| Running jobs         | `jobs.py`, `experts.py`         | The expert processes end; their rows become `cancelled`                                                                                                                          |
+| Live history         | `sessions.py` `history`         | Rebuilt from `messages`                                                                                                                                                          |
+| App connection state | `apps.py`                       | Each enabled app reconnects; state and tool lists are rebuilt                                                                                                                    |
+| Voice session        | `voice/service.py`              | The listening session ends; the body starts a new `listen`                                                                                                                       |

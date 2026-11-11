@@ -241,6 +241,30 @@ async def test_a_notice_wakes_scout_at_two_thirds_of_the_wait_once():
     assert [e.kind for e in rig.events] == ["ask_notice", "ask_ended"]
 
 
+async def test_a_restart_does_not_repeat_a_notice_already_due():
+    rig = Rig()
+    await rig.box.run(call())
+    rig.clock[0] = NOW + timedelta(days=2, minutes=1)
+    again = Rig(rig.memory, clock=rig.clock)
+    again.runner.start()
+    assert [e.kind for e in again.events] == []
+
+
+async def test_a_yes_just_after_the_deadline_ends_it_like_the_timer_would():
+    rig = Rig()
+    await rig.box.run(call())
+    [card] = rig.opened()
+    rig.clock[0] = NOW + timedelta(days=3, seconds=1)  # due, the timer has not fired yet
+    rig.asks.answer(card["id"], "allow", "desktop")
+    await rig.settle()
+    assert rig.source.ran == []
+    assert [(e.kind, e.facts["outcome"]) for e in rig.events] == [("ask_ended", "expired")]
+    assert rig.work.get(card["id"]).end_reason == "expired"
+    assert card["id"] not in rig.runner._raw and card["id"] not in rig.runner._noticed
+    rig.runner.fire_due()
+    assert len(rig.events) == 1  # not told twice
+
+
 async def test_no_answer_by_the_deadline_expires_it_and_tells_scout():
     rig = Rig()
     await rig.box.run(call())
