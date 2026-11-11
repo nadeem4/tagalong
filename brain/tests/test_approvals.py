@@ -398,3 +398,10 @@ def test_edit_and_remove_preference_notify_only_when_something_changed(mem):
     assert service.remove_preference(pref.id) is False
     assert service.edit_preference(pref.id, "c") is False
     assert sent == [("changed", {"what": "approvals"})] * 2
+
+
+def test_record_logs_who_decided_and_why(mem, caplog):
+    caplog.set_level("INFO", logger="brain.asks")
+    _record(make(mem, []), decided_by="preference", outcome="approved", reason="always ok")
+    [line] = [r.getMessage() for r in caplog.records if r.getMessage().startswith("ask.decided")]
+    assert "by=preference" in line and "why=approved" in line

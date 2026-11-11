@@ -11,7 +11,9 @@ import argparse
 import asyncio
 import getpass
 import os
+import re
 import sys
+import time
 from collections.abc import Awaitable, Callable, MutableMapping
 from functools import partial
 from pathlib import Path
@@ -63,6 +65,8 @@ def _parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("doctor", help="show what this machine has and what is missing")
     sub.add_parser("stop", help="stop the brain the desktop left running")
+    perf = sub.add_parser("perf", help="how long the brain's steps take, from its log")
+    perf.add_argument("--since", default="1h", help="how far back to look: 30m, 1h, 2d (1h)")
     key = sub.add_parser("key", help="the Anthropic key").add_subparsers(dest="sub", required=True)
     setter = key.add_parser("set", help="save the key (read from a hidden prompt or stdin)")
     setter.add_argument("--stdin", action="store_true", help="read the key from standard input")
@@ -92,6 +96,7 @@ def main(
     secret: Callable[[str], str] = getpass.getpass,
     stdin: TextIO | None = None,
     stop: Callable[[Path], str] = stop_real_brain,
+    now: Callable[[], float] = time.time,
 ) -> int:
     """Every outside thing is a parameter, so tests run on fakes. Exits 0 ok, 1 failed, 2 usage."""
     args = _parser().parse_args(argv)  # a usage error exits 2 here
@@ -108,6 +113,8 @@ def main(
             await _doctor(home, env, reg, machine, out)
         elif args.cmd == "stop":
             _stop(home, stop, out)
+        elif args.cmd == "perf":
+            _perf(home, args.since, now(), out)
         elif args.cmd == "key":
             _key(home, env, args.stdin, stdin, secret, out)
         elif args.cmd == "install":
@@ -128,6 +135,46 @@ def main(
     except KeyboardInterrupt:
         return 130
     return 0
+
+
+_UNIT_S = {"m": 60, "h": 3600, "d": 86400}
+_FIELDS = re.compile(r"(\w+)=(\S*)")
+
+
+def _perf(home: Path, since: str, now: float, out) -> None:
+    """Latest timings the brain wrote to brain.log in the window, and how many asks were
+    closed by a cancel. The brain writes `perf` and `ask.closed` lines (see telemetry.py)."""
+    m = re.fullmatch(r"(\d+)([mhd])", since)
+    if m is None:
+        raise _Fail("--since is a number and m, h or d, like 30m or 2h.")
+    start = now - int(m[1]) * _UNIT_S[m[2]]
+    log = home / "brain.log"
+    if not log.exists():
+        raise _Fail(f"No brain.log in {home}: start the brain first.")
+    steps: dict[str, dict[str, str]] = {}  # the last line per step: the timings only grow
+    cancelled = 0
+    for line in log.read_text(encoding="utf-8", errors="replace").splitlines():
+        kind = line.split(" ", 1)[0]
+        if kind not in ("perf", "ask.closed"):
+            continue
+        try:  # a truncated or junk line is skipped, not fatal
+            f = dict(_FIELDS.findall(line))
+            if float(f["t"]) < start:
+                continue
+            if kind == "perf":
+                for key in ("step", "n", "p50", "p95", "max"):
+                    f[key]
+                steps[f["step"]] = f
+            elif f.get("why") == "cancelled":
+                cancelled += 1
+        except (KeyError, ValueError):
+            continue
+    out(f"{'step':<12}{'n':>6}{'p50 s':>9}{'p95 s':>9}{'max s':>9}")
+    for step, f in sorted(steps.items()):
+        out(f"{step:<12}{f['n']:>6}{f['p50']:>9}{f['p95']:>9}{f['max']:>9}")
+    if not steps:
+        out(f"No timings in the last {since}.")
+    out(f"asks closed by cancel: {cancelled}")
 
 
 def _stop(home: Path, stop: Callable[[Path], str], out) -> None:

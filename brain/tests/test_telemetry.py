@@ -7,7 +7,7 @@ import logging
 
 import pytest
 
-from brain.telemetry import TIMINGS, LoopLagMonitor, Timings, timed
+from brain.telemetry import TIMINGS, LoopLagMonitor, Timings, ask_event, dump_timings, timed
 
 
 class FakeTime:
@@ -83,3 +83,25 @@ def test_ring_buffer_drops_oldest():
         t.record("x", float(n), {})
     assert [s for s, _ in t.samples("x")] == [2.0, 3.0, 4.0]
     assert t.summary()["x"].count == 3
+
+
+async def test_dump_timings_writes_one_perf_line_per_step_and_only_when_changed(caplog):
+    TIMINGS.clear()
+    TIMINGS.record("turn", 1.5, {})
+    caplog.set_level("INFO", logger="brain.perf")
+    task = asyncio.create_task(dump_timings(every=0.01))
+    await asyncio.sleep(0.1)
+    task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
+    lines = [r.getMessage() for r in caplog.records if r.getMessage().startswith("perf ")]
+    assert len(lines) == 1  # nothing changed after the first write
+    for part in ("t=", "step=turn", "n=1", "p50=1.500", "p95=1.500", "max=1.500"):
+        assert part in lines[0]
+    TIMINGS.clear()
+
+
+def test_ask_event_turns_spaces_in_why_into_underscores(caplog):
+    caplog.set_level("INFO", logger="brain.asks")
+    ask_event("closed", "a1", "brain", "job ended: stopped")
+    [line] = [r.getMessage() for r in caplog.records]
+    assert "why=job_ended:_stopped" in line

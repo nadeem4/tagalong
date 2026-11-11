@@ -18,6 +18,7 @@ from brain.store import rules
 from brain.store.db import utc_text
 from brain.store.rules import Preference
 from brain.store.work import WorkStore
+from brain.telemetry import ask_event
 
 if TYPE_CHECKING:
     from brain.toolbox import Handler, ToolSpec
@@ -87,6 +88,7 @@ class Approvals:
             preference.sentence if preference else None,
             reason,
         )
+        ask_event("decided", ask_id, decided_by, outcome)
         self._notify("changed", {"what": "approvals"})
         if preference is not None:
             self._notify(

@@ -93,7 +93,7 @@ use.
 On a brain machine with no screen, `uv run tagalong doctor` shows what is set up and what is
 missing, and `tagalong key set`, `install <expert>`, `login <expert>` and `apps add <app>` do the
 same setup from a terminal (see [docs/development.md](docs/development.md)); none of them needs the
-brain to be running.
+brain to be running. `uv run tagalong perf` prints how long the brain's steps take.
 
 Upgrading: if you installed the Claude Code adapter globally with npm before, set
 `TAGALONG_EXPERT_CMD=claude-agent-acp` to keep using it, or let Scout install it.

@@ -165,6 +165,7 @@ uv run tagalong key set               # hidden prompt; or: echo "$KEY" | uv run 
 uv run tagalong install claude-acp    # shows what it downloads, asks y/N (--yes skips)
 uv run tagalong login claude-acp      # a terminal window or the expert's browser step
 uv run tagalong apps add <registry-id>
+uv run tagalong perf --since 1h      # step timings and cancelled asks, from brain.log
 uv run brain                          # start (or restart) the brain afterwards
 ```
 

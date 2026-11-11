@@ -18,7 +18,7 @@ The brain is Python; the TypeScript apps are bodies.
 - Setup: pnpm install (Node >= 22, pnpm 10)
 - Test: pnpm test (vitest, all packages); pnpm --filter @tagalong/desktop test:e2e for the Electron Playwright suites (they run on a fake brain, no real brain needed)
 - Check: pnpm typecheck && pnpm lint && pnpm format:check
-- Brain (Python 3.12 or 3.13): cd brain && uv sync; uv run pytest; uv run ruff check; uv run ruff format --check; uv run brain (starts the websocket server); uv run tagalong stop (ends the brain the desktop left running)
+- Brain (Python 3.12 or 3.13): cd brain && uv sync; uv run pytest; uv run ruff check; uv run ruff format --check; uv run brain (starts the websocket server); uv run tagalong stop (ends the brain the desktop left running); uv run tagalong perf [--since 1h] (step timings and cancelled asks, read from brain.log)
 - Run: pnpm dev:desktop (builds contract, ui and the browser add-on first; the desktop starts the brain detached if none is running (output in <TAGALONG_HOME>/brain.log) and leaves it running on quit; or run `cd brain && uv run brain` yourself); the desktop dials the brain at TAGALONG_BRAIN_ADDR (default 127.0.0.1:47321) and retries every 2 s
 - Experts: Scout installs them on demand from the registry (nothing to install by hand); each runs on the user's own login, not the API key; TAGALONG_EXPERT_CMD adds one custom expert
 - Setup from a terminal (no screen): cd brain && uv run tagalong doctor (also stop, key set, install <expert>, login <expert>, apps add <app>; never needs a running brain)
