@@ -35,6 +35,7 @@ from brain.masking import Masker, SecretLogFilter, mask_json
 from brain.memory import Memory
 from brain.mind.turn import AnthropicModel
 from brain.models import chosen as chosen_model
+from brain.models import model_name
 from brain.offers import OfferSettings
 from brain.server import start_server
 from brain.sessions import Session
@@ -212,6 +213,7 @@ async def _run() -> None:
             "log_path": str(config.data_dir / "brain.log"),
             "places": [{"id": b.id, "kind": b.kind, "name": b.name} for b in bodies.online()],
             "work_running": bool(session.records.running_jobs()),
+            "model": model_name(chosen_model(memory.db, config.model)),
         }
 
     session = Session(

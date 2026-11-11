@@ -21,6 +21,7 @@ const WIRE = {
   log_path: 'C:/Users/me/.tagalong/brain.log',
   places: [{ id: 'desktop', kind: 'desktop', name: 'Desktop' }],
   work_running: false,
+  model: 'Claude Opus 5.5',
 };
 
 function setup(over: { wire?: object | 'missing'; link?: string; hello?: object } = {}) {
@@ -57,6 +58,7 @@ function setup(over: { wire?: object | 'missing'; link?: string; hello?: object 
     copied,
     opened,
     setWire: (next: object | 'missing') => (wire = next),
+    brain: deps.brain,
   };
 }
 
@@ -78,7 +80,25 @@ describe('brain card', () => {
       logPath: 'C:/Users/me/.tagalong/brain.log',
       places: [{ id: 'desktop', kind: 'desktop', name: 'Desktop' }],
       workRunning: false,
+      model: 'Claude Opus 5.5',
     });
+  });
+
+  it('an older brain that does not name its model still gives a card, with no model', async () => {
+    const { model: _model, ...old } = WIRE;
+    const { status } = setup({ wire: old });
+    expect(await status.card()).toMatchObject({ status: 'running', model: null });
+  });
+
+  it('offline card keeps the model last seen', async () => {
+    const { status, brain } = setup();
+    await status.card();
+    (brain as { link: string }).link = 'offline';
+    expect(await status.card()).toMatchObject({ status: 'offline', model: 'Claude Opus 5.5' });
+  });
+
+  it('offline card that never saw the brain has no model', async () => {
+    expect(await setup({ link: 'offline' }).status.card()).toMatchObject({ model: null });
   });
 
   it('offline card keeps addr, data folder and log', async () => {

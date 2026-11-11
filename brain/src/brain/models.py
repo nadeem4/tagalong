@@ -33,5 +33,10 @@ def chosen(db: sqlite3.Connection, env_default: str) -> str:
     return saved if any(m.id == saved for m in MODELS) else env_default
 
 
+def model_name(model_id: str) -> str:
+    """The name shown for an id; an unlisted one (a custom TAGALONG_MODEL) shows as is."""
+    return next((m.name for m in MODELS if m.id == model_id), model_id)
+
+
 def save(db: sqlite3.Connection, model_id: str) -> None:
     set_setting(db, _KEY, model_id)

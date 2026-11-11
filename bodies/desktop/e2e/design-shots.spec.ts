@@ -49,6 +49,7 @@ function status(startedBy: string, workRunning: boolean): Record<string, unknown
       { id: 'browser', kind: 'browser', name: 'Browser' },
     ],
     work_running: workRunning,
+    model: 'Claude Opus 5.5',
   };
 }
 

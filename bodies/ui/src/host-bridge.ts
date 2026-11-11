@@ -202,6 +202,8 @@ export interface BrainCard {
   update: 'none' | 'ready' | 'terminal';
   version: string | null;
   build: string | null;
+  /** The model Scout thinks with, by name; null until the brain has said. */
+  model: string | null;
   /** The app's own version and build, to show beside a brain that differs, and while offline. */
   appVersion: string;
   appBuild: string;

@@ -549,6 +549,7 @@ export function createFakeHostBridge(
           update: 'none',
           version: '0.9.2',
           build: 'a1b2c3d',
+          model: 'Claude Opus 5.5',
           appVersion: '0.9.2',
           appBuild: 'a1b2c3d',
           startedAt: new Date(Date.now() - 25 * 60_000).toISOString(),

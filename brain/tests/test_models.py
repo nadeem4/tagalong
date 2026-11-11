@@ -32,6 +32,11 @@ def test_unknown_saved_model_falls_back(db):
     assert models.chosen(db, "claude-sonnet-5-5") == "claude-sonnet-5-5"
 
 
+def test_model_name_is_the_listed_name_or_the_id():
+    assert models.model_name("claude-sonnet-5-5") == "Claude Sonnet 5.5"
+    assert models.model_name("my-custom-model") == "my-custom-model"
+
+
 def test_every_model_has_a_price():
     assert [m.id for m in models.MODELS] == [
         "claude-opus-5-5",
