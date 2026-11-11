@@ -8,10 +8,9 @@ import { createRoot } from 'react-dom/client';
 import { ApprovedReport, CompanionBubble, GreetingLine, HostBridgeProvider } from '@tagalong/ui';
 import type { ContextSnapshot, PetRemarkParams, StatusMark } from '@tagalong/ui/shapes';
 import type { DropOffer } from '@tagalong/ui';
-// Bundled, not fetched: the bubble's two typefaces ship inside the app, Latin subset only.
+// Bundled, not fetched: the bubble's typeface (Onest 400 and 600) ships inside the app, Latin subset only.
 import '@fontsource/onest/latin-400.css';
 import '@fontsource/onest/latin-600.css';
-import '@fontsource/pixelify-sans/latin-700.css';
 import './app.css';
 import '../../shared/ipc';
 import { SpeechPlayer } from './voice-player';

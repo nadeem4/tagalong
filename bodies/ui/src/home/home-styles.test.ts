@@ -1,15 +1,15 @@
-/** Tests for HOME_CSS: the dark focus ring on light surfaces and the shared page rules. */
+/** Tests for HOME_CSS: the focus ring follows the surface, never a fixed gold. */
 
 import { describe, expect, it } from 'vitest';
 import { themeTokens as t } from '../theme/tokens';
 import { HOME_CSS } from './home-styles';
 
 describe('HOME_CSS', () => {
-  it('rings keyboard focus in dark ink on Home’s light surfaces, and gold on the navy nav', () => {
+  it('no gold focus override: the ring comes from the surface variable', () => {
     expect(HOME_CSS).toContain(
-      `.home :focus-visible {\n  outline: ${t.size.focusRing}px solid ${t.color.focusOnLight}; outline-offset: ${t.size.focusOffset}px;`,
+      `.home :focus-visible {\n  outline: ${t.size.focusRing}px solid var(--tg-focus); outline-offset: ${t.size.focusOffset}px;`,
     );
-    expect(HOME_CSS).toContain(`.home-nav :focus-visible { outline-color: ${t.color.focusOnNavy}; }`);
+    expect(HOME_CSS).not.toMatch(/focus-visible[^}]*#F2C14E/i);
   });
 
   it('shows the where-things-run status dots and keeps the wrap rule to that card', () => {

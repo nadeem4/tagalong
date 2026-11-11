@@ -136,7 +136,7 @@ export function JobsPanel({ embedded = false, openJob = null, onOpenJob }: JobsP
         </div>
       )}
       <section className="home-card" aria-label="Jobs">
-        <h2 className="home-card__label">JOBS</h2>
+        <h2 className="home-card__label">Jobs</h2>
         {failed && jobs === null && (
           <p role="alert">
             Tagalong could not read the jobs. They load again when Home reopens or a job changes.

@@ -78,7 +78,7 @@ export function WhereThingsRun() {
 
   return (
     <section className="home-card home-card--run" aria-label="Where things run">
-      <h2 className="home-card__label">WHERE THINGS RUN</h2>
+      <h2 className="home-card__label">Where things run</h2>
       <p className="home-card__row home-card__row--app">
         <span className="home-conn__initial" aria-hidden="true">
           B

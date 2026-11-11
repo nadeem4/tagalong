@@ -190,7 +190,7 @@ function Overview({ companion, host }: { companion: Pet | undefined; host: HomeH
       </div>
       <div className="home-cards">
         <section className="home-card" aria-label={name}>
-          <h2 className="home-card__label">{name.toUpperCase()}</h2>
+          <h2 className="home-card__label">{name}</h2>
           <p className="home-card__lead">
             <span
               className={status.ok ? 'home-dot' : 'home-dot home-dot--warn'}

@@ -3,6 +3,9 @@
  * at once, and tells the person to go back to the popup. Chrome remembers the grant for the
  * extension, which is what the offscreen page then uses.
  */
+import '@fontsource/onest/latin-400.css';
+import '@fontsource/onest/latin-600.css';
+
 const allow = document.getElementById('allow') as HTMLButtonElement;
 const result = document.getElementById('result') as HTMLElement;
 

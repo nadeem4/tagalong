@@ -2,6 +2,8 @@
  * The permission window's glue: shows what Scout wants and why, and on a click asks Chrome.
  * chrome.permissions.request must run inside the click handler, which is why this is a page.
  */
+import '@fontsource/onest/latin-400.css';
+import '@fontsource/onest/latin-600.css';
 import { buttonsFor, chromeRequestFor, parseRequest, type Scope } from './model';
 import { denial } from '../permissions';
 

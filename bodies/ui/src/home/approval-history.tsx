@@ -133,7 +133,7 @@ export function ApprovalHistory({ rows, counts, filter, onFilter, hasMore, onMor
         </div>
       </div>
       <div className="apv-bar">
-        <h2 className="home-card__label">HISTORY</h2>
+        <h2 className="home-card__label">History</h2>
         <div className="apv-seg" role="group" aria-label="Filter history">
           {FILTERS.map((item) => (
             <button

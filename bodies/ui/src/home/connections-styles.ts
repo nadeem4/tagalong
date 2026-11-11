@@ -5,7 +5,7 @@
  * to one. Colours come from the tokens; a few literals wait for the token pass.
  * Scoped under `.home` so it outranks the card's own paragraph rules. Contains CONNECTIONS_CSS.
  */
-import { themeTokens as t } from '../theme/tokens';
+import { themeTokens as t, typeCss } from '../theme/tokens';
 
 // No token yet for the check card's border or the Recommended chip.
 const WARN_LINE = '#EED79A';
@@ -23,38 +23,38 @@ export const CONNECTIONS_CSS = `
 .home .cx-row--top { align-items: start; }
 .home .cx-tile {
   width: 36px; height: 36px; border-radius: 10px; background: ${t.color.panelTile}; color: ${t.color.panelText};
-  display: grid; place-items: center; font-size: 14px; line-height: 21px; font-weight: 600;
+  display: grid; place-items: center; ${typeCss('bodyLead')}; font-weight: 600;
 }
 .home .cx-row__main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .home .cx-row__name {
   display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap;
-  font-size: 14px; line-height: 21px; font-weight: 600; color: ${t.color.panelText};
+  ${typeCss('bodyLead')}; font-weight: 600; color: ${t.color.panelText};
 }
 .home .cx-row__desc {
-  color: ${t.color.panelText}; font-size: 13px; line-height: 20px; max-width: 62ch; overflow: hidden;
+  color: ${t.color.panelText}; ${typeCss('body')}; max-width: 62ch; overflow: hidden;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
-.home .cx-meta { color: ${t.color.panelMuted}; font-size: 12px; line-height: 16px; font-weight: 400; }
+.home .cx-meta { color: ${t.color.panelMuted}; ${typeCss('small')}; }
 .home .cx-row__side { display: flex; align-items: center; gap: 12px; justify-self: end; flex-wrap: wrap; justify-content: flex-end; }
 .home .cx-row__note { padding: 0 0 10px 50px; }
 .home .cx-fixed { min-width: 72px; }
 .home .cx-chip {
   display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px; border-radius: 10px;
-  font-size: 11px; line-height: 14px; font-weight: 600; flex: none; white-space: nowrap;
+  ${typeCss('caption')}; flex: none; white-space: nowrap;
   background: ${t.color.panelTile}; color: ${t.color.chipFreeInk};
 }
 .home .cx-chip--official { background: ${t.color.okFill}; color: ${t.color.okInk}; }
 .home .cx-chip--rec { background: ${REC_FILL}; color: ${REC_INK}; }
 .home .cx-chip--quiet { background: transparent; color: ${t.color.panelMuted}; border: 1px solid ${t.color.panelLine}; }
 .home .cx-status {
-  display: inline-flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 6px; ${typeCss('small')}; font-weight: 600;
   color: ${t.color.okInk}; white-space: nowrap;
 }
-.home .cx-group-label { margin: 4px 0 -4px; color: ${t.color.panelMuted}; font-size: 12px; line-height: 16px; font-weight: 600; }
+.home .cx-group-label { margin: 4px 0 -4px; color: ${t.color.panelMuted}; ${typeCss('small')}; font-weight: 600; }
 .home .cx-icon { width: 16px; height: 16px; flex: none; }
 .home .cx-more {
   display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px 50px; padding: 2px 0; border: 0; background: none;
-  font: inherit; font-size: 12px; line-height: 16px; font-weight: 600; color: ${t.color.panelMuted}; cursor: pointer;
+  font: inherit; ${typeCss('small')}; font-weight: 600; color: ${t.color.panelMuted}; cursor: pointer;
 }
 .home .cx-others {
   margin: 6px 0 0 50px; padding-left: 14px; border-left: 1px solid ${t.color.panelLine}; list-style: none;
@@ -69,12 +69,12 @@ export const CONNECTIONS_CSS = `
 }
 .home .cx-check__title {
   display: flex; align-items: center; gap: 8px; margin: 0; color: ${t.color.warnInk};
-  font-size: 14px; line-height: 21px; font-weight: 600;
+  ${typeCss('bodyLead')}; font-weight: 600;
 }
-.home .cx-check__facts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 20px; }
-.home .cx-check__lead { color: ${t.color.panelText}; font-weight: 600; font-size: 14px; line-height: 21px; }
+.home .cx-check__facts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; ${typeCss('body')}; }
+.home .cx-check__lead { color: ${t.color.panelText}; ${typeCss('bodyLead')}; font-weight: 600; }
 .home .cx-check__foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.home .cx-check__foot p { flex: 1 1 260px; margin: 0; color: ${t.color.warnInk}; font-size: 12px; line-height: 16px; }
+.home .cx-check__foot p { flex: 1 1 260px; margin: 0; color: ${t.color.warnInk}; ${typeCss('small')}; }
 .home .cx-check .tg-button--secondary { background: transparent; border-color: rgba(92, 70, 0, .35); color: ${t.color.warnInk}; }
 .home .cx-link {
   display: inline-flex; align-items: center; gap: 4px; color: ${t.color.link}; font-weight: 600;
@@ -89,19 +89,19 @@ export const CONNECTIONS_CSS = `
 }
 .home .cx-search__box input {
   flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none; padding: 0;
-  font: inherit; font-size: 14px; line-height: 21px; color: ${t.color.panelText};
+  font: inherit; ${typeCss('bodyLead')}; color: ${t.color.panelText};
 }
-.home .cx-search__box:focus-within { outline: 2px solid ${t.color.focusOnLight}; outline-offset: 2px; }
-.home .cx-search__status { min-height: 16px; margin: 0; font-size: 12px; line-height: 16px; }
+.home .cx-search__box:focus-within { outline: 2px solid var(--tg-focus); outline-offset: 2px; }
+.home .cx-search__status { min-height: 16px; margin: 0; ${typeCss('small')}; }
 .home .cx-stale { opacity: .45; }
 
 .home .cx-outcome {
-  display: inline-flex; align-items: center; gap: 6px; font-size: 13px; line-height: 20px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 6px; ${typeCss('bodyLead')}; font-weight: 600;
   color: ${t.color.okInk};
 }
 .home .cx-outcome--err { color: ${t.color.errInk}; }
 .home .cx-waiting {
-  display: inline-flex; align-items: center; gap: 8px; font-size: 13px; line-height: 20px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 8px; ${typeCss('bodyLead')}; font-weight: 600;
   color: ${t.color.panelMuted}; white-space: nowrap;
 }
 .home .cx-spin {
@@ -111,12 +111,12 @@ export const CONNECTIONS_CSS = `
 @keyframes cx-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .home .cx-spin { animation: none; border-top-color: ${t.color.panelMuted}; } }
 .home .cx-progress { display: flex; flex-direction: column; gap: 6px; width: 200px; }
-.home .cx-progress__top { display: flex; justify-content: space-between; font-size: 12px; line-height: 16px; font-weight: 600; color: ${t.color.panelText}; }
+.home .cx-progress__top { display: flex; justify-content: space-between; ${typeCss('small')}; font-weight: 600; color: ${t.color.panelText}; }
 .home .cx-bar { height: 4px; border-radius: 2px; background: ${t.color.panelTile}; overflow: hidden; }
 .home .cx-bar > i { display: block; height: 100%; background: ${t.color.panelText}; border-radius: 2px; }
 .home .cx-errline {
   display: flex; align-items: center; gap: 8px; margin: 0 0 12px 50px; padding: 10px 12px; border-radius: 8px;
-  background: ${t.color.errFill}; color: ${t.color.errInk}; font-size: 13px; line-height: 20px; font-weight: 600;
+  background: ${t.color.errFill}; color: ${t.color.errInk}; ${typeCss('bodyLead')}; font-weight: 600;
 }
 .home .cx-errline .tg-button { margin-left: auto; }
 
@@ -125,15 +125,15 @@ export const CONNECTIONS_CSS = `
 .home .cx-foot__note { margin-left: auto; }
 .home .cx-linkbtn {
   display: inline-flex; align-items: center; gap: 4px; margin-left: auto; padding: 0; border: 0; background: none;
-  font: inherit; font-size: 13px; line-height: 20px; font-weight: 600; color: ${t.color.link}; cursor: pointer;
+  font: inherit; ${typeCss('bodyLead')}; font-weight: 600; color: ${t.color.link}; cursor: pointer;
 }
 .home .cx-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 20px 0 8px; }
-.home .cx-empty p { margin: 0; font-size: 13px; line-height: 20px; color: ${t.color.panelMuted}; }
-.home .cx-empty .cx-empty__lead { font-weight: 600; color: ${t.color.panelText}; }
+.home .cx-empty p { margin: 0; ${typeCss('body')}; color: ${t.color.panelMuted}; }
+.home .cx-empty .cx-empty__lead { ${typeCss('bodyLead')}; font-weight: 600; color: ${t.color.panelText}; }
 
 .home .cx-form { display: flex; flex-direction: column; gap: 16px; padding: 16px 0 0; border-top: 1px solid ${t.color.panelLine}; }
-.home .cx-form__title { margin: 0; font-size: 16px; line-height: 22px; font-weight: 600; color: ${t.color.panelText}; }
-.home .cx-form__lead { margin: 0; font-size: 13px; line-height: 20px; color: ${t.color.panelMuted}; }
-.home .cx-form__hint { margin: -8px 0 0; font-size: 12px; line-height: 16px; color: ${t.color.panelMuted}; }
+.home .cx-form__title { margin: 0; ${typeCss('title')}; color: ${t.color.panelText}; }
+.home .cx-form__lead { margin: 0; ${typeCss('body')}; color: ${t.color.panelMuted}; }
+.home .cx-form__hint { margin: -8px 0 0; ${typeCss('small')}; color: ${t.color.panelMuted}; }
 .home .cx-form__actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 `;

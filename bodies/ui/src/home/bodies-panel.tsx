@@ -114,7 +114,7 @@ export function BodiesPanel() {
     return failed ? (
       <section className="home-card bodies" aria-labelledby={headingId}>
         <h2 id={headingId} className="home-card__label">
-          BODIES
+          Bodies
         </h2>
         <p role="alert">Tagalong could not read this. It loads again when Home reopens.</p>
       </section>
@@ -135,7 +135,7 @@ export function BodiesPanel() {
   return (
     <section className="home-card bodies" aria-labelledby={headingId}>
       <h2 id={headingId} className="home-card__label">
-        BODIES
+        Bodies
       </h2>
       <p>Where you can reach Scout. Each one is the same Scout and the same conversation.</p>
       <ul aria-label="Bodies" className="bodies-list">

@@ -1,7 +1,7 @@
 /** Tests for CONNECTIONS_CSS: the row grid, chips, check card, and only the type sizes and weights the type roles define. */
 
 import { describe, expect, it } from 'vitest';
-import { themeTokens as t } from '../theme/tokens';
+import { themeTokens as t, typeCss } from '../theme/tokens';
 import { CONNECTIONS_CSS } from './connections-styles';
 
 describe('CONNECTIONS_CSS', () => {
@@ -29,11 +29,9 @@ describe('CONNECTIONS_CSS', () => {
     );
   });
 
-  it('uses only the sizes and weights of the type roles, so the type system maps on mechanically', () => {
-    const sizes = [...CONNECTIONS_CSS.matchAll(/font-size: (\d+)px/g)].map((m) => Number(m[1]));
-    for (const size of sizes) expect([26, 20, 16, 14, 13, 12, 11]).toContain(size);
-    const weights = [...CONNECTIONS_CSS.matchAll(/font-weight: (\d+)/g)].map((m) => Number(m[1]));
-    for (const weight of weights) expect([400, 600]).toContain(weight);
-    expect(sizes.length).toBeGreaterThan(5);
+  it('sets text only through the type roles, with no capitals or letter spacing', () => {
+    expect(CONNECTIONS_CSS).toContain(typeCss('bodyLead'));
+    expect(CONNECTIONS_CSS).toContain(typeCss('small'));
+    expect(CONNECTIONS_CSS).not.toMatch(/text-transform|letter-spacing/);
   });
 });

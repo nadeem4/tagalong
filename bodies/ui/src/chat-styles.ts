@@ -4,7 +4,7 @@
  * rule: anything bordered or filled that holds text keeps at least 8px inside (12 to 16 for
  * cards and message tiles); only keycaps and small pills are tighter. Contains CHAT_CSS.
  */
-import { themeTokens as t } from './theme/tokens';
+import { themeTokens as t, typeCss } from './theme/tokens';
 
 export const CHAT_CSS = `
 /* Who is talking: Bean's still tile and the name, only on lines Scout starts. */
@@ -13,10 +13,9 @@ export const CHAT_CSS = `
   border-radius: 30%; background: #222845;
 }
 .bubble-who {
-  display: flex; align-items: center; gap: 8px; font-size: 12px; line-height: 16px;
-  font-weight: ${t.fontWeight.semibold}; color: ${t.color.text};
+  display: flex; align-items: center; gap: 8px; ${typeCss('small')}; font-weight: ${t.fontWeight.semibold}; color: ${t.color.text};
 }
-.bubble-hint { font-size: 11px; line-height: 16px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.textMuted}; }
+.bubble-hint { ${typeCss('caption')}; color: ${t.color.textMuted}; }
 /* The quiet line reading aloud: the speaking button's bars (styled in companion-bubble), not pressable. */
 .bubble-bars { display: inline-flex; align-items: center; gap: 3px; margin-left: 2px; }
 .bubble-bars span:nth-child(1) { height: 8px; }
@@ -56,8 +55,8 @@ export const CHAT_CSS = `
   padding: 0 8px 0 16px; border-bottom: 1px solid ${t.color.line}; background: ${t.color.sidebar};
 }
 .bubble-head strong {
-  margin-right: auto; font-family: ${t.font.wordmark}; font-weight: ${t.fontWeight.wordmark};
-  font-size: 16px; line-height: 20px; letter-spacing: -0.01em;
+  margin-right: auto; font-family: ${t.font.wordmark};
+  ${typeCss('title')};
 }
 .bubble-head .bubble-toggle { min-height: 26px; }
 .bubble-head .bubble-row { gap: 8px; }
@@ -70,13 +69,13 @@ export const CHAT_CSS = `
 .bubble-exchange { display: flex; flex-direction: column; gap: 12px; }
 .bubble-mine {
   align-self: flex-end; max-width: 82%; margin: 0; padding: 12px 16px; border-radius: 12px 12px 4px 12px;
-  background: #222845; font-size: 14px; line-height: 21px; white-space: pre-wrap; overflow-wrap: anywhere;
+  background: #222845; ${typeCss('bodyLead')}; white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .bubble-scoutmsg { display: flex; flex-direction: column; gap: 6px; }
 
 /* A turn in progress: the thinking row with Stop beside it, then a gold cursor on the text. */
 .bubble-live { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.bubble-thinking { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #C9CEE0; }
+.bubble-thinking { display: flex; align-items: center; gap: 10px; ${typeCss('body')}; color: #C9CEE0; }
 .bubble-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: ${t.color.gold}; }
 .bubble-stop { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px 0 8px; }
 .bubble-stop i { width: 8px; height: 8px; border-radius: 2px; background: #C9CEE0; display: block; }
@@ -97,8 +96,8 @@ export const CHAT_CSS = `
   margin: auto 0; display: flex; flex-direction: column; align-items: center; gap: 12px;
   padding: 24px 40px; text-align: center;
 }
-.bubble-empty p { margin: 0; max-width: 260px; font-size: 14px; line-height: 21px; color: #C9CEE0; }
-.bubble-empty-key { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: ${t.color.textMuted}; }
+.bubble-empty p { margin: 0; max-width: 260px; ${typeCss('bodyLead')}; color: #C9CEE0; }
+.bubble-empty-key { display: inline-flex; align-items: center; gap: 4px; ${typeCss('caption')}; color: ${t.color.textMuted}; }
 
 /* The approval card in the chat: the card surface, 16px inside. */
 .bubble--chat .card {
