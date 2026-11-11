@@ -128,7 +128,11 @@ async def test_overview_lists_installed_and_browsable_with_states(tmp_path):
     assert [(e["id"], e["state"]) for e in out["experts"]] == [("claude-acp", "ready")]
     assert out["experts"][0]["tested"] is True
     assert out["apps"] == [{"id": "a1", "name": "N", "state": "off"}]
-    assert [e["id"] for e in out["browse_experts"]] == ["codex-acp"]
+    # An installed expert stays in the list so its row can say Added.
+    assert [(e["id"], e["added"]) for e in out["browse_experts"]] == [
+        ("claude-acp", True),
+        ("codex-acp", False),
+    ]
     assert out["browse_apps"] == []  # no search: only the curated lists, never a raw page
     assert out["stale"] is False and out["progress"] is None
 
@@ -471,7 +475,7 @@ async def test_overview_experts_are_tagged(tmp_path):
     rig = Rig(tmp_path, [expert(version="2.0.0"), expert("mine", "1", None, "custom")])
     out = await rig.call("setup_overview")
     assert [e["official"] for e in out["experts"]] == [True, False]
-    assert [e["official"] for e in out["browse_experts"]] == [True]
+    assert [e["official"] for e in out["browse_experts"]] == [True, True]
 
 
 async def test_overview_reports_registry_sources(tmp_path):
@@ -553,3 +557,31 @@ async def test_experts_curated_order_and_flags(tmp_path):
     assert [r["recommended"] for r in rows] == [True, False, False, False, False]
     assert rows[0]["tested"] is True and rows[3]["tested"] is False
     assert out["show_more_from"] == 3
+
+
+async def test_curated_apps_keep_installed_ones_marked_added(tmp_path):
+    rig = Rig(tmp_path, mcp=CURATED, apps=[{"id": "a1", "name": "Notion", "state": "ready"}])
+    out = await rig.call("setup_overview")
+    assert [(r["id"], r["added"]) for r in out["popular"]] == [("com.notion/mcp", True)]
+    assert [r["added"] for r in out["popular_more"]] == [False, False]
+
+
+async def test_expert_rows_carry_licence_repo_and_account(tmp_path):
+    def agent(id, **extra):
+        return {
+            "id": id,
+            "name": id,
+            "version": "1",
+            "description": "d",
+            "license": "Apache-2.0",
+            "distribution": {"npx": {"package": f"@x/{id}@1"}},
+            **extra,
+        }
+
+    acp = json.dumps(
+        {"agents": [agent("claude-acp"), agent("zed-acp", repository="https://g.test/zed")]}
+    ).encode()
+    rows = (await Rig(tmp_path, acp=acp).call("setup_overview"))["browse_experts"]
+    assert [r["account"] for r in rows] == [True, False]
+    assert rows[1]["licence"] == "Apache-2.0" and rows[1]["repo"] == "https://g.test/zed"
+    assert rows[0]["repo"] == ""

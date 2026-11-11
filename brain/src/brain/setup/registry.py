@@ -115,6 +115,7 @@ def _acp_entry(raw: dict) -> RegistryEntry:
         raw.get("description", ""),
         raw.get("license", ""),
         distributions,
+        repo=str(raw.get("repository") or raw.get("website") or ""),
     )
 
 

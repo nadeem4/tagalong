@@ -1,17 +1,16 @@
 /**
- * The Apps tab on Home's Connections page: the Connected list (status, on/off, Restart, Remove),
- * then Add an app: search the registry (Official first, a check card before community) and, for
- * anything not listed, "Add one by hand". Contains AppsTab.
+ * The Apps tab on Home's Connections page: "Your apps" (Official, then Community, each with status,
+ * on/off, Restart, Remove) and "Add an app": search the registry (Official first, a check card
+ * before community) and "Add it yourself" for anything not listed. Contains AppsTab.
  */
-import { useState } from 'react';
 import type { AppAddParams, AppInfo, AppRow } from '../shapes';
-import { Button } from '../controls/button';
-import { AddForm } from './add-form';
 import { AppSearch } from './app-search';
 import { ConnectionRow } from './connection-row';
+import type { Outcome } from './outcome';
 
 export function AppsTab({
   apps,
+  officialIds,
   offline,
   busy,
   refresh,
@@ -19,11 +18,13 @@ export function AppsTab({
   onRestart,
   onSignIn,
   onRemove,
-  onConnect,
-  onConnectAnyway,
   onAdd,
+  onAddAnyway,
+  onAddApp,
 }: {
   apps: AppInfo[];
+  /** Ids of the installed apps that are Official; null when the brain could not say, so no groups. */
+  officialIds: ReadonlySet<string> | null;
   offline: boolean;
   busy: ReadonlySet<string>;
   refresh: number;
@@ -31,50 +32,67 @@ export function AppsTab({
   onRestart: (app: AppInfo) => void;
   onSignIn: (app: AppInfo) => void;
   onRemove: (app: AppInfo) => void;
-  onConnect: (row: AppRow, query: string) => void;
-  onConnectAnyway: (row: AppRow, query: string) => void;
-  onAdd: (params: AppAddParams) => Promise<boolean>;
+  onAdd: (row: AppRow, query: string) => Promise<Outcome | null>;
+  onAddAnyway: (row: AppRow, query: string) => Promise<Outcome | null>;
+  onAddApp: (params: AppAddParams) => Promise<boolean>;
 }) {
-  const [byHand, setByHand] = useState(false);
+  const rowFor = (app: AppInfo, trust: 'official' | 'community' | null) => (
+    <ConnectionRow
+      key={app.id}
+      app={app}
+      trust={trust}
+      onSwitch={() => onSwitch(app)}
+      onRestart={() => onRestart(app)}
+      onSignIn={() => onSignIn(app)}
+      onRemove={() => onRemove(app)}
+    />
+  );
+  const official = officialIds === null ? [] : apps.filter((app) => officialIds.has(app.id));
+  const community = officialIds === null ? [] : apps.filter((app) => !officialIds.has(app.id));
+
   return (
     <>
-      <section className="home-card" aria-label="Connected apps">
-        <h2 className="home-card__label">Connected</h2>
-        {apps.length > 0 && (
-          <ul aria-label="Apps" className="home-list home-conns__list">
-            {apps.map((app) => (
-              <ConnectionRow
-                key={app.id}
-                app={app}
-                onSwitch={() => onSwitch(app)}
-                onRestart={() => onRestart(app)}
-                onSignIn={() => onSignIn(app)}
-                onRemove={() => onRemove(app)}
-              />
-            ))}
+      <section className="home-card" aria-label="Your apps">
+        <h2 className="home-card__label">Your apps</h2>
+        {officialIds === null && apps.length > 0 && (
+          <ul aria-label="Apps" className="cx-list">
+            {apps.map((app) => rowFor(app, null))}
           </ul>
+        )}
+        {official.length > 0 && (
+          <>
+            <p className="cx-group-label">Official</p>
+            <ul aria-label="Official apps" className="cx-list">
+              {official.map((app) => rowFor(app, 'official'))}
+            </ul>
+          </>
+        )}
+        {community.length > 0 && (
+          <>
+            <p className="cx-group-label">Community</p>
+            <p className="cx-grp-note">
+              Made by other people. Scout asks before it changes anything with them.
+            </p>
+            <ul aria-label="Community apps" className="cx-list">
+              {community.map((app) => rowFor(app, 'community'))}
+            </ul>
+          </>
         )}
         {apps.length === 0 && !offline && (
           <p className="tg-note">No apps yet. Search for one below.</p>
         )}
       </section>
 
-      <section className="home-card home-conns" aria-label="Add an app">
+      <section className="home-card" aria-label="Add an app">
         <h2 className="home-card__label">Add an app</h2>
         <AppSearch
           busy={busy}
           refresh={refresh}
-          onConnect={onConnect}
-          onConnectAnyway={onConnectAnyway}
+          offline={offline}
+          onAdd={onAdd}
+          onAddAnyway={onAddAnyway}
+          onAddApp={onAddApp}
         />
-        <Button variant="quiet" aria-expanded={byHand} onClick={() => setByHand(!byHand)}>
-          Add one by hand
-        </Button>
-        {byHand && (
-          <div className="tg-panel home-conns__form-host">
-            <AddForm onAdd={onAdd} />
-          </div>
-        )}
       </section>
     </>
   );

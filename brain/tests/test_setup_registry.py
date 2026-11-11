@@ -56,6 +56,7 @@ async def test_parses_acp_sample(tmp_path):
         "0.99.1",
     )
     assert claude.requires == {}
+    assert claude.repo == "https://github.com/agentclientprotocol/claude-agent-acp"
     gem = by_id["gemini"].distributions[0]
     assert gem.package == "@google/gemini-cli" and gem.args == ["--acp"]
     binary = by_id["fake-binary-agent"].distributions
