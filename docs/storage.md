@@ -622,20 +622,21 @@ Everything waiting on the person (a card, choice, install, sign-in, expert quest
 setup step), one row each with one lifecycle. Nothing writes it yet: the asks, choices and
 installs move onto it in later slices (F6 and F7).
 
-| Column            | Type             | Meaning                                                                                              |
-| ----------------- | ---------------- | ---------------------------------------------------------------------------------------------------- |
-| `id`              | TEXT PRIMARY KEY | A random hex id                                                                                      |
-| `kind`            | TEXT             | `ask`, `choice`, `install`, `signin`, `expert_ask`, `offer` or `setup` (CHECK)                       |
-| `origin_body`     | TEXT             | The body the item came from, so a reply goes back to it                                              |
-| `state`           | TEXT             | `open`, `answered`, `done` or `expired` (CHECK); default `open`                                      |
-| `saved_call_json` | TEXT             | The call to run on a later yes, as JSON, or null. Callers mask it before saving                      |
-| `live_only`       | INTEGER          | 1 when the item is tied to a running process (an expert's question) and cannot run later             |
-| `job_id`          | TEXT             | The job it belongs to, or null                                                                       |
-| `created_at`      | TEXT             | UTC time text                                                                                        |
-| `deadline_at`     | TEXT             | UTC time text: `created_at` plus `DEADLINE_S` (one day) unless the item asked for another            |
-| `closed_at`       | TEXT             | When it left `open`, or null                                                                         |
-| `closed_by`       | TEXT             | Who closed it: the answering body, or `brain`                                                        |
-| `reason`          | TEXT             | The answer for `answered`; `deadline` or `process_ended` for `expired`; the finish reason for `done` |
+| Column            | Type             | Meaning                                                                                   |
+| ----------------- | ---------------- | ----------------------------------------------------------------------------------------- |
+| `id`              | TEXT PRIMARY KEY | A random hex id                                                                           |
+| `kind`            | TEXT             | `ask`, `choice`, `install`, `signin`, `expert_ask`, `offer` or `setup` (CHECK)            |
+| `origin_body`     | TEXT             | The body the item came from, so a reply goes back to it                                   |
+| `state`           | TEXT             | `open`, `answered`, `done` or `expired` (CHECK); default `open`                           |
+| `saved_call_json` | TEXT             | The call to run on a later yes, as JSON, or null. Callers mask it before saving           |
+| `live_only`       | INTEGER          | 1 when the item is tied to a running process (an expert's question) and cannot run later  |
+| `job_id`          | TEXT             | The job it belongs to, or null                                                            |
+| `created_at`      | TEXT             | UTC time text                                                                             |
+| `deadline_at`     | TEXT             | UTC time text: `created_at` plus `DEADLINE_S` (one day) unless the item asked for another |
+| `closed_at`       | TEXT             | When it left `open`, or null                                                              |
+| `closed_by`       | TEXT             | Who closed it: the answering body, or `brain`                                             |
+| `answer`          | TEXT             | The person's answer, set when it is `answered` and kept when the item is later `done`     |
+| `reason`          | TEXT             | Why it closed: `answered`, `deadline`, `process_ended`, or the finish reason for `done`   |
 
 - Moves: `open` to `answered`, `done` or `expired`; `answered` to `done`. A person's answer counts
   while the item is `open`, even if the turn that raised it is gone; after the deadline it is

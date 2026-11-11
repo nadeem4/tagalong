@@ -21,6 +21,7 @@ def migrate(db) -> None:
         " deadline_at TEXT NOT NULL,"
         " closed_at TEXT,"
         " closed_by TEXT,"
+        " answer TEXT,"
         " reason TEXT)"
     )
     db.execute("CREATE INDEX open_items_open ON open_items(state, deadline_at)")

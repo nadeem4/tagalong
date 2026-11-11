@@ -35,6 +35,7 @@ class OpenItem:
     deadline_at: datetime
     closed_at: datetime | None
     closed_by: str | None
+    answer: str | None
     reason: str | None
 
 
@@ -73,6 +74,7 @@ def _item(s: store.StoredItem) -> OpenItem:
         datetime.fromisoformat(s.deadline_at),
         closed,
         s.closed_by,
+        s.answer,
         s.reason,
     )
 
@@ -123,7 +125,7 @@ class OpenItems:
         item = self.get(id)
         if item.state != "open":
             raise OpenItemRefused(item.state if item.state == "expired" else "closed")
-        return self._close(item, "answered", by, answer)
+        return self._close(item, "answered", by, "answered", answer=answer)
 
     def finish(self, id: str, reason: str) -> OpenItem:
         """The work for an open or answered item is done (an expired or done one is left as is)."""
@@ -150,9 +152,18 @@ class OpenItems:
     def list_open(self, origin_body: str | None = None) -> list[OpenItem]:
         return [_item(s) for s in store.list_open(self.db, origin_body)]
 
-    def _close(self, item: OpenItem, state: str, by: str, reason: str, only: str = "open"):
-        if not store.close(self.db, item.id, state, utc_text(self._now()), by, reason, only=only):
-            return self.get(item.id)
+    def _close(
+        self,
+        item: OpenItem,
+        state: str,
+        by: str,
+        reason: str,
+        only: str = "open",
+        answer: str | None = None,
+    ) -> OpenItem:
+        at = utc_text(self._now())
+        if not store.close(self.db, item.id, state, at, by, reason, answer=answer, only=only):
+            raise OpenItemRefused("closed")  # another move got there first
         closed = self.get(item.id)
         _event(state, closed, by, reason)
         return closed

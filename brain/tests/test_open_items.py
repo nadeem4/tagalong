@@ -28,7 +28,8 @@ def test_answer_while_open_counts(tmp_path):
     item = items.open("ask", "desktop", saved_call={"tool": "x"})
     clock.at = T0 + timedelta(seconds=DEADLINE_S - 1)
     done = items.answer(item.id, "yes", "desktop")
-    assert (done.state, done.closed_by, done.reason) == ("answered", "desktop", "yes")
+    assert (done.state, done.closed_by, done.answer) == ("answered", "desktop", "yes")
+    assert done.reason == "answered"
     assert items.list_open() == []
 
 
@@ -82,7 +83,7 @@ def test_every_transition_is_logged(tmp_path, caplog):
         "open_item.done",
         "open_item.expired",
     ]
-    assert f"id={a.id} kind=ask by=desktop why=yes" in lines[3]
+    assert f"id={a.id} kind=ask by=desktop why=answered" in lines[3]
     assert f"id={c.id} kind=setup by=brain why=deadline" in lines[5]
 
 
@@ -92,3 +93,20 @@ def test_one_deadline_rule(tmp_path):
     short = items.open("ask", "desktop", ttl_s=60)
     assert default.deadline_at == T0 + timedelta(seconds=DEADLINE_S)
     assert short.deadline_at == T0 + timedelta(seconds=60)
+
+
+def test_finish_keeps_the_answer(tmp_path):
+    items, _ = make(tmp_path)
+    item = items.open("ask", "desktop")
+    items.answer(item.id, "yes please", "desktop")
+    done = items.finish(item.id, "ran")
+    assert (done.state, done.answer, done.reason) == ("done", "yes please", "ran")
+
+
+def test_answer_in_a_closed_state_is_refused(tmp_path):
+    items, _ = make(tmp_path)
+    item = items.open("ask", "desktop")
+    items.finish(item.id, "ran")
+    with pytest.raises(OpenItemRefused) as e:
+        items.answer(item.id, "yes", "desktop")
+    assert e.value.reason == "closed"

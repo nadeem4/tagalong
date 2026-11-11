@@ -39,10 +39,12 @@ def test_insert_get_roundtrip_and_survives_reopen(tmp_path):
 def test_close_only_moves_an_open_item(tmp_path):
     db = open_db(tmp_path / "t.db")
     _put(db)
-    assert store.close(db, "i1", "answered", "2026-11-11T10:00:00+00:00", "desktop", "yes")
+    assert store.close(
+        db, "i1", "answered", "2026-11-11T10:00:00+00:00", "desktop", "answered", answer="yes"
+    )
     assert not store.close(db, "i1", "expired", "2026-11-11T11:00:00+00:00", "brain", "late")
     item = store.get(db, "i1")
-    assert (item.state, item.closed_by, item.reason) == ("answered", "desktop", "yes")
+    assert (item.state, item.closed_by, item.answer) == ("answered", "desktop", "yes")
 
 
 def test_queries_for_open_due_and_live_only(tmp_path):

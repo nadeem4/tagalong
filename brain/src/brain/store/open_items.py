@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 _COLUMNS = (
     "id, kind, origin_body, state, saved_call_json, live_only, job_id, created_at, deadline_at,"
-    " closed_at, closed_by, reason"
+    " closed_at, closed_by, answer, reason"
 )
 
 
@@ -27,6 +27,7 @@ class StoredItem:
     deadline_at: str
     closed_at: str | None
     closed_by: str | None
+    answer: str | None
     reason: str | None
 
 
@@ -77,12 +78,14 @@ def close(
     by: str,
     reason: str,
     *,
+    answer: str | None = None,
     only: str = "open",
 ) -> bool:
     """Move an item from state `only` to `state`; False when it was not in that state."""
     cur = db.execute(
-        "UPDATE open_items SET state=?, closed_at=?, closed_by=?, reason=? WHERE id=? AND state=?",
-        (state, at, by, reason, id, only),
+        "UPDATE open_items SET state=?, closed_at=?, closed_by=?, answer=COALESCE(?, answer),"
+        " reason=? WHERE id=? AND state=?",
+        (state, at, by, answer, reason, id, only),
     )
     return cur.rowcount == 1
 
