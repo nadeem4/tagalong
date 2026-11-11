@@ -18,4 +18,5 @@ export * from './setup';
 export * from './status';
 export * from './timers';
 export * from './turn-events';
+export * from './updates';
 export * from './voice';

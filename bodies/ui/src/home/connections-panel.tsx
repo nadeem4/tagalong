@@ -2,12 +2,20 @@
  * Home's Connections page, two tabs. Apps: "Your apps", then a registry search (Official first, a
  * check card before community) and Add it yourself. Experts: the installed coding agents and the
  * registry's. The brain owns every list and the keys; this page only asks and reads again, and
- * hands each add's outcome back to the row that was pressed. Contains ConnectionsPanel; the tabs
+ * hands each add's outcome back to the row that was pressed. Updates (check, update one or all,
+ * the auto switches) go the same way and reload on `changed updates`. Contains ConnectionsPanel; the tabs
  * are apps-tab.tsx and experts-tab.tsx, the add form add-form.tsx.
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import type { AppAddParams, AppInfo, AppRow, SetupOverview, SetupResult } from '../shapes';
+import type {
+  AppAddParams,
+  AppInfo,
+  AppRow,
+  SetupOverview,
+  SetupResult,
+  UpdatesState,
+} from '../shapes';
 import { failure } from '../failure';
 import { useHostBridge } from '../host-bridge';
 import { Button } from '../controls/button';
@@ -15,6 +23,7 @@ import { AppsTab } from './apps-tab';
 import { ExpertsTab } from './experts-tab';
 import { JobTabs, panelId, tabId } from './job-tabs';
 import type { Outcome } from './outcome';
+import type { UpdatesControls } from './updates-bar';
 
 type Status = { text: string; error: boolean } | null;
 type Tab = 'apps' | 'experts';
@@ -61,6 +70,8 @@ export function ConnectionsPanel() {
   // Counts finished changes so the app search reads again; not bumped on first load.
   const [refresh, setRefresh] = useState(0);
   const [setupFailed, setSetupFailed] = useState(false);
+  const [updates, setUpdates] = useState<UpdatesState | null>(null);
+  const [checking, setChecking] = useState(false);
 
   const reloadSetup = useCallback(() => {
     // A failure is shown on the Experts tab as one plain line; the apps list says when the brain is away.
@@ -76,8 +87,14 @@ export function ConnectionsPanel() {
     );
   }, [bridge]);
 
+  // No updates state (an old brain, or it is away) just means the card has no update words.
+  const reloadUpdates = useCallback(() => {
+    bridge.updatesState().then(setUpdates, () => setUpdates(null));
+  }, [bridge]);
+
   const reload = useCallback(() => {
     reloadSetup();
+    reloadUpdates();
     bridge
       .listConnections()
       .then((latest) => {
@@ -89,7 +106,7 @@ export function ConnectionsPanel() {
         if (failure(error) === BRAIN_OFFLINE) setOffline(true);
         else setStatus({ text: failure(error), error: true });
       });
-  }, [bridge, reloadSetup]);
+  }, [bridge, reloadSetup, reloadUpdates]);
   useEffect(reload, [reload]);
   useEffect(
     () =>
@@ -105,6 +122,11 @@ export function ConnectionsPanel() {
   useEffect(
     () => bridge.onBrainChanged((what) => what === 'setup' && reloadSetup()),
     [bridge, reloadSetup],
+  );
+  // An update moves on (waiting, updating, updated, failed): read the state again.
+  useEffect(
+    () => bridge.onBrainChanged((what) => what === 'updates' && reloadUpdates()),
+    [bridge, reloadUpdates],
   );
 
   if (apps === null) return <p className="home-note">Loading connections…</p>;
@@ -162,6 +184,24 @@ export function ConnectionsPanel() {
   const officialIds =
     setup === null ? null : new Set(setup.apps.filter((app) => app.official).map((app) => app.id));
 
+  // The brain says when an update may run (never mid-job); a press that must wait shows on the row.
+  const updateControls: UpdatesControls | null =
+    updates === null
+      ? null
+      : {
+          state: updates,
+          checking,
+          onCheck: () => {
+            setChecking(true);
+            void act(async () => setUpdates(await bridge.updatesCheck())).finally(() =>
+              setChecking(false),
+            );
+          },
+          onUpdate: (kind, id) => void act(() => bridge.updateItem(kind, id)),
+          onUpdateAll: (kind) => void act(() => bridge.updateAll(kind)),
+          onAuto: (kind, official, on) => void act(() => bridge.setAutoUpdate(kind, official, on)),
+        };
+
   const add = (params: AppAddParams): Promise<boolean> =>
     act(() => bridge.addConnection(params), `${params.name} added.`);
 
@@ -199,6 +239,7 @@ export function ConnectionsPanel() {
         {tab === 'apps' && (
           <AppsTab
             apps={apps}
+            updates={updateControls}
             officialIds={officialIds}
             offline={offline}
             busy={asking}
@@ -234,6 +275,7 @@ export function ConnectionsPanel() {
         {tab === 'experts' && setup !== null && (
           <ExpertsTab
             setup={setup}
+            updates={updateControls}
             asking={asking}
             onAct={(id) => setUp(id, () => bridge.setupExpert(id, false))}
             onAdd={(id) => setUp(id, () => bridge.setupExpert(id, false))}

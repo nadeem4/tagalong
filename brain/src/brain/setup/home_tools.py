@@ -7,7 +7,6 @@ the OK itself, so it passes `approved: true`. Progress is the latest `setup_prog
 
 import asyncio
 import json
-import re
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -40,6 +39,7 @@ from brain.setup.trust import (
     is_official_expert,
     service_key,
 )
+from brain.setup.updates import Updates
 from brain.setup.why import WhyPick, shorten
 from brain.toolbox import Handler, ToolSpec
 
@@ -83,16 +83,6 @@ class SetupProgress:
 
     def failed(self) -> dict | None:
         return self._failed
-
-
-def _numbers(version: str) -> tuple[int, ...] | None:
-    parts = re.findall(r"\d+", version)
-    return tuple(int(p) for p in parts) if parts else None
-
-
-def _newer(registry_version: str, installed: str) -> bool:
-    new, old = _numbers(registry_version), _numbers(installed)
-    return new is not None and old is not None and new > old
 
 
 def _token(message: str) -> str | None:
@@ -153,11 +143,10 @@ def home_setup_tools(
             "repo": facts["repo"],
         }
 
-    def state(expert: InstalledExpert, latest: dict[str, str]) -> str:
+    def state(expert: InstalledExpert) -> str:
+        # A newer version is the updates row's to show, not a state of the expert.
         if expert.source == "custom":
             return "ready"
-        if _newer(latest.get(expert.id, ""), expert.version):
-            return "needs_update"
         return "ready" if expert.logged_in is True else "needs_login"
 
     async def curated(
@@ -220,7 +209,6 @@ def home_setup_tools(
             mcp, stale_mcp = await listing(lambda: registry.mcp_servers(query, cursor=cursor))
         else:
             mcp, stale_mcp = None, False
-        latest = {e.id: e.version for e in acp.entries} if acp else {}
         installed = experts()
         added = {a["name"] for a in apps()}
         # Only what can be added here and is not already added; the model writes at most
@@ -277,7 +265,7 @@ def home_setup_tools(
                         "id": e.id,
                         "name": e.name,
                         "version": e.version,
-                        "state": state(e, latest),
+                        "state": state(e),
                         "tested": is_tested(e.id),
                         "official": is_official_expert(e.id),
                     }
@@ -368,9 +356,7 @@ def home_setup_tools(
         found = installed.get(str(args.get("id")))
         tool = "install_expert"
         if found is not None:
-            acp, _ = await listing(registry.acp_agents)
-            latest = {e.id: e.version for e in acp.entries} if acp else {}
-            current = state(found, latest)
+            current = state(found)
             if current == "ready":
                 return json.dumps({"error": "already_ready", "detail": found.id})
             if current == "needs_login":
@@ -428,5 +414,92 @@ def home_setup_tools(
                 tier=Tier.auto,  # asks for itself, so the gate adds none
             ),
             setup_app,
+        ),
+    ]
+
+
+def home_update_tools(updates: Updates) -> list[tuple[ToolSpec, Handler]]:
+    """Home's update tools: what is out of date, check now, update one or a whole tab, and the
+    per-group "keep up to date automatically" switch. A press is the person's own OK; whether an
+    update waits for a running job is the brain's to decide (see `setup/updates.py`)."""
+    home = frozenset({"home"})
+
+    def kind_of(args: dict) -> str:
+        kind = args.get("kind")
+        if kind not in ("app", "expert"):
+            raise RpcError(ErrorCode.invalid_params, "kind must be app or expert.")
+        return kind
+
+    async def state(_args: dict) -> str:
+        return json.dumps(updates.state())
+
+    async def check_now(_args: dict) -> str:
+        await updates.check(refresh=True)
+        return json.dumps(updates.state())
+
+    async def update_item(args: dict) -> str:
+        return json.dumps(await updates.update(str(args.get("kind")), str(args.get("id"))))
+
+    async def update_all(args: dict) -> str:
+        return json.dumps(await updates.update_all(kind_of(args)))
+
+    async def set_auto(args: dict) -> str:
+        kind, official, on = kind_of(args), args.get("official"), args.get("on")
+        if not isinstance(official, bool) or not isinstance(on, bool):
+            raise RpcError(ErrorCode.invalid_params, "official and on must be true or false.")
+        updates.set_auto(kind, official, on)
+        return json.dumps({"kind": kind, "official": official, "on": on})
+
+    kind = {"type": "string", "enum": ["app", "expert"]}
+
+    def spec(name: str, text: str, props: dict, effect: str) -> ToolSpec:
+        schema = {"type": "object", "properties": props, "required": list(props)}
+        return ToolSpec(name, text, schema, home, effect=effect)  # type: ignore[arg-type]
+
+    return [
+        (
+            spec(
+                "updates_state",
+                "What is out of date, when it was last checked, and the switches.",
+                {},
+                "read",
+            ),
+            state,
+        ),
+        (
+            spec(
+                "updates_check",
+                "Read the registries now and report what is out of date.",
+                {},
+                "change",
+            ),
+            check_now,
+        ),
+        (
+            spec(
+                "update_item",
+                "Update one app or expert.",
+                {"kind": kind, "id": {"type": "string"}},
+                "change",
+            ),
+            update_item,
+        ),
+        (
+            spec(
+                "update_all",
+                "Update every app or expert that has an update.",
+                {"kind": kind},
+                "change",
+            ),
+            update_all,
+        ),
+        (
+            spec(
+                "set_auto_update",
+                "Keep a group (Official or Community apps, or experts) up to date automatically.",
+                {"kind": kind, "official": {"type": "boolean"}, "on": {"type": "boolean"}},
+                "change",
+            ),
+            set_auto,
         ),
     ]

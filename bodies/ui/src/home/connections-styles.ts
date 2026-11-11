@@ -54,6 +54,12 @@ export const CONNECTIONS_CSS = `
 }
 :is(.home, .wt) .cx-status--off { color: ${t.color.panelMuted}; }
 :is(.home, .wt) .cx-status--warn { color: ${t.color.warnInk}; }
+:is(.home, .wt) .cx-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+:is(.home, .wt) .cx-card-tools { display: flex; align-items: center; gap: 8px; }
+:is(.home, .wt) .cx-auto { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 10px; background: ${t.color.panel}; }
+:is(.home, .wt) .cx-auto__row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+:is(.home, .wt) .cx-auto__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+:is(.home, .wt) .cx-auto__text > span:first-child { ${typeCss('body')}; font-weight: 600; color: ${t.color.panelText}; }
 :is(.home, .wt) .cx-panel { display: flex; flex-direction: column; gap: 20px; }
 :is(.home, .wt) .cx-quiet { display: inline-flex; align-items: center; gap: 2px; }
 :is(.home, .wt) .cx-quiet .tg-button { padding: 0 8px; }

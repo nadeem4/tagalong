@@ -132,6 +132,7 @@ class Session:
         make_run: Callable[..., ExpertRun] | None = None,
         experts: Callable[[], list[InstalledExpert]] | None = None,
         apps: Apps | None = None,
+        before_job: Callable[[], Awaitable[None]] | None = None,
         tokens: TokenFile | None = None,
         wakes_per_hour: int = DEFAULT_WAKES_PER_HOUR,
         kinds: dict[str, EventKind] | None = None,
@@ -233,6 +234,7 @@ class Session:
             on_timers_changed=lambda: timers.changed(),
             outputs=outputs,
             apps=apps,
+            before_start=before_job,
         )
         self.jobs.startup()  # parts left running by a dead brain: held for a carry-on, or failed
         timers = self.timers = Timers(

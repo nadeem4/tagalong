@@ -161,6 +161,7 @@ class Rig:
         shared: bool = False,
         load: bool | str = False,
         apps=None,
+        before_start=None,
     ) -> None:
         self.bridge = FakeBridge()
         script = tmp_path / "script.json"
@@ -217,6 +218,7 @@ class Rig:
             now=lambda: self.wall,
             on_timers_changed=lambda: setattr(self, "timers_changed", self.timers_changed + 1),
             apps=apps,
+            **({} if before_start is None else {"before_start": before_start}),
         )
 
     def make_run(self, expert, **callbacks) -> ExpertRun:
@@ -2789,3 +2791,41 @@ async def test_resolve_step_stop_stops_running_parts_before_closing(make_rig):
     assert out["goal"] == "failed" and got.closed_at
     assert [p.state for p in got.parts] == ["cancelled", "cancelled"]  # no expert left running
     assert rig.jobs._runs == {}
+
+
+async def test_a_job_does_not_start_its_expert_until_before_start_returns(make_rig):
+    gate = asyncio.Event()
+
+    async def before_start():
+        await gate.wait()  # an update is being swapped in
+
+    rig = make_rig(FakeAsks(Answer("Plan")), before_start=before_start)
+    starting = asyncio.ensure_future(rig.jobs.start("one", str(rig.folder)))
+    await asyncio.sleep(0.1)
+    assert not starting.done() and not rig.log.exists()
+    gate.set()
+    await asyncio.wait_for(starting, 10)
+    assert rig.spawns() == 1
+
+
+async def test_a_job_that_waited_behind_an_update_starts_the_updated_command(make_rig):
+    gate = asyncio.Event()
+
+    async def before_start():
+        await gate.wait()
+        rig.experts = [installed(command=[sys.executable, str(AGENT), "--updated"])]
+
+    rig = make_rig(FakeAsks(Answer("Plan")), before_start=before_start)
+    commands: list[list[str]] = []
+    real = rig.jobs._make_run
+
+    def spy(expert, **callbacks):
+        commands.append(expert.command)
+        return real(expert, **callbacks)
+
+    rig.jobs._make_run = spy
+    starting = asyncio.ensure_future(rig.jobs.start("one", str(rig.folder)))
+    await asyncio.sleep(0.1)
+    gate.set()
+    await asyncio.wait_for(starting, 10)
+    assert commands == [[sys.executable, str(AGENT), "--updated"]]

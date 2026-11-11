@@ -55,7 +55,7 @@ SIGN_IN_WAIT_S = 600.0
 MAX_TOOLS_LISTED = 30
 
 
-def _spec(dist: Distribution, version: str) -> str:
+def package_spec(dist: Distribution, version: str) -> str:
     sep = "==" if dist.kind == "uvx" else "@"
     return f"{dist.package}{sep}{version}" if version else str(dist.package)
 
@@ -82,7 +82,7 @@ def app_params(
             "config": {"url": dist.url},
         }
     env = {name: f"${{{name}}}" for name in dist.env}
-    spec = _spec(dist, dist.version or entry.version)
+    spec = package_spec(dist, dist.version or entry.version)
     if dist.kind == "npx":
         node = usable_node(home, machine)
         if node is None:
@@ -180,7 +180,9 @@ async def add_registry_app(
         machine = await inspect_fn()
     params = app_params(entry, dist, machine, home)
     trust = "official" if is_official_app(entry.id) else "community"
-    return await save_app(apps, memory, tokens, notify, params, trust=trust)
+    # Only a package app has a version to keep; a remote one is always the host's latest.
+    version = (dist.version or entry.version) if dist and dist.kind in ("npx", "uvx") else ""
+    return await save_app(apps, memory, tokens, notify, params, trust=trust, version=version)
 
 
 def app_setup_tools(
