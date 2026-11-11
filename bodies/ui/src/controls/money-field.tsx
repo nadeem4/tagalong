@@ -2,6 +2,7 @@
  * MoneyField: a dollar text field with minus and plus buttons. Typed text is passed through
  * untouched (the caller validates); only the buttons step, by 1, and never below 1 (a daily limit of 0 is not allowed).
  */
+import { Icon } from '../icons';
 import { Button } from './button';
 
 function step(text: string, by: number): string {
@@ -53,10 +54,10 @@ export function MoneyField({
           }}
         />
         <Button variant="secondary" aria-label="Decrease" onClick={() => onChange(step(value, -1))}>
-          −
+          <Icon name="minus" />
         </Button>
         <Button variant="secondary" aria-label="Increase" onClick={() => onChange(step(value, 1))}>
-          +
+          <Icon name="plus" />
         </Button>
       </div>
     </div>

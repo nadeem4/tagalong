@@ -381,80 +381,116 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     ],
   };
   let running: unknown[] = [];
-  // Rows as list_permissions sends them: grouped by source on Home, each with what it allows.
+  // Rows and groups as list_permissions sends them: plain words, grouped, each with what it allows.
+  const row = (
+    name: string,
+    title: string,
+    line: string,
+    info: string,
+    group: string,
+    source: string,
+    source_name: string,
+    flags: Record<string, unknown> = {},
+  ) => ({
+    name,
+    description: `${title} (the model's own description)`,
+    title,
+    line,
+    info,
+    group,
+    effect: 'change',
+    mode: 'ask',
+    locked: false,
+    self_asks: false,
+    person_only: false,
+    online: true,
+    source,
+    source_name,
+    ...flags,
+  });
+  const permissionGroups = [
+    { id: 'memory', title: 'Memory', note: 'Things Scout keeps between chats.' },
+    {
+      id: 'jobs',
+      title: 'Jobs and experts',
+      note: 'Bigger work Scout hands to an expert such as Claude Code.',
+    },
+    {
+      id: 'computer',
+      title: 'This computer',
+      note: 'Windows and files. File tools only work inside folders you allowed.',
+    },
+    {
+      id: 'browser',
+      title: 'Chrome on work PC',
+      note: 'Your browser',
+    },
+    { id: 'app:gmail', title: 'Gmail', note: 'From Gmail' },
+  ];
   const permissions = [
-    {
-      name: 'recall',
-      description: 'Look up what Scout remembers',
-      effect: 'read',
-      mode: 'auto',
-      locked: false,
-      self_asks: false,
-      person_only: false,
-      online: true,
-      source: 'built_in',
-      source_name: 'Built in',
-    },
-    {
-      name: 'hand_off',
-      description: 'Hand a job to an expert',
-      effect: 'change',
-      mode: 'auto',
-      locked: false,
-      self_asks: true,
-      person_only: false,
-      online: true,
-      source: 'built_in',
-      source_name: 'Built in',
-    },
-    {
-      name: 'desktop__move_window',
-      description: 'Move a window on your desktop',
-      effect: 'change',
-      mode: 'ask',
-      locked: false,
-      self_asks: false,
-      person_only: false,
-      online: true,
-      source: 'body:desktop',
-      source_name: 'Desktop',
-    },
-    {
-      name: 'desktop__close_window',
-      description: 'Close a window on your desktop',
-      effect: 'change',
-      mode: 'ask',
-      locked: true,
-      self_asks: false,
-      person_only: false,
-      online: true,
-      source: 'body:desktop',
-      source_name: 'Desktop',
-    },
-    {
-      name: 'extension__open_tab',
-      description: 'Open a browser tab',
-      effect: 'change',
-      mode: 'ask',
-      locked: false,
-      self_asks: false,
-      person_only: false,
-      online: false,
-      source: 'body:extension',
-      source_name: 'Chrome on work PC',
-    },
-    {
-      name: 'gmail__delete_mail',
-      description: 'Delete an email',
-      effect: 'change',
-      mode: 'ask',
-      locked: true,
-      self_asks: false,
-      person_only: true,
-      online: true,
-      source: 'app:gmail',
-      source_name: 'Gmail',
-    },
+    row(
+      'recall',
+      'Look back in memory',
+      'Searches saved notes, past chats and past jobs.',
+      'When something may have come up before, Scout searches what it saved.',
+      'memory',
+      'built_in',
+      'Built in',
+      { effect: 'read', mode: 'auto' },
+    ),
+    row(
+      'hand_off',
+      'Hand work to an expert',
+      'Sends a task to an expert like Claude Code.',
+      'For bigger work, Scout passes the task to an expert.',
+      'jobs',
+      'built_in',
+      'Built in',
+      { mode: 'auto', self_asks: true },
+    ),
+    row(
+      'desktop__list_windows',
+      'See open windows',
+      "Lists your open windows, not what's in them.",
+      "Scout sees each window's name and whether it's in front, behind or minimized.",
+      'computer',
+      'body:desktop',
+      'Desktop',
+      { effect: 'read', mode: 'auto' },
+    ),
+    row(
+      'desktop__open_url',
+      'Open a link',
+      'Opens a web page in your browser.',
+      'Scout opens a secure (https) page, usually a sign-in page for an app.',
+      'computer',
+      'body:desktop',
+      'Desktop',
+      { locked: true },
+    ),
+    row(
+      'extension__tabs',
+      'See and read tabs',
+      'Lists your tabs and reads the one you need.',
+      'Scout finds the tab you mean and reads its text.',
+      'browser',
+      'body:extension',
+      'Chrome on work PC',
+      { effect: 'read', mode: 'auto', online: false },
+    ),
+    row(
+      'gmail__delete_mail',
+      'delete_mail',
+      'Delete an email',
+      '',
+      'app:gmail',
+      'app:gmail',
+      'Gmail',
+      {
+        locked: true,
+        person_only: true,
+      },
+    ),
   ];
 
   server.on('connection', (socket: WebSocket) => {
@@ -853,7 +889,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           heldLoops = [];
           for (const app of loopApps) app.on = false;
           notify('changed', { what: 'loops' });
-        } else if (params.tool === 'list_permissions') value = { tools: permissions };
+        } else if (params.tool === 'list_permissions')
+          value = { tools: permissions, groups: permissionGroups };
         else if (params.tool === 'set_permission') {
           const row = permissions.find((p) => p.name === params.input?.tool);
           const chosen = String(params.input?.mode);
