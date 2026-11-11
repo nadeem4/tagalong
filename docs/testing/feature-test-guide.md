@@ -2191,6 +2191,25 @@ with a fake key; the real check against Anthropic is done by hand here.
 5. **Action (developers):** start with a real `ANTHROPIC_API_KEY` in the environment.
    **Expected:** the section reads "Set by your environment" and the field is disabled.
 
+### K.2b. Scout's model
+
+Needs the desktop and a brain with a key. The e2e `key-settings.spec.ts` covers the pick on the fake
+brain; this checks it on the real one.
+
+1. **Action:** open **Home → Settings → Scout's model**. **Expected:** the section reads "The AI
+   model Scout thinks with, on your Anthropic key." with a greyed **Provider** (Anthropic, "More
+   providers coming later") and a **Model** that shows **Claude Opus 5.5**.
+2. **Action:** press the **Model** field (or Tab to it and press Enter). **Expected:** a list of
+   Claude Opus 5.5, Claude Sonnet 5.5 and Claude Haiku 5.5, each with its one-line note; the
+   current one has a tick and the default one a "Default" tag. Arrows, Home and End move,
+   Escape closes.
+3. **Action:** pick **Claude Sonnet 5.5**. **Expected:** the list closes, the field shows Sonnet
+   and "Saved." appears at once (no save button). Restart the brain: Sonnet is still chosen.
+4. **Action:** ask Scout something long, pick another model while it answers, then ask again.
+   **Expected:** the running answer finishes on the old model; the next one uses the new.
+5. **Action:** stop the brain. **Expected:** the section shows nothing to pick until the brain is
+   back.
+
 ### K.3. Show the tour again
 
 1. **Action:** **Home → Overview → Show the tour again**. **Expected:** the walkthrough window
@@ -2575,7 +2594,7 @@ Do not test these here.
 Home > Overview shows a "Scout's brain" card above "Where things run".
 
 1. Start Tagalong with the brain running. The card shows Running, "This PC" and the address, the
-   version, "Tagalong" under Started by, the process id, the data folder and log file with their
+   version, the model name (for example Claude Opus 5.5), "Tagalong" under Started by, the process id, the data folder and log file with their
    Open links, and the places connected.
 2. Click Copy details and paste: the text includes the build id.
 3. Stop the brain from a terminal (`uv run tagalong stop`). The card turns to "Can't reach Scout's
@@ -2588,7 +2607,9 @@ Home > Overview shows a "Scout's brain" card above "Where things run".
 5. Let Tagalong start the brain, then change a `.py` file under `brain/src/brain` and restart only
    the desktop: with no job running the brain restarts quietly once. With a job running, an
    "Update ready" prompt offers "Restart now" and "When your job finishes".
-6. Installer (by hand, Windows): install an older build, start it so the brain runs, then run the
+6. Pick another model under **Settings → Scout's model**: the card's **Model** row shows the new
+   name at once, and while the brain is offline it keeps the last name it showed.
+7. Installer (by hand, Windows): install an older build, start it so the brain runs, then run the
    new installer. The brain process (the id in `brain.pid`) must be gone before files are
    replaced, the install must finish without a "file in use" error, and the new app starts a new
    brain. Do the same for uninstall.

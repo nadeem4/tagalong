@@ -14,6 +14,7 @@ import type {
   FixTarget,
   LoopsState,
   MemoryEntry,
+  ModelState,
   Pet,
   SetupOverview,
   SetupResult,
@@ -214,6 +215,8 @@ export interface BrainCard {
   update: 'none' | 'ready' | 'terminal';
   version: string | null;
   build: string | null;
+  /** The model Scout thinks with, by name; null until the brain has said. */
+  model: string | null;
   /** The app's own version and build, to show beside a brain that differs, and while offline. */
   appVersion: string;
   appBuild: string;
@@ -319,6 +322,10 @@ export interface HostBridge {
   setKey(key: string): Promise<KeyResult>;
   /** Sets the daily spend limit in dollars (finite, above 0). */
   setDailyLimit(usd: number): Promise<void>;
+  /** Settings' Scout's model: the provider, the model in use and the models to pick from. */
+  modelState(): Promise<ModelState>;
+  /** Picks the model Scout thinks with, from its next reply; rejects with the brain's refusal. */
+  setModel(model: string): Promise<void>;
   /** Opens the first-run walkthrough, at a step when one is named (9 is the key). */
   openWalkthrough(step?: number): Promise<void>;
   /** Home's Spend card: what was spent today and the daily limit, as the brain knows them. */
@@ -411,7 +418,7 @@ export interface HostBridge {
   restartBrainAfterWork(): Promise<void>;
   openBrainFolder(): Promise<void>;
   openBrainLog(): Promise<void>;
-  /** Copies version, build, process id, address, data folder and who started it. */
+  /** Copies version, build, process id, address, data folder, model and who started it. */
   copyBrainDetails(): Promise<void>;
   /**
    * The brain changed something Home shows (`memory`, `permissions`; `link` when the connection

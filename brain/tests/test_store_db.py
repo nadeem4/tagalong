@@ -19,7 +19,7 @@ def _version(db: sqlite3.Connection) -> int:
 
 
 def test_migrations_are_numbered_without_gaps():
-    assert [m.number for m in load_migrations()] == list(range(1, 29))
+    assert [m.number for m in load_migrations()] == list(range(1, 30))
 
 
 def test_fresh_file_reaches_latest(tmp_path):
@@ -182,3 +182,14 @@ def test_support_files_are_not_migrations(tmp_path):
     (tmp_path / "__pycache__").mkdir()
     (tmp_path / "README.md").write_text("notes")
     assert [m.number for m in load_migrations(tmp_path)] == [1]
+
+
+def test_settings_round_trip(tmp_path):
+    from brain.store.settings import get_setting, set_setting
+
+    db = open_db(tmp_path / "t.db")
+    assert get_setting(db, "model") is None
+    set_setting(db, "model", "a")
+    set_setting(db, "model", "b")
+    assert get_setting(db, "model") == "b"
+    db.close()

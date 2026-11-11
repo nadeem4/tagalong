@@ -34,6 +34,8 @@ from brain.loops.tools import loop_tools
 from brain.masking import Masker, SecretLogFilter, mask_json
 from brain.memory import Memory
 from brain.mind.turn import AnthropicModel
+from brain.models import chosen as chosen_model
+from brain.models import model_name
 from brain.offers import OfferSettings
 from brain.server import start_server
 from brain.sessions import Session
@@ -108,8 +110,11 @@ async def _run() -> None:
         log.error("cannot open memory: %s", err)
         sys.exit(1)
     bodies = Bodies()
+    # The saved Settings choice wins over TAGALONG_MODEL, read at the start of each turn.
+    model = AnthropicModel(
+        lambda k: AsyncAnthropic(api_key=k), lambda: chosen_model(memory.db, config.model), key
+    )
     build = build_id(config.build, Path(__file__).parent)  # once: hashing reads every source file
-    model = AnthropicModel(lambda k: AsyncAnthropic(api_key=k), config.model, key)
     budget = Budget(config.data_dir / "budget.json", config.daily_budget_usd)
     reader_model = AnthropicModel(lambda k: AsyncAnthropic(api_key=k), config.reader_model, key)
     # Its own ledger, so a heavy mail day never silences Scout and a spent Scout budget never
@@ -208,6 +213,7 @@ async def _run() -> None:
             "log_path": str(config.data_dir / "brain.log"),
             "places": [{"id": b.id, "kind": b.kind, "name": b.name} for b in bodies.online()],
             "work_running": bool(session.records.running_jobs()),
+            "model": model_name(chosen_model(memory.db, config.model)),
         }
 
     session = Session(
@@ -229,6 +235,7 @@ async def _run() -> None:
         outputs_keep=config.outputs_keep,
         masker=masker,
         keys=keys,
+        model_default=config.model,
         setup_facts=partial(setup_facts, registry, inspect_machine),
         extra_tools=setup_tools(config.data_dir, registry, inspect_machine)
         + expert_tools

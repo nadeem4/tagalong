@@ -331,7 +331,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
 ## Providers and keys
 
 Scout thinks through the Python brain. It needs your Anthropic key: the walkthrough asks for it, and Settings → Anthropic key changes it
-and the daily limit. For developers, a real `ANTHROPIC_API_KEY` in the environment still works and
+and the daily limit; Settings → Scout's model picks the Claude model (Opus 5.5 by default, applied from the next reply). For developers, a real `ANTHROPIC_API_KEY` in the environment still works and
 wins (Settings then shows "Set by your environment"; see `.env.example`). Experts run on your Claude Code sign-in instead. The desktop passes your key
 to the brain once and keeps no copy.
 

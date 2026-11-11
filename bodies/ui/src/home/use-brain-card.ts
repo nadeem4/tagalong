@@ -20,9 +20,10 @@ export function useBrainCard(): { card: BrainCard | null; setup: BrainLink['setu
 
   useEffect(() => {
     refresh();
-    // The link going up or down, and a job starting or ending (which Restart now depends on).
+    // The link going up or down, a job starting or ending (which Restart now depends on), and
+    // the model being picked in Settings.
     return bridge.onBrainChanged((what) => {
-      if (what === 'link' || what === 'jobs') refresh();
+      if (what === 'link' || what === 'jobs' || what === 'model') refresh();
     });
   }, [bridge, refresh]);
 

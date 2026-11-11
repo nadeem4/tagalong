@@ -574,6 +574,7 @@ def test_status_marks_work_running_while_a_job_runs(monkeypatch, tmp_path):
     with pytest.raises(Stop):
         asyncio.run(_run())
     assert seen["idle"]["work_running"] is False
+    assert seen["idle"]["model"] == "Claude Opus 5.5"
     status = seen["busy"]
     assert status["work_running"] is True
     assert status["build"] == "9.9.9" and status["started_by"] == "desktop"

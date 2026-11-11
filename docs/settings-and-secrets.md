@@ -152,6 +152,13 @@ here: they are brain state in the `rules` table of `tagalong.db`, read and set t
 brain's `list_permissions` and `set_permission` (see [brain.md](brain.md#permissions-and-asks)).
 Home shows them in groups the brain names, collapsed until opened, in plain words, with a search box.
 
+**Scout's model** (Settings, right after the key) is not in `settings.json`: the brain owns it. The
+section reads `model_state` and a pick calls `set_model` (`IPC.modelState`, `IPC.modelSet`, handled in
+`src/main/ipc/model.ts`); the brain keeps the choice in its `settings` table, refuses an id it does
+not list, and applies it from the next reply. The picker is the shared `ModelField` in
+`bodies/ui/src/model/`, saved at once with "Saved." and an inline error if the brain refuses.
+`TAGALONG_MODEL` is only the default until a model is chosen.
+
 The daily limit is the one guard limit you can change in the app: **Settings → Anthropic key → Daily limit** (the amount and **Set** in one row, with "$1.20 of $5.00 used today" and a meter under it; the meter turns amber at the limit) calls the brain's `set_daily_limit` (a finite amount above 0). Other guard limits are not settings here. The brain's spend guards take `TAGALONG_DAILY_BUDGET_USD`
 and `TAGALONG_STEP_CAP`: `config.py` reads and checks them at start, and they are passed in when
 `sessions.py` registers the guards (a guard never imports `config`). They live in the brain's

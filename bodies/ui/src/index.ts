@@ -51,6 +51,9 @@ export { SETTINGS_CSS } from './settings/settings-styles';
 /** The Anthropic key field and the daily-limit field, shared by Settings and the walkthrough. */
 export { KeyField, LimitField } from './key/key-field';
 export { useKeyStatus } from './key/use-key-status';
+
+/** Settings' Scout's model: the provider and model selects. */
+export { ModelField } from './model/model-field';
 export type { KeyHost } from './key/use-key-status';
 
 /** Shared controls: toggle, select, slider, money field, keycap, buttons, and their sheet. */

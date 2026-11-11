@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 /** The sections in the order the page shows them; the standalone window's nav links to each. */
 const SECTIONS = [
   { id: 'key', title: 'Anthropic key' },
+  { id: 'model', title: "Scout's model" },
   { id: 'privacy', title: 'Privacy' },
   { id: 'files', title: 'Files Scout may use' },
   { id: 'voice', title: 'Voice' },
