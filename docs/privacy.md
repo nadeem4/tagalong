@@ -253,7 +253,7 @@ The Python brain replaces secrets with `[secret]` before text is saved:
   keys, and `?token=`-style url params (Bearer and url param names match in any letter case).
   Every literal env value of 8 or more characters from an app's env config is treated as a secret,
   so an ordinary word or path in it reads `[secret]` wherever it shows up in saved text.
-- **If masking fails,** the text is stored as `[withheld]`, never raw (if a later guard blocks after masking worked, the masked text is kept). The list of secret values
+- **If masking fails,** the text is stored as `[withheld]`, never raw. The list of secret values
   is reused for up to 1 second.
 - **Not masked:** Scout's live turn (the model sees and uses the real value), the side-check
   prompt, the tool's own input (an app gets the real arguments), a job's task text,

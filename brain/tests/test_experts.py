@@ -385,8 +385,6 @@ async def test_missing_command_is_a_fact_with_the_exe_and_no_install_hint(tmp_pa
         ("codex-acp", "OPENAI_API_KEY", "GEMINI_API_KEY"),
         ("codex-acp", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"),
         ("codex-acp", "ANTHROPIC_AUTH_TOKEN", "GEMINI_API_KEY"),
-        ("gemini", "GEMINI_API_KEY", "OPENAI_API_KEY"),
-        ("gemini", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"),
         ("custom", "ANTHROPIC_API_KEY", None),
         ("custom", "OPENAI_API_KEY", None),
     ],

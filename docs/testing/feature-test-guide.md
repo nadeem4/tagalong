@@ -165,6 +165,10 @@ desktop app. You need `uv` and an Anthropic key.
 10. **Action:** `say` with `We are planning a trip to Lisbon.`, stop the brain, start it, say hello, then
     `say` with `What were we just talking about?`
     **Expected:** Scout answers about the Lisbon trip; the chat was picked up after the restart.
+    10b. **Action:** let Scout answer a wake with no words (a quiet event, so the reply is only thinking),
+    stop the brain, start it, then `say` hello.
+    **Expected:** no `[withheld]` text in the chat, in Scout's answer or in the saved messages; the
+    silent reply was dropped with the wake it answered.
 11. **Action:** `say` with `Search our chat for Lisbon.`
     **Expected:** a `recall` tool call that finds the old message.
 12. **Action:** hold a long chat until the model compacts it (hard to trigger by hand; skip it if the

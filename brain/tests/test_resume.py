@@ -30,9 +30,9 @@ def test_an_assistant_message_emptied_by_stripping_keeps_alternation_valid():
         "role": "assistant",
         "content": [{"type": "code_execution_tool_result", "tool_use_id": "s", "content": {}}],
     }
-    history = rebuild_history([u("q"), only, u("next")])
+    history = rebuild_history([u("q0"), a("r0"), u("q"), only, u("next")])
     assert [m["role"] for m in history] == ["user", "assistant", "user"]
-    assert history[1]["content"] == [{"type": "text", "text": WITHHELD}]
+    assert WITHHELD not in str(history)  # the silent reply goes with the message it answered
 
 
 def test_resume_strips_citations_and_mcp_tool_use_like_the_save_path():
@@ -77,8 +77,9 @@ def test_resume_keeps_no_thinking_anywhere_so_the_dropped_run_is_a_prefix():
     history = rebuild_history(messages)
     assert "thinking" not in str(history)
     assert history[1]["content"] == [{"type": "text", "text": "r1"}]
-    assert history[3]["content"] == [{"type": "text", "text": WITHHELD}]
-    assert history[5]["content"] == [{"type": "text", "text": "r3"}]
+    assert WITHHELD not in str(history)
+    assert [m["role"] for m in history] == ["user", "assistant", "user", "assistant"]
+    assert history[3]["content"] == [{"type": "text", "text": "r3"}]
 
 
 def test_resume_leaves_a_history_without_thinking_as_it_was():

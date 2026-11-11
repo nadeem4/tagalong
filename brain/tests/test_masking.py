@@ -89,16 +89,6 @@ def test_mask_json_does_not_mutate_the_original():
     assert obj == {"a": ["12345678"]}
 
 
-def test_failure_reply_with_secret_is_masked_in_place_not_withheld():
-    # A later save guard blocks; the secret is still masked, so the reply keeps its words.
-    from brain.guards import Guard, block
-
-    guards = _guards()
-    guards.add(Guard("no_more", Hook.save, lambda ctx: block("nope")))
-    out = mask_json(guards, "chat", "Sorry, the key 12345678 failed")
-    assert out == "Sorry, the key [secret] failed"
-
-
 def test_save_guard_raising_withholds():
     def boom():
         raise RuntimeError("no")

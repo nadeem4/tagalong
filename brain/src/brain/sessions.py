@@ -44,7 +44,7 @@ from brain.experts import ExpertHosts, ExpertRun
 from brain.job_records import Job, JobRecords
 from brain.jobs import Jobs
 from brain.loops.service import LoopService
-from brain.masking import WITHHELD, Masker, mask_json, mask_message, mask_secrets
+from brain.masking import Masker, mask_json, mask_message, mask_secrets
 from brain.memory import Memory
 from brain.mind.capabilities import AppCaps, BodyCaps, ExpertCaps, capability_picture
 from brain.mind.prompt import (
@@ -973,8 +973,8 @@ class Session:
         if message["role"] == "assistant" and isinstance(content, list):
             if any(self._thinking_changes(b) for b in content):
                 content = without_thinking(content)
-            # an empty content list would not rebuild into valid history
-            message = {**message, "content": content or [{"type": "text", "text": WITHHELD}]}
+            # an emptied reply stays empty: resume drops it with the message it answered
+            message = {**message, "content": content}
         return mask_message(self.guards, "chat", message)
 
     def _thinking_changes(self, block: Any) -> bool:

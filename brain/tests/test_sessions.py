@@ -828,7 +828,7 @@ async def test_nested_structural_names_in_tool_input_are_masked(tmp_path):
     assert saved[1]["content"][0]["id"] == "t1"
 
 
-async def test_thinking_only_message_saves_a_placeholder_and_resumes(tmp_path):
+async def test_thinking_only_message_saves_empty_and_resumes_without_withheld(tmp_path):
     turn = Final(
         [{"type": "thinking", "thinking": f"key {SECRET}", "signature": "s"}],
         "end_turn",
@@ -839,9 +839,9 @@ async def test_thinking_only_message_saves_a_placeholder_and_resumes(tmp_path):
     session.say("desktop", say("hi"))
     await finish_quietly(session)
     saved = memory.load_messages()
-    assert saved[-1]["content"] == [{"type": "text", "text": "[withheld]"}]
+    assert saved[-1]["content"] == []
     resumed, _ = make(Gate(["ok"]), memory, masker=secret_masker())
-    assert resumed.history[-1]["content"]
+    assert "[withheld]" not in json.dumps(resumed.history)
 
 
 async def test_restarts_after_a_thinking_reply_do_not_save_it_twice(tmp_path):
