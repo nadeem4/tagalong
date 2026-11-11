@@ -14,10 +14,20 @@ const EMPTY: SetupOverview = {
   experts: [],
   apps: [],
   browseExperts: [
-    { id: 'claude-acp', name: 'Claude Code', version: '2', description: 'd', official: false },
+    {
+      id: 'claude-acp',
+      name: 'Claude Code',
+      version: '2',
+      description: 'd',
+      official: false,
+      recommended: false,
+      tested: false,
+    },
   ],
   browseApps: [],
   popular: [],
+  popularMore: [],
+  showMoreFrom: null,
   appGroups: [],
   nextCursor: null,
   sources: null,
@@ -47,6 +57,8 @@ const GMAIL = {
   version: '1',
   description: 'd',
   official: false,
+  recommended: false,
+  tested: false,
 };
 
 /** Renders the step and opens the optional expert line, where Claude Code's setup lives. */
@@ -258,7 +270,7 @@ describe('StepSix', () => {
     expect(await screen.findByText('Connecting Gmail…')).toBeVisible();
     host.setupOverview.mockResolvedValue({
       ...EMPTY,
-      apps: [{ id: 'a1', name: 'Gmail', state: 'connected' }],
+      apps: [{ id: 'a1', name: 'Gmail', state: 'connected', official: false }],
     });
     await act(async () => finish());
     expect(await screen.findByText('Gmail is connected.')).toBeVisible();
@@ -283,6 +295,8 @@ describe('StepSix', () => {
         version: '1',
         description: 'd',
         official: false,
+        recommended: false,
+        tested: false,
       },
     ]);
     render(<StepSix host={host} />);
@@ -294,7 +308,7 @@ describe('StepSix', () => {
   it('an app that is saved but not signed in says to finish in Home, not connected', async () => {
     const host = hostWith({
       ...EMPTY,
-      apps: [{ id: 'a1', name: 'Gmail', state: 'needs_sign_in' }],
+      apps: [{ id: 'a1', name: 'Gmail', state: 'needs_sign_in', official: false }],
     });
     render(<StepSix host={host} />);
     expect(await screen.findByText('Finish Gmail in Home.')).toBeVisible();

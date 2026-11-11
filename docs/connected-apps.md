@@ -173,34 +173,41 @@ flowchart LR
   P -- "reads the list again" --> I
 ```
 
-- **Rows**: name, "Runs on this PC" or "Web address", a status dot and word (`Connected`,
-  `Connecting`, `Needs sign-in`, `Not working`, `Off`), the tool count, the brain's error line when
-  there is one, the on/off switch, **Restart** and **Remove**. **Remove** asks again inside the page
-  (**Yes, remove** or **Keep**) before `remove_app`.
-- **Apps tab**: a **Connected** card (the rows above), then **Add an app** (`app-search.tsx`): a
-  search box (read 300 ms after typing stops; only the newest request writes results), a **Popular**
-  row while it is empty, results grouped per service with **Load more**, and **Add one by hand**
-  (`add-form.tsx`, the form below). In a group (`app-group-row.tsx`) the **Official** version leads
-  with its tag and a **Connect** that goes to the brain approved at once (`setup_app` with
-  `approved` true, then its own Allow card). Community versions sit behind "Show N other versions",
-  each with a **Community** tag, why it matched, its publisher and where it runs. Its **Connect**
-  opens the **check card** (`check-card.tsx`) first: who made it ("not the service itself"), runs on
-  your PC or hosted by whom, how you sign in, licence, "Reviewed: Not yet audited by anyone", **See its code** (only for an http(s) address, opened in your own browser),
-  **Back** and **Connect anyway** (`setup_app` with `approved` and `community_ok` true). The brain
-  decides what is Official; a registry that cannot be reached shows one plain line. With an empty
-  box the brain sends only its curated lists (`popular`, then `popular_more` behind "Show more"),
-  never the registry's raw first page.
+- **Rows** (`app-group-row.tsx`, styles in `connections-styles.ts`): a 36px tile, the name with its
+  Official or Community chip, a meta line ("Runs on your PC" or "Runs on the web", the tool count, the
+  brain's error line when there is one), a status dot and word (`Connected`, `Connecting`, `Needs
+sign-in`, `Not working`, `Off`), the on/off switch, and quiet **Restart** and **Remove**. **Remove**
+  asks again inside the page (**Yes, remove** or **Keep**) before `remove_app`. Each row has one verb.
+- **Apps tab**: **Your apps** (the rows above, Official first, then Community), then **Add an app**
+  (`app-search.tsx`): a search field (`setup/search-field.tsx`, read 300 ms after typing stops; only
+  the newest request writes results), a **Popular** list while it is empty (more behind "Show
+  more"), results grouped per service with **Load more**, and "Can't find it? Add it yourself"
+  (`add-form.tsx`, the form below). In a group the **Official** version leads with its chip and an
+  **Add** that goes to the brain approved at once (`setup_app` with `approved` true, then its own Allow
+  card). Other makers sit behind "N more from other makers", each with a **Community** chip, why it
+  matched, its publisher and where it runs. Its **Add…** opens the **check card** (`check-card.tsx`,
+  facts in `setup/check-facts.tsx`) first: who made it ("not the service itself"), runs on your PC or
+  hosted by whom, how you sign in, licence, "Reviewed: Not yet audited by anyone", **See its code**
+  (only for an http(s) address, opened in your own browser), **Back** and **Add anyway** (`setup_app`
+  with `approved` and `community_ok` true). How an add ended ("Notion added.", or the refusal, with
+  the button kept for a retry) shows on the pressed row (`outcome.ts`), not in a line at the top. The
+  brain decides what is Official; a registry that cannot be reached shows one plain line, and offline
+  only the offline note shows. With an empty box the brain sends only its curated lists (`popular`,
+  then `popular_more`), never the registry's raw first page.
 - **Trust kept at install**: a registry install saves `official` or `community` on the app row
   (`apps.trust`, from the entry's id); an app added by hand is `community`. Home's list reads it
   back as `official` on each connected app, so the tag survives a restart. Apps connected before this was kept read Community until added again.
-- **Experts tab**: the **For long jobs** card (`experts-group.tsx`) lists installed experts, each led
-  by the kind of job it does (`jobs-kinds.ts`) with the product underneath, with a state chip
-  (Ready, Needs login, Update available) and a **Log in** or **Update** button; **Add an expert**
-  lists the registry's experts. An Official one has **Add**; a community one opens the same check
-  card, and **Connect anyway** sends `setup_expert` with `approved` and `community_ok`. These go
-  through `setup_overview`, `setup_expert` and `setup_app` (see [brain.md](brain.md#home-tools)): the
-  button opens the same Allow card Scout's install opens, and progress ("Installing 40%") rides
-  `changed setup`.
+- **Experts tab** (`experts-tab.tsx`, `experts-group.tsx`): **Your experts** (installed, Official
+  first, each led by the kind of job it does from `jobs-kinds.ts` with the product underneath, a state
+  chip (Ready, Needs login, Update available) and a **Log in** or **Update** button), then **Add an
+  expert**: the brain's curated list is open (`browse_experts`, with Recommended and "Tested with
+  Scout" or "Not tested with Scout"), **Show more** reveals the rest (`show_more_from`), and a search
+  field covers both. An Official one has **Add**; a community one has **Add…**, which opens the same
+  check card, and **Add anyway** sends `setup_expert` with `approved` and `community_ok`. Only
+  experts that install and run on this PC are listed. Progress ("Getting what it needs to run") and
+  a failed install show on the expert's row. These go through `setup_overview`, `setup_expert` and
+  `setup_app` (see [brain.md](brain.md#home-tools)): the button opens the same Allow card Scout's
+  install opens, and progress rides `changed setup`.
 - **Trust at the door**: the desktop's `ipc/setup.ts` honours `approved` for an app only from the Home
   window, and for an expert only from the tour or from Home with `community_ok`; anything else opens
   the Allow card.

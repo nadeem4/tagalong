@@ -177,9 +177,7 @@ export function AppSearch({
                 <Button variant="secondary" onClick={() => setShowMore(true)}>
                   Show more
                 </Button>
-                <span className="cx-meta">
-                  {popularMore.map((app) => app.name).join(', ')}…
-                </span>
+                <span className="cx-meta">{popularMore.map((app) => app.name).join(', ')}…</span>
               </span>
             )}
             {cursor !== null && (

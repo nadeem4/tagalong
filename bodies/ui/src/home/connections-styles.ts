@@ -50,7 +50,7 @@ export const CONNECTIONS_CSS = `
   display: inline-flex; align-items: center; gap: 6px; ${typeCss('small')}; font-weight: 600;
   color: ${t.color.okInk}; white-space: nowrap;
 }
-.home .cx-group-label { margin: 4px 0 -4px; color: ${t.color.panelMuted}; ${typeCss('small')}; font-weight: 600; }
+.home .cx-group-label { margin: 4px 0 6px; color: ${t.color.panelMuted}; ${typeCss('small')}; font-weight: 600; }
 .home .cx-icon { width: 16px; height: 16px; flex: none; }
 .home .cx-more {
   display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px 50px; padding: 2px 0; border: 0; background: none;

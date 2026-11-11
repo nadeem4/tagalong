@@ -7,7 +7,12 @@ describe('SearchField', () => {
   it('is a labelled search box with the placeholder and reports typing', () => {
     const onChange = vi.fn();
     render(
-      <SearchField label="Search apps" placeholder="Notion, Linear…" value="" onChange={onChange} />,
+      <SearchField
+        label="Search apps"
+        placeholder="Notion, Linear…"
+        value=""
+        onChange={onChange}
+      />,
     );
     const input = screen.getByRole('searchbox', { name: 'Search apps' });
     expect(input.getAttribute('placeholder')).toBe('Notion, Linear…');

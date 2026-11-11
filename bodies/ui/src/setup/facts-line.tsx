@@ -22,7 +22,8 @@ export function whereLine(runs: 'pc' | 'hosted' | null): string | null {
 }
 
 export function FactsLine({ row }: { row: AppRow | ExpertLine }) {
-  const sign = 'signIn' in row ? SIGN_IN[row.signIn] : row.account ? 'Signs in with your own account' : null;
+  const sign =
+    'signIn' in row ? SIGN_IN[row.signIn] : row.account ? 'Signs in with your own account' : null;
   const parts = [whereLine(row.runs), sign].filter((part) => part !== null);
   return <span className="cx-meta">{parts.join(' · ')}</span>;
 }

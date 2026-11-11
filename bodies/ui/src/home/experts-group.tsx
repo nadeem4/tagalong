@@ -98,7 +98,9 @@ export function ExpertsGroup({
           <div className="cx-row__main">
             <span className="cx-row__name" title={expert.name}>
               {expert.name}
-              {!expert.tested && <span className="cx-chip cx-chip--quiet">Not tested with Scout</span>}
+              {!expert.tested && (
+                <span className="cx-chip cx-chip--quiet">Not tested with Scout</span>
+              )}
             </span>
             <span className="cx-meta">
               {expert.version === '' ? 'Your own command' : `v${expert.version}`} ·{' '}

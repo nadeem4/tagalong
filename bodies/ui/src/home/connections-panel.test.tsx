@@ -1,8 +1,8 @@
 /** Tests for ConnectionsPanel: the brain's apps, Add an app, switch, Restart, Remove. */
 
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { AppGroup, AppInfo, AppRow, SetupOverview, SetupResult } from '../shapes';
+import type { AppInfo, SetupOverview } from '../shapes';
 import { HostBridgeProvider } from '../host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
 import { ConnectionsPanel } from './connections-panel';
@@ -369,7 +369,9 @@ describe('ConnectionsPanel groups', () => {
   it('splits installed apps into Official and Community when the registry knows who made them', async () => {
     const bridge = createFakeHostBridge({
       apps: [FILES, { ...WIKI, id: 'com.notion/mcp', name: 'Notion' }],
-      setup: { apps: [{ id: 'com.notion/mcp', name: 'Notion', official: true }] },
+      setup: {
+        apps: [{ id: 'com.notion/mcp', name: 'Notion', state: 'connected', official: true }],
+      },
     });
     await renderPanel(bridge);
     expect(

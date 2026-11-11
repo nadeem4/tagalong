@@ -58,7 +58,9 @@ describe('Experts tab: add an expert', () => {
     await open({ browseExperts: [CLAUDE] });
     expect(screen.queryByText('Browse and add')).toBeNull();
     expect(screen.getByRole('button', { name: 'Add Claude Code' })).toBeVisible();
-    expect(screen.getByText('Experts take on long jobs for Scout, on your own login.')).toBeVisible();
+    expect(
+      screen.getByText('Experts take on long jobs for Scout, on your own login.'),
+    ).toBeVisible();
     expect(screen.getByPlaceholderText('Codex, Goose, an agent for…')).toBeVisible();
   });
 
@@ -84,7 +86,9 @@ describe('Experts tab: add an expert', () => {
     await open({ browseExperts: [CLAUDE, GEMINI, CODEX, GOOSE], showMoreFrom: 3 });
     expect(screen.queryByText('Goose')).toBeNull();
     expect(screen.getByText('Goose…')).toBeVisible();
-    expect(screen.getByText('Only experts that install and run on this PC are listed.')).toBeVisible();
+    expect(
+      screen.getByText('Only experts that install and run on this PC are listed.'),
+    ).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Show more' }));
     expect(screen.getByText('More experts that run on this PC')).toBeVisible();
     expect(within(rowOf('Goose')).getByText('Runs on your PC')).toBeVisible();
@@ -118,7 +122,9 @@ describe('Experts tab: add an expert', () => {
     expect(add).toHaveTextContent('Add…');
     await click(add);
     expect(screen.getByRole('group', { name: 'Check first' })).toBeVisible();
-    expect(screen.getByText("The expert list doesn't say who made this or check it.")).toBeVisible();
+    expect(
+      screen.getByText("The expert list doesn't say who made this or check it."),
+    ).toBeVisible();
     expect(bridge.setupCalls).toEqual([]);
     await click(screen.getByRole('button', { name: 'Add anyway' }));
     expect(bridge.setupCalls).toEqual([
@@ -182,7 +188,10 @@ describe('Experts tab: add an expert', () => {
 describe('Experts tab: your experts', () => {
   it('splits into Official and Community', async () => {
     await open({
-      experts: [installed('claude-acp', 'Claude Code'), installed('x', 'Xtra', { official: false })],
+      experts: [
+        installed('claude-acp', 'Claude Code'),
+        installed('x', 'Xtra', { official: false }),
+      ],
     });
     const card = within(screen.getByRole('region', { name: 'Your experts' }));
     expect(card.getByText('Official', { selector: 'p' })).toBeVisible();
@@ -227,7 +236,9 @@ describe('Experts tab: your experts', () => {
       within(screen.getByRole('region', { name: 'Xtra' })).getByText('Not tested with Scout'),
     ).toBeVisible();
     expect(
-      within(screen.getByRole('region', { name: 'Claude Code' })).queryByText('Not tested with Scout'),
+      within(screen.getByRole('region', { name: 'Claude Code' })).queryByText(
+        'Not tested with Scout',
+      ),
     ).toBeNull();
   });
 

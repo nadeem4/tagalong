@@ -52,6 +52,8 @@ export interface FakeBrain {
   readingEvents: Record<string, unknown>[];
   /** Replace the rows `reading_status` answers and tell the bodies `changed: reading`. */
   setReading(rows: Record<string, unknown>[]): void;
+  /** Add fields to the `setup_overview` answer (progress, failed...), optionally make searches fail, and tell the bodies `changed: setup`. */
+  setSetup(patch: Record<string, unknown>, failingSearches?: boolean): void;
   /** How many times `set_api_key` was called (the key itself is never recorded). */
   keyAttempts: number;
   /** Every amount Settings sent to `set_daily_limit`, in order. */
@@ -223,6 +225,22 @@ const NOTION_GROUP = {
   ],
 };
 
+const expertChoice = (id: string, name: string, over: Record<string, unknown> = {}) => ({
+  id,
+  name,
+  version: '1',
+  description: `${name} works on long jobs`,
+  official: true,
+  recommended: false,
+  tested: true,
+  ...over,
+});
+const BROWSE_EXPERTS = [
+  expertChoice('claude-acp', 'Claude Code', { recommended: true }),
+  expertChoice('codex-acp', 'Codex'),
+  expertChoice('goose', 'Goose', { official: false, tested: false }),
+];
+
 const APPS = [
   {
     id: 'files',
@@ -322,6 +340,9 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   const appSetups: string[] = [];
   const appFlags: { approved: unknown; communityOk: unknown }[] = [];
   let expertInstalled = false;
+  // Screenshot states for Connections: extra overview fields, and searches that fail.
+  let setupPatch: Record<string, unknown> = {};
+  let failSearches = false;
   let gmailConnected = false;
   const limits: number[] = [];
   let hasKey = options.hasKey ?? true;
@@ -707,6 +728,16 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           limits.push(dailyLimitUsd);
           notify('changed', { what: 'settings' });
         } else if (params.tool === 'setup_overview') {
+          if (failSearches && String(params.input?.query ?? '') !== '') {
+            socket.send(
+              JSON.stringify({
+                jsonrpc: '2.0',
+                id: msg.id,
+                error: { code: -32000, message: 'registry unreachable' },
+              }),
+            );
+            return;
+          }
           value = {
             experts: expertInstalled
               ? [
@@ -716,24 +747,31 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
                     version: '2.0.0',
                     state: 'ready',
                     tested: true,
+                    official: true,
                   },
                 ]
               : [],
             apps: gmailConnected ? [{ id: 'a1', name: 'Gmail', state: 'connected' }] : [],
-            browse_experts: [],
+            // D5: curated experts first (Claude Code recommended), then what sits behind Show more.
+            browse_experts: expertInstalled
+              ? BROWSE_EXPERTS.filter((e) => e.id !== 'claude-acp')
+              : BROWSE_EXPERTS,
+            show_more_from: expertInstalled ? 1 : 2,
             // The registry answers a search by name; no query is a first page without Gmail.
             browse_apps:
               gmailConnected || !String(params.input?.query ?? '').includes('gmail')
                 ? []
                 : [{ id: 'io.example/gmail', name: 'Gmail', version: '1', description: 'Mail' }],
             // C1 facts: a search for notion is one service, an Official head and two community.
-            popular: [],
+            popular: [notionRow('com.notion/mcp', true, 'Notion')],
+            popular_more: [],
             app_groups: String(params.input?.query ?? '').includes('notion') ? [NOTION_GROUP] : [],
             next_cursor: null,
             sources: null,
             stale: false,
             progress: null,
             failed: null,
+            ...setupPatch,
           };
         } else if (params.tool === 'setup_app') {
           appSetups.push(String(params.input?.id));
@@ -876,6 +914,19 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             jsonrpc: '2.0',
             method: 'changed',
             params: { seq: ++seq, what: 'timers' },
+          }),
+        );
+      }
+    },
+    setSetup: (patch, failing = false) => {
+      setupPatch = patch;
+      failSearches = failing;
+      for (const socket of sockets) {
+        socket.send(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'changed',
+            params: { seq: ++seq, what: 'setup' },
           }),
         );
       }

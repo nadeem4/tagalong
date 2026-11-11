@@ -20,7 +20,9 @@ export function CheckFacts({ row }: { row: AppRow | ExpertFacts }) {
   if (!('publisher' in row)) {
     return (
       <ul className="cx-check__facts">
-        <li className="cx-check__lead">The expert list doesn&apos;t say who made this or check it.</li>
+        <li className="cx-check__lead">
+          The expert list doesn&apos;t say who made this or check it.
+        </li>
         <li>{whereLine('pc')}</li>
       </ul>
     );
