@@ -6,7 +6,7 @@
  */
 import { z } from 'zod';
 
-const ExpertState = z.enum(['ready', 'needs_login', 'needs_update']);
+const ExpertState = z.enum(['ready', 'needs_login']);
 const Choice = z.object({
   id: z.string().min(1),
   name: z.string(),

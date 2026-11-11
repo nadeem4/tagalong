@@ -284,6 +284,14 @@ async def test_a_good_reinstall_swaps_in_the_new_files_and_record(tmp_path, ensu
     assert sorted(p.name for p in old.parent.iterdir() if p.name != "claude-acp") == []
 
 
+async def test_a_reinstall_keeps_the_experts_login(tmp_path, ensure):
+    await go(tmp_path, npx_entry(), machine(), Npm())
+    ExpertStore(tmp_path).set_login("claude-acp", True)
+    expert = await go(tmp_path, npx_entry(version="0.99.2", pinned="0.99.2"), machine(), Npm())
+    assert expert.logged_in is True
+    assert ExpertStore(tmp_path).get("claude-acp").logged_in is True
+
+
 async def test_a_package_with_no_bin_fails_cleanly(tmp_path, ensure):
     with pytest.raises(InstallError) as err:
         await go(tmp_path, npx_entry(), machine(), Npm(bin_value={}))
@@ -469,14 +477,14 @@ class Net:
         return ACP if "agentclientprotocol" in url else NODE_INDEX
 
 
-def make_tools(tmp_path, npm, mach=None):
+def make_tools(tmp_path, npm, mach=None, updaters=None):
     emitted: list[Event] = []
     notes: list[tuple[str, dict]] = []
 
     async def inspect_fn():
         return mach or machine()
 
-    tools, stop = expert_setup_tools(
+    tools, update, stop = expert_setup_tools(
         tmp_path,
         Registry(tmp_path, Net()),
         inspect_fn,
@@ -487,6 +495,8 @@ def make_tools(tmp_path, npm, mach=None):
         emitted.append,
         lambda m, p: notes.append((m, p)),
     )
+    if updaters is not None:
+        updaters.append(update)
     return {s.name: (s, h) for s, h in tools}, emitted, notes, stop
 
 
@@ -776,3 +786,34 @@ async def test_binary_without_checksum_is_never_offered(tmp_path, where):
     else:
         with pytest.raises(NoBuild):
             await go(tmp_path, binary_entry(None), machine(), Npm())
+
+
+async def test_an_update_is_refused_while_an_install_of_the_same_expert_runs(tmp_path, ensure):
+    hang, updaters = Hang(), []
+    tools, _, _, stop = make_tools(tmp_path, hang, updaters=updaters)
+    await tools["install_expert"][1]({"id": "claude-acp"})
+    await asyncio.wait_for(hang.started.wait(), 5)
+    with pytest.raises(InstallError) as err:
+        await updaters[0](npx_entry())
+    assert err.value.kind == "already_installing"
+    await stop()
+
+
+async def test_an_install_is_refused_while_an_update_of_the_same_expert_runs(tmp_path, ensure):
+    hang, updaters = Hang(), []
+    tools, _, _, stop = make_tools(tmp_path, hang, updaters=updaters)
+    updating = asyncio.ensure_future(updaters[0](npx_entry()))
+    await asyncio.wait_for(hang.started.wait(), 5)
+    again = json.loads(await tools["install_expert"][1]({"id": "claude-acp"}))
+    assert again["error"] == "already_installing"
+    await stop()
+    await asyncio.gather(updating, return_exceptions=True)
+
+
+async def test_an_update_installs_and_frees_the_guard(tmp_path, ensure):
+    updaters = []
+    tools, _, _, _ = make_tools(tmp_path, Npm(), updaters=updaters)
+    expert = await updaters[0](npx_entry())
+    assert expert.id == "claude-acp"
+    again = json.loads(await tools["install_expert"][1]({"id": "claude-acp"}))
+    assert again == {"started": "claude-acp"}

@@ -202,8 +202,9 @@ sign-in`, `Not working`, `Off`), the on/off switch, and quiet **Restart** and **
   (`apps.trust`, from the entry's id); an app added by hand is `community`. Home's list reads it
   back as `official` on each connected app, so the tag survives a restart. Apps connected before this was kept read Community until added again.
 - **Experts tab** (`experts-tab.tsx`, `experts-group.tsx`): **Your experts** (installed, Official
-  first, each led by the kind of job it does from `jobs-kinds.ts` with the product underneath, a state
-  chip (Ready, Needs login, Update available) and a **Log in** or **Update** button), then **Add an
+  first, each led by the kind of job it does from `jobs-kinds.ts` with the product underneath, an Official or Community chip (the same `cx-chip` as the app rows), a state
+  chip (Ready, Needs login) and a **Log in** button; a newer version shows as `v1.2 → v1.3` with
+  an **Update** button from the updates state), then **Add an
   expert**: the brain's curated list is open (`browse_experts`, with Recommended and "Tested with
   Scout" or "Not tested with Scout"), **Show more** reveals the rest (`show_more_from`), and a search
   field covers both. A row says "Signs in with your own account" when the brain's `account` field
@@ -278,11 +279,46 @@ to the Connect offer (see [docs/brain.md](brain.md#missing-tool-connect-then-car
   (a token) is not added by Scout; add it by hand with a token from Home.
 - No secret value is ever written into the app's row, the card or the result.
 
+## Updates
+
+`setup/updates.py` (`Updates`) keeps installed apps and experts current. The brain checks once a
+day (a 30 second `tick` loop started in `main.py` asks whether a check or a waiting update is due)
+and when Home presses **Check for updates**.
+
+- **What a version means.** A local app's version is the package version pinned in its command
+  (`apps.version`, read back from the stored command by migration 0030, set again when
+  `install_app` or an update rewrites the command) against the MCP registry's latest. An expert's
+  is the version it was installed at against the ACP registry's. A remote (hosted) app has none:
+  its service updates it, so its row says "Always up to date" and has no update controls. An app
+  added by hand with no pinned package has no version and shows no update until it is added
+  again.
+- **When an update applies by itself.** Each group has a switch, kept in the `settings` table as
+  `auto_update.{app,expert}.{official,community}`: Official on, Community off at first (code
+  nobody has reviewed waits for you). A group that is off shows "Waits for you" on its rows and an
+  **Update** button; **Update all (n)** updates every row waiting in that tab.
+- **Never mid-job.** An update that is due (automatic, or pressed) while a job runs waits in a
+  queue, the row says "Waiting for a job to finish…", and `tick` applies it once the job ends. A
+  job that starts while an update is being swapped in waits for the swap to end first, so it
+  never meets an expert or app halfway through. It then starts the expert's updated command, read
+  again from the store after the wait.
+- **On the row.** Updating…, then "Updated to vX." (the old version stays if it fails, with "The
+  update didn't work." and the button again; an app whose new version does not connect is put
+  back on its old command and started again; if that restart fails too, it is logged and the row
+  keeps the update's own error). The brain sends `changed` with `what: "updates"` on
+  every status change and the page reads the state again.
+- **Home calls** (`setup/home_tools.py`, never offered to Scout): `updates_state`,
+  `updates_check`, `update_item {kind, id}`, `update_all {kind}` (`{started}`, `{waiting: "job"}`
+  or `{error}`), `set_auto_update {kind, official, on}`; see [brain.md](brain.md#home-tools).
+- The page side is `bodies/ui/src/home/updates-bar.tsx` (the header, the two switches and the
+  row's update side) used by `apps-tab.tsx` and `experts-group.tsx`.
+
 ## Storage
 
 | Where                         | Holds                                                                                                            |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `apps` table in `tagalong.db` | `id`, `name`, `transport`, `config` (JSON), `auth`, `enabled`                                                    |
+| `apps` table in `tagalong.db` | `id`, `name`, `transport`, `config` (JSON), `auth`, `enabled`, `version` (the pinned package version, or empty)  |
+| `settings` table              | `auto_update.{app,expert}.{official,community}`: whether that group updates by itself                            |
+| `cache/updates.json`          | When the registries were last checked and the latest version seen for each app and expert                        |
 | `rules` table (`mode` rows)   | The user's saved `ask` or `auto` per tool, like any other tool                                                   |
 | `app-tokens.json`             | `{ "<id>": token, "<id>:env:<NAME>": value, "<id>:url_query": "a=b&c=d" }`, owner-only where the platform allows |
 | `app-oauth/<app id>.json`     | The app's OAuth tokens and client registration, per app                                                          |

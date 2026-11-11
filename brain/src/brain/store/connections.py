@@ -1,6 +1,7 @@
 """Connected apps (MCP): the `apps` table, each app's mail switch and its read cursors.
 
 A cursor is where a reader got to in one stream of an app (`mail`, `sent`, `backfill`).
+An app also keeps the package version it runs.
 """
 
 import json
@@ -11,15 +12,15 @@ from brain.apps import AppRow
 
 def list_apps(db: sqlite3.Connection) -> list[AppRow]:
     rows = db.execute(
-        "SELECT id, name, transport, config, auth, enabled, trust FROM apps ORDER BY rowid"
+        "SELECT id, name, transport, config, auth, enabled, trust, version FROM apps ORDER BY rowid"
     )
-    return [AppRow(i, n, t, json.loads(c), a, bool(e), r) for i, n, t, c, a, e, r in rows]
+    return [AppRow(i, n, t, json.loads(c), a, bool(e), r, v) for i, n, t, c, a, e, r, v in rows]
 
 
 def add_app(db: sqlite3.Connection, row: AppRow) -> None:
     db.execute(
-        "INSERT INTO apps(id, name, transport, config, auth, enabled, trust)"
-        " VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO apps(id, name, transport, config, auth, enabled, trust, version)"
+        " VALUES (?,?,?,?,?,?,?,?)",
         (
             row.id,
             row.name,
@@ -28,7 +29,15 @@ def add_app(db: sqlite3.Connection, row: AppRow) -> None:
             row.auth,
             int(row.enabled),
             row.trust,
+            row.version,
         ),
+    )
+
+
+def set_app_package(db: sqlite3.Connection, app_id: str, config: dict, version: str) -> None:
+    """An update: the new command and the version it pins, in one write."""
+    db.execute(
+        "UPDATE apps SET config=?, version=? WHERE id=?", (json.dumps(config), version, app_id)
     )
 
 

@@ -131,6 +131,45 @@ describe('setup IPC', () => {
     expect(calls).toEqual([]);
   });
 
+  it('updatesState and updatesCheck read the brain and parse the answer', async () => {
+    const state = {
+      checkedAt: null,
+      auto: {
+        apps: { official: true, community: false },
+        experts: { official: true, community: false },
+      },
+      items: [],
+    };
+    const { invoke, calls } = setup(() => text(state));
+    await expect(invoke(IPC.updatesState)).resolves.toEqual(state);
+    await invoke(IPC.updatesCheck);
+    expect(calls).toEqual([
+      ['updates_state', {}],
+      ['updates_check', {}],
+    ]);
+  });
+
+  it('updateItem, updateAll and setAutoUpdate pass checked arguments to the brain', async () => {
+    const { invoke, calls } = setup(() => text({ started: true }));
+    await expect(invoke(IPC.updateItem, 'app', 'github')).resolves.toEqual({ started: true });
+    await invoke(IPC.updateAll, 'expert');
+    await invoke(IPC.setAutoUpdate, 'app', false, true);
+    expect(calls).toEqual([
+      ['update_item', { kind: 'app', id: 'github' }],
+      ['update_all', { kind: 'expert' }],
+      ['set_auto_update', { kind: 'app', official: false, on: true }],
+    ]);
+  });
+
+  it('the update channels validate their arguments', async () => {
+    const { invoke, calls } = setup(() => text({}));
+    await expect(invoke(IPC.updateItem, 'thing', 'x')).rejects.toThrow();
+    await expect(invoke(IPC.updateItem, 'app', '')).rejects.toThrow();
+    await expect(invoke(IPC.updateAll, 'x')).rejects.toThrow();
+    await expect(invoke(IPC.setAutoUpdate, 'app', 'no', true)).rejects.toThrow();
+    expect(calls).toEqual([]);
+  });
+
   it('a refusal the brain reports comes back as the result', async () => {
     const { invoke } = setup(() => text({ error: 'denied' }));
     await expect(invoke(IPC.setupExpert, 'x', false)).resolves.toEqual({ error: 'denied' });

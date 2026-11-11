@@ -29,7 +29,7 @@ from brain.setup.login import (
 )
 from brain.setup.net import GetJson
 from brain.setup.registry import Registry, RegistryEntry, RegistryUnavailable
-from brain.setup.store import ExpertStore
+from brain.setup.store import ExpertStore, InstalledExpert
 from brain.setup.terminal import NoTerminal
 from brain.toolbox import Handler, ToolSpec
 from brain.voice.models import Fetch
@@ -49,8 +49,14 @@ def expert_setup_tools(
     get_json: GetJson,
     emit: Callable[[Event], None],
     notify: Callable[[str, dict], None],
-) -> tuple[list[tuple[ToolSpec, Handler]], Callable[[], Awaitable[None]]]:
-    """The tools, and a `stop` that cancels running installs (each cleans up) at shutdown."""
+) -> tuple[
+    list[tuple[ToolSpec, Handler]],
+    Callable[[RegistryEntry], Awaitable[InstalledExpert]],
+    Callable[[], Awaitable[None]],
+]:
+    """The tools, `update` (a reinstall for the updates check, under the same one-per-expert
+    guard, so two installs never share `tools/<id>.part`), and a `stop` that cancels running
+    installs (each cleans up) at shutdown."""
     running: dict[str, asyncio.Task] = {}
     shown: dict[str, str] = {}  # the version each Allow card named, until its install starts
 
@@ -116,6 +122,18 @@ def expert_setup_tools(
         task.add_done_callback(lambda _: running.pop(entry.id, None))
         return json.dumps({"started": entry.id})
 
+    async def update(entry: RegistryEntry) -> InstalledExpert:
+        if entry.id in running:
+            raise InstallError("already_installing", entry.id)
+        task = asyncio.ensure_future(
+            install_expert(
+                entry, home, await inspect_fn(), run, fetch, get_json, store, lambda step: None
+            )
+        )
+        running[entry.id] = task
+        task.add_done_callback(lambda _: running.pop(entry.id, None))
+        return await task  # a cancel of the caller cancels the install, which cleans up
+
     async def stop() -> None:
         tasks = list(running.values())
         for task in tasks:
@@ -133,7 +151,7 @@ def expert_setup_tools(
         tier=Tier.person_only,  # only the person allows it, every time; no Always button
         card=card,
     )
-    return [(spec, install)], stop
+    return [(spec, install)], update, stop
 
 
 def _facts(err: Exception) -> tuple[str, str]:

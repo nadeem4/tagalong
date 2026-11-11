@@ -654,3 +654,13 @@ async def test_install_app_for_community_stays_person_only_and_asks_with_the_car
         await box.run(Call("c1", "install_app", {"id": "io.github.bob/pkg"}, "t1", ""))
     assert asks.asked[0]["community"] is True and asks.locked
     assert r.memory.list_apps() == []
+
+
+async def test_install_saves_the_package_version_and_a_remote_app_has_none(rig):
+    r = rig()
+    await r.run("acme/notes")
+    await r.run("acme/cloud")
+    assert {a.name: a.version for a in r.memory.list_apps()} == {
+        "notes": "1.2.3",
+        "cloud": "",
+    }

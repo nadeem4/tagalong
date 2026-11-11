@@ -13,6 +13,7 @@ import { AddedStatus, OutcomeText, Tile, Waiting } from './app-group-row';
 import { CheckCard } from './check-card';
 import { ExpertsGroup, FailLine, InstallingCard } from './experts-group';
 import { useOutcomes, type Outcome } from './outcome';
+import type { UpdatesControls } from './updates-bar';
 
 function ExpertItem({
   item,
@@ -103,7 +104,9 @@ export function ExpertsTab({
   onAct,
   onAdd,
   onAddAnyway,
+  updates,
 }: {
+  updates: UpdatesControls | null;
   setup: SetupOverview;
   asking: ReadonlySet<string>;
   onAct: (id: string) => Promise<Outcome | null>;
@@ -149,6 +152,7 @@ export function ExpertsTab({
         outcomes={outcomes}
         failedId={failed?.expert ?? null}
         onAct={(id) => void track(id, onAct(id))}
+        updates={updates}
       />
       {items.length > 0 && (
         <section className="home-card" aria-label="Add an expert">

@@ -31,7 +31,7 @@ connection from `store.db.open_db`; nothing else opens the file.
   `clear_mail`).
 - `store/outputs.py`: owns `tool_outputs` (`put_output`, `get_output`, `prune_outputs`).
 - `store/rules.py`: owns `rules` (modes, preferences, offers).
-- `store/settings.py`: owns `settings` (`get_setting`, `set_setting`), a small key and value table; today it holds the chosen Scout model under `model`.
+- `store/settings.py`: owns `settings` (`get_setting`, `set_setting`), a small key and value table; today it holds the chosen Scout model under `model` and, for updates, `auto_update.{app,expert}.{official,community}` (`"1"` or `"0"`: whether that group updates by itself; absent means Official on, Community off). The last check time and the latest versions seen are a cache file, `<TAGALONG_HOME>/cache/updates.json`, not a table.
 - `store/work.py`: `WorkStore` over `work`, `work_events`, `work_fts` and the detail tables
   `work_job`, `work_timer`, `work_loop`, `work_ask` and `job_steps`: create, the state machine,
   rollup, retry, due queries, search, the resume scan and the sweep. Jobs, asks, timers and loops
@@ -42,7 +42,7 @@ Nothing outside this package runs SQL: `tests/test_store_boundary.py` fails if a
 under `brain/src/brain` calls `.execute`, `.executescript` or `.executemany`.
 
 - `store/migrations/`: `NNNN_name.sql` (or `NNNN_name.py` with a `migrate(db)` function) files,
-  `0001_memories` to `0029_settings`. The numbers have no gaps (the loader refuses a gap or a
+  `0001_memories` to `0030_app_updates`. The numbers have no gaps (the loader refuses a gap or a
   duplicate). Each file runs in one transaction together with its `user_version` bump, so a
   failure leaves the file at the last good version. A file is never edited after it has merged;
   a schema change is a new file.
@@ -629,14 +629,17 @@ Connected apps (MCP servers).
 | `enabled`    | INTEGER          | 0 or 1; default 1                                                                                   |
 | `reads_mail` | INTEGER          | 0 or 1; default 0. The "Read my mail for loops" switch for this app, kept across a restart          |
 | `trust`      | TEXT             | `official` or `community` (CHECK); default `community`. Kept from the install so Home still tags it |
+| `version`    | TEXT             | The package version pinned in the command, or empty (a hand-added or remote app); default empty     |
 
-- Written by: `apps.py` `Apps` through `store/connections.py` `add_app`, `set_app_enabled`, `remove_app`.
+- Written by: `apps.py` `Apps` through `store/connections.py` `add_app`, `set_app_enabled`, `remove_app`, `set_app_package` (an update).
 - Read by: `store/connections.py` `list_apps`.
 - Retention: until the app is removed.
 - Upgrade: migration `0028_app_trust` adds `trust` with no backfill: an older row holds only the
   registry title and a URL or command, which prove nothing, so apps connected before it read
   Community until they are added again. A registry install saves it from the entry's id; an app added by hand
-  is `community`.
+  is `community`. Migration `0030_app_updates` adds `version`, backfilled from the package argument
+  in the stored command; an app with none (added by hand, or remote) shows no update until it is
+  added again.
 - Masked: secrets are moved out of the row into separate files before it is saved
   (`apps.py` `split_secrets`); `${VAR}` references stay as written. See
   [connected-apps.md](connected-apps.md).

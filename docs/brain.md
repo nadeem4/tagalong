@@ -827,13 +827,27 @@ The first-run setup adds six more Home tools (never offered to Scout):
 | `model_state`     | `{}`              | `{"provider": "anthropic", "model", "default", "models": [{"id", "name", "line"}]}`; `model` is the choice in force, `default` the one used when none is chosen             |
 | `set_model`       | `{"model": str}`  | `{"model": str}`; `invalid_params` for an id not in `models`; saves it and sends `changed {what: "model"}`; it applies from the next reply, the one running keeps its model |
 
+Updates add five Home tools (`setup/home_tools.py` `home_update_tools`, never offered to Scout):
+`updates_state` (read; `{checkedAt, auto: {apps: {official, community}, experts: {...}}, items:
+[{kind, id, name, installed, latest|null, remote, official, auto, status, error?}]}`, `status` one
+of `idle`, `waiting`, `updating`, `updated`, `failed`), `updates_check` (checks the registries now,
+then answers the same state), `update_item {kind, id}` and `update_all {kind}` (`{started}`, or
+`{waiting: "job"}` while a job runs, or `{error}`), and `set_auto_update {kind, official, on}`.
+Each status change sends `changed {what: "updates"}`. `setup/updates.py` `Updates` checks once a
+day (read afresh, not from the cache) from a 30 second `tick` loop in `main.py` (a failing tick is
+logged, never ends the loop), applies only for a group left on (Official on, Community off at
+first), and never while a job runs: the apply holds a lock and `Updates.quiet()` waits on it,
+which `Jobs` awaits before it starts a run (`before_job` in `main.py`), and a hand-off waiting
+on its Allow card counts as running (`Jobs.starting`); see
+[connected-apps.md](connected-apps.md#updates).
+
 The Connections page and the tour add three more Home tools (`setup/home_tools.py`, never offered
 to Scout): `setup_overview` (read; `{experts: [{id, name, version, state, tested}], apps,
 browse_experts, browse_apps, popular, popular_more, show_more_from, stale, progress, failed}`; an optional `query` searches the app
 registry, so `browse_apps` holds that search's entries (empty with no query)
 (the tour asks once per job's app), and `setup_app` takes the same `query` so install_app can find
-the entry again; an optional `cursor` asks for that search's next page), where `state` is `ready`, `needs_login` or
-`needs_update`, an expert not installed is simply absent, and `progress` and `failed` come from
+the entry again; an optional `cursor` asks for that search's next page), where `state` is `ready` or `needs_login` (a newer version is the updates row's, not a state),
+an expert not installed is simply absent, and `progress` and `failed` come from
 the install's `setup_progress` and `setup_done` events), `setup_expert` and `setup_app`
 (`{id, approved?}`, tier `auto`: they ask for themselves). With `approved` false they open the same Allow card Scout's
 `install_expert`, `login_expert` and `install_app` open (empty card text, so the body renders it
@@ -1106,6 +1120,14 @@ words what the person reads (guidance in `mind/soul.md`).
   `uv_missing`, `already_added`, `registry_unavailable`). Pass the same `query` as `find_apps` so
   the entry is in the cached page.
 - `tools.py` `setup_facts`: the facts a refused `hand_off` carries (see Experts).
+- `updates.py`: `Updates`, which finds newer versions of installed experts and local apps (an
+  app's is the package version pinned in its command, `apps.version`; a remote app has none),
+  keeps the last check and latest versions in `cache/updates.json`, and applies an update: an
+  expert through `expert_setup_tools`' `update` (the install path's staging and swap, under the
+  same one-per-expert guard as Home's install, keeping the expert's login), an app by
+  `set_app_package` plus `Apps.restart`, then `Apps.wait_settled`; if the new command does not
+  connect, the old one is written back and started again. A due update waits while a job runs
+  (`quiet`, above).
 - `cli.py`: the `tagalong` command (`uv run tagalong`, or `tagalong` once installed), for a brain
   machine with no screen. It is a thin caller of the functions above (`inspect`, `Registry`,
   `install_card`, `install_expert`, `app_params`, `save_app`, `LoginDriver`, `ExpertStore`) with

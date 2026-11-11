@@ -102,3 +102,21 @@ test('experts_list_is_open_and_a_community_one_is_checked_first', async () => {
   await add.getByRole('button', { name: 'Add Codex' }).click();
   await expect.poll(() => brain.expertSetups, { timeout: 15_000 }).toEqual(['codex-acp']);
 });
+
+test('update one app', async () => {
+  const home = await windowFor('home');
+  await home.getByRole('tab', { name: 'Apps' }).click();
+  await expect(home.getByText('Checked 5 minutes ago')).toBeVisible({ timeout: 15_000 });
+
+  // A remote app has nothing to update: its service does it.
+  await expect(
+    home.getByRole('region', { name: /^Wiki/ }).getByText(/Always up to date/),
+  ).toBeVisible();
+
+  // The local one shows the version move; pressing Update asks the brain, which says Updated.
+  const files = home.getByRole('region', { name: 'Files' });
+  await expect(files.getByText(/v1\.2 → v1\.3/)).toBeVisible();
+  await files.getByRole('button', { name: 'Update Files' }).click();
+  await expect.poll(() => brain.updateCalls, { timeout: 15_000 }).toEqual(['item app files']);
+  await expect(files.getByText('Updated to v1.3.')).toBeVisible();
+});

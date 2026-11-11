@@ -234,8 +234,15 @@ async def install_expert(
     except BaseException:
         await asyncio.shield(_clean(staged, download))
         raise
+    before = store.get(entry.id)  # a reinstall is the same account: keep its login state
     expert = InstalledExpert(
-        entry.id, entry.name, _version(entry, dist), command, "registry", None, node_kind
+        entry.id,
+        entry.name,
+        _version(entry, dist),
+        command,
+        "registry",
+        before.logged_in if before else None,
+        node_kind,
     )
     try:
         # Shielded: a cancel from here on still finishes the swap and the record together.

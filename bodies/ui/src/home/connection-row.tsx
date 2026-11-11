@@ -6,10 +6,11 @@
  */
 
 import { useState } from 'react';
-import type { AppInfo } from '../shapes';
+import type { AppInfo, UpdateRow } from '../shapes';
 import { Button } from '../controls/button';
 import { Toggle } from '../controls/toggle';
 import { Tile } from './app-group-row';
+import { UpdateSide, updateMeta, updateVisible } from './updates-bar';
 
 // The brain opens the page on its own machine, so a brain elsewhere cannot finish a sign-in.
 export const SAME_MACHINE =
@@ -52,10 +53,15 @@ export function ConnectionRow({
   onRestart,
   onSignIn,
   onRemove,
+  update,
+  onUpdate,
 }: {
   app: AppInfo;
   /** Who made it, when the brain says; null shows no chip. */
   trust: 'official' | 'community' | null;
+  /** Its version line and update state, when the brain has said; Update presses call onUpdate. */
+  update?: UpdateRow | undefined;
+  onUpdate?: () => void;
   onSwitch: () => void;
   onRestart: () => void;
   onSignIn: () => void;
@@ -67,6 +73,8 @@ export function ConnectionRow({
   // An oauth app that is connecting is waiting on the person's browser, not on the network.
   const waiting = app.auth === 'oauth' && app.status === 'connecting';
   const needsSignIn = app.auth === 'oauth' && app.status === 'needs-sign-in';
+  const versionWords = update === undefined ? null : updateMeta(update);
+  const updateShown = update !== undefined && updateVisible(update);
 
   return (
     <li className="cx-item">
@@ -83,6 +91,7 @@ export function ConnectionRow({
           </span>
           <span className="cx-meta">
             {TRANSPORT_WORDS[app.transport]} · {toolCount}
+            {versionWords !== null && ` · ${versionWords}`}
           </span>
         </div>
         <div className="cx-row__side">
@@ -118,10 +127,16 @@ export function ConnectionRow({
               </Button>
             )}
           </span>
-          <span className="cx-status">
-            <span className={STATUS_DOT[app.status]} aria-hidden="true" />
-            {waiting ? 'Waiting for the browser' : STATUS_WORDS[app.status]}
-          </span>
+          {/* A healthy app's status gives way to its update words, as in the mockup. */}
+          {!(updateShown && app.status === 'connected') && (
+            <span className="cx-status">
+              <span className={STATUS_DOT[app.status]} aria-hidden="true" />
+              {waiting ? 'Waiting for the browser' : STATUS_WORDS[app.status]}
+            </span>
+          )}
+          {update !== undefined && onUpdate !== undefined && (
+            <UpdateSide row={update} onUpdate={onUpdate} />
+          )}
           <Toggle checked={app.enabled} onChange={onSwitch} label={`Scout can use ${name}`} />
         </div>
       </section>

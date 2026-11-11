@@ -9,6 +9,8 @@ import type {
   BodiesState,
   LoopsState,
   TimerRow,
+  UpdateResult,
+  UpdatesState,
   Pet,
   MemoryEntry,
   ModelState,
@@ -66,6 +68,10 @@ export interface FakeHostBridge extends HostBridge {
   loops: LoopsState;
   /** Every loops call made, in order: `set gmail on`, `forget id`, `wipe`. */
   readonly loopCalls: readonly string[];
+  /** The brain's updates state; a test may swap it, then `emitChanged('updates')`. */
+  updates: UpdatesState;
+  /** Every updates call, in order: `check`, `item app github`, `all expert`, `auto app official on`. */
+  readonly updateCalls: readonly string[];
   /** Home's timers; cancelTimer edits it, a test may swap it. */
   timers: TimerRow[];
   /** The id of every cancelTimer call, in order. */
@@ -194,6 +200,10 @@ export function createFakeHostBridge(
     loops?: LoopsState;
     /** Home's timers. */
     timers?: TimerRow[];
+    /** What updatesState answers; defaults to nothing out of date, the default switches. */
+    updates?: Partial<UpdatesState>;
+    /** What updateItem and updateAll answer; defaults to `{ started: true }`. */
+    updateResult?: UpdateResult;
     /** Home's Bodies state. */
     bodies?: BodiesState;
     /** The brain's reading_status answer (JSON text). */
@@ -237,6 +247,7 @@ export function createFakeHostBridge(
   const setupOverviewCalls: { query?: string; cursor?: string }[] = [];
   const permissionSets: { tool: string; mode: 'off' | 'ask' | 'auto' }[] = [];
   const cancelledTimers: string[] = [];
+  const updateCalls: string[] = [];
   const loopCalls: string[] = [];
   const whatsappChanges: WhatsAppChange[] = [];
   const readingCalls: string[] = [];
@@ -439,6 +450,37 @@ export function createFakeHostBridge(
     wipeLoops() {
       loopCalls.push('wipe');
       fake.loops = { apps: fake.loops.apps.map((a) => ({ ...a, on: false })), loops: [] };
+      return Promise.resolve();
+    },
+    updates: {
+      checkedAt: null,
+      auto: {
+        apps: { official: true, community: false },
+        experts: { official: true, community: false },
+      },
+      items: [],
+      ...options.updates,
+    },
+    updateCalls,
+    updatesState() {
+      return Promise.resolve(structuredClone(fake.updates));
+    },
+    updatesCheck() {
+      updateCalls.push('check');
+      return Promise.resolve(structuredClone(fake.updates));
+    },
+    updateItem(kind, id) {
+      updateCalls.push(`item ${kind} ${id}`);
+      return Promise.resolve(options.updateResult ?? { started: true });
+    },
+    updateAll(kind) {
+      updateCalls.push(`all ${kind}`);
+      return Promise.resolve(options.updateResult ?? { started: true });
+    },
+    setAutoUpdate(kind, official, on) {
+      updateCalls.push(`auto ${kind} ${official ? 'official' : 'community'} ${on ? 'on' : 'off'}`);
+      const group = kind === 'app' ? fake.updates.auto.apps : fake.updates.auto.experts;
+      group[official ? 'official' : 'community'] = on;
       return Promise.resolve();
     },
     timersState() {

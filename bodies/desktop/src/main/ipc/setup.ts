@@ -3,10 +3,11 @@
  * (setup:expert, setup:app) through the brain's Home tools. `approved` true is honoured only
  * from a window that showed the person the choice: Home for an app (the brain still asks for
  * the check card on a community one unless `communityOk`), the tour for an expert, or Home for
- * an expert with `communityOk`. Contains registerSetupIpc.
+ * an expert with `communityOk`. Also the update calls (state, check now, update one or all,
+ * the per-group auto switch). Contains registerSetupIpc.
  */
 
-import { parseSetupOverview } from '@tagalong/ui/shapes';
+import { parseSetupOverview, parseUpdatesState } from '@tagalong/ui/shapes';
 import { z } from 'zod';
 import { IPC } from '../../shared/ipc';
 import { callJson } from '../brain/call-json';
@@ -63,6 +64,31 @@ export function registerSetupIpc(
     };
     return parseSetupOverview(await callJson(brain, 'setup_overview', input));
   });
+  // Updates: the brain decides when one may run (never mid-job); the page only asks.
+  const Kind = z.enum(['app', 'expert']);
+  handle(IPC.updatesState, async () => parseUpdatesState(await callJson(brain, 'updates_state')));
+  handle(IPC.updatesCheck, async () => parseUpdatesState(await callJson(brain, 'updates_check')));
+  handle(IPC.updateItem, async (_event: unknown, kind: unknown, id: unknown) =>
+    Result.parse(
+      await callJson(brain, 'update_item', {
+        kind: Kind.parse(kind),
+        id: z.string().min(1).parse(id),
+      }),
+    ),
+  );
+  handle(IPC.updateAll, async (_event: unknown, kind: unknown) =>
+    Result.parse(await callJson(brain, 'update_all', { kind: Kind.parse(kind) })),
+  );
+  handle(
+    IPC.setAutoUpdate,
+    async (_event: unknown, kind: unknown, official: unknown, on: unknown) => {
+      await callJson(brain, 'set_auto_update', {
+        kind: Kind.parse(kind),
+        official: z.boolean().parse(official),
+        on: z.boolean().parse(on),
+      });
+    },
+  );
   handle(
     IPC.setupExpert,
     setUp(

@@ -13,15 +13,21 @@ import { Icon } from '../setup/icons';
 import { InstallCard } from '../setup/install-card';
 import { OutcomeText, Tile } from './app-group-row';
 import type { Outcome } from './outcome';
+import {
+  UpdateSide,
+  UpdatesBar,
+  rowUpdate,
+  updateVersion,
+  updateWaits,
+  type UpdatesControls,
+} from './updates-bar';
 
 const STATE_WORDS: Record<SetupExpert['state'], string> = {
   ready: 'Ready',
   needs_login: 'Needs sign-in',
-  needs_update: 'Update available',
 };
 const ACTION: Partial<Record<SetupExpert['state'], string>> = {
   needs_login: 'Sign in',
-  needs_update: 'Update',
 };
 const STAGES: Record<string, string> = {
   checking: 'Checking this computer',
@@ -83,7 +89,10 @@ export function ExpertsGroup({
   outcomes,
   failedId,
   onAct,
+  updates,
 }: {
+  /** The brain's updates, null when it could not say: the row then shows no update at all. */
+  updates: UpdatesControls | null;
   experts: SetupExpert[];
   progress: SetupOverview['progress'];
   /** Ids waiting on the person's answer to an Allow card. */
@@ -95,8 +104,14 @@ export function ExpertsGroup({
 }) {
   const row = (expert: SetupExpert) => {
     const working = progress?.expert === expert.id || asking.has(expert.id);
+    // The Update button and the version words come from the updates state.
+    const update = rowUpdate(updates, 'expert', expert.id);
     const action = ACTION[expert.state];
     const outcome = outcomes.get(expert.id);
+    const versionWords = update === undefined ? null : updateVersion(update);
+    const side = update !== undefined && (
+      <UpdateSide row={update} onUpdate={() => updates?.onUpdate('expert', expert.id)} />
+    );
     return (
       <li key={expert.id} className="cx-item">
         <section className="cx-row" aria-label={expert.name}>
@@ -104,20 +119,34 @@ export function ExpertsGroup({
           <div className="cx-row__main">
             <span className="cx-row__name">
               <span title={expert.name}>{expert.name}</span>
+              <span className={expert.official ? 'cx-chip cx-chip--official' : 'cx-chip'}>
+                {expert.official ? 'Official' : 'Community'}
+              </span>
               {!expert.tested && (
                 <span className="cx-chip cx-chip--quiet">Not tested with Scout</span>
               )}
             </span>
             <span className="cx-meta">
-              {expert.version === '' ? 'Your own command' : `v${expert.version}`} ·{' '}
-              {EXPERT_JOB[expert.id] ?? DEFAULT_EXPERT_JOB}
+              {expert.version === '' ? 'Your own command' : (versionWords ?? `v${expert.version}`)}{' '}
+              · {EXPERT_JOB[expert.id] ?? DEFAULT_EXPERT_JOB}
+              {update !== undefined && updateWaits(update) && ' · Waits for you'}
             </span>
           </div>
           <div className="cx-row__side">
             {outcome !== undefined && <OutcomeText outcome={outcome} />}
             {progress?.expert === expert.id ? null : (
               <>
-                <span className="cx-status">{STATE_WORDS[expert.state]}</span>
+                {update?.status === 'updated' && side}
+                <span
+                  className={expert.state === 'ready' ? 'cx-status' : 'cx-status cx-status--warn'}
+                >
+                  <span
+                    className={expert.state === 'ready' ? 'home-dot' : 'home-dot home-dot--warn'}
+                    aria-hidden="true"
+                  />
+                  {STATE_WORDS[expert.state]}
+                </span>
+                {update !== undefined && update.status !== 'updated' && side}
                 {action !== undefined && (
                   <Button
                     variant="primary"
@@ -144,7 +173,11 @@ export function ExpertsGroup({
   const community = experts.filter((expert) => !expert.official);
   return (
     <section className="home-card" aria-label="Your experts">
-      <h2 className="home-card__label">Your experts</h2>
+      {updates === null ? (
+        <h2 className="home-card__label">Your experts</h2>
+      ) : (
+        <UpdatesBar title="Your experts" kind="expert" controls={updates} />
+      )}
       {experts.length === 0 && <p className="tg-note">No experts yet. Add one below.</p>}
       {official.length > 0 && (
         <>
@@ -157,6 +190,9 @@ export function ExpertsGroup({
       {community.length > 0 && (
         <>
           <p className="cx-group-label">Community</p>
+          <p className="cx-grp-note">
+            Made by other people. Scout asks before it changes anything with them.
+          </p>
           <ul aria-label="Community experts" className="cx-list">
             {community.map(row)}
           </ul>

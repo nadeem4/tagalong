@@ -19,6 +19,9 @@ import type {
   SetupOverview,
   SetupResult,
   TimerRow,
+  UpdateKind,
+  UpdateResult,
+  UpdatesState,
   TurnEvent,
   WhatsAppChange,
 } from './shapes';
@@ -307,6 +310,18 @@ export interface HostBridge {
     query?: string,
     communityOk?: boolean,
   ): Promise<SetupResult>;
+  /**
+   * What is out of date, when the registries were last read, and the per-group auto switches.
+   * Changes arrive as `changed updates`.
+   */
+  updatesState(): Promise<UpdatesState>;
+  /** Reads the registries now ("Check for updates") and answers the fresh state. */
+  updatesCheck(): Promise<UpdatesState>;
+  /** One update; `waiting` answers when a job is running (it starts after the job). */
+  updateItem(kind: UpdateKind, id: string): Promise<UpdateResult>;
+  updateAll(kind: UpdateKind): Promise<UpdateResult>;
+  /** "Keep Official/Community apps or experts up to date automatically". */
+  setAutoUpdate(kind: UpdateKind, official: boolean, on: boolean): Promise<void>;
   addConnection(params: AppAddParams): Promise<{ id: string }>;
   setConnectionEnabled(id: string, enabled: boolean): Promise<unknown>;
   restartConnection(id: string): Promise<unknown>;
