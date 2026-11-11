@@ -101,6 +101,32 @@ describe('InstallConfirm done card prompts', () => {
 });
 
 describe('InstallConfirm', () => {
+  it('a row that was already in error does not fail a fresh Allow, only a new error does', async () => {
+    const bridge = createFakeHostBridge();
+    bridge.apps = [
+      { id: 'notion', name: 'Notion', status: 'error', error: 'old', tools: [] },
+    ] as never;
+    show(APP_ASK, bridge);
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
+    await waitFor(() => expect(screen.getByRole('list', { name: 'Steps' })).toBeVisible());
+    act(() => bridge.emit({ type: 'connections.changed' } as never));
+    expect(screen.queryByRole('alert')).toBeNull();
+    bridge.apps = [
+      { id: 'notion', name: 'Notion', status: 'needs-sign-in', error: '', tools: [] },
+    ] as never;
+    act(() => bridge.emit({ type: 'connections.changed' } as never));
+    await waitFor(() => expect(screen.getByText('Your browser opened to sign in.')).toBeVisible());
+    bridge.apps = [
+      { id: 'notion', name: 'Notion', status: 'error', error: 'old', tools: [] },
+    ] as never;
+    act(() => bridge.emit({ type: 'connections.changed' } as never));
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        "Notion didn't finish signing in. Nothing was connected.",
+      ),
+    );
+  });
+
   it('Allow approves once and the card moves to working, staying in place', async () => {
     const { bridge } = show(APP_ASK);
     fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
@@ -176,21 +202,52 @@ describe('InstallConfirm', () => {
 });
 
 describe('install card in the bubble', () => {
-  it('one card per install, and it survives a dismiss and the turn ending', async () => {
-    const bridge = createFakeHostBridge();
+  function bubble(bridge = createFakeHostBridge()) {
     render(
       <HostBridgeProvider bridge={bridge}>
         <CompanionBubble petId="scout" petName="Scout" expanded />
       </HostBridgeProvider>,
     );
-    const ask = { ...APP_ASK, type: 'connector.confirm', turnId: 't1' } as never;
-    act(() => bridge.emit(ask));
-    act(() => bridge.emit(ask));
+    return bridge;
+  }
+  const ask = (over: object = {}) => ({ ...APP_ASK, type: 'connector.confirm', turnId: 't1', ...over }) as never;
+
+  it('one card per install, and an Allowed one survives a dismiss and the turn ending', async () => {
+    const bridge = bubble();
+    act(() => bridge.emit(ask()));
+    act(() => bridge.emit(ask()));
     await waitFor(() =>
       expect(screen.getAllByRole('group', { name: 'Set up Notion' })).toHaveLength(1),
     );
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
+    await waitFor(() => expect(screen.getByRole('list', { name: 'Steps' })).toBeVisible());
     act(() => bridge.emit({ type: 'connector.dismiss', approvalId: 'a1' } as never));
     act(() => bridge.emit({ type: 'turn.completed', turnId: 't1' } as never));
     expect(screen.getByRole('group', { name: 'Set up Notion' })).toBeVisible();
+  });
+
+  it('a closed ask drops its card while it is still asking, so no live Allow stays', async () => {
+    const bridge = bubble();
+    act(() => bridge.emit(ask()));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Allow' })).toBeVisible());
+    act(() => bridge.emit({ type: 'connector.dismiss', approvalId: 'a1' } as never));
+    expect(screen.queryByRole('group', { name: 'Set up Notion' })).toBeNull();
+  });
+
+  it('a repeat ask for the same install replaces its card with a fresh one', async () => {
+    const bridge = bubble();
+    act(() => bridge.emit(ask()));
+    fireEvent.click(await screen.findByRole('button', { name: 'Allow' }));
+    await waitFor(() => expect(screen.getByRole('list', { name: 'Steps' })).toBeVisible());
+    act(() => bridge.emit(ask({ approvalId: 'a9' })));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Allow' })).toBeVisible());
+    expect(screen.getAllByRole('group', { name: 'Set up Notion' })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
+    await waitFor(() =>
+      expect(bridge.approvals).toEqual([
+        { approvalId: 'a1', decision: 'once' },
+        { approvalId: 'a9', decision: 'once' },
+      ]),
+    );
   });
 });
