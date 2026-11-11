@@ -398,10 +398,10 @@ describe('Scout’s remark survives', () => {
   it('the placeholder goes back to Ask once the follow-up is answered', async () => {
     const bridge = createFakeHostBridge();
     renderBubble(bridge, { remark: REMARK, expanded: true });
-    expect(screen.getByPlaceholderText('Reply to Scout')).toBeVisible();
+    expect(screen.getByPlaceholderText('Reply to Scout…')).toBeVisible();
     await act(async () => askIn('Message Scout', 'Yes'));
     turn(bridge, 'turn-1', 'Done.');
-    expect(screen.getByPlaceholderText('Ask Scout anything')).toBeVisible();
+    expect(screen.getByPlaceholderText('Ask Scout…')).toBeVisible();
   });
 
   it('a second remark keeps the first above it', () => {
@@ -690,15 +690,15 @@ describe('CompanionBubble, the chat footer and empty state', () => {
 
   it('asks for a reply after a remark', () => {
     chat({ remark: 'Your 3pm moved.' });
-    expect(screen.getByLabelText('Message Scout')).toHaveAttribute('placeholder', 'Reply to Scout');
+    expect(screen.getByLabelText('Message Scout')).toHaveAttribute(
+      'placeholder',
+      'Reply to Scout…',
+    );
   });
 
   it('keeps the default placeholder with no remark', () => {
     chat();
-    expect(screen.getByLabelText('Message Scout')).toHaveAttribute(
-      'placeholder',
-      'Ask Scout anything',
-    );
+    expect(screen.getByLabelText('Message Scout')).toHaveAttribute('placeholder', 'Ask Scout…');
   });
 
   it('shows the Bean and the same sentence in the empty chat', () => {
@@ -810,8 +810,9 @@ describe('CompanionBubble, talking to Scout', () => {
         />
       </HostBridgeProvider>,
     );
-    const toggle = screen.getByRole('switch', { name: 'Always listening' });
-    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    const toggle = screen.getByRole('button', { name: 'Always listening' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(toggle).toHaveTextContent('');
     fireEvent.click(toggle);
     expect(onToggle).toHaveBeenCalledOnce();
     rerender(
@@ -823,8 +824,8 @@ describe('CompanionBubble, talking to Scout', () => {
         />
       </HostBridgeProvider>,
     );
-    expect(screen.getByRole('switch', { name: 'Always listening' })).toHaveAttribute(
-      'aria-checked',
+    expect(screen.getByRole('button', { name: 'Always listening' })).toHaveAttribute(
+      'aria-pressed',
       'true',
     );
     expect(screen.getByRole('status')).toHaveTextContent(
@@ -842,7 +843,7 @@ describe('CompanionBubble, talking to Scout', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Listening. Start with “Scout” to ask.');
   });
 
-  it('has a Seeing switch beside it', () => {
+  it('has a Seeing icon toggle beside it', () => {
     const onToggle = vi.fn();
     render(
       <HostBridgeProvider bridge={createFakeHostBridge()}>
@@ -854,8 +855,8 @@ describe('CompanionBubble, talking to Scout', () => {
         />
       </HostBridgeProvider>,
     );
-    const seeing = screen.getByRole('switch', { name: 'Seeing' });
-    expect(seeing).toHaveAttribute('aria-checked', 'true');
+    const seeing = screen.getByRole('button', { name: 'Seeing your screen' });
+    expect(seeing).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(seeing);
     expect(onToggle).toHaveBeenCalledOnce();
   });
@@ -1265,10 +1266,10 @@ describe('the live job line', () => {
     expect(screen.queryByTestId('job-line')).toBeNull();
   });
 
-  it('keeps the full text in its title when the step is long', async () => {
+  it('shows a long step whole, wrapped rather than cut', async () => {
     const long = `cat ${'C:/very/long/path/'.repeat(8)}file.ts`;
     renderBubble(createFakeHostBridge({ runningSteps: [running(long)] }));
     const line = await screen.findByTestId('job-line');
-    expect(line.getAttribute('title')).toBe(`Claude Code: ${long}`);
+    expect(line.textContent).toBe(`Claude Code: ${long}`);
   });
 });

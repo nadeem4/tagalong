@@ -57,13 +57,13 @@ test('Always listening: off at launch, on only when switched, Scout hears and an
   await avatar.evaluate(() => window.tagalongHost.togglePanel());
   const panel = await windowFor('panel');
 
-  const toggle = panel.getByRole('switch', { name: 'Always listening' });
+  const toggle = panel.getByRole('button', { name: 'Always listening' });
   await toggle.waitFor({ state: 'visible', timeout: 30_000 });
-  await expect(toggle).toHaveAttribute('aria-checked', 'false');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   await expect(avatar.getByTestId('listening-mark')).toHaveCount(0);
 
   await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-checked', 'true');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
   await expect(avatar.getByTestId('listening-mark')).toHaveAttribute('data-state', 'on');
   // Switching on shows "Listening" on Scout for a few seconds: a mark, not a spoken line.
   await expect(avatar.getByTestId('status-mark')).toHaveAttribute('data-id', 'listening-on');
@@ -78,7 +78,7 @@ test('Always listening: off at launch, on only when switched, Scout hears and an
   await expect(panel.getByText(/This is the fake brain/)).toBeVisible({ timeout: 30_000 });
   expect(brain.voice.mics).toBeGreaterThanOrEqual(3);
 
-  await panel.getByRole('switch', { name: 'Always listening' }).click();
+  await panel.getByRole('button', { name: 'Always listening' }).click();
   await expect(avatar.getByTestId('listening-mark')).toHaveCount(0);
   await expect.poll(() => brain.voice.unlistens).toBeGreaterThan(0);
 });

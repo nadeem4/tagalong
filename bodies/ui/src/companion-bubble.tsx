@@ -19,7 +19,7 @@ import { CONTROLS_CSS } from './controls/controls-styles';
 import { StatusMark } from './status-mark';
 import { CARD_CSS } from './card-styles';
 import { CHAT_CSS } from './chat-styles';
-import { CloseIcon, CollapseIcon } from './chat-icons';
+import { CloseIcon, CollapseIcon, ExpandIcon, EyeIcon, MicIcon, SendIcon } from './chat-icons';
 import { ScoutMark } from './scout-mark';
 import { Keycap } from './controls';
 import type { BeanClipData } from './theme/bean-clip';
@@ -348,42 +348,79 @@ export function CompanionBubble({
       title={listening ? 'Stop listening' : `Talk to ${petName} (or hold ${talk.keyLabel})`}
       onClick={talk.onMic}
     >
-      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-        <rect x="5.5" y="1.5" width="5" height="8.5" rx="2.5" fill="currentColor" />
-        <path d="M3 8a5 5 0 0 0 10 0M8 13v2" stroke="currentColor" fill="none" strokeWidth="1.5" />
-      </svg>
+      <MicIcon state={listening ? 'on' : 'plain'} />
     </button>
   );
-  const alwaysToggle = talk?.always !== undefined && (
-    <button
-      type="button"
-      role="switch"
-      className="bubble-toggle"
-      aria-checked={talk.always.on}
-      onClick={talk.always.onToggle}
-      title={
-        talk.always.on
-          ? 'Scout is listening all the time. Click to stop.'
-          : 'Let Scout listen all the time'
-      }
-    >
-      Always listening
-    </button>
+  // A header toggle: an icon button (pressed = on) with the tooltip the mockup draws beside it.
+  const headToggle = (
+    label: string,
+    on: boolean,
+    onToggle: () => void,
+    icon: ReactNode,
+    tip: { title: string; sub?: string },
+  ) => (
+    <span className="bubble-tgwrap">
+      <button
+        type="button"
+        className="bubble-tg"
+        aria-label={label}
+        aria-pressed={on}
+        aria-describedby={`tip-${label.replace(/\s/g, '-')}`}
+        onClick={onToggle}
+      >
+        {icon}
+      </button>
+      <span className="bubble-tip" role="tooltip" id={`tip-${label.replace(/\s/g, '-')}`}>
+        {tip.title}
+        {tip.sub !== undefined && <span className="bubble-tip-sub">{tip.sub}</span>}
+      </span>
+    </span>
   );
-  const seeingToggle = seeing !== undefined && (
+  const alwaysToggle =
+    talk?.always !== undefined &&
+    headToggle(
+      'Always listening',
+      talk.always.on,
+      talk.always.onToggle,
+      <MicIcon state={talk.always.on ? 'on' : 'off'} />,
+      talk.always.on
+        ? { title: 'Always listening: on', sub: 'Click to turn off.' }
+        : {
+            title: 'Always listening: off',
+            sub: `Click to turn on. Hold ${talk.keyLabel} to talk once.`,
+          },
+    );
+  const seeingToggle =
+    seeing !== undefined &&
+    headToggle(
+      'Seeing your screen',
+      seeing.on,
+      seeing.onToggle,
+      <EyeIcon on={seeing.on} />,
+      seeing.on
+        ? { title: 'Seeing your screen: on', sub: 'Click to pause.' }
+        : { title: 'Seeing your screen: off', sub: 'Click to let Scout see.' },
+    );
+  // What Scout is doing right now, in the header's second line.
+  const headStatus =
+    talk?.always === undefined && seeing === undefined
+      ? 'Ready'
+      : talk?.always?.on === true && seeing?.on === true
+        ? 'Listening · seeing your screen'
+        : talk?.always?.on === true
+          ? 'Listening'
+          : seeing?.on === true
+            ? 'Seeing your screen'
+            : 'Not listening or looking';
+  const expandButton = onOpenChat !== undefined && (
     <button
       type="button"
-      role="switch"
-      className="bubble-toggle"
-      aria-checked={seeing.on}
-      onClick={seeing.onToggle}
-      title={
-        seeing.on
-          ? 'Scout can see your screen. Click to pause.'
-          : 'Sight is paused. Click to let Scout see.'
-      }
+      className="bubble-tg"
+      aria-label="Open full chat"
+      title="Open full chat"
+      onClick={onOpenChat}
     >
-      Seeing
+      <ExpandIcon />
     </button>
   );
   const talkLine =
@@ -550,6 +587,14 @@ export function CompanionBubble({
 
   // The chat opens on, and follows, the newest message. Only new content moves it, never typing.
   const log = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLTextAreaElement>(null);
+  // The composer grows with its text, up to a few lines, then scrolls.
+  useEffect(() => {
+    const el = box.current;
+    if (el === null) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  }, [draft]);
   const streamed = reply.state === 'idle' ? '' : reply.text;
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -704,27 +749,43 @@ export function CompanionBubble({
     scoutLine !== null || (question === null && past[past.length - 1]?.question === null);
   const field = (label: string, inChat = false) => (
     <label className="bubble-field">
-      <span className={inChat ? 'bubble-sr' : undefined}>{label}</span>
-      {/* Named outright: the mic button inside the label would join its name in Chromium. */}
-      <input
+      <span className="bubble-sr">{label}</span>
+      {/* Named outright: the buttons inside the label would join its name in Chromium. */}
+      <textarea
+        ref={box}
+        rows={1}
         aria-label={label}
-        placeholder={
-          inChat ? (replying ? `Reply to ${petName}` : `Ask ${petName} anything`) : undefined
-        }
+        placeholder={`${replying ? 'Reply to' : 'Ask'} ${petName}…${
+          talk === undefined ? '' : ` or hold ${talk.keyLabel} to talk`
+        }`}
         value={draft}
         autoFocus
+        data-chat={inChat ? 'true' : undefined}
         aria-busy={reply.state === 'running' ? 'true' : undefined}
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === 'Enter') send();
+          // Shift+Enter is left to the browser: it adds the line.
+          if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            send();
+          }
         }}
       />
       {micButton}
+      <button
+        type="button"
+        className="bubble-send"
+        aria-label="Send"
+        disabled={draft.trim() === '' || reply.state === 'running'}
+        onClick={send}
+      >
+        <SendIcon />
+      </button>
     </label>
   );
 
   const closeButton = onClose !== undefined && (
-    <button type="button" className="bubble-close" aria-label="Close" onClick={onClose}>
+    <button type="button" className="bubble-close bubble-tg" aria-label="Close" onClick={onClose}>
       <CloseIcon />
     </button>
   );
@@ -739,7 +800,14 @@ export function CompanionBubble({
           <style>{CARD_CSS}</style>
           <style>{CHAT_CSS}</style>
           <header className="bubble-head">
-            <strong>{petName}</strong>
+            <ScoutMark {...(scout !== undefined ? { clip: scout } : {})} size={32} />
+            <span className="bubble-headwho">
+              <strong>{petName}</strong>
+              <span className="bubble-headstatus" data-testid="head-status">
+                <span className="bubble-priv" aria-hidden="true" />
+                {headStatus}
+              </span>
+            </span>
             <span className="bubble-row">
               {alwaysToggle}
               {seeingToggle}
@@ -748,7 +816,7 @@ export function CompanionBubble({
               {onCollapse !== undefined && (
                 <button
                   type="button"
-                  className="bubble-icon"
+                  className="bubble-tg"
                   aria-label="Back to bubble"
                   title="Back to bubble"
                   onClick={onCollapse}
@@ -823,6 +891,7 @@ export function CompanionBubble({
             {alwaysToggle}
             {seeingToggle}
             {speakingIndicator}
+            {expandButton}
             {closeButton}
           </span>
         </div>
@@ -840,16 +909,7 @@ export function CompanionBubble({
         {statusRow}
         {talkStatus}
         {field(`Ask ${petName}`)}
-        <div className="bubble-row bubble-hints">
-          {replyHint}
-          <span>Enter to ask</span>
-          <span>Esc to close</span>
-          {onOpenChat !== undefined && (
-            <button type="button" className="bubble-quiet" onClick={onOpenChat}>
-              Open full chat
-            </button>
-          )}
-        </div>
+        {replyHint !== false && <p className="bubble-hints">{replyHint}</p>}
       </div>
     </Speech>
   );
@@ -1011,16 +1071,6 @@ const BUBBLE_CSS = `
 .bubble-mic:hover { background: #222845; color: ${t.color.text}; }
 .bubble-mic[aria-pressed='true'] { background: ${t.color.gold}; color: ${t.color.goldInk}; }
 .bubble-mic:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 2px; }
-.bubble-toggle {
-  flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px;
-  border: 1px solid ${t.color.fieldLine}; border-radius: 999px; background: transparent;
-  color: ${t.color.textMuted}; font: inherit; ${typeCss('small')}; cursor: pointer;
-}
-.bubble-toggle::before {
-  content: ''; width: 6px; height: 6px; border-radius: 50%; background: ${t.color.fieldLine};
-}
-.bubble-toggle:hover { background: #222845; color: ${t.color.text}; }
-.bubble-toggle:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 2px; }
 .bubble-heard {
   align-self: flex-end; max-width: 85%; margin: 0; padding: 6px 10px; border-radius: 10px 10px 4px 10px;
   background: #222845; color: #C9CEE0; ${typeCss('body')};
@@ -1048,9 +1098,6 @@ const BUBBLE_CSS = `
 }
 .bubble-text { margin: 0; ${typeCss('bodyLead')}; white-space: pre-wrap; overflow-wrap: anywhere; }
 .bubble-status { margin: 0; color: #C9CEE0; ${typeCss('small')}; }
-.bubble-jobline {
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
 .bubble-answer { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
 .bubble-error { margin: 0; padding: 8px 12px; border-radius: 6px; background: #3a1d2a; color: #ffb4c0; ${typeCss('body')}; }
 .bubble-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
@@ -1058,20 +1105,12 @@ const BUBBLE_CSS = `
   display: inline-flex; align-items: center; gap: 4px; max-width: 100%; min-height: 28px;
   padding: 0 4px 0 10px; border-radius: 999px; background: #222845; color: #C9CEE0; ${typeCss('small')};
 }
-.bubble-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bubble-chip button {
   width: 24px; height: 24px; border: 0; border-radius: 50%; background: transparent;
   color: ${t.color.textMuted}; cursor: pointer;
 }
-.bubble-field { flex: none; position: relative; display: flex; flex-direction: column; gap: 6px; ${typeCss('small')}; color: ${t.color.textMuted}; }
-.bubble-field input {
-  flex: none; height: 44px; box-sizing: border-box; padding: 0 44px 0 12px; border: 1px solid #7CB8F2;
-  border-radius: 8px; background: ${t.color.field}; color: ${t.color.text}; font: inherit; ${typeCss('bodyLead')};
-}
-.bubble-field .bubble-mic { position: absolute; right: 6px; bottom: 8px; }
 .bubble-row { display: flex; align-items: center; gap: 12px; }
 .bubble-hints { ${typeCss('caption')}; color: ${t.color.textMuted}; }
-.bubble-hints .bubble-quiet { margin-left: auto; }
 .bubble-primary {
   height: 36px; padding: 0 16px; border: 0; border-radius: 8px; background: ${t.color.gold};
   color: ${t.color.goldInk}; font: inherit; font-weight: 600; cursor: pointer;

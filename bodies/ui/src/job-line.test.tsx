@@ -134,6 +134,6 @@ describe('JobLine', () => {
     const line = screen.getByTestId('job-line');
     expect(line.textContent).toBe('Claude Code: npm init -y');
     expect(line.getAttribute('aria-live')).toBe('off');
-    expect(line.getAttribute('title')).toBe('Claude Code: npm init -y');
+    expect(line.hasAttribute('title')).toBe(false);
   });
 });

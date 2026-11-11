@@ -1,7 +1,7 @@
 /**
  * The bubble's one live line for a running job ("Claude Code: npm init -y"): a hook that reads
  * the newest running step from the brain, and the muted row that shows it. Step title only,
- * never output; not Scout's voice, so it is never spoken.
+ * never output, shown whole; not Scout's voice, so it is never spoken.
  * Contains useRunningStep and JobLine.
  */
 import { useEffect, useState } from 'react';
@@ -56,10 +56,10 @@ export function useRunningStep(bridge: HostBridge): RunningStep | null {
 }
 
 export function JobLine({ step }: { step: RunningStep }) {
-  const text = `${step.expert}: ${step.text}`;
+  // The whole step wraps in mono; a title would only repeat it.
   return (
-    <p className="bubble-status bubble-jobline" data-testid="job-line" aria-live="off" title={text}>
-      {text}
+    <p className="bubble-status bubble-jobline" data-testid="job-line" aria-live="off">
+      {step.expert}: <code>{step.text}</code>
     </p>
   );
 }

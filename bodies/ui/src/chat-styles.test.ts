@@ -21,8 +21,8 @@ describe('CHAT_CSS padding', () => {
 });
 
 describe('CHAT_CSS chat window', () => {
-  it('has a 52px header', () => {
-    expect(ruleOf(CHAT_CSS, '.bubble-head')).toContain('height: 52px');
+  it('has a 56px header', () => {
+    expect(ruleOf(CHAT_CSS, '.bubble-head')).toContain('height: 56px');
   });
 
   it('keeps turns 24px apart and 12px inside', () => {
@@ -34,11 +34,10 @@ describe('CHAT_CSS chat window', () => {
     expect(minPadding(CHAT_CSS, '.bubble-mine')).toBeGreaterThanOrEqual(12);
   });
 
-  it('shows a pill that is on with a gold dot and a muted gold edge', () => {
-    expect(ruleOf(CHAT_CSS, ".bubble-toggle[aria-checked='true']")).toContain(
-      'border-color: #6B5A2A',
+  it('shows an icon toggle that is on with a gold fill and a muted gold edge', () => {
+    expect(ruleOf(CHAT_CSS, ".bubble-tg[aria-pressed='true']")).toContain(
+      'rgba(242, 193, 78, 0.35)',
     );
-    expect(ruleOf(CHAT_CSS, ".bubble-toggle[aria-checked='true']::before")).toContain('#F2C14E');
   });
 
   it('keeps the context chips at least 8px from their edge', () => {
@@ -57,13 +56,11 @@ describe('CHAT_CSS chat window', () => {
   });
 
   it('dims the field while a turn runs', () => {
-    expect(ruleOf(CHAT_CSS, ".bubble-field input[aria-busy='true']")).toContain('opacity');
+    expect(ruleOf(CHAT_CSS, ".bubble-field textarea[aria-busy='true']")).toContain('opacity');
   });
 
-  it('rings the field in the focus variable, 2px, with at least 12px inside', () => {
-    expect(ruleOf(CHAT_CSS, '.bubble--chat .bubble-field input:focus-visible')).toContain(
-      'outline: 2px solid var(--tg-focus)',
-    );
-    expect(minPadding(CHAT_CSS, '.bubble--chat .bubble-field input')).toBeGreaterThanOrEqual(12);
+  it('rings the composer in sky and keeps 8px inside it', () => {
+    expect(ruleOf(CHAT_CSS, '.bubble-field:focus-within')).toContain('border-color');
+    expect(minPadding(CHAT_CSS, '.bubble-field')).toBeGreaterThanOrEqual(8);
   });
 });
