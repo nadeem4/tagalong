@@ -2273,7 +2273,7 @@ async def test_a_hushed_read_aloud_turn_says_nothing_more():
     join(session, "desktop")
     read_aloud(session)
     session.say("desktop", say("typed"))
-    mouth.hush("desktop")  # barge-in before the reply starts
+    mouth.clear()  # barge-in before the reply starts
     gate.set()
     await finish_quietly(session)
     await asyncio.sleep(0.05)

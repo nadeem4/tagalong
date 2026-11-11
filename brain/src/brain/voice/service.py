@@ -109,7 +109,11 @@ class VoiceService:
             session.silence()
 
     def hush(self, body_id: str) -> None:
-        self._mouth.hush(body_id)
+        for turn in self._mouth.turns_on(body_id):
+            self._mouth.clear(turn)
+
+    async def close(self) -> None:
+        await self._mouth.close()
 
     def spoken(
         self,
