@@ -251,8 +251,10 @@ def home_setup_tools(
         popular, popular_more = [], []
         if not searching:
             (popular, stale_a), (popular_more, stale_b) = (
-                await curated(POPULAR_APPS, machine, added),
-                await curated(MORE_APPS, machine, added),
+                *await asyncio.gather(
+                    curated(POPULAR_APPS, machine, added),
+                    curated(MORE_APPS, machine, added),
+                ),
             )
             stale_mcp = stale_a or stale_b
         browse, show_more_from = ordered_experts(

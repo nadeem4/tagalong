@@ -192,7 +192,7 @@ flowchart LR
   never the registry's raw first page.
 - **Trust kept at install**: a registry install saves `official` or `community` on the app row
   (`apps.trust`, from the entry's id); an app added by hand is `community`. Home's list reads it
-  back as `official` on each connected app, so the tag survives a restart.
+  back as `official` on each connected app, so the tag survives a restart. Apps connected before this was kept read Community until added again.
 - **Experts tab**: the **FOR LONG JOBS** card (`experts-group.tsx`) lists installed experts, each led
   by the kind of job it does (`jobs-kinds.ts`) with the product underneath, with a state chip
   (Ready, Needs login, Update available) and a **Log in** or **Update** button; **ADD AN EXPERT**

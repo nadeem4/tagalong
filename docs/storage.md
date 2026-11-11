@@ -632,8 +632,9 @@ Connected apps (MCP servers).
 - Written by: `apps.py` `Apps` through `store/connections.py` `add_app`, `set_app_enabled`, `remove_app`.
 - Read by: `store/connections.py` `list_apps`.
 - Retention: until the app is removed.
-- Upgrade: migration `0028_app_trust` adds `trust` and backfills `official` where the saved name
-  passes `is_official_app`. A registry install saves it from the entry's id; an app added by hand
+- Upgrade: migration `0028_app_trust` adds `trust` with no backfill: an older row holds only the
+  registry title and a URL or command, which prove nothing, so apps connected before it read
+  Community until they are added again. A registry install saves it from the entry's id; an app added by hand
   is `community`.
 - Masked: secrets are moved out of the row into separate files before it is saved
   (`apps.py` `split_secrets`); `${VAR}` references stay as written. See
