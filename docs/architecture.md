@@ -170,8 +170,8 @@ records a clean close and closes the brain client.
 
 ## What wakes Scout
 
-Anything that is not the person typing (a timer, a finished job, a loop, a card answer) will enter
-the brain through one front door, `brain/src/brain/dispatcher.py`. Each event kind carries an
+Everything that wants Scout's attention (the person's own words, a timer, a finished job, a loop, a
+card answer) will enter the brain through one front door, `brain/src/brain/dispatcher.py`. Each event kind carries an
 urgency set by code (`now`, `next_pause`, `idle`, `hold`), and the dispatcher delivers by the
 speech state: at once, at the next sentence break, only when quiet, or kept as an open item. The
 core is in place; moving the sources onto it comes in a later slice, and `scheduler.py` runs the

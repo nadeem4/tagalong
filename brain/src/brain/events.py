@@ -54,7 +54,7 @@ _KINDS = (
     EventKind("job_question", urgency="next_pause", batch_seconds=None, max_per_hour=None),
     EventKind("choice", urgency="next_pause", batch_seconds=None, max_per_hour=None),
     EventKind("setup_progress", urgency="idle", wakes=False),
-    EventKind("setup_done", urgency="idle", batch_seconds=None, max_per_hour=None),
+    EventKind("setup_done", urgency="next_pause", batch_seconds=None, max_per_hour=None),
     EventKind("setup_login", urgency="next_pause", batch_seconds=None, max_per_hour=None),
     EventKind("focus", urgency="idle", wakes=False),
     EventKind("tab", urgency="idle", wakes=False),

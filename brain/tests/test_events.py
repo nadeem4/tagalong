@@ -233,8 +233,5 @@ def test_urgency_examples():
     assert EVENT_KINDS["loop"].urgency == "idle"
 
 
-def test_every_waking_kind_note_says_its_urgency():
-    notes = load_notes()
-    for kind in EVENT_KINDS.values():
-        if kind.wakes and kind.enabled:
-            assert "Urgency:" in notes[kind.name]
+def test_setup_done_is_next_pause():
+    assert EVENT_KINDS["setup_done"].urgency == "next_pause"

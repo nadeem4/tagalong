@@ -2344,10 +2344,17 @@ flowchart TD
   L -- "not yet" --> W["keep waiting"]
 ```
 
-A newer waiting item with the same kind and key replaces the older one. Items that become
-deliverable within `BATCH_S` of each other go out as one `deliver` call, ordered by urgency then
-arrival; a `now` item skips the wait. A delivery that raises is logged and its items wait again. The
-`deliver` callback and the mouth's `State` feed (`set_speech_state`) are wired by the later slice.
+A newer waiting item with the same kind and key replaces the older one. An item that had to wait
+for its gate (a sentence break, quiet) goes the moment the gate opens, because a break can end
+before any window would; items that are deliverable on arrival wait out `BATCH_S` from the oldest
+post so close arrivals share one `deliver` call, ordered by urgency then arrival. A `now` item, or
+any state change, cuts that wait short. A delivery that raises is logged and its items go back with
+their original order (a newer same-key item still replaces them); after `MAX_FAILS` failures an item
+is logged as `dispatcher.gave_up` and dropped. `stop()` logs everything still waiting as
+`dispatcher.dropped`. F12 turns both into holding open items. The `deliver` callback and the mouth's
+`State` feed (`set_speech_state`) are wired by the later slice. `Dispatcher` requires the
+`OpenItems` store so a `hold` can never be lost. The event notes in `mind/events.md` do not mention
+urgency: the model cannot act on delivery timing.
 Tests: `tests/test_dispatcher.py` (fake clock) and `tests/test_events.py`.
 
 ## Not built yet
