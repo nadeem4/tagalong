@@ -815,6 +815,9 @@ feeds Home's "Scout's brain" card (`brainStatus`, `brainRestart`, `brainRestartA
 `brainOpenFolder`, `brainOpenLog`, `brainCopyDetails`); `restart` is refused for a person-started
 brain; "When your job finishes" waits for the next `changed jobs` with no work running, and an old
 brain that cannot answer `brain_status` (unknown facts) never restarts behind a waiting job. The
+stop is `uv run --no-sync tagalong stop` (`stopBrain` in `brain/launch.ts`): a sync would rewrite
+`.venv/Scripts/brain.exe`, which the running brain holds open on Windows, so uv would fail before
+the stop runs; the relaunch syncs instead. The
 card's `BrainCard` carries `build` plus the app's own `appVersion` and `appBuild`: the Version row
 reads `Tagalong <version> · build <id>`, and an out-of-date brain reads `Brain <version> · build
 <id> (app is <version> · <build>)`; offline it shows the app's own version and "Tagalong" under
