@@ -257,15 +257,14 @@ Rules each module enforces:
   because Escape does not close it) with the same web preferences as Home, loading
   `walkthrough.html` (`loadPage` takes an optional query, so `?step=N` names the step). The page
   (`src/walkthrough.tsx`) mounts `Walkthrough` from `@tagalong/ui` (`bodies/ui/src/walkthrough/`):
-  a navy side panel with the nine-step list, the step on the page, and a footer (Back on the left, not on step 1;
-  a quiet Skip link (not on step 9) and the primary Next on the right, "Get started" on step 1 and "Finish" on step 9).
+  a navy side panel with the ten-step list, the step on the page, and a footer (Back on the left, not on step 1;
+  a quiet Skip link (not on steps 9 and 10) and the primary Next on the right, "Get started" on step 1; on step 9 Next stays off until the key is good; step 10 shows a quiet "I'll do this later" and the primary "Finish", which both finish and are never off).
   Steps 1 to 4 are static copy under the pitch "One companion for everything you do": welcome (a day
   with Scout), how it works (the route a request takes), what to ask (five everyday moments, from
   `moments.ts`) and asking (the ask and pause keys as keycaps, a static bubble preview, what Scout
   never looks at). The side panel carries the `on-navy` class so shared controls draw a gold focus
   ring there. Steps 5 to 9 sit on the shared controls: voice (a `Select` for the talk key, who
-  speaks, voice and microphone, a `Toggle` for Scout talks, a `Slider` for speed, and a "Test your microphone" `MicTest` under the microphone that shows its level through the host's `watchMicLevel`; see [voice.md](voice.md#the-level-meter)), everyday jobs (a list from `bodies/ui/src/jobs-kinds.ts`, each with a one-click **Connect** for the app it needs through the host's `setupApp`, which the renderer wires to the brain's `setup_app` so its Allow card still shows; a job's app is found by name in the overview's apps and registry, and no button shows when the registry lacks it; then one quiet line, "For long jobs, Scout can also use an expert", that opens the expert setup, so "Claude Code" stays out of sight until asked for: one button sets Claude Code up through the brain's `setup_expert` (the press is the OK;
-  progress rides `changed setup`, the login is a second press; the button is disabled while a press is in flight; only the tour window's `approved: true` reaches the brain), a static hand-off card), browser (a numbered list; copy `chrome://extensions` or `edge://extensions`, Show
+  speaks, voice and microphone, a `Toggle` for Scout talks, a `Slider` for speed, and a "Test your microphone" `MicTest` under the microphone that shows its level through the host's `watchMicLevel`; see [voice.md](voice.md#the-level-meter)), everyday jobs (a list from `bodies/ui/src/jobs-kinds.ts` that only explains, with no buttons: connecting happens on step 10), browser (a numbered list; copy `chrome://extensions` or `edge://extensions`, Show
   folder and Copy folder path for the add-on), "Scout asks first, and you set the limit" (a static
   approval card, the daily limit in the shared `MoneyField` stepper, saved with `set_daily_limit`
   only on Next, and only if it changed; an amount of 0 or less blocks Next; Settings' `LimitField`
@@ -274,18 +273,31 @@ Rules each module enforces:
   ends; an unreadable spend shows nothing) and the key. Steps 4 and 5 stage their choices (ask
   key, talk key, Scout talks, voice, speed, microphone) and write them through `saveSettings`
   only on Next, sending the whole `hotkeys` or `voice` object. The side list jumps only to steps
-  already reached. Skip finishes when a key is set, else goes to step 9.
+  already reached. Skip finishes when a key is set, else goes to step 9 (the key step).
   Step 9 wraps the shared `KeyField` and reports whether the key is good (checked, already set,
-  or from the environment) to the shell, which turns Finish on only then; with the brain offline
+  or from the environment) to the shell, which turns Next on only then; with the brain offline
   it says "Scout's brain is not running", Check is off and it enables itself when the brain
   connects. It shows the `.env` path from `key_status` ("Saved on the machine running Scout's brain
   in ...", since the brain can be elsewhere) beside the four key notes (saved by the brain in one
   file, only sent to Anthropic, never written to history or logs, change or remove it in Settings)
   and never the key; "Where do I get one?" calls
-  `openKeyPage`, which main answers by opening exactly the Console key page. Finish calls
-  `finishWalkthrough({ close: false })`, which marks the tour seen without closing, and opens
+  `openKeyPage`, which main answers by opening exactly the Console key page.
+  Step 10, "Connect your tools" (`step-ten.tsx`), is the one place the tour connects things, and
+  nothing on it blocks Finish. It reads the brain's `setup_overview` through the host's
+  `setupOverview` (and again on `changed setup`) and draws the Connections page's rows: an **Apps**
+  group (Gmail, Google Calendar and Notion, each with the Official chip, "<job> · Browser sign-in"
+  as its meta line, and Add, "Waiting for you…" or Connected; an app the registry no longer
+  offers is simply absent) and an **An expert for long jobs** group with Claude Code (Official and
+  Recommended chips; Add, then "Installing…" with a percent bar, then "Needs sign-in" with a Sign in
+  button, then Ready). Add goes through the host's `setupApp` and `setupExpert`, which the renderer
+  wires to the brain's `setup_app` and `setup_expert` (the press is the OK; only the tour window's
+  `approved: true` reaches the brain; a press in flight sends one call). Finish calls
+  `finishWalkthrough({ close: false })`, which marks the tour seen without closing, reads
+  `setupOverview` once more, and opens
   the finish card ("Scout is on your screen", the ask and talk keys as keycaps, three things to
-  try, Open Home, Done); Done or Open Home then calls `finishWalkthrough()` to close the window. A rejection on either shows as
+  try, a "Ready to use" block with a New tag listing the tour's connected apps and Claude Code as
+  Connected, "Still installing. Scout will tell you when it's ready." or "Needs sign-in" (left out
+  when nothing was connected), Open Home, Done); Done or Open Home then calls `finishWalkthrough()` to close the window. A rejection on either shows as
   an alert. The renderer page
   supplies the host calls for steps 6 and 7 (`browserFolder`, `showBrowserFolder`, a clipboard
   write, `openHome`).
@@ -654,13 +666,19 @@ pictures")`: `IPC.askScout` (`ipc/ask-scout.ts`) brings the companion up and sen
   `approveTool` IPC (`ipc/connections.ts`) calls it and swallows only `not_found` (the ask already closed), because that card goes with its closed frame.
   Any other refusal (the brain offline) rejects back to the bubble, which keeps the card up to click again; only the person's click answers an ask. The bubble is brought up when an ask opens.
 
-Home's Connections page also carries the Bodies card (`bodies/ui/src/home/bodies-panel.tsx`,
-`ipc/bodies.ts`): the three bodies with Connected or Not connected, and the WhatsApp setup: five fields
+Home's Places page (`bodies/ui/src/home/places-view.tsx`, nav label Places with a "New" badge, after
+Connections; `ipc/bodies.ts`) lists the places you can talk to Scout: **This PC** (Desktop), the **Chrome
+add-on** (Connected or Not set up, with a "Get the add-on" button that opens the tour at its Browser step,
+step 7) and **WhatsApp**, each with a purpose line and Connected, Not set up or Offline (WhatsApp is
+Offline when its five values are saved but it is not connected). WhatsApp's setup sits under its row:
+five fields
 (access token, app secret, verify token as password inputs; phone number ID and your number as text), one
 `Toggle` named WhatsApp (disabled, with the reason, until all five are saved) and one Save. A saved value shows
 only the word Saved; Save sends only the fields typed and then clears them. A failure shows one fixed line;
 `ipc/bodies.ts` checks the argument with a strict zod shape and rebuilds every error from fixed text with no
-`cause`, so a pasted secret never comes back. The card reads again on `changed { what: "bodies" }`.
+`cause`, so a pasted secret never comes back. The page reads again on `changed { what: "bodies" }`;
+if the brain cannot be read it says so in an alert. `e2e/design-shots.spec.ts` renders it in all three
+states against the fake brain's `bodies` option.
 See [whatsapp.md](whatsapp.md).
 
 `turn-events.ts` turns the validated notifications into the TurnEvents the renderer already

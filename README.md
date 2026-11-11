@@ -69,7 +69,7 @@ The desktop never stops the brain, whoever started it. Its output goes to `~/.ta
 (or `<TAGALONG_HOME>/brain.log`). To stop it, run `cd brain && uv run tagalong stop`.
 
 The brain can also run the WhatsApp bridge (it starts only when `TAGALONG_WHATSAPP_*` are set; see
-`.env.example` and [docs/brain.md](docs/brain.md#whatsapp-bridge)). Home > Connections > Bodies shows which bodies are connected and sets WhatsApp up ([docs/whatsapp.md](docs/whatsapp.md)).
+`.env.example` and [docs/brain.md](docs/brain.md#whatsapp-bridge)). Home > Places shows which places you can talk to Scout from (this PC, the browser add-on, WhatsApp) and sets WhatsApp up ([docs/whatsapp.md](docs/whatsapp.md)).
 
 To let Scout hand work to an expert (Claude Code, Codex or Gemini, each tested), have Scout install
 it from the registry; nothing is installed ahead of time. With several installed, Scout names the
@@ -174,7 +174,7 @@ its bodies fit together.
 
 ## First run
 
-Start Tagalong (it starts the brain if none is running). The first launch opens the walkthrough, a nine-step tour (the idea, what to ask, asking, talking, everyday jobs, the browser add-on, your limits), and Scout appears on your screen when you finish, skip or close it. The last step takes your Anthropic key: paste it, Tagalong checks it and your brain saves it, and Finish turns on once it is good. Skip jumps to that step when no key is set, and the tour comes back at the next launch if you close it part-way (change the key later under **Home → Settings → Anthropic key**; **Home → Overview → Show the tour again** reopens the tour); hotkeys, listening and the rest are under **Home → Settings**.
+Start Tagalong (it starts the brain if none is running). The first launch opens the walkthrough, a ten-step tour (the idea, what to ask, asking, talking, everyday jobs, the browser add-on, your limits), and Scout appears on your screen when you finish, skip or close it. Step 9 takes your Anthropic key: paste it, Tagalong checks it and your brain saves it, and Next turns on once it is good. The last step, Connect your tools, adds Gmail, Google Calendar, Notion and Claude Code in a click each (Finish never waits for them, and "I'll do this later" finishes too). Skip jumps to the key step when no key is set, and the tour comes back at the next launch if you close it part-way (change the key later under **Home → Settings → Anthropic key**; **Home → Overview → Show the tour again** reopens the tour); hotkeys, listening and the rest are under **Home → Settings**.
 
 ## Asking Scout
 
@@ -260,7 +260,7 @@ change works at once.
 ## Home: one window for everything
 
 Right-click the tray icon and choose **Open Tagalong**. The tray has only four items: **Open
-Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in six pages:
+Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in seven pages:
 
 - **Overview**: whether Scout is ready and what it thinks with, what was spent today, Scout's brain (whether it runs, its version, who started it, restart, and an update prompt when its build is older than the app's), and where things run (each connected app's command or web address, Claude Code, and how Scout reads your screen: window text and text from pictures, each Working, Needs a fix or Not working, with "Ask Scout to fix it" when Windows lacks the text-recognition pack for your language).
   **Spend** shows the dollars spent today against the daily limit,
@@ -310,6 +310,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   - Scout reads with an app on its own. Anything that changes something (a tool the app does not
     mark read-only) shows a card in Scout's bubble: which app, what will change, **Allow once** or
     **Cancel**.
+- **Places**: where you can talk to Scout. **This PC**, the **Chrome add-on** (Connected or Not set up, with **Get the add-on**, which opens the tour at its Browser step) and **WhatsApp** (Connected, Not set up or Offline), and WhatsApp's setup under its row ([docs/whatsapp.md](docs/whatsapp.md)).
 - **Approvals**: the preferences Scout follows (the sentence, when you agreed to it, how often it was used, with **Edit** and **Remove**; "Always ask me before risky actions" is listed like any other), a summary of how many asks there were, how many Scout answered and how many you refused, and the history of every permission ask by day, filtered by **All**, **Decided by Scout** or **Refused**. A row Scout approved says so and quotes the preference it relied on. When Scout approves an ask, a small quiet card in the bubble says "Approved for you" and which preference it used.
 - **What Scout remembers**: its facts, preferences and conversation summaries, newest first.
   Delete any one.

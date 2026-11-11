@@ -52,6 +52,8 @@ export interface FakeBrainOptions {
   port?: number;
   /** What hello says of the brain's version and build (default: the app's own, a current brain). */
   hello?: { version: string; build: string };
+  /** After `setup_expert` the install stays at this percent (the tour's "Installing…" row). */
+  expertInstallingPercent?: number;
   /** The `brain_status` answer (snake_case, as the real tool); absent: the tool is unknown, as on an old brain. */
   brainStatus?: Record<string, unknown>;
   /**
@@ -242,6 +244,17 @@ const notionRow = (id: string, official: boolean, publisher: string) => ({
   repo: official ? '' : `https://example.test/${id}`,
   why: official ? '' : 'Matches the name',
 });
+/** The tour's connect step: one Official row per app it offers (what the registry's popular list holds). */
+const officialRow = (id: string, name: string) => ({
+  ...notionRow(id, true, 'example.test'),
+  name,
+  description: name,
+});
+const TOUR_APPS = [
+  officialRow('io.example/gmail', 'Gmail'),
+  officialRow('io.example/calendar', 'Google Calendar'),
+  officialRow('com.notion/mcp', 'Notion'),
+];
 const NOTION_GROUP = {
   service: 'Notion',
   official: notionRow('com.notion/mcp', true, 'Notion'),
@@ -821,12 +834,15 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
                 ? []
                 : [{ id: 'io.example/gmail', name: 'Gmail', version: '1', description: 'Mail' }],
             // C1 facts: a search for notion is one service, an Official head and two community.
-            popular: [],
+            popular: TOUR_APPS,
             app_groups: String(params.input?.query ?? '').includes('notion') ? [NOTION_GROUP] : [],
             next_cursor: null,
             sources: null,
             stale: false,
-            progress: null,
+            progress:
+              options.expertInstallingPercent !== undefined && expertSetups.length > 0
+                ? { expert: 'claude-acp', stage: 'node', percent: options.expertInstallingPercent }
+                : null,
             failed: null,
           };
         } else if (params.tool === 'setup_app') {
@@ -840,7 +856,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         } else if (params.tool === 'setup_expert') {
           expertSetups.push(String(params.input?.id));
           expertApprovals.push(params.input?.approved);
-          expertInstalled = true;
+          expertInstalled = options.expertInstallingPercent === undefined;
           notify('changed', { what: 'setup' });
         } else if (params.tool === 'list_memories') {
           value = {
