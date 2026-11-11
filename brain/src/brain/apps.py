@@ -74,6 +74,7 @@ class AppRow:
     config: dict[str, Any]
     auth: str
     enabled: bool
+    trust: str = "community"  # "official" or "community", kept from the install
 
 
 def slug_for(name: str, taken: set[str] | frozenset[str]) -> str:

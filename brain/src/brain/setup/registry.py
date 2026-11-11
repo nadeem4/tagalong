@@ -89,6 +89,8 @@ def _acp_distributions(raw: dict) -> list[Distribution]:
             package, version = _split(spec["package"], sep)
             out.append(Distribution(kind, package, version, args=list(spec.get("args", []))))
     for platform, spec in (raw.get("binary") or {}).items():
+        if not spec.get("sha256"):
+            continue  # the installer refuses an unchecked download, so it is never offered
         out.append(
             Distribution(
                 "binary",
@@ -186,10 +188,12 @@ def _platform_tag(machine: Machine) -> str:
 
 def build_for(entry: RegistryEntry, machine: Machine) -> Distribution | None:
     """The way to run this entry here, or None (a fact Scout reports). Prefers npx, then a
-    binary for this machine, then a hosted remote, then uvx."""
+    checksummed binary for this machine, then a hosted remote, then uvx."""
     tag = _platform_tag(machine)
     for kind in ("npx", "binary", "remote", "uvx"):
         for d in entry.distributions:
+            if d.kind == "binary" and not d.sha256:
+                continue  # the installer would refuse it, so it is not a way to run this
             if d.kind == kind and (kind != "binary" or tag in d.platforms):
                 return d
     return None

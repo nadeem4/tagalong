@@ -8,6 +8,7 @@ runs in the background, outside the turn: the tool returns at once and the end a
 
 import asyncio
 import json
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import asdict
 from pathlib import Path
@@ -33,6 +34,7 @@ from brain.setup.terminal import NoTerminal
 from brain.toolbox import Handler, ToolSpec
 from brain.voice.models import Fetch
 
+log = logging.getLogger(__name__)
 InspectFn = Callable[[], Awaitable[Machine]]
 _ID_SCHEMA = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
 
@@ -86,8 +88,10 @@ def expert_setup_tools(
             )
             facts = {"expert": entry.id, "ok": True, "installed": json.dumps(asdict(expert))}
         except InstallError as err:
+            log.warning("install of %s failed: %s: %s", entry.id, err.kind, err.detail)
             facts = {"expert": entry.id, "ok": False, "error": err.kind, "detail": err.detail}
         except Exception as err:  # the person is told something, never left waiting
+            log.warning("install of %s failed: %r", entry.id, err)
             facts = {"expert": entry.id, "ok": False, "error": "failed", "detail": repr(err)}
         # A cancel (shutdown) skips this: nobody is left to tell.
         emit(Event("setup_done", facts, key=entry.id))

@@ -6,6 +6,7 @@ runner sends, so tests read that log to see the prompts, mode and replies that a
 
 import asyncio
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -163,6 +164,24 @@ async def test_start_returns_the_modes_and_begin_sends_task_and_mode(tmp_path):
         next(f for f in sent if f.get("method") == "session/set_mode")["params"]["modeId"] == "plan"
     )
     assert prompts(tmp_path) == ["fix the bug"]
+
+
+async def test_auth_status_update_is_accepted_quietly(tmp_path, caplog):
+    # The adapter sends `auth/status_update`, which the acp client router has no route for.
+    h = Harness()
+    steps = [{"auth_status": {"status": "authenticated"}}, {"text": "ok"}]
+    run = make_run(h, tmp_path, steps, expert_id="claude-acp")
+    with caplog.at_level(logging.INFO, logger="brain.experts"):
+        try:
+            await run.start(tmp_path)
+            await run.begin("default", "hi")
+            state = await finished(h)
+        finally:
+            await run.close()
+    assert state[0] == "done"
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+    info = [r for r in caplog.records if r.levelno == logging.INFO and "claude-acp" in r.message]
+    assert len(info) == 1
 
 
 async def test_progress_result_and_done(tmp_path):

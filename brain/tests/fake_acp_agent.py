@@ -8,7 +8,9 @@ The script may instead be a list of step lists, one per prompt (the last is reus
 Steps: {"sleep": secs} pause | {"crash": code} os._exit mid-prompt | {"text": s} message
 chunk | {"tool": {"id", "title", "kind"?, "input"?, "status"?, "locations"?: [paths]}} tool call
 start | {"tool_update": {"id", "status", "text"?}} tool call progress | {"plan": [{"content",
-"status"?}]} plan update | {"permission": {"title", "kind"?, "options"?}} ask and wait |
+"status"?}]} plan update |
+{"auth_status": {...}} an `auth/status_update` notification |
+{"permission": {"title", "kind"?, "options"?}} ask and wait |
 {"question": {"message", "options": [labels]} or {"message", "questions": [...]}}
 elicitation and wait | {"hang": true}
 wait until session/cancel | {"stubborn": true} hang, ignoring cancel | {"end": stop_reason}
@@ -202,6 +204,9 @@ class FakeAgent:
                         body = spec["terminal"]["output"]
                         spec = {**spec, "text": "```console\n" + body + "\n```"}
                     await self.conn.session_update(session_id, _tool_progress(spec))
+            elif "auth_status" in step:
+                # A notification the schema has no route for, which the real adapter sends.
+                await self.conn._conn.send_notification("auth/status_update", step["auth_status"])
             elif "plan" in step:
                 entries = [
                     acp.plan_entry(e["content"], status=e.get("status", "pending"))

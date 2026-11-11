@@ -644,7 +644,17 @@ class _Client:
         self._host = host
 
     def on_connect(self, conn) -> None:
-        pass
+        # The adapter sends `auth/status_update`, which the acp library has no route for, so it
+        # would log an error each time. The library offers no hook, so the router is wrapped.
+        router = conn._conn._handler
+
+        async def handler(method, params, is_notification):
+            if method == "auth/status_update":
+                log.info("expert %s sent an auth status update", self._host._expert_id)
+                return None
+            return await router(method, params, is_notification)
+
+        conn._conn._handler = handler
 
     async def session_update(self, session_id, update, **kw) -> None:
         run = self._host.session_for(session_id)  # a replayed or unknown session is dropped
