@@ -265,6 +265,138 @@ test('D5 connections', async () => {
     rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
 });
+// E1: updates on the Apps tab, on the mockup's apps (GitHub, Filesystem, Linear, Obsidian, Notion).
+test('E1 updates', async () => {
+  const brain = await startFakeBrain();
+  const dataDir = seedSettings(mkdtempSync(join(tmpdir(), 'tagalong-shot-')));
+  const app = await electron.launch({
+    args: ['.', `--user-data-dir=${dataDir}`],
+    cwd: appDir,
+    env: { ...process.env, TAGALONG_BRAIN_ADDR: brain.addr },
+  });
+  try {
+    const find = async (name: string): Promise<Page> => {
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        const page = app.windows().find((p) => p.url().includes(`${name}.html`));
+        if (page !== undefined) return page;
+        await new Promise((resolveWait) => setTimeout(resolveWait, 250));
+      }
+      throw new Error(`no ${name} window appeared`);
+    };
+    const row = (id: string, name: string, tools: number, remote: boolean) => ({
+      id,
+      name,
+      transport: remote ? 'http' : 'stdio',
+      auth: 'none',
+      enabled: true,
+      status: 'connected',
+      error: '',
+      ...(remote ? { url: `https://${id}.example.com/mcp` } : { command: 'node', args: [] }),
+      tools: Array.from({ length: tools }, (_, n) => ({
+        name: `${id}__t${n}`,
+        effect: 'look',
+        locked: false,
+      })),
+    });
+    const apps = [
+      row('notion', 'Notion', 12, true),
+      row('github', 'GitHub', 26, false),
+      row('filesystem', 'Filesystem', 5, false),
+      row('linear', 'Linear, by acme-dev', 9, false),
+      row('obsidian', 'Obsidian, by vaultkit', 6, false),
+    ];
+    const official = new Set(['notion', 'github', 'filesystem']);
+    brain.setSetup({
+      apps: apps.map((a) => ({
+        id: a.id,
+        name: a.name,
+        state: 'connected',
+        official: official.has(a.id),
+      })),
+    });
+    const item = (id: string, name: string, over: Record<string, unknown>) => ({
+      kind: 'app',
+      id,
+      name,
+      installed: '',
+      latest: null,
+      remote: false,
+      official: official.has(id),
+      auto: official.has(id),
+      status: 'idle',
+      ...over,
+    });
+    const notion = item('notion', 'Notion', { remote: true });
+    const checkedAt = new Date(Date.now() - 5 * 60_000).toISOString();
+    const states: Record<string, Record<string, unknown>[]> = {
+      'header-idle': [
+        notion,
+        item('github', 'GitHub', { installed: '1.0' }),
+        item('filesystem', 'Filesystem', { installed: '1.3' }),
+        item('linear', 'Linear', { installed: '0.5' }),
+        item('obsidian', 'Obsidian', { installed: '1.3' }),
+      ],
+      'updates-available': [
+        notion,
+        item('github', 'GitHub', { installed: '0.9', latest: '1.0' }),
+        item('filesystem', 'Filesystem', { installed: '1.2', latest: '1.3' }),
+        item('linear', 'Linear', { installed: '0.4', latest: '0.5' }),
+        item('obsidian', 'Obsidian', { installed: '1.3' }),
+      ],
+      // The mockup's own picture: one updating, one waiting, one that waits for you, one just done.
+      updating: [
+        notion,
+        item('github', 'GitHub', { installed: '0.9', latest: '1.0', status: 'updating' }),
+        item('filesystem', 'Filesystem', { installed: '1.2', latest: '1.3' }),
+        item('linear', 'Linear', { installed: '0.4', latest: '0.5' }),
+        item('obsidian', 'Obsidian', { installed: '1.3', status: 'updated' }),
+      ],
+      updated: [
+        notion,
+        item('github', 'GitHub', { installed: '1.0', status: 'updated' }),
+        item('filesystem', 'Filesystem', { installed: '1.3', status: 'updated' }),
+        item('linear', 'Linear', { installed: '0.4', latest: '0.5' }),
+        item('obsidian', 'Obsidian', { installed: '1.3', status: 'updated' }),
+      ],
+    };
+    const put = (items: Record<string, unknown>[]) =>
+      brain.setUpdates(
+        {
+          checkedAt,
+          auto: {
+            apps: { official: true, community: false },
+            experts: { official: true, community: false },
+          },
+          items,
+        },
+        apps,
+      );
+    // The apps are read when the page opens; each state after that arrives as `changed updates`.
+    put(states['header-idle'] ?? []);
+    const avatar = await find('avatar');
+    await avatar.evaluate(() => window.tagalongHost.openSettings());
+    const home = await find('home');
+    await home.getByRole('button', { name: 'Connections' }).click();
+    await home.getByRole('tab', { name: 'Apps' }).click();
+    for (const [state, items] of Object.entries(states)) {
+      put(items);
+      await home.waitForTimeout(800);
+      await expect(home.getByRole('region', { name: 'Your apps' })).toContainText('Checked', {
+        timeout: 15_000,
+      });
+      await expect(home.getByRole('region', { name: 'GitHub' })).toBeVisible();
+      await home.getByRole('region', { name: 'Your apps' }).scrollIntoViewIfNeeded();
+      await shot(home, 'E1', state);
+    }
+    await home.getByRole('region', { name: 'Notion' }).scrollIntoViewIfNeeded();
+    await shot(home, 'E1', 'remote-row');
+  } finally {
+    await closeApp(app);
+    await brain.close();
+    rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+  }
+});
+
 // E5: Settings > Scout's model in its four mocked states. The listbox hangs below the card, so
 // the open shot scrolls the card to the top and clips a taller area.
 test('E5 model states', async () => {

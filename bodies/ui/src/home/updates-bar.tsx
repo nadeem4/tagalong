@@ -5,6 +5,7 @@
  * may run; this only asks and shows. Contains UpdatesBar, UpdateSide, updateMeta, updateVersion,
  * updateWaits, updateVisible, rowUpdate and UpdatesControls.
  */
+import { useEffect, useState } from 'react';
 import type { UpdateKind, UpdateRow, UpdatesState } from '../shapes';
 import { pendingUpdates } from '../shapes';
 import { Button } from '../controls/button';
@@ -44,13 +45,19 @@ export function UpdatesBar({
   title,
   kind,
   controls,
-  now = Date.now(),
+  now,
 }: {
   title: string;
   kind: UpdateKind;
   controls: UpdatesControls;
+  /** Fixed time for tests; otherwise the words follow the clock, once a minute. */
   now?: number;
 }) {
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setClock(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
   const { state } = controls;
   const pending = pendingUpdates(state, kind);
   const word = kind === 'app' ? 'apps' : 'experts';
@@ -82,7 +89,7 @@ export function UpdatesBar({
       <div className="cx-card-top">
         <h2 className="home-card__label">{title}</h2>
         <div className="cx-card-tools">
-          <span className="cx-meta">{checkedWords(state.checkedAt, now)}</span>
+          <span className="cx-meta">{checkedWords(state.checkedAt, now ?? clock)}</span>
           <Button variant="quiet" disabled={controls.checking} onClick={controls.onCheck}>
             Check for updates
           </Button>

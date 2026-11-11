@@ -1485,6 +1485,23 @@ the apps in C1 to C7 use a command or a pasted key.
 - [ ] Turn the network off and search. The page keeps the Connected list and says it could not
       reach the registry (or shows the cached results marked stale).
 
+### C6b. Updates (fake brain for the page, real brain for the rest)
+
+Automated: `uv run pytest tests/test_setup_updates.py`, the UI tests in
+`bodies/ui/src/home/connections-updates.test.tsx` and the `update one app` Playwright test.
+
+- [ ] Home → **Connections** → **Apps** has "Checked N minutes ago", **Check for updates** and, when
+      something waits, **Update all (n)**. Two switches say "Keep Official apps up to date
+      automatically" (on) and "Keep Community apps up to date automatically" (off, with its note).
+- [ ] A local app with a newer version shows `v0.9 → v1.0` and an **Update** button. A community
+      one with its switch off adds "Waits for you". A web app says "Always up to date" and has no
+      update control.
+- [ ] Press **Update** on one: the row shows **Updating…**, then "Updated to v1.0." and the new version.
+- [ ] While a job runs, press **Update**: the row says "Waiting for a job to finish…" and the update
+      happens once the job ends, never before.
+- [ ] Turn the Community switch on: its waiting updates apply by themselves at the next check.
+- [ ] The **Experts** tab has the same header, switches and buttons for Claude Code and the others.
+
 ### C7. Where things run
 
 - [ ] With the brain running, Home → **Overview** → **Where things run** shows

@@ -69,6 +69,10 @@ export interface FakeBrain {
   setTimers(rows: Record<string, unknown>[]): void;
   /** Every timer id Home sent to `timer_cancel`, in order. */
   timerCancels: string[];
+  /** Every updates call Home made, in order: `check`, `item app files`, `all app`, `auto app community on`. */
+  updateCalls: string[];
+  /** Replace fields of the `updates_state` answer and the rows `list_apps` answers, then tell the bodies `changed: updates`. */
+  setUpdates(patch: Record<string, unknown>, apps?: Record<string, unknown>[]): void;
   /** The data of every `reading` event the desktop sent (how this PC reads the screen). */
   readingEvents: Record<string, unknown>[];
   /** Replace the rows `reading_status` answers and tell the bodies `changed: reading`. */
@@ -373,6 +377,41 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   const appSetups: string[] = [];
   const appFlags: { approved: unknown; communityOk: unknown }[] = [];
   let expertInstalled = false;
+  // E1: what `updates_state` answers (Files has an update waiting, Wiki is a remote app), what
+  // the page pressed, and the rows `list_apps` answers (a shot swaps them for the mockup's).
+  let updatesState: Record<string, unknown> = {
+    checkedAt: new Date(Date.now() - 5 * 60_000).toISOString(),
+    auto: {
+      apps: { official: true, community: false },
+      experts: { official: true, community: false },
+    },
+    items: [
+      {
+        kind: 'app',
+        id: 'files',
+        name: 'Files',
+        installed: '1.2',
+        latest: '1.3',
+        remote: false,
+        official: true,
+        auto: true,
+        status: 'idle',
+      },
+      {
+        kind: 'app',
+        id: 'wiki',
+        name: 'Wiki',
+        installed: '',
+        latest: null,
+        remote: true,
+        official: false,
+        auto: false,
+        status: 'idle',
+      },
+    ],
+  };
+  const updateCalls: string[] = [];
+  let appRows: Record<string, unknown>[] = APPS;
   // Screenshot states for Connections: extra overview fields, and searches that fail.
   let setupPatch: Record<string, unknown> = {};
   let failSearches: boolean | 'hang' = false;
@@ -730,6 +769,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             app?: string;
             on?: boolean;
             until?: string;
+            kind?: string;
+            official?: boolean;
           };
         };
         let value: unknown = {};
@@ -919,8 +960,45 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
               { id: 'm2', kind: 'fact', text: 'Prefers green tea', at: '2026-10-26T10:00:00Z' },
             ],
           };
-        } else if (params.tool === 'list_apps') value = { apps: APPS };
-        else if (params.tool === 'list_approvals') {
+        } else if (params.tool === 'list_apps') value = { apps: appRows };
+        else if (params.tool === 'updates_state') value = updatesState;
+        else if (params.tool === 'updates_check') {
+          updateCalls.push('check');
+          value = updatesState;
+        } else if (params.tool === 'update_item') {
+          updateCalls.push(`item ${String(params.input?.kind)} ${String(params.input?.id)}`);
+          // The brain runs it at once (no job is running) and the row ends as Updated.
+          const items = (updatesState.items as Record<string, unknown>[]).map((row) =>
+            row.kind === params.input?.kind && row.id === params.input?.id
+              ? { ...row, installed: row.latest, latest: null, status: 'updated' }
+              : row,
+          );
+          updatesState = { ...updatesState, items };
+          notify('changed', { what: 'updates' });
+          value = { started: true };
+        } else if (params.tool === 'update_all') {
+          updateCalls.push(`all ${String(params.input?.kind)}`);
+          value = { started: true, count: 0 };
+        } else if (params.tool === 'set_auto_update') {
+          updateCalls.push(
+            `auto ${String(params.input?.kind)} ${params.input?.official === true ? 'official' : 'community'} ${params.input?.on === true ? 'on' : 'off'}`,
+          );
+          const auto = updatesState.auto as Record<string, Record<string, boolean>>;
+          const key = `${String(params.input?.kind)}s`;
+          updatesState = {
+            ...updatesState,
+            auto: {
+              ...auto,
+              [key]: {
+                ...auto[key],
+                [params.input?.official === true ? 'official' : 'community']:
+                  params.input?.on === true,
+              },
+            },
+          };
+          notify('changed', { what: 'updates' });
+          value = {};
+        } else if (params.tool === 'list_approvals') {
           const filter = params.input?.filter;
           const rows = APPROVALS.filter((r) =>
             filter === 'scout'
@@ -1035,6 +1113,20 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     permissionSets,
     loopCalls,
     timerCancels,
+    updateCalls,
+    setUpdates: (patch, apps) => {
+      updatesState = { ...updatesState, ...patch };
+      if (apps !== undefined) appRows = apps;
+      for (const socket of sockets) {
+        socket.send(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'changed',
+            params: { seq: ++seq, what: 'updates' },
+          }),
+        );
+      }
+    },
     setTimers: (rows) => {
       timers = rows;
       for (const socket of sockets) {
