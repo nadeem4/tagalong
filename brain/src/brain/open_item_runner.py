@@ -264,7 +264,16 @@ class AskRunner:
             self._asks.card_closed(item.id)
         back: list[OpenItem] = []
         for item in self._items.list_open(kind=KIND):
-            if not self._asks.is_open(item.id) and await self._show_again(item):
+            try:
+                if not self._asks.is_open(item.id) and await self._show_again(item):
+                    back.append(item)
+                    continue
+            except Exception:  # one card that cannot be built must not hide the others
+                log.exception("an open ask could not be shown again: %s", item.id)
+                continue
+            # A card up already may have opened while no screen showed it: told if it is newer
+            # than the absence.
+            if away_s is not None and item.created_at >= since and item.state == "open":
                 back.append(item)
         if back:
             asks = [

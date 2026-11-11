@@ -209,7 +209,8 @@ class Asks:
 
     def card_closed(self, ask_id: str) -> None:
         """Tell the bodies a card ended while they were away; one that never showed it ignores
-        this."""
+        this. The contract only has `timeout` for a card that ended unanswered, so one whose
+        expert process ended reads the same."""
         self._bodies.notify("ask", {"id": ask_id, "state": "closed", "reason": "timeout"})
 
     def is_open(self, ask_id: str) -> bool:

@@ -3,7 +3,7 @@
  * a yes) with a plain line and how long it has waited. Runs on the fake host bridge.
  */
 
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { HostBridgeProvider } from '../host-bridge';
 import { createFakeHostBridge } from '../test-support/fake-host-bridge';
@@ -16,13 +16,14 @@ function open(openItems: { id: string; kind: string; title: string; ageS: number
       <HeldTab />
     </HostBridgeProvider>,
   );
+  return bridge;
 }
 
 describe('HeldTab', () => {
   it('lists open items with what they are and how long they have waited', async () => {
     open([
-      { id: 'a1', kind: 'ask', title: "I'll delete 3 old logs.", ageS: 7200 },
-      { id: 'o1', kind: 'offer', title: 'offer', ageS: 90 },
+      { id: 'a1', kind: 'Permission', title: "I'll delete 3 old logs.", ageS: 7200 },
+      { id: 'o1', kind: 'Offer', title: 'Always allow reading files?', ageS: 90 },
     ]);
     const list = await screen.findByRole('list', { name: 'Waiting on you' });
     const rows = within(list).getAllByRole('listitem');
@@ -30,10 +31,20 @@ describe('HeldTab', () => {
     expect(rows[0]).toHaveTextContent("I'll delete 3 old logs.");
     expect(rows[0]).toHaveTextContent('2 h');
     expect(rows[1]).toHaveTextContent('1 min');
+    expect(rows[0]).toHaveTextContent('Permission');
+    expect(rows[1]).not.toHaveTextContent('OfferOffer');
   });
 
   it('says nothing is waiting when there are no open items', async () => {
     open([]);
     expect(await screen.findByText('Nothing is waiting on you.')).toBeInTheDocument();
+  });
+
+  it('reads again when a card opens or closes, so a row drops without reopening Home', async () => {
+    const bridge = open([{ id: 'a1', kind: 'Permission', title: 'Delete logs', ageS: 60 }]);
+    await screen.findByText('Delete logs');
+    bridge.loops = { ...bridge.loops, openItems: [] };
+    act(() => bridge.emit({ type: 'connector.dismiss', approvalId: 'a1' }));
+    await waitFor(() => expect(screen.queryByText('Delete logs')).toBeNull());
   });
 });

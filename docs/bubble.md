@@ -223,7 +223,8 @@ answer comes back to Scout as a `choice` event and Scout calls its loop tools. T
 or frame of its own.
 
 **On return.** When the screen comes back, every ask still open shows its card again (same `ask` frame
-as before, no new one) and a card that ended while the body was away is closed with `reason: "timeout"`.
+as before, no new one) and a card that ended while the body was away is closed with `reason: "timeout"` (the only reason the contract has for it, so a card dropped
+because an expert's process ended reads the same).
 The same open items are listed on Home's Tasks page, Held tab, under "Waiting on you" (see
 [desktop.md](desktop.md)); no frame or card was added.
 

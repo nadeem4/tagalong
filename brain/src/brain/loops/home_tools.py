@@ -18,12 +18,29 @@ from brain.toolbox import Handler, ToolSpec
 _NO_ARGS = {"type": "object", "properties": {}}
 
 
-def _title(item: OpenItem) -> str:
-    """A plain row line: an ask says what it would let Scout do; other kinds name themselves."""
+# What Home calls each kind of open item, and the line for those with no words of their own.
+# Setup news is left out: it waits on Scout, not on the person.
+_KINDS = {
+    "ask": ("Permission", ""),
+    "choice": ("Question", "Scout is waiting for your choice"),
+    "expert_ask": ("Expert request", "An expert wants your OK"),
+    "offer": ("Offer", ""),
+}
+
+
+def _row(item: OpenItem, now: datetime) -> dict:
     saved = item.saved_call or {}
+    word, line = _KINDS[item.kind]
     if item.kind == "ask":
-        return summarise(saved.get("text") or "", saved.get("name") or "", saved.get("input") or {})
-    return item.kind
+        line = summarise(saved.get("text") or "", saved.get("name") or "", saved.get("input") or {})
+    elif item.kind == "offer":
+        line = saved.get("sentence") or "An offer from Scout"
+    return {
+        "id": item.id,
+        "kind": word,
+        "title": line,
+        "age_s": int((now - item.created_at).total_seconds()),
+    }
 
 
 def loop_home_tools(
@@ -63,15 +80,7 @@ def loop_home_tools(
             for lp in service.all_loops()
         ]
         now = service.now()
-        open_items = [
-            {
-                "id": it.id,
-                "kind": it.kind,
-                "title": _title(it),
-                "age_s": int((now - it.created_at).total_seconds()),
-            }
-            for it in items.list_open()
-        ]
+        open_items = [_row(it, now) for it in items.list_open() if it.kind in _KINDS]
         return json.dumps({"apps": mail_apps(), "loops": loops, "open_items": open_items})
 
     async def set_switch(args: dict) -> str:

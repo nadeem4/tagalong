@@ -88,9 +88,17 @@ export function LoopsPanel() {
 
   useEffect(() => {
     refresh();
-    return bridge.onBrainChanged((what) => {
+    // A card opening or closing changes the open items, and the brain sends no `changed` for it.
+    const stopCards = bridge.onTurnEvent((event) => {
+      if (event.type === 'connector.confirm' || event.type === 'connector.dismiss') refresh();
+    });
+    const stopChanges = bridge.onBrainChanged((what) => {
       if (what === 'loops' || what === 'apps') refresh(); // Gmail may have just connected
     });
+    return () => {
+      stopCards();
+      stopChanges();
+    };
   }, [bridge, refresh]);
 
   // Read again either way: on a refusal the card then shows what the brain really holds.

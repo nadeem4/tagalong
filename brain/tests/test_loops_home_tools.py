@@ -258,13 +258,18 @@ async def test_home_loop_done_and_later_unknown_id_are_invalid_params(rig):
         assert err.value.code == ErrorCode.invalid_params
 
 
-async def test_held_list_carries_open_items_with_plain_title_and_age(rig):
+async def test_held_list_names_each_open_item_plainly_and_leaves_out_setup_news(rig):
     saved = {"name": "delete_files", "input": {}, "text": "I'll delete 3 old logs."}
     rig.items.open("ask", "desktop", saved_call=saved)
     rig.items.open("choice", "desktop", live_only=True)
+    rig.items.open("expert_ask", "desktop", live_only=True)
+    rig.items.open("offer", "brain", saved_call={"sentence": "Always allow reading files?"})
+    rig.items.open("setup", "brain", saved_call={"kind": "setup_done", "facts": {}, "key": "k"})
     rows = (await rig.call("loops_state"))["open_items"]
     assert [(r["kind"], r["title"], r["age_s"]) for r in rows] == [
-        ("ask", "I'll delete 3 old logs.", 7200),
-        ("choice", "choice", 7200),
+        ("Permission", "I'll delete 3 old logs.", 7200),
+        ("Question", "Scout is waiting for your choice", 7200),
+        ("Expert request", "An expert wants your OK", 7200),
+        ("Offer", "Always allow reading files?", 7200),
     ]
     assert all(r["id"] for r in rows)

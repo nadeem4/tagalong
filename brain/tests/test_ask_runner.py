@@ -323,7 +323,7 @@ async def test_reconnect_reshows_open_cards():
     await rig.box.run(call())
     [item] = rig.items.list_open(kind="ask")
     rig.bodies.sent.clear()
-    rig.runner.returned(3600)  # the card is up already: no second one
+    rig.runner.returned(None)  # the card is up already: no second one
     await rig.settle()
     assert rig.opened() == [] and rig.events == []
     rig.asks.expire(item.id, "x")  # the body dropped it while away
@@ -356,6 +356,41 @@ async def test_return_wake_names_waiting_asks_and_their_age():
     [row] = json.loads(wake.facts["asks"])
     assert wake.facts["count"] == 1
     assert (row["ask"], row["tool"], row["age_s"]) == (item.id, "t", 18000)
-    again.runner.returned(18000)  # the cards are up now: nothing more to say
+    assert wake.key == "asks_waiting"  # a later one replaces an unsent earlier one
+
+
+async def test_a_card_that_cannot_be_built_does_not_stop_the_others():
+    rig = Rig()
+    await rig.box.run(call(1))
+    await rig.box.run(call(2))
+    again = Rig(rig.memory)
+    again.runner.start()
+    real = again.box.ask_request
+    seen = []
+
+    async def flaky(c, spec, kind, **kw):
+        seen.append(c.input["n"])
+        if c.input["n"] == 1:
+            raise ValueError("card broke")
+        return await real(c, spec, kind, **kw)
+
+    again.box.ask_request = flaky
+    again.runner.returned(None)
     await again.settle()
-    assert [e.kind for e in again.events].count("asks_waiting") == 1
+    assert seen == [1, 2]
+    [card] = again.opened()
+    [wake] = [e for e in again.events if e.kind == "asks_waiting"]
+    assert wake.facts["count"] == 1 and card["input"] == {"n": 2}
+
+
+async def test_an_ask_opened_while_no_screen_was_up_is_told_on_return():
+    rig = Rig()
+    rig.bodies.online = []  # a WhatsApp-only wake turn: no display body
+    await rig.box.run(call())
+    [item] = rig.items.list_open(kind="ask")
+    rig.clock[0] = NOW + timedelta(minutes=5)
+    rig.runner.returned(600)  # the card was published already, so it counts as up
+    await rig.settle()
+    [wake] = [e for e in rig.events if e.kind == "asks_waiting"]
+    [row] = json.loads(wake.facts["asks"])
+    assert (row["ask"], row["age_s"]) == (item.id, 300)
