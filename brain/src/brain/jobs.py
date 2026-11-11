@@ -26,6 +26,7 @@ from brain.guards import Guards
 from brain.job_activity import PAGE_LIMIT, JobActivity, _clip, activity_line, activity_summary
 from brain.job_records import Job, JobPart, JobRecords, home_state
 from brain.masking import mask_json
+from brain.open_items import OpenItemRefused, OpenItems
 from brain.outputs import OutputStore, preview
 from brain.permission import (
     AskRequest,
@@ -122,11 +123,13 @@ class Jobs:
         drop: Callable[[str, str], None] = lambda kind, key: None,
         on_timers_changed: Callable[[], None] = lambda: None,
         outputs: OutputStore | None = None,
+        items: OpenItems | None = None,
         apps=None,
         before_start: Callable[[], Awaitable[None]] | None = None,
         steps_max_entries: int = DEFAULT_JOB_STEPS_MAX_ENTRIES,
         steps_max_bytes: int = DEFAULT_JOB_STEPS_MAX_BYTES,
     ) -> None:
+        self._items = items  # an expert's permission ask is a live-only item; None: none kept
         self._steps_max_entries = steps_max_entries  # caps of one job's step log (settings)
         self._steps_max_bytes = steps_max_bytes
         self._before_start = before_start  # awaited before a run starts: no update mid-swap
@@ -895,6 +898,28 @@ class Jobs:
         agent = _prefix(self._agent_of(job, part))
         tool = f"{agent}:{request.title}"
         ask_id = uuid.uuid4().hex  # the ask's work row is also its log entry
+        person = expert_asker(
+            partial(self._open_ask, job_id=job_id, part=part, stay_open=True),
+            tool,
+            request.input,
+            request.options,
+            ask_id,
+        )
+
+        async def ask_person():
+            # Only what waits on the person is an item, so a rule's or Scout's grant leaves none.
+            if self._items is None:
+                return await person()
+            self._items.open("expert_ask", "brain", live_only=True, job_id=job_id, id=ask_id)
+            try:
+                answer = await person()
+            except BaseException:  # the part stopped or the ask failed: nobody can answer now
+                with suppress(OpenItemRefused):
+                    self._items.expire(ask_id, "process_ended")
+                raise
+            self._items.finish(ask_id, "answered")
+            return answer
+
         decision = await self._engine.decide(
             AskRequest(
                 kind="expert_request",
@@ -904,13 +929,7 @@ class Jobs:
                 summary=summarise(request.title, tool, request.input),
                 input=request.input,
                 tier=Tier.ask,
-                how_to_ask=expert_asker(
-                    partial(self._open_ask, job_id=job_id, part=part, stay_open=True),
-                    tool,
-                    request.input,
-                    request.options,
-                    ask_id,
-                ),
+                how_to_ask=ask_person,
                 job_id=job_id,
                 ask_id=ask_id,
                 can_allow_once=once is not None and job is not None,  # never allow_always
@@ -1014,6 +1033,8 @@ class Jobs:
                 del books[job_id]
         if job_id in self._runs:
             return False
+        if self._items is not None:  # no process of this job is left to answer its asks
+            self._items.expire_live_only(job_id=job_id)
         self._stop_activity_notes(job_id)
         self._progress_sent.pop(job_id, None)
         return True

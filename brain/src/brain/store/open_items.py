@@ -125,5 +125,11 @@ def find_open(db: sqlite3.Connection, kind: str, match: dict) -> StoredItem | No
     return None
 
 
-def live_only_open(db: sqlite3.Connection) -> list[StoredItem]:
-    return _select(db, "state='open' AND live_only=1")
+def live_only_open(db: sqlite3.Connection, job_id: str | None = None) -> list[StoredItem]:
+    if job_id is None:
+        return _select(db, "state='open' AND live_only=1")
+    return _select(db, "state='open' AND live_only=1 AND job_id=?", (job_id,))
+
+
+def ids_for_job(db: sqlite3.Connection, job_id: str) -> list[str]:
+    return [i.id for i in _select(db, "job_id=?", (job_id,))]

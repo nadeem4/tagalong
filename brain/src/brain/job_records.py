@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-from brain.store import outputs
+from brain.store import open_items, outputs
 from brain.store.db import utc_text
 from brain.store.work import TERMINAL, WorkRow, WorkStore
 
@@ -65,6 +65,7 @@ class Job:
     scout_result: str | None = None
     closed_at: str | None = None
     parts: list[JobPart] = field(default_factory=list)
+    open_items: list[str] = field(default_factory=list)  # ids of the asks this job raised
 
 
 class JobRecords:
@@ -139,6 +140,7 @@ class JobRecords:
             scout_result=self._text(goal) or None,
             closed_at=goal.ended_at if goal.state in TERMINAL else None,
             parts=parts,
+            open_items=open_items.ids_for_job(self._db, goal.id),
         )
 
     def get_job(self, id: str) -> Job | None:
