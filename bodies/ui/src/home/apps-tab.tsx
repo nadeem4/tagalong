@@ -70,7 +70,7 @@ export function AppsTab({
         {community.length > 0 && (
           <>
             <p className="cx-group-label">Community</p>
-            <p className="cx-meta">
+            <p className="cx-grp-note">
               Made by other people. Scout asks before it changes anything with them.
             </p>
             <ul aria-label="Community apps" className="cx-list">

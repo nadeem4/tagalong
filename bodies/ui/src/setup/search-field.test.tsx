@@ -26,7 +26,8 @@ describe('SearchField', () => {
     );
     expect(screen.getByRole('status')).toHaveTextContent('Searching…');
     rerender(<SearchField label="Search apps" placeholder="" value="x" onChange={vi.fn()} />);
-    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    // With nothing to say the line is not drawn at all, so it takes no space.
+    expect(screen.queryByRole('status')).toBeNull();
   });
 
   it('shows a note on the same line when not loading, and Searching… wins while loading', () => {

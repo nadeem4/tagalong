@@ -91,31 +91,33 @@ export function ConnectionRow({
               Sign in
             </Button>
           )}
-          <Button variant="quiet" aria-label={`Restart ${name}`} onClick={onRestart}>
-            Restart
-          </Button>
-          {confirming ? (
-            <>
-              <Button variant="danger" aria-label={`Yes, remove ${name}`} onClick={onRemove}>
-                Yes, remove
-              </Button>
-              <Button
-                variant="secondary"
-                aria-label={`Keep ${name}`}
-                onClick={() => setConfirming(false)}
-              >
-                Keep
-              </Button>
-            </>
-          ) : (
-            <Button
-              variant="quiet"
-              aria-label={`Remove ${name}`}
-              onClick={() => setConfirming(true)}
-            >
-              Remove
+          <span className="cx-quiet">
+            <Button variant="quiet" aria-label={`Restart ${name}`} onClick={onRestart}>
+              Restart
             </Button>
-          )}
+            {confirming ? (
+              <>
+                <Button variant="danger" aria-label={`Yes, remove ${name}`} onClick={onRemove}>
+                  Yes, remove
+                </Button>
+                <Button
+                  variant="secondary"
+                  aria-label={`Keep ${name}`}
+                  onClick={() => setConfirming(false)}
+                >
+                  Keep
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="quiet"
+                aria-label={`Remove ${name}`}
+                onClick={() => setConfirming(true)}
+              >
+                Remove
+              </Button>
+            )}
+          </span>
           <span className="cx-status">
             <span className={STATUS_DOT[app.status]} aria-hidden="true" />
             {waiting ? 'Waiting for the browser' : STATUS_WORDS[app.status]}

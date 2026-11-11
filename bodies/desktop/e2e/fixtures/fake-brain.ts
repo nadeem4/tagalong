@@ -240,7 +240,8 @@ const notionRow = (id: string, official: boolean, publisher: string) => ({
   sign_in: official ? 'browser' : 'key',
   licence: official ? 'Proprietary' : 'MIT',
   repo: official ? '' : `https://example.test/${id}`,
-  why: official ? '' : 'Matches the name',
+  // Official rows carry no why-pick: the row falls back to the description.
+  ...(official ? {} : { why: 'Matches the name' }),
 });
 const NOTION_GROUP = {
   service: 'Notion',
@@ -850,6 +851,28 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             progress: null,
             failed: null,
             ...setupPatch,
+          };
+        } else if (params.tool === 'bodies_status') {
+          value = {
+            bodies: [
+              { kind: 'desktop', name: 'Desktop', connected: true },
+              { kind: 'browser', name: 'Browser', connected: true },
+              { kind: 'whatsapp', name: 'WhatsApp', connected: false },
+            ],
+          };
+        } else if (params.tool === 'whatsapp_status') {
+          value = {
+            enabled: false,
+            set: {
+              access_token: false,
+              app_secret: false,
+              verify_token: false,
+              phone_number_id: false,
+              allowed_number: false,
+            },
+            complete: false,
+            state: 'off',
+            port: 8080,
           };
         } else if (params.tool === 'setup_app') {
           appSetups.push(String(params.input?.id));

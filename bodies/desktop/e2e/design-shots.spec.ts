@@ -175,10 +175,43 @@ test('D5 connections', async () => {
 
     brain.setSetup({}, true);
     await search.fill('notion');
-    await expect(home.getByRole('alert')).toBeVisible({ timeout: 15_000 });
+    // Not getByRole('alert'): the Bodies card has one too.
+    await expect(home.getByText("Scout couldn't load the app list")).toBeVisible({
+      timeout: 15_000,
+    });
     await shot(home, 'D5', 'apps-error');
     brain.setSetup({}, false);
     await search.fill('');
+
+    // A curated row for something already installed says "Added"; Linear is added from its row.
+    const curated = (id: string, name: string, added: boolean) => ({
+      id,
+      name,
+      version: '1',
+      description: `${name} for Scout`,
+      official: true,
+      added,
+      publisher: name,
+      runs: 'hosted',
+      host: `mcp.${name.toLowerCase()}.com`,
+      sign_in: 'browser',
+      licence: 'Proprietary',
+      repo: '',
+    });
+    brain.setSetup({
+      popular: [
+        curated('com.notion/mcp', 'Notion', true),
+        curated('app.linear/mcp', 'Linear', false),
+      ],
+    });
+    await expect(home.getByText('Added', { exact: true }).first()).toBeVisible({
+      timeout: 15_000,
+    });
+    await shot(home, 'D5', 'apps-added-curated');
+    await home.getByRole('button', { name: 'Add Linear', exact: true }).click();
+    await expect(home.getByText('Linear added.')).toBeVisible({ timeout: 15_000 });
+    await shot(home, 'D5', 'apps-added-outcome');
+    brain.setSetup({});
 
     await home
       .getByRole('button', { name: /Add it yourself/ })
@@ -192,11 +225,33 @@ test('D5 connections', async () => {
     await shot(home, 'D5', 'experts-default');
     await add.getByRole('button', { name: 'Show more' }).click();
     await add.getByRole('button', { name: 'Add Goose' }).click();
+    const expertCheck = add.getByRole('group', { name: 'Check first' });
+    await expertCheck.scrollIntoViewIfNeeded();
+    await expect(expertCheck.getByText('See its code')).toBeVisible();
     await shot(home, 'D5', 'experts-check-card');
-    await add
-      .getByRole('group', { name: 'Check first' })
-      .getByRole('button', { name: 'Back' })
-      .click();
+    await expertCheck.getByRole('button', { name: 'Back' }).click();
+
+    brain.setSetup({
+      browse_experts: [
+        {
+          id: 'claude-acp',
+          name: 'Claude Code',
+          version: '1',
+          description: 'Claude Code works on long jobs',
+          official: true,
+          recommended: true,
+          tested: true,
+          added: true,
+          account: true,
+          licence: 'MIT',
+          repo: 'https://example.test/claude-acp',
+        },
+      ],
+      show_more_from: 1,
+    });
+    await expect(add.getByText('Added', { exact: true })).toBeVisible({ timeout: 15_000 });
+    await shot(home, 'D5', 'experts-added');
+    brain.setSetup({});
 
     brain.setSetup({ progress: { expert: 'codex-acp', stage: 'downloading', percent: 40 } });
     await expect(home.getByText('Installing…').first()).toBeVisible({ timeout: 15_000 });

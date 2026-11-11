@@ -120,7 +120,7 @@ export function AppSearch({
       onAddAnyway={(chosen) => void track(chosen.id, onAddAnyway(chosen, term))}
     />
   );
-  const empty = term !== '' && settled && !unreachable && groups.length === 0;
+  const empty = !pending && term !== '' && settled && !unreachable && groups.length === 0;
 
   return (
     <>

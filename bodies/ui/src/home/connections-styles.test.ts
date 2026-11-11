@@ -50,6 +50,22 @@ describe('CONNECTIONS_CSS', () => {
     expect(CONNECTIONS_CSS).toMatch(/\.cx-two \{[^}]*grid-template-columns: 1fr 1fr/);
   });
 
+  it('spaces the cards, the group label, the community note and the quiet buttons like the mockup', () => {
+    expect(CONNECTIONS_CSS).toMatch(
+      /\.cx-panel \{[^}]*display: flex[^}]*flex-direction: column[^}]*gap: 20px/,
+    );
+    expect(CONNECTIONS_CSS).toMatch(/\.cx-group-label \{[^}]*margin: 8px 0 -6px/);
+    expect(CONNECTIONS_CSS).toMatch(
+      new RegExp(`\\.cx-grp-note \\{[^}]*margin: -2px 0 0[^}]*${typeCss('small')}`),
+    );
+    expect(CONNECTIONS_CSS).toMatch(/\.cx-quiet \{[^}]*gap: 2px/);
+    expect(CONNECTIONS_CSS).toMatch(/\.cx-quiet \.tg-button \{[^}]*padding: 0 8px/);
+  });
+
+  it('draws the search status line only with text, so it has no minimum height', () => {
+    expect(CONNECTIONS_CSS).not.toMatch(/\.cx-search__status \{[^}]*min-height/);
+  });
+
   it('sets text only through the type roles, with no capitals or letter spacing', () => {
     expect(CONNECTIONS_CSS).toContain(typeCss('bodyLead'));
     expect(CONNECTIONS_CSS).toContain(typeCss('small'));

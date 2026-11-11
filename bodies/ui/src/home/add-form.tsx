@@ -170,30 +170,32 @@ export function AddForm({
               />
             </Field>
           </div>
-          <Field id={id('sign')} label="Signs in with">
-            <select
-              id={id('sign')}
-              className="cx-input"
-              value={signIn}
-              onChange={(event) => setSignIn(event.target.value as SignIn)}
-            >
-              <option value="none">Nothing</option>
-              <option value="oauth">The app’s own sign-in page</option>
-              <option value="token">A key you paste</option>
-            </select>
-          </Field>
-          {signIn === 'token' && (
-            <Field id={id('key')} label="Key">
-              <input
-                id={id('key')}
+          <div className="cx-two">
+            <Field id={id('sign')} label="Signs in with">
+              <select
+                id={id('sign')}
                 className="cx-input"
-                type="password"
-                autoComplete="off"
-                value={key}
-                onChange={(event) => setKey(event.target.value)}
-              />
+                value={signIn}
+                onChange={(event) => setSignIn(event.target.value as SignIn)}
+              >
+                <option value="none">Nothing</option>
+                <option value="oauth">The app’s own sign-in page</option>
+                <option value="token">A key you paste</option>
+              </select>
             </Field>
-          )}
+            {signIn === 'token' && (
+              <Field id={id('key')} label="Key">
+                <input
+                  id={id('key')}
+                  className="cx-input"
+                  type="password"
+                  autoComplete="off"
+                  value={key}
+                  onChange={(event) => setKey(event.target.value)}
+                />
+              </Field>
+            )}
+          </div>
           {signIn === 'oauth' && <p className="cx-form__hint">{SAME_MACHINE}</p>}
         </>
       ) : (

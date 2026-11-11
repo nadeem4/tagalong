@@ -71,8 +71,17 @@ describe('AppGroupRow', () => {
     expect(screen.getAllByText('Notion, by acme-dev')).toHaveLength(2);
     expect(screen.getAllByText('Community')).toHaveLength(2);
     expect(screen.getByText('Reads pages')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Hide other makers' }));
+    // The label stays; only the chevron and aria-expanded change.
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(screen.getByRole('button', { name: '2 more from other makers' }));
     expect(screen.queryByText('Reads pages')).toBeNull();
+  });
+
+  it('an empty why falls back to the description', () => {
+    setup({ service: 'notion', official: HEAD, others: [row('io.c/notion', 'Notion', false, '')] });
+    fireEvent.click(screen.getByRole('button', { name: '1 more from another maker' }));
+    // The head's own description plus the community row's fallback.
+    expect(screen.getAllByText('Notion description')).toHaveLength(2);
   });
 
   it('one other maker reads "1 more from another maker"', () => {

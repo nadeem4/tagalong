@@ -83,7 +83,7 @@ export function AppItem({
               {row.official ? 'Official' : 'Community'}
             </span>
           </span>
-          <span className="cx-row__desc">{row.why ?? row.description}</span>
+          <span className="cx-row__desc">{row.why || row.description}</span>
           <FactsLine row={row} />
         </div>
         <div className="cx-row__side">
@@ -169,7 +169,7 @@ export function AppGroupRow({
           onClick={() => setOpen(!open)}
         >
           <Icon name={open ? 'chevDown' : 'chevRight'} />
-          {open ? 'Hide other makers' : more}
+          {more}
         </button>
         {open && <ul className="cx-others">{others.map((row) => item(row))}</ul>}
       </>

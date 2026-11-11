@@ -204,6 +204,16 @@ describe('AppSearch', () => {
     expect(screen.getByRole('button', { name: /Can't find it\? Add it yourself/ })).toBeTruthy();
   });
 
+  it('does not say nothing matched while the next search is still running', async () => {
+    const bridge = createFakeHostBridge({ setupFor: () => ({ appGroups: [] }) });
+    await renderSearch(bridge);
+    await type('xyz');
+    expect(screen.getByText('No apps match "xyz".')).toBeTruthy();
+    bridge.setupOverview = () => new Promise(() => undefined);
+    await type('xyzw');
+    expect(screen.queryByText(/No apps match/)).toBeNull();
+  });
+
   it('offers adding it yourself under the results and under Popular too', async () => {
     const bridge = createFakeHostBridge({ setupFor: () => ({ popular: [NOTION] }) });
     await renderSearch(bridge);

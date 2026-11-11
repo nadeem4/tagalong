@@ -195,7 +195,7 @@ export function ConnectionsPanel() {
         onSelect={(id) => setTab(id as Tab)}
         label="Connections sections"
       />
-      <div role="tabpanel" id={panelId(tab)} aria-labelledby={tabId(tab)}>
+      <div className="cx-panel" role="tabpanel" id={panelId(tab)} aria-labelledby={tabId(tab)}>
         {tab === 'apps' && (
           <AppsTab
             apps={apps}
