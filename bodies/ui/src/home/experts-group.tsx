@@ -105,6 +105,9 @@ export function ExpertsGroup({
     const action = ACTION[expert.state];
     const outcome = outcomes.get(expert.id);
     const versionWords = update === undefined ? null : updateVersion(update);
+    const side = update !== undefined && (
+      <UpdateSide row={update} onUpdate={() => updates?.onUpdate('expert', expert.id)} />
+    );
     return (
       <li key={expert.id} className="cx-item">
         <section className="cx-row" aria-label={expert.name}>
@@ -131,13 +134,17 @@ export function ExpertsGroup({
               <ProgressBlock progress={progress} />
             ) : (
               <>
-                <span className="cx-status">{STATE_WORDS[expert.state]}</span>
-                {update !== undefined && (
-                  <UpdateSide
-                    row={update}
-                    onUpdate={() => updates?.onUpdate('expert', expert.id)}
+                {update?.status === 'updated' && side}
+                <span
+                  className={expert.state === 'ready' ? 'cx-status' : 'cx-status cx-status--warn'}
+                >
+                  <span
+                    className={expert.state === 'ready' ? 'home-dot' : 'home-dot home-dot--warn'}
+                    aria-hidden="true"
                   />
-                )}
+                  {STATE_WORDS[expert.state]}
+                </span>
+                {update !== undefined && update.status !== 'updated' && side}
                 {action !== undefined && (
                   <Button
                     variant="primary"
@@ -178,6 +185,9 @@ export function ExpertsGroup({
       {community.length > 0 && (
         <>
           <p className="cx-group-label">Community</p>
+          <p className="cx-grp-note">
+            Made by other people. Scout asks before it changes anything with them.
+          </p>
           <ul aria-label="Community experts" className="cx-list">
             {community.map(row)}
           </ul>

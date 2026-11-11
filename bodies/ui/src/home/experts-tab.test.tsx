@@ -240,6 +240,7 @@ describe('Experts tab: your experts', () => {
     const card = within(screen.getByRole('region', { name: 'Your experts' }));
     expect(card.getByText('Official', { selector: 'p' })).toBeVisible();
     expect(card.getByText('Community', { selector: 'p' })).toBeVisible();
+    expect(card.getByText(/Made by other people/)).toBeVisible();
     const official = within(screen.getByRole('list', { name: 'Official experts' }));
     expect(official.getByText('Claude Code')).toBeVisible();
     expect(official.queryByText('Xtra')).toBeNull();

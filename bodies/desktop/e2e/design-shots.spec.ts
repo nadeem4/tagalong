@@ -424,18 +424,24 @@ test('E1 experts updates', async () => {
       }
       throw new Error(`no ${name} window appeared`);
     };
-    const installed = (id: string, name: string, version: string, official: boolean) => ({
+    const installed = (
+      id: string,
+      name: string,
+      version: string,
+      official: boolean,
+      state = 'ready',
+    ) => ({
       id,
       name,
       version,
-      state: 'ready',
+      state,
       tested: true,
       official,
     });
     brain.setSetup({
       experts: [
         installed('claude-acp', 'Claude Code', '1.2.0', true),
-        installed('gemini', 'Gemini CLI', '0.10.0', true),
+        installed('gemini', 'Gemini CLI', '0.10.0', true, 'needs_login'),
         installed('foo', 'Foo', '0.3.0', false),
       ],
     });
@@ -455,6 +461,12 @@ test('E1 experts updates', async () => {
       'experts-updates-available': [
         item('claude-acp', 'Claude Code', true, { installed: '1.2', latest: '1.3' }),
         item('gemini', 'Gemini CLI', true, { installed: '0.10' }),
+        item('foo', 'Foo', false, { installed: '0.3', latest: '0.4' }),
+      ],
+      // The mockup's own picture: one waiting, one just updated that now needs sign-in.
+      'experts-updated-needs-sign-in': [
+        item('claude-acp', 'Claude Code', true, { installed: '1.2', latest: '1.3' }),
+        item('gemini', 'Gemini CLI', true, { installed: '0.10', status: 'updated' }),
         item('foo', 'Foo', false, { installed: '0.3', latest: '0.4' }),
       ],
       'experts-updating': [
