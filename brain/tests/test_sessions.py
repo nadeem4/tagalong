@@ -1780,6 +1780,16 @@ async def test_answer_to_an_expired_expert_ask_says_it_expired():
     assert err.value.code is ErrorCode.not_found
 
 
+async def test_answer_to_an_expired_scout_ask_keeps_the_plain_not_found():
+    bodies = Bodies()
+    bodies.notify = lambda m, p: None
+    session = Session(Reactive(["hi"]), Open(), bodies, 10, Memory(":memory:"))
+    item = session.items.open("ask", "brain")
+    session.items.expire(item.id, "deadline")
+    with pytest.raises(RpcError, match="no open ask"):
+        session.answer(item.id, "allow", "desktop")
+
+
 async def test_session_passes_the_turn_timeout():
     class Stall:
         model_id = "m"

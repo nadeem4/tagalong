@@ -895,7 +895,8 @@ class Session:
             self._asks.answer(ask_id, option, body_id, text, apps)
         except RpcError as err:
             item = self.items.get(ask_id)
-            if err.code is ErrorCode.not_found and item is not None and item.state == "expired":
+            expired = item is not None and (item.kind, item.state) == ("expert_ask", "expired")
+            if err.code is ErrorCode.not_found and expired:
                 # An expert's ask ends with its process; say so rather than "no open ask".
                 raise RpcError(ErrorCode.not_found, "that ask expired; the expert stopped") from err
             raise

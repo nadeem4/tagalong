@@ -25,8 +25,8 @@ from brain.job_records import Job, JobPart, JobRecords
 from brain.jobs import JobError, Jobs, job_note
 from brain.masking import Masker, mask_secrets
 from brain.memory import Memory
-from brain.open_items import OpenItems
-from brain.permission import Decision, Engine, Person, SideCheckDecider
+from brain.open_items import OpenItemRefused, OpenItems
+from brain.permission import Decision, Engine, Grant, Person, SideCheckDecider
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.store import InstalledExpert
 from brain.store import rules
@@ -2888,3 +2888,44 @@ async def test_job_links_open_item_ids(make_rig):
     await until(lambda: expert_items(rig))
     (item,) = expert_items(rig)
     assert rig.records.get_job(str(job)).open_items == [item.id]
+
+
+async def test_stopping_one_part_expires_only_its_own_item(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), None), ASK_STEPS)
+    job = await rig.jobs.start("one", str(rig.folder))
+    await until(lambda: len(expert_items(rig)) == 1)
+    rig.asks.script += [Answer("Plan"), None]  # the second part's mode ask, then its permission
+    await second_part(rig, job)
+    await until(lambda: len(expert_items(rig)) == 2)
+    await rig.jobs.stop(job, "p1")
+    await until(lambda: len(expert_items(rig)) == 1)
+    assert rig.records.get_job(str(job)).parts[1].state == "active"  # the job still runs
+
+
+async def test_answer_after_a_stop_is_refused_as_expired(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), None), ASK_STEPS)
+    job = await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: expert_items(rig))
+    (item,) = expert_items(rig)
+    await rig.jobs.stop(job)
+    await until(lambda: not expert_items(rig))
+    assert item.id in rig.asks.closed_by_cancel  # the expert's request was cancelled
+    with pytest.raises(OpenItemRefused) as err:
+        rig.items.answer(item.id, "allow", "desktop")
+    assert err.value.reason == "expired"
+
+
+class GrantAll:
+    name = "standing_rule"
+
+    async def decide(self, req):
+        return Grant("rule")
+
+
+async def test_a_rule_granted_expert_ask_writes_no_item(make_rig):
+    steps = [{"permission": {"title": "ls", "options": OPTS}}]
+    engine = Engine([GrantAll()], None, None, lambda name: None)
+    rig = make_rig(FakeAsks(Answer("Plan")), steps, engine=engine)
+    job = await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: rig.finished)
+    assert rig.records.get_job(str(job)).open_items == []

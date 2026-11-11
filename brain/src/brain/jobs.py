@@ -26,7 +26,7 @@ from brain.guards import Guards
 from brain.job_activity import PAGE_LIMIT, JobActivity, _clip, activity_line, activity_summary
 from brain.job_records import Job, JobPart, JobRecords, home_state
 from brain.masking import mask_json
-from brain.open_items import OpenItems
+from brain.open_items import OpenItemRefused, OpenItems
 from brain.outputs import OutputStore, preview
 from brain.permission import (
     AskRequest,
@@ -897,11 +897,29 @@ class Jobs:
         folder = job.folder if job is not None else ""
         agent = _prefix(self._agent_of(job, part))
         tool = f"{agent}:{request.title}"
-        # The ask's work row is its log entry and the item is its record for the person: one id.
-        item = None
-        if self._items is not None:
-            item = self._items.open("expert_ask", "brain", live_only=True, job_id=job_id)
-        ask_id = item.id if item is not None else uuid.uuid4().hex
+        ask_id = uuid.uuid4().hex  # the ask's work row is also its log entry
+        person = expert_asker(
+            partial(self._open_ask, job_id=job_id, part=part, stay_open=True),
+            tool,
+            request.input,
+            request.options,
+            ask_id,
+        )
+
+        async def ask_person():
+            # Only what waits on the person is an item, so a rule's or Scout's grant leaves none.
+            if self._items is None:
+                return await person()
+            self._items.open("expert_ask", "brain", live_only=True, job_id=job_id, id=ask_id)
+            try:
+                answer = await person()
+            except BaseException:  # the part stopped or the ask failed: nobody can answer now
+                with suppress(OpenItemRefused):
+                    self._items.expire(ask_id, "process_ended")
+                raise
+            self._items.finish(ask_id, "answered")
+            return answer
+
         decision = await self._engine.decide(
             AskRequest(
                 kind="expert_request",
@@ -911,20 +929,12 @@ class Jobs:
                 summary=summarise(request.title, tool, request.input),
                 input=request.input,
                 tier=Tier.ask,
-                how_to_ask=expert_asker(
-                    partial(self._open_ask, job_id=job_id, part=part, stay_open=True),
-                    tool,
-                    request.input,
-                    request.options,
-                    ask_id,
-                ),
+                how_to_ask=ask_person,
                 job_id=job_id,
                 ask_id=ask_id,
                 can_allow_once=once is not None and job is not None,  # never allow_always
             )
         )
-        if item is not None:
-            self._items.finish(item.id, decision.reason or "decided")
         self._changed()
         if decision.allowed:
             # The person's own pick, else the expert's allow-once for a rule or Scout grant.

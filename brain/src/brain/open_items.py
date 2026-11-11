@@ -92,9 +92,10 @@ class OpenItems:
         live_only: bool = False,
         job_id: str | None = None,
         ttl_s: float = DEADLINE_S,
+        id: str | None = None,
     ) -> OpenItem:
         now = self._now()
-        id = uuid.uuid4().hex
+        id = id or uuid.uuid4().hex
         store.insert(
             self.db,
             id,
