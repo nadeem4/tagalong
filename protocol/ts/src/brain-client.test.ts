@@ -4,6 +4,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Tool } from './shapes.js';
+import type { HelloResult } from './messages.js';
 import {
   BrainClient,
   BrainOffline,
@@ -120,6 +121,39 @@ describe('BrainClient', () => {
         params: { protocol: 1, body: { id: 'desktop', kind: 'desktop', name: 'Desktop' }, tools },
       },
     ]);
+  });
+
+  it('calls onHello with the hello result', async () => {
+    const hellos: HelloResult[] = [];
+    const ctx = setup(undefined, { onHello: (r) => hellos.push(r) });
+    ctx.client.start();
+    const s = ctx.sockets[0]!;
+    s.opens();
+    await vi.advanceTimersByTimeAsync(0);
+    s.receive({
+      jsonrpc: '2.0',
+      id: s.sent[0]!.id,
+      result: {
+        protocol: 1,
+        session: 's1',
+        tools: [],
+        seq: 0,
+        resync: false,
+        version: '0.1.0',
+        build: 'abc123abc123',
+      },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(hellos).toEqual([expect.objectContaining({ version: '0.1.0', build: 'abc123abc123' })]);
+  });
+
+  it('an old brain without version still connects', async () => {
+    const hellos: HelloResult[] = [];
+    const { statuses } = await online(undefined, { onHello: (r) => hellos.push(r) });
+    expect(statuses.at(-1)).toBe('online');
+    expect(hellos).toHaveLength(1);
+    expect(hellos[0]!.version).toBeUndefined();
+    expect(hellos[0]!.build).toBeUndefined();
   });
 
   it('goes online and keeps the session once hello resolves', async () => {

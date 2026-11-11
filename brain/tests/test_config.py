@@ -337,3 +337,17 @@ def test_config_retention_settings():
         for bad in ("0", "-1", "lots"):
             with pytest.raises(ValueError, match=key):
                 load_config({key: bad})
+
+
+def test_started_by_defaults_to_person():
+    assert load_config({}).started_by == "person"
+    assert load_config({"TAGALONG_STARTED_BY": "something"}).started_by == "person"
+
+
+def test_started_by_desktop():
+    assert load_config({"TAGALONG_STARTED_BY": "desktop"}).started_by == "desktop"
+
+
+def test_build_reads_env():
+    assert load_config({}).build is None
+    assert load_config({"TAGALONG_BUILD": "0.9.2"}).build == "0.9.2"

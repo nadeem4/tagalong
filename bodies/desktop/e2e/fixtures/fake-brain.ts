@@ -22,6 +22,23 @@
  */
 import { WebSocketServer, type WebSocket } from 'ws';
 import type { AddressInfo } from 'node:net';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { ownBuild } from '../../src/main/brain/build-id';
+
+/**
+ * The version and build the app itself would report in dev, so a default fake brain is current
+ * and ordinary specs see no update prompt. Only the version specs pass an old `hello`.
+ */
+const own = ownBuild({
+  packaged: false,
+  appVersion: (
+    JSON.parse(
+      readFileSync(fileURLToPath(new URL('../../package.json', import.meta.url)), 'utf8'),
+    ) as { version: string }
+  ).version,
+  brainDir: fileURLToPath(new URL('../../../../brain', import.meta.url)),
+});
 
 /** How the fake brain behaves about the Anthropic key. */
 export interface FakeBrainOptions {
@@ -33,6 +50,10 @@ export interface FakeBrainOptions {
   environment?: boolean;
   /** Listen here instead of on a free port, so a spec can start the brain after the app. */
   port?: number;
+  /** What hello says of the brain's version and build (default: the app's own, a current brain). */
+  hello?: { version: string; build: string };
+  /** The `brain_status` answer (snake_case, as the real tool); absent: the tool is unknown, as on an old brain. */
+  brainStatus?: Record<string, unknown>;
 }
 
 export interface FakeBrain {
@@ -481,7 +502,14 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         notify('reply', { ...base, done: true });
         notify('turn', { ...base, state: 'ended', reason: 'done' });
       } else if (msg.method === 'hello') {
-        const result = { protocol: 1, session: 's1', tools: [], seq, resync: false };
+        const result = {
+          protocol: 1,
+          session: 's1',
+          tools: [],
+          seq,
+          resync: false,
+          ...(options.hello ?? own),
+        };
         socket.send(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result }));
       } else if (msg.method === 'listen') {
         mode = String(msg.params?.mode);
@@ -802,6 +830,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           const at = preferences.findIndex((p) => p.id === params.input?.id);
           if (at >= 0) preferences.splice(at, 1);
           notify('changed', { what: 'approvals' });
+        } else if (params.tool === 'brain_status' && options.brainStatus !== undefined) {
+          value = options.brainStatus;
         } else if (params.tool === 'reading_status') value = { rows: readingRows };
         else if (params.tool === 'timers_state') value = { timers };
         else if (params.tool === 'timer_cancel') {

@@ -119,6 +119,14 @@ export const IPC = {
   brainLink: 'tagalong:brain:link',
   // Retry the first-run install after it failed.
   brainSetupRetry: 'tagalong:brain:setup-retry',
+  // Scout's brain card: its facts, a restart (now or after the running job), and the folder,
+  // log and details the card opens or copies.
+  brainStatus: 'tagalong:brain:status',
+  brainRestart: 'tagalong:brain:restart',
+  brainRestartAfterWork: 'tagalong:brain:restart-after-work',
+  brainOpenFolder: 'tagalong:brain:open-folder',
+  brainOpenLog: 'tagalong:brain:open-log',
+  brainCopyDetails: 'tagalong:brain:copy-details',
   // Home's Approvals page: the decision history and the preferences Scout follows.
   listApprovals: 'tagalong:approvals:list',
   listPreferences: 'tagalong:approvals:preferences:list',

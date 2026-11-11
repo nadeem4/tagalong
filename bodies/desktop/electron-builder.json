@@ -43,6 +43,7 @@
     "createStartMenuShortcut": true,
     "shortcutName": "Tagalong",
     "runAfterFinish": true,
+    "include": "build/installer.nsh",
     "deleteAppDataOnUninstall": false
   },
   "mac": {

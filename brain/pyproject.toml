@@ -1,6 +1,6 @@
 [project]
 name = "brain"
-version = "0.0.0"
+version = "0.1.0"
 description = "Tagalong brain: the Python side of contract v1"
 requires-python = ">=3.12,<3.14"
 dependencies = [

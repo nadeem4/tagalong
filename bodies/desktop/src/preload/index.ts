@@ -23,6 +23,7 @@ import type {
 import type { Settings, SettingsPatch } from '../shared/settings';
 import type {
   AskInput,
+  BrainCard,
   BrainLink,
   DropOffer,
   ApprovalCounts,
@@ -112,6 +113,12 @@ const bridge: PreloadBridge = {
     ipcRenderer.invoke(IPC.setPermission, tool, mode) as Promise<void>,
   brainLink: () => ipcRenderer.invoke(IPC.brainLink) as Promise<BrainLink>,
   retryBrainSetup: () => ipcRenderer.invoke(IPC.brainSetupRetry) as Promise<void>,
+  brainCard: () => ipcRenderer.invoke(IPC.brainStatus) as Promise<BrainCard>,
+  restartBrain: () => ipcRenderer.invoke(IPC.brainRestart) as Promise<void>,
+  restartBrainAfterWork: () => ipcRenderer.invoke(IPC.brainRestartAfterWork) as Promise<void>,
+  openBrainFolder: () => ipcRenderer.invoke(IPC.brainOpenFolder) as Promise<void>,
+  openBrainLog: () => ipcRenderer.invoke(IPC.brainOpenLog) as Promise<void>,
+  copyBrainDetails: () => ipcRenderer.invoke(IPC.brainCopyDetails) as Promise<void>,
   listJobs: () => ipcRenderer.invoke(IPC.listJobs) as Promise<JobRow[]>,
   stopJob: (job: string) => ipcRenderer.invoke(IPC.stopJob, job) as Promise<void>,
   jobActivity: (job: string, afterRev: number) =>

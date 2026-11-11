@@ -11,6 +11,7 @@ import uuid
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 47321
@@ -64,6 +65,8 @@ class Config:
     tool_preview_chars: int = DEFAULT_TOOL_PREVIEW_CHARS  # per tool result shown to the model
     job_steps_max_entries: int = DEFAULT_JOB_STEPS_MAX_ENTRIES
     job_steps_max_bytes: int = DEFAULT_JOB_STEPS_MAX_BYTES
+    build: str | None = None  # the app's version when packaged; None in a dev checkout
+    started_by: Literal["desktop", "person"] = "person"  # who owns the process
 
 
 def split_command(cmd: str, posix: bool | None = None) -> list[str]:
@@ -133,6 +136,8 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
         job_steps_max_bytes=_positive_int(
             env, "TAGALONG_JOB_STEPS_MAX_BYTES", DEFAULT_JOB_STEPS_MAX_BYTES
         ),
+        build=env.get("TAGALONG_BUILD") or None,
+        started_by="desktop" if env.get("TAGALONG_STARTED_BY") == "desktop" else "person",
     )
 
 

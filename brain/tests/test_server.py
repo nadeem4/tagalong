@@ -98,6 +98,21 @@ async def test_hello_ok(env):
         assert [b.id for b in bodies.online()] == ["desktop"]
 
 
+async def test_hello_result_carries_version_and_build(tmp_path):
+    bodies = Bodies()
+    session = Session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
+    server = await start_server("127.0.0.1", 0, bodies, "s1", session, ("0.1.0", "abc123abc123"))
+    url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+    try:
+        async with connect(url) as ws:
+            result = (await call(ws, hello()))["result"]
+        assert result["version"] == "0.1.0"
+        assert result["build"] == "abc123abc123"
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
 async def test_message_before_hello_closes(env):
     _, url = env
     async with connect(url) as ws:

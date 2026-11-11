@@ -27,6 +27,7 @@ from brain.store.work import TransitionRefused
 from brain.toolbox import BodySource, BrainSource, Toolbox, ToolSpec
 from brain.tools import (
     RECALL_MAX_CHARS,
+    brain_status_tools,
     brain_tools,
     expert_tools,
     format_hits,
@@ -1664,3 +1665,15 @@ async def test_list_permissions_names_each_body_by_what_it_declared(home):
 def test_list_timers_description_asks_for_ids_to_be_shown(trun):
     text = trun.specs["list_timers"].description.lower()
     assert "id" in text and "cancel" in text
+
+
+async def test_brain_status_reports_the_facts():
+    facts = {"version": "0.1.0", "build": "abc", "pid": 7, "work_running": False}
+    [(spec, handler)] = brain_status_tools(lambda: facts)
+    assert spec.name == "brain_status" and spec.effect == "read"
+    assert json.loads(await handler({})) == facts
+
+
+def test_brain_status_is_home_only():
+    [(spec, _)] = brain_status_tools(lambda: {})
+    assert spec.audience == frozenset({"home"})
