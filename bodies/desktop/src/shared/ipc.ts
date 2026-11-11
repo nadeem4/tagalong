@@ -135,6 +135,9 @@ export const IPC = {
   readingOpenLanguageSettings: 'tagalong:reading:open-language-settings',
   keySet: 'tagalong:key:set',
   limitSet: 'tagalong:limit:set',
+  // Scout's model in Settings: read the choice, pick one.
+  modelState: 'tagalong:model:state',
+  modelSet: 'tagalong:model:set',
   // The first-run walkthrough: open it (at a step) or finish it.
   walkthroughOpen: 'tagalong:walkthrough:open',
   walkthroughFinish: 'tagalong:walkthrough:finish',

@@ -83,6 +83,7 @@ import { createBrainSetup, registerBrainLinkIpc } from './ipc/brain-link';
 import { registerBodiesIpc } from './ipc/bodies';
 import { registerLoopsIpc } from './ipc/loops';
 import { registerTimersIpc } from './ipc/timers';
+import { registerModelIpc } from './ipc/model';
 import { registerPermissionsIpc } from './ipc/permissions';
 import { registerSettingsIpc } from './ipc/settings';
 import { registerSetupIpc } from './ipc/setup';
@@ -927,6 +928,7 @@ function registerIpc(): void {
   registerPermissionsIpc(handle, { brain: required().brain });
   registerLoopsIpc(handle, { brain: required().brain });
   registerTimersIpc(handle, { brain: required().brain });
+  registerModelIpc(handle, { brain: required().brain });
   registerBodiesIpc(handle, { brain: required().brain });
   registerJobsIpc(handle, { brain: required().brain });
   registerApprovalsIpc(handle, { brain: required().brain });

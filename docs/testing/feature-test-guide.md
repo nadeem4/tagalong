@@ -2188,6 +2188,25 @@ with a fake key; the real check against Anthropic is done by hand here.
 5. **Action (developers):** start with a real `ANTHROPIC_API_KEY` in the environment.
    **Expected:** the section reads "Set by your environment" and the field is disabled.
 
+### K.2b. Scout's model
+
+Needs the desktop and a brain with a key. The e2e `key-settings.spec.ts` covers the pick on the fake
+brain; this checks it on the real one.
+
+1. **Action:** open **Home → Settings → Scout's model**. **Expected:** the section reads "The AI
+   model Scout thinks with, on your Anthropic key." with a greyed **Provider** (Anthropic, "More
+   providers coming later") and a **Model** that shows **Claude Opus 5.5**.
+2. **Action:** press the **Model** field (or Tab to it and press Enter). **Expected:** a list of
+   Claude Opus 5.5, Claude Sonnet 5.5 and Claude Haiku 5.5, each with its one-line note; the
+   current one has a tick and the default one a "Default" tag. Arrows, Home and End move,
+   Escape closes.
+3. **Action:** pick **Claude Sonnet 5.5**. **Expected:** the list closes, the field shows Sonnet
+   and "Saved." appears at once (no save button). Restart the brain: Sonnet is still chosen.
+4. **Action:** ask Scout something long, pick another model while it answers, then ask again.
+   **Expected:** the running answer finishes on the old model; the next one uses the new.
+5. **Action:** stop the brain. **Expected:** the section shows nothing to pick until the brain is
+   back.
+
 ### K.3. Show the tour again
 
 1. **Action:** **Home → Overview → Show the tour again**. **Expected:** the walkthrough window

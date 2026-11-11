@@ -36,7 +36,13 @@ import type {
   KeyStatus,
   KeyResult,
 } from '@tagalong/ui';
-import type { BodiesState, LoopsState, TimerRow, WhatsAppChange } from '@tagalong/ui/shapes';
+import type {
+  BodiesState,
+  LoopsState,
+  ModelState,
+  TimerRow,
+  WhatsAppChange,
+} from '@tagalong/ui/shapes';
 import { IPC } from '../shared/ipc';
 import type { PreloadBridge } from '../shared/ipc';
 import { heldUntilHeard } from './held';
@@ -137,6 +143,8 @@ const bridge: PreloadBridge = {
   keyStatus: () => ipcRenderer.invoke(IPC.keyStatus) as Promise<KeyStatus>,
   setKey: (key: string) => ipcRenderer.invoke(IPC.keySet, key) as Promise<KeyResult>,
   setDailyLimit: (usd: number) => ipcRenderer.invoke(IPC.limitSet, usd) as Promise<void>,
+  modelState: () => ipcRenderer.invoke(IPC.modelState) as Promise<ModelState>,
+  setModel: (model: string) => ipcRenderer.invoke(IPC.modelSet, model) as Promise<void>,
   openWalkthrough: (step?: number) =>
     ipcRenderer.invoke(IPC.walkthroughOpen, { step }) as Promise<void>,
   onBrainChanged: (handler: (what: string) => void) => {

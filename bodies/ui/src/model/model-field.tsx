@@ -7,7 +7,7 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { HostBridge } from '../host-bridge';
 import type { ModelState } from '../shapes';
-import { themeTokens as t } from '../theme/tokens';
+import { themeTokens as t, typeCss } from '../theme/tokens';
 
 export type ModelHost = Pick<HostBridge, 'modelState' | 'setModel' | 'onBrainChanged'>;
 
@@ -123,7 +123,9 @@ export function ModelField({ host }: { host: ModelHost }) {
             aria-disabled="true"
           >
             <span className="tg-model__value">
-              <span className="tg-model__name">{PROVIDER_NAMES[state.provider] ?? state.provider}</span>
+              <span className="tg-model__name">
+                {PROVIDER_NAMES[state.provider] ?? state.provider}
+              </span>
             </span>
             <Chevron />
           </div>
@@ -253,7 +255,7 @@ function Check() {
   );
 }
 
-// Sizes follow the type roles (body-lead 14/20, body 13/20, small 12/16, caption 11/14; 400/600).
+// Text sits on the type roles; the labels and the option names take the 600 weight of the mockup.
 const MODEL_CSS = `
 .tg-model__row {
   display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 12px 32px; align-items: start;
@@ -261,9 +263,9 @@ const MODEL_CSS = `
 }
 .tg-model__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding-top: 8px; }
 .tg-model__labelrow { display: flex; align-items: center; gap: 10px; }
-.tg-model__label { font-size: 13px; line-height: 20px; font-weight: 600; color: ${t.color.panelText}; }
-.tg-model__note { font-size: 13px; line-height: 20px; color: ${t.color.panelMuted}; max-width: 46ch; }
-.tg-model__msg { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; font-weight: 600; }
+.tg-model__label { ${typeCss('body')};font-weight:600; color: ${t.color.panelText}; }
+.tg-model__note { ${typeCss('body')}; color: ${t.color.panelMuted}; max-width: 46ch; }
+.tg-model__msg { display: flex; align-items: center; gap: 6px; ${typeCss('small')};font-weight:600; }
 .tg-model__msg--ok { color: ${t.color.okInk}; }
 .tg-model__msg--err { color: ${t.color.errInk}; }
 .tg-model__check { width: 16px; height: 16px; flex: none; }
@@ -272,7 +274,7 @@ const MODEL_CSS = `
   position: relative; box-sizing: border-box; width: 100%; height: 36px; display: flex; align-items: center;
   gap: 8px; padding: 0 10px 0 12px; border: 1px solid ${t.color.keycapLine}; border-radius: 8px;
   background: #fff; box-shadow: 0 1px 1px rgba(18, 22, 43, 0.04); font-family: ${t.font.ui};
-  font-size: 14px; line-height: 20px; color: ${t.color.panelText};
+  ${typeCss('bodyLead')}; color: ${t.color.panelText};
 }
 .tg-model__sel--live { cursor: pointer; }
 .tg-model__sel--live:focus-visible { outline: 2px solid ${t.color.focusOnLight}; outline-offset: 2px; }
@@ -284,7 +286,7 @@ const MODEL_CSS = `
 .tg-model__sel[aria-disabled='true'] .tg-model__chev { color: #b4b9c9; }
 .tg-model__value { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 6px; white-space: nowrap; overflow: hidden; }
 .tg-model__name { flex: none; }
-.tg-model__line { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: ${t.color.panelMuted}; font-size: 13px; }
+.tg-model__line { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: ${t.color.panelMuted}; ${typeCss('body')}; }
 .tg-model__line::before { content: '\\00B7'; margin-right: 6px; }
 .tg-model__chev { width: 16px; height: 16px; flex: none; color: ${t.color.panelMuted}; }
 .tg-model__list {
@@ -298,12 +300,12 @@ const MODEL_CSS = `
 }
 .tg-model__list li.is-active { background: ${t.color.panelTile}; }
 .tg-model__opt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.tg-model__optname { display: flex; align-items: center; gap: 8px; font-size: 14px; line-height: 20px; font-weight: 600; color: ${t.color.panelText}; }
-.tg-model__optline { font-size: 12px; line-height: 16px; color: ${t.color.panelMuted}; }
+.tg-model__optname { display: flex; align-items: center; gap: 8px; ${typeCss('bodyLead')};font-weight:600; color: ${t.color.panelText}; }
+.tg-model__optline { ${typeCss('small')}; color: ${t.color.panelMuted}; }
 .tg-model__tick { width: 16px; height: 16px; color: ${t.color.panelText}; }
 .tg-model__chip {
   display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 9px; flex: none;
-  background: ${t.color.panelTile}; color: ${t.color.chipFreeInk}; font-size: 11px; line-height: 14px; font-weight: 600;
+  background: ${t.color.panelTile}; color: ${t.color.chipFreeInk}; ${typeCss('caption')};
 }
 .tg-model__list li.is-active .tg-model__chip { background: #fff; }
 `;
