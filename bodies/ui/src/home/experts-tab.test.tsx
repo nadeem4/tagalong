@@ -263,6 +263,19 @@ describe('Experts tab: your experts', () => {
     expect(bridge.setupCalls).toEqual([{ kind: 'expert', id: 'claude-acp', approved: false }]);
   });
 
+  it('each installed expert wears an Official or Community chip', async () => {
+    await open({
+      experts: [
+        installed('claude-acp', 'Claude Code'),
+        installed('x', 'Xtra', { official: false }),
+      ],
+    });
+    const claude = within(screen.getByRole('region', { name: 'Claude Code' }));
+    const xtra = within(screen.getByRole('region', { name: 'Xtra' }));
+    expect(claude.getByText('Official')).toBeVisible();
+    expect(xtra.getByText('Community')).toBeVisible();
+  });
+
   it('an untested expert reads Not tested with Scout', async () => {
     await open({
       experts: [

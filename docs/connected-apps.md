@@ -202,7 +202,7 @@ sign-in`, `Not working`, `Off`), the on/off switch, and quiet **Restart** and **
   (`apps.trust`, from the entry's id); an app added by hand is `community`. Home's list reads it
   back as `official` on each connected app, so the tag survives a restart. Apps connected before this was kept read Community until added again.
 - **Experts tab** (`experts-tab.tsx`, `experts-group.tsx`): **Your experts** (installed, Official
-  first, each led by the kind of job it does from `jobs-kinds.ts` with the product underneath, a state
+  first, each led by the kind of job it does from `jobs-kinds.ts` with the product underneath, an Official or Community chip (the same `cx-chip` as the app rows), a state
   chip (Ready, Needs login) and a **Log in** button; a newer version shows as `v1.2 → v1.3` with
   an **Update** button from the updates state), then **Add an
   expert**: the brain's curated list is open (`browse_experts`, with Recommended and "Tested with

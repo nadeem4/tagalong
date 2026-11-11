@@ -112,6 +112,9 @@ export function ExpertsGroup({
           <div className="cx-row__main">
             <span className="cx-row__name">
               <span title={expert.name}>{expert.name}</span>
+              <span className={expert.official ? 'cx-chip cx-chip--official' : 'cx-chip'}>
+                {expert.official ? 'Official' : 'Community'}
+              </span>
               {!expert.tested && (
                 <span className="cx-chip cx-chip--quiet">Not tested with Scout</span>
               )}
