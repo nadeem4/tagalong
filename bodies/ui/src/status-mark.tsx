@@ -60,6 +60,7 @@ export function StatusMark({ mark, variant, onFix }: StatusMarkProps) {
         margin: 0,
         fontFamily: t.font.ui,
         fontSize: t.type.small.size,
+        lineHeight: `${t.type.small.line}px`,
         color: tone === 'warn' ? '#F2D48A' : t.color.textMuted,
       }}
     >

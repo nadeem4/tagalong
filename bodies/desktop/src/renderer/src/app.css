@@ -7,13 +7,9 @@
   --muted: #64748b;
   --line: #e2e8f0;
   --surface: #ffffff;
-  font-family:
-    'Segoe UI Variable Text',
-    'Segoe UI',
-    system-ui,
-    -apple-system,
-    sans-serif;
+  font-family: 'Onest', system-ui, sans-serif;
   font-size: 14px;
+  line-height: 21px;
   color: var(--ink);
 }
 
@@ -80,6 +76,7 @@ body {
   cursor: pointer;
   padding: 2px 7px;
   font-size: 11px;
+  line-height: 14px;
 }
 
 section {
@@ -137,11 +134,13 @@ button:disabled {
 .settings__note {
   color: var(--muted);
   font-size: 12px;
+  line-height: 16px;
 }
 
 .settings__error {
   color: #b91c1c;
   font-size: 12px;
+  line-height: 16px;
 }
 
 /* The bubble sits at the bottom of its transparent window, where the pet is. */

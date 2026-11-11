@@ -4,7 +4,7 @@
  * variables, not props: `:root` is the light page, `.on-navy` the navy chrome, so the focus
  * ring is navy on light and gold on navy without any wiring.
  */
-import { themeTokens as t } from '../theme/tokens';
+import { themeTokens as t, typeCss } from '../theme/tokens';
 
 export const CONTROLS_CSS = `
 :root {
@@ -35,7 +35,7 @@ export const CONTROLS_CSS = `
   position: relative; flex: none; width: ${t.size.toggleW}px; height: ${t.size.toggleH}px; padding: 0;
   border: 1px solid var(--tg-ctl-line); border-radius: ${t.size.toggleH}px;
   background: ${t.color.scrollbarThumb}; color: ${t.color.panelText}; cursor: pointer;
-  font-family: ${t.font.ui}; font-size: ${t.type.caption.size}px; font-weight: ${t.fontWeight.semibold};
+  font-family: ${t.font.ui}; ${typeCss('caption')};
   transition: background 120ms;
 }
 .tg-toggle:hover:not(:disabled) { border-color: var(--tg-ctl-muted); }
@@ -57,7 +57,7 @@ export const CONTROLS_CSS = `
 .tg-three__option {
   min-width: 46px; height: ${t.size.toggleH}px; padding: 0 ${t.space.md}px; border: 0;
   border-radius: ${t.size.toggleH}px; background: transparent; color: var(--tg-ctl-ink); cursor: pointer;
-  font-family: ${t.font.ui}; font-size: ${t.type.caption.size}px; font-weight: ${t.fontWeight.semibold};
+  font-family: ${t.font.ui}; ${typeCss('caption')};
   transition: background 120ms;
 }
 .tg-three__option:hover:not(:disabled):not([aria-checked='true']) { background: var(--tg-ctl-line); }
@@ -65,13 +65,13 @@ export const CONTROLS_CSS = `
 .tg-three__option:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .tg-select { display: flex; flex-direction: column; gap: ${t.space.xs}px; min-width: 0; }
-.tg-select__label { color: var(--tg-ctl-muted); font-size: ${t.type.small.size}px; }
+.tg-select__label { color: var(--tg-ctl-muted); ${typeCss('small')}; }
 .tg-select__wrap { position: relative; display: block; }
 .tg-select .tg-select__wrap select {
   appearance: none; width: 100%; height: ${t.size.control}px; padding: 0 34px 0 ${t.space.lg}px;
   border: 1px solid var(--tg-ctl-line); border-radius: ${t.radius.field}px;
   background: var(--tg-ctl-bg); color: var(--tg-ctl-ink);
-  font-family: ${t.font.ui}; font-size: ${t.type.bodyLead.size}px; cursor: pointer;
+  font-family: ${t.font.ui}; ${typeCss('bodyLead')}; cursor: pointer;
 }
 .tg-select select:hover:not(:disabled) { border-color: var(--tg-ctl-muted); }
 .tg-select select:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -85,13 +85,13 @@ export const CONTROLS_CSS = `
   display: inline-block; min-width: 24px; padding: 2px 7px; text-align: center;
   border: 1px solid ${t.color.keycapLine}; border-bottom-width: 2px; border-radius: 6px;
   background: ${t.color.keycapFill}; color: ${t.color.keycapInk};
-  font-family: ${t.font.ui}; font-size: ${t.type.small.size}px; font-weight: ${t.fontWeight.semibold};
+  font-family: ${t.font.ui}; ${typeCss('small')}; font-weight: ${t.fontWeight.semibold};
 }
 
 .tg-slider { display: flex; flex-direction: column; gap: ${t.space.sm}px; }
 .tg-slider__head { display: flex; justify-content: space-between; align-items: baseline; gap: ${t.space.lg}px; }
-.tg-slider__head label { color: var(--tg-ctl-muted); font-size: ${t.type.small.size}px; }
-.tg-slider__head output { color: var(--tg-ctl-ink); font-size: ${t.type.body.size}px; font-weight: ${t.fontWeight.semibold}; }
+.tg-slider__head label { color: var(--tg-ctl-muted); ${typeCss('small')}; }
+.tg-slider__head output { color: var(--tg-ctl-ink); ${typeCss('body')}; font-weight: ${t.fontWeight.semibold}; }
 .tg-slider input[type='range'] {
   appearance: none; width: 100%; height: ${t.size.toggleH}px; margin: 0; background: transparent; cursor: pointer;
 }
@@ -106,14 +106,14 @@ export const CONTROLS_CSS = `
 .tg-slider input[type='range']:hover::-webkit-slider-thumb { background: ${t.color.keycapFill}; }
 
 .tg-money { display: flex; flex-direction: column; gap: ${t.space.xs}px; }
-.tg-money > label { color: var(--tg-ctl-muted); font-size: ${t.type.small.size}px; }
+.tg-money > label { color: var(--tg-ctl-muted); ${typeCss('small')}; }
 .tg-money__row { display: flex; align-items: center; gap: ${t.space.sm}px; }
-.tg-money__prefix { color: var(--tg-ctl-muted); font-size: ${t.type.bodyLead.size}px; }
+.tg-money__prefix { color: var(--tg-ctl-muted); ${typeCss('bodyLead')}; }
 .tg-money .tg-money__row input[type='text'] {
   width: 96px; height: ${t.size.control}px; padding: 0 ${t.space.lg}px;
   border: 1px solid var(--tg-ctl-line); border-radius: ${t.radius.field}px;
   background: var(--tg-ctl-bg); color: var(--tg-ctl-ink);
-  font-family: ${t.font.ui}; font-size: ${t.type.bodyLead.size}px;
+  font-family: ${t.font.ui}; ${typeCss('bodyLead')};
 }
 .tg-money .tg-money__row input[type='text'][aria-invalid='true'] { border: 2px solid ${t.color.errInk}; }
 .tg-money .tg-button {
@@ -127,8 +127,8 @@ export const CONTROLS_CSS = `
 .tg-meter__bar--loud { background: ${t.color.gold}; }
 .tg-mictest { display: flex; flex-direction: column; gap: ${t.space.sm}px; }
 .tg-mictest__row { display: flex; align-items: center; gap: ${t.space.lg}px; }
-.tg-mictest__help { margin: 0; color: var(--tg-ctl-muted); font-size: ${t.type.small.size}px; }
-.tg-mictest__error { margin: 0; color: ${t.color.errInk}; font-size: ${t.type.small.size}px; }
+.tg-mictest__help { margin: 0; color: var(--tg-ctl-muted); ${typeCss('small')}; }
+.tg-mictest__error { margin: 0; color: ${t.color.errInk}; ${typeCss('small')}; }
 .tg-sr-only {
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap; border: 0;
@@ -138,7 +138,7 @@ export const CONTROLS_CSS = `
   display: inline-flex; align-items: center; justify-content: center; gap: ${t.space.sm}px;
   height: ${t.size.control}px; padding: 0 ${t.space.xl}px; border-radius: ${t.radius.field}px;
   border: 1px solid transparent; cursor: pointer;
-  font-family: ${t.font.ui}; font-size: ${t.type.bodyLead.size}px; font-weight: ${t.fontWeight.semibold};
+  font-family: ${t.font.ui}; ${typeCss('bodyLead')}; font-weight: ${t.fontWeight.semibold};
 }
 .tg-button:disabled { opacity: 0.5; cursor: not-allowed; }
 .tg-button--primary { background: ${t.color.gold}; border-color: ${t.color.gold}; color: ${t.color.goldInk}; }
@@ -151,7 +151,7 @@ export const CONTROLS_CSS = `
 .tg-button--danger:hover:not(:disabled) { background: ${t.color.errInk}; color: ${t.color.errFill}; }
 
 .tg-keyfield { display: flex; flex-direction: column; gap: ${t.space.sm}px; }
-.tg-keyfield__label { color: var(--tg-ctl-ink); font-size: ${t.type.body.size}px; font-weight: ${t.fontWeight.semibold}; }
+.tg-keyfield__label { color: var(--tg-ctl-ink); ${typeCss('body')}; font-weight: ${t.fontWeight.semibold}; }
 .tg-keyfield__row { display: flex; align-items: center; gap: ${t.space.md}px; }
 .tg-keyfield__box { position: relative; flex: 1; min-width: 0; }
 /* The id selector outranks Settings' generic input rule whatever the sheet order. */
@@ -159,7 +159,7 @@ export const CONTROLS_CSS = `
   width: 100%; height: ${t.size.fieldHeight}px; padding: 0 64px 0 ${t.space.lg}px;
   border: 1px solid var(--tg-ctl-line); border-radius: ${t.radius.field}px;
   background: var(--tg-ctl-bg); color: var(--tg-ctl-ink);
-  font-family: ${t.font.ui}; font-size: ${t.type.bodyLead.size}px;
+  font-family: ${t.font.ui}; ${typeCss('bodyLead')};
 }
 .tg-keyfield #tg-api-key:focus-visible { outline: ${t.size.focusRing}px solid var(--tg-focus); outline-offset: ${t.size.focusOffset}px; }
 .tg-keyfield[data-state='valid'] #tg-api-key { border-color: ${t.color.okInk}; }
@@ -172,5 +172,5 @@ export const CONTROLS_CSS = `
 .tg-keyfield__status { min-height: 20px; }
 .tg-keyfield[data-state='invalid'] .tg-keyfield__status { color: ${t.color.errInk}; font-weight: ${t.fontWeight.semibold}; }
 .tg-keyfield[data-state='valid'] .tg-keyfield__status { color: ${t.color.okInk}; }
-.tg-spent { margin: 4px 0 0; color: var(--tg-ctl-muted); font-size: ${t.type.small.size}px; font-variant-numeric: tabular-nums; }
+.tg-spent { margin: 4px 0 0; color: var(--tg-ctl-muted); ${typeCss('small')}; font-variant-numeric: tabular-nums; }
 `;

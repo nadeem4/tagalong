@@ -13,7 +13,12 @@ describe('popup and mic page type', () => {
   it('popup and mic page use Onest', () => {
     expect(read('popup.css')).toContain("'Onest'");
     expect(read('..', 'permission', 'mic.html')).toContain("'Onest'");
-    for (const entry of [read('popup.ts'), read('..', 'permission', 'mic.ts')]) {
+    expect(read('..', 'permission', 'permission.html')).toContain("'Onest'");
+    for (const entry of [
+      read('popup.ts'),
+      read('..', 'permission', 'mic.ts'),
+      read('..', 'permission', 'permission.ts'),
+    ]) {
       expect(entry).toContain("import '@fontsource/onest/latin-400.css'");
       expect(entry).toContain("import '@fontsource/onest/latin-600.css'");
     }

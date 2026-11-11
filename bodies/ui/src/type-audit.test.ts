@@ -35,13 +35,10 @@ const sheets: Record<string, string> = {
   'status-mark.tsx': read(uiSrc, 'status-mark.tsx'),
   'desktop app.css': read(bodies, 'desktop', 'src', 'renderer', 'src', 'app.css'),
   'desktop home.css': read(bodies, 'desktop', 'src', 'renderer', 'src', 'home.css'),
+  'mic.html': read(bodies, 'browser', 'src', 'permission', 'mic.html'),
+  'permission.html': read(bodies, 'browser', 'src', 'permission', 'permission.html'),
   'popup.css': read(bodies, 'browser', 'src', 'popup', 'popup.css'),
 };
-
-const roleSizes = new Set<number>([
-  ...Object.values(themeTokens.type).map((r) => r.size),
-  themeTokens.dockTag,
-]);
 
 function offenders(test: (css: string) => string[]): string[] {
   return Object.entries(sheets).flatMap(([name, css]) => test(css).map((hit) => `${name}: ${hit}`));
@@ -52,27 +49,47 @@ describe('type audit', () => {
     expect(offenders((css) => css.match(/text-transform:\s*uppercase/g) ?? [])).toEqual([]);
   });
 
-  it('has no letter spacing', () => {
+  it('has no letter spacing but the display tracking', () => {
     const bad = (css: string): string[] =>
       (css.match(/letter-spacing:\s*[^;]+/g) ?? []).filter(
-        (m) => !/:\s*(0|normal)$/.test(m.trim()),
+        (m) => !/:\s*(0|normal|-0\.015em)$/.test(m.trim()),
       );
     expect(offenders(bad)).toEqual([]);
   });
 
-  it('sets every size on a role', () => {
+  it('sets every size on a role, with its role line height and weight', () => {
+    const lineOf = new Map<number, number>(
+      Object.values(themeTokens.type).map((r) => [r.size, r.line]),
+    );
+    lineOf.set(themeTokens.dockTag, 11);
+    // Weights a role may take; a block that sets none inherits.
+    const weights = new Map<number, number[]>([
+      [26, [600]],
+      [20, [600]],
+      [16, [600]],
+      [14, [400, 600]],
+      [13, [400]],
+      [12, [400, 600]],
+      [11, [600]],
+      [9, [600]],
+    ]);
     const bad = (css: string): string[] =>
-      [...css.matchAll(/font-?[sS]ize:\s*([\d.]+)(px)?/g)]
-        .filter((m) => !roleSizes.has(Number(m[1])))
-        .map((m) => m[0]);
-    expect(offenders(bad)).toEqual([]);
-  });
-
-  it('sets weights 400 or 600 only', () => {
-    const bad = (css: string): string[] =>
-      [...css.matchAll(/font-?[wW]eight:\s*(\d+)/g)]
-        .filter((m) => m[1] !== '400' && m[1] !== '600')
-        .map((m) => m[0]);
+      [...css.matchAll(/\{[^{}]*\}/g)].flatMap(([block]) => {
+        const size = /font-size:\s*([\d.]+)px/.exec(block);
+        if (size === null) return [];
+        const px = Number(size[1]);
+        if (!lineOf.has(px)) return [`size ${px}px is not a role`];
+        const line = /line-height:\s*([\d.]+)(px)?/.exec(block);
+        const out: string[] = [];
+        if (line === null || line[2] !== 'px' || Number(line[1]) !== lineOf.get(px)) {
+          out.push(`${px}px needs line-height ${lineOf.get(px)}px, got ${line?.[0] ?? 'none'}`);
+        }
+        const weight = /font-weight:\s*(\d+)/.exec(block);
+        if (weight !== null && !weights.get(px)?.includes(Number(weight[1]))) {
+          out.push(`${px}px cannot be weight ${weight[1]}`);
+        }
+        return out;
+      });
     expect(offenders(bad)).toEqual([]);
   });
 

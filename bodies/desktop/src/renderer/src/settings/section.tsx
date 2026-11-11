@@ -34,7 +34,7 @@ export const SettingsUiContext = createContext<SettingsUi>({
   invalid: null,
 });
 
-/** One panel with a short pixel heading, and an ⓘ beside it when it has a longer note. */
+/** One panel with a short heading, and an ⓘ beside it when it has a longer note. */
 export function Section({
   id,
   info,
