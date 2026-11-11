@@ -57,6 +57,12 @@ def _has_compaction(message: dict) -> bool:
 
 
 def rebuild_history(messages: list[dict]) -> list[dict]:
+    return rebuild_with_flag(messages)[0]
+
+
+def rebuild_with_flag(messages: list[dict]) -> tuple[list[dict], bool]:
+    """The rebuilt history, and whether it ends in a cancelled tool_result added here (so not
+    yet in the saved chat)."""
     start = 0
     marks = [i for i, m in enumerate(messages) if _has_compaction(m)]
     if marks:
@@ -80,10 +86,12 @@ def rebuild_history(messages: list[dict]) -> list[dict]:
             cut = max(i for i, m in enumerate(history) if _is_turn_start(m))
         history = history[cut:]
 
+    added = False
     last = history[-1] if history else None
     if last and last["role"] == "assistant" and isinstance(last["content"], list):
         calls = [b for b in last["content"] if b.get("type") == "tool_use"]
         if calls:
+            added = True
             history.append(
                 {
                     "role": "user",
@@ -98,4 +106,4 @@ def rebuild_history(messages: list[dict]) -> list[dict]:
                     ],
                 }
             )
-    return history
+    return history, added

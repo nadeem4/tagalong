@@ -56,7 +56,7 @@ from brain.mind.prompt import (
     system_prompt,
     user_content,
 )
-from brain.mind.resume import rebuild_history
+from brain.mind.resume import rebuild_with_flag
 from brain.mind.turn import Call, Model, run_turn
 from brain.models import DEFAULT_MODEL_ID
 from brain.offers import Offers, OfferSettings
@@ -301,12 +301,11 @@ class Session:
             make_run.bridge = ExpertApps(apps, lambda: self.toolbox, self.guards)
         self._now = now
         loaded = memory.load_messages()
-        self.history: list = rebuild_history(loaded)
+        self.history, added = rebuild_with_flag(loaded)
         self._saved = len(self.history)  # history[:_saved] is already in the database
-        if self.history and self.history[-1]["role"] != loaded[-1]["role"]:
-            # rebuild_history added a cancelled tool_result after a dangling tool_use; store it
-            # with the next save so the stored chat stays valid. By role, not identity: resume
-            # rebuilds a reply that only lost its thinking as a new object.
+        if added:
+            # resume added a cancelled tool_result after a dangling tool_use; store it with the
+            # next save so the stored chat stays valid.
             self._saved -= 1
         self._inbox: list = []
         # True when the last turn was cancelled before any word and its request is still last in

@@ -3211,3 +3211,25 @@ async def test_a_say_joining_a_whatsapp_turn_keeps_every_row_whatsapp():
     assert session.say("desktop", say("also")).joined is True
     await finish(session)
     assert _saved_bodies(session) == ["whatsapp"]
+
+
+async def test_silent_reply_after_a_tool_round_resumes_without_a_duplicate_tool_result(tmp_path):
+    memory = file_memory(tmp_path)
+    use = {"type": "tool_use", "id": "t1", "name": "recall", "input": {}}
+    result = {"type": "tool_result", "tool_use_id": "t1", "content": "found"}
+    memory.save_messages(
+        [
+            {"role": "user", "content": [{"type": "text", "text": "q"}]},
+            {"role": "assistant", "content": [use]},
+            {"role": "user", "content": [result]},
+            {"role": "assistant", "content": []},  # a silent reply after the tool round
+        ]
+    )
+    session, _ = make(Gate(["ok"]), memory)
+    session.say("desktop", say("next"))
+    await finish_quietly(session)
+    saved = memory.load_messages()
+    ids = [b["tool_use_id"] for m in saved for b in m["content"] if b.get("type") == "tool_result"]
+    assert ids == ["t1"]
+    resumed, _ = make(Gate(["ok"]), memory)
+    assert [m["role"] for m in resumed.history][-2:] == ["user", "assistant"]
