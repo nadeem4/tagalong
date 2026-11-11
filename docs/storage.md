@@ -618,15 +618,15 @@ An expert's question to Scout is a `question` row under its job: `active` while 
 
 Connected apps (MCP servers).
 
-| Column       | Type             | Meaning                                                                                    |
-| ------------ | ---------------- | ------------------------------------------------------------------------------------------ |
-| `id`         | TEXT PRIMARY KEY | App id                                                                                     |
-| `name`       | TEXT             | Display name                                                                               |
-| `transport`  | TEXT             | `stdio` or `http` (CHECK)                                                                  |
-| `config`     | TEXT             | Transport details as JSON; secrets are never in it                                         |
-| `auth`       | TEXT             | `none`, `token` or `oauth` (CHECK)                                                         |
-| `enabled`    | INTEGER          | 0 or 1; default 1                                                                          |
-| `reads_mail` | INTEGER          | 0 or 1; default 0. The "Read my mail for loops" switch for this app, kept across a restart |
+| Column       | Type             | Meaning                                                                                             |
+| ------------ | ---------------- | --------------------------------------------------------------------------------------------------- |
+| `id`         | TEXT PRIMARY KEY | App id                                                                                              |
+| `name`       | TEXT             | Display name                                                                                        |
+| `transport`  | TEXT             | `stdio` or `http` (CHECK)                                                                           |
+| `config`     | TEXT             | Transport details as JSON; secrets are never in it                                                  |
+| `auth`       | TEXT             | `none`, `token` or `oauth` (CHECK)                                                                  |
+| `enabled`    | INTEGER          | 0 or 1; default 1                                                                                   |
+| `reads_mail` | INTEGER          | 0 or 1; default 0. The "Read my mail for loops" switch for this app, kept across a restart          |
 | `trust`      | TEXT             | `official` or `community` (CHECK); default `community`. Kept from the install so Home still tags it |
 
 - Written by: `apps.py` `Apps` through `store/connections.py` `add_app`, `set_app_enabled`, `remove_app`.
