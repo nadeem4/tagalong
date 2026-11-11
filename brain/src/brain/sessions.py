@@ -56,7 +56,7 @@ from brain.mind.prompt import (
     system_prompt,
     user_content,
 )
-from brain.mind.resume import rebuild_with_flag
+from brain.mind.resume import rebuild_history
 from brain.mind.turn import Call, Model, run_turn
 from brain.models import DEFAULT_MODEL_ID
 from brain.offers import Offers, OfferSettings
@@ -301,7 +301,7 @@ class Session:
             make_run.bridge = ExpertApps(apps, lambda: self.toolbox, self.guards)
         self._now = now
         loaded = memory.load_messages()
-        self.history, added = rebuild_with_flag(loaded)
+        self.history, added = rebuild_history(loaded)
         self._saved = len(self.history)  # history[:_saved] is already in the database
         if added:
             # resume added a cancelled tool_result after a dangling tool_use; store it with the

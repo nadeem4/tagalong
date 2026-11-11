@@ -56,11 +56,7 @@ def _has_compaction(message: dict) -> bool:
     )
 
 
-def rebuild_history(messages: list[dict]) -> list[dict]:
-    return rebuild_with_flag(messages)[0]
-
-
-def rebuild_with_flag(messages: list[dict]) -> tuple[list[dict], bool]:
+def rebuild_history(messages: list[dict]) -> tuple[list[dict], bool]:
     """The rebuilt history, and whether it ends in a cancelled tool_result added here (so not
     yet in the saved chat)."""
     start = 0

@@ -2054,7 +2054,7 @@ Title (url); ...]`, from the `web_search` / `web_fetch` `server_tool_use` input 
 restarted Scout still knows it searched. The note is saved text, so it is masked too. A message
 with only server blocks and no search or fetch among them is saved with empty content. A server block is `server_tool_use` or any
 `*_tool_result` (web_search, web_fetch, code_execution, tool_search ...; `web_tools.is_server_block`),
-so new tool versions need no list edit. `rebuild_history` drops them too, which heals chats saved
+so new tool versions need no list edit. `rebuild_history` (returns the history and whether it added a cancelled `tool_result` that is not yet saved) drops them too, which heals chats saved
 before this rule (an orphaned result makes the API reject every request); an assistant message left
 empty (a silent reply) is dropped together with the turn-start message it answered, never given a
 stand-in text the model would copy; roles still alternate.

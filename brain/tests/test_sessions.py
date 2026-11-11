@@ -63,6 +63,10 @@ class Open:
 NO_WAIT = {"job_ended": EventKind("job_ended", batch_seconds=0, max_per_hour=10)}
 
 
+def rebuild(messages):
+    return rebuild_history(messages)[0]
+
+
 def make(model, memory=None, kinds=NO_WAIT, now=None, bodies=None, masker=None):
     sent = []
     bodies = bodies or Bodies()
@@ -570,7 +574,7 @@ async def test_cancelled_reply_stays_answered_after_restart(tmp_path):
     session.cancel(first.turn)
     await finish_quietly(session)
     assert [m["role"] for m in memory.load_messages()] == ["user", "assistant"]
-    assert rebuild_history(memory.load_messages())[-1]["content"][0]["text"] == "Once upon"
+    assert rebuild(memory.load_messages())[-1]["content"][0]["text"] == "Once upon"
     session.say("desktop", say("hi in 3 words"))
     await finish_quietly(session)
     assert [m["role"] for m in model.seen[1]] == ["user", "assistant", "user"]
@@ -1019,7 +1023,7 @@ async def test_cancelled_result_added_on_resume_is_stored(tmp_path):
     session, _ = make(Gate(["one"]), memory)
     session.say("desktop", say("b"))
     await finish_quietly(session)
-    rebuilt = rebuild_history(file_memory(tmp_path).load_messages())
+    rebuilt = rebuild(file_memory(tmp_path).load_messages())
     for i, m in enumerate(rebuilt):
         if m["role"] == "assistant" and isinstance(m["content"], list):
             ids = [b["id"] for b in m["content"] if b.get("type") == "tool_use"]
@@ -1128,7 +1132,7 @@ async def test_wake_held_while_busy_runs_after_the_turn_ends():
     assert states(sent) == ["started", "ended", "started", "ended"]
     assert "Event: job_ended" in model.seen[-1][-1]["content"][-1]["text"]
     assert records_for(memory).get_job("j1").parts[-1].reported
-    assert rebuild_history(memory.load_messages()) == session.history
+    assert rebuild(memory.load_messages()) == session.history
 
 
 async def test_wake_goes_to_the_body_the_user_last_talked_to():
