@@ -6,7 +6,11 @@
 
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { HostBridgeProvider, type BrainCard as BrainCardData, type BrainLink } from '../host-bridge';
+import {
+  HostBridgeProvider,
+  type BrainCard as BrainCardData,
+  type BrainLink,
+} from '../host-bridge';
 import { createFakeHostBridge } from '../test-support/fake-host-bridge';
 import { BrainCard } from './brain-card';
 
@@ -75,7 +79,10 @@ describe('BrainCard', () => {
   });
 
   it('counts hours and minutes of uptime', async () => {
-    renderCard({ ...RUNNING, startedAt: new Date(Date.now() - (3 * 60 + 12) * 60_000).toISOString() });
+    renderCard({
+      ...RUNNING,
+      startedAt: new Date(Date.now() - (3 * 60 + 12) * 60_000).toISOString(),
+    });
     expect(await region()).toHaveTextContent('Up 3 h 12 min');
   });
 

@@ -56,19 +56,19 @@ Request means a JSON-RPC request that gets a result or an error. Notification me
 
 ### Body → brain
 
-| Method     | Kind         | Params                                                                                        | Result                                              |
-| ---------- | ------------ | --------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Method     | Kind         | Params                                                                                        | Result                                                                |
+| ---------- | ------------ | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | `hello`    | request      | `{ protocol, body: Body, tools: Tool[], last_seq? }`                                          | `{ protocol, session, tools: Tool[], seq, resync, version?, build? }` |
-| `tools`    | request      | `{ tools: Tool[] }`                                                                           | `{}`                                                |
-| `say`      | request      | `{ text?, parts?: Part[], context?, spoken?, voice?, speed?, interrupted?: { turn, heard } }` | `{ turn, joined }`                                  |
-| `event`    | notification | `{ name, data? }`                                                                             |                                                     |
-| `call`     | request      | `{ tool, input }`                                                                             | `{ output: Part[] }`                                |
-| `answer`   | request      | `{ ask, option, text?, apps? }`                                                               | `{}`                                                |
-| `cancel`   | notification | `{ turn }`                                                                                    |                                                     |
-| `listen`   | request      | `{ mode: "held" \| "always" }`                                                                | `{}`                                                |
-| `mic`      | notification | `{ pcm }`                                                                                     |                                                     |
-| `unlisten` | notification | `{}`                                                                                          |                                                     |
-| `hush`     | notification | `{}`                                                                                          |                                                     |
+| `tools`    | request      | `{ tools: Tool[] }`                                                                           | `{}`                                                                  |
+| `say`      | request      | `{ text?, parts?: Part[], context?, spoken?, voice?, speed?, interrupted?: { turn, heard } }` | `{ turn, joined }`                                                    |
+| `event`    | notification | `{ name, data? }`                                                                             |                                                                       |
+| `call`     | request      | `{ tool, input }`                                                                             | `{ output: Part[] }`                                                  |
+| `answer`   | request      | `{ ask, option, text?, apps? }`                                                               | `{}`                                                                  |
+| `cancel`   | notification | `{ turn }`                                                                                    |                                                                       |
+| `listen`   | request      | `{ mode: "held" \| "always" }`                                                                | `{}`                                                                  |
+| `mic`      | notification | `{ pcm }`                                                                                     |                                                                       |
+| `unlisten` | notification | `{}`                                                                                          |                                                                       |
+| `hush`     | notification | `{}`                                                                                          |                                                                       |
 
 - **hello.** Opens the connection. `tools` are the body's tools. The result carries the brain's own tools (the ones a body may `call`; the Home tools, listed in the Home tools table of docs/brain.md), the shared `session` id, the latest `seq` in this body's outbox, and `resync` (see Replay). `version` and `build` are optional: the brain's own version and build id (the app version when packaged, a hash of its source in a dev checkout). The desktop compares them with its own to tell whether the brain is from an older version; a brain that omits them is treated as older. They add no version bump. A second `hello` on the same connection gets `invalid_request`.
 - **tools.** The body's tool list changed; it replaces the whole list.

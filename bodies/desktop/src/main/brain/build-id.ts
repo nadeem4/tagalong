@@ -39,8 +39,6 @@ export function ownBuild(opts: { packaged: boolean; appVersion: string; brainDir
   version: string;
   build: string;
 } {
-  const build = opts.packaged
-    ? opts.appVersion
-    : sourceHash(join(opts.brainDir, 'src', 'brain'));
+  const build = opts.packaged ? opts.appVersion : sourceHash(join(opts.brainDir, 'src', 'brain'));
   return { version: opts.appVersion, build };
 }

@@ -343,7 +343,7 @@ test('Home is one window: Scout, jobs, connections and settings', async () => {
   );
   const pets = await panel.evaluate(() => window.tagalong.listPets());
   expect(pets.map((pet) => pet.id)).toEqual(['scout']);
-  await expect(home.getByRole('region', { name: 'Scout' })).toContainText(
+  await expect(home.getByRole('region', { name: 'Scout', exact: true })).toContainText(
     'Never at its blind spots.',
   );
 

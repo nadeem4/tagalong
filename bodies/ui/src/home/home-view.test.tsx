@@ -165,7 +165,7 @@ describe('HomeView', () => {
     expect(screen.queryByRole('region', { name: 'Recent' })).toBeNull();
   });
 
-  it('shows where things run and Scout\'s brain on the overview', async () => {
+  it("shows where things run and Scout's brain on the overview", async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     await screen.findByRole('region', { name: 'Where things run' });
     const brain = await screen.findByRole('region', { name: "Scout's brain" });

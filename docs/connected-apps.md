@@ -212,7 +212,7 @@ flowchart LR
   `signInConnection`, then `sign_in_app`). While it is connecting the chip reads **Waiting for the
   browser** and the button is gone. A note says the brain and the browser must be on the same
   computer.
-- **Where things run**: Overview has a read-only card: for the brain and each app a letter tile,
+- **Where things run**: Overview has a read-only card (the brain has its own "Scout's brain" card above it, see [desktop.md](desktop.md)): for each app a letter tile,
   the name over its command line (`node files-server.js`) or web address, and a coloured status
   chip; Claude Code closes the list. A group above it, "How Scout reads your screen", has two rows
   (Reading window text, Text from pictures) with the same kind of chip; see [desktop.md](desktop.md). Secrets never show: the brain strips

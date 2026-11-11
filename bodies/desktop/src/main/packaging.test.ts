@@ -23,7 +23,7 @@ interface BuilderConfig {
   npmRebuild: boolean;
   extraResources: { from: string; to: string; filter?: string[] }[];
   win: { target: { target: string; arch: string[] }[] };
-  nsis: { oneClick: boolean; perMachine: boolean; runAfterFinish: boolean };
+  nsis: { oneClick: boolean; perMachine: boolean; runAfterFinish: boolean; include?: string };
   mac: { target: string[] };
   linux: { target: string[] };
 }
@@ -47,6 +47,16 @@ describe('electron-builder config', () => {
     expect(config.nsis.oneClick).toBe(false);
     expect(config.nsis.perMachine).toBe(false);
     expect(config.nsis.runAfterFinish).toBe(true);
+  });
+
+  it('installer includes the brain stop, so an update never meets a running brain', () => {
+    expect(config.nsis.include).toBe('build/installer.nsh');
+    const script = readFileSync(
+      fileURLToPath(new URL('../../build/installer.nsh', import.meta.url)),
+      'utf8',
+    );
+    expect(script).toContain('brain.pid');
+    expect(script).toContain('taskkill');
   });
 
   it('keeps the product name, so the installed app finds the same user data folder', () => {

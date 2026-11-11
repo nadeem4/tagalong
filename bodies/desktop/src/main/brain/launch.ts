@@ -147,7 +147,9 @@ export function stopBrain(
   options: Pick<LaunchOptions, 'env' | 'brainDir' | 'uv' | 'sync' | 'spawn'>,
 ): Promise<boolean> {
   const { env, brainDir, uv, sync, spawn } = options;
-  const args = sync ? ['run', '--frozen', '--no-dev', 'tagalong', 'stop'] : ['run', 'tagalong', 'stop'];
+  const args = sync
+    ? ['run', '--frozen', '--no-dev', 'tagalong', 'stop']
+    : ['run', 'tagalong', 'stop'];
   return new Promise((resolve) => {
     const child = spawn(uv, args, { cwd: brainDir, env, stdio: 'ignore', windowsHide: true });
     child.once('error', () => resolve(false));

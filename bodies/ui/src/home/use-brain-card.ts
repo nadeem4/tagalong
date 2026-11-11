@@ -12,7 +12,10 @@ export function useBrainCard(): { card: BrainCard | null; setup: BrainLink['setu
 
   const refresh = useCallback(() => {
     void bridge.brainCard().then(setCard, () => undefined);
-    void bridge.brainLink().then((link) => setSetup(link.setup), () => undefined);
+    void bridge.brainLink().then(
+      (link) => setSetup(link.setup),
+      () => undefined,
+    );
   }, [bridge]);
 
   useEffect(() => {

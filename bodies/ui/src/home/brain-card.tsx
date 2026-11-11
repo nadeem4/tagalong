@@ -111,8 +111,8 @@ export function BrainCard() {
     <section className="home-card brain-card" aria-label="Scout's brain">
       <h2 className="brain-card__title">Scout's brain</h2>
       <p>
-        The part of Scout that thinks, remembers and runs your jobs. It keeps running when you
-        close Tagalong.
+        The part of Scout that thinks, remembers and runs your jobs. It keeps running when you close
+        Tagalong.
       </p>
       {offline && setup === 'installing' && (
         <p>Setting up Scout's brain — one-time download. This can take a few minutes.</p>

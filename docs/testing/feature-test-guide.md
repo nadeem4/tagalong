@@ -2552,3 +2552,25 @@ Do not test these here.
   computer only.
 - **"Always allow" for connected apps.** Every change asks.
 - **macOS and Linux.** The app stops at launch on both; their installer configs are unverified.
+
+## Scout's brain (desktop, by hand for the installer)
+
+Home > Overview shows a "Scout's brain" card above "Where things run".
+
+1. Start Tagalong with the brain running. The card shows Running, "This PC" and the address, the
+   version, "Tagalong" under Started by, the process id, the data folder and log file with their
+   Open links, and the places connected.
+2. Click Copy details and paste: the text includes the build id.
+3. Stop the brain from a terminal (`uv run tagalong stop`). The card turns to "Can't reach Scout's
+   brain. Trying again every 2 s." with Start brain. Click it: the brain starts and the card
+   returns to Running.
+4. Start a brain yourself in a terminal from an older checkout, then open Tagalong: the card says
+   "You, from a terminal" with the note that Tagalong leaves it alone, and no restart button. The
+   update prompt says to restart it in the terminal. Nothing kills the brain.
+5. Let Tagalong start the brain, then change a `.py` file under `brain/src/brain` and restart only
+   the desktop: with no job running the brain restarts quietly once. With a job running, an
+   "Update ready" prompt offers "Restart now" and "When your job finishes".
+6. Installer (by hand, Windows): install an older build, start it so the brain runs, then run the
+   new installer. The brain process (the id in `brain.pid`) must be gone before files are
+   replaced, the install must finish without a "file in use" error, and the new app starts a new
+   brain. Do the same for uninstall.

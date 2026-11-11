@@ -40,12 +40,7 @@ import { createTurnEvents } from './brain/turn-events';
 import { startBrain } from './brain/start';
 import { homedir } from 'node:os';
 import { ownBuild } from './brain/build-id';
-import {
-  brainLogPath,
-  dataDir as brainDataDir,
-  realLaunch,
-  realStop,
-} from './brain/launch';
+import { brainLogPath, dataDir as brainDataDir, realLaunch, realStop } from './brain/launch';
 import type { RealLaunch } from './brain/launch';
 import { saveAvatarSpot } from './avatar-spot';
 import { offlineWatch } from './brain/offline-watch';
