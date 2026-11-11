@@ -102,8 +102,8 @@ rule is per body.
 - **One send queue.** Asks and replies go out through one queue, so an ask that
   arrives while a long reply is being sent waits until all its parts are out.
 - **Closed or unknown.** A tap on an ask the brain closed, or one the bridge never held, sends the
-  brain `window_closed {via: "tap"}`; an answer the brain refuses as not found sends
-  `window_closed {via: "answer"}`. The brain wakes Scout (urgency `next_pause`, see
+  brain `ask_closed {via: "tap"}`; an answer the brain refuses as not found sends
+  `ask_closed {via: "answer"}`. The brain wakes Scout (urgency `next_pause`, see
   [brain.md](brain.md#front-door-and-urgency)) and Scout says in its own words that the question is
   closed. If the brain is down the event is dropped and logged.
 - **Late taps.** An ask that is still open on the brain (for example one whose turn is long over) can

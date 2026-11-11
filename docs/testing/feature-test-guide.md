@@ -2595,13 +2595,17 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
    imports only `node:` modules.
 3. Asks and long replies, same command, on the fake brain: an open ask is sent as reply buttons (one
    to three short options) or numbered text; a tap or a typed `yes` answers the one open ask with the
-   `answer` call; two open asks make a typed text reply `More than one question is open: please tap a
-button`; a tap on a closed, unknown or refused ask replies `That question is closed.`; text with no
+   `answer` call; two open asks make a typed text send a `many_pending` event (the bridge writes no text); a tap on a closed, unknown or refused ask sends an `ask_closed` event; with the brain offline the event is dropped and logged and nothing is sent to the phone; text with no
    ask open is a normal `say`; after a resync the re-sent ask is shown once; a reply needing more than
    four messages ends with `(cut: ask me for the rest)`. A typed "yes" after a newer reply is a normal `say` (only a tap answers the older ask); an ask with empty text, text over 1024 characters or duplicate titles is sent as text; an ask that fails to send cannot be answered; an ask arriving mid-reply is sent after the reply's parts.
 4. By hand: start it with the five `TAGALONG_WHATSAPP_*` values set and its stdin closed
    (`node bodies/whatsapp/dist/index.js < /dev/null`): it prints that it is listening and exits at
    once. With a value missing it prints a message naming the variable and exits 1.
+5. By hand, with a real phone (needs F11, body-targeted wakes, for Scout's words to reach the phone):
+   tap a button on an ask that has already ended, then with two asks open type `yes`. Each time
+   nothing canned arrives; Scout writes a short line of its own saying the question is closed, or
+   asking you to tap the one you mean. A third such moment within the hour may be held by the cap and
+   spoken later.
 
 ## Home Places page and WhatsApp setup
 

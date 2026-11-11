@@ -153,7 +153,7 @@ export function createBridge(deps: BridgeDeps): {
     client.answerWith(a.ask, a.option, a.text).catch((err: unknown) => {
       if (err instanceof RpcError && err.code === ErrorCode.not_found) {
         desk.close(a.ask);
-        tell('window_closed', { via: 'answer' });
+        tell('ask_closed', { via: 'answer' });
       } else log('whatsapp: the brain is not reachable, answer not delivered');
     });
   };
@@ -163,7 +163,7 @@ export function createBridge(deps: BridgeDeps): {
     window.touch();
     if (m.kind === 'button') {
       const tapped = desk.fromButton(m.buttonId);
-      if ('closed' in tapped) tell('window_closed', { via: 'tap' });
+      if ('closed' in tapped) tell('ask_closed', { via: 'tap' });
       else answer(tapped);
       return;
     }

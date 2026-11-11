@@ -64,7 +64,7 @@ _KINDS = (
     EventKind("setup_done", urgency="next_pause", batch_seconds=None, max_per_hour=None),
     EventKind("setup_login", urgency="next_pause", batch_seconds=None, max_per_hour=None),
     # The WhatsApp body reports these moments as facts; Scout words any reply.
-    EventKind("window_closed", urgency="next_pause", batch_seconds=0, max_per_hour=6),
+    EventKind("ask_closed", urgency="next_pause", batch_seconds=0, max_per_hour=6),
     EventKind("many_pending", urgency="next_pause", batch_seconds=0, max_per_hour=6),
     EventKind("focus", urgency="idle", wakes=False),
     EventKind("tab", urgency="idle", wakes=False),
@@ -99,13 +99,13 @@ def from_body(body_id: str, name: str, data: object) -> Event | None:
             dl = DownloadData.model_validate(data)
             facts = {"body": body_id, "name": dl.name[:200], "state": dl.state}
             return Event("download", facts, key=body_id)
-        if name == "window_closed":
+        if name == "ask_closed":
             # The answer or tap met a question the brain no longer holds.
             if isinstance(data, dict) and data.get("via") in ("tap", "answer"):
                 return Event(
-                    "window_closed",
+                    "ask_closed",
                     {"body": body_id, "via": data["via"]},
-                    key=f"window_closed:{body_id}",
+                    key=f"ask_closed:{body_id}",
                 )
         if name == "many_pending":
             asks = data.get("asks") if isinstance(data, dict) else None

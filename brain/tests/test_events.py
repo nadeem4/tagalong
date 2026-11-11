@@ -227,19 +227,19 @@ def test_every_kind_has_an_urgency_set_by_code():
 
 
 def test_event_kinds_have_urgency():
-    for name in ("window_closed", "many_pending"):
+    for name in ("ask_closed", "many_pending"):
         kind = EVENT_KINDS[name]
         assert kind.urgency == "next_pause"
         assert kind.wakes and kind.batch_seconds == 0
         assert load_notes()[name].strip()
-    assert "urgency" not in load_notes()["window_closed"].lower()
+    assert "urgency" not in load_notes()["ask_closed"].lower()
 
 
-def test_from_body_whatsapp_window_closed():
-    event = from_body("wa", "window_closed", {"via": "tap"})
-    assert event == Event("window_closed", {"body": "wa", "via": "tap"}, key="window_closed:wa")
-    assert from_body("wa", "window_closed", {"via": "x"}) is None
-    assert from_body("wa", "window_closed", None) is None
+def test_from_body_whatsapp_ask_closed():
+    event = from_body("wa", "ask_closed", {"via": "tap"})
+    assert event == Event("ask_closed", {"body": "wa", "via": "tap"}, key="ask_closed:wa")
+    assert from_body("wa", "ask_closed", {"via": "x"}) is None
+    assert from_body("wa", "ask_closed", None) is None
 
 
 def test_from_body_whatsapp_many_pending():

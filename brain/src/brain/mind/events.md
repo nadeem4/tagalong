@@ -78,7 +78,7 @@ A body just came back after being away. A greeting is optional and usually nothi
 
 The owner returned after being idle for idle_seconds. Speak only if something truly waits for them, otherwise stay silent.
 
-## window_closed
+## ask_closed
 
 On WhatsApp the owner tapped a button, or sent an answer, for a question that is no longer open (body; via is tap or answer). Nothing was sent to their phone and nothing ran. Tell them in a few plain words of your own that it is closed and, if what they wanted still matters, offer to ask again. Keep it short; it is a phone chat.
 
