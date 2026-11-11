@@ -1,6 +1,6 @@
 /**
- * Design tokens shared by Home, Settings, the bubble and the dock: colours, fonts, sizes,
- * spacing and radii. Contains themeTokens.
+ * Design tokens shared by Home, Settings, the bubble and the dock: colours, fonts, the seven
+ * type roles, spacing and radii. Contains themeTokens and typeCss.
  */
 export const themeTokens = {
   color: {
@@ -51,8 +51,7 @@ export const themeTokens = {
   },
   font: {
     ui: "'Onest', system-ui, sans-serif",
-    pixel: "'Pixelify Sans', 'Onest', sans-serif",
-    /** The name "Scout": Onest, never the pixel font (its c reads as o). */
+    /** The name "Scout": Onest at 600, like every other heading. */
     wordmark: "'Onest', system-ui, sans-serif",
     mono: "ui-monospace, 'Cascadia Mono', Consolas, monospace",
   },
@@ -75,17 +74,19 @@ export const themeTokens = {
     brightCyan: '#A6E8EA',
     brightWhite: '#FFFFFF',
   },
-  fontSize: {
-    /** The smallest functional text. Nothing goes below it. */
-    min: 11,
-    small: 12,
-    body: 13,
-    field: 14,
-    groupHeading: 13,
-    panelHeading: 15,
-    title: 20,
+  /** The seven type roles (size and line in px). Onest at 400 or 600 only. */
+  type: {
+    display: { size: 26, line: 32, weight: 600 },
+    heading: { size: 20, line: 28, weight: 600 },
+    title: { size: 16, line: 22, weight: 600 },
+    bodyLead: { size: 14, line: 21, weight: 400 },
+    body: { size: 13, line: 20, weight: 400 },
+    small: { size: 12, line: 16, weight: 400 },
+    caption: { size: 11, line: 14, weight: 600 },
   },
-  fontWeight: { semibold: 600, bold: 700, wordmark: 600 },
+  /** The dock pet's tag: the one size outside the roles. */
+  dockTag: 9,
+  fontWeight: { regular: 400, semibold: 600, wordmark: 600 },
   space: { hair: 3, xxs: 2, xs: 4, sm: 6, md: 8, lg: 12, xl: 16, xxl: 20, xxxl: 24, page: 32 },
   radius: { field: 8, row: 10, tile: 10, chip: 10, small: 8 },
   size: {
@@ -100,5 +101,12 @@ export const themeTokens = {
     /** Height of buttons, selects and fields in the shared controls. */
     control: 36,
   },
-  letterSpacing: { pixel: 1, title: 0.5 },
 } as const;
+
+export type TypeRole = keyof typeof themeTokens.type;
+
+/** A role as the font-size, line-height and weight declarations of a style string. */
+export function typeCss(role: TypeRole): string {
+  const { size, line, weight } = themeTokens.type[role];
+  return `font-size:${size}px;line-height:${line}px;font-weight:${weight}`;
+}

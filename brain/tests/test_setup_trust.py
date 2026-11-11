@@ -71,6 +71,19 @@ def test_third_party_namespaces_for_another_service_are_community():
         assert not trust.is_official_app(lookalike), lookalike
 
 
+def test_popular_apps_are_official_and_ordered():
+    # Verified on the live registry (2026-11-10): the other well-known services have no Official
+    # one-click entry there, so only these are listed.
+    assert trust.POPULAR_APPS == ("com.notion/mcp",)
+    assert trust.MORE_APPS == ("app.linear/linear", "com.atlassian/atlassian-mcp-server")
+    assert all(trust.is_official_app(i) for i in trust.POPULAR_APPS + trust.MORE_APPS)
+
+
+def test_popular_experts_order_and_recommended():
+    assert trust.POPULAR_EXPERTS == ("claude-acp", "gemini", "codex-acp")
+    assert trust.RECOMMENDED_EXPERT == "claude-acp"
+
+
 def test_the_service_itself_is_official():
     assert trust.is_official_app("com.notion/mcp")
     assert trust.is_official_app("com.atlassian/atlassian-mcp-server")

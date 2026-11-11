@@ -472,6 +472,13 @@ describe('PermissionsPanel search', () => {
     expect(screen.getByText('Look back in memory')).toBeInTheDocument();
   });
 
+  it('the header still counts every tool of the group while a search narrows the list', async () => {
+    renderPanel(bridgeOf(MOVE, OPEN));
+    await header('This computer');
+    find('open a link');
+    expect(await header('This computer')).toHaveTextContent('2 · 1 Ask, 1 Auto');
+  });
+
   it('groups with a match open and others hide', async () => {
     renderPanel(bridgeOf(MOVE, READ));
     await header('Memory');

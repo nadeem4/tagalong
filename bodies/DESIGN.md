@@ -39,54 +39,45 @@ colors:
   ready-green: '#2F9E44'
   scrollbar-thumb: '#CDD2DE'
 typography:
-  page-title:
+  display:
+    fontFamily: "'Onest', system-ui, sans-serif"
+    fontSize: '26px'
+    lineHeight: '32px'
+    fontWeight: 600
+  heading:
     fontFamily: "'Onest', system-ui, sans-serif"
     fontSize: '20px'
-    fontWeight: 600
-  companion-name:
-    fontFamily: "'Pixelify Sans', 'Onest', sans-serif"
-    fontSize: '18px'
-    fontWeight: 700
-    letterSpacing: '0.5px'
-  panel-heading-pixel:
-    fontFamily: "'Pixelify Sans', 'Onest', sans-serif"
-    fontSize: '15px'
-    fontWeight: 600
-    letterSpacing: '1px'
-  card-label:
-    fontFamily: "'Pixelify Sans', 'Onest', sans-serif"
-    fontSize: '12px'
-    fontWeight: 400
-    letterSpacing: '1px'
-  subhead:
-    fontFamily: "'Onest', system-ui, sans-serif"
-    fontSize: '15px'
+    lineHeight: '28px'
     fontWeight: 600
   title:
     fontFamily: "'Onest', system-ui, sans-serif"
-    fontSize: '14px'
+    fontSize: '16px'
+    lineHeight: '22px'
     fontWeight: 600
   body-lead:
     fontFamily: "'Onest', system-ui, sans-serif"
     fontSize: '14px'
+    lineHeight: '21px'
     fontWeight: 400
-    lineHeight: 1.5
   body:
     fontFamily: "'Onest', system-ui, sans-serif"
     fontSize: '13px'
+    lineHeight: '20px'
     fontWeight: 400
-  label:
+  small:
     fontFamily: "'Onest', system-ui, sans-serif"
     fontSize: '12px'
+    lineHeight: '16px'
     fontWeight: 400
+  caption:
+    fontFamily: "'Onest', system-ui, sans-serif"
+    fontSize: '11px'
+    lineHeight: '14px'
+    fontWeight: 600
   dock-tag:
     fontFamily: "'Onest', system-ui, sans-serif"
     fontSize: '9px'
     lineHeight: '11px'
-    fontWeight: 600
-  label-min:
-    fontFamily: "'Onest', system-ui, sans-serif"
-    fontSize: '11px'
     fontWeight: 600
   mono:
     fontFamily: "ui-monospace, 'Cascadia Mono', Consolas, monospace"
@@ -291,7 +282,7 @@ Scout's state is always a pose plus a word: Bean's clip changes per mood (with a
 - One figure, Bean, everywhere (moving on the dock, still elsewhere); modern chrome around it.
 - Navy for Scout's surfaces, off-white for reading.
 - Gold for the primary action, an on state and Scout's active marks; sky blue for focus and fields inside the bubble.
-- Pixel type for names, titles and short uppercase labels; Onest for every sentence and control.
+- One typeface, Onest, in seven roles; rank comes from size and weight, never capitals.
 - Bean outside the dock is always a still frame: 56px in Home's nav.
 - Flat: tone and hairlines, no drop shadows.
 
@@ -301,7 +292,7 @@ A cool ink-navy family and a cool off-white family, one warm gold, and a few sig
 
 ### Primary
 
-- **Gold** (gold): the primary button fill (`Button` primary, `bubble-primary`), a switch that is on, a pressed day toggle, the pressed mic, the Working tag, the listening dot, the speaking bars, the hand-off working dot, text selection and the focus ring in Settings and Home. Ink on gold is always **Gold Ink** (gold-ink).
+- **Gold** (gold): the primary button fill (`Button` primary, `bubble-primary`), a switch that is on, a pressed day toggle, the pressed mic, the Working tag, the listening dot, the speaking bars, the hand-off working dot, text selection and the focus ring on navy surfaces only. Ink on gold is always **Gold Ink** (gold-ink).
 
 ### Secondary
 
@@ -336,34 +327,40 @@ A cool ink-navy family and a cool off-white family, one warm gold, and a few sig
 
 ## Typography
 
-**Display Font:** Pixelify Sans (with Onest, sans-serif)
-**Body Font:** Onest (with system-ui, sans-serif), set on `body` in the renderer sheet so no window falls back to the browser default
+**Font:** Onest (with system-ui, sans-serif), set on `body` in the renderer sheet so no window falls back to the browser default. One face for every window and the browser add-on's popup and mic page.
 **Mono:** ui-monospace, Cascadia Mono, Consolas (`font.mono`)
 
-Every window bundles its faces from `@fontsource` (Latin subset), nothing fetched: Home Onest 400/600 and Pixelify Sans 400/600/700; the bubble Onest 400/600 and Pixelify Sans 700; the dock Onest 600 for its tags.
+Every window bundles Onest 400 and 600 from `@fontsource` (Latin subset), nothing fetched; the browser add-on bundles the same two files into its popup and mic page. Weights are 400 and 600 only. Rank comes from size and weight; muted colour means "extra detail". No capitals, no letter spacing, no second typeface.
 
-**Character:** A chunky pixel face gives Scout a name and a voice; a clean geometric sans keeps every sentence and control modern.
+**Character:** One clean geometric sans. Scout's name and voice come from the words and Bean, not from a different face.
 
 ### Hierarchy
 
-- **Page title** (Onest 600, 20px): each Home page's heading.
-- **Wordmark** (Onest 600, 18px): "Scout" in Home's nav and the walkthrough side (the side panel is `on-navy`, so controls there take the gold focus ring); the chat header uses 16px. Never the pixel face (its c reads as o). Class `tg-wordmark`, tokens `font.wordmark` and `fontWeight.wordmark`.
-- **Panel heading, pixel** (Pixelify 600, 15px, 1px, uppercase): Settings section headings.
-- **Card label** (Pixelify 400, 12px, 1px, uppercase): Home card headings ("JOBS", "SPEND").
-- **Subhead** (Onest 600, 15px): Settings sub-headings, alert titles.
-- **Title** (Onest 600, 14px): buttons, nav items, headlines.
-- **Body lead** (Onest 400, 14px, 1.5): bubble text, answers, Home notes.
-- **Body** (Onest 400, 13px): card text, previews, the chat's messages, help text (1.55).
-- **Label** (Onest 400, 12px): meta lines, field labels, quiet bubble buttons, bubble chips.
-- **Label min** (Onest 600, 11px): chips, the dock's Paused chip, bubble hints.
-- **Dock tag** (Onest 600, 9px, 11px line): Seeing and Working on the dock, small so they sit beside Bean's floating sign rather than on it.
-- **Mono** (12px): an expert's live steps in the hand-off card; inline code in answers is 12.5px.
+Seven roles in `themeTokens.type` (size/line in px, weight); `typeCss(role)` writes one into a style string.
+
+| Role      | Size / line | Weight     | Used for                                                   |
+| --------- | ----------- | ---------- | ---------------------------------------------------------- |
+| display   | 26/32       | 600        | Walkthrough headlines, big figures (today's spend)         |
+| heading   | 20/28       | 600        | Each Home page's title                                     |
+| title     | 16/22       | 600        | Sub-headings, dialogs, the wordmark                        |
+| body-lead | 14/21       | 400 or 600 | Bubble text, answers, button and nav labels, card headings |
+| body      | 13/20       | 400        | Card text, previews, chat messages, help text              |
+| small     | 12/16       | 400 or 600 | Meta lines, field labels, quiet bubble buttons             |
+| caption   | 11/14       | 600        | Chips, status words, hints                                 |
+
+- **Wordmark** ("Scout" in Home's nav, the walkthrough side and the chat header): title role, Onest 600. Class `tg-wordmark`, tokens `font.wordmark` and `fontWeight.wordmark`.
+- **Dock tag** (Onest 600, 9px, 11px line, `themeTokens.dockTag`): Seeing and Working on the dock, small so they sit beside Bean's floating sign rather than on it. The one size outside the roles.
+- **Mono** (12px): an expert's live steps in the hand-off card; inline code in answers is 12px.
+- **Sentence case:** every label, card heading and button is sentence case ("Permissions", "Read my mail for loops"). Nothing is set in capitals.
+- **Tabular numerals:** money and counts (spend card, daily limit, tab counts, times) use `font-variant-numeric: tabular-nums` so digits line up.
 
 ### Named Rules
 
-**The Pixel Is A Name Rule.** Pixelify Sans sets names, titles and short uppercase headings only. Sentences, controls, fields, statuses and numbers are Onest.
+**The Seven Roles Rule.** Every font size is one of the seven roles, or the 9px dock tag. `bodies/ui/src/type-audit.test.ts` reads every style sheet and fails on any other size, any weight other than 400 or 600, any capitals, any letter spacing (except the display role's -0.015em), any line height off its role and any pixel font.
 
-**The 11px Floor Rule.** No functional text below 11px (`fontSize.min`). The one exception is the dock tags (9px, a user decision, 2026-10-17): at 11px they covered Bean's sign in the 96px window, and the accessible name says the state in full.
+**The 11px Floor Rule.** No functional text below 11px (`type.caption`). The one exception is the dock tags (9px, a user decision, 2026-10-17): at 11px they covered Bean's sign in the 96px window, and the accessible name says the state in full.
+
+**The Focus Ring Rule.** Keyboard focus is a 2px ring: navy (`focusOnLight`) on light surfaces, gold (`focusOnNavy`) on navy ones only. Both come from the `--tg-focus` variable that `.on-navy` flips; no sheet sets a fixed gold focus ring.
 
 ## Layout
 
@@ -380,7 +377,7 @@ gold edge, icon buttons for back and close). 24 px between turns, 12 px inside a
 messages sit on an avatar-tile bubble (12 px by 16 px inside), Scout's replies run full width, code
 blocks have a 1 px field-line edge and 12 px inside, list markers are muted. Scout's mark (Bean's
 still, 20 px, 48 px when the chat is empty) and name appear only on lines Scout starts. The footer
-field has at least 12 px inside and a 2 px gold focus ring. Anything bordered or filled that holds
+field has at least 12 px inside and a 2 px focus ring (navy on light, gold on navy). Anything bordered or filled that holds
 text keeps at least 8 px inside, 12 to 16 px for cards and tiles; only keycaps and small pills are
 tighter.
 
@@ -408,7 +405,7 @@ Ink Navy, 1px Field Line border, 12px radius, 14px by 16px padding, 12px gap, wi
 
 - **Ask:** chips for what Scout can see (Avatar Tile pills, Soft Text, each with a 24px round remove button), then the field: Field Navy, a 1px Sky border, 44px, 14px text, with a 12px Shell Muted label. Gold **primary** (36px, 8px radius, 600) and **quiet** buttons (28px, 6px radius, 1px Field Line border, Soft Text 12px). A 28px close button (Shell Muted, Avatar Tile on hover).
 - **Answer:** Markdown at 14px/1.5, up to 260px then scrolling; code on Avatar Tile, code blocks on Field Navy, tables with Field Line borders, links in Sky (shown as text with the address on hover). Errors are a Navy Error box.
-- **Full chat:** the bubble at full height with a Sidebar Navy header (Scout's name in Pixelify 16px), a scrolling log (your messages right-aligned on Avatar Tile) and a footer with the field, both behind Shell Line hairlines.
+- **Full chat:** the bubble at full height with a Sidebar Navy header (Scout's name in Onest 600, 16px), a scrolling log (your messages right-aligned on Avatar Tile) and a footer with the field, both behind Shell Line hairlines.
 - **Job line:** while an expert job runs, one 12px Soft Text line, `<expert>: <step title>`, truncated with an ellipsis, above the status row; no reserved space when absent, not announced to screen readers and never spoken.
 - **Status marks:** neutral words, never Scout speaking. On Scout, a 1-2 word pill at the bottom centre, just above the corner dots (Onest 600 11px, 2px 7px, full radius; Warn Fill on Warn Ink for problems, `#6B7290` on Text for the rest), its sentence as the tooltip. In the bubble, a 12px `role="status"` row above the question box (`#F2D48A` for problems, Muted Text otherwise) with a quiet **Fix it** when there is a fix. No animation.
 - **Dock listening dot (Always listening):** the 8px green dot at Scout's bottom right, solid while on, outlined while paused, a lighter green (`#B8F5B9`) quick pulse (0.6s, to 1.35x) while speech is heard, and a 2px green ring outside its white ring during the follow-up window. Its tooltip names the state. Reduced motion stops the pulse.
@@ -421,8 +418,8 @@ The connector confirm card shares the card CSS (`CARD_CSS`): a lead sentence, th
 ### Home
 
 - **Nav:** Sidebar Navy, 232px. Scout's 56px Avatar Tile tile (Bean, still, cropped to fill it) with the name and "Your companion" in Sky, then the six pages (Overview, Tasks, Connections, Approvals, What Scout remembers, Settings) as 40px buttons in Onest 14px Shell Muted; hover Frost Text; current (`aria-current="page"`) on Active Row Navy in 600.
-- **Cards:** white, 1px Panel Line, 12px radius, 16px by 20px padding, a pixel card label, 13px Panel Muted text and a quiet button. The Overview card leads with a status dot and a word ("Ready"; with the brain down the dot turns warn and the word reads "Brain: Offline", "Brain: Connecting" or "Brain: Needs update", the same words as Where things run).
-- **Page:** every tab sits in one `.home-page` box, 920px wide at most, centred, with one 32px inset (`space.page`), so the left edge never moves between tabs. Each page opens with a 22px title and one muted line (Overview: "Everything Scout is doing for you."). The nav carries `on-navy`, so shared controls take the gold focus ring there.
+- **Cards:** white, 1px Panel Line, 12px radius, 16px by 20px padding, a 14px Onest card label at 600, 13px Panel Muted text and a quiet button. The Overview card leads with a status dot and a word ("Ready"; with the brain down the dot turns warn and the word reads "Brain: Offline", "Brain: Connecting" or "Brain: Needs update", the same words as Where things run).
+- **Page:** every tab sits in one `.home-page` box, 920px wide at most, centred, with one 32px inset (`space.page`), so the left edge never moves between tabs. Each page opens with a 20px title and one muted line (Overview: "Everything Scout is doing for you."). The nav carries `on-navy`, so shared controls take the gold focus ring there.
 - **Jobs and Connections:** rows between Panel Line hairlines. A job row has the title (truncated, full text in `title`), a state chip and a no-wrap time on the left and its Watch, Stop or Show result button on the right. **Watch** opens the job page in place of the list (a quiet "Jobs" button above the title, named "Back to Jobs", goes back; focus moves to the title on Watch and returns to that Watch button): the title, the same state chip, the elapsed time and Stop, over a read-only log on Page Navy with a Line border and the 10px row radius, Mono 12px/1.55. `$ command` lines are 600 with a glyph (check in green, cross in red, a Gold spinner that stands still for reduced motion), output is Text Muted with the 16 ANSI colours tuned for the navy, edits are Sky, said lines start `# ` and are muted, the end line (`# done`, `# stopped`, `# error: ...`) is 600. A **Jump to latest** pill (Gold, 32px, pill) floats at the bottom when the person has scrolled up. A command with an exit code shows `exit N` after its text (400 weight, ANSI green for 0, red otherwise); with no code, only the glyph. Named Rule: a running command with no output says "output appears when the command finishes" rather than looking stuck. The Connections page has three groups below the app rows: Experts (a Panel Line row per installed expert with a state chip and one quiet Log in or Update button) and two Browse lists (apps, experts) of registry entries with a quiet Add button, which shows the stage and percent while it installs. A setup refusal or failure is one short line under the title, a muted note when nothing is wrong and an error line when it is. A connection row has an initial tile, the name, a status chip, the shared On/Off switch and its Sign in, Restart and Remove buttons.
 - **Approvals and Memory:** preferences and history are white cards; times never wrap; each memory row has a kind chip, the fact (wraps inside the row), the date and a quiet Delete button.
 
@@ -432,7 +429,7 @@ Home's Permissions card (`permissions-panel.tsx`, `permission-group.tsx`, `info-
 
 ### Walkthrough frame
 
-1040x680: a navy side panel (`on-navy`: Scout, the nine steps, the footnote; the key step reads "Required" until a key is set, then "Key set") beside the off-white page. Each step opens with a small uppercase eyebrow (the step name), a 26px Onest 600 headline and a lead; dense steps scroll inside the page with a thin scrollbar while the footer stays pinned. The footer is Back (outlined, left, hidden on step 1), a quiet Skip text link and the gold primary button ("Get started", "Next", "Finish") with an arrow. Steps 1 to 4 use white cards with a 1px line and 12 to 16px radius, a day strip with gold timeline dots, a CSS-arrow flow, keycaps for shortcuts and a static navy bubble preview. Steps 5 to 9 reuse the shared controls (selects, switch, slider, money stepper, key field) in a two-column form, a quiet "Spent today" line under the daily limit (muted small text, `tg-spent`), a navy hand-off or approval preview card (`wt-handoff`, an illustration, `aria-hidden`), a white card of four checked key notes, and a finish screen of keycap rows (Ask, Talk) beside three things to try, ending in Open Home and Done.
+1040x680: a navy side panel (`on-navy`: Scout, the nine steps, the footnote; the key step reads "Required" until a key is set, then "Key set") beside the off-white page. Each step opens with a small eyebrow (the step name, sentence case), a 26px Onest 600 headline and a lead; dense steps scroll inside the page with a thin scrollbar while the footer stays pinned. The footer is Back (outlined, left, hidden on step 1), a quiet Skip text link and the gold primary button ("Get started", "Next", "Finish") with an arrow. Steps 1 to 4 use white cards with a 1px line and 12 to 16px radius, a day strip with gold timeline dots, a CSS-arrow flow, keycaps for shortcuts and a static navy bubble preview. Steps 5 to 9 reuse the shared controls (selects, switch, slider, money stepper, key field) in a two-column form, a quiet "Spent today" line under the daily limit (muted small text, `tg-spent`), a navy hand-off or approval preview card (`wt-handoff`, an illustration, `aria-hidden`), a white card of four checked key notes, and a finish screen of keycap rows (Ask, Talk) beside three things to try, ending in Open Home and Done.
 
 ### Settings controls
 
@@ -451,7 +448,7 @@ Live in `bodies/ui/src/controls/` and are styled by `CONTROLS_CSS`, injected nex
 - **Keycap and Shortcut:** one `kbd` per key; an Electron accelerator is shown as Ctrl, Shift, Space, never `CommandOrControl`.
 - **Level meter** (`LevelMeter`, with `MicTest`): a read-only `role="meter"` bar, 10px high, 1px control line, filled in the control ink and Gold at the loud end (80% and up); shown only while the "Test your microphone" button is on, with a small muted line that nothing is recorded or sent and an Err Ink line when the microphone cannot open.
 - **Button** (`Button`): primary (Gold), secondary, quiet and danger; type=button by default.
-- **Limit field** (`LimitField`): "Daily limit" and what happens at it on the left; on the right a 36px amount box (`$`, the amount with two decimals, the steppers inside its border) with a secondary **Set** beside it, then a saved line (ok, fades after a few seconds) or a refusal (2px Err Ink border, `aria-invalid`) under it. Today's spend sits under that: "$1.20 of $5.00 used today" and a percentage over a 6px `role="meter"` bar (`.tg-meter2`, filled in the control ink; the warn bar colour `warnBar` once the limit is reached, with a warn message). No "no limit" option.
+- **Limit field** (`LimitField`): "Daily limit" and what happens at it on the left; on the right a 36px amount box (`$`, the amount with two decimals, the steppers inside its border) with a secondary **Set** beside it, then a saved line (check icon, ok colour, fades after a few seconds) or a refusal (error icon, 2px Err Ink border, `aria-invalid`) under it. Today's spend sits under that: "$1.20 of $5.00 used today" and a percentage over a 6px `role="meter"` bar (`.tg-spendmeter`, filled in the control ink; the warn bar colour `warnBar` once the limit is reached, with a warn message). No "no limit" option.
 - **Key field** (`KeyField`): label above; Show sits inside the input on the right, Check key (secondary) beside it, a polite status line under it. States: empty, checking, valid (ok border) and invalid (2px Err Ink border, `aria-invalid`).
 
 ## Motion
@@ -465,7 +462,7 @@ Under `prefers-reduced-motion: reduce`: Bean shows one still frame per mood (fra
 
 - **Reduced motion** is honoured everywhere above.
 - **Status is never colour alone:** dock tags are words, the Paused chip says Paused, chips carry words, the Overview dot sits beside "Ready".
-- **Focus rings:** 2px at 2px offset, Gold in Settings (`.tg-settings :focus-visible`), Home (`.home :focus-visible`), and Sky in the bubble.
+- **Focus rings:** 2px at 2px offset, from `--tg-focus`: navy on Home's and Settings' light pages, Gold under `.on-navy`, and Sky in the bubble.
 - **The figure:** `BeanClip` is `aria-hidden`; on the dock the wrapper is `role="img"` with Scout's name and state. The invitation is announced whole through a hidden status line while the visible text types; the bubble's status row is `role="status"`. The chat log is `role="log"`; errors are `role="alert"`; expert steps are `aria-live="polite"`.
 
 ## Do's and Don'ts
@@ -476,7 +473,7 @@ Under `prefers-reduced-motion: reduce`: Bean shows one still frame per mood (fra
 - **Do** draw Scout as Bean through `BeanClip`: moving on the dock, still (`still`, sized with `size`) everywhere else.
 - **Do** keep gold for the one primary action, an on or pressed control, and Scout's active marks.
 - **Do** pair every status with a word (and an icon where there is room).
-- **Do** keep pixel type to names, titles and short uppercase headings; set sentences and controls in Onest.
+- **Do** set every size on one of the seven type roles, in sentence case, with tabular numerals for money and counts.
 - **Do** stop every animation under `prefers-reduced-motion`.
 - **Do** build new bubble cards from `HANDOFF_CSS`: a lead sentence, labelled rows, one Gold primary and a quiet Cancel.
 
@@ -485,5 +482,5 @@ Under `prefers-reduced-motion: reduce`: Bean shows one still frame per mood (fra
 - **Don't** draw Scout any other way than Bean's strips.
 - **Don't** use gold for decoration or fills larger than a button.
 - **Don't** signal state by colour alone.
-- **Don't** set sentences, fields or errors in Pixelify Sans, or any text below 11px.
+- **Don't** use capitals, letter spacing, a second typeface or any text below 11px (the dock tag aside).
 - **Don't** add drop shadows; separate with tone and hairlines.

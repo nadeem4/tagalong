@@ -3,6 +3,8 @@
  * into storage (the worker restarts on the change), and lists what Scout may do with a Remove
  * button each. The logic worth testing lives in model.ts.
  */
+import '@fontsource/onest/latin-400.css';
+import '@fontsource/onest/latin-600.css';
 import type { WorkerStatus } from '../body';
 import { browserName, detectBrowser } from '../identity';
 import { chromeStorage as storage } from '../layer/chromium';

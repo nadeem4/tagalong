@@ -96,9 +96,9 @@ describe('TasksView', () => {
       loops: { apps: [{ id: 'gmail', name: 'Gmail', on: true }], loops: [loop('a')] },
     });
     open(bridge);
-    expect(screen.queryByText('READ MY MAIL FOR LOOPS')).toBeNull();
+    expect(screen.queryByText('Read my mail for loops')).toBeNull();
     fireEvent.click(await screen.findByRole('tab', { name: /^Held/ }));
-    expect(await screen.findByText('READ MY MAIL FOR LOOPS')).toBeVisible();
+    expect(await screen.findByText('Read my mail for loops')).toBeVisible();
     fireEvent.click(await screen.findByRole('button', { name: 'Forget Loop a' }));
     await waitFor(() => expect(bridge.loopCalls).toEqual(['forget a']));
   });

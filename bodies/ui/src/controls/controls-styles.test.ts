@@ -15,7 +15,7 @@ describe('CONTROLS_CSS', () => {
 
   it('sets no text below the 11px floor', () => {
     const sizes = [...CONTROLS_CSS.matchAll(/font-size:\s*(\d+)px/g)].map((m) => Number(m[1]));
-    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(t.fontSize.min);
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(t.type.caption.size);
   });
 
   it('takes every colour from the design tokens', () => {
@@ -71,7 +71,7 @@ describe('CONTROLS_CSS', () => {
   });
 
   it('draws the spend meter 6px slim and turns it amber when the limit is reached', () => {
-    expect(CONTROLS_CSS).toMatch(/\.tg-meter2\s*\{[^}]*height: 6px/);
-    expect(CONTROLS_CSS).toMatch(/\.tg-meter2--full[^{]*\{[^}]*background: /);
+    expect(CONTROLS_CSS).toMatch(/\.tg-spendmeter\s*\{[^}]*height: 6px/);
+    expect(CONTROLS_CSS).toMatch(/\.tg-spendmeter--full[^{]*\{[^}]*background: /);
   });
 });

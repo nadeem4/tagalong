@@ -320,7 +320,7 @@ describe('LimitField', () => {
     expect(meter).toHaveAttribute('aria-valuenow', '1.2');
     expect(meter).toHaveAttribute('aria-valuemin', '0');
     expect(meter).toHaveAttribute('aria-valuemax', '5');
-    expect(meter).not.toHaveClass('tg-meter2--full');
+    expect(meter).not.toHaveClass('tg-spendmeter--full');
   });
 
   it('shows no spend line until the spend is known', () => {
@@ -339,7 +339,7 @@ describe('LimitField', () => {
     );
     expect(screen.getByText('$5.30 of $5.00 used today')).toBeInTheDocument();
     expect(screen.getByText('100%')).toBeInTheDocument();
-    expect(screen.getByRole('meter')).toHaveClass('tg-meter2--full');
+    expect(screen.getByRole('meter')).toHaveClass('tg-spendmeter--full');
     expect(
       screen.getByText(
         'Today’s $5 is spent; Scout pauses until midnight. Raise the limit to carry on.',

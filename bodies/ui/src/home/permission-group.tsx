@@ -8,6 +8,7 @@ import { useId, useState } from 'react';
 import { Button } from '../controls/button';
 import { ThreeWay, type ThreeWayOption } from '../controls/three-way';
 import type { PermissionGroup as GroupInfo, PermissionRow } from '../host-bridge';
+import { Icon } from '../icons';
 import { InfoPopover } from './info-popover';
 
 export type Mode = PermissionRow['mode'];
@@ -140,44 +141,44 @@ function PermissionRowItem({ row, onSet }: RowProps) {
 interface GroupProps {
   group: GroupInfo;
   rows: PermissionRow[];
+  /** Every tool of the group: the header counts these even while a search narrows `rows`. */
+  all: PermissionRow[];
   open: boolean;
   onToggle: () => void;
   onSet: (name: string, mode: Mode) => void;
 }
 
-/** `rows` are the ones to list; the header always summarises them all unless the panel narrowed
- * them to a search, in which case the summary says what is shown. */
-export function PermissionGroup({ group, rows, open, onToggle, onSet }: GroupProps) {
+export function PermissionGroup({ group, rows, all, open, onToggle, onSet }: GroupProps) {
   const bodyId = useId();
-  const risky = rows.filter((row) => isRisky(row) && shownMode(row) === 'auto').length;
+  const risky = all.filter((row) => isRisky(row) && shownMode(row) === 'auto').length;
   const inHeader = noteInHeader(group);
   return (
-    <div className="perm-group2">
+    <div className="perm-grp">
       <button
         type="button"
-        className="perm-group2__head"
+        className="perm-grp__head"
         aria-expanded={open}
         aria-controls={bodyId}
         onClick={onToggle}
       >
-        <span className="perm-group2__chev" aria-hidden="true">
-          {open ? '▾' : '▸'}
+        <span className="perm-grp__chev" aria-hidden="true">
+          <Icon name={open ? 'chev-d' : 'chev-r'} />
         </span>
-        <span className="perm-group2__name">{group.title}</span>
+        <span className="perm-grp__name">{group.title}</span>
         {inHeader && <span className="perm-chip perm-chip--quiet">{group.note}</span>}
+        <span className="perm-grp__sum">
+          {all.length} · {summarize(all)}
+        </span>
         {risky > 0 && (
           <span className="perm-chip perm-chip--warn">
             {risky} risky {risky === 1 ? 'tool' : 'tools'} on Auto
           </span>
         )}
-        <span className="perm-group2__sum">
-          {rows.length} · {summarize(rows)}
-        </span>
       </button>
       <div id={bodyId} hidden={!open}>
         {open && (
           <>
-            {!inHeader && <p className="perm-group2__note">{group.note}</p>}
+            {!inHeader && <p className="perm-grp__note">{group.note}</p>}
             <ul className="perm-list">
               {rows.map((row) => (
                 <PermissionRowItem key={row.name} row={row} onSet={onSet} />

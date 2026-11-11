@@ -57,7 +57,7 @@ test('the mail switch, the Held list, forget and Stop and wipe', async () => {
   await home.getByRole('button', { name: 'Tasks', exact: true }).click();
   await home.getByRole('tab', { name: /^Held/ }).click();
 
-  const card = home.getByRole('region', { name: 'READ MY MAIL FOR LOOPS' });
+  const card = home.getByRole('region', { name: 'Read my mail for loops' });
   const toggle = card.getByRole('switch', { name: 'Read my mail for loops (Gmail)' });
   await expect(toggle).toHaveAttribute('aria-checked', 'false', { timeout: 30_000 });
   await expect(card).toContainText('Nothing is held.');

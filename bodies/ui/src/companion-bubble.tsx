@@ -31,7 +31,7 @@ import { wantsHealthCheck } from './health-ask';
 import { healthHeadline, healthRows } from './health';
 import type { HealthRow } from './health';
 import { HealthCard } from './health-card';
-import { themeTokens as t } from './theme/tokens';
+import { themeTokens as t, typeCss } from './theme/tokens';
 import { stopStatus } from './stop-status';
 
 /**
@@ -994,7 +994,7 @@ const BUBBLE_CSS = `
 .bubble-top { display: flex; align-items: flex-start; justify-content: flex-end; gap: 8px; }
 .bubble-close {
   flex: none; width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent;
-  color: ${t.color.textMuted}; font-size: 18px; line-height: 1; cursor: pointer;
+  color: ${t.color.textMuted}; ${typeCss('title')}; cursor: pointer;
 }
 .bubble-close:hover { background: #222845; color: ${t.color.text}; }
 .bubble-speaking {
@@ -1014,7 +1014,7 @@ const BUBBLE_CSS = `
 .bubble-toggle {
   flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px;
   border: 1px solid ${t.color.fieldLine}; border-radius: 999px; background: transparent;
-  color: ${t.color.textMuted}; font: inherit; font-size: 12px; cursor: pointer;
+  color: ${t.color.textMuted}; font: inherit; ${typeCss('small')}; cursor: pointer;
 }
 .bubble-toggle::before {
   content: ''; width: 6px; height: 6px; border-radius: 50%; background: ${t.color.fieldLine};
@@ -1023,12 +1023,12 @@ const BUBBLE_CSS = `
 .bubble-toggle:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 2px; }
 .bubble-heard {
   align-self: flex-end; max-width: 85%; margin: 0; padding: 6px 10px; border-radius: 10px 10px 4px 10px;
-  background: #222845; color: #C9CEE0; font-size: 13px; line-height: 1.45;
+  background: #222845; color: #C9CEE0; ${typeCss('body')};
 }
 .bubble-listening {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; font-size: 12px; color: #C9CEE0;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; ${typeCss('small')}; color: #C9CEE0;
 }
-.bubble-partial { flex-basis: 100%; font-size: 13px; line-height: 1.45; color: ${t.color.text}; }
+.bubble-partial { flex-basis: 100%; ${typeCss('body')}; color: ${t.color.text}; }
 .bubble-listening-dot {
   flex: none; width: 8px; height: 8px; border-radius: 50%; background: ${t.color.gold};
   animation: bubble-pulse 1.2s ease-in-out infinite;
@@ -1046,31 +1046,31 @@ const BUBBLE_CSS = `
   .bubble-speaking span, .bubble-speaking span:nth-child(2),
   .bubble-bars span, .bubble-bars span:nth-child(2) { transform: scaleY(0.6); transition: none; }
 }
-.bubble-text { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
-.bubble-status { margin: 0; color: #C9CEE0; font-size: 12px; }
+.bubble-text { margin: 0; ${typeCss('bodyLead')}; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bubble-status { margin: 0; color: #C9CEE0; ${typeCss('small')}; }
 .bubble-jobline {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .bubble-answer { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
-.bubble-error { margin: 0; padding: 8px 12px; border-radius: 6px; background: #3a1d2a; color: #ffb4c0; font-size: 13px; }
+.bubble-error { margin: 0; padding: 8px 12px; border-radius: 6px; background: #3a1d2a; color: #ffb4c0; ${typeCss('body')}; }
 .bubble-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .bubble-chip {
   display: inline-flex; align-items: center; gap: 4px; max-width: 100%; min-height: 28px;
-  padding: 0 4px 0 10px; border-radius: 999px; background: #222845; color: #C9CEE0; font-size: 12px;
+  padding: 0 4px 0 10px; border-radius: 999px; background: #222845; color: #C9CEE0; ${typeCss('small')};
 }
 .bubble-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bubble-chip button {
   width: 24px; height: 24px; border: 0; border-radius: 50%; background: transparent;
   color: ${t.color.textMuted}; cursor: pointer;
 }
-.bubble-field { flex: none; position: relative; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: ${t.color.textMuted}; }
+.bubble-field { flex: none; position: relative; display: flex; flex-direction: column; gap: 6px; ${typeCss('small')}; color: ${t.color.textMuted}; }
 .bubble-field input {
   flex: none; height: 44px; box-sizing: border-box; padding: 0 44px 0 12px; border: 1px solid #7CB8F2;
-  border-radius: 8px; background: ${t.color.field}; color: ${t.color.text}; font: inherit; font-size: 14px;
+  border-radius: 8px; background: ${t.color.field}; color: ${t.color.text}; font: inherit; ${typeCss('bodyLead')};
 }
 .bubble-field .bubble-mic { position: absolute; right: 6px; bottom: 8px; }
 .bubble-row { display: flex; align-items: center; gap: 12px; }
-.bubble-hints { font-size: 11px; color: ${t.color.textMuted}; }
+.bubble-hints { ${typeCss('caption')}; color: ${t.color.textMuted}; }
 .bubble-hints .bubble-quiet { margin-left: auto; }
 .bubble-primary {
   height: 36px; padding: 0 16px; border: 0; border-radius: 8px; background: ${t.color.gold};
@@ -1078,7 +1078,7 @@ const BUBBLE_CSS = `
 }
 .bubble-quiet {
   align-self: flex-start; min-height: 28px; padding: 0 10px; border: 1px solid ${t.color.fieldLine};
-  border-radius: 6px; background: transparent; color: #C9CEE0; font: inherit; font-size: 12px; cursor: pointer;
+  border-radius: 6px; background: transparent; color: #C9CEE0; font: inherit; ${typeCss('small')}; cursor: pointer;
 }
 .bubble-primary:focus-visible, .bubble-quiet:focus-visible, .bubble-close:focus-visible, .bubble-say:focus-visible {
   outline: 2px solid var(--tg-focus); outline-offset: 2px;

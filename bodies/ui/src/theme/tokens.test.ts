@@ -1,7 +1,7 @@
 /** Tests for the design tokens: text and status colours meet 4.5:1 contrast. */
 
 import { describe, expect, it } from 'vitest';
-import { themeTokens } from './tokens';
+import { themeTokens, typeCss } from './tokens';
 
 /** WCAG relative luminance of a `#rrggbb` colour. */
 function luminance(hex: string): number {
@@ -41,6 +41,33 @@ describe('design tokens', () => {
     expect(themeTokens.font.wordmark).toContain('Onest');
     expect(themeTokens.font.wordmark).not.toContain('Pixelify');
     expect(themeTokens.fontWeight.wordmark).toBe(600);
+  });
+
+  it('has seven roles with the agreed sizes', () => {
+    const rows = Object.entries(themeTokens.type).map(([k, v]) => [k, v.size, v.line]);
+    expect(rows).toEqual([
+      ['display', 26, 32],
+      ['heading', 20, 28],
+      ['title', 16, 22],
+      ['bodyLead', 14, 21],
+      ['body', 13, 20],
+      ['small', 12, 16],
+      ['caption', 11, 14],
+    ]);
+    expect(themeTokens.dockTag).toBe(9);
+    expect(typeCss('body')).toBe('font-size:13px;line-height:20px;font-weight:400');
+    expect(typeCss('title')).toBe('font-size:16px;line-height:22px;font-weight:600');
+  });
+
+  it('uses weights 400 or 600 only', () => {
+    for (const role of Object.values(themeTokens.type)) expect([400, 600]).toContain(role.weight);
+    expect(themeTokens.fontWeight).toEqual({ regular: 400, semibold: 600, wordmark: 600 });
+  });
+
+  it('has no pixel font and no letter spacing', () => {
+    expect('pixel' in themeTokens.font).toBe(false);
+    expect('letterSpacing' in themeTokens).toBe(false);
+    expect('fontSize' in themeTokens).toBe(false);
   });
 
   it('rings focus navy on light and gold on navy, each readable on its surface', () => {

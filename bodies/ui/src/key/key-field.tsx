@@ -9,6 +9,7 @@ import type { KeyResult } from '../host-bridge';
 import { Button } from '../controls/button';
 import { MoneyField } from '../controls/money-field';
 import { failure } from '../failure';
+import { Icon } from '../icons';
 import { cap, dollars } from '../home/spend-format';
 import { useKeyStatus } from './use-key-status';
 import type { KeyHost } from './use-key-status';
@@ -229,7 +230,8 @@ export function LimitField({
             className={message.error ? 'tg-error' : 'tg-saved'}
             role={message.error ? 'alert' : 'status'}
           >
-            {message.text}
+            <Icon name={message.error ? 'err' : 'check'} />
+            <span>{message.text}</span>
           </p>
         )}
         {spent && (
@@ -241,7 +243,7 @@ export function LimitField({
               <span>{percent}%</span>
             </div>
             <div
-              className={full ? 'tg-meter2 tg-meter2--full' : 'tg-meter2'}
+              className={full ? 'tg-spendmeter tg-spendmeter--full' : 'tg-spendmeter'}
               role="meter"
               aria-label="Spent today"
               aria-valuenow={spentUsd}

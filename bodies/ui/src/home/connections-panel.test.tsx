@@ -104,7 +104,7 @@ describe('ConnectionsPanel', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Apps' })).toHaveAttribute('aria-selected', 'true');
     const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
-    expect(headings).toEqual(['CONNECTED', 'ADD AN APP']);
+    expect(headings).toEqual(['Connected', 'Add an app']);
   });
 
   it('Add one by hand opens the form, and the old summary is gone', async () => {
@@ -381,7 +381,7 @@ describe('ConnectionsPanel groups', () => {
     expect(
       within(screen.getByRole('region', { name: 'Beta' })).getByText('Long, many-step jobs'),
     ).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'FOR LONG JOBS' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'For long jobs' })).toBeVisible();
   });
 
   it('each expert row shows its state and the action that fits it', async () => {

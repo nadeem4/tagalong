@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useHostBridge } from '../host-bridge';
 import type { PermissionGroup as GroupInfo, PermissionRow } from '../host-bridge';
+import { Icon } from '../icons';
 import { PermissionGroup, type Mode } from './permission-group';
 
 const matches = (row: PermissionRow, term: string): boolean =>
@@ -63,7 +64,11 @@ export function PermissionsPanel() {
       : list.groups
           .map((group) => {
             const own = list.rows.filter((row) => row.group === group.id);
-            return { group, rows: searching ? own.filter((row) => matches(row, needle)) : own };
+            return {
+              group,
+              all: own,
+              rows: searching ? own.filter((row) => matches(row, needle)) : own,
+            };
           })
           .filter((entry) => entry.rows.length > 0);
 
@@ -79,26 +84,31 @@ export function PermissionsPanel() {
       )}
       {list !== null && list.rows.length === 0 && <p>Scout has no tools yet.</p>}
       {list !== null && list.rows.length > 0 && (
-        <input
-          type="search"
-          className="perm-search"
-          aria-label="Find a permission"
-          placeholder="Find a permission"
-          value={term}
-          onChange={(event) => setTerm(event.target.value)}
-        />
+        <label className="perm-search">
+          <Icon name="search" />
+          <input
+            type="search"
+            aria-label="Find a permission"
+            placeholder="Find a permission"
+            value={term}
+            onChange={(event) => setTerm(event.target.value)}
+          />
+        </label>
       )}
       {searching && shown.length === 0 && <p>{`No permission matches "${term.trim()}".`}</p>}
-      {shown.map(({ group, rows }) => (
-        <PermissionGroup
-          key={group.id}
-          group={group}
-          rows={rows}
-          open={searching || openIds.has(group.id)}
-          onToggle={() => toggle(group.id)}
-          onSet={apply}
-        />
-      ))}
+      <div className="perm-grps">
+        {shown.map(({ group, rows, all }) => (
+          <PermissionGroup
+            key={group.id}
+            group={group}
+            rows={rows}
+            all={all}
+            open={searching || openIds.has(group.id)}
+            onToggle={() => toggle(group.id)}
+            onSet={apply}
+          />
+        ))}
+      </div>
     </section>
   );
 }
