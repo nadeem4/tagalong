@@ -41,6 +41,7 @@ function setup(over: Partial<LaunchOptions> = {}) {
     log: { warn: (line) => err.push(line) },
     uv: 'uv',
     sync: false,
+    platform: 'linux',
     onSetup: (state) => void setups.push(state),
     ...over,
   };
@@ -119,6 +120,16 @@ describe('launchBrain', () => {
     expect(children[0]?.unrefed).toBe(true);
     expect(closed).toEqual([77]);
     expect(result).toBeUndefined();
+  });
+
+  it('on Windows starts the brain hidden, not detached, so no console window opens', async () => {
+    // Detached on Windows means no console; uv's console child then gets a new, visible one.
+    // Hidden (not detached), the brain shares uv's hidden console and still outlives the app.
+    const { options, spawned, children } = setup({ platform: 'win32' });
+    await launchBrain(options);
+    expect(spawned[0]?.opts.detached).toBe(false);
+    expect(spawned[0]?.opts.windowsHide).toBe(true);
+    expect(children[0]?.unrefed).toBe(true);
   });
 
   it('leaves a running brain alone and opens no log', async () => {
