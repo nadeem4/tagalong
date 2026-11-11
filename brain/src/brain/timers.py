@@ -145,6 +145,7 @@ class Timers:
                 event,
                 on_start=lambda: self._fired(row.id),
                 on_end=lambda reason: self._told(row.id) if reason == "done" else None,
+                retell=True,  # a cancelled wake did not tell it: once more
             )
 
     def _fired(self, id: str) -> None:

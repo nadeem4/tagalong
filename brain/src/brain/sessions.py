@@ -217,14 +217,15 @@ class Session:
         self._kinds = {**EVENT_KINDS, **(kinds or {})}
         self.dispatcher = Dispatcher(self._deliver, items, kinds=self._kinds, batch_s=0)
         self._says_waiting: set[str] = set()  # says posted, not yet delivered: wakes wait for them
-        # The newest waiting say that starts a turn (its id, its body): a say made now joins it.
-        self._say_turn: tuple[str, str | None] | None = None
         # Says from another body that arrived mid-turn: each starts a turn when that one ends.
         self._later: list[tuple[str | None, str, list, SayParams]] = []
         # The owner's words that joined the running turn: it takes them in at its next step.
         self._inbox: list = []
         self._joined: tuple[str | None, SayParams] | None = None
-        self._says_cancelled: set[str] = set()  # of those, the ones a body cancelled already
+        # False once the running turn has done its last read of what was said: later words start
+        # a turn of their own, because this one would end without answering them.
+        self._inbox_open = True
+        self._starting: str | None = None  # a say's turn id between its reply and its start
         items.expire_live_only()  # what a last run left tied to a process can no longer run
         # Scout's offer to approve a repeated kind of ask; one service for tools and experts.
         offer = self._offers = Offers(
@@ -400,7 +401,7 @@ class Session:
         for w in paused[: len(told)]:  # the rest are told at the next start
             work.mark_reported(w.id)
 
-    def say(self, body_id: str, params: SayParams) -> SayResult:
+    async def say(self, body_id: str, params: SayParams) -> SayResult:
         check_part_sizes(params.parts or [])  # over_limit, before anything changes
         content = user_content(params)  # may raise ValueError before anything changes
         sender = self._bodies.body(body_id)
@@ -418,19 +419,14 @@ class Session:
                 return SayResult(turn=turn, joined=False)
         if not self._ready():
             return SayResult(turn=self._end_unanswered(shown_on), joined=False)
-        # Through the front door like every source. A say made while a turn runs (or while an
-        # earlier say waits to start one) joins that turn when it is shown on the same body; a
-        # say for another body gets its own turn after, so each reply goes where it was asked.
-        running = (self._turn_id, self._turn_body) if self._busy() else self._say_turn
-        join = running is not None and running[1] == shown_on
-        turn = running[0] if join and running else uuid.uuid4().hex
-        token = uuid.uuid4().hex if join else turn  # a cancel of the turn id finds its say
+        # Through the front door like every source. Whether it joins the running turn or starts
+        # one is decided when the door delivers it, so the answer is never stale.
+        result: asyncio.Future[SayResult] = asyncio.get_running_loop().create_future()
+        token = uuid.uuid4().hex
         self._says_waiting.add(token)
-        if running is None:
-            self._say_turn = (turn, shown_on)
-        payload = {"turn": turn, "token": token, "join": join, "content": content, "params": params}
+        payload = {"token": token, "result": result, "content": content, "params": params}
         self.dispatcher.post(Item("say", shown_on or BRAIN, payload, "now"))
-        return SayResult(turn=turn, joined=join)
+        return await result
 
     def post_event(
         self,
@@ -439,15 +435,16 @@ class Session:
         on_start: Callable[[], None] | None = None,
         on_drop: Callable[[], None] | None = None,
         on_end: Callable[[str], None] | None = None,
+        retell: bool = False,
     ) -> None:
         """Every wake source posts here: the dispatcher decides when, the scheduler batches and
         caps it, and the wake turn is shown on the event's origin body when it can."""
         ended = on_end
-        if on_end is not None:
+        if on_end is not None and retell:
 
             def ended(reason: str) -> None:
                 on_end(reason)
-                if reason != "done":  # the turn that carried the news did not finish: tell again
+                if reason == "cancelled":  # news a cancelled turn did not tell: once more, no more
                     self.post_event(event, on_start=on_start, on_drop=on_drop, on_end=on_end)
 
         item = Item(
@@ -482,29 +479,45 @@ class Session:
                 )
 
     async def _deliver_say(self, item: Item) -> None:
-        """Never waits on a turn: words arriving mid-turn join it at its next step, and with no
-        turn running they start one. A turn that has just finished is let to clear first."""
+        """Never waits on a turn: words arriving mid-turn join it at its next step (same body, and
+        the turn still reading), another body's wait for their own turn, and with no turn running
+        they start one. The say's caller is answered here, with the turn that really has them."""
         shown = None if item.origin_body == BRAIN else item.origin_body
-        turn, token = item.payload["turn"], item.payload["token"]
+        content, params = item.payload["content"], item.payload["params"]
+        result: asyncio.Future[SayResult] = item.payload["result"]
         try:
             while self._task is not None and self._task.done():
                 await asyncio.sleep(0)  # its done callback runs next and clears the turn
-            if token in self._says_cancelled:  # cancelled before it started: run nothing
-                self._says_cancelled.discard(token)
-                self._end_cancelled(turn, shown)
-            elif self._busy() and item.payload["join"] and self._turn_body == shown:
-                self._inbox.append(item.payload["content"])
-                self._joined = (shown, item.payload["params"])  # the newest, if its turn is cut
-                self._speak(self._turn_id, self._turn_body, item.payload["params"])
+            if self._busy() and self._inbox_open and self._turn_body == shown:
+                self._inbox.append(content)
+                self._joined = (shown, params)  # the newest, if its turn is cut
+                self._speak(self._turn_id, self._turn_body, params)
+                result.set_result(SayResult(turn=self._turn_id or "", joined=True))
             elif self._busy():
-                self._later.append((shown, turn, item.payload["content"], item.payload["params"]))
+                turn = uuid.uuid4().hex
+                self._later.append((shown, turn, content, params))
+                result.set_result(SayResult(turn=turn, joined=False))
             else:
-                self._start_turn(shown, item.payload["content"], turn_id=turn)
-                self._speak(turn, shown, item.payload["params"])
+                turn = uuid.uuid4().hex
+                # The caller learns the turn id before its `started` goes out.
+                result.set_result(SayResult(turn=turn, joined=False))
+                self._starting = turn
+                await asyncio.sleep(0)
+                cut = self._starting != turn  # cancelled in the moment before its turn began
+                self._starting = None
+                if cut:
+                    self._end_cancelled(turn, shown)
+                else:
+                    self._start_turn(shown, content, turn_id=turn)
+                    self._speak(turn, shown, params)
+        except BaseException as err:
+            if not result.done():
+                result.set_exception(err)
+            if not isinstance(err, Exception):
+                raise
+            log.exception("could not deliver a say")
         finally:
-            self._says_waiting.discard(token)
-            if self._say_turn and self._say_turn[0] == token:
-                self._say_turn = None
+            self._says_waiting.discard(item.payload["token"])
             self.scheduler.pump()  # wakes held back for this say may go now
 
     def _turn_origin(self, turn_id: str | None = None) -> str:
@@ -579,6 +592,9 @@ class Session:
             self._memory.set_last_cut(cut)
         except Exception:
             log.exception("could not mark the cut-off request")
+
+    def _close_inbox(self) -> None:
+        self._inbox_open = False
 
     def _owner_joined(self) -> None:
         # The owner's words reached the model, so a nudge from here on is theirs; one already
@@ -717,6 +733,7 @@ class Session:
         self._emit_job_event(
             Event("job_ended", {"report": self.jobs.note(job)}, key=job.id),
             on_end=_when_told(lambda: self.records.mark_reported(job.id)),
+            retell=True,
         )
 
     def _emit_job_event(self, event: Event, **hooks) -> None:
@@ -831,6 +848,7 @@ class Session:
         self.post_event(
             Event("work_failed", facts, key=f"work_failed:{row.id}"),
             on_end=_when_told(lambda: work.mark_reported(row.id)),
+            retell=True,
         )
 
     async def _rerun_step(self, row: WorkRow) -> None:
@@ -903,6 +921,7 @@ class Session:
         `turn_id` is the id a say already told its body."""
         turn_id = turn_id or uuid.uuid4().hex
         self._turn_id = turn_id
+        self._inbox_open = True
         self._turn_job = None
         self._wake_jobs = set()
         self._owner_turn = started_by == "user"
@@ -965,6 +984,7 @@ class Session:
                 turn_timeout=self._turn_timeout,
                 inbox=self._inbox,
                 on_owner_input=self._owner_joined,
+                on_last_read=self._close_inbox,
                 on_rejected=self._reject,
             )
 
@@ -1020,8 +1040,8 @@ class Session:
     def cancel(self, turn_id: str) -> None:
         if turn_id == self._turn_id and self._task is not None:
             self._task.cancel()
-        elif turn_id in self._says_waiting:
-            self._says_cancelled.add(turn_id)
+        elif turn_id == self._starting:
+            self._starting = None
         elif any(turn == turn_id for _, turn, _, _ in self._later):
             shown = next(b for b, turn, _, _ in self._later if turn == turn_id)
             self._later = [x for x in self._later if x[1] != turn_id]
@@ -1180,7 +1200,7 @@ class Session:
 
 def _when_told(mark: Callable[[], None]) -> Callable[[str], None]:
     """Mark news told only when the turn carrying it finished: a cancelled or failed turn did not
-    tell it, so it stays for the next start."""
+    tell it, so it stays for the next start (a cancelled one is also posted again, once)."""
 
     def on_end(reason: str) -> None:
         if reason == "done":

@@ -174,11 +174,12 @@ the total can run a little low.
 
 ## What a turn does
 
-`say` answers `{turn, joined}` at once (`joined` is true when a turn is running, or an earlier
-say is about to start one, on the same body). The say goes through the front door like every other
-source (the dispatcher, see below). A joined say is handed to the running turn, which takes it in
-at its next step; a say from another body waits and gets its own turn after, answered on its own
-body. The work then runs in the background and streams notifications. There is one
+`say` answers `{turn, joined}` once the front door has delivered it (the dispatcher, see below), so
+the answer is never stale: `joined` is true only when a turn is running, on the same body, and has
+not yet done its last read of what was said. A joined say is handed to the running turn, which takes
+it in at its next step. Any other say (another body, or one arriving after that last read) gets a
+fresh turn id and its own turn after the running one, answered on its own body; with no turn running
+it starts one at once. The work then runs in the background and streams notifications. There is one
 conversation for all bodies and at most one running turn.
 
 ```mermaid
@@ -392,9 +393,10 @@ setup still hears a job's question. A wake with no origin goes to the last body 
 is a phone while a screen is online, then to the first screen.
 
 **News is told when the turn ends.** A wake's news (a finished job, a timer, a setup result) is
-marked reported only when the turn carrying it finishes `done`. A cancelled or failed wake keeps
-its news: the event is posted again with the same key, so the next wake tells it (`on_end` carries
-the reason; the per-kind caps stop a loop). A loop is marked surfaced only after its
+marked reported only when the turn carrying it finishes `done`. A wake that ends `cancelled` keeps
+its news and posts it once more with the same key, so the next wake tells it (`on_end` carries the
+reason; only job, timer and setup news opt in, and never twice). A failed wake does not post again, and
+a question is never re-asked. A loop is marked surfaced only after its
 event was accepted.
 
 The routing order lives in `mind/soul.md` ("Routing"): answer from what Scout knows; use its own

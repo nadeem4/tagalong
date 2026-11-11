@@ -31,7 +31,7 @@ def make(memory=None, clock=None, job_facts=None):
     starts = []
     ends = []
 
-    def emit(event, *, on_start=None, on_end=None):
+    def emit(event, *, on_start=None, on_end=None, retell=False):
         events.append(event)
         starts.append(on_start)
         ends.append(on_end)
@@ -296,7 +296,7 @@ def _noting():
     work = WorkStore(Memory(":memory:").db, clock)
     timers = Timers(
         work,
-        lambda event, *, on_start=None, on_end=None: starts.append(on_start),
+        lambda event, *, on_start=None, on_end=None, retell=False: starts.append(on_start),
         clock,
         notify=lambda k, d: notes.append((k, d)),
     )

@@ -54,4 +54,4 @@ class SetupEvents:
             if reason == "done":  # a cancelled wake did not tell it: it stays open
                 self._items.finish(item_id, "told")
 
-        self._emit(event, on_end=told)
+        self._emit(event, on_end=told, retell=True)

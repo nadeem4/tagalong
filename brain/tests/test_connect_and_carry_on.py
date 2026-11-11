@@ -92,7 +92,7 @@ async def test_a_missing_tool_is_offered_then_connected_then_the_request_resumes
         ]
     )
     join(session, "desktop")
-    session.say("desktop", say(REQUEST))
+    await session.say("desktop", say(REQUEST))
     await idle(session)
     (ask,) = [a for a in session.open_asks() if a.get("tool") == "choose"]
     assert ask["options"] == [CONNECT, "Not now"]
