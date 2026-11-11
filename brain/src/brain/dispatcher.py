@@ -206,6 +206,9 @@ class Dispatcher:
                     w.fails += 1
                     if w.fails >= MAX_FAILS:
                         _log.error("dispatcher.gave_up item=%s", _label(w))
+                        result = w.item.payload.get("result") if w.item.kind == "say" else None
+                        if result is not None and not result.done():
+                            result.set_exception(RuntimeError("the say could not be delivered"))
                     else:
                         # Back in with its original order; a newer same-key item will replace it.
                         self._waiting.append(w)

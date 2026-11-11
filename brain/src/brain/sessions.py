@@ -426,7 +426,8 @@ class Session:
         self._says_waiting.add(token)
         payload = {"token": token, "result": result, "content": content, "params": params}
         self.dispatcher.post(Item("say", shown_on or BRAIN, payload, "now"))
-        return await result
+        # Shielded: a body that disconnects cancels its caller, but the say is still delivered.
+        return await asyncio.shield(result)
 
     def post_event(
         self,
@@ -492,15 +493,18 @@ class Session:
                 self._inbox.append(content)
                 self._joined = (shown, params)  # the newest, if its turn is cut
                 self._speak(self._turn_id, self._turn_body, params)
-                result.set_result(SayResult(turn=self._turn_id or "", joined=True))
+                if not result.done():
+                    result.set_result(SayResult(turn=self._turn_id or "", joined=True))
             elif self._busy():
                 turn = uuid.uuid4().hex
                 self._later.append((shown, turn, content, params))
-                result.set_result(SayResult(turn=turn, joined=False))
+                if not result.done():
+                    result.set_result(SayResult(turn=turn, joined=False))
             else:
                 turn = uuid.uuid4().hex
                 # The caller learns the turn id before its `started` goes out.
-                result.set_result(SayResult(turn=turn, joined=False))
+                if not result.done():
+                    result.set_result(SayResult(turn=turn, joined=False))
                 self._starting = turn
                 await asyncio.sleep(0)
                 cut = self._starting != turn  # cancelled in the moment before its turn began
@@ -1128,8 +1132,8 @@ class Session:
             )
         )
         if owns:
-            if self._inbox and (reason == "cancelled" or rejected):
-                # Joined the turn that was cancelled: they get a turn of their own, not a
+            if self._inbox and (reason != "done" or rejected):
+                # Joined a turn that did not finish: they get a turn of their own, not a
                 # silent place in an unanswered one.
                 pending = [b for s in self._inbox for b in s]
                 self._inbox.clear()

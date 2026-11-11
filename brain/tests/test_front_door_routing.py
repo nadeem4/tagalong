@@ -290,3 +290,48 @@ async def test_news_that_did_not_opt_in_is_not_posted_again():
     await finish_quietly(session)
     await settle()
     assert [i.kind for i in posted].count("job_ended") == 1  # a settled question is not re-asked
+
+
+async def test_a_say_survives_its_body_disconnecting_before_delivery():
+    model = Gate(["answered"])
+    session, _ = make(model)
+    join(session, "desktop")
+    real = session.dispatcher.deliver
+    release = asyncio.Event()
+
+    async def late(items):
+        await release.wait()
+        await real(items)
+
+    session.dispatcher.deliver = late
+    task = asyncio.create_task(session.say("desktop", say("still here")))
+    await settle()
+    task.cancel()  # the connection closed; its handler task is cancelled
+    release.set()
+    await idle(session)
+    assert {"type": "text", "text": "still here"} in model.seen[0][-1]["content"]
+
+
+class BoomLater(Gate):
+    def __init__(self, gate):
+        super().__init__([])
+        self.gate = gate
+
+    async def stream(self, system, messages, tools):
+        self.seen.append([dict(m) for m in messages])
+        await self.gate.wait()
+        raise RuntimeError("the model is down")
+        yield  # pragma: no cover
+
+
+async def test_a_say_joined_to_a_turn_that_errors_gets_its_own_turn():
+    gate = asyncio.Event()
+    model = BoomLater(gate)
+    session, _ = make(model)
+    join(session, "desktop")
+    await session.say("desktop", say("a"))
+    await settle()
+    assert (await session.say("desktop", say("b"))).joined is True
+    gate.set()
+    await idle(session)
+    assert len(model.seen) == 2  # b was not left unanswered in the failed turn's history
