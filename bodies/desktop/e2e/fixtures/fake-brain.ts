@@ -402,7 +402,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     {
       id: 'browser',
       title: 'Chrome on work PC',
-      note: 'Shown once the browser add-on is connected; the group is named after your browser.',
+      note: 'Your browser',
     },
     { id: 'app:gmail', title: 'Gmail', note: 'From Gmail' },
   ];
@@ -457,10 +457,19 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
       'Chrome on work PC',
       { effect: 'read', mode: 'auto', online: false },
     ),
-    row('gmail__delete_mail', 'delete_mail', 'Delete an email', '', 'app:gmail', 'app:gmail', 'Gmail', {
-      locked: true,
-      person_only: true,
-    }),
+    row(
+      'gmail__delete_mail',
+      'delete_mail',
+      'Delete an email',
+      '',
+      'app:gmail',
+      'app:gmail',
+      'Gmail',
+      {
+        locked: true,
+        person_only: true,
+      },
+    ),
   ];
 
   server.on('connection', (socket: WebSocket) => {
@@ -850,7 +859,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           heldLoops = [];
           for (const app of loopApps) app.on = false;
           notify('changed', { what: 'loops' });
-        } else if (params.tool === 'list_permissions') value = { tools: permissions, groups: permissionGroups };
+        } else if (params.tool === 'list_permissions')
+          value = { tools: permissions, groups: permissionGroups };
         else if (params.tool === 'set_permission') {
           const row = permissions.find((p) => p.name === params.input?.tool);
           const chosen = String(params.input?.mode);

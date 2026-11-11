@@ -1180,10 +1180,12 @@ def home_tools(
 
     def _group(group: str, kind: str, source_name: str) -> Group:
         """One group's heading: the table's wording, else the body or app it comes from. The
-        browser's group is named after the browser body itself."""
+        browser's group is named after the browser body itself and says so as "Your browser"."""
         table = next((g for g in GROUPS if g.id == group), None)
+        if group == "browser":
+            return Group(group, source_name, "Your browser")
         if table is not None:
-            return Group(group, source_name if group == "browser" else table.title, table.note)
+            return Group(group, table.title, table.note)
         if group == "other":
             return Group(group, "Other tools", "Tools without their own wording yet.")
         return Group(group, source_name, f"From {source_name}")

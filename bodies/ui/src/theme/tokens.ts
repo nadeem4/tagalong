@@ -42,6 +42,8 @@ export const themeTokens = {
     okInk: '#1F5A2E',
     warnFill: '#FFF4D6',
     warnInk: '#5C4600',
+    /** The border of a warning chip or message. */
+    warnLine: '#EED79A',
     errFill: '#FDE7E5',
     errInk: '#8A1C12',
   },

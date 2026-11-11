@@ -1714,7 +1714,8 @@ async def test_desktop_tools_land_in_this_computer_group(home):
 async def test_browser_group_is_titled_by_the_browser_body(home):
     declare(home.bodies, "chrome", ("tabs", "read", None))
     reply = json.loads(await home.run("list_permissions"))
-    assert [g for g in reply["groups"] if g["id"] == "browser"][0]["title"] == "chrome"
+    group = [g for g in reply["groups"] if g["id"] == "browser"][0]
+    assert (group["title"], group["note"]) == ("chrome", "Your browser")
 
 
 async def test_groups_come_in_wording_order_and_only_when_they_have_tools(home):
