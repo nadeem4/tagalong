@@ -6,6 +6,7 @@ mind/events.md so code stays free of canned lines.
 from dataclasses import dataclass
 from functools import cache
 from importlib.resources import files
+from typing import Literal
 
 from pydantic import ValidationError
 
@@ -20,9 +21,15 @@ class Event:
     key: str | None = None
 
 
+Urgency = Literal["now", "next_pause", "idle", "hold"]
+
+
 @dataclass(frozen=True)
 class EventKind:
     name: str
+    # When the dispatcher may hand this kind to Scout. Code sets it per kind; neither the
+    # model nor an item's payload can raise it (see dispatcher.py).
+    urgency: Urgency = "idle"
     wakes: bool = True
     enabled: bool = True
     # None: never merged, one wake per event.
@@ -32,26 +39,26 @@ class EventKind:
 
 
 _KINDS = (
-    EventKind("timer", batch_seconds=0, max_per_hour=6),
-    EventKind("watches_paused", batch_seconds=0, max_per_hour=2),
-    EventKind("job_ended", batch_seconds=30, max_per_hour=10),
-    EventKind("ask_notice", batch_seconds=60, max_per_hour=6),
-    EventKind("ask_ended", batch_seconds=30, max_per_hour=10),
-    EventKind("asks_waiting", batch_seconds=None, max_per_hour=None),
-    EventKind("job_quiet", batch_seconds=0, max_per_hour=3),
-    EventKind("job_step_failed", batch_seconds=120, max_per_hour=4),
-    EventKind("work_failed", batch_seconds=0, max_per_hour=10),
-    EventKind("loop", batch_seconds=0, max_per_hour=4),
-    EventKind("body_online", batch_seconds=0, max_per_hour=2),
-    EventKind("back", batch_seconds=0, max_per_hour=2),
-    EventKind("job_question", batch_seconds=None, max_per_hour=None),
-    EventKind("choice", batch_seconds=None, max_per_hour=None),
-    EventKind("setup_progress", wakes=False),
-    EventKind("setup_done", batch_seconds=None, max_per_hour=None),
-    EventKind("setup_login", batch_seconds=None, max_per_hour=None),
-    EventKind("focus", wakes=False),
-    EventKind("tab", wakes=False),
-    EventKind("download", wakes=False),
+    EventKind("timer", urgency="next_pause", batch_seconds=0, max_per_hour=6),
+    EventKind("watches_paused", urgency="idle", batch_seconds=0, max_per_hour=2),
+    EventKind("job_ended", urgency="idle", batch_seconds=30, max_per_hour=10),
+    EventKind("ask_notice", urgency="idle", batch_seconds=60, max_per_hour=6),
+    EventKind("ask_ended", urgency="next_pause", batch_seconds=30, max_per_hour=10),
+    EventKind("asks_waiting", urgency="next_pause", batch_seconds=None, max_per_hour=None),
+    EventKind("job_quiet", urgency="idle", batch_seconds=0, max_per_hour=3),
+    EventKind("job_step_failed", urgency="idle", batch_seconds=120, max_per_hour=4),
+    EventKind("work_failed", urgency="next_pause", batch_seconds=0, max_per_hour=10),
+    EventKind("loop", urgency="idle", batch_seconds=0, max_per_hour=4),
+    EventKind("body_online", urgency="next_pause", batch_seconds=0, max_per_hour=2),
+    EventKind("back", urgency="next_pause", batch_seconds=0, max_per_hour=2),
+    EventKind("job_question", urgency="next_pause", batch_seconds=None, max_per_hour=None),
+    EventKind("choice", urgency="next_pause", batch_seconds=None, max_per_hour=None),
+    EventKind("setup_progress", urgency="idle", wakes=False),
+    EventKind("setup_done", urgency="next_pause", batch_seconds=None, max_per_hour=None),
+    EventKind("setup_login", urgency="next_pause", batch_seconds=None, max_per_hour=None),
+    EventKind("focus", urgency="idle", wakes=False),
+    EventKind("tab", urgency="idle", wakes=False),
+    EventKind("download", urgency="idle", wakes=False),
 )
 EVENT_KINDS: dict[str, EventKind] = {k.name: k for k in _KINDS}
 

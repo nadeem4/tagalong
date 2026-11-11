@@ -87,6 +87,7 @@ the total can run a little low.
 | `brain/src/brain/mind/resume.py`       | Rebuilds a valid history from the saved chat at start                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `brain/src/brain/memory.py`            | Scout's memory: `Memory`, the one object over `tagalong.db`; chat, memory, apps and outputs delegate to `store/`; it masks memory text on the way in (`Memory.mask`, set by the session to the `save` guard)                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `brain/src/brain/store/`               | The database layer: `db.py` opens `tagalong.db` and runs the numbered migrations in `migrations/`; `search.py` the FTS5 helpers and `search`; `conversation.py`, `memory.py`, `connections.py` and `outputs.py` own the SQL of chat, memory items, apps and tool outputs; `work.py` is `WorkStore`, the work table's state machine (jobs use it today, through `job_records.py`); `rules.py` the `rules` table: tool modes, preferences and offers                                                                                                                                                                           |
+| `brain/src/brain/dispatcher.py`        | `Dispatcher`: the front-door queue; `post(Item)` takes urgency from the event kind, `set_speech_state` and `set_conversation_active` say when delivery may happen, one loop hands batches to the `deliver` callback; `hold` items become open items. See [Front door](#front-door-and-urgency)                                                                                                                                                                                                                                                                                                                               |
 | `brain/src/brain/open_items.py`        | `OpenItems`: the one record for what waits on the person (`open`, `answer`, `finish`, `expire_due`, `expire_live_only`, `list_open`, `list_answered`, `find_open`; `expire_live_only(job_id=None)` takes one job's items only), one lifecycle (open to answered, done or expired), one deadline (`DEADLINE_S`, a day) and a log line per move, `open_item.<event> t=<epoch> id=<id> kind=<kind> by=<who> why=<why>`, on logger `brain.open_items`. Scout's asks use it through `open_item_runner.py`, choices, offers and setup events directly (kinds `choice`, `offer`, `setup`); the table is in [storage.md](storage.md) |
 | `brain/src/brain/toolbox.py`           | `Toolbox`: lists and gates every tool call, from `BrainSource`, `AppSource` and `BodySource`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `brain/src/brain/asks.py`              | `Asks`: shows Scout's permission cards with no waiter, runs a job's permission asks (they wait) and `open` asks (no turn, custom options, typed answers); each is an `ask` work row that ends with its ask or its job                                                                                                                                                                                                                                                                                                                                                                                                        |
@@ -2313,6 +2314,48 @@ this]` (`Memory.replace_last_message` rewrites the cut turn's message), never th
 - **Hand check.** `cd brain && uv run python tests/voice_smoke.py [DATA_DIR] [OUT.wav]` runs the
   real voice once and prints load time, time per sentence and the real-time factor (not part of
   `pytest`).
+
+## Front door and urgency
+
+`dispatcher.py` is the one queue everything that wants Scout's attention will enter (F10 adds the
+core; sources are moved onto it in a later slice, and `scheduler.py` still runs the wakes until then).
+An `Item` has a kind, an origin body, a payload, an urgency and an optional key. The urgency is a
+field of the event kind in `events.py`: code sets it, and neither the payload nor the model can raise
+it. `post` looks the kind up and overrides the item's own urgency; only a kind not yet registered
+falls back to the item's.
+
+| Urgency      | Delivered                                                                    |
+| ------------ | ---------------------------------------------------------------------------- |
+| `now`        | at once, with whatever else is waiting and deliverable                       |
+| `next_pause` | when speech is at a `sentence_break` or `idle`                               |
+| `idle`       | only when speech is `idle` and no conversation is active                     |
+| `hold`       | never delivered: kept as an open item (shown on return or on Home), not lost |
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+flowchart TD
+  P["post(Item)"] --> U{"urgency from the event kind"}
+  U -- hold --> O["open item kept"]
+  U -- now, next_pause, idle --> Q["priority queue"]
+  Q --> L["one loop"]
+  S["speech state and conversation flag"] --> L
+  L -- "deliverable now" --> B["wait BATCH_S, then one batch"]
+  B --> D["deliver(items)"]
+  L -- "not yet" --> W["keep waiting"]
+```
+
+A newer waiting item with the same kind and key replaces the older one. An item that had to wait
+for its gate (a sentence break, quiet) goes the moment the gate opens, because a break can end
+before any window would; items that are deliverable on arrival wait out `BATCH_S` from the oldest
+post so close arrivals share one `deliver` call, ordered by urgency then arrival. A `now` item, or
+any state change, cuts that wait short. A delivery that raises is logged and its items go back with
+their original order (a newer same-key item still replaces them); after `MAX_FAILS` failures an item
+is logged as `dispatcher.gave_up` and dropped. `stop()` logs everything still waiting as
+`dispatcher.dropped`. F12 turns both into holding open items. The `deliver` callback and the mouth's
+`State` feed (`set_speech_state`) are wired by the later slice. `Dispatcher` requires the
+`OpenItems` store so a `hold` can never be lost. The event notes in `mind/events.md` do not mention
+urgency: the model cannot act on delivery timing.
+Tests: `tests/test_dispatcher.py` (fake clock) and `tests/test_events.py`.
 
 ## Not built yet
 

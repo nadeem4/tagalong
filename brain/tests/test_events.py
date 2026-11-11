@@ -219,3 +219,19 @@ def test_ask_ended_kind_has_a_note():
     kind = EVENT_KINDS["ask_ended"]
     assert kind.wakes and kind.batch_seconds == 30 and kind.max_per_hour == 10
     assert load_notes()["ask_ended"].strip()
+
+
+def test_every_kind_has_an_urgency_set_by_code():
+    for kind in EVENT_KINDS.values():
+        assert kind.urgency in ("now", "next_pause", "idle", "hold")
+
+
+def test_urgency_examples():
+    assert EVENT_KINDS["timer"].urgency == "next_pause"
+    assert EVENT_KINDS["job_question"].urgency == "next_pause"
+    assert EVENT_KINDS["job_ended"].urgency == "idle"
+    assert EVENT_KINDS["loop"].urgency == "idle"
+
+
+def test_setup_done_is_next_pause():
+    assert EVENT_KINDS["setup_done"].urgency == "next_pause"
