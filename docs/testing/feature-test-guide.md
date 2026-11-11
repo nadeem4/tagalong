@@ -178,9 +178,8 @@ desktop app. You need `uv` and an Anthropic key.
 13. **Action:** stop the brain, set `TAGALONG_TURN_TIMEOUT_S=5`, start it, and `say` something that
     makes Scout run a slow tool or wait on a stalled model (a model stub that never answers, or a
     tool that sleeps longer than 5 s).
-    **Expected:** a stalled model ends the turn after about 5 s: one `reply` saying it took too
-    long ("Sorry, I took too long on that and had to stop. Ask me again?"), then `turn` `ended`
-    with `reason: "error"`. A slow tool alone does not trip it, and neither does waiting for you to
+    **Expected:** a stalled model ends the turn after about 5 s: no `reply` (Scout writes no
+    message of its own), then `turn` `ended` with `reason: "error"`. A slow tool alone does not trip it, and neither does waiting for you to
     answer an ask, because time inside tool calls is not counted. A new `say` works.
 14. **Action:** hand a task to an expert (`hand_off`), then close the body (quit the desktop) while
     it runs. Reopen the desktop after the expert has finished.
@@ -617,8 +616,11 @@ history and preferences with `call` as in the section above.
    hand.
    **Expected:** no delay, and `spend_today` does not rise from the asks (no look happens, only
    offers after three approvals can spend).
-8. **Action:** let an offer ask sit unanswered for 10 minutes.
-   **Expected:** it closes and nothing is saved.
+8. **Action:** let an offer card sit unanswered, then stop and start the brain.
+   **Expected:** no timer closes it; after the restart the same card is shown again once a body
+   connects (not at start), and nothing
+   is saved until you answer **Yes, auto-approve**. Automated: `test_offers.py`
+   (`test_offer_survives_restart`).
 
 ## Approvals page (real brain)
 
@@ -829,7 +831,10 @@ on fakes. To see it by hand, add a loop with an anchor to a test store and open 
 
 ## Open items (automated only)
 
-Nothing shows an open item yet, so there is nothing to click. It is covered by
+Nothing shows an open item yet, so there is nothing to click. Choices, offers and setup events also
+use it: `tests/test_choices.py` (a timed-out choice expires its item and tells Scout),
+`tests/test_offers.py` and `tests/test_setup_events.py` (an offer and an install's news survive a
+restart). It is covered by
 `cd brain && uv run pytest tests/test_open_items_store.py tests/test_open_items.py -q` on a temporary database:
 
 1. An item answered before its deadline counts; answered after it, the answer is refused as `expired`.

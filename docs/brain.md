@@ -87,7 +87,7 @@ the total can run a little low.
 | `brain/src/brain/mind/resume.py`       | Rebuilds a valid history from the saved chat at start                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `brain/src/brain/memory.py`            | Scout's memory: `Memory`, the one object over `tagalong.db`; chat, memory, apps and outputs delegate to `store/`; it masks memory text on the way in (`Memory.mask`, set by the session to the `save` guard)                                                                                                                                                                                                                                                                       |
 | `brain/src/brain/store/`               | The database layer: `db.py` opens `tagalong.db` and runs the numbered migrations in `migrations/`; `search.py` the FTS5 helpers and `search`; `conversation.py`, `memory.py`, `connections.py` and `outputs.py` own the SQL of chat, memory items, apps and tool outputs; `work.py` is `WorkStore`, the work table's state machine (jobs use it today, through `job_records.py`); `rules.py` the `rules` table: tool modes, preferences and offers                                 |
-| `brain/src/brain/open_items.py`        | `OpenItems`: the one record for what waits on the person (`open`, `answer`, `finish`, `expire_due`, `expire_live_only`, `list_open`, `list_answered`, `find_open`), one lifecycle (open to answered, done or expired), one deadline (`DEADLINE_S`, a day) and a log line per move, `open_item.<event> t=<epoch> id=<id> kind=<kind> by=<who> why=<why>`, on logger `brain.open_items`. Scout's asks use it through `open_item_runner.py`; the table is in [storage.md](storage.md) |
+| `brain/src/brain/open_items.py`        | `OpenItems`: the one record for what waits on the person (`open`, `answer`, `finish`, `expire_due`, `expire_live_only`, `list_open`, `list_answered`, `find_open`), one lifecycle (open to answered, done or expired), one deadline (`DEADLINE_S`, a day) and a log line per move, `open_item.<event> t=<epoch> id=<id> kind=<kind> by=<who> why=<why>`, on logger `brain.open_items`. Scout's asks use it through `open_item_runner.py`, choices, offers and setup events directly (kinds `choice`, `offer`, `setup`); the table is in [storage.md](storage.md) |
 | `brain/src/brain/toolbox.py`           | `Toolbox`: lists and gates every tool call, from `BrainSource`, `AppSource` and `BodySource`                                                                                                                                                                                                                                                                                                                                                                                       |
 | `brain/src/brain/asks.py`              | `Asks`: shows Scout's permission cards with no waiter, runs a job's permission asks (they wait) and `open` asks (no turn, custom options, typed answers); each is an `ask` work row that ends with its ask or its job                                                                                                                                                                                                                                                              |
 | `brain/src/brain/open_item_runner.py`  | `AskRunner`: Scout's asks as `ask` open items. A call that needs the person is saved and its card shown, and the turn goes on; the answer, however late, runs the saved call through the same gate and emits `ask_ended`. Also the deadline timer, the restart close and the card shown again when a body joins                                                                                                                                                                    |
@@ -105,7 +105,7 @@ the total can run a little low.
 | `brain/src/brain/timers_home.py`       | `timer_home_tools`: Home-only `timers_state` (every timer, soonest first) and `timer_cancel {id}` (an unknown id, or a `watch` row, is `invalid_params`); `Timers.cancel` ends the row and emits `changed { what: "timers" }`, as does any other timer change                                                                                                                                                                                                                      |
 | `brain/src/brain/timers.py`            | `Timers`: fires the due `timer` and `watch` work rows as `timer` events, hands due `tool_call` and `expert_call` retries to the session and keeps one wake armed                                                                                                                                                                                                                                                                                                                   |
 | `brain/src/brain/mind/events.md`       | One note per event kind on how Scout should weigh it (model wording, not code)                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `brain/src/brain/choices.py`           | `Choices`: Scout's non-blocking `choose` question; an answer emits a `choice` event                                                                                                                                                                                                                                                                                                                                                                                                |
+| `brain/src/brain/choices.py`           | `Choices`: Scout's non-blocking `choose` question, a `choice` open item; an answer or a timeout emits a `choice` event                                                                                                                                                                                                                                                                                                                                                                                                |
 | `brain/src/brain/questions.py`         | `ScoutQuestions`: an expert's question goes to Scout first (`ask`, `answer`, `pass_to_user`, `cancel_job`); each is a `question` work row under its job                                                                                                                                                                                                                                                                                                                            |
 | `brain/src/brain/jobs.py`              | `Jobs`: hand-off ask, relayed Claude Code asks, the 2-job cap, progress and the `jobs` rows, `changed: jobs`                                                                                                                                                                                                                                                                                                                                                                       |
 | `brain/src/brain/job_activity.py`      | `JobActivity`: one per running job; turns ACP updates into masked, capped job steps (`job_steps`, kept by `WorkStore`)                                                                                                                                                                                                                                                                                                                                                             |
@@ -214,8 +214,8 @@ flowchart TD
 - **Turn timeout.** A turn that runs longer than `TAGALONG_TURN_TIMEOUT_S` (300 s by default) is
   stopped, so a stalled model cannot hold the conversation open. Time spent inside a tool batch,
   including the wait for the person to answer an ask, does not count; model calls and guards do.
-  On timeout Scout sends one message ("Sorry, I took too long on that and had to stop. Ask me
-  again?") and the turn ends with `error`. History stays valid: an open `tool_use` is closed.
+  On timeout the turn ends with `error` and Scout writes nothing (the loop has no words of its
+  own). Only the desktop shows an error for it; WhatsApp sends nothing. History stays valid: an open `tool_use` is closed.
 - If any delta was sent, exactly one `reply` with `done: true` follows, whatever the end reason.
 - History is append-only and always valid: a half-streamed message is never kept, and a
   `tool_use` always gets a `tool_result`, even on cancel. A cancel is the one case where a
@@ -626,7 +626,11 @@ flowchart TD
 - **Offers.** After you approve by hand, `Offers.consider` may open a separate ask (`tool`
   `approval_offer`, options `Yes, auto-approve` and `Keep asking`, no turn) in the background.
   Settings are `TAGALONG_OFFER_MIN_APPROVALS`, `TAGALONG_OFFER_WINDOW_DAYS` and
-  `TAGALONG_KEEP_ASKING_DAYS`.
+  `TAGALONG_KEEP_ASKING_DAYS`. The offer is an `offer` open item whose card text is the model's
+  sentence alone (code adds no words), and no timer drops it. One you have not answered when the
+  brain stops is shown again when a body comes online (`Offers.resume`, called on a connect; at
+  start nobody is there yet, so the item just stays open); the item is let go after the one
+  deadline, and a click after it counts as no answer.
 - **Deny.** The tool does not run. Scout is told "The user said no to <tool>."
 - **No answer.** A Scout ask never holds its turn: the turn gets "waiting for the person's
   answer" at once and the ask stays open up to its deadline (see
@@ -743,9 +747,14 @@ flowchart TD
 clickable options. It is `effect: "read"`, mode `auto` (the ask is its own gate), and it does not
 wait: it opens an ask (`tool: "choose"`, optional `free_text`, optional `recommended`, 1-6 short
 options, none only with `free_text`) and returns `{"asked": id}` at once. A background task waits
-(10 minutes); when the person answers it emits a `choice` event `{ask, question, option, text}`
-(`option` is empty when the person typed their own answer) that wakes Scout (never merged, outside the hourly caps). An unanswered or timed-out choice emits
-nothing, so no turn is stuck, and a late answer gets `not_found`. With nobody online the tool
+(10 minutes) and the ask is a `choice` open item (its id is the ask id). When the person answers
+it closes the item and emits a `choice` event `{ask, question, option, text}` (`option` is empty
+when the person typed their own answer) that wakes Scout (never merged, outside the hourly
+caps). A choice nobody answers in time expires its item (reason `deadline`, logged) and emits the
+same event with `expired: "yes"` and no option, so Scout learns nothing was decided and the
+drop is never silent. No turn is stuck, and a late answer gets `not_found`. The item is tied to
+the running brain, so the session expires one left from a last run at start (every live-only item
+  does, once) and Scout is not told of those. With nobody online the tool
 refuses.
 
 Saved preferences reach Scout as facts: `render_preferences` (`mind/prompt.py`) lists the
@@ -1031,7 +1040,10 @@ words what the person reads (guidance in `mind/soul.md`).
   folder a killed brain left (`sweep_staging`). If the registry moved on after the card named a version, it returns
   `version_changed` (`"<shown> -> <now>"`) and installs nothing. It emits non-waking `setup_progress` events (`expert`, `stage`,
   `percent`) plus `changed {what: "setup"}`, and one waking `setup_done` event when it ends:
-  `expert`, `ok`, and either `installed` (the expert as JSON) or `error` and `detail`. Brain
+  `expert`, `ok`, and either `installed` (the expert as JSON) or `error` and `detail`. A waking
+  `setup_done` or `setup_login` is saved as a `setup` open item (`setup/events.py`) until Scout's
+  wake turn has finished, so a restart, a cancelled turn or a budget-dropped wake does not lose it; at start the saved
+  ones are sent again, and a newer event for the same expert or app replaces the older. Brain
   shutdown cancels running installs, each of which cleans up what it staged.
   An `npx` entry runs `npm install --prefix tools/<id>.part <package>@<version>` (the card shows that same version; an unpinned package gets the entry's) with a system
   Node that is new enough (and has its own npm), else Tagalong's own Node; the Node floor is 22 for

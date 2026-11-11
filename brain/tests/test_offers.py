@@ -14,6 +14,7 @@ from brain.guards import stop
 from brain.memory import Memory
 from brain.mind.turn import Final
 from brain.offers import Offers, OfferSettings
+from brain.open_items import OpenItems
 from brain.protocol import ErrorCode, RpcError
 from brain.store import rules
 from brain.store.db import utc_text
@@ -64,9 +65,11 @@ class Budget:
 
 
 class FakeAsks:
-    def __init__(self, answer=None, online=True):
+    def __init__(self, answer=None, online=True, hang=False, during=None):
         self.answer = answer if answer is not None else Answer(YES)
         self.online = online
+        self.during = during  # runs while the card is shown, before the person answers
+        self.hang = hang  # the card is shown and nobody answers before the brain stops
         self.opened = []
 
     def anyone_online(self):
@@ -74,6 +77,10 @@ class FakeAsks:
 
     async def open(self, **kw):
         self.opened.append(kw)
+        if self.during:
+            self.during()
+        if self.hang:
+            await asyncio.Event().wait()
         if isinstance(self.answer, Exception):
             raise self.answer
         return self.answer
@@ -95,9 +102,11 @@ class Rig:
         self.sent = []
         self.clock = NOW
         approvals = approvals_on(mem, lambda m, p: self.sent.append((m, p)), lambda: self.clock)
+        self.items = OpenItems(mem.db, lambda: self.clock)
         self.offers = Offers(
-            self.model, self.budget, mem, self.asks, approvals, settings, lambda: self.clock
-        )
+            self.model, self.budget, mem, self.asks, self.items, approvals, settings,
+            lambda: self.clock,
+        )  # fmt: skip
 
     def approve(self, days_ago=1, by="person", group=GROUP, tool="Read", n=1, summary="read a"):
         at = utc_text(NOW - timedelta(days=days_ago))
@@ -226,7 +235,6 @@ async def test_keep_asking_saves_nothing(mem):
         RpcError(ErrorCode.timeout, "nobody answered"),
         RpcError(ErrorCode.cancelled, "cancelled"),
         RuntimeError("boom"),
-        Answer(None),
         Answer("something else"),
     ],
 )
@@ -255,8 +263,8 @@ async def test_offer_text_names_the_sentence(rig):
     assert ask["options"] == [YES, KEEP]
     assert ask["tool"] == "approval_offer"
     assert ask["input"] == {"sentence": "Fine to read files", "group": GROUP}
-    assert ask["timeout"] == 600
-    assert "Fine to read files" in ask["text"] and GROUP in ask["text"] and "3" in ask["text"]
+    assert ask["timeout"] is None  # an offer is not dropped by a timer
+    assert ask["text"] == "Fine to read files"  # the model's words, no canned lead
 
 
 async def test_the_look_gets_the_offer_wording_and_the_recent_approvals(rig):
@@ -304,9 +312,78 @@ async def test_consider_skips_look_when_the_guards_stop(mem):
 
     r = Rig(mem)
     r.offers = Offers(
-        r.model, r.budget, mem, r.asks, approvals_on(mem, lambda m, p: None, lambda: NOW),
-        SETTINGS, lambda: NOW, guards=StopGuards(),
+        r.model, r.budget, mem, r.asks, r.items,
+        approvals_on(mem, lambda m, p: None, lambda: NOW), SETTINGS, lambda: NOW,
+        guards=StopGuards(),
     )  # fmt: skip
     r.approve(n=3)
     await r.consider()
     assert r.model.calls == 0 and rules.offers_for(mem.db, GROUP) == []
+
+
+async def test_offer_survives_restart(mem):
+    first = Rig(mem, asks=FakeAsks(hang=True))
+    first.approve(n=3)
+    first.offers.consider(GROUP, "scout_tool", "Read")
+    for _ in range(10):
+        await asyncio.sleep(0)
+    for task in list(first.offers._tasks):  # the brain stops with the card unanswered
+        task.cancel()
+    await asyncio.gather(*first.offers._tasks, return_exceptions=True)
+    [item] = OpenItems(mem.db, lambda: NOW).list_open()
+    assert item.kind == "offer"
+
+    again = Rig(mem, asks=FakeAsks(Answer(YES)))  # a new brain over the same database
+    again.offers.resume()
+    while again.offers._tasks:
+        await asyncio.gather(*list(again.offers._tasks))
+    [ask] = again.asks.opened
+    assert ask["text"] == "Fine to read files"
+    assert any(not p.builtin for p in rules.list_preferences(mem.db))
+    assert [o for _, o in rules.offers_for(mem.db, GROUP)] == ["yes"]
+    assert OpenItems(mem.db, lambda: NOW).list_open() == []
+
+
+async def test_resume_with_nobody_online_keeps_the_offer_until_a_body_comes(mem):
+    first = Rig(mem, asks=FakeAsks(hang=True))
+    first.approve(n=3)
+    first.offers.consider(GROUP, "scout_tool", "Read")
+    for _ in range(10):
+        await asyncio.sleep(0)
+    for task in list(first.offers._tasks):
+        task.cancel()
+    await asyncio.gather(*first.offers._tasks, return_exceptions=True)
+
+    asks = FakeAsks(Answer(YES), online=False)  # the brain starts before any body connects
+    again = Rig(mem, asks=asks)
+    again.offers.resume()
+    await asyncio.sleep(0)
+    assert asks.opened == [] and len(again.items.list_open()) == 1
+    assert not any(not p.builtin for p in rules.list_preferences(mem.db))
+
+    asks.online = True  # a body connects
+    again.offers.resume()
+    while again.offers._tasks:
+        await asyncio.gather(*list(again.offers._tasks))
+    assert len(asks.opened) == 1
+    assert [o for _, o in rules.offers_for(mem.db, GROUP)] == ["yes"]
+    assert again.items.list_open() == []
+
+
+async def test_a_nobody_online_answer_leaves_the_offer_open(mem):
+    rig = Rig(mem, asks=FakeAsks(Answer(None)))
+    rig.approve(n=3)
+    await rig.consider()
+    assert len(rig.items.list_open()) == 1
+    assert rules.offers_for(mem.db, GROUP) == []
+
+
+async def test_a_yes_after_the_deadline_is_no_answer_not_a_crash(mem):
+    rig = Rig(mem)
+    rig.asks = FakeAsks(Answer(YES), during=lambda: setattr(rig, "clock", NOW + timedelta(days=2)))
+    rig.offers._asks = rig.asks
+    rig.approve(n=3)
+    await rig.consider()  # must not raise
+    assert not any(not p.builtin for p in rules.list_preferences(mem.db))
+    assert [o for _, o in rules.offers_for(mem.db, GROUP)] == ["no_answer"]
+    assert rig.items.list_open() == []

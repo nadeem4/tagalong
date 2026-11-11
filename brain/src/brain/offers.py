@@ -1,6 +1,8 @@
 """Offers: after the person has allowed one kind of ask by hand several times, Scout may offer
 to approve that kind from now on. Code decides when to look and caps how often; the model only
 writes the sentence. Nothing is saved unless the person answers "Yes, auto-approve".
+An offer is an `offer` open item: no timer drops it, and one not answered when the brain stops
+is shown again when a body comes online (`resume`, which a connect calls).
 """
 
 import asyncio
@@ -16,6 +18,7 @@ from brain.config import DEFAULT_STEP_CAP
 from brain.guards import Guards, Hook, ModelCallCtx
 from brain.memory import Memory
 from brain.mind.turn import Final, Model
+from brain.open_items import OpenItem, OpenItemRefused, OpenItems
 from brain.side_check import prompt_section
 from brain.store import rules
 from brain.store.db import utc_text
@@ -25,7 +28,6 @@ log = logging.getLogger(__name__)
 YES = "Yes, auto-approve"
 KEEP = "Keep asking"
 LOOK_TIMEOUT_S = 20.0
-ASK_TIMEOUT_S = 600
 LOOK_GAP = timedelta(days=1)
 HISTORY_ROWS = 10
 HISTORY_SCAN = 200
@@ -62,6 +64,7 @@ class Offers:
         budget,
         memory: Memory,
         asks: Asks,
+        items: OpenItems,
         approvals: Approvals,
         settings: OfferSettings,
         now: Callable[[], datetime],
@@ -72,6 +75,7 @@ class Offers:
         self._guards = guards or spend_guards(budget, DEFAULT_STEP_CAP)
         self._memory = memory
         self._asks = asks
+        self._items = items
         self._approvals = approvals  # saves the preference, so Home hears about it
         self._settings = settings
         self._now = now
@@ -117,8 +121,38 @@ class Offers:
         if sentence is None:
             rules.add_offer(self._memory.db, group_key, utc_text(self._now()), "none")
             return
-        outcome = await self._offer(group_key, source, tool, count, sentence)
-        rules.add_offer(self._memory.db, group_key, utc_text(self._now()), outcome)
+        item = self._items.open(
+            "offer",
+            "brain",
+            saved_call={
+                "group": group_key,
+                "source": source,
+                "tool": tool,
+                "sentence": sentence,
+            },
+        )
+        await self._present(item)
+
+    def resume(self) -> None:
+        """Show again the offers the last run left unanswered. Called when a body connects, since
+        at start nobody is there to see a card; with nobody online the items just stay open."""
+        self._items.expire_due(self._now())
+        if not self._asks.anyone_online():
+            return
+        for item in self._items.list_open():
+            if item.kind == "offer" and item.saved_call["group"] not in self._busy:
+                self._busy.add(item.saved_call["group"])
+                task = asyncio.get_running_loop().create_task(self._resume_one(item))
+                self._tasks.add(task)
+                task.add_done_callback(self._tasks.discard)
+
+    async def _resume_one(self, item: OpenItem) -> None:
+        try:
+            await self._present(item)
+        except Exception:
+            log.exception("offer failed")
+        finally:
+            self._busy.discard(item.saved_call["group"])
 
     async def _look(self, group_key: str, count: int) -> str | None:
         """The model's one-sentence offer, or None for no offer (errors included)."""
@@ -162,26 +196,39 @@ class Offers:
                 final = item
         return final
 
-    async def _offer(
-        self, group_key: str, source: str, tool: str, count: int, sentence: str
-    ) -> str:
-        """Ask the person; the preference is saved only on an explicit yes."""
-        lead = f"You've allowed {group_key} {count} times lately. Approve it from now on? "
+    async def _present(self, item: OpenItem) -> None:
+        """Ask the person and record how it ended; the preference is saved only on an explicit
+        yes. The card is the model's sentence alone: the code adds no words."""
+        call = item.saved_call
+        group_key = call["group"]
+        outcome = "no_answer"
         try:
             answer = await self._asks.open(
-                text=f"{lead}“{sentence}”",
+                text=call["sentence"],
                 options=[YES, KEEP],
                 tool="approval_offer",
-                input={"sentence": sentence, "group": group_key},
-                timeout=ASK_TIMEOUT_S,
+                input={"sentence": call["sentence"], "group": group_key},
+                timeout=None,  # the item's deadline is the one rule; nothing drops it silently
             )
-        except Exception:  # timeout, cancel or a broken transport: no answer
-            return "no_answer"
-        if answer.option == KEEP:
-            return "keep_asking"
-        if answer.option != YES:
-            return "no_answer"
-        self._approvals.add_preference(
-            sentence=sentence, source=source, tool=tool, group_key=group_key
-        )
-        return "yes"
+            option = answer.option
+            answer_missing = option is None  # Asks answers None when no body displays
+        except Exception:  # cancel or a broken transport: no answer
+            option, answer_missing = None, False
+        if option is None and answer_missing:
+            return  # nobody was online: the item stays open and is shown at the next connect
+        if option in (YES, KEEP):
+            try:
+                self._items.answer(item.id, option, "person")
+                outcome = "yes" if option == YES else "keep_asking"
+            except OpenItemRefused:  # the click came after the deadline: it cannot count
+                pass
+        if outcome == "no_answer":
+            self._items.finish(item.id, "no_answer")
+        if outcome == "yes":
+            self._approvals.add_preference(
+                sentence=call["sentence"],
+                source=call["source"],
+                tool=call["tool"],
+                group_key=group_key,
+            )
+        rules.add_offer(self._memory.db, group_key, utc_text(self._now()), outcome)
