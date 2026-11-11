@@ -339,6 +339,19 @@ describe('SpeechPlayer', () => {
       expect(speech).toContainEqual({ turn: 't2', n: 1, state: 'started' });
     });
 
+    it('clear of a turn while paused between sentences lets the next turn speak', async () => {
+      const { p, played, finish } = player();
+      p.enqueue(sentence(1));
+      await tick();
+      finish();
+      await tick();
+      p.pause();
+      p.clear('t1');
+      p.enqueue({ turn: 't2', n: 1, text: 'Two.', pcm: 'AA==', sampleRate: 24000 });
+      await tick();
+      expect(played).toHaveLength(2);
+    });
+
     it('a clear that races a sentence still playing says idle once', async () => {
       const { p, finish, speech } = player();
       p.enqueue(sentence(1));

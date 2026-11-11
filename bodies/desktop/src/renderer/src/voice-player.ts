@@ -292,12 +292,13 @@ export class SpeechPlayer {
     this.silenced = turn;
     if (this.answeringTurn === turn) this.answeringTurn = null;
     if (this.record.turn === turn) this.record = { turn: null, texts: [], played: 0 };
+    // Nothing else is sounding: a pause held between sentences must not outlive the turn it held.
+    if ((playing || this.current === null) && this.paused) {
+      this.paused = false;
+      (this.options.output ?? speakers).resume();
+      this.release?.();
+    }
     if (playing) {
-      if (this.paused) {
-        this.paused = false;
-        (this.options.output ?? speakers).resume();
-        this.release?.();
-      }
       this.playing = false;
       this.current = null;
       this.abort.abort();
