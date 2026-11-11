@@ -406,6 +406,8 @@ class Jobs:
             # Nothing between this wait and `_starting += 1` awaits, so an update that looks at
             # the jobs after it sees this one.
             await self._before_start()
+            # An update may have swapped this expert's command while the job waited.
+            chosen = next((e for e in self._experts() if e.id == chosen.id), chosen)
         running = [
             (j, p)
             for j in self._records.running_jobs()

@@ -388,6 +388,29 @@ async def test_an_app_that_will_not_connect_puts_the_old_command_back(rig):
     assert r.apps.restarted == ["linear", "linear"]  # the old command was launched again
 
 
+async def test_a_failed_rollback_restart_keeps_the_updates_own_error(rig, caplog):
+    r = rig()
+    r.memory.add_app(linear_app("0.4.0"))
+    r.apps.bad_launches = 1
+    real = r.apps.restart
+    calls = []
+
+    async def restart(app_id):
+        calls.append(app_id)
+        if len(calls) == 2:
+            raise OSError("rollback boom")
+        await real(app_id)
+
+    r.apps.restart = restart
+    caplog.set_level(logging.ERROR)
+    await r.updates.check(refresh=False)
+    await r.updates.update("app", "linear")
+    await r.updates.wait()
+    row_state = r.items()[("app", "linear")]
+    assert (row_state["status"], row_state["error"]) == ("failed", "could not start")
+    assert "rollback boom" in caplog.text
+
+
 async def test_set_auto_update_saves_per_group(rig):
     r = rig()
     r.memory.add_app(files_app("1.2.0"))

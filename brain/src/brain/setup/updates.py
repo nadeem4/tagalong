@@ -369,7 +369,11 @@ class Updates:
         except BaseException:
             # Put the old command back and start it again: the app must not stay down.
             self._memory.set_app_package(item_id, row.config, row.version)
-            await asyncio.shield(self._apps.restart(item_id))
+            try:
+                await asyncio.shield(self._apps.restart(item_id))
+            except Exception:
+                # The update's own error is the one to show; this one is only logged.
+                log.exception("could not start %s again after rolling back its update", item_id)
             raise
         self._notify("changed", {"what": "apps"})
 

@@ -2793,7 +2793,7 @@ async def test_resolve_step_stop_stops_running_parts_before_closing(make_rig):
     assert rig.jobs._runs == {}
 
 
-async def test_a_job_waits_for_before_start_and_counts_as_starting_meanwhile(make_rig):
+async def test_a_job_does_not_start_its_expert_until_before_start_returns(make_rig):
     gate = asyncio.Event()
 
     async def before_start():
@@ -2806,3 +2806,26 @@ async def test_a_job_waits_for_before_start_and_counts_as_starting_meanwhile(mak
     gate.set()
     await asyncio.wait_for(starting, 10)
     assert rig.spawns() == 1
+
+
+async def test_a_job_that_waited_behind_an_update_starts_the_updated_command(make_rig):
+    gate = asyncio.Event()
+
+    async def before_start():
+        await gate.wait()
+        rig.experts = [installed(command=[sys.executable, str(AGENT), "--updated"])]
+
+    rig = make_rig(FakeAsks(Answer("Plan")), before_start=before_start)
+    commands: list[list[str]] = []
+    real = rig.jobs._make_run
+
+    def spy(expert, **callbacks):
+        commands.append(expert.command)
+        return real(expert, **callbacks)
+
+    rig.jobs._make_run = spy
+    starting = asyncio.ensure_future(rig.jobs.start("one", str(rig.folder)))
+    await asyncio.sleep(0.1)
+    gate.set()
+    await asyncio.wait_for(starting, 10)
+    assert commands == [[sys.executable, str(AGENT), "--updated"]]

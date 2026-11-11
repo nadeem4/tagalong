@@ -299,10 +299,11 @@ and when Home presses **Check for updates**.
 - **Never mid-job.** An update that is due (automatic, or pressed) while a job runs waits in a
   queue, the row says "Waiting for a job to finish…", and `tick` applies it once the job ends. A
   job that starts while an update is being swapped in waits for the swap to end first, so it
-  never meets an expert or app halfway through.
+  never meets an expert or app halfway through, and it then starts the expert's updated command, read again from the store after the wait.
 - **On the row.** Updating…, then "Updated to vX." (the old version stays if it fails, with "The
   update didn't work." and the button again; an app whose new version does not connect is put
-  back on its old command and started again). The brain sends `changed` with `what: "updates"` on
+  back on its old command and started again; if that restart fails too, it is logged and the row
+  keeps the update's own error). The brain sends `changed` with `what: "updates"` on
   every status change and the page reads the state again.
 - **Home calls** (`setup/home_tools.py`, never offered to Scout): `updates_state`,
   `updates_check`, `update_item {kind, id}`, `update_all {kind}` (`{started}`, `{waiting: "job"}`

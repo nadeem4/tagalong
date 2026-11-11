@@ -265,7 +265,7 @@ test('D5 connections', async () => {
     rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
 });
-// E1: updates on the Apps tab, on the mockup's apps (GitHub, Filesystem, Linear, Obsidian, Notion).
+// E1: updates on the Apps tab, on the mockup's apps (Notion, Google Calendar, GitHub, Filesystem, Linear, Obsidian).
 test('E1 updates', async () => {
   const brain = await startFakeBrain();
   const dataDir = seedSettings(mkdtempSync(join(tmpdir(), 'tagalong-shot-')));
@@ -300,12 +300,13 @@ test('E1 updates', async () => {
     });
     const apps = [
       row('notion', 'Notion', 12, true),
+      row('gcal', 'Google Calendar', 8, true),
       row('github', 'GitHub', 26, false),
       row('filesystem', 'Filesystem', 5, false),
       row('linear', 'Linear, by acme-dev', 9, false),
       row('obsidian', 'Obsidian, by vaultkit', 6, false),
     ];
-    const official = new Set(['notion', 'github', 'filesystem']);
+    const official = new Set(['notion', 'gcal', 'github', 'filesystem']);
     brain.setSetup({
       apps: apps.map((a) => ({
         id: a.id,
@@ -327,10 +328,12 @@ test('E1 updates', async () => {
       ...over,
     });
     const notion = item('notion', 'Notion', { remote: true });
+    const gcal = item('gcal', 'Google Calendar', { remote: true });
     const checkedAt = new Date(Date.now() - 5 * 60_000).toISOString();
     const states: Record<string, Record<string, unknown>[]> = {
       'header-idle': [
         notion,
+        gcal,
         item('github', 'GitHub', { installed: '1.0' }),
         item('filesystem', 'Filesystem', { installed: '1.3' }),
         item('linear', 'Linear', { installed: '0.5' }),
@@ -338,6 +341,7 @@ test('E1 updates', async () => {
       ],
       'updates-available': [
         notion,
+        gcal,
         item('github', 'GitHub', { installed: '0.9', latest: '1.0' }),
         item('filesystem', 'Filesystem', { installed: '1.2', latest: '1.3' }),
         item('linear', 'Linear', { installed: '0.4', latest: '0.5' }),
@@ -346,6 +350,7 @@ test('E1 updates', async () => {
       // The mockup's own picture: one updating, one waiting, one that waits for you, one just done.
       updating: [
         notion,
+        gcal,
         item('github', 'GitHub', { installed: '0.9', latest: '1.0', status: 'updating' }),
         item('filesystem', 'Filesystem', { installed: '1.2', latest: '1.3' }),
         item('linear', 'Linear', { installed: '0.4', latest: '0.5' }),
@@ -353,6 +358,7 @@ test('E1 updates', async () => {
       ],
       updated: [
         notion,
+        gcal,
         item('github', 'GitHub', { installed: '1.0', status: 'updated' }),
         item('filesystem', 'Filesystem', { installed: '1.3', status: 'updated' }),
         item('linear', 'Linear', { installed: '0.4', latest: '0.5' }),
