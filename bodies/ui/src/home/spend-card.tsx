@@ -6,12 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useHostBridge } from '../host-bridge';
 import type { SpendToday } from '../host-bridge';
-import { changesSpend, dollars } from './spend-format';
-
-/** A cap as the person typed it: "$1", "$2.50". */
-function cap(usd: number): string {
-  return Number.isInteger(usd) ? `$${usd}` : `$${usd.toFixed(2)}`;
-}
+import { cap, changesSpend, dollars } from './spend-format';
 
 /**
  * Home's Spend card. Read again whenever a turn starts or ends, and when the brain connection changes.
