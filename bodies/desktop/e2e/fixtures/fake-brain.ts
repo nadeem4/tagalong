@@ -686,6 +686,11 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
               params: { call: `c-${turn}`, tool: 'list_windows', input: {} },
             }),
           );
+        } else if (msg.params?.text?.includes('break it')) {
+          // A turn the brain could not finish: the chat shows its error box.
+          notify('turn', { ...base, state: 'ended', reason: 'error' });
+        } else if (msg.params?.text?.includes('think slowly')) {
+          // A turn that stays open: the chat shows Scout thinking until the app closes.
         } else if (msg.params?.text?.includes('permission')) {
           const ask = `a${turns}`;
           held.set(ask, finish);

@@ -183,6 +183,19 @@ test.describe('E3 chat', () => {
     const page = await panel();
     await page.getByLabel(/^Ask /).waitFor({ state: 'visible', timeout: 30_000 });
     await shot(page, 'E3', 'quick-bubble');
+    // The quick bubble with an answer, then with a job running under it.
+    const quick = page.getByLabel(/^Ask /);
+    await quick.fill('hello there');
+    await quick.press('Enter');
+    await expect(page.getByText('This is the fake brain.').first()).toBeVisible({ timeout: 30_000 });
+    await shot(page, 'E3', 'quick-bubble-answer');
+    brain.setRunning(
+      [{ job: 'j1', expert: 'Claude Code', text: 'npm init -y', at: new Date().toISOString() }],
+      'job_activity',
+    );
+    await expect(page.getByTestId('job-line')).toBeVisible({ timeout: 15_000 });
+    await shot(page, 'E3', 'quick-bubble-job');
+    brain.setRunning([], 'jobs');
     await page.getByRole('button', { name: 'Open full chat' }).click();
     await page.getByRole('log').waitFor({ state: 'visible' });
     await shot(page, 'E3', 'header-at-rest');
@@ -202,14 +215,21 @@ test.describe('E3 chat', () => {
 
     // The full chat: your message, Scout's gist with Show more, a code block.
     await ask('explain the failing test');
-    await expect(page.getByTestId('code-bar')).toBeVisible({ timeout: 30_000 });
+    const more = page.getByRole('button', { name: /Show more/ });
+    await expect(more).toBeVisible({ timeout: 30_000 });
     await shot(page, 'E3', 'full-chat');
+    await more.click();
+    await expect(page.getByTestId('code-bar')).toBeVisible();
+    await shot(page, 'E3', 'full-chat-expanded');
 
     // An app that fails first, then one that works: ask, signing in, done.
     await ask('install notion');
     const failing = page.getByRole('group', { name: 'Set up Notion' });
     await expect(failing).toBeVisible({ timeout: 30_000 });
     await failing.getByRole('button', { name: 'Allow' }).click();
+    // It gets as far as Signing in, then fails: the card stops at step 3.
+    brain.setScene({ apps: [notion('needs-sign-in')] });
+    await expect(failing).toContainText('browser', { timeout: 15_000 });
     brain.setScene({ apps: [notion('error')] });
     await expect(failing.getByRole('alert')).toBeVisible({ timeout: 15_000 });
     await shot(page, 'E3', 'install-failed');
@@ -255,6 +275,55 @@ test.describe('E3 chat', () => {
     brain.setScene({ setup: { progress: null, experts: [claude('ready')] } });
     await expect(expert).toContainText('is ready', { timeout: 15_000 });
     await shot(page, 'E3', 'expert-ready');
+
+    // The header with both toggles off, then both on.
+    const seeing = page.getByRole('button', { name: 'Seeing your screen' });
+    if ((await seeing.getAttribute('aria-pressed')) === 'true') await seeing.click();
+    await expect(seeing).toHaveAttribute('aria-pressed', 'false');
+    await shot(page, 'E3', 'header-both-off');
+    await seeing.click();
+    await always.click();
+    await expect(always).toHaveAttribute('aria-pressed', 'true');
+    await shot(page, 'E3', 'header-both-on');
+    await page.mouse.move(200, 300);
+
+    // The cards: a choice (an offer), an ask with its facts, a running job, an error, a long
+    // message in the composer and the mic tooltip.
+    await ask('offer');
+    await expect(page.getByText('Approve it from now on?')).toBeVisible({ timeout: 30_000 });
+    await shot(page, 'E3', 'card-choice');
+    await page.getByRole('button', { name: 'Keep asking' }).click();
+    await ask('permission');
+    await expect(page.getByRole('button', { name: 'Allow', exact: true }).first()).toBeVisible({
+      timeout: 30_000,
+    });
+    await shot(page, 'E3', 'card-ask');
+    await page.getByRole('button', { name: 'Allow', exact: true }).first().click();
+    brain.setRunning(
+      [{ job: 'j1', expert: 'Claude Code', text: 'npm init -y', at: new Date().toISOString() }],
+      'job_activity',
+    );
+    await expect(page.getByTestId('job-line')).toBeVisible({ timeout: 15_000 });
+    await shot(page, 'E3', 'card-job');
+    brain.setRunning([], 'jobs');
+    await expect(page.getByTestId('job-line')).toHaveCount(0, { timeout: 15_000 });
+    await ask('break it');
+    await expect(page.getByRole('alert').filter({ hasText: 'Try again' })).toBeVisible({
+      timeout: 30_000,
+    });
+    await page.getByRole('alert').filter({ hasText: 'Try again' }).scrollIntoViewIfNeeded();
+    await shot(page, 'E3', 'card-error');
+    await page.getByLabel(/^(Message|Reply to) Scout/).fill('first line\nsecond line\nthird line');
+    await page.getByRole('button', { name: /^Talk to / }).hover();
+    await shot(page, 'E3', 'composer-multiline-mic-tip');
+    await page.getByLabel(/^(Message|Reply to) Scout/).fill('');
+    await page.mouse.move(200, 300);
+
+    // Scout thinking: a turn that stays open. Last, because it never ends.
+    await ask('think slowly');
+    await expect(page.getByText(/is thinking/)).toBeVisible({ timeout: 30_000 });
+    await page.getByText(/is thinking/).scrollIntoViewIfNeeded();
+    await shot(page, 'E3', 'thinking');
   });
 });
 

@@ -17,7 +17,7 @@ const GATE_OPTIONS = new Set(['allow', 'always', 'deny']);
  * Built like the hand-off card: what will happen, then Not now, Always allow and Allow.
  * A tool that cannot be always allowed carries the "Always asks" chip.
  * A brain ask (it carries `options`) leads with Scout's own words and drops Always allow when
- * the tool is locked; an app change keeps the connector wording and offers Allow once or Deny.
+ * the tool is locked; an app change keeps the connector wording and offers Allow or Not now.
  * A job's ask has options of its own (modes, Claude Code's permission names) or is a question,
  * so it shows each option as a button and, for a question, a text field; it answers by name.
  */

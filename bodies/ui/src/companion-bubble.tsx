@@ -190,7 +190,7 @@ export function CompanionBubble({
   const [draft, setDraft] = useState('');
   const [removed, setRemoved] = useState<ReadonlySet<Chip['id']>>(new Set());
   const [reply, setReply] = useState<Reply>({ state: 'idle' });
-  // A change Scout wants to make in a connected app, waiting for Allow once, Always allow or Deny.
+  // A change Scout wants to make in a connected app, waiting for Allow, Always allow or Not now.
   // The brain can ask about several tools at once, so they queue oldest first and the card
   // shows the head; answering or dismissing it brings up the next.
   const [confirms, setConfirms] = useState<ConnectorConfirmParams[]>([]);
