@@ -18,6 +18,9 @@ import { StepOne } from './step-one';
 import { StepSeven } from './step-seven';
 import { StepSix } from './step-six';
 import { StepThree } from './step-three';
+import { StepTen, readyOf } from './step-ten';
+import type { ReadyItem } from './step-ten';
+
 import { StepTwo } from './step-two';
 import { STEPS, skipTour } from './steps';
 import { StepSaveContext } from './use-step-save';
@@ -53,8 +56,10 @@ function body(step: number, host: WalkthroughHost, onValid: (valid: boolean) => 
       return <StepSeven host={host} />;
     case 8:
       return <StepEight host={host} />;
-    default:
+    case 9:
       return <StepNine host={host} onValid={onValid} />;
+    default:
+      return <StepTen host={host} />;
   }
 }
 
@@ -84,6 +89,7 @@ export function Walkthrough({ host, scout, initialStep = 1 }: WalkthroughProps) 
   const [finishKeysShown, setFinishKeysShown] = useState<{ ask: string; talk: string } | null>(
     null,
   );
+  const [ready, setReady] = useState<ReadyItem[]>([]);
   const closing = useRef(false);
   const save = useRef<Save | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -140,6 +146,8 @@ export function Walkthrough({ host, scout, initialStep = 1 }: WalkthroughProps) 
     setBusy(true);
     try {
       await host.finishWalkthrough({ close: false });
+      // What the connect step set up; if the brain cannot be read the block is simply left out.
+      setReady(await host.setupOverview().then(readyOf, () => []));
       setFinishKeysShown(await finishKeys(host));
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure));
@@ -183,6 +191,7 @@ export function Walkthrough({ host, scout, initialStep = 1 }: WalkthroughProps) 
             onOpenHome={() => void close(true)}
             onClose={() => void close(false)}
             error={error}
+            ready={ready}
           />
         ) : (
           <>
@@ -198,7 +207,7 @@ export function Walkthrough({ host, scout, initialStep = 1 }: WalkthroughProps) 
               onBack={() => go(Math.max(current - 1, 1))}
               onNext={() => void next()}
               onSkip={() => void leave()}
-              canFinish={keyValid}
+              keyReady={keyValid}
               onFinish={() => void finish()}
             />
           </>

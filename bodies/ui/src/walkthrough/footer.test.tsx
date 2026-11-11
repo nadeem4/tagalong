@@ -41,15 +41,40 @@ describe('Footer', () => {
     expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
   });
 
-  it('step 9 labels Next "Finish" and keeps it off until the key is good', () => {
+  it('step 9 (the key) keeps Next off until the key is good, and has no Finish', () => {
     mount(9);
-    expect(screen.getByRole('button', { name: 'Finish' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Finish' })).not.toBeInTheDocument();
   });
 
-  it('step 9 Finish is on once canFinish, and calls onFinish', () => {
-    const props = mount(9, { canFinish: true });
+  it('step 9 Next is on once the key is good, and calls onNext', () => {
+    const props = mount(9, { keyReady: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(props.onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it('Finish on step ten is never disabled', () => {
+    mount(10);
+    expect(screen.getByRole('button', { name: 'Finish' })).toBeEnabled();
+  });
+
+  it('step ten has Back, a quiet "I’ll do this later" and Finish, and no Skip', () => {
+    mount(10);
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'Back',
+      'I’ll do this later',
+      'Finish',
+    ]);
+    expect(screen.getByRole('button', { name: 'I’ll do this later' })).not.toHaveClass(
+      'wt-primary',
+    );
+  });
+
+  it('Finish and "I’ll do this later" both call onFinish', () => {
+    const props = mount(10);
     fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
-    expect(props.onFinish).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'I’ll do this later' }));
+    expect(props.onFinish).toHaveBeenCalledTimes(2);
   });
 
   it('Skip calls onSkip and is not the primary button', () => {
@@ -61,7 +86,7 @@ describe('Footer', () => {
     expect(screen.getByRole('button', { name: 'Next' })).toHaveClass('wt-primary');
   });
 
-  it('step 9 has no Skip, since there is nothing left to skip', () => {
+  it('step 9 has no Skip, since the key cannot be skipped', () => {
     mount(9);
     expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
   });

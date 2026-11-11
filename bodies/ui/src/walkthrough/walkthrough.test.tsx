@@ -21,10 +21,10 @@ function open(host = makeWalkthroughHost(), initialStep?: number) {
 const sideButton = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}`) });
 
 describe('Walkthrough', () => {
-  it('renders nine step names and the footnote', () => {
+  it('renders ten step names and the footnote', () => {
     open();
     const list = screen.getByRole('list', { name: 'Steps' });
-    expect(list.querySelectorAll('li')).toHaveLength(9);
+    expect(list.querySelectorAll('li')).toHaveLength(10);
     expect(
       screen.getByText('You can change all of this later in Home, under Settings.'),
     ).toBeInTheDocument();
@@ -132,7 +132,7 @@ describe('Walkthrough', () => {
 });
 
 describe('Walkthrough, a non-coder path', () => {
-  it('never says Claude Code on steps 1 to 6 unless the expert line is opened', async () => {
+  it('never says Claude Code on steps 1 to 6', async () => {
     const { container } = render(<Walkthrough host={makeWalkthroughHost()} scout={SCOUT} />);
     expect(container.textContent).not.toMatch(/Claude Code/);
     fireEvent.click(screen.getByRole('button', { name: 'Get started' }));
@@ -143,15 +143,11 @@ describe('Walkthrough, a non-coder path', () => {
     }
     await screen.findByRole('heading', { name: 'Scout does the everyday jobs' });
     expect(container.textContent).not.toMatch(/Claude Code/);
-    fireEvent.click(
-      screen.getByRole('button', { name: 'For long jobs, Scout can also use an expert' }),
-    );
-    expect(container.textContent).toMatch(/Claude Code/);
   });
 });
 
 describe('Walkthrough, the end', () => {
-  it('shows the placeholder-free steps 6 to 9', async () => {
+  it('shows the placeholder-free steps 6 to 9, then connect your tools', async () => {
     open(makeWalkthroughHost({ key: HAS_KEY }), 6);
     await screen.findByRole('heading', { name: 'Scout does the everyday jobs' });
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
@@ -165,15 +161,55 @@ describe('Walkthrough, the end', () => {
     expect(screen.queryByText(/coming in the next update/)).not.toBeInTheDocument();
   });
 
-  it('Finish is off on step 9 until the key is set, and there is no Skip', async () => {
+  it('Next is off on step 9 until the key is set, and there is no Skip', async () => {
     open(makeWalkthroughHost(), 9);
     await screen.findByText(/Saved on the machine running/);
-    expect(screen.getByRole('button', { name: 'Finish' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
   });
 
+  it('saving the key goes to step ten', async () => {
+    open(makeWalkthroughHost({ key: HAS_KEY }), 9);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await screen.findByRole('heading', { name: 'Connect your tools' });
+    expect(screen.getByRole('button', { name: 'Finish' })).toBeEnabled();
+  });
+
+  it('the finish card lists what the connect step set up', async () => {
+    const host = makeWalkthroughHost({ key: HAS_KEY });
+    host.setupOverview.mockImplementation(() =>
+      Promise.resolve({
+        experts: [{ id: 'claude-acp', name: 'Claude Code', version: '2', state: 'ready', tested: true }],
+        apps: [{ id: 'com.google/gmail', name: 'Gmail', state: 'connected' }],
+        browseExperts: [],
+        browseApps: [],
+        popular: [],
+        appGroups: [],
+        nextCursor: null,
+        sources: null,
+        stale: false,
+        progress: null,
+        failed: null,
+      } as never),
+    );
+    open(host, 10);
+    fireEvent.click(await screen.findByRole('button', { name: 'Finish' }));
+    await screen.findByRole('heading', { name: 'Scout is on your screen' });
+    const list = await screen.findByRole('list', { name: 'Ready to use' });
+    expect(list).toHaveTextContent('Gmail');
+    expect(list).toHaveTextContent('Claude Code');
+  });
+
+  it('"I’ll do this later" finishes the tour like Finish does', async () => {
+    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 10);
+    fireEvent.click(await screen.findByRole('button', { name: 'I’ll do this later' }));
+    await screen.findByRole('heading', { name: 'Scout is on your screen' });
+    expect(host.finishWalkthrough).toHaveBeenCalledWith({ close: false });
+  });
+
   it('Finish with a key opens the finish card; Done finishes once, Open Home opens Home first', async () => {
-    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 9);
+    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 10);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Finish' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
     await screen.findByRole('heading', { name: 'Scout is on your screen' });
@@ -191,7 +227,7 @@ describe('Walkthrough, the end', () => {
   });
 
   it('a failure while closing shows an alert instead of an unhandled rejection', async () => {
-    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 9);
+    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 10);
     host.finishWalkthrough.mockImplementation((options?: { close?: boolean }) =>
       options?.close === false ? Promise.resolve() : Promise.reject(new Error('Could not close.')),
     );
@@ -203,7 +239,7 @@ describe('Walkthrough, the end', () => {
   });
 
   it('Open Home on the card opens Home and finishes the tour', async () => {
-    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 9);
+    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 10);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Finish' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
     await screen.findByRole('heading', { name: 'Scout is on your screen' });

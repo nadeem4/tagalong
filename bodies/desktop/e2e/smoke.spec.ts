@@ -335,7 +335,7 @@ test('Home is one window: Scout, jobs, connections and settings', async () => {
   const home = await windowFor('home');
   await expect(home).toHaveTitle('Home');
 
-  // One companion and six pages, all fed by the brain.
+  // One companion and seven pages, all fed by the brain.
   const nav = home.getByRole('navigation', { name: 'Tagalong' });
   await expect(nav.getByRole('button')).toHaveText(
     [

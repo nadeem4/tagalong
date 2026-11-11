@@ -4,6 +4,7 @@
  */
 
 import { Button, Shortcut } from '../controls';
+import type { ReadyItem } from './step-ten';
 
 interface FinishCardProps {
   /** The ask key as a person reads it, e.g. Ctrl+Shift+Space. */
@@ -13,7 +14,15 @@ interface FinishCardProps {
   onClose: () => void;
   /** Why closing failed, if it did. */
   error?: string;
+  /** What the connect step set up; the block is left out when this is empty or absent. */
+  ready?: readonly ReadyItem[];
 }
+
+const READY_WORDS: Record<ReadyItem['state'], string> = {
+  connected: 'Connected',
+  installing: 'Still installing. Scout will tell you when it’s ready.',
+  signin: 'Needs sign-in. Finish it in Home, under Connections.',
+};
 
 const TRY = [
   'What’s on today?',
@@ -21,7 +30,14 @@ const TRY = [
   'Remind me in 20 minutes to call Sam',
 ];
 
-export function FinishCard({ askKey, talkKey, onOpenHome, onClose, error }: FinishCardProps) {
+export function FinishCard({
+  askKey,
+  talkKey,
+  onOpenHome,
+  onClose,
+  error,
+  ready = [],
+}: FinishCardProps) {
   return (
     <>
       <div className="wt-body">
@@ -59,6 +75,23 @@ export function FinishCard({ askKey, talkKey, onOpenHome, onClose, error }: Fini
               </ul>
             </div>
           </div>
+          {ready.length > 0 && (
+            <div className="wt-ready">
+              <span className="wt-label">
+                <span id="wt-ready">Ready to use</span> <span className="wt-new">New</span>
+              </span>
+              <ul className="wt-keylist" aria-labelledby="wt-ready">
+                {ready.map((item) => (
+                  <li key={item.name}>
+                    <span>{item.name}</span>
+                    <span className={item.state === 'connected' ? 'wt-ok' : 'wt-pending'}>
+                      {READY_WORDS[item.state]}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <p className="wt-note">
             Connected apps, timers and what Scout remembers are in Home whenever you want them.
           </p>

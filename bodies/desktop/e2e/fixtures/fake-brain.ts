@@ -54,6 +54,11 @@ export interface FakeBrainOptions {
   hello?: { version: string; build: string };
   /** The `brain_status` answer (snake_case, as the real tool); absent: the tool is unknown, as on an old brain. */
   brainStatus?: Record<string, unknown>;
+  /**
+   * What `bodies_status` and `whatsapp_status` answer, for Places: which bodies are connected and
+   * which WhatsApp values are saved (default: only the desktop, nothing saved, WhatsApp off).
+   */
+  bodies?: { connected?: string[]; whatsappSet?: string[]; whatsappState?: string };
 }
 
 export interface FakeBrain {
@@ -868,6 +873,30 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           notify('changed', { what: 'approvals' });
         } else if (params.tool === 'brain_status' && options.brainStatus !== undefined) {
           value = options.brainStatus;
+        } else if (params.tool === 'bodies_status') {
+          const on = options.bodies?.connected ?? ['desktop'];
+          value = {
+            bodies: [
+              { kind: 'desktop', name: 'Desktop', connected: on.includes('desktop') },
+              { kind: 'browser', name: 'Browser', connected: on.includes('browser') },
+              { kind: 'whatsapp', name: 'WhatsApp', connected: on.includes('whatsapp') },
+            ],
+          };
+        } else if (params.tool === 'whatsapp_status') {
+          const saved = options.bodies?.whatsappSet ?? [];
+          const set = Object.fromEntries(
+            ['access_token', 'app_secret', 'verify_token', 'phone_number_id', 'allowed_number'].map(
+              (key) => [key, saved.includes(key)],
+            ),
+          );
+          const complete = Object.values(set).every(Boolean);
+          value = {
+            enabled: complete && options.bodies?.whatsappState === 'running',
+            set,
+            complete,
+            state: options.bodies?.whatsappState ?? (complete ? 'off' : 'incomplete'),
+            port: 47322,
+          };
         } else if (params.tool === 'reading_status') value = { rows: readingRows };
         else if (params.tool === 'timers_state') value = { timers };
         else if (params.tool === 'timer_cancel') {
