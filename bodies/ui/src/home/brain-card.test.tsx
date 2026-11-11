@@ -1,6 +1,6 @@
 /**
  * Tests for Scout's brain card, one per state of the mockup (running, update ready, started
- * by you, offline), plus the guarantees: the build id is never drawn, a person's brain offers
+ * by you, offline), plus the guarantees: a person's brain offers
  * no Restart, and "When your job finishes" waits for the work.
  */
 

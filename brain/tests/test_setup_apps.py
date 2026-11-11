@@ -6,6 +6,7 @@ real MCP server. The Allow card goes through the real Toolbox so the gate itself
 
 import asyncio
 import json
+import logging
 import os
 from dataclasses import replace
 from pathlib import Path
@@ -13,7 +14,8 @@ from pathlib import Path
 import pytest
 from mcp.types import Tool
 
-from brain.apps import AppError, AppStatus, TokenFile
+from brain.app_tools import save_app
+from brain.apps import AppError, AppRow, AppStatus, TokenFile
 from brain.bodies import Bodies
 from brain.events import Event
 from brain.memory import Memory
@@ -31,6 +33,7 @@ from brain.protocol import RpcError
 from brain.setup import install as install_mod
 from brain.setup.apps import app_params, app_setup_tools
 from brain.setup.facts import Machine, NodePaths, ToolVersion, node_paths
+from brain.setup.home_tools import home_app_rows
 from brain.setup.install import InstallError, NoBuild
 from brain.setup.paths import node_dir
 from brain.setup.registry import Distribution, Registry, RegistryEntry
@@ -441,6 +444,48 @@ async def test_remote_entry_without_a_browser_connects_and_says_so(rig):
     out = await r.run("acme/cloud")
     assert r.apps.signed_in == [] and out["status"] == "needs-sign-in"
     assert out["browser"] is False
+
+
+async def test_registry_install_saves_official_trust(rig):
+    r = rig()
+    await r.run("com.acme/hosted")
+    await r.run("acme/cloud")
+    assert {a.name: a.trust for a in r.memory.list_apps()} == {
+        "hosted": "official",
+        "cloud": "community",
+    }
+
+
+async def test_hand_added_app_is_community(rig):
+    r = rig()
+    params = {
+        "name": "Mine",
+        "transport": "http",
+        "auth": "none",
+        "config": {"url": "https://x.test"},
+    }
+    row = await save_app(r.apps, r.memory, TokenFile(r.home), lambda m, p: None, params)
+    assert row.trust == "community" and r.memory.list_apps()[0].trust == "community"
+
+
+def test_overview_apps_rows_carry_official():
+    rows = [
+        AppRow("a", "A", "http", {}, "oauth", True, "official"),
+        AppRow("b", "B", "http", {}, "oauth", True),
+    ]
+    out = home_app_rows(rows, lambda app_id: "connected")
+    assert out == [
+        {"id": "a", "name": "A", "state": "connected", "official": True},
+        {"id": "b", "name": "B", "state": "connected", "official": False},
+    ]
+
+
+async def test_install_failure_is_logged(rig, monkeypatch, caplog):
+    monkeypatch.setattr("brain.setup.apps.shutil.which", lambda n: None)
+    with caplog.at_level(logging.WARNING, logger="brain.setup.apps"):
+        await rig().run("acme/pytool")
+    warned = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warned) == 1 and all(t in warned[0] for t in ("acme/pytool", "uv_missing", "uvx"))
 
 
 async def test_uv_missing_adds_nothing(rig, monkeypatch):

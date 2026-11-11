@@ -1,6 +1,6 @@
 /**
- * Guards the Scout wordmark: no sheet sets the name "Scout" in the pixel font (it made the
- * c read as o). Reads the style sources because the bubble's sheet is not exported.
+ * Guards the Scout wordmark: every sheet sets the name "Scout" in Onest at 600, the same
+ * face as all other text. Reads the style sources because the bubble's sheet is not exported.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -12,22 +12,22 @@ const rule = (css: string, selector: string): string =>
   css.split('\n').find((line) => line.startsWith(selector)) ?? '';
 
 describe('Scout wordmark', () => {
-  it('is not set in the pixel font on Home', () => {
+  it('is set in Onest on Home', () => {
     const line = rule(HOME_CSS, '.home-nav__who strong');
     expect(line).not.toBe('');
-    expect(line).not.toContain('Pixelify');
+    expect(line).toContain("'Onest'");
   });
 
-  it('is not set in the pixel font in the walkthrough', () => {
+  it('is set in Onest in the walkthrough', () => {
     const line = rule(WALKTHROUGH_CSS, '.wt-name');
     expect(line).not.toBe('');
-    expect(line).not.toContain('Pixelify');
+    expect(line).toContain("'Onest'");
   });
 
-  it('is not set in the pixel font in the bubble', () => {
+  it('is set in Onest in the bubble', () => {
     const source = readFileSync(join(import.meta.dirname, 'chat-styles.ts'), 'utf8');
-    const line = source.split('\n').find((l) => l.startsWith('.bubble-head strong')) ?? '';
-    expect(line).not.toBe('');
-    expect(line).not.toContain('font.pixel');
+    const start = source.indexOf('.bubble-head strong {');
+    expect(start).toBeGreaterThan(-1);
+    expect(source.slice(start, start + 160)).toContain('font-family: ${t.font.wordmark}');
   });
 });

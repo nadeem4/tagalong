@@ -41,7 +41,7 @@ Nothing outside this package runs SQL: `tests/test_store_boundary.py` fails if a
 under `brain/src/brain` calls `.execute`, `.executescript` or `.executemany`.
 
 - `store/migrations/`: `NNNN_name.sql` (or `NNNN_name.py` with a `migrate(db)` function) files,
-  `0001_memories` to `0027_message_cut`. The numbers have no gaps (the loader refuses a gap or a
+  `0001_memories` to `0028_app_trust`. The numbers have no gaps (the loader refuses a gap or a
   duplicate). Each file runs in one transaction together with its `user_version` bump, so a
   failure leaves the file at the last good version. A file is never edited after it has merged;
   a schema change is a new file.
@@ -618,19 +618,24 @@ An expert's question to Scout is a `question` row under its job: `active` while 
 
 Connected apps (MCP servers).
 
-| Column       | Type             | Meaning                                                                                    |
-| ------------ | ---------------- | ------------------------------------------------------------------------------------------ |
-| `id`         | TEXT PRIMARY KEY | App id                                                                                     |
-| `name`       | TEXT             | Display name                                                                               |
-| `transport`  | TEXT             | `stdio` or `http` (CHECK)                                                                  |
-| `config`     | TEXT             | Transport details as JSON; secrets are never in it                                         |
-| `auth`       | TEXT             | `none`, `token` or `oauth` (CHECK)                                                         |
-| `enabled`    | INTEGER          | 0 or 1; default 1                                                                          |
-| `reads_mail` | INTEGER          | 0 or 1; default 0. The "Read my mail for loops" switch for this app, kept across a restart |
+| Column       | Type             | Meaning                                                                                             |
+| ------------ | ---------------- | --------------------------------------------------------------------------------------------------- |
+| `id`         | TEXT PRIMARY KEY | App id                                                                                              |
+| `name`       | TEXT             | Display name                                                                                        |
+| `transport`  | TEXT             | `stdio` or `http` (CHECK)                                                                           |
+| `config`     | TEXT             | Transport details as JSON; secrets are never in it                                                  |
+| `auth`       | TEXT             | `none`, `token` or `oauth` (CHECK)                                                                  |
+| `enabled`    | INTEGER          | 0 or 1; default 1                                                                                   |
+| `reads_mail` | INTEGER          | 0 or 1; default 0. The "Read my mail for loops" switch for this app, kept across a restart          |
+| `trust`      | TEXT             | `official` or `community` (CHECK); default `community`. Kept from the install so Home still tags it |
 
 - Written by: `apps.py` `Apps` through `store/connections.py` `add_app`, `set_app_enabled`, `remove_app`.
 - Read by: `store/connections.py` `list_apps`.
 - Retention: until the app is removed.
+- Upgrade: migration `0028_app_trust` adds `trust` with no backfill: an older row holds only the
+  registry title and a URL or command, which prove nothing, so apps connected before it read
+  Community until they are added again. A registry install saves it from the entry's id; an app added by hand
+  is `community`.
 - Masked: secrets are moved out of the row into separate files before it is saved
   (`apps.py` `split_secrets`); `${VAR}` references stay as written. See
   [connected-apps.md](connected-apps.md).

@@ -177,7 +177,7 @@ flowchart LR
   `Connecting`, `Needs sign-in`, `Not working`, `Off`), the tool count, the brain's error line when
   there is one, the on/off switch, **Restart** and **Remove**. **Remove** asks again inside the page
   (**Yes, remove** or **Keep**) before `remove_app`.
-- **Apps tab**: a **CONNECTED** card (the rows above), then **ADD AN APP** (`app-search.tsx`): a
+- **Apps tab**: a **Connected** card (the rows above), then **Add an app** (`app-search.tsx`): a
   search box (read 300 ms after typing stops; only the newest request writes results), a **Popular**
   row while it is empty, results grouped per service with **Load more**, and **Add one by hand**
   (`add-form.tsx`, the form below). In a group (`app-group-row.tsx`) the **Official** version leads
@@ -187,10 +187,15 @@ flowchart LR
   opens the **check card** (`check-card.tsx`) first: who made it ("not the service itself"), runs on
   your PC or hosted by whom, how you sign in, licence, "Reviewed: Not yet audited by anyone", **See its code** (only for an http(s) address, opened in your own browser),
   **Back** and **Connect anyway** (`setup_app` with `approved` and `community_ok` true). The brain
-  decides what is Official; a registry that cannot be reached shows one plain line.
-- **Experts tab**: the **FOR LONG JOBS** card (`experts-group.tsx`) lists installed experts, each led
+  decides what is Official; a registry that cannot be reached shows one plain line. With an empty
+  box the brain sends only its curated lists (`popular`, then `popular_more` behind "Show more"),
+  never the registry's raw first page.
+- **Trust kept at install**: a registry install saves `official` or `community` on the app row
+  (`apps.trust`, from the entry's id); an app added by hand is `community`. Home's list reads it
+  back as `official` on each connected app, so the tag survives a restart. Apps connected before this was kept read Community until added again.
+- **Experts tab**: the **For long jobs** card (`experts-group.tsx`) lists installed experts, each led
   by the kind of job it does (`jobs-kinds.ts`) with the product underneath, with a state chip
-  (Ready, Needs login, Update available) and a **Log in** or **Update** button; **ADD AN EXPERT**
+  (Ready, Needs login, Update available) and a **Log in** or **Update** button; **Add an expert**
   lists the registry's experts. An Official one has **Add**; a community one opens the same check
   card, and **Connect anyway** sends `setup_expert` with `approved` and `community_ok`. These go
   through `setup_overview`, `setup_expert` and `setup_app` (see [brain.md](brain.md#home-tools)): the

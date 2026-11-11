@@ -112,7 +112,7 @@ export function PermissionsPanel() {
 
   return (
     <section className="home-card home-perms" aria-label="Permissions">
-      <h2 className="home-card__label">PERMISSIONS</h2>
+      <h2 className="home-card__label">Permissions</h2>
       <p>
         Off: Scout leaves the tool alone and finds another way. Ask: Scout checks with you first.
         Auto: it just does it. Tools that only read start on Auto.

@@ -438,10 +438,13 @@ test('Home is one window: Scout, jobs, connections and settings', async () => {
   // fonts without saying so.
   const fontsLoaded = await home.evaluate(async () => ({
     onest: (await document.fonts.load("14px 'Onest'")).length,
+    onestBold: (await document.fonts.load("600 14px 'Onest'")).length,
     pixel: (await document.fonts.load("17px 'Pixelify Sans'")).length,
   }));
   expect(fontsLoaded.onest).toBeGreaterThan(0);
-  expect(fontsLoaded.pixel).toBeGreaterThan(0);
+  expect(fontsLoaded.onestBold).toBeGreaterThan(0);
+  // Pixelify Sans is retired: nothing is bundled under that name.
+  expect(fontsLoaded.pixel).toBe(0);
 
   // A screenshot for design review, in the gitignored test-results folder.
   await home.screenshot({ path: join(appDir, 'test-results', 'home.png') });

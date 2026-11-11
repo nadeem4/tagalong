@@ -7,12 +7,9 @@ import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HomeView, HostBridgeProvider } from '@tagalong/ui';
 import type { HomeHost, HomePage } from '@tagalong/ui';
-// Bundled, not fetched: Home's two typefaces ship inside the app, Latin subset only.
+// Bundled, not fetched: Home's typeface (Onest 400 and 600) ships inside the app, Latin subset only.
 import '@fontsource/onest/latin-400.css';
 import '@fontsource/onest/latin-600.css';
-import '@fontsource/pixelify-sans/latin-400.css';
-import '@fontsource/pixelify-sans/latin-600.css';
-import '@fontsource/pixelify-sans/latin-700.css';
 import './home.css';
 import '../../shared/ipc';
 import { FIGURE } from './bean-assets';

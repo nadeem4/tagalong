@@ -40,7 +40,7 @@ from brain.sessions import Session
 from brain.setup.apps import app_setup_tools
 from brain.setup.expert_tools import expert_setup_tools, login_tools
 from brain.setup.facts import inspect, real_run_cmd
-from brain.setup.home_tools import SetupProgress, home_setup_tools
+from brain.setup.home_tools import SetupProgress, home_app_rows, home_setup_tools
 from brain.setup.install import NPM_TIMEOUT_S, sweep_staging
 from brain.setup.login import LoginDriver
 from brain.setup.net import http_fetch, real_get_json
@@ -244,10 +244,7 @@ async def _run() -> None:
             registry,
             inspect_machine,
             lambda: all_experts(experts, config.expert_cmd),
-            lambda: [
-                {"id": r.id, "name": r.name, "state": apps.status(r.id).state}
-                for r in memory.list_apps()
-            ],
+            lambda: home_app_rows(memory.list_apps(), lambda i: apps.status(i).state),
             lambda **kw: session.asks.open(**kw),
             lambda **kw: session.approvals.record(**kw),
             expert_tools + app_tools + login,

@@ -33,11 +33,11 @@ def test_migration_adds_apps(tmp_path):
     Memory(path).close()
     db = sqlite3.connect(path)
     cols = [r[1] for r in db.execute("PRAGMA table_info(apps)")]
-    assert cols == ["id", "name", "transport", "config", "auth", "enabled", "reads_mail"]
+    assert cols == ["id", "name", "transport", "config", "auth", "enabled", "reads_mail", "trust"]
     with pytest.raises(sqlite3.IntegrityError):
-        db.execute("INSERT INTO apps VALUES('x','X','ftp','{}','none',1,0)")
+        db.execute("INSERT INTO apps VALUES('x','X','ftp','{}','none',1,0,'community')")
     with pytest.raises(sqlite3.IntegrityError):
-        db.execute("INSERT INTO apps VALUES('x','X','http','{}','basic',1,0)")
+        db.execute("INSERT INTO apps VALUES('x','X','http','{}','basic',1,0,'community')")
     db.close()
     assert len(load_migrations()) >= 5
 

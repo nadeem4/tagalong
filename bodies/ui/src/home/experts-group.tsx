@@ -52,7 +52,7 @@ export function ExpertsGroup({
 }) {
   return (
     <section className="home-card" aria-label="For long jobs">
-      <h2 className="home-card__label">FOR LONG JOBS</h2>
+      <h2 className="home-card__label">For long jobs</h2>
       {experts.length === 0 ? (
         <p className="tg-note">No experts yet. Add one below.</p>
       ) : (

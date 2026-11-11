@@ -76,7 +76,7 @@ export function WhereThingsRun() {
 
   return (
     <section className="home-card home-card--run" aria-label="Where things run">
-      <h2 className="home-card__label">WHERE THINGS RUN</h2>
+      <h2 className="home-card__label">Where things run</h2>
       {link.status !== 'online' ? (
         <p>Connected apps show up when the brain is connected.</p>
       ) : (

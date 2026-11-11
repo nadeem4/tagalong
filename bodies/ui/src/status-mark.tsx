@@ -37,7 +37,8 @@ export function StatusMark({ mark, variant, onFix }: StatusMarkProps) {
           background: tone === 'warn' ? t.color.warnFill : '#6B7290',
           color: tone === 'warn' ? t.color.warnInk : t.color.text,
           fontFamily: t.font.ui,
-          fontSize: t.fontSize.min,
+          fontSize: t.type.caption.size,
+          lineHeight: `${t.type.caption.line}px`,
           fontWeight: t.fontWeight.semibold,
           whiteSpace: 'nowrap',
         }}
@@ -59,7 +60,8 @@ export function StatusMark({ mark, variant, onFix }: StatusMarkProps) {
         gap: t.space.md,
         margin: 0,
         fontFamily: t.font.ui,
-        fontSize: t.fontSize.small,
+        fontSize: t.type.small.size,
+        lineHeight: `${t.type.small.line}px`,
         color: tone === 'warn' ? '#F2D48A' : t.color.textMuted,
       }}
     >

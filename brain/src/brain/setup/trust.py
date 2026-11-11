@@ -24,14 +24,16 @@ EXPERT_VENDORS: frozenset[str] = frozenset(
     }
 )
 
-# Registry ids looked up for the Popular row; Home drops any that is absent, not Official, or
-# cannot be connected in one click here.
-POPULAR: tuple[str, ...] = (
-    "com.notion/mcp",
-    "app.linear/mcp",
-    "com.atlassian/atlassian-mcp-server",
-    "com.asana/mcp",
-)
+# The curated lists Home shows with no search, as registry ids checked against the live registry
+# (2026-11-10): each is Official and connects in one click. Gmail, Google Calendar, Google Drive,
+# Slack, GitHub and Asana publish no such entry there, so they are not listed; add one here when
+# its Official entry appears. Home still drops an id the registry no longer has.
+POPULAR_APPS: tuple[str, ...] = ("com.notion/mcp",)
+MORE_APPS: tuple[str, ...] = ("app.linear/linear", "com.atlassian/atlassian-mcp-server")
+
+# Experts shown first, in this order; the rest sit behind "Show more".
+POPULAR_EXPERTS: tuple[str, ...] = ("claude-acp", "gemini", "codex-acp")
+RECOMMENDED_EXPERT = "claude-acp"
 
 
 def namespace(entry_id: str) -> str:

@@ -32,7 +32,7 @@ The store listing, permission justifications and the public privacy policy are i
 | `src/events.ts`                      | The `tab` and `download` facts: URL stripping, throttle                                   |
 | `src/permissions.ts`                 | The permission broker and its 25 s wait                                                   |
 | `src/permission/`                    | The permission window page                                                                |
-| `src/popup/`                         | The toolbar popup page                                                                    |
+| `src/popup/`                         | The toolbar popup page (Onest, bundled)                                                   |
 | `src/voice/`                         | The voice session (pure), the mic page's hold, the popup port and the float to int16 step |
 | `src/offscreen/`                     | The hidden page that owns the microphone, and its worklet                                 |
 | `src/permission/mic.*`               | The page where you allow the microphone                                                   |
