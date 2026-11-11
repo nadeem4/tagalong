@@ -3148,6 +3148,35 @@ async def test_session_tool_ask_runs_side_check_then_the_person():
     assert (latest.outcome, latest.decided_by) == ("approved", "person")
 
 
+async def test_answer_after_the_turn_was_cancelled_still_runs_the_call():
+    ran = []
+
+    class Recording(ChangeApp):
+        async def run(self, call, tool):
+            ran.append(tool)
+            return "tidied"
+
+    block = asyncio.Event()
+    session, sent = make(Gate([tool_use("files__tidy"), block, "unused"]), Memory(":memory:"))
+    session.toolbox.sources.insert(1, Recording())
+    wakes = []
+    session.ask_runner._emit = lambda event, on_start=None: wakes.append(event)
+    join(session, "desktop")
+    first = session.say("desktop", say("tidy up"))
+    while not open_asks(sent):
+        await asyncio.sleep(0)
+    await settle()  # the turn has its "waiting" result and is blocked on the model
+    session.cancel(first.turn)
+    await finish_quietly(session)
+    [card] = open_asks(sent)
+    session.answer(card["id"], "allow", "desktop")
+    await settle()
+    assert ran == ["files__tidy"]
+    assert [(e.kind, e.facts["outcome"], e.facts["result"]) for e in wakes] == [
+        ("ask_ended", "approved", "tidied")
+    ]
+
+
 # --- return: only a body that shows cards brings the waiting asks back ---
 
 

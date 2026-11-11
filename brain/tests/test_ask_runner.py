@@ -39,8 +39,8 @@ class Bodies:
 
 
 class Source:
-    def __init__(self, *names):
-        self._specs = [ToolSpec(n, f"{n} tool", {"type": "object"}) for n in names]
+    def __init__(self, *names, effect="change"):
+        self._specs = [ToolSpec(n, f"{n} tool", {"type": "object"}, effect=effect) for n in names]
         self.ran: list[tuple[str, dict]] = []
 
     def specs(self):
@@ -58,7 +58,7 @@ class Source:
 
 
 class Rig:
-    def __init__(self, memory=None, clock=None):
+    def __init__(self, memory=None, clock=None, effect="change"):
         self.clock = clock or [NOW]
         self.memory = memory or Memory(":memory:")
         self.work = WorkStore(self.memory.db, lambda: NOW)
@@ -68,7 +68,7 @@ class Rig:
         self.items = OpenItems(self.memory.db, lambda: self.clock[0])
         self.stored: dict[str, str] = {}
         self.events: list[Event] = []
-        self.source = Source("t")
+        self.source = Source("t", effect=effect)
         self.engine = Engine(
             [StandingRule(stored_auto_rules(lambda: self.stored)), Person()],
             self.approvals,
@@ -187,14 +187,58 @@ async def test_a_tool_turned_off_since_refuses_the_late_yes():
     assert rig.events[0].facts["outcome"] == "refused"
 
 
-async def test_a_call_that_held_a_secret_is_not_run_from_its_masked_copy():
+async def test_a_call_that_held_a_secret_runs_from_the_raw_copy_in_the_same_process():
     rig = Rig()
     rig.approvals.mask = lambda value: {**value, "input": {"n": "[secret]"}}
     await rig.box.run(call())
+    [item] = rig.items.list_open(kind="ask")
+    assert item.saved_call["input"] == {"n": "[secret]"}  # nothing unmasked is saved
     rig.asks.answer(rig.opened()[0]["id"], "allow", "desktop")
     await rig.settle()
+    assert rig.source.ran == [("t", {"n": 1})]
+    assert rig.events[0].facts["outcome"] == "approved"
+
+
+async def test_a_call_that_held_a_secret_fails_after_a_restart():
+    rig = Rig()
+    rig.approvals.mask = lambda value: {**value, "input": {"n": "[secret]"}}
+    await rig.box.run(call())
+    again = Rig(rig.memory)
+    again.runner.rejoined()
+    await again.settle()
+    again.asks.answer(again.opened()[0]["id"], "allow", "desktop")
+    await again.settle()
+    assert again.source.ran == []
+    assert again.events[0].facts["reason"] == "held a secret"
+
+
+async def test_deny_wins_even_when_the_tool_became_auto_since():
+    rig = Rig(effect="read")
+    rig.stored["t"] = "ask"  # a read tool is auto by itself; the owner made it ask
+    await rig.box.run(call())
+    [card] = rig.opened()
+    del rig.stored["t"]  # now it is auto again
+
+    rig.asks.answer(card["id"], "deny", "desktop")
+    await rig.settle()
     assert rig.source.ran == []
-    assert rig.events[0].facts["reason"] == "held a secret"
+    assert rig.events[0].facts["outcome"] == "refused"
+    assert rig.work.get(card["id"]).end_reason == "refused"
+
+
+async def test_a_notice_wakes_scout_at_two_thirds_of_the_wait_once():
+    rig = Rig()
+    await rig.box.run(call())
+    [card] = rig.opened()
+    rig.clock[0] = NOW + timedelta(days=2, minutes=1)  # past 2/3 of 3 days
+    rig.runner.fire_due()
+    rig.runner.fire_due()
+    [notice] = [e for e in rig.events if e.kind == "ask_notice"]
+    assert notice.facts["ask"] == card["id"] and notice.facts["left_s"] < 86400
+    assert rig.items.get(card["id"]).state == "open"
+    rig.asks.answer(card["id"], "allow", "desktop")
+    await rig.settle()
+    assert [e.kind for e in rig.events] == ["ask_notice", "ask_ended"]
 
 
 async def test_no_answer_by_the_deadline_expires_it_and_tells_scout():

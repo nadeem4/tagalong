@@ -42,6 +42,11 @@ def _call(item: OpenItem) -> Call:
     )
 
 
+def _notice_at(item: OpenItem) -> datetime:
+    """Two-thirds of the way from opening to the deadline."""
+    return item.created_at + (item.deadline_at - item.created_at) * 2 / 3
+
+
 class AskRunner:
     def __init__(
         self,
@@ -59,6 +64,10 @@ class AskRunner:
         self._now = now
         self._approvals = approvals  # masks the saved call; logs an ask that expired
         self._tasks: set[asyncio.Task] = set()
+        # The unmasked call of an ask that held a secret, for this process only: nothing secret is
+        # saved, so after a restart such an ask cannot run.
+        self._raw: dict[str, Call] = {}
+        self._noticed: set[str] = set()
         self._handle: asyncio.TimerHandle | None = None
 
     def open(self, call: Call, req: AskRequest, wait: timedelta) -> OpenItem:
@@ -72,6 +81,8 @@ class AskRunner:
         if item is not None:
             return item
         item = self._items.open(KIND, "brain", saved_call=saved, ttl_s=wait.total_seconds())
+        if saved["masked"]:
+            self._raw[item.id] = call
         self._asks.show(item.id, replace(call, input=req.input), req.tool, req.tier is not Tier.ask)
         self.changed()
         return item
@@ -94,9 +105,14 @@ class AskRunner:
 
     async def _carry_out(self, item: OpenItem, option: str) -> None:
         call = _call(item)
-        saved = item.saved_call or {}
-        if saved.get("masked"):
-            return self._end(item, "failed", "held a secret")
+        raw = self._raw.pop(item.id, None)
+        if option == "deny":  # before the gate: a tool that became auto must not outrun a no
+            self._record_ask(item, "refused", "person", "the person said no")
+            return self._end(item, "refused", "the person said no")
+        if (item.saved_call or {}).get("masked"):
+            if raw is None:
+                return self._end(item, "failed", "held a secret")
+            call = raw
         toolbox = self._toolbox()
         found = toolbox.spec_named(call.name)
         if found is None:
@@ -124,6 +140,8 @@ class AskRunner:
     def _end(self, item: OpenItem, outcome: str, reason: str = "", result: str = "") -> None:
         """Close the item and wake Scout with what happened; he words it."""
         self._items.finish(item.id, outcome)
+        self._raw.pop(item.id, None)
+        self._noticed.discard(item.id)
         call = _call(item)
         facts: dict[str, str | int] = {
             "ask": item.id,
@@ -147,7 +165,8 @@ class AskRunner:
         self.fire_due()
 
     def changed(self) -> None:
-        """Re-arm the one timer for the earliest deadline among open asks."""
+        """Re-arm the one timer for the earliest moment among open asks: a notice not yet sent
+        or a deadline."""
         if self._handle is not None:
             self._handle.cancel()
             self._handle = None
@@ -155,7 +174,10 @@ class AskRunner:
             loop = asyncio.get_running_loop()
         except RuntimeError:
             return
-        due = [i.deadline_at for i in self._items.list_open(kind=KIND)]
+        due = [
+            i.deadline_at if i.id in self._noticed else _notice_at(i)
+            for i in self._items.list_open(kind=KIND)
+        ]
         if due:
             self._handle = loop.call_later(
                 max((min(due) - self._now()).total_seconds(), 0), self.fire_due
@@ -163,23 +185,12 @@ class AskRunner:
 
     def fire_due(self) -> None:
         for item in self._items.expire_due(self._now(), KIND):
+            self._raw.pop(item.id, None)
+            self._noticed.discard(item.id)
             self._asks.expire(item.id, "no answer")
             call = _call(item)
             summary = summarise(call.text, call.name, call.input)
-            try:
-                self._approvals.record(
-                    source=(item.saved_call or {}).get("source") or "scout_tool",
-                    tool=call.name,
-                    summary=summary,
-                    input=call.input,
-                    group_key=call.name,
-                    outcome="expired",
-                    decided_by="none",
-                    ask_id=item.id,
-                    reason="no answer",
-                )
-            except TransitionRefused:
-                pass  # its row already ended
+            self._record_ask(item, "expired", "none", "no answer")
             facts: dict[str, str | int] = {
                 "ask": item.id,
                 "tool": call.name,
@@ -188,7 +199,37 @@ class AskRunner:
                 "reason": "no answer",
             }
             self._emit(Event("ask_ended", facts, key=f"ask:{item.id}"))
+        now = self._now()
+        for item in self._items.list_open(kind=KIND):
+            if item.id not in self._noticed and now >= _notice_at(item):
+                self._noticed.add(item.id)
+                call = _call(item)
+                facts = {
+                    "ask": item.id,
+                    "tool": call.name,
+                    "summary": summarise(call.text, call.name, call.input),
+                    "age_s": int((now - item.created_at).total_seconds()),
+                    "left_s": int((item.deadline_at - now).total_seconds()),
+                }
+                self._emit(Event("ask_notice", facts, key=f"ask:{item.id}"))
         self.changed()
+
+    def _record_ask(self, item: OpenItem, outcome: str, by: str, reason: str) -> None:
+        call = _call(item)
+        try:
+            self._approvals.record(
+                source=(item.saved_call or {}).get("source") or "scout_tool",
+                tool=call.name,
+                summary=summarise(call.text, call.name, call.input),
+                input=call.input,
+                group_key=call.name,
+                outcome=outcome,
+                decided_by=by,
+                ask_id=item.id,
+                reason=reason,
+            )
+        except TransitionRefused:
+            pass  # its row already ended
 
     # ---- return ----
 

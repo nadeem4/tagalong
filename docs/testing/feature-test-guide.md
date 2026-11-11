@@ -537,9 +537,12 @@ next section.
    **Expected:** the ask is waiting and is shown when the desktop joins; no `no_one` row.
 5. **Action:** press **Stop** on the turn while its ask is open, and run a read tool.
    **Expected:** no row for either, and the card stays up; answering it later still runs the call
-   (`test_cancel_does_not_close_open_ask`).
+   (`test_cancel_does_not_close_open_ask`,
+   `test_answer_after_the_turn_was_cancelled_still_runs_the_call`). A Deny after the tool was set to
+   Auto still refuses (`test_deny_wins_even_when_the_tool_became_auto_since`).
    5b. **Action:** ask Scout for a change tool and say it may wait 1 hour for you; leave the card
-   unanswered. After the hour, open
+   unanswered. After 40 minutes Scout may remind you once (`ask_notice`,
+   `test_a_notice_wakes_scout_at_two_thirds_of_the_wait_once`). After the hour, open
    Home, Approvals.
    **Expected:** the card is gone on every open body, the call never ran, Scout says it expired,
    and the history shows an **Expired** row with `decided_by: "none"` and reason `no answer`
@@ -562,8 +565,8 @@ next section.
    (`test_a_tool_turned_off_since_refuses_the_late_yes`). Quit the brain right after allowing
    and before the call finishes: on start Scout says it is not known if it ran, and it is not run
    again (`test_restart_closes_an_answered_item_it_cannot_vouch_for`). With a secret in the call
-   the yes cannot run it and Scout says it held a secret
-   (`test_a_call_that_held_a_secret_is_not_run_from_its_masked_copy`).
+   the yes runs it in the same session, but after a restart it cannot and Scout says it held a
+   secret (`test_a_call_that_held_a_secret_fails_after_a_restart`).
 6. **Action:** call `edit_preference` on the default with a new sentence, then `remove_preference`.
    **Expected:** the edit shows in `list_preferences`; after the remove the list is empty and
    stays empty after a brain restart. An unknown id, or a sentence over 300 characters, is

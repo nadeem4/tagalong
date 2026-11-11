@@ -616,7 +616,7 @@ flowchart TD
   B -- no --> F{preference covers it?}
   F -- yes --> G[runs once, row by scout]
   F -- no or error --> D{anyone online?}
-  D -- no --> E[ask stays open and parks]
+  D -- no --> E[ask stays open, shown when a body joins]
   D -- yes --> H[ask the owner: Allow card]
   X[Scout calls hand_off] --> Y{owner turn?}
   Y -- yes --> Z[mode card]
@@ -628,15 +628,17 @@ flowchart TD
   Settings are `TAGALONG_OFFER_MIN_APPROVALS`, `TAGALONG_OFFER_WINDOW_DAYS` and
   `TAGALONG_KEEP_ASKING_DAYS`.
 - **Deny.** The tool does not run. Scout is told "The user said no to <tool>."
-- **No answer.** A Scout ask waits in its turn for five minutes, then parks and waits for you up
-  to its deadline (see [Asks that wait](#asks-that-wait)). A job's ask has no deadline and waits
-  with its job.
+- **No answer.** A Scout ask never holds its turn: the turn gets "waiting for the person's
+  answer" at once and the ask stays open up to its deadline (see
+  [Asks that wait](#asks-that-wait)). A job's ask has no deadline and waits with its job.
 - **Nobody online.** The ask is still opened and saved. Only bodies that display count: with
-  just a `display: false` body (the browser) online, a Scout ask parks at once, and the card
-  is replayed to the first displaying body that joins.
-- **Turn cancelled.** An open ask closes with `reason: "cancelled"` and nothing is left behind.
-- **Relaunch of a body.** A body that joins with no `last_seq` (the desktop is a new process) is sent every open ask again after the hello result, and can still answer it; the turn or job waiting on it goes on. The desktop keeps the cards it was sent and its bubble pulls them when it mounts, since the live frame can arrive before any window exists (`openConfirms`, see [desktop.md](desktop.md)). Known gap: after a relaunch the bubble cannot Stop the old turn (open turns are not announced again), so a new ask waits behind it until the card is answered or the ask parks after 300 s. There is no "Stop job" in the bubble: the bubble's Stop ends the turn; a job is stopped from Home > Jobs.
-- **Reconnect.** The waiting lives in memory; each open ask is also an `active` `ask` work row. A restart expires a job's ask and a turn-bound card ("brain restarted"), but keeps a Scout ask
+  just a `display: false` body (the browser) online, the card is replayed to the first
+  displaying body that joins.
+- **Turn cancelled.** A Scout ask is not tied to its turn, so a cancel leaves the card and the
+  saved call alone; a later yes still runs the call. Only a job's ask or a turn-bound card closes
+  with `reason: "cancelled"`.
+- **Relaunch of a body.** A body that joins with no `last_seq` (the desktop is a new process) is sent every open ask again after the hello result, and can still answer it; the turn or job waiting on it goes on. The desktop keeps the cards it was sent and its bubble pulls them when it mounts, since the live frame can arrive before any window exists (`openConfirms`, see [desktop.md](desktop.md)). Known gap: after a relaunch the bubble cannot Stop the old turn (open turns are not announced again), so the old turn stays until it ends (a Scout ask no longer holds it). There is no "Stop job" in the bubble: the bubble's Stop ends the turn; a job is stopped from Home > Jobs.
+- **Reconnect.** A job's ask or a turn-bound card waits in memory, with an `active` `ask` work row. A restart expires them ("brain restarted"), but keeps a Scout ask (an open item)
   with its deadline: it comes back when a body that shows cards joins (see
   [Restart and return](#restart-and-return)). A body that joins with no `last_seq`, or that is told
   `resync`, is sent every ask still open again, with fresh `seq` numbers. A body that reconnects
@@ -675,12 +677,16 @@ turned off since refuses, a tool that no longer exists fails), then the person's
 `Toolbox.carry_out`. The rule and side-check already had their say when the ask opened. It does not
 matter whether the turn is still alive. The item ends `done` and a waking `ask_ended` event
 `{ask, tool, summary, outcome, result | reason}` keyed `ask:<id>` goes to Scout, who words it.
-`outcome` is `approved`, `refused`, `expired` or `failed` (yes, but it could not run). A call whose
-saved copy held a secret fails with "held a secret": the masked copy is never run. A second answer
+`outcome` is `approved`, `refused`, `expired` or `failed` (yes, but it could not run). A no
+never reaches the gate: it is logged `refused` and ended at once, so a tool that became Auto
+since the card opened cannot run on a Deny. A call that held a secret is saved masked; the
+unmasked call is kept in memory for this process only, so the yes runs it, while after a restart
+it fails with "held a secret" (the masked copy is never run). A second answer
 to a closed ask gets `not_found`. The log row is made when the ask ends (`Approvals.record`).
 
-_Deadline._ One `call_later` is armed for the earliest deadline over the open `ask` items. At the
-deadline the item expires, the card closes for every body (reason `timeout`), the ask is logged
+_Notice and deadline._ One `call_later` is armed for the earliest moment over the open `ask`
+items. At two-thirds of the wait Scout gets one `ask_notice` `{ask, tool, summary, age_s, left_s}`
+keyed `ask:<id>` and may remind the person (sent once per brain run). At the deadline the item expires, the card closes for every body (reason `timeout`), the ask is logged
 `expired` (`decided_by: none`, reason `no answer`) and `ask_ended` wakes Scout. An expired ask runs
 nothing; the deadline never changes what is allowed. With no wait given the deadline is 3 days.
 
@@ -1450,6 +1456,7 @@ Event kinds (`EVENT_KINDS` in `events.py`):
 
 | Kind              | Batch window | Cap per hour | Note                                                                                                                                                                                         |
 | ----------------- | ------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ask_notice`      | 60 s         | 6            | A Scout ask is still waiting and two-thirds of its wait has passed (facts: ask, tool, summary, age_s, left_s); Scout may remind the person once or stay silent |
 | `ask_ended`       | 30 s         | 10           | A Scout ask ended (facts: ask, tool, summary, outcome, result or reason); the saved call has already run if the person allowed it                                                     |
 | `job_ended`       | 30 s         | 10           | A job ended; endings within 30 s share one wake                                                                                                                                              |
 | `job_step_failed` | 120 s        | 4            | A step a job ran (usually a command) failed (facts: job, step, exit, activity summary); failures within 120 s share one wake showing the latest, and a held one is dropped when the job ends |

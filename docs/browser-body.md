@@ -499,7 +499,7 @@ Home's Places page (Home > Places) shows whether the add-on is connected to the 
 | `tab_actions`, Chrome refuses    | `tool_failed`: "I could not close that tab: ..." with the reason          |
 | Only the browser is online       | Scout can still read tabs, but an ask waits for the desktop; see below    |
 | Ask from the page, brain down    | Waits up to 5 s for the link, then drops it; the popup says it is down    |
-| `tab_actions`, only browser up   | Waits for the desktop: the ask parks and shows when it joins              |
+| `tab_actions`, only browser up   | Waits for the desktop: the ask stays open and shows when it joins         |
 
 ## Only the browser is online
 

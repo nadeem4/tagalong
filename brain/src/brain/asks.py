@@ -1,4 +1,4 @@
-"""Asks: open an ask to the bodies, wait for one person's answer.
+"""Asks: open an ask to the bodies; a job's ask waits for one person's answer.
 
 `permission` is the confirm ask of a job's tool call (it waits); `open` is for work with no turn
 (expert jobs): custom options, optional typed answer, no default timeout. `show` is Scout's own
