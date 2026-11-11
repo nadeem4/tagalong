@@ -725,11 +725,19 @@ brain restarted, so it is not known if it ran" through `ask_ended` (outcome `fai
 came due while the brain was away expire as at any deadline. The other open items are kept with
 their deadline.
 
-_On return._ `Session._on_connect` calls `AskRunner.rejoined` when the joining body displays (a
-`display: false` body such as the browser does nothing). Every open `ask` item whose card is not
-live in `Asks` (a restart leaves none) gets its card shown again, with the same ask id and no
-`turn`, for every body. A tool that has gone ends the ask `failed` ("that tool is gone"). Nothing is
-decided without the person on return: the rule and side-check ran when the ask opened.
+_On return._ `Session._on_connect` calls `AskRunner.returned(away)` when the joining body displays (a
+`display: false` body such as the browser does nothing); `away` is the seconds the body was gone, or
+none if it was never seen. Three things happen, in order. An item that expired since the body left
+(`OpenItems.expired_since`, for example a live-only expert ask whose process ended) gets an `ask`
+frame `state: "closed"`, `reason: "timeout"`, so a card the body still shows goes away; a body that
+never showed it ignores the frame. Every open `ask` item whose card is not live in `Asks` (a restart
+leaves none) gets its card shown again, with the same ask id and no `turn`, for every body. A tool
+that has gone ends the ask `failed` ("that tool is gone"). Then, if any card was shown again, one
+`asks_waiting` event goes to the scheduler: `count` and `asks`, a JSON list of `ask`, `tool`,
+`summary` and `age_s` (seconds waited), oldest first, so Scout can say how old each is in his own
+words. Cards already up (a second body joining) are not told again. Nothing is decided without the
+person on return: the rule and side-check ran when the ask opened. The Held tab lists the open
+items too (see `loops_state`).
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
@@ -738,7 +746,8 @@ flowchart TD
   A -- yes --> X[closed as failed, not run again; Scout woken]
   A -- no --> K[stays open with its deadline]
   K --> J[a body that displays joins]
-  J --> C[card shown again, same ask id]
+  J --> C[card shown again, same ask id; ended cards closed]
+  C --> W[asks_waiting wake: which asks wait, how old]
   C --> P[person answers]
   P --> R[saved call runs through the floor; ask_ended]
 ```
@@ -1468,27 +1477,28 @@ offline ask from the same job replaces the first. This news is held in memory on
 
 Event kinds (`EVENT_KINDS` in `events.py`):
 
-| Kind              | Batch window | Cap per hour | Note                                                                                                                                                                                         |
-| ----------------- | ------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ask_notice`      | 60 s         | 6            | A Scout ask is still waiting and two-thirds of its wait has passed (facts: ask, tool, summary, age_s, left_s); Scout may remind the person once or stay silent                               |
-| `ask_ended`       | 30 s         | 10           | A Scout ask ended (facts: ask, tool, summary, outcome, result or reason); the saved call has already run if the person allowed it                                                            |
-| `job_ended`       | 30 s         | 10           | A job ended; endings within 30 s share one wake                                                                                                                                              |
-| `job_step_failed` | 120 s        | 4            | A step a job ran (usually a command) failed (facts: job, step, exit, activity summary); failures within 120 s share one wake showing the latest, and a held one is dropped when the job ends |
-| `work_failed`     | 0 s          | 10           | A goal's step gave up after its retries or was not retryable (facts: goal, step, title, reason); Scout says which step failed and offers `resolve_step`                                      |
-| `job_quiet`       | 0 s          | 3            | A running job showed no new step or message for `TAGALONG_JOB_QUIET_MIN` minutes (facts: job, quiet minutes, whether the adapter lives, the running step and how long)                       |
-| `timer`           | 0 s          | 6            | One of Scout's timers or watches came due                                                                                                                                                    |
-| `watches_paused`  | 0 s          | 2            | Watches an update paused, told once at the first start after it                                                                                                                              |
-| `loop`            | 0 s          | 4            | A held loop needs a look (facts: reason, id, title, asks, direction, people, due); for now only `reason=due`. Its text may come from someone else, so it is data                             |
-| `body_online`     | 0 s          | 2            | A body came back after 10+ minutes away                                                                                                                                                      |
-| `back`            | 0 s          | 2            | The owner returned after 5+ minutes idle                                                                                                                                                     |
-| `job_question`    | none         | none         | An expert asks a question, or asked while nobody was online (no question id); one wake each, not counted against the global cap                                                              |
-| `choice`          | none         | none         | The owner answered a `choose` question (option and text); one wake each, not counted against the global cap                                                                                  |
-| `focus`           | none         | none         | Which window is in front (context, no wake)                                                                                                                                                  |
-| `tab`             | none         | none         | Which browser tab is in front (context, no wake)                                                                                                                                             |
-| `download`        | none         | none         | The latest finished or failed browser download (context, no wake)                                                                                                                            |
-| `setup_progress`  | none         | none         | How far an expert install is (expert, stage, percent; context, no wake)                                                                                                                      |
-| `setup_done`      | none         | none         | An install ended: an expert (expert, ok, installed or error, detail) or an app that connected later (app, name, ok, state, tools and tools_total, or detail); wakes Scout                    |
-| `setup_login`     | none         | none         | An expert login ended (expert, state, detail); wakes Scout to say so                                                                                                                         |
+| Kind              | Batch window | Cap per hour | Note                                                                                                                                                                                                              |
+| ----------------- | ------------ | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ask_notice`      | 60 s         | 6            | A Scout ask is still waiting and two-thirds of its wait has passed (facts: ask, tool, summary, age_s, left_s); Scout may remind the person once or stay silent                                                    |
+| `ask_ended`       | 30 s         | 10           | A Scout ask ended (facts: ask, tool, summary, outcome, result or reason); the saved call has already run if the person allowed it                                                                                 |
+| `asks_waiting`    | none         | none         | The person's screen is back and Scout asks that waited while they were away are shown again (facts: count, asks as JSON of ask, tool, summary, age_s); Scout says how old each is and does not ask again in words |
+| `job_ended`       | 30 s         | 10           | A job ended; endings within 30 s share one wake                                                                                                                                                                   |
+| `job_step_failed` | 120 s        | 4            | A step a job ran (usually a command) failed (facts: job, step, exit, activity summary); failures within 120 s share one wake showing the latest, and a held one is dropped when the job ends                      |
+| `work_failed`     | 0 s          | 10           | A goal's step gave up after its retries or was not retryable (facts: goal, step, title, reason); Scout says which step failed and offers `resolve_step`                                                           |
+| `job_quiet`       | 0 s          | 3            | A running job showed no new step or message for `TAGALONG_JOB_QUIET_MIN` minutes (facts: job, quiet minutes, whether the adapter lives, the running step and how long)                                            |
+| `timer`           | 0 s          | 6            | One of Scout's timers or watches came due                                                                                                                                                                         |
+| `watches_paused`  | 0 s          | 2            | Watches an update paused, told once at the first start after it                                                                                                                                                   |
+| `loop`            | 0 s          | 4            | A held loop needs a look (facts: reason, id, title, asks, direction, people, due); for now only `reason=due`. Its text may come from someone else, so it is data                                                  |
+| `body_online`     | 0 s          | 2            | A body came back after 10+ minutes away                                                                                                                                                                           |
+| `back`            | 0 s          | 2            | The owner returned after 5+ minutes idle                                                                                                                                                                          |
+| `job_question`    | none         | none         | An expert asks a question, or asked while nobody was online (no question id); one wake each, not counted against the global cap                                                                                   |
+| `choice`          | none         | none         | The owner answered a `choose` question (option and text); one wake each, not counted against the global cap                                                                                                       |
+| `focus`           | none         | none         | Which window is in front (context, no wake)                                                                                                                                                                       |
+| `tab`             | none         | none         | Which browser tab is in front (context, no wake)                                                                                                                                                                  |
+| `download`        | none         | none         | The latest finished or failed browser download (context, no wake)                                                                                                                                                 |
+| `setup_progress`  | none         | none         | How far an expert install is (expert, stage, percent; context, no wake)                                                                                                                                           |
+| `setup_done`      | none         | none         | An install ended: an expert (expert, ok, installed or error, detail) or an app that connected later (app, name, ok, state, tools and tools_total, or detail); wakes Scout                                         |
+| `setup_login`     | none         | none         | An expert login ended (expert, state, detail); wakes Scout to say so                                                                                                                                              |
 
 A kind can also set `wakes` (false: keep only the latest fact, no turn) and `enabled`. An event with
 a `key` replaces an older held event of the same kind and key (also for kinds with no batch window). Held events live in memory only: a
@@ -1965,7 +1975,7 @@ PowerPoint` but a one-word anchor never matches. A URL anchor must have a path a
     next interval and, after three failures in a row, sets `unread_since` too. A good full poll clears
     it. Nothing here raises into the brain.
 - **Home tools** (`loops/home_tools.py`, Home only, never in Scout's toolbox; `main.py` registers
-  them). `loops_state` answers `{apps, loops}`: `apps` are the connected apps the Gmail adapter
+  them). `loops_state` answers `{apps, loops, open_items}`: `apps` are the connected apps the Gmail adapter
   matches (`can_read`), each with `on` and, only when set, `unread_since`; `loops` are every loop
   the store holds (any status) with id, app, title, asks, direction, due, people and status, and
   never the mail text (the brain does not keep it). `loops_set {app, on}` starts (the 14-day

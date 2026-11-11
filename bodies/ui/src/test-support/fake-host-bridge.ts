@@ -392,7 +392,7 @@ export function createFakeHostBridge(
       fake.memories = fake.memories.filter((memory) => memory.id !== id);
       return Promise.resolve(fake.memories.length < before);
     },
-    loops: options.loops ?? { apps: [], loops: [] },
+    loops: options.loops ?? { apps: [], loops: [], openItems: [] },
     timers: options.timers ?? [],
     cancelledTimers,
     loopCalls,
@@ -449,7 +449,11 @@ export function createFakeHostBridge(
     },
     wipeLoops() {
       loopCalls.push('wipe');
-      fake.loops = { apps: fake.loops.apps.map((a) => ({ ...a, on: false })), loops: [] };
+      fake.loops = {
+        apps: fake.loops.apps.map((a) => ({ ...a, on: false })),
+        loops: [],
+        openItems: [],
+      };
       return Promise.resolve();
     },
     updates: {

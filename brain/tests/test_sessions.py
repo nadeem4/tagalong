@@ -3206,7 +3206,7 @@ async def test_answer_after_the_turn_was_cancelled_still_runs_the_call():
 async def test_return_with_a_display_less_body_does_nothing():
     session, _ = make(Gate([]))
     seen = []
-    session.ask_runner.rejoined = lambda: seen.append("desktop")
+    session.ask_runner.returned = lambda away: seen.append("desktop")
     join_headless(session)
     assert seen == []
     session._bodies.connect(

@@ -270,7 +270,11 @@ async def _run() -> None:
         + expert_tools
         + app_tools
         + login
-        + loop_home_tools(loops, lambda: [(r.id, r.name) for r in memory.list_apps()])
+        + loop_home_tools(
+            loops,
+            lambda: [(r.id, r.name) for r in memory.list_apps()],
+            OpenItems(memory.db, lambda: datetime.now(UTC)),
+        )
         + loop_tools(loops)
         + brain_status_tools(brain_status)
         + home_update_tools(updates)

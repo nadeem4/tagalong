@@ -222,6 +222,11 @@ with `choose`, so Show, Done and Later are these same option rows, the recommend
 answer comes back to Scout as a `choice` event and Scout calls its loop tools. There is no loop card
 or frame of its own.
 
+**On return.** When the screen comes back, every ask still open shows its card again (same `ask` frame
+as before, no new one) and a card that ended while the body was away is closed with `reason: "timeout"`.
+The same open items are listed on Home's Tasks page, Held tab, under "Waiting on you" (see
+[desktop.md](desktop.md)); no frame or card was added.
+
 **GreetingLine.** The quiet line beside the pet, rendered by the panel instead of the bubble for
 a remark or a brain status mark. It fades after `holdMs` (7,000 ms
 by default, 12,000 for remarks) with a 300 ms fade (`LEAVE_MS`); pointing at it or

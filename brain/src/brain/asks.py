@@ -207,6 +207,11 @@ class Asks:
             ask_event("closed", ask_id, "brain", reason)
             self._bodies.notify("ask", {"id": ask_id, "state": "closed", "reason": "timeout"})
 
+    def card_closed(self, ask_id: str) -> None:
+        """Tell the bodies a card ended while they were away; one that never showed it ignores
+        this."""
+        self._bodies.notify("ask", {"id": ask_id, "state": "closed", "reason": "timeout"})
+
     def is_open(self, ask_id: str) -> bool:
         """The ask has a card showing in this session (a restart leaves none)."""
         return ask_id in self._open

@@ -22,9 +22,13 @@ function setup(answer: (tool: string, input?: object) => unknown = () => text({}
 
 describe('registerLoopsIpc', () => {
   it('reads the state and checks its shape', async () => {
+    const open = { id: 'a1', kind: 'ask', title: 'Delete logs', age_s: 60 };
     const state = { apps: [{ id: 'gmail', name: 'Gmail', on: false }], loops: [] };
-    const { invoke, calls } = setup(() => text(state));
-    expect(await invoke(IPC.loopsState)).toEqual(state);
+    const { invoke, calls } = setup(() => text({ ...state, open_items: [open] }));
+    expect(await invoke(IPC.loopsState)).toEqual({
+      ...state,
+      openItems: [{ id: 'a1', kind: 'ask', title: 'Delete logs', ageS: 60 }],
+    });
     expect(calls).toEqual([['loops_state', {}]]);
   });
 

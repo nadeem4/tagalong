@@ -10,16 +10,27 @@ from collections.abc import Callable
 from datetime import datetime
 
 from brain.loops.service import LoopService
+from brain.open_items import OpenItem, OpenItems
+from brain.permission import summarise
 from brain.protocol import ErrorCode, RpcError
 from brain.toolbox import Handler, ToolSpec
 
 _NO_ARGS = {"type": "object", "properties": {}}
 
 
+def _title(item: OpenItem) -> str:
+    """A plain row line: an ask says what it would let Scout do; other kinds name themselves."""
+    saved = item.saved_call or {}
+    if item.kind == "ask":
+        return summarise(saved.get("text") or "", saved.get("name") or "", saved.get("input") or {})
+    return item.kind
+
+
 def loop_home_tools(
-    service: LoopService, apps: Callable[[], list[tuple[str, str]]]
+    service: LoopService, apps: Callable[[], list[tuple[str, str]]], items: OpenItems
 ) -> list[tuple[ToolSpec, Handler]]:
-    """`apps` lists every connected app as (id, name); only the mail ones are offered."""
+    """`apps` lists every connected app as (id, name); only the mail ones are offered. The Held
+    list also carries every open item (asks, choices, offers) with its age."""
     home = frozenset({"home"})
 
     def refuse(message: str) -> RpcError:
@@ -51,7 +62,17 @@ def loop_home_tools(
             }
             for lp in service.all_loops()
         ]
-        return json.dumps({"apps": mail_apps(), "loops": loops})
+        now = service.now()
+        open_items = [
+            {
+                "id": it.id,
+                "kind": it.kind,
+                "title": _title(it),
+                "age_s": int((now - it.created_at).total_seconds()),
+            }
+            for it in items.list_open()
+        ]
+        return json.dumps({"apps": mail_apps(), "loops": loops, "open_items": open_items})
 
     async def set_switch(args: dict) -> str:
         app, on = args.get("app"), args.get("on")

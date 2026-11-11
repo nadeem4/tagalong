@@ -6,6 +6,7 @@ toolbox, engine, asks, open items and approvals wired the way a session wires th
 """
 
 import asyncio
+import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -204,12 +205,12 @@ async def test_a_call_that_held_a_secret_fails_after_a_restart():
     rig.approvals.mask = lambda value: {**value, "input": {"n": "[secret]"}}
     await rig.box.run(call())
     again = Rig(rig.memory)
-    again.runner.rejoined()
+    again.runner.returned(None)
     await again.settle()
     again.asks.answer(again.opened()[0]["id"], "allow", "desktop")
     await again.settle()
     assert again.source.ran == []
-    assert again.events[0].facts["reason"] == "held a secret"
+    assert again.events[-1].facts["reason"] == "held a secret"
 
 
 async def test_deny_wins_even_when_the_tool_became_auto_since():
@@ -297,7 +298,7 @@ async def test_a_card_comes_back_when_a_body_joins_after_a_restart():
     [item] = rig.items.list_open(kind="ask")
     again = Rig(rig.memory)
     again.runner.start()
-    again.runner.rejoined()
+    again.runner.returned(None)
     await again.settle()
     [card] = again.opened()
     assert card["id"] == item.id and card["tool"] == "t"
@@ -315,3 +316,46 @@ async def test_an_ask_that_needs_nobody_runs_in_the_turn():
 
 def test_ask_open_is_not_a_failure():
     assert not issubclass(AskOpen, RpcError)
+
+
+async def test_reconnect_reshows_open_cards():
+    rig = Rig()
+    await rig.box.run(call())
+    [item] = rig.items.list_open(kind="ask")
+    rig.bodies.sent.clear()
+    rig.runner.returned(3600)  # the card is up already: no second one
+    await rig.settle()
+    assert rig.opened() == [] and rig.events == []
+    rig.asks.expire(item.id, "x")  # the body dropped it while away
+    rig.bodies.sent.clear()
+    rig.runner.returned(3600)
+    await rig.settle()
+    assert [c["id"] for c in rig.opened()] == [item.id]
+
+
+async def test_live_only_shown_expired_on_return():
+    rig = Rig()
+    gone = rig.items.open("expert_ask", "desktop", live_only=True)
+    rig.clock[0] = NOW + timedelta(minutes=5)
+    rig.items.expire_live_only()  # its expert ended while the person was away
+    rig.clock[0] = NOW + timedelta(minutes=10)
+    rig.runner.returned(600)
+    await rig.settle()
+    assert rig.closed() == [{"id": gone.id, "state": "closed", "reason": "timeout"}]
+
+
+async def test_return_wake_names_waiting_asks_and_their_age():
+    rig = Rig()
+    await rig.box.run(call())
+    [item] = rig.items.list_open(kind="ask")
+    again = Rig(rig.memory, clock=[NOW + timedelta(hours=5)])
+    again.runner.start()
+    again.runner.returned(18000)
+    await again.settle()
+    [wake] = [e for e in again.events if e.kind == "asks_waiting"]
+    [row] = json.loads(wake.facts["asks"])
+    assert wake.facts["count"] == 1
+    assert (row["ask"], row["tool"], row["age_s"]) == (item.id, "t", 18000)
+    again.runner.returned(18000)  # the cards are up now: nothing more to say
+    await again.settle()
+    assert [e.kind for e in again.events].count("asks_waiting") == 1

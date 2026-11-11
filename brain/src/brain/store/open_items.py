@@ -133,3 +133,7 @@ def live_only_open(db: sqlite3.Connection, job_id: str | None = None) -> list[St
 
 def ids_for_job(db: sqlite3.Connection, job_id: str) -> list[str]:
     return [i.id for i in _select(db, "job_id=?", (job_id,))]
+
+
+def expired_since(db: sqlite3.Connection, since: str) -> list[StoredItem]:
+    return _select(db, "state='expired' AND closed_at>=?", (since,))
