@@ -165,10 +165,21 @@ describe('HomeView', () => {
     expect(screen.queryByRole('region', { name: 'Recent' })).toBeNull();
   });
 
-  it('shows where things run on the overview', async () => {
+  it('shows where things run and Scout\'s brain on the overview', async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
-    const where = await screen.findByRole('region', { name: 'Where things run' });
-    await waitFor(() => expect(where).toHaveTextContent('ws://127.0.0.1:47321'));
+    await screen.findByRole('region', { name: 'Where things run' });
+    const brain = await screen.findByRole('region', { name: "Scout's brain" });
+    await waitFor(() => expect(brain).toHaveTextContent('127.0.0.1:47321'));
+  });
+
+  it('puts the update banner on the other pages, not twice on the overview', async () => {
+    const stale = { ...(await createFakeHostBridge().brainCard()), update: 'ready' as const };
+    renderHome(createFakeHostBridge({ pets: [SCOUT], brainCard: stale }));
+    // On the overview the brain card carries the prompt: one, not two.
+    await screen.findByRole('region', { name: "Scout's brain" });
+    expect(await screen.findAllByText('Update ready')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Tasks' }));
+    expect(await screen.findAllByText('Update ready')).toHaveLength(1);
   });
 
   it('says what is really wrong with Scout instead of plain Ready', async () => {

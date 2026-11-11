@@ -22,6 +22,8 @@ import { TasksView } from './tasks-view';
 import { BodiesPanel } from './bodies-panel';
 import { PermissionsPanel } from './permissions-panel';
 import { SpendCard } from './spend-card';
+import { BrainCard } from './brain-card';
+import { UpdateBanner } from './update-banner';
 import { LINK, WhereThingsRun } from './where-things-run';
 
 export type HomePage = 'overview' | 'tasks' | 'connections' | 'approvals' | 'memory' | 'settings';
@@ -117,6 +119,8 @@ export function HomeView({ host, scout, settings, page: asked, onPage }: HomeVie
       </nav>
       <main className="home-main">
         <div className="home-page">
+          {/* Overview shows the same prompt inside the brain card, so it skips the banner. */}
+          {page !== 'overview' && <UpdateBanner />}
           {page === 'overview' && <Overview companion={companion} host={host} />}
           {page === 'tasks' && <TasksView />}
           {page === 'connections' && (
@@ -202,6 +206,7 @@ function Overview({ companion, host }: { companion: Pet | undefined; host: HomeH
           </Button>
         </section>
       </div>
+      <BrainCard />
       <WhereThingsRun />
       <SpendCard />
     </>

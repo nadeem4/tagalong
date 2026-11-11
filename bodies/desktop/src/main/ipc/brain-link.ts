@@ -57,6 +57,9 @@ export function registerBrainLinkIpc(
     status: brain.link,
     setup: setup.state,
   }));
-  // Only after a failure: any other time a brain is starting or already running.
-  handle(IPC.brainSetupRetry, () => (setup.state === 'failed' ? setup.retry() : undefined));
+  // After a failure, or when the brain is offline (Home's Start brain): the launch probes the
+  // address first, so a brain that is already starting or running is never started twice.
+  handle(IPC.brainSetupRetry, () =>
+    setup.state === 'failed' || brain.link === 'offline' ? setup.retry() : undefined,
+  );
 }

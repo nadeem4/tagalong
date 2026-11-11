@@ -140,6 +140,43 @@ export const HOME_CSS = `
 .conn-check__facts { margin: 0; padding-left: ${t.space.xl}px; display: flex; flex-direction: column; gap: ${t.space.xxs}px; }
 .conn-check .tg-note { color: ${t.color.warnInk}; }
 .conn-check__link { color: ${t.color.warnInk}; margin-right: auto; text-decoration: underline; }
+/* Scout's brain card and the update prompt. */
+.brain-card__title { margin: 0; font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; }
+.brain-facts { display: grid; grid-template-columns: 140px 1fr; margin: 0; border-top: 1px solid ${t.color.panelLine}; }
+.brain-facts dt, .brain-facts dd {
+  padding: ${t.space.md}px 0; border-bottom: 1px solid ${t.color.panelLine};
+  font-size: ${t.fontSize.body}px; line-height: 20px;
+}
+.brain-facts dt { color: ${t.color.panelMuted}; }
+.brain-facts dd {
+  margin: 0; min-width: 0; display: flex; align-items: center; flex-wrap: wrap;
+  gap: ${t.space.xs}px ${t.space.lg}px; overflow-wrap: anywhere; color: ${t.color.panelText};
+}
+.brain-facts--dim dd { color: ${t.color.panelMuted}; }
+.brain-status { display: inline-flex; align-items: center; gap: ${t.space.md}px; }
+.brain-mono { font-family: ${t.font.mono}; font-size: ${t.fontSize.small}px; }
+.brain-chips { display: inline-flex; flex-wrap: wrap; gap: ${t.space.sm}px; }
+.brain-link {
+  border: 0; background: none; padding: 0; cursor: pointer; font: inherit;
+  color: ${t.color.panelText}; text-decoration: underline;
+}
+.brain-link:focus-visible { outline: 2px solid ${t.color.gold}; outline-offset: 2px; }
+.brain-foot { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: ${t.space.md}px; }
+.brain-foot__note { margin-right: auto; font-size: ${t.fontSize.small}px; }
+.brain-error {
+  display: flex; align-items: center; gap: ${t.space.lg}px; padding: ${t.space.lg}px;
+  border-radius: ${t.radius.row}px; background: ${t.color.errFill}; color: ${t.color.errInk};
+}
+.brain-error > span { flex: 1; }
+.brain-update {
+  display: flex; flex-direction: column; gap: ${t.space.md}px; padding: ${t.space.lg}px;
+  border-radius: ${t.radius.row}px; background: ${t.color.warnFill};
+}
+.home-card .brain-update p, .brain-update p { margin: 0; color: ${t.color.warnInk}; font-size: ${t.fontSize.body}px; }
+.brain-update p.brain-update__title { font-weight: ${t.fontWeight.semibold}; }
+.brain-update__foot { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: ${t.space.md}px; }
+.brain-update__foot .brain-update__note { margin-right: auto; font-size: ${t.fontSize.small}px; }
+.home-page > .brain-update { margin-bottom: ${t.space.xl}px; }
 .perm-group { margin-top: ${t.space.xl}px; }
 .perm-group__title { margin: 0 0 ${t.space.xs}px; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; letter-spacing: ${t.letterSpacing.pixel}px; text-transform: uppercase; color: ${t.color.panelMuted}; }
 .perm-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
