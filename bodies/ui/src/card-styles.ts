@@ -3,14 +3,14 @@
  * with a rows table and a small brief line. Contains CARD_CSS. Used by the bubble.
  */
 
-import { themeTokens as t } from './theme/tokens';
+import { themeTokens as t, typeCss } from './theme/tokens';
 
 export const CARD_CSS = `
 .card { display: flex; flex-direction: column; gap: 10px; }
 /* The ask's facts: a muted label and its value, two columns under a hairline. */
 .card-rows { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 10px 0 0; border-top: 1px solid #262C4A; }
 .card-rows > div { display: grid; grid-template-columns: 56px 1fr; gap: 14px; align-items: start; }
-.card-rows dt { font-size: 12px; line-height: 20px; font-weight: 400; color: #A3AAC4; }
+.card-rows dt { ${typeCss('small')}; color: #A3AAC4; }
 .card-rows dd { min-width: 0; margin: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 20px; font-weight: 400; overflow-wrap: anywhere; }
 .card-rows dd small { font-size: 11px; line-height: 14px; font-weight: 600; color: #A3AAC4; overflow-wrap: anywhere; }
 .card-rows > div > .bubble-quiet { align-self: center; flex: none; }
@@ -35,7 +35,7 @@ flex: none; display: inline-flex; align-items: center; height: 20px; padding: 0 
 background: #222845; color: #C9CEE0; font-size: 11px; line-height: 14px; font-weight: 600;
 }
 .card-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
-.card-actions button { align-self: auto; height: 32px; min-height: 32px; padding: 0 14px; border-radius: 8px; font-size: 13px; }
+.card-actions button { align-self: auto; height: 32px; min-height: 32px; padding: 0 14px; border-radius: 8px; ${typeCss('body')}; font-weight: 600; }
 .bubble-radio { flex: none; width: 16px; height: 16px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid ${t.color.textMuted}; }
 .bubble-choice-text { flex: 1; min-width: 0; }
 .bubble-choices .bubble-choice, .bubble-choices .bubble-choice.bubble-primary {

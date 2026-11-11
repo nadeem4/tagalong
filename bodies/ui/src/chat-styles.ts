@@ -71,7 +71,7 @@ export const CHAT_CSS = `
 .bubble--quick { padding: 0; gap: 0; }
 .bubble-compact { display: flex; flex-direction: column; gap: 12px; padding: 12px; }
 .bubble-headwho { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.bubble-head strong { font-family: ${t.font.wordmark}; font-size: 14px; line-height: 20px; font-weight: 600; }
+.bubble-head strong { font-family: ${t.font.wordmark}; ${typeCss('bodyLead')}; font-weight: 600; }
 .bubble-headstatus { display: flex; align-items: center; gap: 6px; ${typeCss('caption')}; font-weight: 400; color: ${t.color.textMuted}; overflow-wrap: anywhere; }
 .bubble-priv { flex: none; width: 6px; height: 6px; border-radius: 50%; background: ${t.color.gold}; box-shadow: 0 0 0 3px rgba(242, 193, 78, 0.18); }
 .bubble-head .bubble-row { flex: none; gap: 4px; }
