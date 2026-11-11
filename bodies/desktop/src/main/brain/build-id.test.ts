@@ -1,4 +1,7 @@
 /** Tests for the desktop's own build id: it must agree with the brain's hash of the same files. */
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { ownBuild, sourceHash } from './build-id';
@@ -12,6 +15,18 @@ const FIXTURE_HASH = '944069bbc26e';
 describe('sourceHash', () => {
   it("matches the brain's hash for the shared fixture", () => {
     expect(sourceHash(FIXTURE)).toBe(FIXTURE_HASH);
+  });
+
+  it('ignores __pycache__, made here because git ignores a stored one', () => {
+    const copy = join(mkdtempSync(join(tmpdir(), 'tagalong-hash-')), 'copy');
+    try {
+      cpSync(FIXTURE, copy, { recursive: true });
+      mkdirSync(join(copy, '__pycache__'));
+      writeFileSync(join(copy, '__pycache__', 'junk.py'), 'compiled = True\n');
+      expect(sourceHash(copy)).toBe(FIXTURE_HASH);
+    } finally {
+      rmSync(dirname(copy), { recursive: true, force: true });
+    }
   });
 });
 

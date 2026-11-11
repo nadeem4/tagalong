@@ -305,7 +305,11 @@ async function start(): Promise<void> {
         forwardConnectionsChanged(what, forwardToRenderers);
         if (what === 'key') void refreshKeyMark();
         // A job moved: a restart waiting for the running work to finish may go now.
-        if (what === 'jobs') void brainControl?.jobsChanged();
+        if (what === 'jobs') {
+          brainControl?.jobsChanged().catch((error: unknown) => {
+            console.warn(`the waiting brain restart failed: ${String(error)}`);
+          });
+        }
         for (const window of BrowserWindow.getAllWindows()) {
           if (!window.isDestroyed()) window.webContents.send(IPC.brainChangedEvent, what);
         }

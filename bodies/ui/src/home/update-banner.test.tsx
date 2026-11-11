@@ -13,6 +13,9 @@ const READY: BrainCard = {
   status: 'running',
   update: 'ready',
   version: '0.9.1',
+  build: '9f8e7d6',
+  appVersion: '0.9.2',
+  appBuild: 'a1b2c3d',
   startedAt: new Date().toISOString(),
   startedBy: 'desktop',
   addr: '127.0.0.1:47321',
@@ -56,7 +59,9 @@ describe('UpdateBanner', () => {
   it('started by you says restart it in your terminal, with no restart button', async () => {
     renderBanner({ ...READY, update: 'terminal', startedBy: 'person' });
     const banner = await screen.findByRole('status');
-    expect(banner).toHaveTextContent('Restart it in your terminal');
+    expect(banner).toHaveTextContent(
+      'You started it, so Tagalong leaves it alone. Restart it in your terminal.',
+    );
     expect(screen.queryByRole('button', { name: /restart/i })).toBeNull();
   });
 

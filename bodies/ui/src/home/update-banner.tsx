@@ -7,22 +7,25 @@
 import { useState } from 'react';
 import { useHostBridge, type BrainCard } from '../host-bridge';
 import { Button } from '../controls/button';
+import { AlertIcon } from './brain-icons';
 import { useBrainCard } from './use-brain-card';
 
-export function UpdatePrompt({ card }: { card: BrainCard }) {
+export const LEAVES_IT_ALONE =
+  'You started it, so Tagalong leaves it alone. Restart it in your terminal.';
+
+/** `withNote`: the banner says why there is no button; the card says it in its own footer. */
+export function UpdatePrompt({ card, withNote }: { card: BrainCard; withNote?: boolean }) {
   const bridge = useHostBridge();
   const [waiting, setWaiting] = useState(false);
-  const [failed, setFailed] = useState(false);
   const mine = card.update === 'ready';
 
   return (
     <div className="brain-update" role="status">
-      <p className="brain-update__title">Update ready</p>
-      <p>
-        {mine
-          ? "Scout's brain is from an older version. Restart to finish updating."
-          : "Scout's brain is from an older version. Restart it in your terminal to finish updating."}
+      <p className="brain-update__title">
+        <AlertIcon />
+        Update ready
       </p>
+      <p>Scout's brain is from an older version. Restart to finish updating.</p>
       {mine && (
         <div className="brain-update__foot">
           {card.workRunning && (
@@ -30,14 +33,13 @@ export function UpdatePrompt({ card }: { card: BrainCard }) {
               Claude Code is running a job. Restarting now stops it.
             </p>
           )}
-          {failed && <p className="brain-update__note">Scout could not restart the brain.</p>}
-          {waiting && <p className="brain-update__note">It restarts when your job finishes.</p>}
-          {card.workRunning && !waiting && (
+          {card.workRunning && (
             <Button
               variant="secondary"
+              disabled={waiting}
               onClick={() => {
                 setWaiting(true);
-                void bridge.restartBrainAfterWork().catch(() => setFailed(true));
+                void bridge.restartBrainAfterWork().catch(() => setWaiting(false));
               }}
             >
               When your job finishes
@@ -45,15 +47,13 @@ export function UpdatePrompt({ card }: { card: BrainCard }) {
           )}
           <Button
             variant="primary"
-            onClick={() => {
-              setFailed(false);
-              void bridge.restartBrain().catch(() => setFailed(true));
-            }}
+            onClick={() => void bridge.restartBrain().catch(() => undefined)}
           >
             Restart now
           </Button>
         </div>
       )}
+      {!mine && withNote === true && <p className="brain-update__note">{LEAVES_IT_ALONE}</p>}
     </div>
   );
 }
@@ -61,5 +61,5 @@ export function UpdatePrompt({ card }: { card: BrainCard }) {
 export function UpdateBanner() {
   const { card } = useBrainCard();
   if (card === null || card.update === 'none') return null;
-  return <UpdatePrompt card={card} />;
+  return <UpdatePrompt card={card} withNote />;
 }

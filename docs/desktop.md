@@ -794,11 +794,21 @@ An old brain that says no version is never current and never loops: at most one 
 app run. `ipc/brain-status.ts` (`createBrainStatus`) holds the state: the `brain_status` Home tool
 feeds Home's "Scout's brain" card (`brainStatus`, `brainRestart`, `brainRestartAfterWork`,
 `brainOpenFolder`, `brainOpenLog`, `brainCopyDetails`); `restart` is refused for a person-started
-brain; "When your job finishes" waits for the next `changed jobs` with no work running. The
+brain; "When your job finishes" waits for the next `changed jobs` with no work running, and an old
+brain that cannot answer `brain_status` (unknown facts) never restarts behind a waiting job. The
+card's `BrainCard` carries `build` plus the app's own `appVersion` and `appBuild`: the Version row
+reads `Tagalong <version> · build <id>`, and an out-of-date brain reads `Brain <version> · build
+<id> (app is <version> · <build>)`; offline it shows the app's own version and "Tagalong" under
+Started by. The copy is the mockup's: the update prompt (an alert icon, "Update ready", "Scout's
+brain is from an older version. Restart to finish updating.") and, for a brain the person started,
+"You started it, so Tagalong leaves it alone. Restart it in your terminal."; the offline line has an
+error icon (`home/brain-icons.tsx`). A failed restart shows nothing extra. The
 desktop marks the brain it spawns with `TAGALONG_STARTED_BY=desktop` and stops it with
 `stopBrain` (`launch.ts`, through `brain.pid`). On Overview the update prompt sits inside the
 card; on every other page `UpdateBanner` shows it at the top. `e2e/where-things-run.spec.ts`
-covers a person-started old brain on the fake brain.
+covers a person-started old brain on the fake brain. The e2e fake brain's default `hello` is the
+app's own version and build (`e2e/fixtures/fake-brain.ts`), so ordinary specs see a current brain
+and no prompt; only the version specs pass an old `hello`.
 
 The Windows installer stops a running brain before it replaces or removes files:
 `build/installer.nsh` (`customInit`, `customUnInit`) reads `brain.pid` from `TAGALONG_HOME` (else

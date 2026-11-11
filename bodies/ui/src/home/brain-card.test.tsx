@@ -18,6 +18,9 @@ const RUNNING: BrainCardData = {
   status: 'running',
   update: 'none',
   version: '0.9.2',
+  build: 'a1b2c3d',
+  appVersion: '0.9.2',
+  appBuild: 'a1b2c3d',
   startedAt: new Date(Date.now() - 25 * 60_000).toISOString(),
   startedBy: 'desktop',
   addr: '127.0.0.1:47321',
@@ -36,6 +39,7 @@ const OFFLINE: BrainCardData = {
   ...RUNNING,
   status: 'offline',
   version: null,
+  build: null,
   startedAt: null,
   startedBy: null,
   pid: null,
@@ -86,23 +90,21 @@ describe('BrainCard', () => {
     expect(await region()).toHaveTextContent('Up 3 h 12 min');
   });
 
-  it('never shows the build id', async () => {
-    // The card type has no build; a stray field must not be drawn either.
-    renderCard({ ...RUNNING, build: '9f8e7d6' } as BrainCardData);
-    const card = await region();
-    expect(card).not.toHaveTextContent('9f8e7d6');
-    expect(card).not.toHaveTextContent(/build/i);
+  it('version row: the app name, the version and the build', async () => {
+    renderCard(RUNNING);
+    expect(await region()).toHaveTextContent('Tagalong 0.9.2 · build a1b2c3d');
   });
 
   it('update ready: warns, offers Restart now, and drops the plain Restart brain', async () => {
-    renderCard({ ...RUNNING, update: 'ready', version: '0.9.1' });
+    renderCard({ ...RUNNING, update: 'ready', version: '0.9.1', build: '9f8e7d6' });
     const card = await region();
     expect(card).toHaveTextContent('Update ready');
+    expect(card.querySelector('.brain-update svg[data-icon="alert"]')).not.toBeNull();
     expect(card).toHaveTextContent(
       "Scout's brain is from an older version. Restart to finish updating.",
     );
     expect(card).toHaveTextContent('Running · Update ready');
-    expect(card).toHaveTextContent('Brain 0.9.1');
+    expect(card).toHaveTextContent('Brain 0.9.1 · build 9f8e7d6 (app is 0.9.2 · a1b2c3d)');
     expect(screen.getByRole('button', { name: 'Restart now' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Restart brain' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'When your job finishes' })).toBeNull();
@@ -128,9 +130,33 @@ describe('BrainCard', () => {
     expect(bridge.brainActions).toEqual(['restart-after-work']);
   });
 
+  it('When your job finishes waits quietly once chosen', async () => {
+    renderCard({ ...RUNNING, update: 'ready', version: '0.9.1', workRunning: true });
+    const button = await screen.findByRole('button', { name: 'When your job finishes' });
+    fireEvent.click(button);
+    expect(button).toBeDisabled();
+  });
+
+  it('started by you with an older brain: the same warning, words instead of buttons', async () => {
+    renderCard({ ...RUNNING, startedBy: 'person', update: 'terminal', version: '0.9.1' });
+    const card = await region();
+    expect(card).toHaveTextContent('Update ready');
+    expect(card).toHaveTextContent(
+      "Scout's brain is from an older version. Restart to finish updating.",
+    );
+    expect(card).toHaveTextContent(
+      'You started it, so Tagalong leaves it alone. Restart it in your terminal.',
+    );
+    expect(card).not.toHaveTextContent('to finish updating.Restart it in your terminal');
+    expect(screen.queryByRole('button', { name: /restart/i })).toBeNull();
+  });
+
   it('started by you: says Tagalong leaves it alone, and has no restart button', async () => {
     renderCard({ ...RUNNING, startedBy: 'person' });
     const card = await region();
+    // A current brain: no warning, the plain running status.
+    expect(card).not.toHaveTextContent('Update ready');
+    expect(card).toHaveTextContent('Running · Up 25 min');
     expect(card).toHaveTextContent('You, from a terminal');
     expect(card).toHaveTextContent(
       'You started it, so Tagalong leaves it alone. Restart it in your terminal.',
@@ -147,7 +173,11 @@ describe('BrainCard', () => {
     expect(card).toHaveTextContent('Offline · Reconnecting');
     expect(card).toHaveTextContent('This PC · 127.0.0.1:47321');
     expect(card).toHaveTextContent('None while offline');
-    expect(within(card).getAllByText('—').length).toBeGreaterThanOrEqual(2);
+    expect(card.querySelector('.brain-error svg[data-icon="err"]')).not.toBeNull();
+    // The app's own version and build, and who would start it; only the process id is unknown.
+    expect(card).toHaveTextContent('Tagalong 0.9.2 · build a1b2c3d');
+    expect(card).toHaveTextContent('Started byTagalong');
+    expect(within(card).getAllByText('—')).toHaveLength(1);
     // Open log sits in the log row and again in the footer, where the reason is.
     expect(screen.getAllByRole('button', { name: 'Open log' })).toHaveLength(2);
     fireEvent.click(screen.getByRole('button', { name: 'Start brain' }));

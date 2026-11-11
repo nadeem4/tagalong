@@ -87,10 +87,14 @@ test('brain card shows version and update banner on a mismatched fake brain', as
   await home.getByRole('button', { name: 'Overview', exact: true }).click();
   const card = home.getByRole('region', { name: "Scout's brain" });
   await expect(card).toContainText(`This PC · ${brain.addr}`, { timeout: 30_000 });
-  await expect(card).toContainText('Brain 0.0.1');
+  await expect(card).toContainText('Brain 0.0.1 · build old');
+  await expect(card).toContainText('(app is ');
   await expect(card).toContainText('You, from a terminal');
   await expect(card).toContainText('Running · Update ready');
-  await expect(card).toContainText('Restart it in your terminal');
+  await expect(card).toContainText('Restart to finish updating.');
+  await expect(card).toContainText(
+    'You started it, so Tagalong leaves it alone. Restart it in your terminal.',
+  );
   // A brain the person started is never restarted from here: no button, and it stays connected.
   await expect(home.getByRole('button', { name: 'Restart now' })).toHaveCount(0);
   await expect(home.getByRole('button', { name: 'Restart brain' })).toHaveCount(0);

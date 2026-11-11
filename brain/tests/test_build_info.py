@@ -14,8 +14,17 @@ FIXTURE = Path(__file__).parent / "fixtures" / "build-hash"
 FIXTURE_HASH = "944069bbc26e"
 
 
-def test_source_hash_is_stable_and_ignores_pycache():
+def test_source_hash_is_stable():
     assert source_hash(FIXTURE) == FIXTURE_HASH
+
+
+def test_source_hash_ignores_pycache(tmp_path):
+    # Made here, not kept in the fixture: git ignores __pycache__, so a stored one is never there.
+    copy = tmp_path / "copy"
+    shutil.copytree(FIXTURE, copy)
+    (copy / "__pycache__").mkdir()
+    (copy / "__pycache__" / "junk.py").write_text("compiled = True\n")
+    assert source_hash(copy) == FIXTURE_HASH
 
 
 def test_source_hash_changes_when_a_file_changes(tmp_path):

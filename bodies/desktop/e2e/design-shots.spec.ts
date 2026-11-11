@@ -63,7 +63,8 @@ const SCENES: Scene[] = [
   { state: 'normal', hello: OURS, brain: status('desktop', false) },
   // A job is running, so the desktop asks instead of restarting quietly.
   { state: 'update-ready', hello: OLD, brain: { ...status('desktop', true), ...OLD } },
-  { state: 'started-by-you', hello: OLD, brain: { ...status('person', false), ...OLD } },
+  // Drawn as a current brain you started: Running, no warning block, no restart.
+  { state: 'started-by-you', hello: OURS, brain: status('person', false) },
   { state: 'offline', hello: OURS, brain: status('desktop', false), offline: true },
 ];
 

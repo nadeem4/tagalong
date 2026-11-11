@@ -200,6 +200,10 @@ export interface BrainCard {
   /** Ready: the brain is older than the app and can be restarted here. Terminal: the person started it. */
   update: 'none' | 'ready' | 'terminal';
   version: string | null;
+  build: string | null;
+  /** The app's own version and build, to show beside a brain that differs, and while offline. */
+  appVersion: string;
+  appBuild: string;
   /** ISO, UTC. */
   startedAt: string | null;
   startedBy: 'desktop' | 'person' | null;

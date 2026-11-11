@@ -168,6 +168,9 @@ export const HOME_CSS = `
   border-radius: ${t.radius.row}px; background: ${t.color.errFill}; color: ${t.color.errInk};
 }
 .brain-error > span { flex: 1; }
+.brain-icon { width: 16px; height: 16px; flex: none; }
+.brain-update p.brain-update__title { display: flex; align-items: center; gap: ${t.space.md}px; }
+.brain-meta { color: ${t.color.panelMuted}; font-size: ${t.fontSize.small}px; }
 .brain-update {
   display: flex; flex-direction: column; gap: ${t.space.md}px; padding: ${t.space.lg}px;
   border-radius: ${t.radius.row}px; background: ${t.color.warnFill};

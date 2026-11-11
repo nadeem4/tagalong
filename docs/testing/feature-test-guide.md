@@ -2562,11 +2562,12 @@ Home > Overview shows a "Scout's brain" card above "Where things run".
    Open links, and the places connected.
 2. Click Copy details and paste: the text includes the build id.
 3. Stop the brain from a terminal (`uv run tagalong stop`). The card turns to "Can't reach Scout's
-   brain. Trying again every 2 s." with Start brain. Click it: the brain starts and the card
-   returns to Running.
+   brain. Trying again every 2 s." with Start brain; Version shows this app's own version and
+   Started by shows "Tagalong". Click Start brain: the brain starts and the card returns to Running.
 4. Start a brain yourself in a terminal from an older checkout, then open Tagalong: the card says
-   "You, from a terminal" with the note that Tagalong leaves it alone, and no restart button. The
-   update prompt says to restart it in the terminal. Nothing kills the brain.
+   "You, from a terminal" and Update ready, with "You started it, so Tagalong leaves it alone.
+   Restart it in your terminal." and no restart button. Nothing kills the brain. Start a current
+   brain yourself: the card says Running with the same note and no warning.
 5. Let Tagalong start the brain, then change a `.py` file under `brain/src/brain` and restart only
    the desktop: with no job running the brain restarts quietly once. With a job running, an
    "Update ready" prompt offers "Restart now" and "When your job finishes".

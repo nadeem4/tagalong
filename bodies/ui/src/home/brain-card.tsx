@@ -1,13 +1,13 @@
 /**
  * Scout's brain, on Overview: what it is, whether it runs, how old it is, who started it and
- * where it keeps things. Shows the version only (the build id is for Copy details). Four
- * states as drawn: running, update ready, started by you (no restart offered), offline (Start
- * brain, unknown facts as a dash). The first-run install lines live here too.
+ * where it keeps things. Four states as drawn: running, update ready, started by you (no
+ * restart offered), offline (Start brain, the app's own version, the unknown as a dash). The
+ * first-run install lines live here too.
  */
-import { useState } from 'react';
 import { useHostBridge, type BrainCard as BrainCardData } from '../host-bridge';
 import { Button } from '../controls/button';
-import { UpdatePrompt } from './update-banner';
+import { ErrIcon } from './brain-icons';
+import { LEAVES_IT_ALONE, UpdatePrompt } from './update-banner';
 import { useBrainCard } from './use-brain-card';
 
 const DASH = '—';
@@ -42,12 +42,29 @@ function Facts({ card }: { card: BrainCardData }) {
     : stale
       ? 'Running · Update ready'
       : `Running · ${card.startedAt === null ? 'Up' : uptime(card.startedAt)}`;
+  // Offline the desktop is the one that will start it, so it names itself, as drawn.
   const startedBy =
-    card.startedBy === 'desktop'
-      ? 'Tagalong'
-      : card.startedBy === 'person'
-        ? 'You, from a terminal'
-        : DASH;
+    card.startedBy === 'person'
+      ? 'You, from a terminal'
+      : card.startedBy === null && !offline
+        ? DASH
+        : 'Tagalong';
+  const own = `Tagalong ${card.appVersion} · build ${card.appBuild}`;
+  const theirs = `Brain ${card.version ?? 'of unknown version'}${card.build === null ? '' : ` · build ${card.build}`}`;
+  const version = offline ? (
+    own
+  ) : stale ? (
+    <>
+      {theirs}{' '}
+      <span className="brain-meta">
+        (app is {card.appVersion} · {card.appBuild})
+      </span>
+    </>
+  ) : card.version === null ? (
+    DASH
+  ) : (
+    `Tagalong ${card.version}${card.build === null ? '' : ` · build ${card.build}`}`
+  );
   return (
     <dl className={offline ? 'brain-facts brain-facts--dim' : 'brain-facts'}>
       <Row label="Status">
@@ -60,9 +77,7 @@ function Facts({ card }: { card: BrainCardData }) {
         {isLocal(card.addr) ? 'This PC · ' : ''}
         <span className="brain-mono">{card.addr}</span>
       </Row>
-      <Row label="Version">
-        {card.version === null ? DASH : `${stale ? 'Brain' : 'Tagalong'} ${card.version}`}
-      </Row>
+      <Row label="Version">{version}</Row>
       <Row label="Started by">{startedBy}</Row>
       <Row label="Process ID">
         <span className="brain-mono">{card.pid ?? DASH}</span>
@@ -102,7 +117,6 @@ function Facts({ card }: { card: BrainCardData }) {
 export function BrainCard() {
   const bridge = useHostBridge();
   const { card, setup } = useBrainCard();
-  const [failed, setFailed] = useState(false);
   if (card === null) return null;
   const offline = card.status === 'offline';
   const person = card.startedBy === 'person';
@@ -119,6 +133,7 @@ export function BrainCard() {
       )}
       {offline && setup === 'failed' && (
         <div className="brain-error" role="alert">
+          <ErrIcon />
           <span>
             Scout's brain did not finish setting up. Check your internet connection, then retry.
           </span>
@@ -129,6 +144,7 @@ export function BrainCard() {
       )}
       {offline && setup === 'idle' && (
         <div className="brain-error" role="alert">
+          <ErrIcon />
           <span>Can't reach Scout's brain. Trying again every 2 s.</span>
           <Button variant="primary" onClick={() => void bridge.retryBrainSetup()}>
             Start brain
@@ -137,20 +153,12 @@ export function BrainCard() {
       )}
       {!offline && card.update !== 'none' && <UpdatePrompt card={card} />}
       <Facts card={card} />
-      {failed && <p className="brain-update__note">Scout could not restart the brain.</p>}
       <div className="brain-foot">
-        {person && !offline && (
-          <p className="brain-foot__note">
-            You started it, so Tagalong leaves it alone. Restart it in your terminal.
-          </p>
-        )}
+        {person && !offline && <p className="brain-foot__note">{LEAVES_IT_ALONE}</p>}
         {!offline && !person && card.update === 'none' && (
           <Button
             variant="secondary"
-            onClick={() => {
-              setFailed(false);
-              void bridge.restartBrain().catch(() => setFailed(true));
-            }}
+            onClick={() => void bridge.restartBrain().catch(() => undefined)}
           >
             Restart brain
           </Button>

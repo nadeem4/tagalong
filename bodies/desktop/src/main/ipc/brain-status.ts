@@ -83,6 +83,9 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
       status: brain.link === 'online' ? 'running' : 'offline',
       update,
       version: f?.version ?? (brain.link === 'online' ? (lastHello.version ?? null) : null),
+      build: f?.build ?? (brain.link === 'online' ? (lastHello.build ?? null) : null),
+      appVersion: ours.version,
+      appBuild: ours.build,
       startedAt: f?.started_at ?? null,
       startedBy: f?.started_by ?? null,
       addr: brain.addr,
@@ -115,7 +118,9 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
   async function jobsChanged(): Promise<void> {
     if (!waitingForWork) return;
     const f = await facts();
-    if (f?.work_running) return;
+    // No facts (an old brain, or the answer failed) means unknown, not idle: keep waiting
+    // rather than stop a job that may be running.
+    if (f === null || f.work_running) return;
     waitingForWork = false;
     await restart();
   }

@@ -56,7 +56,7 @@ function setup(over: { wire?: object | 'missing'; link?: string; hello?: object 
     relaunches,
     copied,
     opened,
-    setWire: (next: object) => (wire = next),
+    setWire: (next: object | 'missing') => (wire = next),
   };
 }
 
@@ -67,6 +67,9 @@ describe('brain card', () => {
       status: 'running',
       update: 'none',
       version: '0.9.2',
+      build: 'a1b2c3d4e5f6',
+      appVersion: '0.9.2',
+      appBuild: 'a1b2c3d4e5f6',
       startedAt: '2026-11-10T08:00:00Z',
       startedBy: 'desktop',
       addr: '127.0.0.1:47321',
@@ -83,6 +86,9 @@ describe('brain card', () => {
     expect(await status.card()).toMatchObject({
       status: 'offline',
       version: null,
+      build: null,
+      appVersion: '0.9.2',
+      appBuild: 'a1b2c3d4e5f6',
       pid: null,
       startedBy: null,
       addr: '127.0.0.1:47321',
@@ -115,6 +121,26 @@ describe('restart', () => {
   it('after work waits for the job to finish', async () => {
     const { status, stops, setWire } = setup({ wire: { ...WIRE, work_running: true } });
     await status.restartAfterWork();
+    expect(stops).toHaveLength(0);
+    setWire(WIRE);
+    await status.jobsChanged();
+    expect(stops).toHaveLength(1);
+  });
+});
+
+describe('restart after work with unknown facts', () => {
+  it('an old brain with no brain_status is never restarted behind a waiting job', async () => {
+    const { status, stops } = setup({ wire: 'missing' });
+    await status.restartAfterWork();
+    await status.jobsChanged();
+    expect(stops).toHaveLength(0);
+  });
+
+  it('facts that go missing while waiting keep it waiting', async () => {
+    const { status, stops, setWire } = setup({ wire: { ...WIRE, work_running: true } });
+    await status.restartAfterWork();
+    setWire('missing');
+    await status.jobsChanged();
     expect(stops).toHaveLength(0);
     setWire(WIRE);
     await status.jobsChanged();
