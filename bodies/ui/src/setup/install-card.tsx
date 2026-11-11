@@ -402,13 +402,13 @@ export const INSTALL_CARD_CSS = `
   background: var(--sc-warnfill); border: 1px solid var(--sc-warnline); color: var(--sc-warnink); ${typeCss('body')};
 }
 .sc-check-t { font-weight: 600; }
-.sc-check ul { margin: 0; padding-left: 18px; }
+.sc-check ul { margin: 0; padding-left: 18px; list-style: disc; }
 .sc-link {
   align-self: flex-start; padding: 0; border: 0; background: transparent; color: var(--sc-link);
   font: inherit; ${typeCss('small')}; font-weight: 600; cursor: pointer; text-decoration: none;
 }
 .sc-disc { ${typeCss('body')}; color: var(--sc-soft); font-weight: 600; }
-.sc-disc ul { margin: 6px 0 0; padding-left: 18px; font-weight: 400; overflow-wrap: anywhere; }
+.sc-disc ul { margin: 6px 0 0; padding-left: 18px; list-style: disc; font-weight: 400; overflow-wrap: anywhere; }
 .sc-try { display: flex; gap: 6px; flex-wrap: wrap; }
 .sc-prompt {
   display: inline-flex; align-items: center; min-height: 28px; padding: 4px 12px; box-sizing: border-box;

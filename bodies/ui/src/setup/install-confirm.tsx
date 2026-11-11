@@ -216,17 +216,25 @@ export function InstallConfirm({
     }
   };
 
+  // The card grows below the fold as it works (a failure adds its words): keep all of it in view.
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    root.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [view]);
+
   return (
-    <InstallCard
-      subject={subject}
-      view={view}
-      onAllow={allow}
-      onNotNow={notNow}
-      onRetry={() => onRetry(subject.name)}
-      onSignIn={() => void bridge.setupExpert(subject.id, true)}
-      onLater={onGone}
-      onManage={() => void bridge.openFix('connections')}
-      onTry={onTry}
-    />
+    <div ref={root}>
+      <InstallCard
+        subject={subject}
+        view={view}
+        onAllow={allow}
+        onNotNow={notNow}
+        onRetry={() => onRetry(subject.name)}
+        onSignIn={() => void bridge.setupExpert(subject.id, true)}
+        onLater={onGone}
+        onManage={() => void bridge.openFix('connections')}
+        onTry={onTry}
+      />
+    </div>
   );
 }

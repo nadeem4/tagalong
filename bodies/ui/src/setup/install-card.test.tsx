@@ -4,7 +4,8 @@
  */
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { InstallCard, subjectOf, type InstallSubject } from './install-card';
+import { INSTALL_CARD_CSS, InstallCard, subjectOf, type InstallSubject } from './install-card';
+import { ruleOf } from '../test-support/css-rules';
 
 const NOTION: InstallSubject = {
   kind: 'app',
@@ -245,5 +246,12 @@ describe('subjectOf', () => {
       signIn: 'account',
       runs: 'pc',
     });
+  });
+});
+
+describe('INSTALL_CARD_CSS', () => {
+  it('keeps the bullets of its lists visible whatever the page resets', () => {
+    expect(ruleOf(INSTALL_CARD_CSS, '.sc-check ul')).toContain('list-style: disc');
+    expect(ruleOf(INSTALL_CARD_CSS, '.sc-disc ul')).toContain('list-style: disc');
   });
 });

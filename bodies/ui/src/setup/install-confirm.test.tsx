@@ -145,6 +145,21 @@ describe('InstallConfirm', () => {
     expect(screen.getByRole('button', { name: 'Not now' })).toBeVisible();
   });
 
+  it('keeps its whole card in view when it grows, as a failure adds its words', async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    const bridge = createFakeHostBridge();
+    show(APP_ASK, bridge);
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
+    await waitFor(() => expect(screen.getByRole('list', { name: 'Steps' })).toBeVisible());
+    scrollIntoView.mockClear();
+    bridge.apps = [
+      { id: 'notion', name: 'Notion', status: 'error', error: 'boom', tools: [] },
+    ] as never;
+    act(() => bridge.emit({ type: 'connections.changed' } as never));
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' }));
+  });
+
   it('an expert download shows its percent from the setup overview', async () => {
     const bridge = createFakeHostBridge();
     show(EXPERT_ASK, bridge);
