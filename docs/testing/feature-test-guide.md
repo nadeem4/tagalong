@@ -821,6 +821,16 @@ on fakes. To see it by hand, add a loop with an anchor to a test store and open 
    `TAGALONG_LOOP_STALE_DAYS` becomes stale and arrives in one wake listing the stale loops.
 5. Focus and tab events still never wake Scout by themselves.
 
+## Open items (automated only)
+
+Nothing shows an open item yet, so there is nothing to click. It is covered by
+`cd brain && uv run pytest tests/test_open_items_store.py tests/test_open_items.py -q` on a temporary database:
+
+1. An item answered before its deadline counts; answered after it, the answer is refused as `expired`.
+2. Close the database and open it again: the open item is still there with its saved call.
+3. An item marked live-only is expired at start; a saved-call item stays open.
+4. Each move (`opened`, `answered`, `done`, `expired`) writes one `open_item.*` line in the log.
+
 ## Show, Done, Later and a drafted reply (automated; the journey by hand with real Gmail)
 
 Automated: `cd brain && uv run pytest tests/test_loops_tools.py tests/test_prompt.py -q` on fakes,

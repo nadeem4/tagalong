@@ -32,6 +32,7 @@ connection from `store.db.open_db`; nothing else opens the file.
 - `store/outputs.py`: owns `tool_outputs` (`put_output`, `get_output`, `prune_outputs`).
 - `store/rules.py`: owns `rules` (modes, preferences, offers).
 - `store/settings.py`: owns `settings` (`get_setting`, `set_setting`), a small key and value table; today it holds the chosen Scout model under `model` and, for updates, `auto_update.{app,expert}.{official,community}` (`"1"` or `"0"`: whether that group updates by itself; absent means Official on, Community off). The last check time and the latest versions seen are a cache file, `<TAGALONG_HOME>/cache/updates.json`, not a table.
+- `store/open_items.py`: owns `open_items` (`insert`, `get`, `close`, `list_open`, `due`, `live_only_open`) and `StoredItem`.
 - `store/work.py`: `WorkStore` over `work`, `work_events`, `work_fts` and the detail tables
   `work_job`, `work_timer`, `work_loop`, `work_ask` and `job_steps`: create, the state machine,
   rollup, retry, due queries, search, the resume scan and the sweep. Jobs, asks, timers and loops
@@ -42,7 +43,7 @@ Nothing outside this package runs SQL: `tests/test_store_boundary.py` fails if a
 under `brain/src/brain` calls `.execute`, `.executescript` or `.executemany`.
 
 - `store/migrations/`: `NNNN_name.sql` (or `NNNN_name.py` with a `migrate(db)` function) files,
-  `0001_memories` to `0030_app_updates`. The numbers have no gaps (the loader refuses a gap or a
+  `0001_memories` to `0031_open_items`. The numbers have no gaps (the loader refuses a gap or a
   duplicate). Each file runs in one transaction together with its `user_version` bump, so a
   failure leaves the file at the last good version. A file is never edited after it has merged;
   a schema change is a new file.
@@ -612,6 +613,37 @@ and is re-ended with the outcome when `Approvals.record` decides it.
 An expert's question to Scout is a `question` row under its job: `active` while waiting,
 `done` when answered or passed, `expired` when Scout never answered or the job ended. Its
 `title` is the question and its `summary` the answer.
+
+## Open items
+
+### open_items
+
+Everything waiting on the person (a card, choice, install, sign-in, expert question, offer or
+setup step), one row each with one lifecycle. Nothing writes it yet: the asks, choices and
+installs move onto it in later slices (F6 and F7).
+
+| Column            | Type             | Meaning                                                                                              |
+| ----------------- | ---------------- | ---------------------------------------------------------------------------------------------------- |
+| `id`              | TEXT PRIMARY KEY | A random hex id                                                                                      |
+| `kind`            | TEXT             | `ask`, `choice`, `install`, `signin`, `expert_ask`, `offer` or `setup` (CHECK)                       |
+| `origin_body`     | TEXT             | The body the item came from, so a reply goes back to it                                              |
+| `state`           | TEXT             | `open`, `answered`, `done` or `expired` (CHECK); default `open`                                      |
+| `saved_call_json` | TEXT             | The call to run on a later yes, as JSON, or null. Callers mask it before saving                      |
+| `live_only`       | INTEGER          | 1 when the item is tied to a running process (an expert's question) and cannot run later             |
+| `job_id`          | TEXT             | The job it belongs to, or null                                                                       |
+| `created_at`      | TEXT             | UTC time text                                                                                        |
+| `deadline_at`     | TEXT             | UTC time text: `created_at` plus `DEADLINE_S` (one day) unless the item asked for another            |
+| `closed_at`       | TEXT             | When it left `open`, or null                                                                         |
+| `closed_by`       | TEXT             | Who closed it: the answering body, or `brain`                                                        |
+| `reason`          | TEXT             | The answer for `answered`; `deadline` or `process_ended` for `expired`; the finish reason for `done` |
+
+- Moves: `open` to `answered`, `done` or `expired`; `answered` to `done`. A person's answer counts
+  while the item is `open`, even if the turn that raised it is gone; after the deadline it is
+  refused (`expired`). `live_only` items are expired at start and when their process ends.
+- Written by: `open_items.py` `OpenItems` through `store/open_items.py`.
+- Read by: `OpenItems.list_open`, `get`.
+- Retention: closed rows stay until a later slice sweeps them.
+- Index: `open_items_open(state, deadline_at)` for the deadline scan.
 
 ## Apps
 
