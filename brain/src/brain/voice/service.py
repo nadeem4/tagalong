@@ -112,6 +112,9 @@ class VoiceService:
         for turn in self._mouth.turns_on(body_id):
             self._mouth.clear(turn)
 
+    async def close(self) -> None:
+        await self._mouth.close()
+
     def spoken(
         self,
         turn: str,

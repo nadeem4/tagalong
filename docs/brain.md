@@ -2269,7 +2269,8 @@ brain sends and falls back to the system voice for a text-only `speech` frame.
   `speech {turn, done: true}`. `Mouth.sentences(turn)` returns what was sent for the newest three
   turns (frame `n` is index `n - 1`), then the sentences made but not yet sent; it survives a clear.
   `Mouth.unsaid(turn)` is only the made-but-unsent part. `Mouth.state` (`talking`,
-  `sentence_break`, `paused`, `idle`) and `on_state` report what the mouth is doing.
+  `sentence_break`, `paused`, `idle`) and `on_state` report what the mouth is doing. A failure on one sentence is
+  logged and the worker goes on; `close()` (called at brain shutdown) stops the worker.
 - **No voice yet.** The Kokoro voice loads on the first spoken turn, not at start. Until it is
   ready (first run downloads about 120 MB), and when it fails to load, sentences go out as `speech
 {turn, text}` with no `pcm`, so the body says them with its system voice. The mouth sends no

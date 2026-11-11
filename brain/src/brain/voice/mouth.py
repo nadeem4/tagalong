@@ -105,7 +105,7 @@ class Mouth:
         voice = voice or DEFAULT_VOICE
         speed = speed or DEFAULT_SPEED
         self._turns[turn] = _Turn(turn, body_id, voice, speed, system_voice, self._enqueue)
-        if self._worker is None:
+        if self._worker is None or self._worker.done():
             self._worker = asyncio.get_running_loop().create_task(self._work())
         self._refresh()
 
@@ -141,10 +141,17 @@ class Mouth:
         for name in [turn] if turn is not None else list(self._turns):
             st = self._turns.pop(name, None)
             if st is not None:
-                self._sent.setdefault(name, []).extend(st.unsent)
+                self._log(name).extend(st.unsent)
                 st.unsent.clear()
         self._queue = deque(item for item in self._queue if item[0] in self._turns)
         self._poke()
+
+    def _log(self, turn: str) -> list[str]:
+        """The turn's sentence log, keeping only the newest KEPT_TURNS logs."""
+        lines = self._sent.setdefault(turn, [])
+        while len(self._sent) > KEPT_TURNS:
+            del self._sent[next(iter(self._sent))]
+        return lines
 
     async def sample(self, text: str, voice: str | None, speed: float | None) -> bytes:
         """One WAV for Settings' Preview. Waits for the voice to load; raises if it cannot."""
@@ -191,37 +198,48 @@ class Mouth:
             if self.on_state is not None:
                 self.on_state(state)
 
+    async def close(self) -> None:
+        """Stop the worker, so no task is left pending when the loop closes."""
+        if self._worker is not None:
+            self._worker.cancel()
+            await asyncio.gather(self._worker, return_exceptions=True)
+
     async def _work(self) -> None:
         while True:
             await self._go.wait()
-            turn, line = self._queue.popleft()
-            st = self._turns.get(turn)
-            if st is None:
-                self._poke()
-                continue
-            if line is None:
-                self._send(st, {"turn": turn, "done": True})
-                del self._turns[turn]
-                self._poke()
-                continue
-            taken = 1
-            # Short lines already waiting are said together; one alone would come out clipped.
-            while len(line) < SHORT_LINE and self._queue and self._queue[0][0] == turn:
-                nxt = self._queue[0][1]
-                if nxt is None:
-                    break
-                self._queue.popleft()
-                line = f"{line} {nxt}"
-                taken += 1
-            self._saying = True
-            self._poke()
             try:
-                await self._say(st, line)
+                await self._take_one()
+            except Exception:  # one bad item must not end the speech for good
+                log.exception("the mouth failed on a sentence")
             finally:
                 self._saying = False
+                self._poke()
+
+    async def _take_one(self) -> None:
+        turn, line = self._queue.popleft()
+        st = self._turns.get(turn)
+        if st is None:
+            return
+        if line is None:
+            del self._turns[turn]
+            self._send(st, {"turn": turn, "done": True})
+            return
+        taken = 1
+        # Short lines already waiting are said together; one alone would come out clipped.
+        while len(line) < SHORT_LINE and self._queue and self._queue[0][0] == turn:
+            nxt = self._queue[0][1]
+            if nxt is None:
+                break
+            self._queue.popleft()
+            line = f"{line} {nxt}"
+            taken += 1
+        self._saying = True
+        self._poke()
+        try:
+            await self._say(st, line)
+        finally:
             if self._turns.get(turn) is st:
                 del st.unsent[:taken]
-            self._poke()
 
     async def _say(self, st: _Turn, line: str) -> None:
         frame: dict = {"turn": st.turn, "text": line}
@@ -238,10 +256,8 @@ class Mouth:
         if self._turns.get(st.turn) is not st:
             return  # cleared while it was being made
         # Logged only once sent, so frame `n` and the log index agree; the log outlives the turn.
-        lines = self._sent.setdefault(st.turn, [])
+        lines = self._log(st.turn)
         lines.append(line)
-        while len(self._sent) > KEPT_TURNS:
-            del self._sent[next(iter(self._sent))]
         self._send(st, {**frame, "n": len(lines)})
 
     def _tts_now(self) -> Tts | None:

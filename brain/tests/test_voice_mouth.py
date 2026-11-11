@@ -438,3 +438,45 @@ async def test_unsent_sentences_survive_clear():
     m.clear()
     await settle()
     assert m.sentences("t") == before  # sent and unsent alike, each once
+
+
+async def test_worker_survives_a_send_error():
+    sent = Sent()
+    m, _ = mouth(sent)
+    await ready(m)
+    sent.frames.clear()
+    real = sent.send_live
+    calls = {"n": 0}
+
+    def flaky(body_id, method, params):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise OSError("socket gone")
+        return real(body_id, method, params)
+
+    sent.send_live = flaky
+    m.spoken("a", "d", None, None)
+    m.reply("a", {"delta": f"{ONE} "})
+    await settle()
+    m.spoken("b", "d", None, None)
+    m.reply("b", {"delta": f"{TWO} "})
+    m.reply("b", {"done": True})
+    await settle()
+    assert [p.get("text") for p in sent.speech() if p["turn"] == "b"] == [TWO, None]
+
+
+async def test_close_ends_the_worker():
+    m, _ = mouth(Sent())
+    m.spoken("t", "d", None, None)
+    worker = m._worker
+    await m.close()
+    assert worker is not None and worker.done()
+
+
+async def test_clear_trims_the_sentence_log_too():
+    m, _ = mouth(Sent())
+    for i in range(5):
+        m.spoken(f"t{i}", "d", None, None)
+        m._turns[f"t{i}"].unsent.append("x")
+        m.clear(f"t{i}")
+    assert m.sentences("t0") == [] and m.sentences("t4") == ["x"]

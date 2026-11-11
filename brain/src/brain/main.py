@@ -288,9 +288,10 @@ async def _run() -> None:
     update_loop: asyncio.Task | None = None
     lag_watch: asyncio.Task | None = None
     perf_dump: asyncio.Task | None = None
-    session.voice = VoiceService(  # models load on first listen and first spoken turn
+    voice = VoiceService(  # models load on first listen and first spoken turn
         bodies, ears_loader(config.data_dir), tts_loader(config.data_dir)
     )
+    session.voice = voice
     session.loops = loops  # focus and tab events also surface loops
     loops.start()  # wakes Scout for a loop already due, and arms the next one
     try:
@@ -346,6 +347,7 @@ async def _run() -> None:
         await logins.stop()
         if bridges is not None:
             await bridges.stop()  # before the brain goes, so no bridge is left running
+        await voice.close()
         await session.jobs.shutdown()
         await apps.shutdown()
         memory.close()
