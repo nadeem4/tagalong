@@ -9,12 +9,14 @@ The one exception is the turn timeout: a stalled model gets one plain message so
 
 import asyncio
 import logging
+import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
 
 from brain.builtin_guards import spend_guards
 from brain.guards import Guards, Hook, ModelCallCtx
+from brain.telemetry import TIMINGS, timed
 
 log = logging.getLogger(__name__)
 
@@ -125,7 +127,12 @@ def _blames_newest(err: Exception, history: list) -> bool:
     return any(word in str(err).lower() for word in ("image", "document"))
 
 
-async def run_turn(
+async def run_turn(**kwargs) -> str:
+    async with timed("turn"):  # the whole turn, tools and waits included
+        return await _run_turn(**kwargs)
+
+
+async def _run_turn(
     *,
     turn_id: str,
     body_id: str | None,
@@ -164,6 +171,7 @@ async def run_turn(
                     steps += 1
 
                     stream = model.stream(system(), history, tools()).__aiter__()
+                    model_clock = time.perf_counter()
                     final = None
                     failed = False
                     shown.clear()
@@ -182,6 +190,9 @@ async def run_turn(
                             break
                         if isinstance(item, Final):
                             final = item
+                            TIMINGS.record(
+                                "model_call", time.perf_counter() - model_clock, {"step": steps}
+                            )
                         else:
                             if not shown and tail and not tail[-1].isspace():
                                 # A new step after a tool round: without a break its words run

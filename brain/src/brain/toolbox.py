@@ -37,6 +37,7 @@ from brain.permission import (
     tool_asker,
 )
 from brain.protocol import LIMITS, CallResult, ErrorCode, RpcError, Tool
+from brain.telemetry import timed
 
 if TYPE_CHECKING:
     from brain.waiting import WaitingAsks
@@ -479,7 +480,8 @@ class Toolbox:
             raise RpcError(ErrorCode.denied, f"{spec.name} is turned off by the owner.")
         kind = getattr(source, "approval_source", "scout_tool")
         try:
-            out = await source.run(call, call.name)
+            async with timed("tool", name=call.name):
+                out = await source.run(call, call.name)
         except Exception as err:
             self._report(call, spec, kind, "failed", None, err)
             raise
@@ -531,7 +533,9 @@ class Toolbox:
                     if caller != "home":
                         await self._gate(call, spec, kind, job_id, wait)
                     found[2] = True
-                    return await source.run(call, call.name)
+                    # Only the run: the gate above may wait on the person.
+                    async with timed("tool", name=call.name):
+                        return await source.run(call, call.name)
         for source in self.sources:
             error = source.unavailable(call.name)
             if error is not None:

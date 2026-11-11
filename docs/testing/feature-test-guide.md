@@ -2648,3 +2648,9 @@ Home > Overview shows a "Scout's brain" card above "Where things run".
    new installer. The brain process (the id in `brain.pid`) must be gone before files are
    replaced, the install must finish without a "file in use" error, and the new app starts a new
    brain. Do the same for uninstall.
+
+## Loop lag and step timings (real brain)
+
+1. Start the brain with `TAGALONG_LOOP_LAG_MS=50` and use Scout. Any `event loop blocked for ...`
+   line in `brain.log` names a real stall longer than 50 ms.
+2. Start the brain with `TAGALONG_LOOP_LAG_MS=abc`. It refuses to start and names the variable.

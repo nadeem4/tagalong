@@ -25,6 +25,7 @@ from brain.permission import (
 )
 from brain.protocol import Body, ErrorCode, RpcError, Tool
 from brain.store import rules
+from brain.telemetry import TIMINGS
 from brain.toolbox import INSTALL_OCR_TIMEOUT_S, BodySource, BrainSource, ToolSpec
 from brain.toolbox import Toolbox as RealToolbox
 
@@ -139,6 +140,16 @@ async def test_brain_source_runs_handler_with_input():
     box = Toolbox([BrainSource([(spec("a"), handler)])])
     c = Call(id="c1", name="a", input={"k": 1}, turn="t1", text="")
     assert await box.run(c) == "got {'k': 1}"
+
+
+async def test_a_tool_call_records_a_timing_sample():
+    async def handler(args):
+        return "ok"
+
+    TIMINGS.clear()
+    await Toolbox([BrainSource([(spec("a"), handler)])]).run(call("a"))
+    [(_, tags)] = TIMINGS.samples("tool")
+    assert tags == {"name": "a"}
 
 
 class AutoPeer:
