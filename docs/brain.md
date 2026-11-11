@@ -124,6 +124,7 @@ the total can run a little low.
 | `brain/src/brain/voice/load.py`        | `ears_loader` and `tts_loader`: download the files and load the models; only `main.py` imports it                                                                                                                                                                                                                                                                                                                                                  |
 | `brain/src/brain/bridges.py`           | `WhatsAppSettings`, `BridgeSupervisor`: runs the WhatsApp bridge child on Tagalong's own Node, restarts it with growing waits, ends it with the brain                                                                                                                                                                                                                                                                                              |
 | `brain/src/brain/bodies_tools.py`      | `bodies_tools`: the Home tools `bodies_status`, `whatsapp_status` and `whatsapp_set` (which bodies are connected, and WhatsApp setup; see [WhatsApp setup tools](#whatsapp-setup-tools))                                                                                                                                                                                                                                                           |
+| `brain/src/brain/build_info.py`        | `app_version()` (package version), `source_hash(root)` and `build_id(env_build, root)` (`TAGALONG_BUILD`, else a 12-hex hash of the `.py` and `.md` files under `src/brain`); both go in the `hello` result                                                                                                                                                                                                                                        |
 | `brain/src/brain/lifecycle.py`         | `brain.pid` (`write_pid`, `clear_pid`) and `stop_brain`, the logic behind `tagalong stop`; the real alive check asks the OS on Windows, where `os.kill(pid, 0)` would send Ctrl+C or kill it                                                                                                                                                                                                                                                       |
 | `brain/src/brain/main.py`              | The `uv run brain` entry point                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
@@ -132,6 +133,11 @@ the total can run a little low.
 - A bad `hello` closes the connection. The protocol version is checked first, so a wrong
   version gets `version_mismatch` with `data.protocol` set to `1` even if the rest of the shape
   is wrong; otherwise a bad shape gets `invalid_params`.
+- The `hello` result carries the brain's `version` and `build` (both optional on the wire, so an
+  older brain that sends neither is still understood; `protocol` stays 1). The desktop compares
+  them with its own to decide on a restart (see [desktop.md](desktop.md#brain-version-check-and-restart)).
+  `TAGALONG_STARTED_BY=desktop` (set by the desktop when it spawns the brain) is reported by
+  `brain_status` as `started_by: "desktop"`; unset, it is `"person"`.
 - After `hello`, `tools` replaces the body's tool list and answers `{}`. A second `hello` gets
   `invalid_request`. The connection stays open.
 - `say` starts or joins a turn (see [What a turn does](#what-a-turn-does)); bad params get
@@ -1136,11 +1142,12 @@ process of the brain, on Tagalong's own Node only (`ensure_node`; the system Nod
 `bodies_tools.py` gives Home three tools (never offered to Scout; `main.py` passes the bridge
 supervisor as a getter, because it is built once the brain's port is known):
 
-| Tool              | Input                                                          | Result text (JSON)                                                                                                                                |
-| ----------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bodies_status`   | `{}`                                                           | `{"bodies": [{"kind", "name", "connected"}]}`, always `desktop`, `browser` and `whatsapp`                                                         |
-| `whatsapp_status` | `{}`                                                           | `{"enabled", "set": {access_token, app_secret, verify_token, phone_number_id, allowed_number: bool}, "complete", "state", "port"}`; never a value |
-| `whatsapp_set`    | any of `enabled` (bool), the five strings, `port` (1024-65535) | the same JSON as `whatsapp_status`                                                                                                                |
+| Tool              | Input                                                          | Result text (JSON)                                                                                                                                                                                                                      |
+| ----------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `brain_status`    | `{}`                                                           | `{"version", "build", "pid", "started_at", "started_by", "addr", "data_dir", "log_path", "places": [{"id", "kind", "name"}], "work_running"}`: the facts on Home's "Scout's brain" card (Home only; `brain_status_tools` in `tools.py`) |
+| `bodies_status`   | `{}`                                                           | `{"bodies": [{"kind", "name", "connected"}]}`, always `desktop`, `browser` and `whatsapp`                                                                                                                                               |
+| `whatsapp_status` | `{}`                                                           | `{"enabled", "set": {access_token, app_secret, verify_token, phone_number_id, allowed_number: bool}, "complete", "state", "port"}`; never a value                                                                                       |
+| `whatsapp_set`    | any of `enabled` (bool), the five strings, `port` (1024-65535) | the same JSON as `whatsapp_status`                                                                                                                                                                                                      |
 
 `whatsapp_set` changes only the keys given. They are written together in one atomic replace of
 `<TAGALONG_HOME>/.env` (`upsert_env_values`, `enabled` as `1` or `0`) and to the running environment, then the supervisor

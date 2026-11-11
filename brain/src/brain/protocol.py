@@ -165,6 +165,9 @@ class HelloResult(Model):
     tools: list[Tool]
     seq: HandshakeSeq
     resync: bool
+    # The brain's own version and build; the desktop compares them to its own.
+    version: str | None = None
+    build: str | None = None
 
 
 class ToolsParams(Model):

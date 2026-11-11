@@ -16,12 +16,26 @@ import { startFakeBrain, type FakeBrain } from './fixtures/fake-brain';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 
+// A brain from an older build that the person started: Tagalong must leave it alone and say so.
+const OLD_BRAIN = { version: '0.0.1', build: 'old' };
+const PERSON_STATUS = {
+  ...OLD_BRAIN,
+  pid: 18420,
+  started_at: new Date(Date.now() - 25 * 60_000).toISOString(),
+  started_by: 'person',
+  addr: '127.0.0.1:47321',
+  data_dir: 'C:\\Users\\you\\.tagalong',
+  log_path: 'C:\\Users\\you\\.tagalong\\brain.log',
+  places: [{ id: 'desktop', kind: 'desktop', name: 'Desktop' }],
+  work_running: false,
+};
+
 let app: ElectronApplication;
 let brain: FakeBrain;
 let dataDir: string;
 
 test.beforeAll(async () => {
-  brain = await startFakeBrain();
+  brain = await startFakeBrain({ hello: OLD_BRAIN, brainStatus: PERSON_STATUS });
   dataDir = seedSettings(mkdtempSync(join(tmpdir(), 'tagalong-where-')));
   app = await electron.launch({
     args: ['.', `--user-data-dir=${dataDir}`],
@@ -60,11 +74,34 @@ test('Overview shows where the brain, apps and Claude Code run', async () => {
   await home.getByRole('button', { name: 'Overview', exact: true }).click();
 
   const card = home.getByRole('region', { name: 'Where things run' });
-  await expect(card).toContainText(`ws://${brain.addr}`, { timeout: 30_000 });
-  await expect(card).toContainText('Connected');
-  await expect(card).toContainText('node files-server.js');
+  await expect(card).toContainText('node files-server.js', { timeout: 30_000 });
   await expect(card).toContainText('https://wiki.example.com/mcp');
   await expect(card).toContainText('Claude Code');
+});
+
+test('brain card shows version and update banner on a mismatched fake brain', async () => {
+  // Opening Home again is harmless, and keeps this test runnable on its own.
+  const avatar = await windowFor('avatar');
+  await avatar.evaluate(() => window.tagalongHost.openSettings());
+  const home = await windowFor('home');
+  await home.getByRole('button', { name: 'Overview', exact: true }).click();
+  const card = home.getByRole('region', { name: "Scout's brain" });
+  await expect(card).toContainText(`This PC · ${brain.addr}`, { timeout: 30_000 });
+  await expect(card).toContainText('Brain 0.0.1 · build old');
+  await expect(card).toContainText('(app is ');
+  await expect(card).toContainText('You, from a terminal');
+  await expect(card).toContainText('Running · Update ready');
+  await expect(card).toContainText('Restart to finish updating.');
+  await expect(card).toContainText(
+    'You started it, so Tagalong leaves it alone. Restart it in your terminal.',
+  );
+  // A brain the person started is never restarted from here: no button, and it stays connected.
+  await expect(home.getByRole('button', { name: 'Restart now' })).toHaveCount(0);
+  await expect(home.getByRole('button', { name: 'Restart brain' })).toHaveCount(0);
+  await home.getByRole('button', { name: 'Tasks', exact: true }).click();
+  await expect(home.getByRole('status')).toContainText('Restart it in your terminal');
+  await home.getByRole('button', { name: 'Overview', exact: true }).click();
+  await expect(card).toContainText('Running · Update ready');
 });
 
 const READING_ROWS = (ocr: Record<string, unknown>) => [
