@@ -4,10 +4,11 @@ A tool call that needs the person's yes opens an `ask` open item holding the cal
 on screen; the turn is told the ask is open and goes on. The answer, whenever it comes (even
 after the turn ended or the brain restarted), runs the saved call through the same gate: the
 floor and the person's answer, then the tool, and wakes Scout with the facts. It also ends an ask
-at its deadline and shows cards again when a body joins.
+at its deadline, and on a body's return shows cards again and tells Scout which asks wait.
 """
 
 import asyncio
+import json
 import logging
 from collections.abc import Callable
 from dataclasses import replace
@@ -18,7 +19,7 @@ from brain.approvals import Approvals
 from brain.asks import Asks
 from brain.events import Event
 from brain.mind.turn import Call
-from brain.open_items import OpenItem, OpenItemRefused, OpenItems
+from brain.open_items import DEADLINE_S, OpenItem, OpenItemRefused, OpenItems
 from brain.permission import AskRequest, PersonAnswer, Tier, summarise
 from brain.protocol import RpcError
 from brain.store.work import TransitionRefused
@@ -245,29 +246,67 @@ class AskRunner:
 
     # ---- return ----
 
-    def rejoined(self) -> None:
-        """A body that displays joined: show again every open ask whose card is not up (a
-        restart leaves none)."""
+    def returned(self, away_s: float | None) -> None:
+        """A body that displays joined after `away_s` seconds (None: not seen before). Cards of
+        items that ended while it was away are closed on it, every open ask whose card is not up
+        is shown again, and Scout is told which of those wait and for how long."""
         try:
             asyncio.get_running_loop()
         except RuntimeError:
             return  # no loop yet (a body joining before the server runs)
-        for item in self._items.list_open(kind=KIND):
-            if not self._asks.is_open(item.id):
-                self._spawn(self._show_again(item))
+        self._spawn(self._return(away_s))
 
-    async def _show_again(self, item: OpenItem) -> None:
+    async def _return(self, away_s: float | None) -> None:
+        now = self._now()
+        # Without a known absence, look back one deadline: nothing older could still be showing.
+        since = now - timedelta(seconds=DEADLINE_S if away_s is None else away_s)
+        for item in self._items.expired_since(since):
+            self._asks.card_closed(item.id)
+        back: list[OpenItem] = []
+        for item in self._items.list_open(kind=KIND):
+            try:
+                if not self._asks.is_open(item.id) and await self._show_again(item):
+                    back.append(item)
+                    continue
+            except Exception:  # one card that cannot be built must not hide the others
+                log.exception("an open ask could not be shown again: %s", item.id)
+                continue
+            # A card up already may have opened while no screen showed it: told if it is newer
+            # than the absence.
+            if (
+                away_s is not None
+                and item.created_at >= since
+                and self._items.get(item.id).state == "open"
+            ):
+                back.append(item)
+        if back:
+            asks = [
+                {
+                    "ask": i.id,
+                    "tool": _call(i).name,
+                    "summary": summarise(_call(i).text, _call(i).name, _call(i).input),
+                    "age_s": int((now - i.created_at).total_seconds()),
+                }
+                for i in back
+            ]
+            facts: dict[str, str | int] = {"count": len(asks), "asks": json.dumps(asks)}
+            self._emit(Event("asks_waiting", facts, key="asks_waiting"))
+
+    async def _show_again(self, item: OpenItem) -> bool:
         call = _call(item)
         toolbox = self._toolbox()
         found = toolbox.spec_named(call.name)
         if found is None:
-            return self._end(item, "failed", "that tool is gone")
+            self._end(item, "failed", "that tool is gone")
+            return False
         spec, kind = found
         req = await toolbox.ask_request(call, spec, kind, job_id=None, ask_id=item.id)
-        if not self._asks.is_open(item.id) and self._items.get(item.id).state == "open":
-            self._asks.show(
-                item.id, replace(call, input=req.input), spec.name, req.tier is not Tier.ask
-            )
+        if self._asks.is_open(item.id) or self._items.get(item.id).state != "open":
+            return False  # another body's join got there first, or it ended meanwhile
+        self._asks.show(
+            item.id, replace(call, input=req.input), spec.name, req.tier is not Tier.ask
+        )
+        return True
 
     def _spawn(self, work) -> None:
         task = asyncio.get_running_loop().create_task(work)

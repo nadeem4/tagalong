@@ -14,6 +14,7 @@ from brain.loops.home_tools import loop_home_tools
 from brain.loops.loop import Loop
 from brain.loops.service import LoopService
 from brain.memory import Memory
+from brain.open_items import OpenItems
 from brain.protocol import ErrorCode, RpcError
 
 T0 = datetime(2026, 11, 4, 9, 0, tzinfo=UTC)
@@ -50,9 +51,11 @@ class Rig:
             poll_s=3600,
             notify=lambda kind, data: self.notes.append((kind, data)),
         )
+        self.items = OpenItems(self.mem.db, lambda: T0 - timedelta(hours=2))
         rows = [("gmail", "Gmail"), ("notes", "Notes"), ("away", "Away")]
         self.tools = {
-            spec.name: handler for spec, handler in loop_home_tools(self.svc, lambda: rows)
+            spec.name: handler
+            for spec, handler in loop_home_tools(self.svc, lambda: rows, self.items)
         }
 
     async def call(self, name, **args):
@@ -181,7 +184,12 @@ async def test_a_saved_switch_is_on_after_a_restart_before_the_app_connects(rig)
 
 
 async def _state(svc):
-    tools = {s.name: h for s, h in loop_home_tools(svc, lambda: [("gmail", "Gmail")])}
+    tools = {
+        s.name: h
+        for s, h in loop_home_tools(
+            svc, lambda: [("gmail", "Gmail")], OpenItems(Memory(":memory:").db, lambda: T0)
+        )
+    }
     return await tools["loops_state"]({})
 
 
@@ -248,3 +256,20 @@ async def test_home_loop_done_and_later_unknown_id_are_invalid_params(rig):
         with pytest.raises(RpcError) as err:
             await rig.call(name, id="nope", **extra)
         assert err.value.code == ErrorCode.invalid_params
+
+
+async def test_held_list_names_each_open_item_plainly_and_leaves_out_setup_news(rig):
+    saved = {"name": "delete_files", "input": {}, "text": "I'll delete 3 old logs."}
+    rig.items.open("ask", "desktop", saved_call=saved)
+    rig.items.open("choice", "desktop", live_only=True)
+    rig.items.open("expert_ask", "desktop", live_only=True)
+    rig.items.open("offer", "brain", saved_call={"sentence": "Always allow reading files?"})
+    rig.items.open("setup", "brain", saved_call={"kind": "setup_done", "facts": {}, "key": "k"})
+    rows = (await rig.call("loops_state"))["open_items"]
+    assert [(r["kind"], r["title"], r["age_s"]) for r in rows] == [
+        ("Permission", "I'll delete 3 old logs.", 7200),
+        ("Question", "Scout is waiting for your choice", 7200),
+        ("Expert request", "An expert wants your OK", 7200),
+        ("Offer", "Always allow reading files?", 7200),
+    ]
+    assert all(r["id"] for r in rows)

@@ -10,16 +10,44 @@ from collections.abc import Callable
 from datetime import datetime
 
 from brain.loops.service import LoopService
+from brain.open_items import OpenItem, OpenItems
+from brain.permission import summarise
 from brain.protocol import ErrorCode, RpcError
 from brain.toolbox import Handler, ToolSpec
 
 _NO_ARGS = {"type": "object", "properties": {}}
 
 
+# What Home calls each kind of open item, and the line for those with no words of their own.
+# Setup news is left out: it waits on Scout, not on the person.
+_KINDS = {
+    "ask": ("Permission", ""),
+    "choice": ("Question", "Scout is waiting for your choice"),
+    "expert_ask": ("Expert request", "An expert wants your OK"),
+    "offer": ("Offer", ""),
+}
+
+
+def _row(item: OpenItem, now: datetime) -> dict:
+    saved = item.saved_call or {}
+    word, line = _KINDS[item.kind]
+    if item.kind == "ask":
+        line = summarise(saved.get("text") or "", saved.get("name") or "", saved.get("input") or {})
+    elif item.kind == "offer":
+        line = saved.get("sentence") or "An offer from Scout"
+    return {
+        "id": item.id,
+        "kind": word,
+        "title": line,
+        "age_s": int((now - item.created_at).total_seconds()),
+    }
+
+
 def loop_home_tools(
-    service: LoopService, apps: Callable[[], list[tuple[str, str]]]
+    service: LoopService, apps: Callable[[], list[tuple[str, str]]], items: OpenItems
 ) -> list[tuple[ToolSpec, Handler]]:
-    """`apps` lists every connected app as (id, name); only the mail ones are offered."""
+    """`apps` lists every connected app as (id, name); only the mail ones are offered. The Held
+    list also carries every open item (asks, choices, offers) with its age."""
     home = frozenset({"home"})
 
     def refuse(message: str) -> RpcError:
@@ -51,7 +79,9 @@ def loop_home_tools(
             }
             for lp in service.all_loops()
         ]
-        return json.dumps({"apps": mail_apps(), "loops": loops})
+        now = service.now()
+        open_items = [_row(it, now) for it in items.list_open() if it.kind in _KINDS]
+        return json.dumps({"apps": mail_apps(), "loops": loops, "open_items": open_items})
 
     async def set_switch(args: dict) -> str:
         app, on = args.get("app"), args.get("on")

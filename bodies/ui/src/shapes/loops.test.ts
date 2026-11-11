@@ -36,4 +36,19 @@ describe('parseLoopsState', () => {
     expect(() => parseLoopsState({ apps: [], loops: [{ ...LOOP, direction: 'x' }] })).toThrow();
     expect(() => parseLoopsState({ apps: [], loops: [{ ...LOOP, status: 'x' }] })).toThrow();
   });
+
+  it('has no open items when the brain sends none', () => {
+    expect(parseLoopsState({ apps: [], loops: [] }).openItems).toEqual([]);
+  });
+
+  it('renames age_s on an open item', () => {
+    const state = parseLoopsState({
+      apps: [],
+      loops: [],
+      open_items: [{ id: 'a1', kind: 'Permission', title: 'Delete logs', age_s: 60 }],
+    });
+    expect(state.openItems).toEqual([
+      { id: 'a1', kind: 'Permission', title: 'Delete logs', ageS: 60 },
+    ]);
+  });
 });

@@ -559,7 +559,11 @@ next section.
    5c. **Action:** close every screen, have Scout call a change tool so its ask opens, quit the
    brain, start it again and open the desktop.
    **Expected:** the card is back for the same ask, and allowing it runs the call
-   (`test_a_card_comes_back_when_a_body_joins_after_a_restart`). Set the tool to Off before
+   (`test_a_card_comes_back_when_a_body_joins_after_a_restart`, `test_reconnect_reshows_open_cards`).
+   Scout is told which asks wait and how old each is (`asks_waiting`,
+   `test_return_wake_names_waiting_asks_and_their_age`), and an expert ask whose process ended while you
+   were away is closed on return (`test_live_only_shown_expired_on_return`). Home's Tasks page, Held tab,
+   lists the open ask under "Waiting on you" with its age (`held-tab.test.tsx`). Set the tool to Off before
    answering: the ask is refused and Scout says so
    (`test_a_tool_turned_off_since_refuses_the_late_yes`). Quit the brain right after allowing
    and before the call finishes: on start Scout says it is not known if it ran, and it is not run

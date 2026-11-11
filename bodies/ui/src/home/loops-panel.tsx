@@ -3,7 +3,8 @@
  * until the person turns it on, with one plain line about where mail goes), the Held list of
  * every loop the brain holds, Forget per loop, and Stop and wipe behind an in-page confirm.
  * The brain owns it all; this asks, then reads again when it says `loops` changed. A row shows
- * what the loop is, never the mail it came from. Contains LoopsPanel.
+ * what the loop is, never the mail it came from. Above it, every open item (a card or offer
+ * still waiting on the person) with how long it has waited. Contains LoopsPanel.
  */
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { LoopRow, LoopsState } from '../shapes';
@@ -33,6 +34,13 @@ function meta(loop: LoopRow): string[] {
   }
   parts.push(STATUS[loop.status]);
   return parts;
+}
+
+/** How long an open item has waited, in the largest whole unit. */
+function waited(seconds: number): string {
+  if (seconds >= 86400) return `${Math.floor(seconds / 86400)} d`;
+  if (seconds >= 3600) return `${Math.floor(seconds / 3600)} h`;
+  return `${Math.max(1, Math.floor(seconds / 60))} min`;
 }
 
 /** Tomorrow 09:00 on the person's clock, as ISO with the local offset (the brain refuses naive times). */
@@ -80,9 +88,17 @@ export function LoopsPanel() {
 
   useEffect(() => {
     refresh();
-    return bridge.onBrainChanged((what) => {
+    // A card opening or closing changes the open items, and the brain sends no `changed` for it.
+    const stopCards = bridge.onTurnEvent((event) => {
+      if (event.type === 'connector.confirm' || event.type === 'connector.dismiss') refresh();
+    });
+    const stopChanges = bridge.onBrainChanged((what) => {
       if (what === 'loops' || what === 'apps') refresh(); // Gmail may have just connected
     });
+    return () => {
+      stopCards();
+      stopChanges();
+    };
   }, [bridge, refresh]);
 
   // Read again either way: on a refusal the card then shows what the brain really holds.
@@ -145,6 +161,29 @@ export function LoopsPanel() {
           )}
         </div>
       ))}
+
+      <div className="loops-held">
+        <h3 className="perm-group__title">
+          Waiting on you{state.openItems.length > 0 ? ` (${state.openItems.length})` : ''}
+        </h3>
+        {state.openItems.length === 0 ? (
+          <p>Nothing is waiting on you.</p>
+        ) : (
+          <ul aria-label="Waiting on you" className="loops-list">
+            {state.openItems.map((item) => (
+              <li key={item.id} className="loops-row">
+                <span className="loops-row__body">
+                  <span className="loops-row__title">{item.title}</span>
+                  <span className="loops-row__meta">
+                    <span>{item.kind}</span>
+                    <span>{waited(item.ageS)}</span>
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <div className="loops-held">
         <h3 className="perm-group__title">Held{open.length > 0 ? ` (${open.length})` : ''}</h3>

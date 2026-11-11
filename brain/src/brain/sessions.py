@@ -582,7 +582,7 @@ class Session:
         self.scheduler.pump()  # also starts a wake that was waiting for a body
         body = self._bodies.body(body_id)
         if body is not None and body.display is not False:
-            self.ask_runner.rejoined()  # open asks whose card is not up are shown again
+            self.ask_runner.returned(away)  # cards come back, ended ones close, Scout is told
             self._offers.resume()  # offers the last run left unanswered are shown again
 
     def _on_job_finished(self, job: Job) -> None:

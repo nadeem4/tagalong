@@ -143,3 +143,15 @@ def test_expire_due_and_list_open_can_take_one_kind(tmp_path):
     assert [i.kind for i in items.list_open(kind="offer")] == ["offer"]
     assert [i.kind for i in items.expire_due(clock.at, kind="ask")] == ["ask"]
     assert [i.kind for i in items.list_open()] == ["offer"]
+
+
+def test_expired_since_lists_what_ended_while_away(tmp_path):
+    items, clock = make(tmp_path)
+    items.open("expert_ask", "desktop", live_only=True)
+    items.expire_live_only()
+    clock.at = T0 + timedelta(hours=1)
+    new = items.open("expert_ask", "desktop", live_only=True)
+    clock.at = T0 + timedelta(hours=2)
+    items.expire_live_only()
+    items.open("ask", "desktop", saved_call={"tool": "x"})
+    assert [i.id for i in items.expired_since(T0 + timedelta(minutes=30))] == [new.id]

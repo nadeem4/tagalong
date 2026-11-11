@@ -33,7 +33,12 @@ const WAITING: LoopRow = {
 
 function open(state: Partial<LoopsState> = {}): FakeHostBridge {
   const bridge = createFakeHostBridge({
-    loops: { apps: [{ id: 'gmail', name: 'Gmail', on: false }], loops: [], ...state },
+    loops: {
+      apps: [{ id: 'gmail', name: 'Gmail', on: false }],
+      loops: [],
+      openItems: [],
+      ...state,
+    },
   });
   render(
     <HostBridgeProvider bridge={bridge}>
@@ -138,7 +143,7 @@ describe('LoopsPanel', () => {
       apps: [{ id: 'gmail', name: 'Gmail', on: true, unreadSince: '2026-11-04T09:30:00+00:00' }],
     });
     expect(await screen.findByText(/Mail unread since \d\d:\d\d/)).toBeInTheDocument();
-    bridge.loops = { apps: [{ id: 'gmail', name: 'Gmail', on: true }], loops: [] };
+    bridge.loops = { apps: [{ id: 'gmail', name: 'Gmail', on: true }], loops: [], openItems: [] };
     act(() => bridge.emitChanged('loops'));
     await waitFor(() => expect(screen.queryByText(/Mail unread since/)).toBeNull());
   });

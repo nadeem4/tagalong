@@ -185,3 +185,7 @@ class OpenItems:
         closed = self.get(item.id)
         _event(state, closed, by, reason)
         return closed
+
+    def expired_since(self, since: datetime) -> list[OpenItem]:
+        """Items that expired at or after `since`: what ended while a body was away."""
+        return [_item(s) for s in store.expired_since(self.db, utc_text(since))]
