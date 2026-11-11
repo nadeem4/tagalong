@@ -61,6 +61,12 @@ class Memory:
     def set_app_enabled(self, app_id: str, enabled: bool) -> None:
         connections.set_app_enabled(self._db, app_id, enabled)
 
+    def set_app_auto_update(self, app_id: str, on: bool) -> None:
+        connections.set_app_auto_update(self._db, app_id, on)
+
+    def set_app_package(self, app_id: str, config: dict, version: str) -> None:
+        connections.set_app_package(self._db, app_id, config, version)
+
     def remove_app(self, app_id: str) -> None:
         connections.remove_app(self._db, app_id)
 

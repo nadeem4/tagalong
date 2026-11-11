@@ -180,7 +180,9 @@ async def add_registry_app(
         machine = await inspect_fn()
     params = app_params(entry, dist, machine, home)
     trust = "official" if is_official_app(entry.id) else "community"
-    return await save_app(apps, memory, tokens, notify, params, trust=trust)
+    # Only a package app has a version to keep; a remote one is always the host's latest.
+    version = (dist.version or entry.version) if dist and dist.kind in ("npx", "uvx") else ""
+    return await save_app(apps, memory, tokens, notify, params, trust=trust, version=version)
 
 
 def app_setup_tools(

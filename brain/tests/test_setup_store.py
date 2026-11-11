@@ -103,3 +103,15 @@ def test_all_experts_adds_the_custom_command_as_source_custom(tmp_path):
     ]
     store.add(expert())
     assert [e.id for e in all_experts(store, ["x"])] == ["claude-acp", "custom"]
+
+
+def test_auto_update_round_trips_and_an_old_file_without_it_still_reads(tmp_path):
+    store = ExpertStore(tmp_path)
+    store.add(expert())
+    assert store.get("claude-acp").auto_update is None
+    store.set_auto_update("claude-acp", True)
+    assert store.get("claude-acp").auto_update is True
+    old = {k: v for k, v in json.loads(experts_file(tmp_path).read_text())["experts"][0].items()}
+    del old["auto_update"]
+    experts_file(tmp_path).write_text(json.dumps({"experts": [old]}), encoding="utf-8")
+    assert store.get("claude-acp").auto_update is None

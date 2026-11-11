@@ -167,6 +167,7 @@ async def save_app(
     params: dict,
     token: str | None = None,
     trust: str = "community",
+    version: str = "",
 ) -> AppRow:
     """Validate, store (secrets apart) and connect one app; the one path every way of adding an
     app takes, Home's add_app and Scout's install_app alike. Raises AppError as a plain line."""
@@ -176,7 +177,9 @@ async def save_app(
     if token is not None and row.auth != "token":
         raise AppError("a token only goes with auth token.")
     clean, secrets = split_secrets(row.id, row.config, row.transport)
-    row = AppRow(row.id, row.name, row.transport, clean, row.auth, row.enabled, trust)
+    row = AppRow(
+        row.id, row.name, row.transport, clean, row.auth, row.enabled, trust, version
+    )
     try:
         if token is not None:
             tokens.set(row.id, token)

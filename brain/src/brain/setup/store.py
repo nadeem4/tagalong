@@ -25,6 +25,8 @@ class InstalledExpert:
     # Which Node the command runs on, so a later change of the system Node can be re-checked;
     # None for an expert that needs no Node (a binary, a custom command).
     node: Literal["private", "system"] | None = None
+    # The person's choice to keep it up to date by itself; None: by trust (Official on).
+    auto_update: bool | None = None
 
 
 def _row(raw: dict) -> InstalledExpert:
@@ -37,6 +39,8 @@ def _row(raw: dict) -> InstalledExpert:
         raise ValueError("bad id")
     if raw.get("node") not in ("private", "system", None):
         raise ValueError("bad node")
+    if raw.get("auto_update") not in (True, False, None):
+        raise ValueError("bad auto_update")
     return InstalledExpert(
         raw["id"],
         str(raw["name"]),
@@ -45,6 +49,7 @@ def _row(raw: dict) -> InstalledExpert:
         raw["source"],
         raw["logged_in"],
         raw.get("node"),
+        raw.get("auto_update"),
     )
 
 
@@ -88,6 +93,11 @@ class ExpertStore:
         rows = self.list()
         if any(e.id == expert_id for e in rows):
             self._write([replace(e, logged_in=state) if e.id == expert_id else e for e in rows])
+
+    def set_auto_update(self, expert_id: str, on: bool) -> None:
+        rows = self.list()
+        if any(e.id == expert_id for e in rows):
+            self._write([replace(e, auto_update=on) if e.id == expert_id else e for e in rows])
 
     def remove(self, expert_id: str) -> None:
         self._write([e for e in self.list() if e.id != expert_id])
