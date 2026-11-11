@@ -201,6 +201,8 @@ export function CompanionBubble({
   const confirm = confirms[0] ?? null;
   // Asks dismissed since mount, so a late pull of the open cards cannot bring one back.
   const dismissed = useRef(new Set<string>());
+  // Install asks whose Allow was pressed: their card follows the install and outlives the ask.
+  const allowing = useRef(new Set<string>());
   const dropConfirms = (gone: (c: ConnectorConfirmParams) => boolean): void =>
     setConfirms((current) => {
       const next = current.filter((c) => !gone(c));
@@ -279,10 +281,14 @@ export function CompanionBubble({
         return;
       }
       case 'connector.dismiss':
-        // An install card stays through this: it follows the install, then the person closes it.
-        // A brain ask closed (answered elsewhere, timed out, cancelled): its card goes.
+        // A brain ask closed (answered elsewhere, timed out, cancelled): its card goes. An
+        // install card goes only while it still asks: once Allowed it follows the install and
+        // the person closes it.
         dismissed.current.add(event.approvalId);
         dropConfirms((c) => c.approvalId === event.approvalId);
+        setInstalls((current) =>
+          current.filter((c) => c.approvalId !== event.approvalId || allowing.current.has(c.approvalId)),
+        );
         return;
       case 'turn.started':
         // A background turn (Scout's own wake) runs on its own; it never answers here.
@@ -795,9 +801,12 @@ export function CompanionBubble({
         />
       )}
       {installs.map((install) => (
-        <ScoutReply key={installKey(install)} scout={scout}>
+        <ScoutReply key={install.approvalId} scout={scout}>
           <InstallConfirm
             confirm={install}
+            onAllowing={(on) =>
+              on ? allowing.current.add(install.approvalId) : allowing.current.delete(install.approvalId)
+            }
             onGone={() => setInstalls((current) => current.filter((c) => c !== install))}
             onTry={(text) => submit(text, undefined)}
             onRetry={(name) => submit(`Set up ${name} again`, undefined)}

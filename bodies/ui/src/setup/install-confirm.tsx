@@ -7,82 +7,11 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ConnectorConfirmParams } from '../shapes';
-import type { AppInfo } from '../shapes';
-import { JOB_KINDS } from '../jobs-kinds';
 import { stageWords } from '../home/experts-group';
 import { useHostBridge } from '../host-bridge';
 import type { HostBridge } from '../host-bridge';
-import {
-  InstallCard,
-  subjectOf,
-  type InstallStep,
-  type InstallSubject,
-  type InstallView,
-} from './install-card';
-
-const APP_STEPS = ['Checking it', 'Connecting', 'Signing in'] as const;
-
-const stepsAt = (at: number, failed: boolean): InstallStep[] =>
-  APP_STEPS.map((label, i) => ({
-    label,
-    state: i < at ? 'done' : i === at ? (failed ? 'fail' : 'now') : 'todo',
-  }));
-
-const findApp = (apps: AppInfo[], s: InstallSubject): AppInfo | undefined => {
-  const slug = s.id.toLowerCase();
-  return apps.find(
-    (a) =>
-      a.id.toLowerCase() === slug ||
-      a.name.toLowerCase() === s.name.toLowerCase() ||
-      slug.includes(a.id.toLowerCase()),
-  );
-};
-
-/** The everyday jobs that need this app: the only per-app prompts the UI knows. */
-const promptsFor = (s: InstallSubject): string[] =>
-  JOB_KINDS.filter(
-    (job) =>
-      job.app !== undefined &&
-      (s.id.toLowerCase().includes(job.app.key) || s.name.toLowerCase().includes(job.app.key)),
-  )
-    .slice(0, 2)
-    .map((job) => job.label);
-
-/** What an app install looks like right now, from its connection row (none yet: checking). */
-function appView(
-  row: AppInfo | undefined,
-  s: InstallSubject,
-  furthest: number,
-): [InstallView, number] {
-  if (row === undefined) return [{ phase: 'working', steps: stepsAt(0, false) }, 0];
-  if (row.status === 'connected') {
-    return [
-      { phase: 'done', tools: row.tools.map((tool) => tool.name), tryPrompts: promptsFor(s) },
-      2,
-    ];
-  }
-  if (row.status === 'error') {
-    return [
-      {
-        phase: 'failed',
-        error: `${s.name} didn't finish connecting. Nothing was connected.`,
-        steps: stepsAt(furthest, true),
-      },
-      furthest,
-    ];
-  }
-  if (row.status === 'needs-sign-in') {
-    return [
-      {
-        phase: 'working',
-        steps: stepsAt(2, false),
-        note: 'Your browser opened to sign in.',
-      },
-      2,
-    ];
-  }
-  return [{ phase: 'working', steps: stepsAt(1, false) }, 1];
-}
+import { InstallCard, subjectOf, type InstallView } from './install-card';
+import { appView, findApp } from './install-progress';
 
 /** What an expert install looks like right now, from the setup overview. */
 function expertView(
@@ -117,6 +46,7 @@ export function InstallConfirm({
   onTry,
   onRetry,
   onWorking,
+  onAllowing,
 }: {
   confirm: ConnectorConfirmParams;
   /** The card is finished with: Not now, Later. */
@@ -127,6 +57,8 @@ export function InstallConfirm({
   onRetry: (name: string) => void;
   /** The header's words while this install works ("Setting up Notion"); null when it does not. */
   onWorking?: (status: string | null) => void;
+  /** Allow was pressed (true), or its answer did not get through (false): the ask is not open any more. */
+  onAllowing?: (allowing: boolean) => void;
 }) {
   const bridge = useHostBridge();
   const base = useMemo(() => subjectOf(confirm.tool, confirm.facts ?? {}), [confirm]);
@@ -135,6 +67,10 @@ export function InstallConfirm({
   const [allowed, setAllowed] = useState(false);
   const [view, setView] = useState<InstallView>({ phase: 'ask' });
   const furthest = useRef(0);
+  // An app row already in error when Allow was pressed is an old failure: only an error that
+  // comes after a change (a new status, or other words) is this install's own.
+  const oldError = useRef<string | null>(null);
+  const fresh = useRef(false);
 
   // The brain knows the real name of what it is installing: use it once it is listed.
   useEffect(() => {
@@ -169,7 +105,10 @@ export function InstallConfirm({
       } else {
         bridge.listConnections().then(
           ({ apps }) => {
-            const [next, at] = appView(findApp(apps, subject), subject, furthest.current);
+            let row = findApp(apps, subject);
+            if (row?.status !== 'error' || row.error !== oldError.current) fresh.current = true;
+            if (row?.status === 'error' && !fresh.current) row = undefined;
+            const [next, at] = appView(row, subject, furthest.current);
             furthest.current = Math.max(furthest.current, at);
             done(next);
           },
@@ -200,13 +139,26 @@ export function InstallConfirm({
   }, [working, base.kind, subject.name]);
 
   const allow = (): void => {
-    void bridge.approveTool(confirm.approvalId, 'once').then(
-      () => {
-        setAllowed(true);
-        setView({ phase: 'working', label: 'Starting…' });
-      },
-      () => undefined,
-    );
+    onAllowing?.(true);
+    const remember =
+      base.kind === 'app'
+        ? bridge.listConnections().then(
+            ({ apps }) => {
+              const row = findApp(apps, subject);
+              oldError.current = row?.status === 'error' ? row.error : null;
+            },
+            () => undefined,
+          )
+        : Promise.resolve();
+    void remember
+      .then(() => bridge.approveTool(confirm.approvalId, 'once'))
+      .then(
+        () => {
+          setAllowed(true);
+          setView({ phase: 'working', label: 'Starting…' });
+        },
+        () => onAllowing?.(false),
+      );
   };
   const notNow = (): void => {
     if (view.phase === 'ask') {
