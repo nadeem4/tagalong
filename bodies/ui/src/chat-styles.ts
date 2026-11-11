@@ -88,11 +88,6 @@ export const CHAT_CSS = `
 }
 .bubble-scout { display: grid; grid-template-columns: 24px 1fr; gap: 12px; align-items: start; max-width: 60ch; }
 .bubble-scout-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.answer-gist { position: relative; max-height: 126px; overflow: hidden; }
-.answer-gist::after {
-  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 40px; pointer-events: none;
-  background: linear-gradient(to bottom, transparent, ${t.color.page});
-}
 .bubble-scoutmsg { display: flex; flex-direction: column; gap: 6px; }
 
 /* A turn in progress: the thinking row with Stop beside it, then a gold cursor on the text. */

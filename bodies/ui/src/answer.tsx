@@ -6,6 +6,7 @@
 import { useState, type ReactNode } from 'react';
 import Markdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Icon } from './setup/icons';
 import { themeTokens as t, typeCss } from './theme/tokens';
 
 /**
@@ -65,9 +66,70 @@ function CodeBlock({ children }: { children?: ReactNode }) {
 /** Links render as text, code blocks get their bar; everything else is react-markdown's default. */
 const COMPONENTS: Components = { a: LINK, pre: CodeBlock };
 
-/** Past this many lines or characters an answer folds to its gist in the full chat. */
+/** The gist of a long answer: whole blocks up to about this many lines and characters. */
 const GIST_LINES = 8;
 const GIST_CHARS = 480;
+const ITEM = /^\s*([-*+]|\d+[.)])\s/;
+
+/** A piece of Markdown that is never cut: a paragraph, a code block, or one item of a list. */
+interface Unit {
+  lines: string[];
+  /** It opens a block (a blank line goes before it). */
+  opens: boolean;
+}
+
+/** The text as units: blocks split at blank lines (a fence stays whole), lists split into items. */
+function unitsOf(text: string): Unit[] {
+  const blocks: string[][] = [];
+  let current: string[] = [];
+  let fenced = false;
+  for (const line of text.split('\n')) {
+    if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
+    if (line.trim() === '' && !fenced) {
+      if (current.length > 0) blocks.push(current);
+      current = [];
+    } else {
+      current.push(line);
+    }
+  }
+  if (current.length > 0) blocks.push(current);
+  return blocks.flatMap((block): Unit[] => {
+    if (!ITEM.test(block[0] ?? '')) return [{ lines: block, opens: true }];
+    const items: Unit[] = [];
+    for (const line of block) {
+      if (ITEM.test(line) && !/^\s{2,}/.test(line)) items.push({ lines: [line], opens: false });
+      else items[items.length - 1]?.lines.push(line);
+    }
+    if (items[0] !== undefined) items[0].opens = true;
+    return items;
+  });
+}
+
+/**
+ * The lead of an answer and what comes with it, cut between blocks or between list items and
+ * never inside one, so no bullet is half shown. The whole text comes back when nothing is left out.
+ */
+export function gistOf(text: string): string {
+  const units = unitsOf(text);
+  let lines = 0;
+  let chars = 0;
+  const kept: Unit[] = [];
+  for (const unit of units) {
+    const size = unit.lines.reduce((n, l) => n + l.length, 0);
+    if (kept.length > 0 && (lines + unit.lines.length > GIST_LINES || chars + size > GIST_CHARS)) {
+      break;
+    }
+    kept.push(unit);
+    lines += unit.lines.length;
+    chars += size;
+  }
+  if (kept.length === units.length) return text;
+  return kept
+    .map(
+      (unit, i) => `${i > 0 && unit.opens ? '\n' : ''}${i > 0 ? '\n' : ''}${unit.lines.join('\n')}`,
+    )
+    .join('');
+}
 
 /**
  * An answer as people read it: the Markdown a model writes (bold, lists, headings, code,
@@ -80,23 +142,32 @@ export function Answer({
 }: {
   text: string;
   className?: string;
-  /** Fold a long answer to its first lines behind Show more. */
+  /** Fold a long answer to its lead behind Show more. */
   gist?: boolean;
 }) {
   const [more, setMore] = useState(false);
-  const long = gist && (text.split('\n').length > GIST_LINES || text.length > GIST_CHARS);
+  const lead = gist ? gistOf(text) : text;
+  const long = lead !== text;
   const folded = long && !more;
-  const classes = ['answer', className, folded ? 'answer-gist' : undefined].filter(Boolean);
   return (
     <>
-      <div className={classes.join(' ')}>
+      <div
+        className={['answer', className].filter(Boolean).join(' ')}
+        data-folded={folded || undefined}
+      >
         <Markdown remarkPlugins={[remarkGfm]} components={COMPONENTS} skipHtml>
-          {text}
+          {folded ? lead : text}
         </Markdown>
       </div>
       {long && (
-        <button type="button" className="answer-more" onClick={() => setMore(!more)}>
+        <button
+          type="button"
+          className="answer-more"
+          aria-expanded={more}
+          onClick={() => setMore(!more)}
+        >
           {more ? 'Show less' : 'Show more'}
+          <Icon name="chevDown" />
         </button>
       )}
     </>
@@ -137,9 +208,11 @@ export const ANSWER_CSS = `
 .answer-copy:hover { background: #222845; color: ${t.color.text}; }
 .answer .answer-code pre { margin: 0; border: 0; border-radius: 0; background: transparent; white-space: pre-wrap; }
 .answer-more {
-  align-self: flex-start; min-height: 28px; padding: 0 10px; border: 0; border-radius: 999px;
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 0 10px; border: 0; border-radius: 999px;
   background: #222845; color: ${t.color.text}; font: inherit; ${typeCss('small')}; font-weight: 600; cursor: pointer;
 }
+.answer-more .cx-icon { flex: none; width: 14px; height: 14px; }
+.answer-more[aria-expanded='true'] .cx-icon { transform: rotate(180deg); }
 .answer blockquote { margin: 0 0 8px; padding-left: 10px; border-left: 2px solid #3A4270; color: ${t.color.textMuted}; }
 .answer table { border-collapse: collapse; ${typeCss('body')}; }
 .answer th, .answer td { padding: 4px 8px; border: 1px solid #2E3558; text-align: left; }

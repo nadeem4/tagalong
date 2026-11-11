@@ -34,9 +34,9 @@ describe('CHAT_CSS chat window', () => {
     expect(ruleOf(CHAT_CSS, '.bubble-scout')).toContain('grid-template-columns: 24px 1fr');
   });
 
-  it('folds a long answer to its gist behind a fade', () => {
-    expect(ruleOf(CHAT_CSS, '.answer-gist')).toContain('max-height: 126px');
-    expect(CHAT_CSS).toContain('.answer-gist::after');
+  it('folds a long answer by whole blocks, so nothing is clipped or faded mid-line', () => {
+    expect(CHAT_CSS).not.toContain('answer-gist');
+    expect(CHAT_CSS).not.toContain('linear-gradient');
   });
   it('has a 56px header', () => {
     expect(ruleOf(CHAT_CSS, '.bubble-head')).toContain('height: 56px');
