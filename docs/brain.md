@@ -845,7 +845,9 @@ forwards `true` from the tour window or Home's own buttons. Each answered card i
 records nothing. An installed expert that needs login is logged in instead of reinstalled (a
 second press after the install: the install and the login are two presses, not one chained
 call); a ready one answers `already_ready`. `browse_apps` leaves out apps already added (matched
-by name, as `install_app` does). Progress rides `changed {what:
+by name, as `install_app` does), but the curated `popular` and `popular_more` and `browse_experts`
+keep an installed item and mark it `added: true`, so its row says "Added" in place of Add.
+Progress rides `changed {what:
 "setup"}`.
 
 `setup_overview` also answers the registry search for Home (all facts, no wording):
@@ -859,14 +861,16 @@ Linear as `app.linear/linear`, Jira and Confluence as `com.atlassian/atlassian-m
 Gmail, Google Calendar, Google Drive, Slack, GitHub and Asana publish no Official one-click entry
 there, so they are not listed until one appears. `browse_experts` is ordered with
 `trust.POPULAR_EXPERTS` first (Claude Code, Gemini CLI, Codex), then the rest; each row has
-`recommended` (Claude Code) and `tested` (`env.is_tested`), and `show_more_from` is the index
-where "Show more" starts. `app_groups` is
+`recommended` (Claude Code), `tested` (`env.is_tested`), `account` (the curated claim that it
+signs in with the person's own account; the registry is silent), `added`, and the registry's
+`licence` and `repo` (its `repository`, else `website`) for the check card. `show_more_from` is the
+index where "Show more" starts. `app_groups` is
 `[{service, official: Row | null, others: [Row]}]` for the query, one group per service, Official
 head first (`setup/grouping.py`); `next_cursor` is the registry's cursor for the next page;
 `sources` names the two registries and their base URLs (`MCP_BASE`, `ACP_URL`) so Settings cannot
 drift from the code. A `Row` is `{id, name, version, description, official, publisher, runs
 ("pc" or "hosted"), host, sign_in ("browser", "key" or "none"), licence, repo, why}`; `why` is on
-community rows only. The installed `apps` rows carry `official`, the trust kept at install
+community rows only, and a curated row adds `added`. The installed `apps` rows carry `official`, the trust kept at install
 (`apps.trust`). Offline with no cache, `app_groups`, `popular` and `popular_more` are empty,
 `stale` is true and the installed lists stay.
 

@@ -414,6 +414,10 @@ describe('ConnectionsPanel groups', () => {
           official: true,
           recommended: false,
           tested: true,
+          added: false,
+          account: false,
+          licence: '',
+          repo: '',
         },
       ],
     };

@@ -338,15 +338,15 @@ Every window bundles Onest 400 and 600 from `@fontsource` (Latin subset), nothin
 
 Seven roles in `themeTokens.type` (size/line in px, weight); `typeCss(role)` writes one into a style string.
 
-| Role      | Size / line | Weight     | Used for                                                   |
-| --------- | ----------- | ---------- | ---------------------------------------------------------- |
-| display   | 26/32       | 600        | Walkthrough headlines, big figures (today's spend)         |
-| heading   | 20/28       | 600        | Each Home page's title                                     |
-| title     | 16/22       | 600        | Sub-headings, dialogs, the wordmark                        |
-| body-lead | 14/21       | 400 or 600 | Bubble text, answers, button and nav labels, card headings |
-| body      | 13/20       | 400        | Card text, previews, chat messages, help text              |
-| small     | 12/16       | 400 or 600 | Meta lines, field labels, quiet bubble buttons             |
-| caption   | 11/14       | 600        | Chips, status words, hints                                 |
+| Role      | Size / line | Weight     | Used for                                                                                       |
+| --------- | ----------- | ---------- | ---------------------------------------------------------------------------------------------- |
+| display   | 26/32       | 600        | Walkthrough headlines, big figures (today's spend)                                             |
+| heading   | 20/28       | 600        | Each Home page's title                                                                         |
+| title     | 16/22       | 600        | Sub-headings, dialogs, the wordmark                                                            |
+| body-lead | 14/21       | 400 or 600 | Bubble text, answers, button and nav labels, card headings                                     |
+| body      | 13/20       | 400 or 600 | Card text, previews, chat messages, help text; 600 for a row's outcome, waiting and error line |
+| small     | 12/16       | 400 or 600 | Meta lines, field labels, quiet bubble buttons                                                 |
+| caption   | 11/14       | 600        | Chips, status words, hints                                                                     |
 
 - **Wordmark** ("Scout" in Home's nav, the walkthrough side and the chat header): title role, Onest 600. Class `tg-wordmark`, tokens `font.wordmark` and `fontWeight.wordmark`.
 - **Dock tag** (Onest 600, 9px, 11px line, `themeTokens.dockTag`): Seeing and Working on the dock, small so they sit beside Bean's floating sign rather than on it. The one size outside the roles.

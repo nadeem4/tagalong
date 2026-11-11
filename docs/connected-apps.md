@@ -181,8 +181,12 @@ sign-in`, `Not working`, `Off`), the on/off switch, and quiet **Restart** and **
 - **Apps tab**: **Your apps** (the rows above, Official first, then Community), then **Add an app**
   (`app-search.tsx`): a search field (`setup/search-field.tsx`, read 300 ms after typing stops; only
   the newest request writes results), a **Popular** list while it is empty (more behind "Show
-  more"), results grouped per service with **Load more**, and "Can't find it? Add it yourself"
-  (`add-form.tsx`, the form below). In a group the **Official** version leads with its chip and an
+  more"), results grouped per service with **Show more**, and "Can't find it? Add it yourself"
+  (`add-form.tsx`, the form below: a two-way segmented control, A web address or A command on this
+  PC, label-above fields and a two-column grid). While a search runs the line under the box says
+  "Searching…" and Popular dims; once it answers, the line says `Results for "term"`; a failed
+  search shows its one line and no stale results. A curated row for something already added says
+  "Added" in place of Add. In a group the **Official** version leads with its chip and an
   **Add** that goes to the brain approved at once (`setup_app` with `approved` true, then its own Allow
   card). Other makers sit behind "N more from other makers", each with a **Community** chip, why it
   matched, its publisher and where it runs. Its **Add…** opens the **check card** (`check-card.tsx`,
@@ -202,9 +206,11 @@ sign-in`, `Not working`, `Off`), the on/off switch, and quiet **Restart** and **
   chip (Ready, Needs login, Update available) and a **Log in** or **Update** button), then **Add an
   expert**: the brain's curated list is open (`browse_experts`, with Recommended and "Tested with
   Scout" or "Not tested with Scout"), **Show more** reveals the rest (`show_more_from`), and a search
-  field covers both. An Official one has **Add**; a community one has **Add…**, which opens the same
+  field covers both. A row says "Signs in with your own account" when the brain's `account` field
+  is true, and "Added" when `added` is. An Official one has **Add**; a community one has **Add…**, which opens the same
   check card, and **Add anyway** sends `setup_expert` with `approved` and `community_ok`. Only
-  experts that install and run on this PC are listed. Progress ("Getting what it needs to run") and
+  experts that install and run on this PC are listed. The expert check card shows the licence and a
+  link to the code (`licence`, `repo`). Progress ("Getting what it needs to run") and
   a failed install show on the expert's row. These go through `setup_overview`, `setup_expert` and
   `setup_app` (see [brain.md](brain.md#home-tools)): the button opens the same Allow card Scout's
   install opens, and progress rides `changed setup`.

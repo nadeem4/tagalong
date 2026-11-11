@@ -73,8 +73,12 @@ export interface FakeBrain {
   readingEvents: Record<string, unknown>[];
   /** Replace the rows `reading_status` answers and tell the bodies `changed: reading`. */
   setReading(rows: Record<string, unknown>[]): void;
-  /** Add fields to the `setup_overview` answer (progress, failed...), optionally make searches fail, and tell the bodies `changed: setup`. */
-  setSetup(patch: Record<string, unknown>, failingSearches?: boolean): void;
+  /**
+   * Add fields to the `setup_overview` answer (progress, failed...), optionally make searches fail
+   * (`true`) or never answer (`'hang'`, for a steady "Searching…" shot), and tell the bodies
+   * `changed: setup`.
+   */
+  setSetup(patch: Record<string, unknown>, failingSearches?: boolean | 'hang'): void;
   /** How many times `set_api_key` was called (the key itself is never recorded). */
   keyAttempts: number;
   /** Every amount Settings sent to `set_daily_limit`, in order. */
@@ -229,6 +233,7 @@ const notionRow = (id: string, official: boolean, publisher: string) => ({
   version: '1',
   description: 'Notion pages',
   official,
+  added: false,
   publisher,
   runs: official ? 'hosted' : 'pc',
   host: official ? 'mcp.notion.com' : null,
@@ -254,11 +259,15 @@ const expertChoice = (id: string, name: string, over: Record<string, unknown> = 
   official: true,
   recommended: false,
   tested: true,
+  added: false,
+  account: false,
+  licence: 'MIT',
+  repo: `https://example.test/${id}`,
   ...over,
 });
 const BROWSE_EXPERTS = [
-  expertChoice('claude-acp', 'Claude Code', { recommended: true }),
-  expertChoice('codex-acp', 'Codex'),
+  expertChoice('claude-acp', 'Claude Code', { recommended: true, account: true }),
+  expertChoice('codex-acp', 'Codex', { account: true }),
   expertChoice('goose', 'Goose', { official: false, tested: false }),
 ];
 
@@ -363,7 +372,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   let expertInstalled = false;
   // Screenshot states for Connections: extra overview fields, and searches that fail.
   let setupPatch: Record<string, unknown> = {};
-  let failSearches = false;
+  let failSearches: boolean | 'hang' = false;
   let gmailConnected = false;
   const limits: number[] = [];
   let hasKey = options.hasKey ?? true;
@@ -756,6 +765,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           limits.push(dailyLimitUsd);
           notify('changed', { what: 'settings' });
         } else if (params.tool === 'setup_overview') {
+          if (failSearches === 'hang' && String(params.input?.query ?? '') !== '') return;
           if (failSearches && String(params.input?.query ?? '') !== '') {
             socket.send(
               JSON.stringify({
@@ -779,7 +789,11 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
                   },
                 ]
               : [],
-            apps: gmailConnected ? [{ id: 'a1', name: 'Gmail', state: 'connected' }] : [],
+            // One installed Official app (Files), so Your apps shows the Official group.
+            apps: [
+              { id: 'files', name: 'Files', state: 'connected', official: true },
+              ...(gmailConnected ? [{ id: 'a1', name: 'Gmail', state: 'connected' }] : []),
+            ],
             // D5: curated experts first (Claude Code recommended), then what sits behind Show more.
             browse_experts: expertInstalled
               ? BROWSE_EXPERTS.filter((e) => e.id !== 'claude-acp')

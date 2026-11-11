@@ -14,7 +14,7 @@ export function SearchField({
   note,
 }: {
   /** What the line says when nothing is loading, such as `Results for "linear"`. */
-  note?: string;
+  note?: string | undefined;
   label: string;
   placeholder: string;
   value: string;

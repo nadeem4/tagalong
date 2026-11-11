@@ -22,6 +22,10 @@ const EMPTY: SetupOverview = {
       official: false,
       recommended: false,
       tested: false,
+      added: false,
+      account: false,
+      licence: '',
+      repo: '',
     },
   ],
   browseApps: [],
@@ -59,6 +63,10 @@ const GMAIL = {
   official: false,
   recommended: false,
   tested: false,
+  added: false,
+  account: false,
+  licence: '',
+  repo: '',
 };
 
 /** Renders the step and opens the optional expert line, where Claude Code's setup lives. */
@@ -297,6 +305,10 @@ describe('StepSix', () => {
         official: false,
         recommended: false,
         tested: false,
+        added: false,
+        account: false,
+        licence: '',
+        repo: '',
       },
     ]);
     render(<StepSix host={host} />);

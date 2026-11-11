@@ -161,7 +161,10 @@ describe('Experts tab: add an expert', () => {
 
   it('signs in with your own account comes from the brain, not the list position', async () => {
     await open({
-      browseExperts: [{ ...CLAUDE, account: false }, { ...CODEX, account: true }],
+      browseExperts: [
+        { ...CLAUDE, account: false },
+        { ...CODEX, account: true },
+      ],
       showMoreFrom: 2,
     });
     expect(within(rowOf('Claude Code')).getByText('Runs on your PC')).toBeVisible();
