@@ -134,6 +134,7 @@ def drive(model, history, b, guards=None):
         history=history,
         tools=lambda: [],
         run_tool=None,
+        inbox=[],
         notify=lambda *a: None,
         budget=b,
         step_cap=10,

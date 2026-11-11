@@ -197,7 +197,7 @@ async def test_say_after_a_cancel_is_read_aloud_on_its_own_body():
     await settle()
     session.cancel(first.turn)
     joined = session.say("desktop", SayParams(text="actually X", spoken=True))
-    assert joined.joined is False
+    assert joined.joined is True  # it joined the turn being cut, and gets one of its own
     await finish_quietly(session)
     await asyncio.sleep(0)
     started = [p for m, p in sent if m == "turn" and p["state"] == "started"]
@@ -597,7 +597,7 @@ async def test_a_say_after_a_cancelled_turn_gets_its_own_answer(tmp_path):
     await settle()
     session.cancel(first.turn)
     joined = session.say("desktop", say("actually do X"))
-    assert joined.joined is False
+    assert joined.joined is True  # it joined the turn being cut, and gets one of its own
     await finish_quietly(session)
     await turns_done(session)
     assert len(model.seen) == 2
@@ -1164,7 +1164,7 @@ async def test_say_from_a_displaying_body_is_unchanged():
     assert session._last_body == "extension"
 
 
-async def test_display_less_say_waits_for_its_own_turn_like_any_say():
+async def test_display_less_say_joins_the_turn_on_the_body_that_shows_it():
     gate = asyncio.Event()
     session, _ = make(Gate([gate, "one", "two"]))
     join(session, "desktop")
@@ -1172,7 +1172,7 @@ async def test_display_less_say_waits_for_its_own_turn_like_any_say():
     first = session.say("desktop", say("a"))
     await settle()
     second = session.say("browser", say("b"))
-    assert second.joined is False and second.turn != first.turn
+    assert second.joined is True and second.turn == first.turn
     gate.set()
     await idle(session)
 
@@ -1193,7 +1193,7 @@ async def test_spent_budget_starts_no_wake_and_leaves_the_job_unreported():
     assert states(sent) == [] and not records_for(memory).get_job("j1").parts[-1].reported
 
 
-async def test_say_during_a_wake_turn_gets_its_own_turn_after_it():
+async def test_say_during_a_wake_turn_joins_it():
     gate = asyncio.Event()
     model = Gate([gate, "told", "thanks back"])
     memory = Memory(":memory:")
@@ -1202,7 +1202,7 @@ async def test_say_during_a_wake_turn_gets_its_own_turn_after_it():
     session.jobs._on_finished(end_job(memory))
     await settle()
     result = session.say("desktop", say("thanks"))
-    assert result.joined is False
+    assert result.joined is True
     gate.set()
     await idle(session)
     assert {"type": "text", "text": "thanks"} in model.seen[-1][-1]["content"]

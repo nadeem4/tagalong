@@ -174,9 +174,11 @@ the total can run a little low.
 
 ## What a turn does
 
-`say` answers `{turn, joined}` at once (`joined` is always `false`: the field stays for the
-contract). The say goes through the front door like every other source (the dispatcher, see
-below), and the work then runs in the background and streams notifications. There is one
+`say` answers `{turn, joined}` at once (`joined` is true when a turn is running, or an earlier
+say is about to start one, on the same body). The say goes through the front door like every other
+source (the dispatcher, see below). A joined say is handed to the running turn, which takes it in
+at its next step; a say from another body waits and gets its own turn after, answered on its own
+body. The work then runs in the background and streams notifications. There is one
 conversation for all bodies and at most one running turn.
 
 ```mermaid
@@ -391,7 +393,8 @@ is a phone while a screen is online, then to the first screen.
 
 **News is told when the turn ends.** A wake's news (a finished job, a timer, a setup result) is
 marked reported only when the turn carrying it finishes `done`. A cancelled or failed wake keeps
-its news for the next one (`on_end` carries the reason). A loop is marked surfaced only after its
+its news: the event is posted again with the same key, so the next wake tells it (`on_end` carries
+the reason; the per-kind caps stop a loop). A loop is marked surfaced only after its
 event was accepted.
 
 The routing order lives in `mind/soul.md` ("Routing"): answer from what Scout knows; use its own
@@ -1556,8 +1559,8 @@ since the brain started never wakes, a quick reconnect does not either, and a br
 **Who started a turn.** The `turn` notification carries `started_by`: `user` for a `say`, `brain`
 for a wake. A body that predates the field reads it as `user`. Bodies use it to show nothing while a
 wake runs (see [desktop.md](desktop.md#the-brain-in-the-main-process)). A person who talks while a
-wake runs gets a turn of their own after it (`say` returns `joined: false`); the body shows it like
-any turn. A `back`'s `idle_seconds` is the time since the last input, not since the body
+wake runs joins it (`say` returns `joined: true`) when the wake is shown on the body they used;
+from another body they get a turn of their own after it. The body shows it like any turn. A `back`'s `idle_seconds` is the time since the last input, not since the body
 noticed the idle.
 
 ```mermaid

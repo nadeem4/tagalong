@@ -10,7 +10,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
-from test_sessions import Gate, file_memory, finish_quietly, make, say, settle, turns_done
+from test_sessions import Gate, file_memory, finish_quietly, make, say, turns_done
 from test_turn import ok_tool, tool_step
 
 from brain.memory import Memory
@@ -131,7 +131,7 @@ async def test_a_400_on_a_request_with_an_image_is_dropped_whatever_it_says(tmp_
     assert "look" not in json.dumps(model.seen[1])
 
 
-async def test_a_say_after_a_rejected_turn_gets_its_own_turn(tmp_path):
+async def test_a_say_joined_to_a_rejected_turn_gets_its_own_turn(tmp_path):
     hold = asyncio.Event()
     memory = file_memory(tmp_path)
     model = AlwaysRejects("Could not process image", hold=hold)
@@ -139,11 +139,8 @@ async def test_a_say_after_a_rejected_turn_gets_its_own_turn(tmp_path):
     session, _ = make(model, memory)
     session.say("desktop", say("a bad picture"))
     await asyncio.sleep(0)
-    await asyncio.sleep(0)
-    assert session.say("desktop", say("and also this")).joined is False
+    assert session.say("desktop", say("and also this")).joined is True
     hold.set()
-    await turns_done(session)
-    await settle()  # the second say gets its turn once the first has ended
     await turns_done(session)
     assert "a bad picture" not in json.dumps(model.seen[-1])
     assert "and also this" in json.dumps(model.seen[-1])
@@ -173,6 +170,7 @@ async def test_a_400_after_a_tool_round_is_not_dropped():
         history=history,
         tools=lambda: [],
         run_tool=ok_tool,
+        inbox=[],
         notify=lambda m, p: None,
         budget=SimpleNamespace(spend=lambda u, m: None),
         step_cap=5,

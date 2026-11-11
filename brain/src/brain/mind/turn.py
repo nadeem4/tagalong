@@ -139,11 +139,13 @@ async def _run_turn(
     history: list,
     tools: Callable[[], list[dict]],
     run_tool: Callable[[Call], Awaitable[str | list[dict]]],
+    inbox: list,
     notify: Callable[[str, dict], None],
     budget,
     step_cap: int,
     guards: Guards | None = None,
     turn_timeout: float | None = None,
+    on_owner_input: Callable[[], None] | None = None,
     on_rejected: Callable[[], None] | None = None,
 ) -> str:
     guards = guards or spend_guards(budget, step_cap)
@@ -221,11 +223,22 @@ async def _run_turn(
                         results = await _run_tools(turn_id, calls, text, run_tool, notify, running)
                         if due is not None:
                             limit.reschedule(due + clock() - began)
-                        history.append({"role": "user", "content": results})
+                        history.append(
+                            {"role": "user", "content": results + _drain(inbox, on_owner_input)}
+                        )
                         continue
-                    _close_dangling_tool_use(history)
-                    reason = "error" if final.stop_reason == "refusal" else "done"
-                    break
+                    closed = _close_dangling_tool_use(history)
+                    if final.stop_reason == "refusal":
+                        reason = "error"
+                        break
+                    says = _drain(inbox, on_owner_input)
+                    if not says:
+                        reason = "done"
+                        break
+                    if closed:
+                        history[-1]["content"] += says
+                    else:
+                        history.append({"role": "user", "content": says})
         except TimeoutError:
             if not limit.expired():
                 raise  # a TimeoutError from inside the loop, not our clock
@@ -260,6 +273,15 @@ async def _run_turn(
     if spoke:
         notify("reply", {"turn": turn_id, "body": body_id, "done": True})
     return reason
+
+
+def _drain(inbox: list, on_owner_input: Callable[[], None] | None = None) -> list[dict]:
+    """Move the owner's says into history; `on_owner_input` fires only when there were some."""
+    blocks = [block for say in inbox for block in say]
+    inbox.clear()
+    if blocks and on_owner_input is not None:
+        on_owner_input()
+    return blocks
 
 
 async def _run_tools(turn_id, calls, said, run_tool, notify, running) -> list[dict]:

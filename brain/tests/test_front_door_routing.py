@@ -5,6 +5,7 @@ finishes, and a phone-only setup still hears a job's question. Fake model and bo
 """
 
 import asyncio
+import json
 
 from job_rows import records_for
 from test_sessions import (
@@ -98,7 +99,10 @@ async def test_cancelled_wake_news_survives():
     await settle()
     session.cancel(session._turn_id)
     await finish_quietly(session)
-    assert not records_for(memory).get_job("j1").parts[-1].reported
+    # Cancelled, so not told yet; the news is posted again and the next wake tells it.
+    await idle(session)
+    assert records_for(memory).get_job("j1").parts[-1].reported
+    assert len(wake_started(sent)) == 2
 
 
 async def test_job_question_reaches_whatsapp_only_setup():
@@ -152,3 +156,37 @@ async def test_cancel_before_the_say_reaches_its_turn_ends_it_cancelled():
     states = [(p["state"], p.get("reason")) for m, p in sent if m == "turn"]
     assert states == [("started", None), ("ended", "cancelled")]
     assert session._task is None
+
+
+async def test_card_answer_not_held_behind_waiting_say():
+    gate = asyncio.Event()
+    session, _ = make(Gate([gate, "ok"]))
+    join(session, "desktop")
+    join(session, "whatsapp")
+    session.say("desktop", say("first"))
+    await settle()  # the turn is running, held on the gate
+    session.say("whatsapp", say("from the phone"))  # its own turn, queued behind the first
+    seen: list[str] = []
+    session.ask_runner.answered = lambda ask, option, body: seen.append(ask)
+    session.dispatcher.post(Item("card_answer", "desktop", {"ask": "a1", "option": "allow"}, "now"))
+    await settle()
+    assert seen == ["a1"]  # the door was not blocked by the say waiting for the turn
+    gate.set()
+    await idle(session)
+
+
+async def test_say_during_turn_joins_through_the_dispatcher():
+    gate = asyncio.Event()
+    model = Gate([gate, "first", "second"])
+    session, _ = make(model)
+    join(session, "desktop")
+    first = session.say("desktop", say("one"))
+    await settle()
+    second = session.say("desktop", say("two"))
+    assert second.joined is True and second.turn == first.turn
+    await settle()
+    assert len(session._inbox) == 1  # handed to the running turn, which takes it at its next step
+    gate.set()
+    await idle(session)
+    assert session._inbox == []
+    assert any("two" in json.dumps(m) for m in model.seen[-1])

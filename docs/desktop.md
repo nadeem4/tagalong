@@ -187,7 +187,7 @@ The same call backs **Start brain** on the offline card, so it also runs when th
   pet remark: the quiet line beside Scout when the bubble is closed, or Scout's message in the
   bubble when it is open and no answer is streaming (main keeps the remark from the hidden bubble,
   so it is never shown twice). A silent, failed, cancelled or over-budget wake shows nothing. If the
-  person asks something while a wake runs, their `say` starts its own turn after it and `ipc/turns.ts`
+  person asks something while a wake runs, their `say` joins it (`joined: true`) and `ipc/turns.ts`
   calls `claim(turnId)` on the mapper: the wake stops being quiet, the bubble gets `turn.started`
   and the text so far, and the rest streams and ends as a normal turn (no pet remark).
 - **A remark kept in the chat.** A remark seen while the panel is hidden goes to the quiet line only

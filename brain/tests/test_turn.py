@@ -73,6 +73,7 @@ def start(
     *,
     run_tool=ok_tool,
     tools=None,
+    inbox=None,
     budget=None,
     step_cap=10,
     guards=None,
@@ -86,6 +87,7 @@ def start(
         history=history,
         tools=tools or (lambda: []),
         run_tool=run_tool,
+        inbox=inbox if inbox is not None else [],
         notify=lambda m, p: sent.append((m, p)),
         budget=budget or Spend(),
         step_cap=step_cap,
@@ -169,6 +171,32 @@ async def test_raising_tool_gives_error_result():
     ]
     ended = {"turn": "t1", "call": "c1", "name": "x", "state": "ended", "ok": False}
     assert ("tool", ended) in sent
+
+
+async def test_say_queued_during_tools_follows_results():
+    inbox = []
+
+    async def tool(call):
+        inbox.append([{"type": "text", "text": "also this"}])
+        return []
+
+    _, history, _, _ = await go(
+        [tool_step(("c1", "x")), text_step("ok")], run_tool=tool, inbox=inbox
+    )
+    assert history[2]["content"][0]["type"] == "tool_result"
+    assert history[2]["content"][-1] == {"type": "text", "text": "also this"}
+    assert inbox == []
+
+
+async def test_say_queued_after_end_turn_runs_another_step():
+    inbox = [[{"type": "text", "text": "wait"}]]
+    reason, history, sent, model = await go([text_step("a"), text_step("b")], inbox=inbox)
+    assert reason == "done"
+    assert model.calls == 2
+    assert history[2] == {"role": "user", "content": [{"type": "text", "text": "wait"}]}
+    assert [p for _, p in sent if p.get("done")] == [
+        {"turn": "t1", "body": "desktop", "done": True}
+    ]
 
 
 async def test_pause_turn_continues_without_user_message():
