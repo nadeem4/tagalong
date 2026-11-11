@@ -7,6 +7,7 @@ app's tools never use it and fall back to their own description. The model-facin
 are not touched by any of this.
 """
 
+# ruff: noqa: E501 - the wording is copied verbatim, one string per line, so it stays diffable
 from dataclasses import dataclass
 
 
