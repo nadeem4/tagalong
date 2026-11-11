@@ -152,12 +152,6 @@ describe('PermissionsPanel', () => {
   });
 
   it('risky flag counts risky tools on Auto and says tool or tools', async () => {
-    const other = row({
-      name: 'desktop__write_file',
-      title: 'Write files',
-      locked: true,
-      mode: 'auto',
-    });
     renderPanel(bridgeOf(OPEN, MOVE));
     expect(await header('This computer')).toHaveTextContent('1 risky tool on Auto');
   });

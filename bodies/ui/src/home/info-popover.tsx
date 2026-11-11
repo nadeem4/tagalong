@@ -11,6 +11,11 @@ export function InfoPopover({ label, text }: { label: string; text: string }) {
   const button = useRef<HTMLButtonElement>(null);
   const pop = useRef<HTMLDivElement>(null);
   const id = useId();
+  const [host, setHost] = useState<Element | null>(null);
+
+  useEffect(() => {
+    setHost(open ? (button.current?.closest('li') ?? null) : null);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -37,7 +42,6 @@ export function InfoPopover({ label, text }: { label: string; text: string }) {
       {text}
     </div>
   );
-  const host = open ? (button.current?.closest('li') ?? null) : null;
 
   return (
     <>

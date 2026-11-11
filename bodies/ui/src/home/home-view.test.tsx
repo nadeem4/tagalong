@@ -308,6 +308,10 @@ describe('HomeView', () => {
       {
         name: 'recall',
         description: 'Look up what Scout remembers',
+        title: 'Look back in memory',
+        line: 'Searches saved notes.',
+        info: '',
+        group: 'memory',
         effect: 'read' as const,
         mode: 'auto' as const,
         locked: false,
@@ -319,8 +323,9 @@ describe('HomeView', () => {
     ];
     renderHome(createFakeHostBridge({ pets: [SCOUT], permissions }), { page: 'settings' });
     expect(await screen.findByText('The settings form')).toBeVisible();
-    expect(await screen.findByRole('radiogroup', { name: 'recall' })).toBeVisible();
+    fireEvent.click(await screen.findByRole('button', { name: /^memory/ }));
+    expect(await screen.findByRole('radiogroup', { name: 'Look back in memory' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
-    expect(screen.queryByRole('radiogroup', { name: 'recall' })).toBeNull();
+    expect(screen.queryByRole('radiogroup', { name: 'Look back in memory' })).toBeNull();
   });
 });
