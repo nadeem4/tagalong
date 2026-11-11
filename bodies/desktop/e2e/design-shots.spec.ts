@@ -187,7 +187,9 @@ test.describe('E3 chat', () => {
     const quick = page.getByLabel(/^Ask /);
     await quick.fill('hello there');
     await quick.press('Enter');
-    await expect(page.getByText('This is the fake brain.').first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('This is the fake brain.').first()).toBeVisible({
+      timeout: 30_000,
+    });
     await shot(page, 'E3', 'quick-bubble-answer');
     brain.setRunning(
       [{ job: 'j1', expert: 'Claude Code', text: 'npm init -y', at: new Date().toISOString() }],

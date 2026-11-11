@@ -97,23 +97,21 @@ export function AppItem({
         </div>
         <div className="cx-row__side">
           {outcome !== undefined && <OutcomeText outcome={outcome} />}
-          {busy ? (
-            installing === undefined && <Waiting />
-          ) : row.added ? (
-            outcome === undefined && <AddedStatus />
-          ) : (
-            outcome?.added !== true && (
-              <Button
-                ref={addButton}
-                variant="secondary"
-                className="cx-fixed"
-                aria-label={`Add ${label}`}
-                onClick={() => (row.official ? onAdd(row) : setChecking(true))}
-              >
-                {row.official ? 'Add' : 'Add…'}
-              </Button>
-            )
-          )}
+          {busy
+            ? installing === undefined && <Waiting />
+            : row.added
+              ? outcome === undefined && <AddedStatus />
+              : outcome?.added !== true && (
+                  <Button
+                    ref={addButton}
+                    variant="secondary"
+                    className="cx-fixed"
+                    aria-label={`Add ${label}`}
+                    onClick={() => (row.official ? onAdd(row) : setChecking(true))}
+                  >
+                    {row.official ? 'Add' : 'Add…'}
+                  </Button>
+                )}
         </div>
       </div>
       {checking && (
