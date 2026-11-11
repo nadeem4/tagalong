@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import types
 from datetime import timedelta
 from types import SimpleNamespace
 
@@ -1373,6 +1374,17 @@ def test_the_install_wait_is_longer_than_the_desktops_own_limit():
 # --- P2: the toolbox hands every ask-mode call to the engine --------------------------------
 
 
+class FakeRunner:
+    """Records what the toolbox hands the ask runner."""
+
+    def __init__(self):
+        self.opened = []
+
+    def open(self, call, req, wait):
+        self.opened.append((call, req, wait))
+        return types.SimpleNamespace(id="item1")
+
+
 def _engine_box(decision, spec_=None, stored=None, owner=False):
     engine = FakeEngine(decision)
     source = FakeSource([spec_ or ToolSpec("t", "t tool", {"type": "object"})])
@@ -1507,13 +1519,13 @@ async def test_ask_wait_hours_is_clamped_and_stripped(given, hours):
         return {"shown": 1}
 
     spec_ = ToolSpec("t", "t tool", {"type": "object"}, card=card)
-    box, source, engine = _engine_box(Decision("allow_once"), spec_)
+    box, source, engine = _engine_box(Decision("deny", "no_decider"), spec_)
+    runner = box._runner = FakeRunner()
     args = {"a": 1} if given is None else {"a": 1, "ask_wait_hours": given}
     await box.run(Call("c1", "t", args, "t1", "Doing it."))
-    [req] = engine.requests
-    assert req.wait == timedelta(hours=hours)
-    assert req.call == {"name": "t", "input": {"a": 1}, "text": "Doing it."}
-    assert source.inputs == [{"a": 1}] and seen == [{"a": 1}]
+    [(call, req, wait)] = runner.opened
+    assert wait == timedelta(hours=hours)
+    assert call.input == {"a": 1} and seen == [{"a": 1}] and source.inputs == []
 
 
 async def test_ask_wait_hours_is_stripped_on_an_auto_tool_too():
@@ -1536,8 +1548,9 @@ def test_ask_wait_hours_only_on_ask_mode_schemas():
     assert set(schema["properties"]) == {"a"}  # the tool's own schema is never edited
 
 
-async def test_job_owned_request_has_no_wait():
+async def test_job_owned_ask_opens_no_item():
     both = ToolSpec("t", "t tool", {"type": "object"}, frozenset({"scout", "expert"}))
     box, _, engine = _engine_box(Decision("allow_once"), both)
+    runner = box._runner = FakeRunner()
     await box.run(call_with_text("t"), caller="expert", job_id="job1")
-    assert engine.requests[0].wait is None and engine.requests[0].call is None
+    assert runner.opened == [] and engine.requests[0].how_to_ask is not None

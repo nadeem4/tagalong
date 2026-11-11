@@ -161,7 +161,7 @@ def test_resume_goal_ends_blocked_in_either_order(tmp_path, unsafe_first):
     assert store.get(goal.id).state == "blocked"
 
 
-# --- Scout-owned asks wait across a restart; a job's ask or a turn-bound card does not ---
+# --- every ask row left active by a restart expires ---
 
 
 def _scout_ask(store, *, safe=True):
@@ -177,25 +177,16 @@ def _scout_ask(store, *, safe=True):
     return row
 
 
-def test_restart_keeps_a_waiting_scout_ask_with_its_deadline(tmp_path):
+def test_restart_expires_an_ask_row_saved_before_asks_became_open_items(tmp_path):
+    # Scout's waiting asks live in open items now; an old row with a deadline must not stay
+    # active forever, whether or not its saved call held a secret.
     seed, restart = _stores(tmp_path)
-    ask = _scout_ask(seed)
+    kept = _scout_ask(seed)
+    secret = _scout_ask(seed, safe=False)
     store = restart()
+    assert dict(store.resume_scan(_yes)) == {kept.id: "expired", secret.id: "expired"}
+    assert store.get(kept.id).end_reason == "brain restarted"
     assert store.resume_scan(_yes) == []
-    got = store.get(ask.id)
-    assert (got.state, got.due_at) == ("active", ask.due_at)
-
-
-def test_restart_expires_a_waiting_ask_that_held_a_secret(tmp_path):
-    seed, restart = _stores(tmp_path)
-    ask = _scout_ask(seed, safe=False)
-    store = restart()
-    assert store.resume_scan(_yes) == [(ask.id, "held a secret")]
-    got = store.get(ask.id)
-    assert (got.state, got.end_reason, got.reported_at) == ("expired", "expired", None)
-    assert store.ask_detail(ask.id)["decided_by"] == "none"
-    [decided] = [e for e in store.events(ask.id) if e.kind == "decided"]
-    assert decided.data == {"outcome": "expired", "decided_by": "none", "reason": "held a secret"}
 
 
 def test_restart_still_expires_job_asks_and_turn_bound_asks(tmp_path):
@@ -208,15 +199,3 @@ def test_restart_still_expires_job_asks_and_turn_bound_asks(tmp_path):
     assert settled[job_ask.id] == settled[card.id] == "expired"
     assert store.get(job_ask.id).end_reason == "brain restarted"
     assert store.get(card.id).end_reason == "brain restarted"
-
-
-def test_resume_scan_twice_changes_nothing_for_waiting_asks(tmp_path):
-    seed, restart = _stores(tmp_path)
-    kept = _scout_ask(seed)
-    secret = _scout_ask(seed, safe=False)
-    store = restart()
-    store.resume_scan(_yes)
-    before = _event_count(store)
-    assert store.resume_scan(_yes) == []
-    assert _event_count(store) == before
-    assert (store.get(kept.id).state, store.get(secret.id).state) == ("active", "expired")

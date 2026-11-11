@@ -586,9 +586,10 @@ async def test_answer_deny_keeps_the_tool_from_running(ask_env):
         async with asyncio.timeout(5):
             while model.step < 2:
                 await asyncio.sleep(0.01)
-    result = tool_result(model)
-    assert result["is_error"] is True
-    assert "said no to desktop__click" in json.dumps(result["content"])
+        # The turn was told the ask is open and went on; the no came later and ran nothing.
+        assert "waiting for the person's answer" in json.dumps(tool_result(model)["content"])
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(next_method(ws, "use"), 0.3)
 
 
 async def test_answer_unknown_ask_is_not_found(ask_env):
@@ -652,7 +653,7 @@ async def test_new_body_sees_the_open_ask(ask_env):
 
 async def test_relaunched_body_with_no_last_seq_is_shown_the_open_ask_again(ask_env):
     # The desktop restarts as a new process: no last_seq, same body id. The ask it left open
-    # (the turn is still waiting on it) must come again, after the hello result.
+    # (its item is still open) must come again, after the hello result.
     url, _ = ask_env
     async with connect(url) as first:
         ask = (await open_ask(first))["params"]
@@ -662,7 +663,7 @@ async def test_relaunched_body_with_no_last_seq_is_shown_the_open_ask_again(ask_
         seen = json.loads(await second.recv())
         assert seen["params"]["id"] == ask["id"] and seen["params"]["state"] == "open"
         frames = await answer(second, ask["id"], "allow")
-        assert frames[-1]["result"] == {}  # still answerable: the waiting turn goes on
+        assert frames[-1]["result"] == {}  # still answerable: the item is open
 
 
 async def test_reconnect_without_resync_gets_the_ask_once_from_the_backlog(ask_env):
@@ -674,9 +675,9 @@ async def test_reconnect_without_resync_gets_the_ask_once_from_the_backlog(ask_e
         assert reply["result"]["resync"] is False
         got = json.loads(await ws.recv())
         assert got["params"]["id"] == ask["id"] and got["params"]["seq"] == ask["seq"]
-        # Nothing else follows: the next frame is the reply to this request.
-        reply = await call(ws, request("cancel", {"turn": "none"}, req_id=5))
-        assert reply["id"] == 5
+        # The ask comes once: the turn's own frames may follow, the ask never again.
+        reply = await call_tool(ws, "nothing", req_id=5, seen=(seen := []))
+        assert reply["id"] == 5 and all(f.get("method") != "ask" for f in seen)
 
 
 async def test_answered_ask_is_not_replayed(ask_env):

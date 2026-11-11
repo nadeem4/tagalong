@@ -60,6 +60,8 @@ from brain.mind.resume import rebuild_history
 from brain.mind.turn import Call, Model, run_turn
 from brain.models import DEFAULT_MODEL_ID
 from brain.offers import Offers, OfferSettings
+from brain.open_item_runner import AskRunner
+from brain.open_items import OpenItems
 from brain.outputs import OutputStore
 from brain.permission import Engine, Person, SideCheckDecider, StandingRule, stored_auto_rules
 from brain.protocol import BODY_DESKTOP, ReadAloudData, ReadingData, SayParams, SayResult, Tool
@@ -91,7 +93,6 @@ from brain.tools import (
     work_tools,
 )
 from brain.voice import VoiceHooks
-from brain.waiting import WaitingAsks
 from brain.web_tools import WebSource, without_server_blocks, without_thinking
 
 log = logging.getLogger("brain")
@@ -212,7 +213,6 @@ class Session:
             approvals,
             offer,
             set_auto=lambda name: self.toolbox.set_mode(name, "auto"),
-            now=now,
         )
         self.records = JobRecords(work, memory.db, now)
         self.jobs = Jobs(
@@ -277,14 +277,15 @@ class Session:
             rules.set_permission_mode(memory.db, name, mode)
             notify("changed", {"what": "permissions"})
 
-        self.waiting = WaitingAsks(
-            work,
+        self.ask_runner = AskRunner(
+            OpenItems(memory.db, now),
             self._asks,
             lambda: self.toolbox,
             self.scheduler.emit,
             now,
             approvals,
         )
+        self._asks.on_item_answer = self.ask_runner.answered
         self.toolbox = Toolbox(
             [BrainSource(tools), *sources],
             modes,
@@ -294,7 +295,7 @@ class Session:
             owner_turn=lambda turn_id: self._owner_turn and turn_id == self._turn_id,
             on_call=self._on_tool_call,
             outputs=outputs,
-            waiting=self.waiting,
+            runner=self.ask_runner,
         )
         if apps is not None and isinstance(make_run, ExpertHosts):
             # Experts reach apps only through the brain, by the same gate as Scout's own calls.
@@ -340,7 +341,7 @@ class Session:
             if step.reported_at is None:
                 self._tell_given_up(step)
         timers.start()
-        self.waiting.start()
+        self.ask_runner.start()
 
     def _tell_paused_watches(self) -> None:
         """Watches a migration paused are mentioned once, then marked told."""
@@ -561,7 +562,7 @@ class Session:
         self.scheduler.pump()  # also starts a wake that was waiting for a body
         body = self._bodies.body(body_id)
         if body is not None and body.display is not False:
-            self.waiting.rejoined(body_id)  # asks that waited for a screen are decided again
+            self.ask_runner.rejoined()  # open asks whose card is not up are shown again
 
     def _on_job_finished(self, job: Job) -> None:
         self._emit_job_event(
