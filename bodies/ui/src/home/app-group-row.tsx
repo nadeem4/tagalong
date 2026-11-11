@@ -1,14 +1,17 @@
 /**
  * One service in the app lists: its Official version first (Add is one press), the versions from
  * other makers behind a toggle. A community row says "Name, by maker" and opens the check card
- * before anything is added. One verb per row: Add, or Add… when a card comes first.
+ * before anything is added. One verb per row: Add, or Add… when a card comes first. A row whose
+ * add is running shows the install card in its Working state, as the chat does.
  * Contains AppGroupRow and AppItem.
  */
 import { useRef, useState, type ReactNode } from 'react';
-import type { AppGroup, AppRow } from '../shapes';
+import type { AppGroup, AppInfo, AppRow } from '../shapes';
 import { Button } from '../controls/button';
 import { FactsLine } from '../setup/facts-line';
 import { Icon } from '../setup/icons';
+import { InstallCard } from '../setup/install-card';
+import { appWorking, findApp, subjectOfRow } from '../setup/install-progress';
 import { CheckCard } from './check-card';
 import type { Outcome } from './outcome';
 
@@ -57,6 +60,7 @@ export function AppItem({
   row,
   busy,
   outcome,
+  apps,
   onAdd,
   onAddAnyway,
   children,
@@ -64,6 +68,8 @@ export function AppItem({
   row: AppRow;
   busy: boolean;
   outcome: Outcome | undefined;
+  /** The installed apps: an add that is running reads its steps from its connection row. */
+  apps: AppInfo[];
   onAdd: (row: AppRow) => void;
   onAddAnyway: (row: AppRow) => void;
   children?: ReactNode;
@@ -71,6 +77,9 @@ export function AppItem({
   const [checking, setChecking] = useState(false);
   const addButton = useRef<HTMLButtonElement>(null);
   const label = row.official ? row.name : `${row.name}, by ${row.publisher}`;
+  const subject = subjectOfRow(row);
+  // Until the brain lists the app there is nothing to follow: it is still waiting on the answer.
+  const installing = busy ? findApp(apps, subject) : undefined;
 
   return (
     <li className="cx-item">
@@ -89,7 +98,7 @@ export function AppItem({
         <div className="cx-row__side">
           {outcome !== undefined && <OutcomeText outcome={outcome} />}
           {busy ? (
-            <Waiting />
+            installing === undefined && <Waiting />
           ) : row.added ? (
             outcome === undefined && <AddedStatus />
           ) : (
@@ -119,6 +128,9 @@ export function AppItem({
           }}
         />
       )}
+      {installing !== undefined && (
+        <InstallCard subject={subject} view={appWorking(installing)} theme="light" />
+      )}
       {children}
     </li>
   );
@@ -128,6 +140,7 @@ export function AppGroupRow({
   group,
   busy,
   outcomes,
+  apps = [],
   onAdd,
   onAddAnyway,
 }: {
@@ -135,6 +148,7 @@ export function AppGroupRow({
   /** Ids whose call is running; they show "Waiting for you…" in place of the button. */
   busy: ReadonlySet<string>;
   outcomes: ReadonlyMap<string, Outcome>;
+  apps?: AppInfo[];
   onAdd: (row: AppRow) => void;
   onAddAnyway: (row: AppRow) => void;
 }) {
@@ -146,6 +160,7 @@ export function AppGroupRow({
       row={row}
       busy={busy.has(row.id)}
       outcome={outcomes.get(row.id)}
+      apps={apps}
       onAdd={onAdd}
       onAddAnyway={onAddAnyway}
     >

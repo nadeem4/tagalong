@@ -5,7 +5,7 @@
  * and shows. Only the newest request may write results. Contains AppSearch.
  */
 import { useEffect, useRef, useState } from 'react';
-import type { AppAddParams, AppGroup, AppRow } from '../shapes';
+import type { AppAddParams, AppGroup, AppInfo, AppRow } from '../shapes';
 import { Button } from '../controls/button';
 import { useHostBridge } from '../host-bridge';
 import { Icon } from '../setup/icons';
@@ -19,6 +19,7 @@ const UNREACHABLE = "Scout couldn't load the app list. Check your internet and t
 
 export function AppSearch({
   busy,
+  apps,
   refresh,
   offline,
   onAdd,
@@ -29,6 +30,8 @@ export function AppSearch({
   offline: boolean;
   /** Ids whose call is running; they show "Waiting for you…". */
   busy: ReadonlySet<string>;
+  /** The installed apps, for the steps of an add that is running. */
+  apps: AppInfo[];
   /** Changes when the apps changed (an add finished): search again, the list has moved on. */
   refresh: number;
   onAdd: (row: AppRow, query: string) => Promise<Outcome | null>;
@@ -115,6 +118,7 @@ export function AppSearch({
         others: app.official ? [] : [app],
       }}
       busy={busy}
+      apps={apps}
       outcomes={outcomes}
       onAdd={(chosen) => void track(chosen.id, onAdd(chosen, term))}
       onAddAnyway={(chosen) => void track(chosen.id, onAddAnyway(chosen, term))}
@@ -163,6 +167,7 @@ export function AppSearch({
                   key={group.service}
                   group={group}
                   busy={busy}
+                  apps={apps}
                   outcomes={outcomes}
                   onAdd={(chosen) => void track(chosen.id, onAdd(chosen, term))}
                   onAddAnyway={(chosen) => void track(chosen.id, onAddAnyway(chosen, term))}
