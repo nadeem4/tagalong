@@ -420,13 +420,14 @@ def test_display_ids_skip_display_false_bodies():
     assert bodies.online_ids() == ["a", "b", "c"]
 
 
-def test_wake_ids_skip_display_less_and_whatsapp_bodies():
+def test_display_ids_put_the_phone_last_and_skip_display_less_bodies():
     bodies = Bodies()
     bodies.connect(body("a"), [], FakePeer(), None)
     bodies.connect(Body(id="b", kind="browser", name="b", display=False), [], FakePeer(), None)
     bodies.connect(Body(id="w", kind="whatsapp", name="WhatsApp"), [], FakePeer(), None)
-    assert bodies.wake_ids() == ["a"]
-    assert bodies.display_ids() == ["a", "w"]  # an ask may still reach the phone
+    bodies.connect(Body(id="z", kind="desktop", name="z"), [], FakePeer(), None)
+    assert bodies.display_ids() == ["a", "z", "w"]  # screens first, the phone last
+    assert bodies.is_phone("w") and not bodies.is_phone("a")
 
 
 def test_body_lookup_is_online_only():

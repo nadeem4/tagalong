@@ -94,7 +94,9 @@ def states(sent):
 
 
 async def finish(session):
-    await session._task
+    await settle()  # a say reaches its turn through the dispatcher
+    if session._task is not None:
+        await session._task
 
 
 async def test_say_starts_turn():
@@ -114,19 +116,20 @@ async def test_say_starts_turn():
     assert session.history[0] == {"role": "user", "content": [{"type": "text", "text": "hello"}]}
 
 
-async def test_second_say_joins_running_turn():
+async def test_second_say_waits_for_a_turn_of_its_own():
     gate = asyncio.Event()
     model = Gate([gate, "one", "two"])
     session, sent = make(model)
     first = session.say("desktop", say("a"))
+    await settle()
     second = session.say("extension", say("b"))
-    assert second.joined is True and second.turn == first.turn
+    assert second.joined is False and second.turn != first.turn
     gate.set()
-    await finish(session)
+    await idle(session)
     last_user = model.seen[-1][-1]
     assert last_user["role"] == "user"
     assert {"type": "text", "text": "b"} in last_user["content"]
-    assert states(sent) == ["started", "ended"]
+    assert states(sent) == ["started", "ended", "started", "ended"]
 
 
 async def turns_done(session):
@@ -138,41 +141,23 @@ async def turns_done(session):
         await asyncio.sleep(0)
 
 
-async def test_leftover_inbox_gets_its_own_turn():
-    # A say that joined a turn cancelled before it could drain the inbox is answered, not lost.
+async def test_a_say_waiting_behind_a_cancelled_turn_is_answered():
     model = Gate([asyncio.Event(), "x"])
     session, sent = make(model)
     result = session.say("desktop", say("a"))
-    await asyncio.sleep(0)
+    await settle()
     session.say("desktop", say("late"))
-    session.cancel(result.turn)  # stops the turn before it can drain the inbox
-    await finish(session)
-    await turns_done(session)
+    session.cancel(result.turn)
+    await idle(session)
     assert [m["role"] for m in model.seen[1]] == ["user"]
     assert model.seen[1][0]["content"] == [{"type": "text", "text": "late"}]
     assert session.say("desktop", say("next")).joined is False
 
 
-async def test_leftover_says_come_before_a_newer_say():
-    model = Gate(["one", "two"])
-    session, sent = make(model)
-    session.say("desktop", say("a"))
-    await finish(session)
-    session._inbox.append([{"type": "text", "text": "old"}])  # joined, but the loop had ended
-    # the finished task's done-callback has not run yet when the new say lands
-    session._task = asyncio.get_running_loop().create_future()
-    session._task.set_result("done")
-    session.say("desktop", say("new"))
-    await finish(session)
-    texts = [b["text"] for b in model.seen[-1][-1]["content"]]
-    assert texts == ["old", "new"]
-    assert session._inbox == []
-
-
 async def test_cancel_running_turn():
     session, sent = make(Gate([asyncio.Event(), "never"]))
     result = session.say("desktop", say("a"))
-    await asyncio.sleep(0)
+    await settle()
     session.cancel(result.turn)
     await finish(session)
     assert sent[-1][1]["state"] == "ended" and sent[-1][1]["reason"] == "cancelled"
@@ -202,87 +187,17 @@ async def test_empty_say_raises():
         session.say("desktop", SayParams(text=None, parts=[]))
 
 
-async def test_say_after_task_finished_but_before_callback_starts_new_turn():
-    session, sent = make(Gate(["one", "two"]))
-    first = session.say("desktop", say("a"))
-    await asyncio.wait({session._task})  # done; the done-callback may not have run yet
-    second = session.say("desktop", say("b"))
-    assert second.joined is False and second.turn != first.turn
-    await finish(session)
-    assert states(sent).count("ended") == 2
-
-
-async def test_say_between_a_cancelled_task_ending_and_its_callback(tmp_path):
-    # The cancelled turn is over but its _ended has not run: the new say joins the unsaved
-    # request and starts the turn that answers both. That request must not be marked cut.
-    memory = file_memory(tmp_path)
-    model = Gate([asyncio.Event(), "ok b", "ok c"])
-    session, _ = make(model, memory)
-    held = []
-    ended = session._ended
-    session._ended = lambda *args: held.append(args)
-    first = session.say("desktop", say("a"))
-    await asyncio.sleep(0)
-    session.cancel(first.turn)
-    await asyncio.wait({session._task})
-    assert held
-    session._ended = ended  # only the first callback is held
-    second = session.say("desktop", say("b"))
-    assert second.joined is False
-    ended(*held[0])  # the old callback runs now, while the merged request is still last
-    await asyncio.wait({session._task})
-    await asyncio.sleep(0)
-    session.say("desktop", say("c"))
-    await finish_quietly(session)
-    assert [m["role"] for m in model.seen[2]] == ["user", "assistant", "user"]
-    assert [m["role"] for m in memory.load_messages()][0] == "user"
-    assert [m["role"] for m in make(Gate(["x"]), memory)[0].history] == [
-        "user",
-        "assistant",
-        "user",
-        "assistant",
-    ]
-
-
-class FailsLater(Gate):
-    """Waits, then breaks: the turn ends in error after a say joined it."""
-
-    async def stream(self, system, messages, tools):
-        self.seen.append(list(messages))
-        await self.steps[0].wait()
-        raise RuntimeError("down")
-        yield
-
-
-async def test_late_says_after_an_error_turn_join_its_request(tmp_path):
-    memory = file_memory(tmp_path)
-    release = asyncio.Event()
-    session, sent = make(FailsLater([release]), memory)
-    session.say("desktop", say("a"))
-    await asyncio.sleep(0)
-    assert session.say("desktop", say("late")).joined is True
-    release.set()
-    await finish_quietly(session)
-    assert sent[-1][1]["reason"] == "error"
-    assert session._task is None  # no new turn: only a cancel gives joined says one
-    assert session.history[-1]["content"] == [
-        {"type": "text", "text": "a"},
-        {"type": "text", "text": "late"},
-    ]
-    assert memory.load_messages()[-1]["content"][-1] == {"type": "text", "text": "late"}
-
-
-async def test_joined_say_after_a_cancel_is_read_aloud_on_its_own_body():
+async def test_say_after_a_cancel_is_read_aloud_on_its_own_body():
     gate = asyncio.Event()
     model = Gate([gate, "done"])
     session, sent = make(model)
     session.voice = voice = RecordingVoice()
     join(session, "desktop")
     first = session.say("desktop", say("tell me"))
-    await asyncio.sleep(0)
+    await settle()
     session.cancel(first.turn)
     joined = session.say("desktop", SayParams(text="actually X", spoken=True))
-    assert joined.joined is True
+    assert joined.joined is False
     await finish_quietly(session)
     await asyncio.sleep(0)
     started = [p for m, p in sent if m == "turn" and p["state"] == "started"]
@@ -302,8 +217,10 @@ async def test_cancel_right_after_say():
 
 
 async def finish_quietly(session):
+    await settle()  # a say reaches its turn through the dispatcher
     task = session._task
-    await asyncio.wait({task})
+    if task is not None:
+        await asyncio.wait({task})
     await asyncio.sleep(0)  # let the done-callback run
 
 
@@ -495,17 +412,17 @@ async def test_remember_tool_round_trip():
     assert result["type"] == "tool_result" and "is_error" not in result
 
 
-async def test_joined_say_does_not_refresh_know():
+async def test_know_is_not_refreshed_mid_turn():
     memory = Memory(":memory:")
     gate = asyncio.Event()
     model = Gate([gate, remember_call("be brief"), "ok"])
     session, _ = make(model, memory)
     session.say("desktop", say("a"))
+    await settle()
     memory.remember("instruction", "added mid-turn")
-    session.say("desktop", say("b"))
     gate.set()
     await finish(session)
-    assert model.systems[0] == model.systems[1]
+    assert model.systems[0] == model.systems[1]  # the steps of one turn share the read
     assert "added mid-turn" not in model.systems[0]
 
 
@@ -570,7 +487,7 @@ async def test_cancelled_reply_stays_answered_after_restart(tmp_path):
     session, _ = make(model, memory)
     first = session.say("desktop", say("long story"))
     await asyncio.sleep(0)
-    await asyncio.sleep(0)
+    await settle()
     session.cancel(first.turn)
     await finish_quietly(session)
     assert [m["role"] for m in memory.load_messages()] == ["user", "assistant"]
@@ -585,7 +502,7 @@ async def _cancel_before_any_word(memory):
     model = Gate([stuck, "hi there"])
     session, _ = make(model, memory)
     first = session.say("desktop", say("long story"))
-    await asyncio.sleep(0)
+    await settle()
     session.cancel(first.turn)
     await finish_quietly(session)
     return model, session
@@ -671,16 +588,16 @@ async def test_a_timed_out_turn_keeps_its_request_for_try_again(tmp_path):
     assert "long story" in json.dumps(model.seen[1])
 
 
-async def test_a_say_joining_a_cancelled_turn_gets_its_own_answer(tmp_path):
+async def test_a_say_after_a_cancelled_turn_gets_its_own_answer(tmp_path):
     # "stop ... actually do X": X joined the turn being cancelled and must still be answered.
     memory = file_memory(tmp_path)
     model = Gate([asyncio.Event(), "done X"])
     session, _ = make(model, memory)
     first = session.say("desktop", say("long story"))
-    await asyncio.sleep(0)
+    await settle()
     session.cancel(first.turn)
     joined = session.say("desktop", say("actually do X"))
-    assert joined.joined is True
+    assert joined.joined is False
     await finish_quietly(session)
     await turns_done(session)
     assert len(model.seen) == 2
@@ -934,7 +851,7 @@ async def test_late_says_are_saved(tmp_path):
     memory = file_memory(tmp_path)
     session, _ = make(Gate([asyncio.Event(), "x"]), memory)
     result = session.say("desktop", say("a"))
-    await asyncio.sleep(0)
+    await settle()
     session.say("desktop", say("late"))
     session.cancel(result.turn)
     await finish_quietly(session)
@@ -1040,7 +957,8 @@ async def test_no_merge_into_saved_message(tmp_path):
     session, _ = make(Gate(["one"]), memory)
     assert len(session.history) == 1
     session.say("desktop", say("new"))
-    assert [m["role"] for m in session.history] == ["user", "user"]
+    await finish_quietly(session)
+    assert [m["role"] for m in session.history] == ["user", "user", "assistant"]
     assert session.history[0]["content"] == [{"type": "text", "text": "old"}]
     await finish_quietly(session)
     assert memory.load_messages()[0]["content"] == [{"type": "text", "text": "old"}]
@@ -1111,9 +1029,12 @@ async def settle():
 
 
 async def idle(session):
-    # Wake turns chain from done callbacks, so wait until no turn is left.
+    # Wake turns chain from done callbacks, and a say reaches its turn through the dispatcher,
+    # so give the queue a moment, then wait until no turn is left.
+    await settle()
     while session._task is not None:
         await finish_quietly(session)
+        await settle()
 
 
 async def test_wake_held_while_busy_runs_after_the_turn_ends():
@@ -1243,16 +1164,17 @@ async def test_say_from_a_displaying_body_is_unchanged():
     assert session._last_body == "extension"
 
 
-async def test_display_less_say_joins_a_running_turn_like_any_say():
+async def test_display_less_say_waits_for_its_own_turn_like_any_say():
     gate = asyncio.Event()
     session, _ = make(Gate([gate, "one", "two"]))
     join(session, "desktop")
     join_headless(session)
     first = session.say("desktop", say("a"))
-    joined = session.say("browser", say("b"))
-    assert joined.joined is True and joined.turn == first.turn
+    await settle()
+    second = session.say("browser", say("b"))
+    assert second.joined is False and second.turn != first.turn
     gate.set()
-    await finish_quietly(session)
+    await idle(session)
 
 
 async def test_spent_budget_starts_no_wake_and_leaves_the_job_unreported():
@@ -1271,18 +1193,18 @@ async def test_spent_budget_starts_no_wake_and_leaves_the_job_unreported():
     assert states(sent) == [] and not records_for(memory).get_job("j1").parts[-1].reported
 
 
-async def test_say_during_a_wake_turn_joins_it():
+async def test_say_during_a_wake_turn_gets_its_own_turn_after_it():
     gate = asyncio.Event()
-    model = Gate([gate, "told"])
+    model = Gate([gate, "told", "thanks back"])
     memory = Memory(":memory:")
     session, sent = make(model, memory)
     join(session, "desktop")
     session.jobs._on_finished(end_job(memory))
     await settle()
     result = session.say("desktop", say("thanks"))
-    assert result.joined is True
+    assert result.joined is False
     gate.set()
-    await finish_quietly(session)
+    await idle(session)
     assert {"type": "text", "text": "thanks"} in model.seen[-1][-1]["content"]
 
 
@@ -1297,15 +1219,15 @@ def end_job(memory, job_id="j1", result="all good", state="done"):
     return records.get_job(job_id)
 
 
-async def test_a_job_ending_wakes_one_turn_with_the_facts_and_marks_it_reported_on_start():
+async def test_a_job_ending_wakes_one_turn_with_the_facts_and_marks_it_reported_when_it_ends():
     model = Gate(["ok"])
     memory = Memory(":memory:")
     session, sent = make(model, memory)
     join(session, "desktop")
     job = end_job(memory)
     session.jobs._on_finished(job)
-    assert records_for(memory).get_job("j1").parts[-1].reported  # the turn started right away
     await idle(session)
+    assert records_for(memory).get_job("j1").parts[-1].reported
     text = model.seen[-1][-1]["content"][-1]["text"]
     assert text.startswith('<data kind="event">') and text.endswith("</data>")
     assert "Event: job_ended" in text
@@ -1330,11 +1252,14 @@ async def test_job_ended_default_batches_30_seconds():
     session, sent = make(Gate(["ok"]), memory, kinds=None, now=lambda: clock[0])
     join(session, "desktop")
     session.jobs._on_finished(end_job(memory))
+    await settle()
     assert states(sent) == [] and not records_for(memory).get_job("j1").parts[-1].reported
     clock[0] += datetime.timedelta(seconds=30)
     session.scheduler.pump()
-    assert records_for(memory).get_job("j1").parts[-1].reported
+    await settle()
+    assert states(sent)[:1] == ["started"]
     await idle(session)
+    assert records_for(memory).get_job("j1").parts[-1].reported
     assert states(sent) == ["started", "ended"]
 
 
@@ -1342,10 +1267,11 @@ async def test_not_reported_until_a_body_is_there_to_tell():
     memory = Memory(":memory:")
     session, _ = make(Gate(["ok"]), memory)
     session.jobs._on_finished(end_job(memory))
+    await settle()
     assert not records_for(memory).get_job("j1").parts[-1].reported
     join(session, "desktop")
-    assert records_for(memory).get_job("j1").parts[-1].reported
     await idle(session)
+    assert records_for(memory).get_job("j1").parts[-1].reported
 
 
 async def test_a_hostile_result_cannot_close_the_fence():
@@ -1370,6 +1296,7 @@ async def test_restart_queues_only_finished_unreported_jobs():
     )  # stopped by the restart
     model = Gate(["a"])
     session, _ = make(model, memory)
+    await settle()  # both reach the scheduler before a body is there
     join(session, "desktop")
     await idle(session)
     told = [m[-1]["content"][-1]["text"] for m in model.seen]
@@ -2029,42 +1956,12 @@ async def test_a_typed_say_never_reaches_the_voice():
     assert voice.calls == []
 
 
-async def test_a_spoken_say_joining_a_typed_turn_makes_it_spoken_from_then_on():
-    gate = asyncio.Event()
-    session, _ = make(Gate([gate, "one", "two"]))
-    session.voice = voice = RecordingVoice()
-    join(session, "desktop")
-    first = session.say("desktop", say("typed"))
-    assert voice.calls == []
-    joined = session.say("desktop", spoken_say("spoken"))
-    assert joined.joined is True
-    assert voice.calls == [("spoken", first.turn, "desktop", None, None)]
-    gate.set()
-    await finish_quietly(session)
-    assert "reply" in kinds_of(voice) and kinds_of(voice)[-1] == "ended"
-
-
-async def test_every_spoken_say_on_a_running_turn_reaches_the_voice():
-    """After a hush the voice drops the turn; a later joined spoken say must re-arm it, so the
-    session may not remember the turn as already spoken."""
-    gate = asyncio.Event()
-    session, _ = make(Gate([gate, "one", "two"]))
-    session.voice = voice = RecordingVoice()
-    join(session, "desktop")
-    first = session.say("desktop", spoken_say("one"))
-    session.say("desktop", spoken_say("two"))  # joins; the voice was hushed in between
-    spoken = [c for c in voice.calls if c[0] == "spoken"]
-    assert spoken == [("spoken", first.turn, "desktop", None, None)] * 2
-    gate.set()
-    await finish_quietly(session)
-
-
 async def test_a_cancelled_spoken_turn_still_ends_in_the_voice():
     session, _ = make(Gate([asyncio.Event(), "never"]))
     session.voice = voice = RecordingVoice()
     join(session, "desktop")
     result = session.say("desktop", spoken_say())
-    await asyncio.sleep(0)
+    await settle()
     session.cancel(result.turn)
     await finish_quietly(session)
     assert voice.calls[-1] == ("ended", result.turn)
@@ -2183,6 +2080,7 @@ async def test_read_aloud_arriving_mid_turn_speaks_the_running_turn():
     session.voice = voice = RecordingVoice()
     join(session, "desktop")
     result = session.say("desktop", say("typed"))
+    await settle()
     read_aloud(session, speed=1.1)
     read_aloud(session, speed=1.1)  # a repeat must not speak it again
     spoken = [c for c in voice.calls if c[0] == "spoken"]
@@ -2200,20 +2098,6 @@ async def test_read_aloud_arriving_mid_turn_ignores_a_turn_on_another_body():
     session.say("browser", say("typed"))  # shown on the desktop
     read_aloud(session, body_id="browser")
     assert voice.calls == []
-    gate.set()
-    await finish_quietly(session)
-
-
-async def test_a_typed_say_joining_a_turn_after_a_hush_speaks_again_under_read_aloud():
-    gate = asyncio.Event()
-    session, _ = make(Gate([gate, "one", "two"]))
-    session.voice = voice = RecordingVoice()
-    join(session, "desktop")
-    read_aloud(session)
-    first = session.say("desktop", say("one"))
-    session.say("desktop", say("two"))  # joins; the voice was hushed in between
-    spoken = [c for c in voice.calls if c[0] == "spoken"]
-    assert spoken == [("spoken", first.turn, "desktop", None, None)] * 2
     gate.set()
     await finish_quietly(session)
 
@@ -2296,6 +2180,7 @@ async def test_a_hushed_read_aloud_turn_says_nothing_more():
     join(session, "desktop")
     read_aloud(session)
     session.say("desktop", say("typed"))
+    await settle()
     mouth.clear()  # barge-in before the reply starts
     gate.set()
     await finish_quietly(session)
@@ -2360,6 +2245,7 @@ async def test_failures_inside_one_batch_window_wake_scout_once():
         entry = ActivityEntry(n, n, at, "command", f"cmd{n}", "failed", str(n), 1)
         session.jobs._step_failed("j1", entry)
         clock[0] += datetime.timedelta(seconds=5)
+    await settle()
     assert states(sent) == []  # still inside the 120 s batch
     clock[0] += datetime.timedelta(seconds=120)
     session.scheduler.pump()
@@ -2423,6 +2309,7 @@ async def test_a_say_started_turn_is_an_owner_turn():
     session, _ = make(Gate([gate, "ok"]))
     assert session.owner_turn() is False  # nothing running
     session.say("desktop", say("hi"))
+    await settle()
     assert session.owner_turn() is True
     gate.set()
     await finish(session)
@@ -2433,24 +2320,10 @@ async def test_a_timer_wake_turn_is_not_an_owner_turn():
     session, _ = make(Gate([gate, "ok"]), kinds=None)
     join(session, "desktop")
     session.body_event("desktop", "back", {"idle_seconds": 600})
+    await settle()
     assert session._busy()
     assert session.owner_turn() is False
     gate.set()
-    await idle(session)
-
-
-async def test_an_owner_message_makes_a_wake_turn_theirs_only_once_the_model_has_it():
-    gate = asyncio.Event()
-    again = asyncio.Event()
-    session, _ = make(Gate([gate, "ok", again, "done"]), kinds=None)
-    join(session, "desktop")
-    session.body_event("desktop", "back", {"idle_seconds": 600})
-    assert session.say("desktop", say("do it")).joined is True
-    assert session.owner_turn() is False  # joined, but not in history yet
-    gate.set()
-    await settle()
-    assert session.owner_turn() is True  # drained into history after the first step
-    again.set()
     await idle(session)
 
 
@@ -2461,6 +2334,7 @@ async def test_the_next_wake_after_an_owner_turn_is_not_an_owner_turn():
     session.say("desktop", say("hi"))
     await idle(session)
     session.body_event("desktop", "back", {"idle_seconds": 600})
+    await settle()
     assert session._busy()
     assert session.owner_turn() is False
     gate.set()
@@ -2508,31 +2382,6 @@ async def test_a_nudge_scout_starts_in_a_wake_turn_asks_the_owner():
     [ask] = open_asks(sent)
     assert ask["tool"] == "tell_expert"
     assert "waiting for the person's answer" in str(tool_results(session))  # open, not held
-    await idle(session)
-
-
-async def test_a_nudge_from_the_step_after_the_owner_joins_a_wake_turn_runs_without_an_ask():
-    gate = asyncio.Event()
-    session, sent = make(Gate([gate, "first", nudge_call(), "sent"]), kinds=None)
-    join(session, "desktop")
-    session.body_event("desktop", "back", {"idle_seconds": 600})
-    session.say("desktop", say("nudge it"))  # the owner steps into the wake turn
-    gate.set()
-    await idle(session)
-    assert open_asks(sent) == []
-    assert "no job j1" in str(tool_results(session))
-
-
-async def test_a_nudge_already_in_flight_when_the_owner_joins_still_asks():
-    session, sent = make(Gate([nudge_call(), "sent"]), kinds=None)
-    join(session, "desktop")
-    session.body_event("desktop", "back", {"idle_seconds": 600})
-    await settle()
-    assert len(open_asks(sent)) == 1  # Scout's own nudge, held on the ask
-    session.say("desktop", say("hello"))  # the owner joins; they did not ask for this nudge
-    await settle()
-    assert len(open_asks(sent)) == 1
-    assert "waiting for the person's answer" in str(tool_results(session))
     await idle(session)
 
 
@@ -2981,6 +2830,7 @@ async def test_a_batched_wake_for_two_jobs_binds_to_the_first_job_tool_not_the_l
     join(session, "desktop")
     session.jobs._on_finished(end_job(memory))
     session.jobs._on_finished(end_job(memory, "j2"))
+    await settle()
     clock[0] += datetime.timedelta(seconds=31)
     session.scheduler.pump()
     await idle(session)
@@ -3257,18 +3107,8 @@ async def test_body_is_kept_if_the_body_leaves_before_the_turn_ends():
     session, _ = make(Gate(["hi"]))
     session._bodies.connect(Body(id="wa", kind="whatsapp", name="WA"), [], peer, None)
     session.say("wa", say("hello"))
+    await settle()
     session._bodies.disconnect("wa", peer)
-    await finish(session)
-    assert _saved_bodies(session) == ["whatsapp"]
-
-
-async def test_a_say_joining_a_whatsapp_turn_keeps_every_row_whatsapp():
-    gate = Gate(["hi"])
-    session, _ = make(gate)
-    session._bodies.connect(Body(id="wa", kind="whatsapp", name="WA"), [], QuietPeer(), None)
-    join(session, "desktop")
-    session.say("wa", say("hello"))
-    assert session.say("desktop", say("also")).joined is True
     await finish(session)
     assert _saved_bodies(session) == ["whatsapp"]
 

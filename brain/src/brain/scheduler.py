@@ -4,7 +4,8 @@ fenced and cannot close its own <data> tag.
 
 The scheduler never owns a turn; Session hands it `busy`, `last_body` and `start`, and calls
 `turn_ended` so the next held batch can run. Each event may carry three hooks: on_start (the
-wake began), on_drop (the budget was spent, so it never will) and on_end (its turn ended).
+wake began), on_drop (the budget was spent, so it never will) and on_end (its turn ended, told
+how: news is marked told only on `done`, so a cancelled wake keeps it).
 """
 
 import asyncio
@@ -36,7 +37,8 @@ def wake_text(kind: EventKind, events: list[tuple[Event, datetime]], note: str) 
 
 
 _Hook = Callable[[], None] | None
-_Hooks = tuple[_Hook, _Hook, _Hook]  # on_start, on_drop, on_end
+_EndHook = Callable[[str], None] | None
+_Hooks = tuple[_Hook, _Hook, _EndHook]  # on_start, on_drop, on_end
 
 
 @dataclass
@@ -81,7 +83,7 @@ class Scheduler:
         self._latest: dict[str, dict[str, Event]] = {}
         self._timer: asyncio.TimerHandle | None = None
         self._wakes: list[tuple[datetime, str]] = []  # capped wakes in the rolling hour
-        self._on_ends: dict[str, list[Callable[[], None]]] = {}  # by the turn id start returned
+        self._on_ends: dict[str, list[Callable[[str], None]]] = {}  # by the turn id start returned
 
     def emit(
         self,
@@ -89,7 +91,7 @@ class Scheduler:
         *,
         on_start: _Hook = None,
         on_drop: _Hook = None,
-        on_end: _Hook = None,
+        on_end: _EndHook = None,
     ) -> None:
         kind = self._kinds.get(event.kind)
         if kind is None or not kind.enabled:
@@ -137,7 +139,7 @@ class Scheduler:
                     self._drop_all()
             if self._groups and not self._busy():
                 group = next((g for g in self._groups if self._remaining(g) <= 0), None)
-                body_id = self._choose_body() if group is not None else None
+                body_id = self._choose_body(group) if group is not None else None
                 if group is not None and body_id is not None:
                     self._groups.remove(group)
                     self._run(group, body_id)
@@ -166,16 +168,16 @@ class Scheduler:
         # after the start, so a failed start stays untold
         self._call([h[0] for h in group.hooks], "on_start", f"{group.kind.name} wake")
 
-    def turn_ended(self, turn_id: str) -> None:
-        self._call(self._on_ends.pop(turn_id, []), "on_end", "wake turn")
+    def turn_ended(self, turn_id: str, reason: str = "done") -> None:
+        self._call(self._on_ends.pop(turn_id, []), "on_end", "wake turn", reason)
         self.pump()
 
     @staticmethod
-    def _call(hooks: list, name: str, label: str) -> None:
+    def _call(hooks: list, name: str, label: str, *args: str) -> None:
         for hook in hooks:
             if hook is not None:
                 try:
-                    hook()
+                    hook(*args)
                 except Exception:
                     log.exception("%s failed for a %s", name, label)
 
@@ -201,10 +203,14 @@ class Scheduler:
         for group in groups:
             self._call([h[1] for h in group.hooks], "on_drop", f"{group.kind.name} wake")
 
-    def _choose_body(self) -> str | None:
+    def _choose_body(self, group: _Group) -> str | None:
+        shown = self._bodies.display_ids()  # screens first, a phone chat last
+        for event, _ in group.events:  # the body it came from answers it
+            if event.origin_body in shown:
+                return event.origin_body
         last = self._last_body()
-        shown = self._bodies.wake_ids()  # never a display-less body or a phone chat
-        if last is not None and last in shown:
+        # A phone chat is not interrupted by a timer or held mail while a screen is online.
+        if last in shown and (last == shown[0] or not self._bodies.is_phone(last)):
             return last
         return shown[0] if shown else None  # none: the next connect retries
 

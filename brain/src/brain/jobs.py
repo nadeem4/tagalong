@@ -20,7 +20,7 @@ from typing import Literal
 
 from brain.asks import Answer, Asks
 from brain.config import DEFAULT_JOB_STEPS_MAX_BYTES, DEFAULT_JOB_STEPS_MAX_ENTRIES
-from brain.events import Event
+from brain.events import BRAIN, Event
 from brain.experts import ExpertHosts, ExpertRun, PermissionRequest, Question, QuietFacts
 from brain.guards import Guards
 from brain.job_activity import PAGE_LIMIT, JobActivity, _clip, activity_line, activity_summary
@@ -117,6 +117,7 @@ class Jobs:
         engine: Engine | None = None,
         guards: Guards | None = None,
         on_away: Callable[[str, str], None] = lambda job_id, what: None,
+        origin_body: Callable[[str | None], str] = lambda turn: BRAIN,
         setup_facts: Callable[[], Awaitable[dict]] | None = None,
         emit: Callable[[Event], None] = lambda event: None,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
@@ -129,6 +130,8 @@ class Jobs:
         steps_max_entries: int = DEFAULT_JOB_STEPS_MAX_ENTRIES,
         steps_max_bytes: int = DEFAULT_JOB_STEPS_MAX_BYTES,
     ) -> None:
+        self._turn_origin = origin_body  # the body showing a turn: where its job's news goes back
+        self._origins: dict[str, str] = {}  # job -> the body that started it
         self._items = items  # an expert's permission ask is a live-only item; None: none kept
         self._steps_max_entries = steps_max_entries  # caps of one job's step log (settings)
         self._steps_max_bytes = steps_max_bytes
@@ -327,8 +330,11 @@ class Jobs:
         if earlier is None and not fresh:
             found = self._records.last_part_for(chosen.id, str(path))
             earlier, earlier_part = found if found else (None, None)
+        job_id = job or uuid.uuid4().hex[:8]
+        if job_id not in self._origins:
+            self._origins[job_id] = self._turn_origin(None)  # the turn that handed it off
         started = await self._start_part(
-            job or uuid.uuid4().hex[:8],
+            job_id,
             chosen,
             task,
             path,
@@ -859,6 +865,10 @@ class Jobs:
             raise JobError(f"job {job_id} has several running parts: {names}; {what}")
         return next(iter(runs.values()))
 
+    def origin(self, job_id: str | None) -> str:
+        """The body that started this job; its news and questions go back there."""
+        return self._origins.get(job_id or "", BRAIN)
+
     def _changed(self) -> None:
         self._notify("changed", {"what": "jobs"})
 
@@ -910,9 +920,15 @@ class Jobs:
             # Only what waits on the person is an item, so a rule's or Scout's grant leaves none.
             if self._items is None:
                 return await person()
-            self._items.open("expert_ask", "brain", live_only=True, job_id=job_id, id=ask_id)
+            self._items.open(
+                "expert_ask", self.origin(job_id), live_only=True, job_id=job_id, id=ask_id
+            )
             try:
                 answer = await person()
+            except NoOneThere:  # the ask timed out or was passed: nobody answered
+                with suppress(OpenItemRefused):
+                    self._items.expire(ask_id, "no_answer")
+                raise
             except BaseException:  # the part stopped or the ask failed: nobody can answer now
                 with suppress(OpenItemRefused):
                     self._items.expire(ask_id, "process_ended")

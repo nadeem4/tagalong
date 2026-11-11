@@ -64,6 +64,14 @@ restart could in theory say the same text twice.
 - `window.ts`: WhatsApp allows free text only for 24 hours after your last message. If a reply
   finishes after that, it is dropped with one log line; the desktop chat still shows it.
 
+## Replies go back to the phone
+
+A message from the phone is a `say` through the brain's front door, so Scout answers on WhatsApp
+even while a desktop turn runs (the phone's say waits for that turn and then gets its own). A body
+`event` from the phone is answered there too. A timer or held-mail wake with no origin still prefers
+a screen: the phone gets it only when no screen is online. A job's question reaches a phone-only
+setup. See [brain.md](brain.md#what-a-turn-does).
+
 ## Asks from the phone
 
 A permission ask or question from Scout reaches the phone as a message, and the answer goes back

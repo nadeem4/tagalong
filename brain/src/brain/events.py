@@ -12,6 +12,8 @@ from pydantic import ValidationError
 
 from brain.protocol import BackData, DownloadData, FocusData, TabData
 
+BRAIN = "brain"  # the origin of an item no body started
+
 
 @dataclass(frozen=True)
 class Event:
@@ -19,6 +21,8 @@ class Event:
     facts: dict[str, str | int]
     # A newer pending event with the same kind and key replaces the older one.
     key: str | None = None
+    # The body it came from, "brain" when none did: its wake turn is shown there if it can.
+    origin_body: str = BRAIN
 
 
 Urgency = Literal["now", "next_pause", "idle", "hold"]
@@ -39,6 +43,9 @@ class EventKind:
 
 
 _KINDS = (
+    # Items the dispatcher delivers itself (a person's words, a card answer), never a wake.
+    EventKind("say", urgency="now", wakes=False),
+    EventKind("card_answer", urgency="now", wakes=False),
     EventKind("timer", urgency="next_pause", batch_seconds=0, max_per_hour=6),
     EventKind("watches_paused", urgency="idle", batch_seconds=0, max_per_hour=2),
     EventKind("job_ended", urgency="idle", batch_seconds=30, max_per_hour=10),

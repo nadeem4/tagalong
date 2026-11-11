@@ -3,16 +3,18 @@
 Urgency comes from the event kind (events.py), never from the payload or the model.
 `now` is delivered at once, `next_pause` at a sentence break or when speech is idle, `idle`
 only when speech is idle and no conversation is active, `hold` is kept as an open item and
-never dropped. Items that arrive close together go out in one delivery. Nothing posts here yet.
+never dropped. Items that arrive close together go out in one delivery. Every source posts
+here (a say, a timer, a job's question or result, a card answer, setup news); a kind nobody
+registered is refused, so no source can bypass the rules by inventing one.
 """
 
 import asyncio
 import logging
 import time
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 
-from brain.events import EVENT_KINDS, Urgency
+from brain.events import EVENT_KINDS, EventKind, Urgency
 from brain.open_items import OpenItems
 
 BATCH_S = 2.0  # items arriving within this window of each other share one delivery
@@ -22,14 +24,24 @@ _log = logging.getLogger("brain.dispatcher")
 _RANK: dict[str, int] = {"now": 0, "next_pause": 1, "idle": 2, "hold": 3}
 
 
+Hook = Callable[[], None] | None
+
+
 @dataclass(frozen=True)
 class Item:
     kind: str
+    # The body it came from ("brain" when none did): its reply is shown there.
     origin_body: str
     payload: dict
+    # Replaced by the kind's own urgency on post; kept so a delivery can read it.
     urgency: Urgency
     # A newer waiting item with the same kind and key replaces the older one.
     key: str | None = None
+    # Run in this process only, never saved with a held item: the wake began, it was dropped, and
+    # its turn ended (with the end reason: a cancelled turn did not carry the news).
+    on_start: Hook = field(default=None, compare=False)
+    on_drop: Hook = field(default=None, compare=False)
+    on_end: Callable[[str], None] | None = field(default=None, compare=False)
 
 
 @dataclass
@@ -55,8 +67,12 @@ class Dispatcher:
         open_items: OpenItems,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         now: Callable[[], float] = time.monotonic,
+        kinds: dict[str, EventKind] = EVENT_KINDS,
+        batch_s: float = BATCH_S,
     ) -> None:
         self.deliver = deliver
+        self._kinds = kinds
+        self._batch_s = batch_s
         self._open_items = open_items
         self._sleep = sleep
         self._now = now
@@ -70,17 +86,26 @@ class Dispatcher:
         self._task: asyncio.Task | None = None
 
     def post(self, item: Item) -> None:
-        """Queue an item. A registered kind decides its own urgency; the item's is only a
-        fallback for kinds not registered yet."""
-        kind = EVENT_KINDS.get(item.kind)
-        urgency = kind.urgency if kind else item.urgency
+        """Queue an item. Its kind decides its urgency; an unregistered kind raises."""
+        kind = self._kinds.get(item.kind)
+        if kind is None:
+            raise ValueError(f"unregistered kind {item.kind!r}")
+        urgency = kind.urgency
         item = replace(item, urgency=urgency)
+        self.start()  # a source may post before the server's loop ran
         if urgency == "hold":
             self._hold(item)
             return
         self._seq += 1
         self._queue.put_nowait(_Entry(_RANK[urgency], self._seq, item, self._now()))
         self._changed.set()
+
+    def drop(self, kind: str, key: str) -> None:
+        """Forget a waiting item of that kind and key (its news is superseded); no hook runs."""
+        self._intake()
+        self._waiting = [
+            w for w in self._waiting if not (w.item.kind == kind and w.item.key == key)
+        ]
 
     def set_speech_state(self, state: str) -> None:
         """`talking`, `sentence_break`, `paused` or `idle`, as the mouth reports it."""
@@ -92,7 +117,14 @@ class Dispatcher:
         self._changed.set()
 
     def start(self) -> None:
-        self._task = asyncio.get_running_loop().create_task(self._run())
+        """Begin delivering. Safe to call again, and a no-op until a loop is running."""
+        if self._task is not None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return  # items wait in the queue until a post or start finds a loop
+        self._task = loop.create_task(self._run())
 
     async def stop(self) -> None:
         if self._task:
@@ -155,7 +187,7 @@ class Dispatcher:
             if not any(w.item.urgency == "now" or w.gated for w in ready):
                 # Items arriving close together share one delivery: wait out what is left of
                 # the window since the oldest was posted, unless something changes.
-                left = BATCH_S - (self._now() - min(w.posted for w in ready))
+                left = self._batch_s - (self._now() - min(w.posted for w in ready))
                 if left > 0:
                     await self._wait_window(left)
                     if self._changed.is_set():

@@ -1,8 +1,8 @@
 """Setup events that wake Scout (an install or a login finished) saved as `setup` open items.
 
-The item stays open until Scout's wake turn has ended, so a restart or a wake dropped because
+The item stays open until Scout's wake turn has finished, so a restart or a wake dropped because
 the budget was spent no longer loses the news: `resume` sends the saved ones again at start.
-A cancelled wake turn still ends it. A newer event for the same expert or app replaces
+A cancelled wake turn leaves it open. A newer event for the same expert or app replaces
 the saved one.
 """
 
@@ -48,5 +48,10 @@ class SetupEvents:
         return self._items.list_open(kind="setup")
 
     def _send(self, item_id: str, event: Event) -> None:
-        # Told only when the turn for it ends; a dropped wake leaves it open for the next start.
-        self._emit(event, on_end=lambda: self._items.finish(item_id, "told"))
+        # Told only when the turn for it finishes; a dropped or cancelled wake leaves it open
+        # for the next start.
+        def told(reason: str) -> None:
+            if reason == "done":  # a cancelled wake did not tell it: it stays open
+                self._items.finish(item_id, "told")
+
+        self._emit(event, on_end=told)

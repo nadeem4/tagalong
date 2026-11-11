@@ -139,16 +139,23 @@ class Timers:
         if repeat_s:
             self._emit(event)
         else:
-            # Ended only once Scout's turn starts, so a lost wake is not lost.
-            self._emit(event, on_start=lambda: self._fired(row.id))
+            # Ended once Scout's turn starts; told only when that turn finishes, so a cancelled
+            # wake leaves it untold.
+            self._emit(
+                event,
+                on_start=lambda: self._fired(row.id),
+                on_end=lambda reason: self._told(row.id) if reason == "done" else None,
+            )
 
     def _fired(self, id: str) -> None:
         try:
             self._work.transition(id, "done", reason="fired", expect="active")
         except TransitionRefused:
             return  # cancelled while the wake waited
-        self._work.mark_reported(id)  # Scout is hearing it now
         self._tell()
+
+    def _told(self, id: str) -> None:
+        self._work.mark_reported(id)
 
     def _arm(self) -> None:
         if self._handle is not None:

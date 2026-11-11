@@ -174,8 +174,10 @@ the total can run a little low.
 
 ## What a turn does
 
-`say` answers `{turn, joined}` at once. The work then runs in the background and streams
-notifications. There is one conversation for all bodies and at most one running turn.
+`say` answers `{turn, joined}` at once (`joined` is always `false`: the field stays for the
+contract). The say goes through the front door like every other source (the dispatcher, see
+below), and the work then runs in the background and streams notifications. There is one
+conversation for all bodies and at most one running turn.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
@@ -187,17 +189,15 @@ flowchart TD
     C -->|failed| Z
     C --> E{stop reason}
     E -->|tool_use| F[run tools together]
-    F --> G[add results and joined says]
+    F --> G[add results]
     G --> B
     E -->|pause_turn| B
-    E -->|other| H{joined says waiting?}
-    H -->|yes| J[add joined says]
-    J --> B
-    H -->|no| Z
+    E -->|other| Z
 ```
 
-- A `say` while a turn runs joins it: the result has `joined: true` and the message is folded
-  into the next step.
+- A `say` while a turn runs waits at the front door and gets a turn of its own when the running
+  one ends (there is no inbox to fold it into). Its reply goes to the body it came from, so a
+  WhatsApp message sent during a desktop turn is answered on WhatsApp.
 - At the start of a turn the always-loaded memories are read once. Every step rebuilds the system
   prompt from Scout's soul, that "What you know" block, the capability picture, the bodies online
   and the local time (with its UTC offset), in that order.
@@ -228,11 +228,10 @@ flowchart TD
   ends in an error, a guard stop or a timeout keeps its request, so "try again" works. The one
   exception is a request the API rejects with a 400 that it caused (it holds an image or document,
   or the error names one): it is dropped and marked `cut` the same way, since sending it again
-  would fail every later turn, and says that joined it get a turn of their own. Any other 400
+  would fail every later turn, and the request is not sent again. Any other 400
   (credit, length, older history) and a 400 after a tool round keep the request. A `say` whose
   part is over 5 MB (decoded), or whose parts total over 20 MB, is refused with `over_limit`
-  before anything is saved or sent. Says that
-  joined a turn being cancelled get a turn of their own. A cancel during a tool step ends on the
+  before anything is saved or sent. A cancel during a tool step ends on the
   cancelled `tool_result`, which is valid as is.
 - Chat is saved at the end of each turn (see [memory.md](memory.md)). A crash mid-turn loses that
   turn's unsaved messages.
@@ -381,10 +380,19 @@ cache prefix long.
 specs by source type (brain, body, app), so a tool set Off drops out of the picture as it does from
 the model's tool list.
 
-Scout-first messages (timers, held mail, finished jobs) never go to a body whose kind is
-`whatsapp`: `Bodies.wake_ids()` is `display_ids()` without it, and the scheduler and the
-display-less-say fallback pick from it. If the person last talked on the phone, the wake goes to
-the desktop, or waits until one connects. An ask can still reach the phone (`display_ids`).
+Every source enters through the front door (`Dispatcher.post`): a say, a timer, a held-mail loop,
+a job's question or result, an install result and a card answer. An unregistered kind is refused
+(`say` and `card_answer` are `now` kinds in `EVENT_KINDS`). A reply goes to the item's
+`origin_body`: a say or a body's event answers on the body it came from, a job's news on the body
+that started it, a card's follow-up on the body showing the turn that asked. `Bodies.display_ids()`
+is the one list of bodies that can show a turn, screens first and a phone last, so a phone-only
+setup still hears a job's question. A wake with no origin goes to the last body used, unless that
+is a phone while a screen is online, then to the first screen.
+
+**News is told when the turn ends.** A wake's news (a finished job, a timer, a setup result) is
+marked reported only when the turn carrying it finishes `done`. A cancelled or failed wake keeps
+its news for the next one (`on_end` carries the reason). A loop is marked surfaced only after its
+event was accepted.
 
 The routing order lives in `mind/soul.md` ("Routing"): answer from what Scout knows; use its own
 tools, a body's tools and connected apps; hand over to an expert only when one is installed and
@@ -592,8 +600,7 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
   The floor keeps a locked or person-only tool from this look: only a standing rule or you decide it.
 - **Follow-ups under the preference rule.** The session keeps `_owner_turn` (`Session.owner_turn()`):
   true while the running turn is the owner's, meaning they started it (`started_by: "user"`) or typed
-  into it (a wake turn they join becomes theirs once their message is drained into history, so a
-  nudge already in flight when they joined still asks). It ends with the turn, so the next timer wake starts
+  into it (a wake turn they start a turn after is not theirs). It ends with the turn, so the next timer wake starts
   as Scout's own. No contract change. `tell_expert` is an `ask`-mode tool marked `follow_up`: on an
   owner turn the gate waves it through (their message was the yes, no ask, no log entry;
   never for a `person_only` tool); on a
@@ -1549,8 +1556,8 @@ since the brain started never wakes, a quick reconnect does not either, and a br
 **Who started a turn.** The `turn` notification carries `started_by`: `user` for a `say`, `brain`
 for a wake. A body that predates the field reads it as `user`. Bodies use it to show nothing while a
 wake runs (see [desktop.md](desktop.md#the-brain-in-the-main-process)). A person who talks while a
-wake runs joins that turn (`say` returns `joined: true`); the body then shows it like any turn from
-that point on. A `back`'s `idle_seconds` is the time since the last input, not since the body
+wake runs gets a turn of their own after it (`say` returns `joined: false`); the body shows it like
+any turn. A `back`'s `idle_seconds` is the time since the last input, not since the body
 noticed the idle.
 
 ```mermaid
