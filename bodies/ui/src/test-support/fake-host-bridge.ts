@@ -20,6 +20,7 @@ import type {
   ApprovalCounts,
   ApprovalRow,
   AskInput,
+  BrainCard,
   BrainLink,
   HostBridge,
   JobActivityEntry,
@@ -77,6 +78,8 @@ export interface FakeHostBridge extends HostBridge {
   readonly jobStops: readonly string[];
   /** How many times Retry was pressed on the brain setup line. */
   readonly setupRetries: () => number;
+  /** The brain card's calls in order: `restart`, `restart-after-work`, `open-folder`, `open-log`, `copy-details`. */
+  readonly brainActions: readonly string[];
   /** A job's steps by job id, and the bubble's running steps; a test may swap them. */
   activity: Record<string, JobActivityEntry[]>;
   /** Scout's watch list by job id; a test may swap them. */
@@ -198,6 +201,8 @@ export function createFakeHostBridge(
     preferences?: PreferenceRow[];
     /** The brain link; defaults to online at the default address. */
     brainLink?: BrainLink;
+    /** Scout's brain card; defaults to a running brain the desktop started, up to date. */
+    brainCard?: BrainCard;
   } = {},
 ): FakeHostBridge {
   const handlers = new Set<(event: TurnEvent) => void>();
@@ -227,6 +232,7 @@ export function createFakeHostBridge(
   const readingCalls: string[] = [];
   const jobStops: string[] = [];
   let setupRetries = 0;
+  const brainActions: string[] = [];
   const activityCalls: [string, number][] = [];
   const reportCalls: [string, string][] = [];
   const keysSet: string[] = [];
@@ -466,6 +472,7 @@ export function createFakeHostBridge(
     jobs: (options.jobs ?? []).map((row) => ({ ...row })),
     jobStops,
     setupRetries: () => setupRetries,
+    brainActions,
     usageSummary() {
       return Promise.resolve({ spentUsd: 0, limitUsd: null });
     },
@@ -508,6 +515,46 @@ export function createFakeHostBridge(
     },
     retryBrainSetup() {
       setupRetries++;
+      return Promise.resolve();
+    },
+    brainCard() {
+      return Promise.resolve(
+        options.brainCard ?? {
+          status: 'running',
+          update: 'none',
+          version: '0.9.2',
+          build: 'a1b2c3d',
+          appVersion: '0.9.2',
+          appBuild: 'a1b2c3d',
+          startedAt: new Date(Date.now() - 25 * 60_000).toISOString(),
+          startedBy: 'desktop',
+          addr: '127.0.0.1:47321',
+          pid: 4242,
+          dataDir: 'C:\\Users\\you\\.tagalong',
+          logPath: 'C:\\Users\\you\\.tagalong\\brain.log',
+          places: [{ id: 'desktop', kind: 'desktop', name: 'Desktop' }],
+          workRunning: false,
+        },
+      );
+    },
+    restartBrain() {
+      brainActions.push('restart');
+      return Promise.resolve();
+    },
+    restartBrainAfterWork() {
+      brainActions.push('restart-after-work');
+      return Promise.resolve();
+    },
+    openBrainFolder() {
+      brainActions.push('open-folder');
+      return Promise.resolve();
+    },
+    openBrainLog() {
+      brainActions.push('open-log');
+      return Promise.resolve();
+    },
+    copyBrainDetails() {
+      brainActions.push('copy-details');
       return Promise.resolve();
     },
     listJobs() {

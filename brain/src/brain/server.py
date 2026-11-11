@@ -96,7 +96,13 @@ def _parse(raw: str | bytes) -> dict | str:
     return message
 
 
-async def _handler(ws: ServerConnection, bodies: Bodies, session_id: str, session: Session) -> None:
+async def _handler(
+    ws: ServerConnection,
+    bodies: Bodies,
+    session_id: str,
+    session: Session,
+    build: tuple[str, str] | None,
+) -> None:
     peer = _Peer()
     writer = asyncio.create_task(_writer(ws, peer))
     body_id: str | None = None
@@ -116,7 +122,7 @@ async def _handler(ws: ServerConnection, bodies: Bodies, session_id: str, sessio
                 if method != "hello":  # method may be None for a response
                     peer.send(_error(req_id, ErrorCode.invalid_request, "hello must come first"))
                     break
-                body_id = _hello(message, req_id, peer, bodies, session_id, session)
+                body_id = _hello(message, req_id, peer, bodies, session_id, session, build)
                 if body_id is None:
                     break
                 continue
@@ -161,7 +167,13 @@ async def _handler(ws: ServerConnection, bodies: Bodies, session_id: str, sessio
 
 
 def _hello(
-    message: dict, req_id: Any, peer: _Peer, bodies: Bodies, session_id: str, session: Session
+    message: dict,
+    req_id: Any,
+    peer: _Peer,
+    bodies: Bodies,
+    session_id: str,
+    session: Session,
+    build: tuple[str, str] | None,
 ) -> str | None:
     """Join the body and queue the result, the backlog, then any open asks it cannot have;
     None means hello failed."""
@@ -185,6 +197,7 @@ def _hello(
         tools=session.home_tools(),
         seq=joined.seq,
         resync=joined.resync,
+        **({"version": build[0], "build": build[1]} if build else {}),
     )
     peer.send(_result(req_id, result))
     for frame in joined.backlog:
@@ -321,9 +334,16 @@ def _dispatch(
 
 
 async def start_server(
-    host: str, port: int, bodies: Bodies, session_id: str, session: Session
+    host: str,
+    port: int,
+    bodies: Bodies,
+    session_id: str,
+    session: Session,
+    build: tuple[str, str] | None = None,
 ) -> Server:
+    """`build` is (version, build id), told to every body in hello; None leaves them out."""
+
     async def handler(ws: ServerConnection) -> None:
-        await _handler(ws, bodies, session_id, session)
+        await _handler(ws, bodies, session_id, session, build)
 
     return await serve(handler, host, port, max_size=MAX_FRAME)

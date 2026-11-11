@@ -11,7 +11,8 @@ out/
 release/
 bodies/desktop/dist/
 bodies/desktop/out/
-bodies/desktop/build/
+bodies/desktop/build/*
+!bodies/desktop/build/installer.nsh
 
 # env & secrets
 .env

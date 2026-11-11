@@ -14,7 +14,10 @@ import type { FileDeps } from '../tools/files';
 
 const DEFAULT_ADDR = '127.0.0.1:47321';
 
-type StartBrainOptions = Pick<BrainClientOptions, 'onNotification' | 'onStatus' | 'onResync'> & {
+type StartBrainOptions = Pick<
+  BrainClientOptions,
+  'onNotification' | 'onStatus' | 'onResync' | 'onHello'
+> & {
   platform: Platform;
   exclusions: () => CaptureExclusions;
   onCapture: (notice: CaptureNotice) => void;

@@ -23,13 +23,14 @@ interface BuilderConfig {
   npmRebuild: boolean;
   extraResources: { from: string; to: string; filter?: string[] }[];
   win: { target: { target: string; arch: string[] }[] };
-  nsis: { oneClick: boolean; perMachine: boolean; runAfterFinish: boolean };
+  nsis: { oneClick: boolean; perMachine: boolean; runAfterFinish: boolean; include?: string };
   mac: { target: string[] };
   linux: { target: string[] };
 }
 
 const config = read('../../electron-builder.json') as BuilderConfig;
 const manifest = read('../../package.json') as {
+  version: string;
   productName: string;
   main: string;
   dependencies: Record<string, string>;
@@ -46,6 +47,16 @@ describe('electron-builder config', () => {
     expect(config.nsis.oneClick).toBe(false);
     expect(config.nsis.perMachine).toBe(false);
     expect(config.nsis.runAfterFinish).toBe(true);
+  });
+
+  it('installer includes the brain stop, so an update never meets a running brain', () => {
+    expect(config.nsis.include).toBe('build/installer.nsh');
+    const script = readFileSync(
+      fileURLToPath(new URL('../../build/installer.nsh', import.meta.url)),
+      'utf8',
+    );
+    expect(script).toContain('brain.pid');
+    expect(script).toContain('taskkill');
   });
 
   it('keeps the product name, so the installed app finds the same user data folder', () => {
@@ -133,6 +144,14 @@ describe('desktop runtime dependencies', () => {
     expect(at('fetch-native.mjs')).toBeLessThan(at('fetch-uv.mjs'));
     expect(at('fetch-uv.mjs')).toBeLessThan(at('electron-vite build'));
     expect(at('electron-vite build')).toBeLessThan(at('electron-builder'));
+  });
+
+  it('brain version follows the app version', () => {
+    const pyproject = readFileSync(
+      fileURLToPath(new URL('../../../../brain/pyproject.toml', import.meta.url)),
+      'utf8',
+    );
+    expect(/^version = "([^"]+)"/m.exec(pyproject)?.[1]).toBe(manifest.version);
   });
 
   it('pins uv by version and sha256 in the fetch script', () => {
