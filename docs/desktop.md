@@ -269,8 +269,8 @@ Rules each module enforces:
   folder and Copy folder path for the add-on), "Scout asks first, and you set the limit" (a static
   approval card, the daily limit in the shared `MoneyField` stepper, saved with `set_daily_limit`
   only on Next, and only if it changed; an amount of 0 or less blocks Next; Settings' `LimitField`
-  uses the same field; both show a quiet "Spent today: $0.42" line under it, read once through
-  `usageSummary`, which the walkthrough host carries; Settings reads again after a turn starts or
+  uses the same field; the tour shows a quiet "Spent today: $0.42" line under it, read once through
+  `usageSummary`, which the walkthrough host carries; Settings shows "$0.42 of $5.00 used today" with a slim meter instead, read again after a turn starts or
   ends; an unreadable spend shows nothing) and the key. Steps 4 and 5 stage their choices (ask
   key, talk key, Scout talks, voice, speed, microphone) and write them through `saveSettings`
   only on Next, sending the whole `hotkeys` or `voice` object. The side list jumps only to steps
@@ -454,7 +454,7 @@ key. The desktop does not read the brain's environment; everything comes from `k
 or clears the `no-key` status mark (`markKey` in `status-marks.ts`). The dock shows the tag
 "Add key", the bubble row says "Add your Anthropic key to start." with an **Add key** button that
 opens the walkthrough at step 9, and Scout says nothing: the app shows its own words. Settings
-has an **Anthropic key** section (the shared key field and the daily limit, in `bodies/ui/src/key/`, with `SpentLine` under the limit),
+has an **Anthropic key** section (the shared key field and the daily limit, in `bodies/ui/src/key/`, with today's spend and a meter under the limit through `useSpentToday`),
 and Home's overview has **Show the tour again**. The health card gains an **Anthropic key** row.
 
 `HostView` (`IPC.hostView`) is what every window reads on open: `settings`, `pets` (the fixed local Scout), `appVersion`,
@@ -516,8 +516,9 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   rejects, so the page says it could not read). The Overview's Scout card shows Brain: Offline (or Connecting, Needs update) while the link is down; the Spend card reads again when the link changes. The spend card uses `spend_today` (`ipc/spend.ts`,
   answering `{ spentUsd, limitUsd }`). Home's Permissions list (a card under the Settings form,
   `bodies/ui/src/home/permissions-panel.tsx`) uses `list_permissions` and `set_permission`
-  (`ipc/permissions.ts`, channels `tagalong:permissions:list` and `tagalong:permissions:set`): rows
-  pass through as the brain sends them, a mode other than `off`, `ask` or `auto` is refused before it
+  (`ipc/permissions.ts`, channels `tagalong:permissions:list` and `tagalong:permissions:set`): the list
+  answers `{groups, rows}` (the brain's `groups` and `tools`, each row with its `title`, `line`, `info` and `group`) and rows
+  pass through as the brain sends them (a reply without both lists is refused), a mode other than `off`, `ask` or `auto` is refused before it
   reaches the brain, and a brain refusal (a tool that asks for itself) rejects so the panel reads the list again.
   The card is a `home-card` like every Home panel. Tools sit in groups by the row's `source` (Built in, then each body, then each app, titled by the row's `source_name`: the name the body declared or the app's name),
   each tool with the shared `ThreeWay` control (`controls/three-way.tsx`, a radio group named by the visible tool name): Off, Ask and
@@ -536,7 +537,7 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   deleted. The ipc layer checks its arguments (the page is not trusted); the card reads again on
   `changed { what: "loops" }`. The fake brain turns a held loop up when the switch goes on, and
   `e2e/loops.spec.ts` walks switch, row, Forget, Cancel and Wipe. A tool the brain marks `self_asks` (Claude Code's own, which asks through a
-  job) shows "Asks itself" with Off and Ask only (it reads as Ask while it is on; the brain's own mode for it is auto).
+  job) shows "Always asks" with Off and Ask only (it reads as Ask while it is on; the brain's own mode for it is auto).
 - **Tasks page:** Home's Tasks page (`bodies/ui/src/home/tasks-view.tsx`, nav label Tasks with a "New" badge) replaces the Jobs page. It shows a title, the **Now** card (`now-card.tsx`: asks waiting for the person with Deny, Always and Allow, running jobs with the live step, a clock that ticks each second, Open and Stop, "Reading <app> mail" when the switch is on and not stalled, and timers due within the hour; "Nothing is running right now." when none) and three tabs with counts, read from the brain on their own and again on `changed` for `jobs`, `loops` and `timers`: **Jobs** (the Jobs panel below, embedded), **Held** (`held-tab.tsx`, the loops panel, where each open row also has Done and Later; Later sends tomorrow 09:00 local time with its offset) and **Timers** (`timers-tab.tsx`: note, local fire time, "every N min", Cancel). Opening a job (Watch or Open) shows its page in place of everything and Back returns to the tab. The Timers tab goes through `ipc/timers.ts` (`timersState` as `timers:state`, `cancelTimer` as `timers:cancel`; brain tools `timers_state`, `timer_cancel`); `e2e/tasks.spec.ts` covers the Now card, counts and Cancel on the fake brain (`setTimers`).
 - **Jobs panel:** the Jobs tab of Home's Tasks page (`bodies/ui/src/home/jobs-panel.tsx`)
   uses `list_jobs` and `stop_job` (`ipc/jobs.ts`, channels

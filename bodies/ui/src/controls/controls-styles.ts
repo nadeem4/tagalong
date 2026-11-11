@@ -172,5 +172,44 @@ export const CONTROLS_CSS = `
 .tg-keyfield__status { min-height: 20px; }
 .tg-keyfield[data-state='invalid'] .tg-keyfield__status { color: ${t.color.errInk}; font-weight: ${t.fontWeight.semibold}; }
 .tg-keyfield[data-state='valid'] .tg-keyfield__status { color: ${t.color.okInk}; }
+/* Daily limit: what it is on the left, the amount and Set in one row on the right, today's spend
+   under them. The steppers sit inside the amount's border. */
+.tg-limitfield {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: ${t.space.lg}px 32px; align-items: start;
+  padding-top: ${t.space.xl}px; border-top: 1px solid ${t.color.panelLine};
+}
+.tg-limitfield__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; max-width: 46ch; }
+.tg-limitfield__title { color: var(--tg-ctl-ink); ${typeCss('bodyLead')}; font-weight: ${t.fontWeight.semibold}; }
+.tg-limitfield__ctl { display: flex; flex-direction: column; gap: ${t.space.md}px; align-items: flex-end; width: 300px; }
+.tg-limitfield__row { display: flex; align-items: center; gap: ${t.space.md}px; height: ${t.size.control}px; }
+.tg-limitfield .tg-money__row {
+  gap: 0; height: ${t.size.control}px; overflow: hidden; box-sizing: border-box;
+  border: 1px solid var(--tg-ctl-line); border-radius: ${t.radius.field}px; background: var(--tg-ctl-bg);
+}
+.tg-limitfield .tg-money__row:focus-within { outline: ${t.size.focusRing}px solid var(--tg-focus); outline-offset: ${t.size.focusOffset}px; }
+.tg-limitfield .tg-money__row:has(input[aria-invalid='true']) { border: 2px solid ${t.color.errInk}; }
+.tg-limitfield .tg-money__prefix { padding: 0 2px 0 ${t.space.lg}px; }
+.tg-limitfield .tg-money .tg-money__row input[type='text'] {
+  width: 64px; height: 100%; padding: 0 ${t.space.md}px 0 2px; border: 0; border-radius: 0; outline: none;
+  font-weight: ${t.fontWeight.semibold}; font-variant-numeric: tabular-nums;
+}
+.tg-limitfield .tg-money .tg-money__row .tg-button {
+  width: 32px; height: 100%; border: 0; border-left: 1px solid ${t.color.panelLine}; border-radius: 0;
+}
+.tg-limitfield .tg-error, .tg-limitfield .tg-saved {
+  display: flex; align-items: center; gap: ${t.space.sm}px; margin: 0; ${typeCss('small')}; font-weight: ${t.fontWeight.semibold};
+}
+.tg-limitfield .tg-error { color: ${t.color.errInk}; }
+.tg-limitfield .tg-saved { color: ${t.color.okInk}; }
+.tg-limitfield .tg-icon { width: 14px; height: 14px; flex: none; }
+.tg-money .tg-button .tg-icon { width: 14px; height: 14px; }
+.tg-spend { width: 100%; display: flex; flex-direction: column; gap: ${t.space.sm}px; }
+.tg-spend__top { display: flex; justify-content: space-between; gap: ${t.space.lg}px; ${typeCss('small')}; font-variant-numeric: tabular-nums; }
+.tg-spend__top strong { color: var(--tg-ctl-ink); font-weight: ${t.fontWeight.semibold}; }
+.tg-spend__top span { color: var(--tg-ctl-muted); }
+.tg-spendmeter { height: 6px; border-radius: 3px; background: ${t.color.panelTile}; overflow: hidden; }
+.tg-spendmeter > i { display: block; height: 100%; border-radius: 3px; background: var(--tg-ctl-ink); }
+.tg-spendmeter--full > i { background: ${t.color.warnBar}; }
+.tg-spend .tg-spend__full { margin: 0; color: ${t.color.warnInk}; ${typeCss('small')}; font-weight: ${t.fontWeight.semibold}; }
 .tg-spent { margin: 4px 0 0; color: var(--tg-ctl-muted); ${typeCss('small')}; font-variant-numeric: tabular-nums; }
 `;
