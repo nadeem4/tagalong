@@ -67,6 +67,9 @@ export const CHAT_CSS = `
   flex: none; box-sizing: border-box; height: 56px; display: flex; align-items: center; gap: 10px;
   padding: 0 8px 0 12px; border-bottom: 1px solid ${t.color.line}; background: ${t.color.sidebar};
 }
+.bubble-head--quick { height: 52px; }
+.bubble--quick { padding: 0; gap: 0; }
+.bubble-compact { display: flex; flex-direction: column; gap: 12px; padding: 12px; }
 .bubble-headwho { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .bubble-head strong { font-family: ${t.font.wordmark}; font-size: 14px; line-height: 20px; font-weight: 600; }
 .bubble-headstatus { display: flex; align-items: center; gap: 6px; ${typeCss('caption')}; font-weight: 400; color: ${t.color.textMuted}; overflow-wrap: anywhere; }

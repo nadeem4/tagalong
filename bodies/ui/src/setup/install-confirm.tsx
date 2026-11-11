@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ConnectorConfirmParams } from '../shapes';
 import type { AppInfo } from '../shapes';
+import { JOB_KINDS } from '../jobs-kinds';
 import { stageWords } from '../home/experts-group';
 import { useHostBridge } from '../host-bridge';
 import type { HostBridge } from '../host-bridge';
@@ -37,6 +38,16 @@ const findApp = (apps: AppInfo[], s: InstallSubject): AppInfo | undefined => {
   );
 };
 
+/** The everyday jobs that need this app: the only per-app prompts the UI knows. */
+const promptsFor = (s: InstallSubject): string[] =>
+  JOB_KINDS.filter(
+    (job) =>
+      job.app !== undefined &&
+      (s.id.toLowerCase().includes(job.app.key) || s.name.toLowerCase().includes(job.app.key)),
+  )
+    .slice(0, 2)
+    .map((job) => job.label);
+
 /** What an app install looks like right now, from its connection row (none yet: checking). */
 function appView(
   row: AppInfo | undefined,
@@ -45,7 +56,10 @@ function appView(
 ): [InstallView, number] {
   if (row === undefined) return [{ phase: 'working', steps: stepsAt(0, false) }, 0];
   if (row.status === 'connected') {
-    return [{ phase: 'done', tools: row.tools.map((tool) => tool.name) }, 2];
+    return [
+      { phase: 'done', tools: row.tools.map((tool) => tool.name), tryPrompts: promptsFor(s) },
+      2,
+    ];
   }
   if (row.status === 'error') {
     return [
@@ -102,6 +116,7 @@ export function InstallConfirm({
   onGone,
   onTry,
   onRetry,
+  onWorking,
 }: {
   confirm: ConnectorConfirmParams;
   /** The card is finished with: Not now, Later. */
@@ -110,6 +125,8 @@ export function InstallConfirm({
   onTry: (prompt: string) => void;
   /** Try again after a failure: asks Scout to set it up again. */
   onRetry: (name: string) => void;
+  /** The header's words while this install works ("Setting up Notion"); null when it does not. */
+  onWorking?: (status: string | null) => void;
 }) {
   const bridge = useHostBridge();
   const base = useMemo(() => subjectOf(confirm.tool, confirm.facts ?? {}), [confirm]);
@@ -171,6 +188,16 @@ export function InstallConfirm({
     // `subject` only changes name; the reads need the id and kind.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allowed, bridge, base.id, base.kind, subject.name]);
+
+  const working = view.phase === 'working';
+  useEffect(() => {
+    onWorking?.(
+      working ? `${base.kind === 'expert' ? 'Installing' : 'Setting up'} ${subject.name}` : null,
+    );
+    return () => onWorking?.(null);
+    // onWorking is a state setter in the bubble; it never changes meaning.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [working, base.kind, subject.name]);
 
   const allow = (): void => {
     void bridge.approveTool(confirm.approvalId, 'once').then(

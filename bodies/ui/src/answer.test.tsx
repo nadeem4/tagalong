@@ -59,6 +59,11 @@ describe('ANSWER_CSS', () => {
     expect(minPadding(ANSWER_CSS, '.answer pre')).toBeGreaterThanOrEqual(12);
   });
 
+  it('keeps bullets and numbers visible whatever the page resets', () => {
+    expect(ruleOf(ANSWER_CSS, '.answer ul')).toContain('list-style: disc');
+    expect(ruleOf(ANSWER_CSS, '.answer ol')).toContain('list-style: decimal');
+  });
+
   it('mutes list markers', () => {
     expect(ruleOf(ANSWER_CSS, '.answer li::marker')).toContain('color: #A3AAC4');
   });
@@ -100,4 +105,3 @@ describe('Answer gist', () => {
     expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull();
   });
 });
-

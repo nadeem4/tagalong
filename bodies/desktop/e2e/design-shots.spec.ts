@@ -155,21 +155,105 @@ test.describe('E3 chat', () => {
     throw new Error('no panel window appeared');
   }
 
-  test('E3 quick bubble, full chat, install card', async () => {
+  const notion = (status: string, toolCount = 0) => ({
+    id: 'notion',
+    name: 'Notion',
+    transport: 'http',
+    auth: 'oauth',
+    enabled: true,
+    status,
+    error: status === 'error' ? 'Sign-in was cancelled' : '',
+    command: '',
+    args: [],
+    tools: Array.from({ length: toolCount }, (_, i) => ({
+      name: `notion__tool_${i + 1}`,
+      effect: 'look',
+      locked: false,
+    })),
+  });
+  const claude = (state: string) => ({
+    id: 'claude-acp',
+    name: 'Claude Code',
+    version: '2.0.0',
+    state,
+    tested: true,
+  });
+
+  test('E3 states: quick bubble, header, full chat, every install card state', async () => {
     const page = await panel();
     await page.getByLabel(/^Ask /).waitFor({ state: 'visible', timeout: 30_000 });
     await shot(page, 'E3', 'quick-bubble');
     await page.getByRole('button', { name: 'Open full chat' }).click();
     await page.getByRole('log').waitFor({ state: 'visible' });
     await shot(page, 'E3', 'header-at-rest');
-    const field = page.getByLabel('Message Scout');
-    await field.fill('please install notion');
-    await field.press('Enter');
+
+    // Listening off, with its tooltip.
+    const always = page.getByRole('button', { name: 'Always listening' });
+    if ((await always.getAttribute('aria-pressed')) === 'true') await always.click();
+    await always.hover();
+    await shot(page, 'E3', 'listening-off-tooltip');
+    await page.mouse.move(200, 300);
+
+    const ask = async (text: string): Promise<void> => {
+      const field = page.getByLabel(/^(Message|Reply to) Scout/);
+      await field.fill(text);
+      await field.press('Enter');
+    };
+
+    // The full chat: your message, Scout's gist with Show more, a code block.
+    await ask('explain the failing test');
+    await expect(page.getByTestId('code-bar')).toBeVisible({ timeout: 30_000 });
+    await shot(page, 'E3', 'full-chat');
+
+    // An app that fails first, then one that works: ask, signing in, done.
+    await ask('install notion');
+    const failing = page.getByRole('group', { name: 'Set up Notion' });
+    await expect(failing).toBeVisible({ timeout: 30_000 });
+    await failing.getByRole('button', { name: 'Allow' }).click();
+    brain.setScene({ apps: [notion('error')] });
+    await expect(failing.getByRole('alert')).toBeVisible({ timeout: 15_000 });
+    await shot(page, 'E3', 'install-failed');
+    await failing.getByRole('button', { name: 'Not now' }).click();
+    await expect(failing).toHaveCount(0);
+
+    brain.setScene({ apps: [] });
+    await ask('install notion');
     const card = page.getByRole('group', { name: 'Set up Notion' });
     await expect(card).toBeVisible({ timeout: 30_000 });
     await shot(page, 'E3', 'install-allow');
     await card.getByRole('button', { name: 'Allow' }).click();
     await expect(card.getByRole('list', { name: 'Steps' })).toBeVisible({ timeout: 15_000 });
+    brain.setScene({ apps: [notion('needs-sign-in')] });
+    await expect(card).toContainText('browser', { timeout: 15_000 });
     await shot(page, 'E3', 'install-working');
+    brain.setScene({ apps: [notion('connected', 12)] });
+    await expect(card).toContainText('Notion is ready.', { timeout: 15_000 });
+    await shot(page, 'E3', 'install-done');
+
+    // A community app: the check comes first.
+    await ask('install obsidian');
+    const community = page.getByRole('group', { name: 'Set up Obsidian' });
+    await expect(community).toBeVisible({ timeout: 30_000 });
+    await shot(page, 'E3', 'install-community-check');
+    await community.getByRole('button', { name: 'Not now' }).click();
+
+    // An expert: downloading, sign in, ready.
+    await ask('install claude');
+    const expert = page.getByRole('group', { name: /Set up Claude/ });
+    await expect(expert).toBeVisible({ timeout: 30_000 });
+    await expert.getByRole('button', { name: 'Allow' }).click();
+    brain.setScene({
+      setup: { progress: { expert: 'claude-acp', stage: 'downloading', percent: 40 } },
+    });
+    await expect(expert).toContainText('40%', { timeout: 15_000 });
+    await shot(page, 'E3', 'expert-downloading');
+    brain.setScene({ setup: { progress: null, experts: [claude('needs_login')] } });
+    await expect(expert.getByRole('button', { name: /log in|sign in/i })).toBeVisible({
+      timeout: 15_000,
+    });
+    await shot(page, 'E3', 'expert-signin');
+    brain.setScene({ setup: { progress: null, experts: [claude('ready')] } });
+    await expect(expert).toContainText('is ready', { timeout: 15_000 });
+    await shot(page, 'E3', 'expert-ready');
   });
 });

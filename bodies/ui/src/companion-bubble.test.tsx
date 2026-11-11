@@ -579,6 +579,27 @@ describe('CompanionBubble, the chat window', () => {
       expect(screen.getByRole('log').scrollTop).toBe(1200);
     });
 
+    it('scrolls the log to the bottom when an install card arrives', () => {
+      const height = { value: 700 };
+      pinned(height);
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge, { expanded: true });
+      height.value = 1800;
+      act(() =>
+        bridge.emit({
+          type: 'connector.confirm',
+          approvalId: 'a1',
+          turnId: 't1',
+          tool: 'install_app',
+          app: 'notion',
+          summary: 'Install Notion?',
+          options: ['allow', 'deny'],
+          facts: { app: 'notion' },
+        } as never),
+      );
+      expect(screen.getByRole('log').scrollTop).toBe(1800);
+    });
+
     it('scrolls the log to the bottom when a card arrives', () => {
       const height = { value: 700 };
       pinned(height);
@@ -1256,10 +1277,10 @@ describe('CompanionBubble on navy', () => {
     renderBubble(createFakeHostBridge(), { snapshot: SNAPSHOT, onClose: () => undefined });
     const chips = screen.getByRole('list', { name: 'What Scout can see' });
     const close = screen.getByRole('button', { name: 'Close' });
-    const header = close.closest('.bubble-top');
+    const header = close.closest('.bubble-head');
     expect(header).not.toBeNull();
     expect(header!.contains(chips)).toBe(false);
-    expect(chips.closest('.bubble-top')).toBeNull();
+    expect(chips.closest('.bubble-head')).toBeNull();
   });
 });
 

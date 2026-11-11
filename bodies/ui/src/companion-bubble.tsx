@@ -196,6 +196,8 @@ export function CompanionBubble({
   // Install asks (an app or an expert) are one card each that stays after Allow and follows the
   // install, so they live apart: a dismiss or the turn's end must not take them away.
   const [installs, setInstalls] = useState<ConnectorConfirmParams[]>([]);
+  // The header's words while an install card is working, keyed like the card.
+  const [installing, setInstalling] = useState<Record<string, string>>({});
   const confirm = confirms[0] ?? null;
   // Asks dismissed since mount, so a late pull of the open cards cannot bring one back.
   const dismissed = useRef(new Set<string>());
@@ -437,8 +439,15 @@ export function CompanionBubble({
         : { title: 'Seeing your screen: off', sub: 'Click to let Scout see.' },
     );
   // What Scout is doing right now, in the header's second line.
+  const talking =
+    past.length > 0 ||
+    question !== null ||
+    scoutLine !== null ||
+    confirms.length > 0 ||
+    installs.length > 0;
   const headStatus =
-    talk?.always === undefined && seeing === undefined
+    Object.values(installing)[0] ??
+    (talk?.always === undefined && seeing === undefined
       ? 'Ready'
       : talk?.always?.on === true && seeing?.on === true
         ? 'Listening · seeing your screen'
@@ -446,7 +455,9 @@ export function CompanionBubble({
           ? 'Listening'
           : seeing?.on === true
             ? 'Seeing your screen'
-            : 'Not listening or looking';
+            : talking
+              ? 'Ready'
+              : 'Not listening or looking');
   const expandButton = onOpenChat !== undefined && (
     <button
       type="button"
@@ -637,7 +648,17 @@ export function CompanionBubble({
       if (element !== null) element.scrollTop = element.scrollHeight;
     });
     return () => cancelAnimationFrame(frame);
-  }, [past.length, question, streamed, scoutLine, expanded, confirm, health, openDrop]);
+  }, [
+    past.length,
+    question,
+    streamed,
+    scoutLine,
+    expanded,
+    confirm,
+    installs.length,
+    health,
+    openDrop,
+  ]);
 
   const chips = chipsOf(snapshot).filter((chip) => !removed.has(chip.id));
   const chipList = chips.length > 0 && (
@@ -774,13 +795,21 @@ export function CompanionBubble({
         />
       )}
       {installs.map((install) => (
-        <InstallConfirm
-          key={installKey(install)}
-          confirm={install}
-          onGone={() => setInstalls((current) => current.filter((c) => c !== install))}
-          onTry={(text) => submit(text, undefined)}
-          onRetry={(name) => submit(`Set up ${name} again`, undefined)}
-        />
+        <ScoutReply key={installKey(install)} scout={scout}>
+          <InstallConfirm
+            confirm={install}
+            onGone={() => setInstalls((current) => current.filter((c) => c !== install))}
+            onTry={(text) => submit(text, undefined)}
+            onRetry={(name) => submit(`Set up ${name} again`, undefined)}
+            onWorking={(words) =>
+              setInstalling((current) => {
+                const key = installKey(install);
+                const { [key]: _gone, ...rest } = current;
+                return words === null ? rest : { ...rest, [key]: words };
+              })
+            }
+          />
+        </ScoutReply>
       ))}
       {confirm !== null && (
         <ConnectorConfirmCard
@@ -838,6 +867,40 @@ export function CompanionBubble({
     </button>
   );
 
+  // The header of both windows: Scout's mark, name and what it is doing, the toggles and the exits.
+  const header = (quick: boolean) => (
+    <header className={quick ? 'bubble-head bubble-head--quick' : 'bubble-head'}>
+      <ScoutMark {...(scout !== undefined ? { clip: scout } : {})} size={quick ? 28 : 32} />
+      <span className="bubble-headwho">
+        <strong>{petName}</strong>
+        <span className="bubble-headstatus" data-testid="head-status">
+          <span className="bubble-priv" aria-hidden="true" />
+          {headStatus}
+        </span>
+      </span>
+      <span className="bubble-row">
+        {alwaysToggle}
+        {seeingToggle}
+        {speakingIndicator}
+        {(alwaysToggle || seeingToggle) && <span className="bubble-sep" aria-hidden="true" />}
+        {quick
+          ? expandButton
+          : onCollapse !== undefined && (
+              <button
+                type="button"
+                className="bubble-tg"
+                aria-label="Back to bubble"
+                title="Back to bubble"
+                onClick={onCollapse}
+              >
+                <CollapseIcon />
+              </button>
+            )}
+        {closeButton}
+      </span>
+    </header>
+  );
+
   if (expanded) {
     return (
       <Speech tail={tail}>
@@ -847,34 +910,7 @@ export function CompanionBubble({
           <style>{ANSWER_CSS}</style>
           <style>{CARD_CSS}</style>
           <style>{CHAT_CSS}</style>
-          <header className="bubble-head">
-            <ScoutMark {...(scout !== undefined ? { clip: scout } : {})} size={32} />
-            <span className="bubble-headwho">
-              <strong>{petName}</strong>
-              <span className="bubble-headstatus" data-testid="head-status">
-                <span className="bubble-priv" aria-hidden="true" />
-                {headStatus}
-              </span>
-            </span>
-            <span className="bubble-row">
-              {alwaysToggle}
-              {seeingToggle}
-              {speakingIndicator}
-              {(alwaysToggle || seeingToggle) && <span className="bubble-sep" aria-hidden="true" />}
-              {onCollapse !== undefined && (
-                <button
-                  type="button"
-                  className="bubble-tg"
-                  aria-label="Back to bubble"
-                  title="Back to bubble"
-                  onClick={onCollapse}
-                >
-                  <CollapseIcon />
-                </button>
-              )}
-              {closeButton}
-            </span>
-          </header>
+          {header(false)}
           <div
             ref={log}
             className="bubble-log"
@@ -930,36 +966,30 @@ export function CompanionBubble({
 
   return (
     <Speech tail={tail}>
-      <div className="bubble on-navy">
+      <div className="bubble bubble--quick on-navy">
         <style>{CONTROLS_CSS}</style>
         <style>{BUBBLE_CSS}</style>
         <style>{ANSWER_CSS}</style>
         <style>{CARD_CSS}</style>
         <style>{CHAT_CSS}</style>
-        <div className="bubble-top">
-          <span className="bubble-row">
-            {alwaysToggle}
-            {seeingToggle}
-            {speakingIndicator}
-            {expandButton}
-            {closeButton}
-          </span>
+        {header(true)}
+        <div className="bubble-compact">
+          {chipList}
+          {askedAloud && question !== null && (
+            <p className="bubble-heard">
+              <span className="bubble-sr">You said: </span>
+              {question}
+            </p>
+          )}
+          {scoutMessage}
+          {answer}
+          {cards}
+          {jobLine}
+          {statusRow}
+          {talkStatus}
+          {field(`Ask ${petName}`)}
+          {replyHint !== false && <p className="bubble-hints">{replyHint}</p>}
         </div>
-        {chipList}
-        {askedAloud && question !== null && (
-          <p className="bubble-heard">
-            <span className="bubble-sr">You said: </span>
-            {question}
-          </p>
-        )}
-        {scoutMessage}
-        {answer}
-        {cards}
-        {jobLine}
-        {statusRow}
-        {talkStatus}
-        {field(`Ask ${petName}`)}
-        {replyHint !== false && <p className="bubble-hints">{replyHint}</p>}
       </div>
     </Speech>
   );

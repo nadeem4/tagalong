@@ -70,6 +70,38 @@ describe('header icon toggles', () => {
   });
 });
 
+describe('quick bubble header', () => {
+  it("has Scout's name, the status line and the toggles, expand and close, in a 52px header", () => {
+    show({
+      talk: talk({ always: { on: true, paused: false, onToggle: vi.fn() } }),
+      seeing: { on: true, onToggle: vi.fn() },
+      onOpenChat: vi.fn(),
+      onClose: vi.fn(),
+    });
+    const head = screen.getByTestId('head-status').closest('header');
+    expect(head).not.toBeNull();
+    expect(head).toHaveClass('bubble-head--quick');
+    expect(head).toHaveTextContent('Listening · seeing your screen');
+    for (const name of ['Always listening', 'Seeing your screen', 'Open full chat', 'Close']) {
+      expect(head?.querySelector(`[aria-label="${name}"]`)).not.toBeNull();
+    }
+    expect(ruleOf(CHAT_CSS, '.bubble-head--quick')).toContain('height: 52px');
+  });
+});
+
+describe('header status while a conversation is open', () => {
+  it('both off with a message sent says Ready, not the empty-chat wording', () => {
+    show({
+      expanded: true,
+      talk: talk({ always: { on: false, paused: false, onToggle: vi.fn() } }),
+      seeing: { on: false, onToggle: vi.fn() },
+    });
+    fireEvent.change(screen.getByLabelText('Message Scout'), { target: { value: 'hi' } });
+    fireEvent.keyDown(screen.getByLabelText('Message Scout'), { key: 'Enter' });
+    expect(screen.getByTestId('head-status')).toHaveTextContent('Ready');
+  });
+});
+
 describe('header expand and hints', () => {
   it('expand icon opens the full chat', () => {
     const onOpenChat = vi.fn();

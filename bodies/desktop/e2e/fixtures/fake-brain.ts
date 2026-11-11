@@ -73,6 +73,8 @@ export interface FakeBrain {
   readingEvents: Record<string, unknown>[];
   /** Replace the rows `reading_status` answers and tell the bodies `changed: reading`. */
   setReading(rows: Record<string, unknown>[]): void;
+  /** Shot scenes: replace the apps list and/or the setup answers (progress, failed, experts) and tell the bodies. */
+  setScene(scene: { apps?: unknown[] | null; setup?: Record<string, unknown> }): void;
   /** How many times `set_api_key` was called (the key itself is never recorded). */
   keyAttempts: number;
   /** Every amount Settings sent to `set_daily_limit`, in order. */
@@ -244,6 +246,40 @@ const NOTION_GROUP = {
   ],
 };
 
+const LONG_ANSWER = [
+  "**The test never picks a folder, so every read is refused.** Yesterday's change made the file tools check the chosen folders first.",
+  '',
+  '- Fix: set a chosen folder in the fixture.',
+  '- Three other tests share that fixture and will pass too.',
+  '- Nothing in the app itself needs to change.',
+  '',
+  '```ts',
+  'const home = await tmpHome();',
+  "await chooseFolder(home, 'notes');",
+  'return { home, files: fileTools(home) };',
+  '```',
+].join('\n');
+
+const INSTALL_FACTS: Record<string, Record<string, unknown>> = {
+  notion: {
+    app: 'notion',
+    official: true,
+    publisher: 'Notion',
+    runs: 'hosted',
+    sign_in: 'browser',
+  },
+  obsidian: {
+    app: 'obsidian',
+    official: false,
+    publisher: 'vaultkit',
+    runs: 'pc',
+    sign_in: 'none',
+    licence: 'MIT',
+    repo: 'github.com/vaultkit/obsidian-mcp',
+  },
+  claude: { expert: 'claude-acp', official: true, publisher: 'Anthropic' },
+};
+
 const APPS = [
   {
     id: 'files',
@@ -343,6 +379,9 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   const appSetups: string[] = [];
   const appFlags: { approved: unknown; communityOk: unknown }[] = [];
   let expertInstalled = false;
+  // A shot scene's own apps and setup answers (null / empty: the defaults).
+  let sceneApps: unknown[] | null = null;
+  let sceneSetup: Record<string, unknown> = {};
   let gmailConnected = false;
   const limits: number[] = [];
   let hasKey = options.hasKey ?? true;
@@ -550,8 +589,11 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         const base = { turn, body: 'desktop' };
         const spoken = msg.params?.spoken === true || readAloud.on === true;
         const finish = () => {
-          notify('reply', { ...base, delta: 'This is the ' });
-          notify('reply', { ...base, delta: 'fake brain.' });
+          // The shots ask for a long, formatted answer: a gist, a list and a code block.
+          const parts = String(msg.params?.text ?? '').includes('explain the failing test')
+            ? [LONG_ANSWER]
+            : ['This is the ', 'fake brain.'];
+          for (const delta of parts) notify('reply', { ...base, delta });
           notify('reply', { ...base, done: true });
           notify('turn', { ...base, state: 'ended', reason: 'done' });
           if (spoken) {
@@ -587,25 +629,20 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             tool: 'desktop__move_window',
             input: { x: 0 },
           });
-        } else if (msg.params?.text?.includes('install notion')) {
-          // An app install ask: its facts ride in `input`, and the chat draws one install card.
+        } else if (/install (notion|obsidian|claude)/.test(String(msg.params?.text ?? ''))) {
+          // An install ask: its facts ride in `input`, and the chat draws one install card.
+          const which = /install (notion|obsidian|claude)/.exec(String(msg.params?.text))![1]!;
           const ask = `a${turns}`;
           held.set(ask, finish);
           notify('ask', {
             id: ask,
             state: 'open',
             turn,
-            text: 'Install Notion?',
+            text: which === 'claude' ? 'Install Claude Code?' : `Install ${which}?`,
             options: ['allow', 'deny'],
             confirm: true,
-            tool: 'install_app',
-            input: {
-              app: 'notion',
-              official: true,
-              publisher: 'Notion',
-              runs: 'hosted',
-              sign_in: 'browser',
-            },
+            tool: which === 'claude' ? 'install_expert' : 'install_app',
+            input: INSTALL_FACTS[which],
           });
         } else if (msg.params?.text?.includes('offer')) {
           // The turn ends first; the offer is a plain ask, as the brain sends it.
@@ -782,6 +819,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             stale: false,
             progress: null,
             failed: null,
+            ...sceneSetup,
           };
         } else if (params.tool === 'setup_app') {
           appSetups.push(String(params.input?.id));
@@ -803,7 +841,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
               { id: 'm2', kind: 'fact', text: 'Prefers green tea', at: '2026-10-26T10:00:00Z' },
             ],
           };
-        } else if (params.tool === 'list_apps') value = { apps: APPS };
+        } else if (params.tool === 'list_apps') value = { apps: sceneApps ?? APPS };
         else if (params.tool === 'list_approvals') {
           const filter = params.input?.filter;
           const rows = APPROVALS.filter((r) =>
@@ -931,6 +969,21 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
       }
     },
     readingEvents,
+    setScene: (scene) => {
+      if (scene.apps !== undefined) sceneApps = scene.apps;
+      if (scene.setup !== undefined) sceneSetup = scene.setup;
+      for (const what of ['apps', 'setup']) {
+        for (const socket of sockets) {
+          socket.send(
+            JSON.stringify({
+              jsonrpc: '2.0',
+              method: 'changed',
+              params: { seq: ++seq, what },
+            }),
+          );
+        }
+      }
+    },
     setReading: (rows) => {
       readingRows = rows;
       for (const socket of sockets) {

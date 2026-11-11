@@ -289,7 +289,7 @@ export function InstallCard({
             <b>{subject.name} is ready.</b>{' '}
             {subject.kind === 'expert'
               ? 'Scout can hand it code fixes and other long jobs.'
-              : `Scout can now use ${subject.name}.`}
+              : `Scout can now read and update ${subject.name}.`}
           </p>
           {view.tools !== undefined && view.tools.length > 0 && (
             <details className="sc-disc">

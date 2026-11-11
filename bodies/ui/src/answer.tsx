@@ -48,7 +48,12 @@ function CodeBlock({ children }: { children?: ReactNode }) {
     <div className="answer-code">
       <div className="answer-code-bar" data-testid="code-bar">
         <span>{language ?? 'code'}</span>
-        <button type="button" className="answer-copy" aria-label={copied ? 'Copied' : 'Copy'} onClick={copy}>
+        <button
+          type="button"
+          className="answer-copy"
+          aria-label={copied ? 'Copied' : 'Copy'}
+          onClick={copy}
+        >
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
@@ -104,6 +109,8 @@ export const ANSWER_CSS = `
 .answer > :last-child { margin-bottom: 0; }
 .answer p, .answer ul, .answer ol, .answer pre, .answer table { margin: 0 0 8px; }
 .answer ul, .answer ol { padding-left: 20px; }
+.answer ul { list-style: disc; }
+.answer ol { list-style: decimal; }
 .answer li + li { margin-top: 2px; }
 .answer h1, .answer h2, .answer h3, .answer h4 { margin: 12px 0 6px; ${typeCss('bodyLead')}; font-weight: ${t.fontWeight.semibold}; }
 .answer h1, .answer h2 { ${typeCss('title')}; }

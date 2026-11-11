@@ -29,13 +29,76 @@ const EXPERT_ASK: ConnectorConfirmParams = {
 function show(confirm: ConnectorConfirmParams, bridge = createFakeHostBridge()) {
   const onGone = vi.fn();
   const onRetry = vi.fn();
+  const onWorking = vi.fn();
   render(
     <HostBridgeProvider bridge={bridge}>
-      <InstallConfirm confirm={confirm} onGone={onGone} onTry={vi.fn()} onRetry={onRetry} />
+      <InstallConfirm
+        confirm={confirm}
+        onGone={onGone}
+        onTry={vi.fn()}
+        onRetry={onRetry}
+        onWorking={onWorking}
+      />
     </HostBridgeProvider>,
   );
-  return { bridge, onGone, onRetry };
+  return { bridge, onGone, onRetry, onWorking };
 }
+
+describe('InstallConfirm header status', () => {
+  it('says Setting up for an app while it works, and nothing once it is done', async () => {
+    const bridge = createFakeHostBridge();
+    const { onWorking } = show(APP_ASK, bridge);
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
+    await waitFor(() => expect(onWorking).toHaveBeenCalledWith('Setting up Notion'));
+    bridge.apps = [
+      { id: 'notion', name: 'Notion', status: 'connected', error: null, tools: [] },
+    ] as never;
+    act(() => bridge.emit({ type: 'connections.changed' } as never));
+    await waitFor(() => expect(onWorking).toHaveBeenLastCalledWith(null));
+  });
+
+  it('says Installing for an expert', async () => {
+    const { onWorking } = show(EXPERT_ASK);
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
+    await waitFor(() =>
+      expect(onWorking).toHaveBeenCalledWith(expect.stringMatching(/^Installing /)),
+    );
+  });
+});
+
+describe('InstallConfirm done card prompts', () => {
+  const connected = (id: string, name: string) =>
+    [{ id, name, status: 'connected', error: null, tools: [] }] as never;
+
+  it('offers the everyday job that needs the app, when there is one', async () => {
+    const bridge = createFakeHostBridge();
+    show(
+      {
+        ...APP_ASK,
+        facts: { ...APP_ASK.facts, app: 'gmail' },
+      } as unknown as ConnectorConfirmParams,
+      bridge,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
+    await waitFor(() => expect(screen.getByRole('list', { name: 'Steps' })).toBeVisible());
+    bridge.apps = connected('gmail', 'Gmail');
+    act(() => bridge.emit({ type: 'connections.changed' } as never));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Draft replies to my inbox' })).toBeVisible(),
+    );
+  });
+
+  it('shows no prompt chip for an app no everyday job needs', async () => {
+    const bridge = createFakeHostBridge();
+    show(APP_ASK, bridge);
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
+    await waitFor(() => expect(screen.getByRole('list', { name: 'Steps' })).toBeVisible());
+    bridge.apps = connected('notion', 'Notion');
+    act(() => bridge.emit({ type: 'connections.changed' } as never));
+    await waitFor(() => expect(screen.getByText('Notion is ready.')).toBeVisible());
+    expect(document.querySelector('.sc-try')).toBeNull();
+  });
+});
 
 describe('InstallConfirm', () => {
   it('Allow approves once and the card moves to working, staying in place', async () => {
