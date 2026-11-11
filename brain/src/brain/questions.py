@@ -65,7 +65,11 @@ class ScoutQuestions:
         # Resolving twice is harmless: on_end fires after an answer too, so settle() guards.
         settle = lambda: self._settle(qid, None, "expired", "Scout did not answer")  # noqa: E731
         try:
-            self._emit(Event("job_question", facts, key=None), on_drop=settle, on_end=settle)
+            self._emit(
+                Event("job_question", facts, key=None),
+                on_drop=settle,
+                on_end=lambda reason: settle(),
+            )
             return await future
         finally:
             self._open.pop(qid, None)

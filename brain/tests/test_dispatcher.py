@@ -239,3 +239,15 @@ async def test_urgency_comes_from_kind_not_payload(tmp_path):
     await clock.advance(BATCH_S)
     assert got == []
     await d.stop()
+
+
+async def test_giving_up_fails_the_say_futures_in_the_dropped_items(tmp_path):
+    d, clock, got, _ = make(tmp_path, fail=100)
+    d.start()
+    result = asyncio.get_running_loop().create_future()
+    d.post(Item("say", "desktop", {"result": result}, "now"))
+    await settle()
+    for _ in range(MAX_FAILS + 3):
+        await clock.advance(BATCH_S)
+    assert result.done() and result.exception() is not None
+    await d.stop()

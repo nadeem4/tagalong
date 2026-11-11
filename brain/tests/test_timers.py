@@ -29,14 +29,18 @@ def make(memory=None, clock=None, job_facts=None):
     clock = clock or Clock()
     events = []
     starts = []
+    ends = []
 
-    def emit(event, *, on_start=None):
+    def emit(event, *, on_start=None, on_end=None, retell=False):
         events.append(event)
         starts.append(on_start)
+        ends.append(on_end)
 
     kw = {"job_facts": job_facts} if job_facts else {}
     work = WorkStore(memory.db, clock)
-    return Timers(work, emit, clock, **kw), work, clock, events, starts
+    timers = Timers(work, emit, clock, **kw)
+    timers.ends = ends  # the end hooks, in the order emitted
+    return timers, work, clock, events, starts
 
 
 def test_fire_due_emits_a_timer_event_with_the_note_and_ends_a_one_off_when_its_wake_starts():
@@ -52,7 +56,11 @@ def test_fire_due_emits_a_timer_event_with_the_note_and_ends_a_one_off_when_its_
     starts[0]()
     done = work.get(t.id)
     assert (done.state, done.end_reason) == ("done", "fired")
-    assert done.reported_at is not None  # Scout is hearing it now
+    assert done.reported_at is None  # the wake has not finished
+    timers.ends[0]("cancelled")
+    assert work.get(t.id).reported_at is None  # a cancelled wake did not carry the news
+    timers.ends[0]("done")
+    assert work.get(t.id).reported_at is not None
 
 
 def test_one_off_is_not_fired_twice():
@@ -288,7 +296,7 @@ def _noting():
     work = WorkStore(Memory(":memory:").db, clock)
     timers = Timers(
         work,
-        lambda event, *, on_start=None: starts.append(on_start),
+        lambda event, *, on_start=None, on_end=None, retell=False: starts.append(on_start),
         clock,
         notify=lambda k, d: notes.append((k, d)),
     )

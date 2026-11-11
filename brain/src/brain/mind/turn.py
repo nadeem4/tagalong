@@ -146,6 +146,7 @@ async def _run_turn(
     guards: Guards | None = None,
     turn_timeout: float | None = None,
     on_owner_input: Callable[[], None] | None = None,
+    on_last_read: Callable[[], None] | None = None,
     on_rejected: Callable[[], None] | None = None,
 ) -> str:
     guards = guards or spend_guards(budget, step_cap)
@@ -233,6 +234,8 @@ async def _run_turn(
                         break
                     says = _drain(inbox, on_owner_input)
                     if not says:
+                        if on_last_read is not None:
+                            on_last_read()  # nothing said from here on can reach this turn
                         reason = "done"
                         break
                     if closed:

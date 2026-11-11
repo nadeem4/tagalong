@@ -189,3 +189,15 @@ def test_throttled_ripe_quiet_loops_arm_after_the_throttle_not_now(tmp_path):
         mem.close()
 
     asyncio.run(run())
+
+
+def test_a_loop_is_not_marked_surfaced_when_its_emit_fails(parts):
+    store, clock, _, _ = parts
+    lp = held(store, due=T0 - timedelta(hours=1))
+
+    def broken(event):
+        raise RuntimeError("the door is shut")
+
+    with pytest.raises(RuntimeError):
+        LoopService(store, broken, clock).start()
+    assert not store.get(lp.id).surfaced  # the next start tries again

@@ -157,10 +157,10 @@ async def _run() -> None:
         handler.addFilter(SecretLogFilter(masker))
     registry = Registry(config.data_dir)
     inspect_machine = partial(inspect, config.data_dir)
-    # Setup news is saved as open items until Scout's wake turn starts; the session exists later.
+    # Setup news is saved as open items until Scout's wake turn ends; the session exists later.
     setup_events = SetupEvents(
         OpenItems(memory.db, lambda: datetime.now(UTC)),
-        lambda event, **hooks: session.scheduler.emit(event, **hooks),
+        lambda event, **hooks: session.post_event(event, **hooks),
         lambda: datetime.now(UTC),
     )
     emit_event = setup_events.emit

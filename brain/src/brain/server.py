@@ -132,6 +132,12 @@ async def _handler(
                 except Exception:
                     log.exception("bad response frame")
                 continue
+            if method == "say":
+                if "id" in message:  # its answer comes when the door delivers it
+                    task = asyncio.create_task(_say(message, req_id, body_id, peer, session))
+                    calls.add(task)
+                    task.add_done_callback(calls.discard)
+                continue
             if method == "call":
                 if "id" in message:  # a notification has nowhere to reply
                     task = asyncio.create_task(_call(message, req_id, peer, session))
@@ -233,6 +239,24 @@ async def _call(message: dict, req_id: Any, peer: _Peer, session: Session) -> No
     peer.send(reply)
 
 
+async def _say(message: dict, req_id: Any, body_id: str, peer: _Peer, session: Session) -> None:
+    """A say is answered once the front door delivers it, so it runs in its own task and the read
+    loop keeps going. Says from one body are posted in the order they arrived."""
+    try:
+        say = SayParams.model_validate(message.get("params"))
+        reply = _result(req_id, await session.say(body_id, say))
+    except ValueError as exc:  # ValidationError is a ValueError
+        reply = _error(req_id, ErrorCode.invalid_params, str(exc))
+    except RpcError as exc:  # over_limit
+        reply = _error(req_id, exc.code, str(exc))
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        log.exception("handler failed for say")
+        reply = _error(req_id, ErrorCode.internal_error, "Internal error")
+    peer.send(reply)
+
+
 def _voice(
     method: str, message: dict, req_id: Any, body_id: str, session: Session, listening: set[str]
 ) -> str | None:
@@ -294,16 +318,6 @@ def _dispatch(
             return _error(req_id, ErrorCode.invalid_params, str(exc))
         bodies.set_tools(body_id, peer, parsed.tools)
         return _result(req_id, {})
-    if method == "say":
-        if "id" not in message:
-            return None
-        try:
-            say = SayParams.model_validate(message.get("params"))
-            return _result(req_id, session.say(body_id, say))
-        except ValueError as exc:  # ValidationError is a ValueError
-            return _error(req_id, ErrorCode.invalid_params, str(exc))
-        except RpcError as exc:  # over_limit
-            return _error(req_id, exc.code, str(exc))
     if method == "answer":
         try:
             reply = AnswerParams.model_validate(message.get("params"))

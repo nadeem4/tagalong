@@ -230,17 +230,15 @@ class Bodies:
         return list(self._online)
 
     def display_ids(self) -> list[str]:
-        # Bodies that can show a turn or an ask; a body with display=false shows nothing.
-        return [i for i, o in self._online.items() if o.body.display is not False]
+        # Bodies that can show a turn or an ask (display=false shows nothing), screens first and
+        # a phone chat last: Scout speaks first on a screen, and on the phone only when it is
+        # the one place left.
+        shown = [i for i, o in self._online.items() if o.body.display is not False]
+        return sorted(shown, key=self.is_phone)
 
-    def wake_ids(self) -> list[str]:
-        # Where Scout may speak first. A phone chat is never interrupted by a timer or held
-        # mail: it answers the person, it does not open the conversation.
-        return [
-            i
-            for i, o in self._online.items()
-            if o.body.display is not False and o.body.kind != BODY_WHATSAPP
-        ]
+    def is_phone(self, body_id: str | None) -> bool:
+        current = self._online.get(body_id) if body_id is not None else None
+        return current is not None and current.body.kind == BODY_WHATSAPP
 
     def body(self, body_id: str) -> Body | None:
         current = self._online.get(body_id)

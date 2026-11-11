@@ -10,7 +10,7 @@ import datetime
 import json
 from types import SimpleNamespace
 
-from test_sessions import Gate, Open, join, say
+from test_sessions import Gate, Open, join, say, settle
 
 from brain.bodies import Bodies
 from brain.events import Event, EventKind
@@ -65,6 +65,7 @@ def rig(steps, memory=None):
 
 
 async def idle(session):
+    await settle()  # a say or an answer reaches its turn through the dispatcher
     while session._task is not None:
         task = session._task
         await asyncio.wait({task})
@@ -91,7 +92,7 @@ async def test_a_missing_tool_is_offered_then_connected_then_the_request_resumes
         ]
     )
     join(session, "desktop")
-    session.say("desktop", say(REQUEST))
+    await session.say("desktop", say(REQUEST))
     await idle(session)
     (ask,) = [a for a in session.open_asks() if a.get("tool") == "choose"]
     assert ask["options"] == [CONNECT, "Not now"]

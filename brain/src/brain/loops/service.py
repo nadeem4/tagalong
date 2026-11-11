@@ -122,10 +122,10 @@ class LoopService:
     def _surface(
         self, loop: Loop, reason: str, key: str, extra: dict[str, str | int] | None = None
     ) -> None:
-        # Marked before emitting: a crash after this loses one wake, never repeats it.
-        self._store.mark_surfaced(loop.id, key, self._today())
+        # Marked only once the emit took it: a refused post leaves the loop to surface again.
         facts = {**self._facts(loop, reason), **(extra or {})}
         self._emit(Event("loop", facts, key=f"loop:{loop.id}"))
+        self._store.mark_surfaced(loop.id, key, self._today())
         self._notify("changed", {"what": "loops"})
 
     def _take(self, reason: str) -> bool:

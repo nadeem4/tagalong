@@ -17,6 +17,7 @@ from test_sessions import (
     read_aloud,
     remember_call,
     say,
+    settle,
     states,
 )
 
@@ -72,10 +73,10 @@ async def talk_over_a_running_turn(heard=1, steps=None):
     gate = asyncio.Event()
     model = SnapGate([gate, *(steps or ["ok"])])
     session, sent, voice = make_voiced(model)
-    first = session.say("desktop", say("tell me"))
+    first = await session.say("desktop", say("tell me"))
     voice.logs[first.turn] = ["One.", "Two.", "Three."]
-    await asyncio.sleep(0)
-    second = session.say("desktop", over("wait", first.turn, heard))
+    await settle()
+    second = await session.say("desktop", over("wait", first.turn, heard))
     await finish_quietly(session)
     return session, sent, voice, model, first, second
 
@@ -95,7 +96,7 @@ async def test_next_turn_receives_spoken_and_unsaid_once():
     session, _, _, model, _, _ = await talk_over_a_running_turn(steps=["ok", "again"])
     block = last_user_texts(model)[0]
     assert "One." in block and "Two. Three." in block
-    session.say("desktop", say("and now?"))
+    await session.say("desktop", say("and now?"))
     await finish_quietly(session)
     assert "interruption" not in json.dumps(model.seen[-1])
 
@@ -104,10 +105,10 @@ async def test_unsaid_is_not_in_saved_history():
     memory = Memory(":memory:")
     gate = asyncio.Event()
     session, _, voice = make_voiced(SnapGate([gate, "ok"]), memory)
-    first = session.say("desktop", say("tell me"))
+    first = await session.say("desktop", say("tell me"))
     voice.logs[first.turn] = ["One.", "Two.", "Three."]
-    await asyncio.sleep(0)
-    session.say("desktop", over("wait", first.turn, 1))
+    await settle()
+    await session.say("desktop", over("wait", first.turn, 1))
     await finish_quietly(session)
     assert "Two. Three." not in json.dumps(memory.load_messages())
     assert "Two. Three." not in json.dumps(session.history)
@@ -116,10 +117,10 @@ async def test_unsaid_is_not_in_saved_history():
 async def test_saved_history_keeps_only_the_spoken_sentences_and_marks_the_cut():
     memory = Memory(":memory:")
     session, _, voice = make_voiced(SnapGate(["One. Two. Three.", "ok"]), memory)
-    first = session.say("desktop", say("tell me"))
+    first = await session.say("desktop", say("tell me"))
     await finish_quietly(session)
     voice.logs[first.turn] = ["One.", "Two.", "Three."]
-    session.say("desktop", over("wait", first.turn, 1))
+    await session.say("desktop", over("wait", first.turn, 1))
     await finish_quietly(session)
     cut = {"type": "text", "text": f"One.\n\n{MARK}"}
     assert session.history[1] == {"role": "assistant", "content": [cut]}
@@ -137,14 +138,14 @@ async def test_second_interrupt_replaces_the_first_unsaid():
     gate = asyncio.Event()
     model = SnapGate([gate, gate, "done"])
     session, _, voice = make_voiced(model)
-    a = session.say("desktop", say("tell me"))
+    a = await session.say("desktop", say("tell me"))
     voice.logs[a.turn] = ["A1.", "A2."]
-    await asyncio.sleep(0)
-    b = session.say("desktop", over("wait", a.turn, 1))
+    await settle()
+    b = await session.say("desktop", over("wait", a.turn, 1))
     voice.logs[b.turn] = ["B1.", "B2."]
     while len(model.seen) < 2:  # b waits for a to wind down, then asks the model
         await asyncio.sleep(0.005)
-    session.say("desktop", over("no, this", b.turn, 0))
+    await session.say("desktop", over("no, this", b.turn, 0))
     await finish_quietly(session)
     block = last_user_texts(model)[0]
     assert "B1. B2." in block and "A2." not in block
@@ -154,7 +155,7 @@ async def test_stale_turn_in_interrupted_is_a_plain_say():
     model = SnapGate(["hi"])
     session, _, voice = make_voiced(model)
     voice.logs["gone"] = ["Old."]
-    session.say("desktop", over("hello", "gone", 0))
+    await session.say("desktop", over("hello", "gone", 0))
     await finish_quietly(session)
     assert last_user_texts(model)[0] == "hello"
     assert MARK not in json.dumps(session.history)
@@ -162,10 +163,10 @@ async def test_stale_turn_in_interrupted_is_a_plain_say():
 
 async def test_interrupt_after_all_sentences_has_empty_unsaid():
     session, sent, voice = make_voiced(SnapGate(["One. Two.", "ok"]))
-    first = session.say("desktop", say("tell me"))
+    first = await session.say("desktop", say("tell me"))
     await finish_quietly(session)
     voice.logs[first.turn] = ["One.", "Two."]
-    session.say("desktop", over("thanks", first.turn, 2))
+    await session.say("desktop", over("thanks", first.turn, 2))
     await finish_quietly(session)
     assert MARK not in json.dumps(session.history)
     assert states(sent) == ["started", "ended", "started", "ended"]
@@ -176,11 +177,11 @@ async def test_history_stays_valid_after_a_cancel_mid_tool_call():
     gate = asyncio.Event()
     model = SnapGate([remember_call("x"), gate, "ok"])
     session, _, voice = make_voiced(model)
-    first = session.say("desktop", say("tell me"))
+    first = await session.say("desktop", say("tell me"))
     voice.logs[first.turn] = ["One.", "Two."]
     for _ in range(20):
         await asyncio.sleep(0.005)
-    session.say("desktop", over("wait", first.turn, 1))
+    await session.say("desktop", over("wait", first.turn, 1))
     await finish_quietly(session)
     roles = [m["role"] for m in session.history]
     assert all(a != b for a, b in zip(roles, roles[1:], strict=False))  # strictly alternating
@@ -225,10 +226,10 @@ async def test_a_cut_after_streamed_words_replaces_them_with_the_heard_part():
                 yield item
 
     session, _, voice = make_voiced(Streaming(["ok"]))
-    first = session.say("desktop", say("tell me"))
+    first = await session.say("desktop", say("tell me"))
     voice.logs[first.turn] = ["One.", "Two.", "Three."]
-    await asyncio.sleep(0)
-    session.say("desktop", over("wait", first.turn, 1))
+    await settle()
+    await session.say("desktop", over("wait", first.turn, 1))
     await finish_quietly(session)
     assert [m["role"] for m in session.history] == ["user", "assistant", "user", "assistant"]
     assert session.history[1]["content"] == [{"type": "text", "text": f"One.\n\n{MARK}"}]

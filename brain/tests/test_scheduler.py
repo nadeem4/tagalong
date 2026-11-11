@@ -46,10 +46,11 @@ class FakeBodies(Bodies):
         return list(self.ids)
 
     def display_ids(self) -> list[str]:
-        return [i for i in self.ids if i not in self.headless]
+        shown = [i for i in self.ids if i not in self.headless]
+        return sorted(shown, key=self.is_phone)  # screens first, the phone last
 
-    def wake_ids(self) -> list[str]:
-        return [i for i in self.display_ids() if i not in self.phones]
+    def is_phone(self, body_id: str) -> bool:
+        return body_id in self.phones
 
     def is_online(self, body_id: str) -> bool:
         return body_id in self.ids
@@ -128,18 +129,25 @@ def test_wake_never_goes_to_a_display_less_body():
     assert [b for b, _ in rig.starts] == ["desktop"]
 
 
-def test_wake_never_goes_to_a_whatsapp_body_even_if_it_was_last():
+def test_wake_prefers_a_screen_to_a_whatsapp_body_even_if_it_was_last():
     rig = Rig(online=("whatsapp", "desktop"), last="whatsapp")
     rig.bodies.phones = {"whatsapp"}
     rig.scheduler.emit(ev())
     assert [b for b, _ in rig.starts] == ["desktop"]
 
 
-def test_wake_waits_when_only_a_whatsapp_body_is_online():
+def test_wake_goes_to_a_whatsapp_body_when_it_is_the_only_one_online():
     rig = Rig(online=("whatsapp",), last="whatsapp")
     rig.bodies.phones = {"whatsapp"}
     rig.scheduler.emit(ev())
-    assert rig.starts == []
+    assert [b for b, _ in rig.starts] == ["whatsapp"]
+
+
+def test_whatsapp_event_wake_runs_on_whatsapp():
+    rig = Rig(online=("desktop", "whatsapp"), last="desktop")
+    rig.bodies.phones = {"whatsapp"}
+    rig.scheduler.emit(Event("ping", {"body": "whatsapp"}, origin_body="whatsapp"))
+    assert [b for b, _ in rig.starts] == ["whatsapp"]
 
 
 def test_wake_waits_when_only_display_less_bodies_are_online():
@@ -441,22 +449,22 @@ def test_on_drop_runs_for_each_dropped_event_when_the_budget_is_spent():
 def test_on_end_runs_when_the_wake_turn_ends():
     rig = Rig()
     ended = []
-    rig.scheduler.emit(ev(), on_end=lambda: ended.append(1))
+    rig.scheduler.emit(ev(), on_end=lambda reason: ended.append(reason))
     assert ended == []
     rig.scheduler.turn_ended("other")
     assert ended == []
     rig.scheduler.turn_ended("t1")  # the id start returned
-    assert ended == [1]
+    assert ended == ["done"]
     rig.scheduler.turn_ended("t1")
-    assert ended == [1]
+    assert ended == ["done"]
 
 
 def test_on_end_does_not_run_for_a_replaced_event():
     rig = Rig()
     rig.busy = True
     ended = []
-    rig.scheduler.emit(ev("ping", key="k"), on_end=lambda: ended.append("old"))
-    rig.scheduler.emit(ev("ping", key="k"), on_end=lambda: ended.append("new"))
+    rig.scheduler.emit(ev("ping", key="k"), on_end=lambda reason: ended.append("old"))
+    rig.scheduler.emit(ev("ping", key="k"), on_end=lambda reason: ended.append("new"))
     rig.busy = False
     rig.scheduler.pump()
     rig.scheduler.turn_ended("t1")
@@ -496,7 +504,7 @@ def test_failed_start_runs_on_drop_once_per_event():
     rig = failing_rig()
     dropped = []
     rig.scheduler.emit(
-        ev("ping"), on_drop=lambda: dropped.append(1), on_end=lambda: dropped.append("end")
+        ev("ping"), on_drop=lambda: dropped.append(1), on_end=lambda reason: dropped.append("end")
     )
     assert dropped == [1]
 
@@ -521,7 +529,7 @@ def test_a_raising_hook_does_not_stop_the_other_hooks_or_the_pump(caplog):
     rig2 = Rig()
     ends = []
     rig2.scheduler.emit(ev("slow", a="1"), on_end=boom)
-    rig2.scheduler.emit(ev("slow", a="2"), on_end=lambda: ends.append("b"))
+    rig2.scheduler.emit(ev("slow", a="2"), on_end=lambda reason: ends.append("b"))
     rig2.t = T0 + timedelta(seconds=30)
     rig2.scheduler.pump()
     rig2.scheduler.emit(ev("ping"))

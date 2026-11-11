@@ -2571,8 +2571,10 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 1. `cd brain && uv run pytest tests/test_bridges.py -q`: off or incomplete setup runs nothing, a
    bridge that exits is restarted after 1, 2, 4, 8, 16, 30 s, `stop` ends the child, and a secret in
    the child's output is masked in the log.
-2. `uv run pytest tests/test_bodies.py tests/test_scheduler.py tests/test_sessions.py -q -k "whatsapp or wake_ids"`:
-   a timer or held-mail wake never goes to a `whatsapp` body, even when it was the last one used.
+2. `uv run pytest tests/test_bodies.py tests/test_scheduler.py tests/test_sessions.py -q -k "whatsapp or display_ids"` and `tests/test_front_door_routing.py`:
+   a body's say or event is answered on that body (a WhatsApp say during a desktop turn is answered
+   on WhatsApp), a timer or held-mail wake prefers a screen to a phone, and a job's question
+   reaches a phone-only setup.
 3. `uv run pytest tests/test_main.py -q -k "bridge or whatsapp"`: the brain starts the bridge after
    the server and stops it at shutdown.
 4. By hand, before the bridge package exists: set `TAGALONG_WHATSAPP_ENABLED=1` and five fake values

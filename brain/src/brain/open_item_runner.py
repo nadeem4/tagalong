@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 
 from brain.approvals import Approvals
 from brain.asks import Asks
-from brain.events import Event
+from brain.events import BRAIN, Event
 from brain.mind.turn import Call
 from brain.open_items import DEADLINE_S, OpenItem, OpenItemRefused, OpenItems
 from brain.permission import AskRequest, PersonAnswer, Tier, summarise
@@ -57,7 +57,9 @@ class AskRunner:
         emit: Callable[..., None],  # the scheduler's emit
         now: Callable[[], datetime],
         approvals: Approvals,
+        origin: Callable[[str], str] = lambda turn: BRAIN,
     ) -> None:
+        self._origin = origin  # the body showing a turn: where its asks' answers and news go back
         self._items = items
         self._asks = asks
         self._toolbox = toolbox
@@ -81,7 +83,9 @@ class AskRunner:
         item = self._items.find_open(KIND, {"name": saved["name"], "input": saved["input"]})
         if item is not None:
             return item
-        item = self._items.open(KIND, "brain", saved_call=saved, ttl_s=wait.total_seconds())
+        item = self._items.open(
+            KIND, self._origin(call.turn), saved_call=saved, ttl_s=wait.total_seconds()
+        )
         if saved["masked"]:
             self._raw[item.id] = call
         self._asks.show(item.id, replace(call, input=req.input), req.tool, req.tier is not Tier.ask)
@@ -168,7 +172,7 @@ class AskRunner:
             facts["reason"] = reason
         if outcome == "approved":
             facts["result"] = result
-        self._emit(Event("ask_ended", facts, key=f"ask:{item.id}"))
+        self._emit(Event("ask_ended", facts, key=f"ask:{item.id}", origin_body=item.origin_body))
 
     # ---- deadline and restart ----
 
@@ -218,7 +222,9 @@ class AskRunner:
                     "age_s": int((now - item.created_at).total_seconds()),
                     "left_s": int((item.deadline_at - now).total_seconds()),
                 }
-                self._emit(Event("ask_notice", facts, key=f"ask:{item.id}"))
+                self._emit(
+                    Event("ask_notice", facts, key=f"ask:{item.id}", origin_body=item.origin_body)
+                )
         self.changed()
 
     def _expired(self, item: OpenItem) -> None:
@@ -236,7 +242,7 @@ class AskRunner:
             "outcome": "expired",
             "reason": "no answer",
         }
-        self._emit(Event("ask_ended", facts, key=f"ask:{item.id}"))
+        self._emit(Event("ask_ended", facts, key=f"ask:{item.id}", origin_body=item.origin_body))
 
     def _record_ask(self, item: OpenItem, outcome: str, by: str, reason: str) -> None:
         call = _call(item)
