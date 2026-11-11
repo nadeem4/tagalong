@@ -353,7 +353,7 @@ async def test_say_reaches_every_body(chat):
             }
 
 
-async def test_say_during_turn_joins(chat):
+async def test_say_during_turn_gets_its_own_turn(chat):
     url, gate = chat
     async with connect(url) as ws:
         await call(ws, hello())
@@ -361,7 +361,8 @@ async def test_say_during_turn_joins(chat):
         started = json.loads(await ws.recv())
         assert started["params"]["state"] == "started"
         second = await call(ws, request("say", {"text": "b"}, req_id=3))
-        assert second["result"] == {"turn": first["result"]["turn"], "joined": True}
+        assert second["result"]["joined"] is False
+        assert second["result"]["turn"] != first["result"]["turn"]
         gate.set()
 
 

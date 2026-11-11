@@ -2324,8 +2324,9 @@ this]` (`Memory.replace_last_message` rewrites the cut turn's message), never th
 
 ## Front door and urgency
 
-`dispatcher.py` is the one queue everything that wants Scout's attention will enter (F10 adds the
-core; sources are moved onto it in a later slice, and `scheduler.py` still runs the wakes until then).
+`dispatcher.py` is the one queue everything that wants Scout's attention enters: say, timers, loops, job
+questions and results, install results and card answers all `post` here, and `scheduler.py` batches
+and caps the wakes it hands on. `drop(kind, key)` forgets a waiting item whose news is superseded.
 An `Item` has a kind, an origin body, a payload, an urgency and an optional key. The urgency is a
 field of the event kind in `events.py`: code sets it, and neither the payload nor the model can raise
 it. `post` looks the kind up and overrides the item's own urgency; only a kind not yet registered
@@ -2358,8 +2359,8 @@ post so close arrivals share one `deliver` call, ordered by urgency then arrival
 any state change, cuts that wait short. A delivery that raises is logged and its items go back with
 their original order (a newer same-key item still replaces them); after `MAX_FAILS` failures an item
 is logged as `dispatcher.gave_up` and dropped. `stop()` logs everything still waiting as
-`dispatcher.dropped`. F12 turns both into holding open items. The `deliver` callback and the mouth's
-`State` feed (`set_speech_state`) are wired by the later slice. `Dispatcher` requires the
+`dispatcher.dropped`. F12 turns both into holding open items. `Session._deliver` is the `deliver`
+callback. `Dispatcher` requires the
 `OpenItems` store so a `hold` can never be lost. The event notes in `mind/events.md` do not mention
 urgency: the model cannot act on delivery timing.
 Tests: `tests/test_dispatcher.py` (fake clock) and `tests/test_events.py`.

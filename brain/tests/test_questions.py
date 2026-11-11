@@ -152,7 +152,7 @@ async def test_on_end_without_an_answer_resolves_none():
     emit = _Emit()
     sq = ScoutQuestions(emit, fresh_work())
     task = await _ask(sq, emit)
-    emit.calls[0][2]()
+    emit.calls[0][2]("done")
     assert await task is None
 
 
@@ -161,7 +161,7 @@ async def test_on_end_after_an_answer_is_harmless():
     sq = ScoutQuestions(emit, fresh_work())
     task = await _ask(sq, emit)
     sq.answer(emit.id(), {"way": "a"})
-    emit.calls[0][2]()
+    emit.calls[0][2]("done")
     assert await task == {"way": "a"}
 
 

@@ -174,8 +174,7 @@ Everything that wants Scout's attention (the person's own words, a timer, a fini
 card answer) will enter the brain through one front door, `brain/src/brain/dispatcher.py`. Each event kind carries an
 urgency set by code (`now`, `next_pause`, `idle`, `hold`), and the dispatcher delivers by the
 speech state: at once, at the next sentence break, only when quiet, or kept as an open item. The
-core is in place; moving the sources onto it comes in a later slice, and `scheduler.py` runs the
-wakes until then. See [brain.md](brain.md#front-door-and-urgency).
+every source posts here, and `scheduler.py` batches and caps the wakes it receives. See [brain.md](brain.md#front-door-and-urgency).
 
 ## Subsystem map
 

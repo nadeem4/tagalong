@@ -2929,3 +2929,14 @@ async def test_a_rule_granted_expert_ask_writes_no_item(make_rig):
     job = await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     assert rig.records.get_job(str(job)).open_items == []
+
+
+async def test_an_expert_ask_nobody_answers_expires_with_no_answer(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer(None)), ASK_STEPS)
+    job = await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: [i for i in rig.items.list_open() if i.id in rig.asks.open_ids] == [])
+    await until(lambda: rig.asks.opened[1:])
+    item_id = rig.asks.opened[1]["ask_id"]
+    await until(lambda: rig.items.get(item_id).state == "expired")
+    assert rig.items.get(item_id).reason == "no_answer"
+    assert rig.items.get(item_id).origin_body == rig.jobs.origin(str(job))

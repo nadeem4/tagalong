@@ -17,6 +17,7 @@ from test_sessions import (
     read_aloud,
     remember_call,
     say,
+    settle,
     states,
 )
 
@@ -74,7 +75,7 @@ async def talk_over_a_running_turn(heard=1, steps=None):
     session, sent, voice = make_voiced(model)
     first = session.say("desktop", say("tell me"))
     voice.logs[first.turn] = ["One.", "Two.", "Three."]
-    await asyncio.sleep(0)
+    await settle()
     second = session.say("desktop", over("wait", first.turn, heard))
     await finish_quietly(session)
     return session, sent, voice, model, first, second
@@ -106,7 +107,7 @@ async def test_unsaid_is_not_in_saved_history():
     session, _, voice = make_voiced(SnapGate([gate, "ok"]), memory)
     first = session.say("desktop", say("tell me"))
     voice.logs[first.turn] = ["One.", "Two.", "Three."]
-    await asyncio.sleep(0)
+    await settle()
     session.say("desktop", over("wait", first.turn, 1))
     await finish_quietly(session)
     assert "Two. Three." not in json.dumps(memory.load_messages())
@@ -139,7 +140,7 @@ async def test_second_interrupt_replaces_the_first_unsaid():
     session, _, voice = make_voiced(model)
     a = session.say("desktop", say("tell me"))
     voice.logs[a.turn] = ["A1.", "A2."]
-    await asyncio.sleep(0)
+    await settle()
     b = session.say("desktop", over("wait", a.turn, 1))
     voice.logs[b.turn] = ["B1.", "B2."]
     while len(model.seen) < 2:  # b waits for a to wind down, then asks the model
@@ -227,7 +228,7 @@ async def test_a_cut_after_streamed_words_replaces_them_with_the_heard_part():
     session, _, voice = make_voiced(Streaming(["ok"]))
     first = session.say("desktop", say("tell me"))
     voice.logs[first.turn] = ["One.", "Two.", "Three."]
-    await asyncio.sleep(0)
+    await settle()
     session.say("desktop", over("wait", first.turn, 1))
     await finish_quietly(session)
     assert [m["role"] for m in session.history] == ["user", "assistant", "user", "assistant"]
