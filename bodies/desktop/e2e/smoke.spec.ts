@@ -338,7 +338,15 @@ test('Home is one window: Scout, jobs, connections and settings', async () => {
   // One companion and six pages, all fed by the brain.
   const nav = home.getByRole('navigation', { name: 'Tagalong' });
   await expect(nav.getByRole('button')).toHaveText(
-    ['Overview', 'TasksNew', 'Connections', 'Approvals', 'What Scout remembers', 'Settings'],
+    [
+      'Overview',
+      'TasksNew',
+      'Connections',
+      'PlacesNew',
+      'Approvals',
+      'What Scout remembers',
+      'Settings',
+    ],
     { timeout: 15_000 },
   );
   const pets = await panel.evaluate(() => window.tagalong.listPets());
