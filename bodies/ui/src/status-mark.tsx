@@ -38,6 +38,7 @@ export function StatusMark({ mark, variant, onFix }: StatusMarkProps) {
           color: tone === 'warn' ? t.color.warnInk : t.color.text,
           fontFamily: t.font.ui,
           fontSize: t.type.caption.size,
+          lineHeight: `${t.type.caption.line}px`,
           fontWeight: t.fontWeight.semibold,
           whiteSpace: 'nowrap',
         }}

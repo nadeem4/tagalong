@@ -83,7 +83,7 @@ export const HOME_CSS = `
   margin: 0 0 ${t.space.md}px; padding: ${t.space.lg}px; border-radius: ${t.radius.row}px;
   background: ${t.color.warnFill}; display: flex; flex-direction: column; gap: ${t.space.md}px;
 }
-.home-card .home-reading__fix p { color: ${t.color.warnInk}; line-height: 1.5; }
+.home-card .home-reading__fix p { color: ${t.color.warnInk}; }
 .home-reading__actions { display: flex; align-items: center; flex-wrap: wrap; gap: ${t.space.lg}px; }
 .home-reading__actions .job-overview__link { color: ${t.color.warnInk}; }
 .home-spend { ${typeCss('display')}; font-variant-numeric: tabular-nums; }
