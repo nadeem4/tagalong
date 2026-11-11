@@ -4,7 +4,7 @@
  * createVoiceBridge and registerVoiceIpc.
  */
 
-import { BrainOffline } from '@tagalong/contract';
+import { BrainOffline, SpeechStateParams } from '@tagalong/contract';
 import type { BrainClient } from '@tagalong/contract';
 import { addressedToScout, isStopListening, mightBeStop, STATUS_WORDS } from '@tagalong/ui/shapes';
 import { IPC } from '../../shared/ipc';
@@ -14,7 +14,7 @@ import type { StatusMarks } from '../status-marks';
 import { callJson } from '../brain/call-json';
 import type { IpcHandle, IpcOn } from './handle';
 
-type VoiceBrain = Pick<BrainClient, 'listen' | 'mic' | 'unlisten' | 'hush'>;
+type VoiceBrain = Pick<BrainClient, 'listen' | 'mic' | 'unlisten' | 'hush' | 'speechState'>;
 
 const HEARD_EVENTS = {
   speech_start: 'speechStart',
@@ -43,8 +43,10 @@ export interface VoiceBridge {
   stop(): void;
   /** The brain is reachable again: an open listening session asks the new connection to listen. */
   onOnline(): void;
-  /** Heard, voice and speech notifications from the brain; any other method is ignored. */
+  /** Heard, voice, speech and speech_control notifications from the brain; any other is ignored. */
   onNotification(method: string, params: unknown): void;
+  /** What the panel's player is doing, on its way to the brain. A bad shape is dropped. */
+  speechState(params: unknown): void;
   /** The health check: the brain's last word on its voice. */
   models(): VoiceModels;
 }
@@ -139,6 +141,7 @@ export function createVoiceBridge(deps: BridgeDeps): VoiceBridge {
     onNotification: (method, params) => {
       if (method === 'heard') heard(params as Parameters<typeof heard>[0]);
       else if (method === 'voice') voice(params as Parameters<typeof voice>[0]);
+      else if (method === 'speech_control') sendToPanel(IPC.speechControl, params);
       else if (method === 'speech') {
         const p = params as {
           turn: string;
@@ -159,6 +162,10 @@ export function createVoiceBridge(deps: BridgeDeps): VoiceBridge {
           });
         }
       }
+    },
+    speechState: (params) => {
+      const parsed = SpeechStateParams.safeParse(params);
+      if (parsed.success) brain.speechState(parsed.data);
     },
     // The brain's `voice` frames come from the ears alone; the mouth has no status to show.
     models: () => ({ ears: !voiceFailed }),
@@ -214,6 +221,9 @@ export function registerVoiceIpc(handle: IpcHandle, deps: VoiceIpcDeps): void {
       console.warn('[main] a mic frame could not reach the brain', error),
     );
   });
+
+  // The player's state, a frame at a time. Live-only: nothing is kept here.
+  deps.on(IPC.speechState, (_event, params: unknown) => bridge.speechState(params));
 
   handle(IPC.earsStop, () => inOrder(() => bridge.stop()));
   handle(IPC.hush, () => deps.brain.hush());

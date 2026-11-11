@@ -291,10 +291,37 @@ def test_approved_notification_shape():
 
 
 def test_voice_methods_are_in_the_maps():
-    assert {"listen", "mic", "unlisten", "hush"} <= set(BODY_TO_BRAIN)
-    assert {"heard", "voice", "speech"} <= set(BRAIN_TO_BODY)
+    assert {"listen", "mic", "unlisten", "hush", "speech_state"} <= set(BODY_TO_BRAIN)
+    assert {"heard", "voice", "speech", "speech_control"} <= set(BRAIN_TO_BODY)
     assert BODY_TO_BRAIN["listen"][1] is not None
     assert BODY_TO_BRAIN["mic"][1] is None
+    assert BODY_TO_BRAIN["speech_state"][1] is None
+    assert BRAIN_TO_BODY["speech_control"][1] is None
+
+
+@pytest.mark.parametrize("state", ["started", "ended", "paused", "idle"])
+def test_speech_state_takes_four_states_with_an_optional_sentence(state):
+    model = BODY_TO_BRAIN["speech_state"][0]
+    assert model.model_validate({"turn": "t", "n": 2, "state": state}).state == state
+    assert model.model_validate({"turn": "t", "state": state}).n is None
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [{"state": "idle"}, {"turn": "t", "state": "playing"}, {"turn": "t", "n": 0, "state": "idle"}],
+)
+def test_speech_state_rejects_a_bad_frame(bad):
+    with pytest.raises(ValidationError):
+        BODY_TO_BRAIN["speech_state"][0].model_validate(bad)
+
+
+def test_speech_control_takes_three_actions_and_an_optional_turn():
+    model = BRAIN_TO_BODY["speech_control"][0]
+    for action in ("pause", "resume", "clear"):
+        assert model.model_validate({"action": action}).turn is None
+    assert model.model_validate({"action": "clear", "turn": "t"}).turn == "t"
+    with pytest.raises(ValidationError):
+        model.model_validate({"action": "stop"})
 
 
 @pytest.mark.parametrize(

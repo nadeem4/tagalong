@@ -36,7 +36,7 @@ interface TalkOptions {
   /** A spoken answer is still streaming in: the window waits for all of it, not a gap. */
   answering: boolean;
   /** Scout's voice: speech over it pauses it, and the words heard decide what happens next. */
-  player: Pick<SpeechPlayer, 'speaking' | 'pause' | 'resume' | 'text' | 'interruption' | 'stop'>;
+  player: Pick<SpeechPlayer, 'speaking' | 'pause' | 'resume' | 'text' | 'interruption' | 'cutOff'>;
 }
 
 /** One of the panel's marks on Scout, set or cleared in main; a failure is only logged. */
@@ -138,7 +138,7 @@ export function useTalk(options: TalkOptions): {
       onInterrupt: (text) => {
         const { player } = latest.current;
         const heard = cut.take(player.interruption());
-        player.stop();
+        player.cutOff();
         cue.hushed();
         micOk();
         cue.asked();

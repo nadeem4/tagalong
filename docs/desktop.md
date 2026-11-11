@@ -492,7 +492,11 @@ shell, the screen):
 Events main sends to renderers (no answer): `turnEvent`, `contextEvent`, `captureEvent`,
 `sightPauseEvent`, `hotkeyProblemEvent`, `settingsChangedEvent`,
 `statusMarkEvent`, `listeningEvent`, `homePageEvent`, `remarkEvent`, `panelSideEvent`, `dropEvent`, `stopVoiceEvent`,
-`talkEvent`, `talkReleaseEvent`, `talkCancelEvent`, `earsEvent`, `earsStatusEvent`.
+`talkEvent`, `talkReleaseEvent`, `talkCancelEvent`, `earsEvent`, `earsStatusEvent`, and to the panel
+alone `speechChunk`, `speechDone` and `speechControl` (the brain's `speech_control`: pause, resume or
+clear what is being said). The panel sends `speechState` the other way (one-way, no answer): each
+sentence started or ended, paused, or idle, which main checks and sends on as `speech_state`. See
+[voice.md](voice.md).
 
 `dropOnPet` checks the sender with `fromWindow(window)` (in `handle.ts`), which compares
 `event.sender` (set by Electron in main, so a page cannot forge it) with that window's

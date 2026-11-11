@@ -15,6 +15,7 @@ import {
   type ListenParams,
   type MethodSchemas,
   type SayParams,
+  type SpeechStateParams,
 } from './messages.js';
 
 export type BrainStatus = 'connecting' | 'online' | 'offline' | 'outdated';
@@ -161,9 +162,14 @@ export class BrainClient {
     this.notify('hush');
   }
 
-  private notify(method: string): void {
+  /** What this body's speaker is doing. Live-only: dropped unless online. */
+  speechState(params: SpeechStateParams): void {
+    this.notify('speech_state', params);
+  }
+
+  private notify(method: string, params: object = {}): void {
     if (this.status !== 'online') return;
-    this.socket?.send(JSON.stringify({ jsonrpc: '2.0', method, params: {} }));
+    this.socket?.send(JSON.stringify({ jsonrpc: '2.0', method, params }));
   }
 
   /**

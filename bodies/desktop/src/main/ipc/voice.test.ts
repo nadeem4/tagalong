@@ -14,6 +14,7 @@ function fakeBrain() {
     mic: vi.fn(() => true),
     unlisten: vi.fn(),
     hush: vi.fn(),
+    speechState: vi.fn(),
     call: vi.fn(),
   };
 }
@@ -244,6 +245,26 @@ describe('what the brain sends back', () => {
       [IPC.speechChunk, { turn: 't1', text: 'Plain.' }],
       [IPC.speechDone, { turn: 't1' }],
     ]);
+  });
+
+  it('sends the player’s speech_state to the brain, and the brain’s speech_control to the panel alone', () => {
+    const { send, brain, bridge, sent, toPanel } = setup();
+    send(IPC.speechState, { turn: 't1', n: 2, state: 'ended' });
+    expect(brain.speechState).toHaveBeenCalledWith({ turn: 't1', n: 2, state: 'ended' });
+    bridge.onNotification('speech_control', { action: 'pause' });
+    bridge.onNotification('speech_control', { action: 'clear', turn: 't1' });
+    expect(sent).toEqual([]);
+    expect(toPanel).toEqual([
+      [IPC.speechControl, { action: 'pause' }],
+      [IPC.speechControl, { action: 'clear', turn: 't1' }],
+    ]);
+  });
+
+  it('drops a speech_state the panel sent in a bad shape', () => {
+    const { send, brain } = setup();
+    send(IPC.speechState, { turn: 't1', state: 'playing' });
+    send(IPC.speechState, 'idle');
+    expect(brain.speechState).not.toHaveBeenCalled();
   });
 
   it('ignores notifications that are not voice ones', () => {

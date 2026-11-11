@@ -17,10 +17,13 @@ import {
   ReadAloudEventData,
   ReadingEventData,
   SayParams,
+  SpeechControlParams,
   SpeechParams,
+  SpeechStateParams,
   TabEventData,
   TurnParams,
   VoiceParams,
+  bodyToBrain,
   brainToBody,
   type BodyToBrainMethod,
   type BrainToBodyMethod,
@@ -44,6 +47,7 @@ describe('method maps', () => {
       | 'mic'
       | 'unlisten'
       | 'hush'
+      | 'speech_state'
     >();
   });
   it('has literal brain to body method names', () => {
@@ -59,6 +63,7 @@ describe('method maps', () => {
       | 'heard'
       | 'voice'
       | 'speech'
+      | 'speech_control'
     >();
   });
 });
@@ -87,6 +92,27 @@ describe('voice messages', () => {
     expect(
       SpeechParams.safeParse({ turn: 't', text: 'x', pcm: 'AA==', sample_rate: 24000 }).success,
     ).toBe(true);
+  });
+  it('marks speech_state and speech_control live, with no seq', () => {
+    expect('live' in bodyToBrain.speech_state && bodyToBrain.speech_state.live).toBe(true);
+    expect('live' in brainToBody.speech_control && brainToBody.speech_control.live).toBe(true);
+    expect('seq' in SpeechStateParams.shape).toBe(false);
+    expect('seq' in SpeechControlParams.shape).toBe(false);
+  });
+  it('bounds speech_state to a turn, a sentence number and four states', () => {
+    for (const state of ['started', 'ended', 'paused', 'idle']) {
+      expect(SpeechStateParams.safeParse({ turn: 't', n: 1, state }).success).toBe(true);
+    }
+    expect(SpeechStateParams.safeParse({ turn: 't', state: 'playing' }).success).toBe(false);
+    expect(SpeechStateParams.safeParse({ state: 'idle' }).success).toBe(false);
+    expect(SpeechStateParams.safeParse({ turn: 't', n: 0, state: 'started' }).success).toBe(false);
+  });
+  it('bounds speech_control to three actions and an optional turn', () => {
+    for (const action of ['pause', 'resume', 'clear']) {
+      expect(SpeechControlParams.safeParse({ action }).success).toBe(true);
+    }
+    expect(SpeechControlParams.safeParse({ action: 'clear', turn: 't' }).success).toBe(true);
+    expect(SpeechControlParams.safeParse({ action: 'stop' }).success).toBe(false);
   });
   it('bounds voice progress', () => {
     expect(VoiceParams.safeParse({ status: 'loading', progress: 1.5 }).success).toBe(false);

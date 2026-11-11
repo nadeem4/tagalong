@@ -1,0 +1,1 @@
+{ "jsonrpc": "2.0", "method": "speech_state", "params": { "turn": "t1", "n": 2, "state": "ended" } }

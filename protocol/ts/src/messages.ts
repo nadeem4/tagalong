@@ -283,6 +283,24 @@ export const SpeechParams = z
   .refine((s) => (s.pcm === undefined) === (s.sample_rate === undefined), 'pcm needs sample_rate');
 export type SpeechParams = z.infer<typeof SpeechParams>;
 
+// What the body's speaker is doing, so the brain knows whether Scout is talking: one frame per
+// sentence started or ended (n is that sentence), and paused or idle for the whole player.
+// Live-only, no seq.
+export const SpeechStateParams = z.object({
+  turn: Id,
+  n: z.int().positive().optional(),
+  state: z.enum(['started', 'ended', 'paused', 'idle']),
+});
+export type SpeechStateParams = z.infer<typeof SpeechStateParams>;
+
+// The brain holds, resumes or drops what the body is saying. `turn` narrows a clear to one
+// turn's sentences. Live-only, no seq.
+export const SpeechControlParams = z.object({
+  action: z.enum(['pause', 'resume', 'clear']),
+  turn: Id.optional(),
+});
+export type SpeechControlParams = z.infer<typeof SpeechControlParams>;
+
 export interface MethodSchemas {
   params: ZodType;
   result?: ZodType;
@@ -302,6 +320,7 @@ export const bodyToBrain = {
   mic: { params: MicParams },
   unlisten: { params: EmptyParams },
   hush: { params: EmptyParams },
+  speech_state: { params: SpeechStateParams, live: true },
 } satisfies Record<string, MethodSchemas>;
 
 export const brainToBody = {
@@ -316,6 +335,7 @@ export const brainToBody = {
   heard: { params: HeardParams, live: true },
   voice: { params: VoiceParams, live: true },
   speech: { params: SpeechParams, live: true },
+  speech_control: { params: SpeechControlParams, live: true },
 } satisfies Record<string, MethodSchemas>;
 
 export type BodyToBrainMethod = keyof typeof bodyToBrain;

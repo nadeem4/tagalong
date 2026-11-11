@@ -442,6 +442,21 @@ class SpeechParams(Model):
         return self
 
 
+# What the body's speaker is doing: one frame per sentence started or ended (`n` is that
+# sentence), and paused or idle for the whole player. Live-only, no `seq`.
+class SpeechStateParams(Model):
+    turn: Id
+    n: Annotated[int, Field(ge=1)] | None = None
+    state: Literal["started", "ended", "paused", "idle"]
+
+
+# The brain holds, resumes or drops what the body is saying; `turn` narrows a clear to one
+# turn's sentences. Live-only, no `seq`.
+class SpeechControlParams(Model):
+    action: Literal["pause", "resume", "clear"]
+    turn: Id | None = None
+
+
 # Method name -> (params model, result model or None for notifications).
 type MethodMap = dict[str, tuple[type[BaseModel], type[BaseModel] | None]]
 
@@ -457,6 +472,7 @@ BODY_TO_BRAIN: MethodMap = {
     "mic": (MicParams, None),
     "unlisten": (EmptyParams, None),
     "hush": (EmptyParams, None),
+    "speech_state": (SpeechStateParams, None),
 }
 
 BRAIN_TO_BODY: MethodMap = {
@@ -471,4 +487,5 @@ BRAIN_TO_BODY: MethodMap = {
     "heard": (HeardParams, None),
     "voice": (VoiceParams, None),
     "speech": (SpeechParams, None),
+    "speech_control": (SpeechControlParams, None),
 }
