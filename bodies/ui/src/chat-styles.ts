@@ -50,6 +50,13 @@ export const CHAT_CSS = `
   padding: 8px 10px; border-radius: 8px; background: #E9ECF5; color: #12162B;
   ${typeCss('small')}; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
+.bubble-tip::before {
+  content: ''; position: absolute; top: -5px; right: 12px; width: 10px; height: 10px; background: #E9ECF5;
+  transform: rotate(45deg);
+}
+/* Above its button, for the composer at the foot of the window. */
+.bubble-tip--up { top: auto; bottom: 40px; }
+.bubble-tip--up::before { top: auto; bottom: -5px; }
 .bubble-tgwrap:hover .bubble-tip, .bubble-tgwrap:focus-within .bubble-tip { display: block; }
 .bubble-tip-sub { display: block; margin-top: 2px; color: #4A5168; }
 

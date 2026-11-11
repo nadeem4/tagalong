@@ -384,17 +384,29 @@ export function CompanionBubble({
   );
 
   const listening = talk !== undefined && talk.state === 'listening';
+  // The mic's tooltip is drawn like the header's (not the native title), and says the talk key.
   const micButton = talk !== undefined && (
-    <button
-      type="button"
-      className="bubble-mic"
-      aria-label={listening ? 'Stop listening' : `Talk to ${petName}`}
-      aria-pressed={listening}
-      title={listening ? 'Stop listening' : `Talk to ${petName} (or hold ${talk.keyLabel})`}
-      onClick={talk.onMic}
-    >
-      <MicIcon state={listening ? 'on' : 'plain'} />
-    </button>
+    <span className="bubble-tgwrap">
+      <button
+        type="button"
+        className="bubble-mic"
+        aria-label={listening ? 'Stop listening' : `Talk to ${petName}`}
+        aria-pressed={listening}
+        aria-describedby="tip-mic"
+        onClick={talk.onMic}
+      >
+        <MicIcon state={listening ? 'on' : 'plain'} />
+      </button>
+      <span className="bubble-tip bubble-tip--up" role="tooltip" id="tip-mic">
+        {listening ? (
+          'Stop listening'
+        ) : (
+          <>
+            Hold <Keycap>{talk.keyLabel}</Keycap> to talk
+          </>
+        )}
+      </span>
+    </span>
   );
   // A header toggle: an icon button (pressed = on) with the tooltip the mockup draws beside it.
   const headToggle = (

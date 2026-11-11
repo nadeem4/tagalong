@@ -834,6 +834,20 @@ describe('CompanionBubble, talking to Scout', () => {
     expect(screen.getAllByRole('button', { name: 'Talk to Scout' })).toHaveLength(1);
   });
 
+  it('the mic carries the drawn tooltip with the talk key, not the native title', () => {
+    render(
+      <HostBridgeProvider bridge={createFakeHostBridge()}>
+        <CompanionBubble petId="scout" petName="Scout" talk={talk()} />
+      </HostBridgeProvider>,
+    );
+    const mic = screen.getByRole('button', { name: 'Talk to Scout' });
+    expect(mic).not.toHaveAttribute('title');
+    const tip = document.getElementById('tip-mic');
+    expect(tip).toHaveAttribute('role', 'tooltip');
+    expect(tip).toHaveClass('bubble-tip--up');
+    expect(mic).toHaveAccessibleDescription('Hold Right Ctrl to talk');
+  });
+
   it('keeps the text box named for what it asks, the mic inside it notwithstanding', () => {
     render(
       <HostBridgeProvider bridge={createFakeHostBridge()}>
