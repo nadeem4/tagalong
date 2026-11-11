@@ -571,6 +571,7 @@ async def test_home_list_jobs_shape_unchanged(home, records):
         "parts",
         "activity",
         "summary",
+        "open_items",
     }
     assert set(rows["ok"]["parts"][0]) == {
         "id",
