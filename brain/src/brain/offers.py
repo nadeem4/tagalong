@@ -136,11 +136,11 @@ class Offers:
     def resume(self) -> None:
         """Show again the offers the last run left unanswered. Called when a body connects, since
         at start nobody is there to see a card; with nobody online the items just stay open."""
-        self._items.expire_due(self._now())
+        self._items.expire_due(self._now(), "offer")
         if not self._asks.anyone_online():
             return
-        for item in self._items.list_open():
-            if item.kind == "offer" and item.saved_call["group"] not in self._busy:
+        for item in self._items.list_open(kind="offer"):
+            if item.saved_call["group"] not in self._busy:
                 self._busy.add(item.saved_call["group"])
                 task = asyncio.get_running_loop().create_task(self._resume_one(item))
                 self._tasks.add(task)

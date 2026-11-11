@@ -65,8 +65,7 @@ class Choices:
             )
         except RpcError:
             log.info("choice %s closed without an answer", ask_id)
-            # Whatever closed it, the item is no longer open; the one deadline rule logs it.
-            self._items.expire_due(self._items.get(ask_id).deadline_at)
+            self._items.expire(ask_id, "no_answer")  # this item only, whatever closed the ask
             self._emit(Event("choice", self._facts(ask_id, text, "", "", expired=True), key=ask_id))
             return
         if answer.option is None:  # everyone went offline before it opened

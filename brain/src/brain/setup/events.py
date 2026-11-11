@@ -38,13 +38,13 @@ class SetupEvents:
 
     def resume(self) -> None:
         """At start: news the last run never told is sent again (a day-old one is let go)."""
-        self._items.expire_due(self._now())
+        self._items.expire_due(self._now(), "setup")
         for item in self._saved():
             call = item.saved_call
             self._send(item.id, Event(call["kind"], call["facts"], key=call["key"]))
 
     def _saved(self) -> list[OpenItem]:
-        return [i for i in self._items.list_open() if i.kind == "setup"]
+        return self._items.list_open(kind="setup")
 
     def _send(self, item_id: str, event: Event) -> None:
         # Told only when the turn for it ends; a dropped wake leaves it open for the next start.

@@ -101,12 +101,23 @@ async def test_choice_timeout_expires_item_not_silent_drop():
     ask_id = choices.ask("Which?", ["a"], None, True)
     await asyncio.sleep(0.05)
     item = choices._items.get(ask_id)
-    assert (item.state, item.reason) == ("expired", "deadline")
+    assert (item.state, item.reason) == ("expired", "no_answer")
     (event,) = events  # Scout hears that nobody answered
     assert event.kind == "choice" and event.facts["expired"] == "yes"
     assert event.facts["option"] == "" and event.facts["question"] == "Which?"
     assert choices._tasks == set()
     assert bodies.sent[-1]["reason"] == "timeout"
+
+
+async def test_a_choice_timeout_leaves_other_kinds_of_open_items_alone():
+    _, _, choices = rig(timeout=0.01)
+    items = choices._items
+    other_ask = items.open("ask", "desktop", ttl_s=0)  # already past its deadline
+    offer = items.open("offer", "brain", ttl_s=0)
+    choices.ask("Which?", ["a"], None, True)
+    await asyncio.sleep(0.05)
+    assert items.get(other_ask.id).state == "open"
+    assert items.get(offer.id).state == "open"
 
 
 async def test_an_answered_choice_closes_its_item():

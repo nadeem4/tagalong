@@ -142,6 +142,13 @@ class OpenItems:
             for s in store.due(self.db, utc_text(now), kind)
         ]
 
+    def expire(self, id: str, reason: str) -> OpenItem:
+        """End one open item as expired, for a deadline the caller keeps itself."""
+        item = self.get(id)
+        if item is None:
+            raise OpenItemRefused("not_found")
+        return self._close(item, "expired", "brain", reason)
+
     def expire_live_only(self) -> list[OpenItem]:
         """Run at start and when a process ends: its items can no longer run."""
         return [
