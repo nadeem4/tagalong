@@ -31,6 +31,7 @@ from brain.tools import (
     expert_tools,
     format_hits,
     home_tools,
+    model_tools,
     output_tools,
     preference_tools,
     question_tools,
@@ -219,6 +220,7 @@ def home(mem, tmp_path):
     tools = (
         brain_tools(mem, notify)
         + home_tools(budget, lambda: box)
+        + model_tools(mem.db, "claude-sonnet-5-5", notify)
         + expert_tools(jobs, lambda: owner["turn"])
     )
     box = Toolbox(
@@ -851,6 +853,34 @@ async def test_set_permission_unknown_tool_sends_nothing(home):
     assert home.sent == []
 
 
+async def test_model_state_lists_three_with_lines(home):
+    state = json.loads(await home.run("model_state"))
+    assert state["provider"] == "anthropic"
+    assert state["model"] == "claude-sonnet-5-5"  # the env default until one is saved
+    assert state["default"] == "claude-opus-5-5"
+    assert [m["name"] for m in state["models"]] == [
+        "Claude Opus 5.5",
+        "Claude Sonnet 5.5",
+        "Claude Haiku 5.5",
+    ]
+    assert state["models"][1]["line"] == "Faster and cheaper"
+
+
+async def test_set_model_saves_and_says_changed(home):
+    out = json.loads(await home.run("set_model", {"model": "claude-haiku-5-5"}))
+    assert out == {"model": "claude-haiku-5-5"}
+    assert json.loads(await home.run("model_state"))["model"] == "claude-haiku-5-5"
+    assert ("changed", {"what": "model"}) in home.sent
+
+
+async def test_set_model_refuses_unknown(home):
+    for bad in ({"model": "gpt-9"}, {"model": ""}, {}):
+        with pytest.raises(RpcError) as err:
+            await home.run("set_model", bad)
+        assert err.value.code == ErrorCode.invalid_params
+    assert ("changed", {"what": "model"}) not in home.sent
+
+
 def test_home_tools_are_not_in_model_tools(home):
     names = {t["name"] for t in home.box.model_tools()}
     assert names == {
@@ -881,6 +911,8 @@ def test_home_tools_contract_records_have_no_for_or_mode(home):
         "spend_today",
         "list_permissions",
         "set_permission",
+        "model_state",
+        "set_model",
     }
     for r in records:
         assert set(r.model_dump(exclude_none=True)) == {

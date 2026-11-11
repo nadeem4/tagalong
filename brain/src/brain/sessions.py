@@ -58,6 +58,7 @@ from brain.mind.prompt import (
 )
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Call, Model, run_turn
+from brain.models import DEFAULT_MODEL_ID
 from brain.offers import Offers, OfferSettings
 from brain.outputs import OutputStore
 from brain.permission import Engine, Person, SideCheckDecider, StandingRule, stored_auto_rules
@@ -81,6 +82,7 @@ from brain.tools import (
     choice_tools,
     expert_tools,
     home_tools,
+    model_tools,
     output_tools,
     preference_tools,
     question_tools,
@@ -137,6 +139,7 @@ class Session:
         turn_timeout: float = DEFAULT_TURN_TIMEOUT_S,
         masker: Masker | None = None,
         keys: KeySettings | None = None,
+        model_default: str = DEFAULT_MODEL_ID,  # TAGALONG_MODEL; a saved choice overrides it
         extra_tools: list[tuple[ToolSpec, Handler]] | None = None,
         setup_facts: Callable[[], Awaitable[dict]] | None = None,
         preview_chars: int = DEFAULT_TOOL_PREVIEW_CHARS,
@@ -244,6 +247,7 @@ class Session:
         tools = (
             brain_tools(memory, notify)
             + home_tools(budget, lambda: self.toolbox, keys)
+            + model_tools(memory.db, model_default, notify)
             + voice_tools(lambda: self.voice)
             + expert_tools(self.jobs, self.owner_turn)
             + work_tools(self.records.work, self.jobs, timers.changed)

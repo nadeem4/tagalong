@@ -275,6 +275,91 @@ async def test_budget_spent_each_step_with_model_id():
     assert budget.spent == ["claude-sonnet-5-5"] * 2
 
 
+class _RecordingClient:
+    """A fake Anthropic client: scripted final messages, and the model of every request."""
+
+    def __init__(self, finals):
+        self.finals = list(finals)
+        self.requested = []
+        self.beta = SimpleNamespace(messages=SimpleNamespace(stream=self._stream))
+
+    def _stream(self, **kw):
+        self.requested.append(kw["model"])
+        final = self.finals.pop(0)
+
+        class Stream:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                return False
+
+            @property
+            def text_stream(self):
+                async def none():
+                    return
+                    yield
+
+                return none()
+
+            async def get_final_message(self):
+                return final
+
+        return Stream()
+
+
+def _msg(stop, content):
+    return SimpleNamespace(
+        content=[SimpleNamespace(to_dict=lambda c=c: c) for c in content],
+        stop_reason=stop,
+        usage=None,
+        model="m",
+    )
+
+
+def _chosen_model(client, choice):
+    return AnthropicModel(lambda key: client, lambda: choice["id"], "k")
+
+
+async def test_model_id_is_read_at_turn_start():
+    choice = {"id": "claude-sonnet-5-5"}
+    client = _RecordingClient([_msg("end_turn", [])])
+    model = _chosen_model(client, choice)
+    assert model.model_id == "claude-sonnet-5-5"
+    choice["id"] = "claude-haiku-5-5"
+    assert model.model_id == "claude-haiku-5-5"  # read live between turns
+    await start(model, [{"role": "user", "content": "go"}], [])
+    assert client.requested == ["claude-haiku-5-5"]
+
+
+async def test_set_model_applies_to_the_next_turn_not_the_running_one():
+    choice = {"id": "claude-sonnet-5-5"}
+    call = {"type": "tool_use", "id": "c1", "name": "x", "input": {}}
+    client = _RecordingClient(
+        [_msg("tool_use", [call]), _msg("end_turn", []), _msg("end_turn", [])]
+    )
+    model = _chosen_model(client, choice)
+
+    async def switch(_call):
+        choice["id"] = "claude-haiku-5-5"  # the person picks another model mid-turn
+        return "ok"
+
+    budget = Spend()
+    await start(model, [{"role": "user", "content": "a"}], [], run_tool=switch, budget=budget)
+    await start(model, [{"role": "user", "content": "b"}], [], budget=budget)
+    assert client.requested == ["claude-sonnet-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]
+    assert budget.spent == ["m", "m", "m"]  # the Final's own model wins; the pin is only a request
+
+
+async def test_reader_model_ignores_the_setting():
+    choice = {"id": "claude-haiku-5-5"}
+    reader = AnthropicModel(lambda key: object(), "claude-haiku-5-5", "k")
+    scout = _chosen_model(_RecordingClient([]), choice)
+    choice["id"] = "claude-opus-5-5"
+    assert scout.model_id == "claude-opus-5-5"
+    assert reader.model_id == "claude-haiku-5-5"
+
+
 async def test_real_budget_works(tmp_path):
     budget = Budget(tmp_path / "b.json", 5.0, today=lambda: datetime.date(2026, 10, 25))
     reason, *_ = await go([text_step()], budget=budget)

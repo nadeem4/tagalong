@@ -68,10 +68,25 @@ class AnthropicModel:
     """The client is built from the key on demand, so a key set from the app works at once and
     the brain can start with none."""
 
-    def __init__(self, make_client: Callable[[str], Any], model_id: str, key: str | None = None):
+    def __init__(
+        self,
+        make_client: Callable[[str], Any],
+        model_id: str | Callable[[], str],
+        key: str | None = None,
+    ):
         self._make_client = make_client
         self._client = make_client(key) if key else None
-        self.model_id = model_id
+        self._choose = model_id if callable(model_id) else lambda: model_id
+        self._pinned: str | None = None
+
+    @property
+    def model_id(self) -> str:
+        return self._pinned or self._choose()
+
+    def begin_turn(self) -> None:
+        """Keep the model chosen now for every request of this turn: a change in Settings
+        applies from the next turn, never halfway through a running one."""
+        self._pinned = self._choose()
 
     @property
     def ready(self) -> bool:
@@ -125,6 +140,8 @@ async def run_turn(
     on_rejected: Callable[[], None] | None = None,
 ) -> str:
     guards = guards or spend_guards(budget, step_cap)
+    if begin := getattr(model, "begin_turn", None):
+        begin()
     running: dict[str, str] = {}  # call id -> tool name, for tools that have not finished
     steps = 0
     shown: list[str] = []  # deltas of the step being streamed, kept if a cancel cuts it off
