@@ -290,7 +290,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   step, labelled by expert, app or Scout tool, with times) and **Reports** (one collapsed report
   per expert, read when you open it, rendered without any raw HTML). A running job opens on
   Activity, a finished one on Overview.
-- **Connections**: two tabs. **Apps** searches the app registry (the Official version first, a check card before any community one, a short curated Popular list when the box is empty, never the registry's raw first page) and **Experts** lists the experts Scout can install and use, Claude Code first (a download with no checksum is never offered; Log in, Update or Add; each asks first), so "what is on my calendar" or "any reviews waiting on
+- **Connections**: two tabs. **Apps** lists your apps (Official, then Community) and searches the app registry (the Official version first with **Add**, other makers behind "N more from other makers" with **Add…** and a check card, a short curated Popular list when the box is empty, never the registry's raw first page; how an add ended shows on its row) and **Experts** lists yours and an open, curated list to add from, Claude Code first (a download with no checksum is never offered; Log in, Update or Add; each asks first), so "what is on my calendar" or "any reviews waiting on
   GitHub" just work. The Python brain runs these itself (stdio or http MCP apps, a pasted key for
   http) and this page reads and changes them through the brain, so the brain has to be running.
   Apps with their own sign-in page work too (see [docs/connected-apps.md](docs/connected-apps.md)).
@@ -314,11 +314,12 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
 - **What Scout remembers**: its facts, preferences and conversation summaries, newest first.
   Delete any one.
 - **Settings**, in six sections. Press ⓘ beside a setting for the longer story. Below the form,
-  **Permissions** lists every tool Scout can use, grouped by where it comes from (built in, then each connected
-  body by the name it gave, then each connected app), each with **Off**, **Ask** or **Auto**: Auto means
-  Scout does it without asking, Off takes the tool away so Scout routes around it. A tool that
+  **Permissions** lists every tool Scout can use in plain words, in groups (Memory, This computer, your browser, each
+  connected app and so on), each collapsed until you open it, with a one-line summary such as "13 · 2 Ask, 11 Auto" and a flag when a risky
+  tool is on Auto. A search box finds a tool by name or description. Each tool has **Off**, **Ask** or **Auto**: Auto means
+  Scout does it without asking, Off takes the tool away so Scout routes around it. Press ⓘ beside a tool for the longer story. A tool that
   always needs your yes offers only Off and Ask, a risky one warns before Auto, and a tool of a
-  body that is not connected is dimmed. Claude Code's tool shows **Asks itself** (Off or Ask, never Auto), because Claude Code does its own asking.
+  body that is not connected is dimmed. Claude Code's tool shows **Always asks** (Off or Ask, never Auto), because Claude Code does its own asking.
   - **Privacy**: what Scout never looks at.
   - **Files Scout may use**: the folders Scout's file tools may touch. None until you add one with
     **Add folder**; **Remove** takes it away at once.
@@ -330,7 +331,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
 ## Providers and keys
 
 Scout thinks through the Python brain. It needs your Anthropic key: the walkthrough asks for it, and Settings → Anthropic key changes it
-and the daily limit. For developers, a real `ANTHROPIC_API_KEY` in the environment still works and
+and the daily limit; Settings → Scout's model picks the Claude model (Opus 5.5 by default, applied from the next reply). For developers, a real `ANTHROPIC_API_KEY` in the environment still works and
 wins (Settings then shows "Set by your environment"; see `.env.example`). Experts run on your Claude Code sign-in instead. The desktop passes your key
 to the brain once and keeps no copy.
 

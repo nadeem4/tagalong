@@ -431,8 +431,8 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     **Expected:** a "Claude Code asks" card shows the request and its input with one button per
     option; the question card (when Scout passes the question on, see the next section) has a **Your answer** field and **Send** (Enter sends too). Typing
     an answer and sending it continues the job with your words.
-14. **Action:** open Home → Settings → Permissions.
-    **Expected:** Claude Code's tool shows "Asks itself" with **Off** and **Ask**, no **Auto**.
+14. **Action:** open Home → Settings → Permissions, then open **Jobs and experts**.
+    **Expected:** the groups start collapsed, each with a count and a summary such as "13 · 2 Ask, 11 Auto"; the groups are named in plain words (Memory, This computer, your browser, each app) and each tool has a plain name and one line, with no code names. Opening Jobs and experts shows Claude Code's tool "Hand work to an expert" with an "Always asks" chip and only **Off** and **Ask**, no **Auto**. Press ⓘ beside a tool: its longer text opens below the row; Escape closes it. A risky tool on Auto shows an amber "N risky tool(s) on Auto" chip on its group; type part of a tool's name in **Find a permission**: only groups with a match show, opened, and clearing the box restores the collapsed groups.
 15. **Action:** with two experts installed, ask Scout to hand a task to Claude Code, then to
     "hand this to Codex" (and Gemini). Ask "which experts do you have?" and hand off without
     naming one.
@@ -957,9 +957,9 @@ desktop to talk to Scout. The page's own checks are in [Connections](#connection
    section is a card like the other Home tabs, on the same page width. Seeing, Always listening and
    Scout talks are On/Off switches (Space or Enter flips them). The three shortcuts show as keycaps
    (Ctrl, Shift, Space), never "CommandOrControl".
-3. **Action:** change a voice setting, a shortcut and press **Check key** or **Set limit** before
+3. **Action:** change a voice setting, a shortcut and press **Check key** or **Set** (the daily limit) before
    pressing Save.
-4. **Expected:** Check key and Set limit work on their own and do not save the page; Save then saves
+4. **Expected:** Check key and Set work on their own and do not save the page; Save then saves
    the voice and shortcut edits once. With the key set in the environment the key field is disabled
    and reads "Set by your environment".
 
@@ -1474,13 +1474,13 @@ the apps in C1 to C7 use a command or a pasted key.
 ### C6a. Search the registry
 
 - [ ] Home → **Connections** → search `notion`. The Official Notion app is first with an
-      **Official** tag; community apps with Notion in their name sit under it, each with a one-line
-      reason to pick it, and an unrelated app is not in that group.
+      **Official** chip and **Add**; "N more from other makers" opens the community ones under it,
+      each with a one-line reason to pick it, and an unrelated app is not in that group.
 - [ ] Search `a b&c#é`. The page answers (results or none) and does not error; a blank search shows
-      the Popular row.
+      the Popular list.
 - [ ] Press **Connect** on a community app. A check card names who made it ("not the service
       itself"), where it runs, how it signs in, the licence and "Not yet audited by anyone". Nothing
-      is added until **Connect anyway**; **Back** adds nothing.
+      is added until **Add anyway**; **Back** adds nothing.
 - [ ] Ask Scout in chat to install a community app. The same card appears and nothing is added
       until you press Allow; no saved preference skips it.
 - [ ] Turn the network off and search. The page keeps the Connected list and says it could not
@@ -2101,7 +2101,7 @@ Folders come from Home → Settings → **Files Scout may use**; none by default
    the `rules` table). Automated: `test_store_rules.py`, `test_migrate_rules.py`.
 7. **Never Auto.** Find a tool that always needs your yes (for example a connected app's delete
    tool). **Expected:** it says "Always asks" and offers only **Off** and **Ask**. Claude Code's
-   own tool says "Asks itself" and offers **Off** and **Ask** (turn it Off, then **Ask**: it works again).
+   own tool says "Always asks" and offers **Off** and **Ask** (turn it Off, then **Ask**: it works again).
 8. **Keyboard.** Tab into a tool's control, then press the arrow keys. **Expected:** the choice
    moves between **Off**, **Ask** and **Auto** (skipping any not offered) and the brain follows.
 
@@ -2182,12 +2182,34 @@ with a fake key; the real check against Anthropic is done by hand here.
    again. The key text appears nowhere on screen or in the log file.
 3. **Action:** with the network off, check a key. **Expected:** "Scout could not reach Anthropic.
    Try again." and the button reads **Try again**. Stop the brain: "Scout's brain is not running."
-4. **Action:** set the **Daily limit (USD)** to 0, then to 8. **Expected:** 0 is refused ("Enter an
-   amount above $0."); 8 reads "Daily limit saved." and Home's Spend card shows the new limit. A
-   "Spent today: $x.xx" line sits under the limit and updates after Scout answers something; the
-   same line shows on tour step 8.
+4. **Action:** set the **Daily limit** to 0, then to 8, and press **Set** (or Enter). **Expected:** 0 is
+   refused under the field ("Enter an amount above $0.", red border); 8 reads "Saved. Scout stops at
+   $8.00 a day." under the field, which fades after a few seconds, and Home's Spend card shows the new
+   limit. The amount shows two decimals. Under the field "$x.xx of $8.00 used today" with a percentage and a
+   slim meter updates after Scout answers something. When today's spend reaches the limit the meter turns amber
+   and "Today's $8 is spent; Scout pauses until midnight. Raise the limit to carry on." shows. Tour step 8 keeps its
+   "Spent today: $x.xx" line.
 5. **Action (developers):** start with a real `ANTHROPIC_API_KEY` in the environment.
    **Expected:** the section reads "Set by your environment" and the field is disabled.
+
+### K.2b. Scout's model
+
+Needs the desktop and a brain with a key. The e2e `key-settings.spec.ts` covers the pick on the fake
+brain; this checks it on the real one.
+
+1. **Action:** open **Home → Settings → Scout's model**. **Expected:** the section reads "The AI
+   model Scout thinks with, on your Anthropic key." with a greyed **Provider** (Anthropic, "More
+   providers coming later") and a **Model** that shows **Claude Opus 5.5**.
+2. **Action:** press the **Model** field (or Tab to it and press Enter). **Expected:** a list of
+   Claude Opus 5.5, Claude Sonnet 5.5 and Claude Haiku 5.5, each with its one-line note; the
+   current one has a tick and the default one a "Default" tag. Arrows, Home and End move,
+   Escape closes.
+3. **Action:** pick **Claude Sonnet 5.5**. **Expected:** the list closes, the field shows Sonnet
+   and "Saved." appears at once (no save button). Restart the brain: Sonnet is still chosen.
+4. **Action:** ask Scout something long, pick another model while it answers, then ask again.
+   **Expected:** the running answer finishes on the old model; the next one uses the new.
+5. **Action:** stop the brain. **Expected:** the section shows nothing to pick until the brain is
+   back.
 
 ### K.3. Show the tour again
 
@@ -2232,14 +2254,14 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
    Gmail), asked once per job. A saved app that is not signed in reads "Finish Gmail in Home.", not
    connected. A job whose app the registry lacks shows no button. Steps 1 to 6 never say "Claude
    Code" until the expert line is opened. Home's **Connections** page lists experts
-   under **For long jobs**, each led by the kind of job ("Fix code and other long jobs") with the
+   under **Your experts**, each led by the kind of job ("Fix code and other long jobs") with the
    product and version underneath.
    Then press the quiet line **For long jobs, Scout can also use an expert**: Claude Code's card and
    the hand-off preview open. Press **Set up Claude Code**. **Expected:** the stage words move on
    (checking, Node, installing), then "Claude Code is set up." With the login missing the button
    reads **Log in to Claude Code**; pressing it opens the login window and the card then says "Finish logging in in the window that opened." until the login ends, then it reads "Claude Code is set up." by itself (already logged in: it goes straight to set up); with the brain stopped the card says it can't check and
-   offers **Check again**. The opened line shows a hand-off card. On Home's **Connections** page the **For long jobs** card lists Claude Code with its
-   state; the **Experts** tab's **Add an expert** offers more (an Official one has **Add** and opens an Allow card first; a community one shows the check card first, and **Connect anyway** is that approval, so it opens no further Allow card) (Log in on a Claude Code you already logged into elsewhere opens no card: it says "Already logged in." and the chip turns ready).
+   offers **Check again**. The opened line shows a hand-off card. On Home's **Connections** page **Your experts** lists Claude Code with its
+   state; the **Experts** tab's **Add an expert** offers more (an Official one has **Add** and opens an Allow card first; a community one shows the check card first, and **Add anyway** is that approval, so it opens no further Allow card) (Log in on a Claude Code you already logged into elsewhere opens no card: it says "Already logged in." and the chip turns ready).
 2. **Action:** on step 7 press **Copy chrome://extensions**, paste it somewhere; press **Show
    folder** and **Copy folder path**. **Expected:** the address and the add-on folder path are
    what you pasted; the folder opens.
@@ -2513,9 +2535,9 @@ button`; a tap on a closed, unknown or refused ask replies `That question is clo
 ## Home app search and the check card (C2)
 
 1. Automated: `pnpm --filter @tagalong/ui exec vitest run src/home/app-search.test.tsx src/home/app-group-row.test.tsx src/home/check-card.test.tsx src/home/experts-tab.test.tsx src/home/connections-panel.test.tsx`; `pnpm --filter @tagalong/desktop exec vitest run src/main/ipc/setup.test.ts src/renderer/src/settings`; `pnpm --filter @tagalong/desktop exec playwright test e2e/connections.spec.ts` (after `pnpm --filter @tagalong/desktop build`).
-2. By hand, Home > Connections > Apps: type `notion` in **Search apps**. **Expected:** after a moment one Notion group, the **Official** version first with **Connect Notion**; "Show N other versions" lists community ones, each tagged **Community**.
-3. Press **Connect** on a community version. **Expected:** the check card opens (maker, where it runs, sign-in, licence, "Reviewed: Not yet audited by anyone", **See its code**, which opens your own browser); **Back** closes it and connects nothing. **Connect anyway** connects it.
-4. Clear the box. **Expected:** a **Popular** row (the curated apps only; see D2 below). Disconnect from the network and search: one plain line says Scout could not reach the registry.
+2. By hand, Home > Connections > Apps: type `notion` in **Search apps**. **Expected:** after a moment one Notion group, the **Official** version first with **Add Notion**; "N more from other makers" lists community ones, each chipped **Community**.
+3. Press **Add…** on a community version. **Expected:** the check card opens (maker, where it runs, sign-in, licence, "Reviewed: Not yet audited by anyone", **See its code**, which opens your own browser); **Back** closes it and connects nothing. **Add anyway** connects it.
+4. Clear the box. **Expected:** a **Popular** list (the curated apps only; see D2 below). Disconnect from the network and search: one plain line says Scout could not reach the registry.
 5. Settings > **Where Scout looks for apps** lists the two registries, read only. Home > Jobs now holds the **Read my mail for loops** card.
 
 ## One type system on Onest (D3)
@@ -2523,6 +2545,15 @@ button`; a tap on a closed, unknown or refused ask replies `That question is clo
 1. Automated: `cd bodies/ui && pnpm exec vitest run src/type-audit.test.ts src/theme/tokens.test.ts src/wordmark.test.ts` (every size on one of seven roles, weights 400 or 600, no capitals, no letter spacing, no pixel font); `cd bodies/browser && pnpm exec vitest run src/popup/popup-font.test.ts`; `cd bodies/desktop && pnpm exec playwright test e2e/smoke.spec.ts` (Onest 400 and 600 load, nothing is bundled as Pixelify Sans).
 2. By hand, open Home, Settings, the bubble, the tour and the browser popup. **Expected:** one typeface everywhere; card headings and labels read "Permissions", "Spend", "Read my mail for loops" in sentence case, never in capitals; money and counts line up their digits.
 3. Tab through Home on a light page and through the nav. **Expected:** the focus ring is navy on the light page and gold only on the navy side menu.
+
+## Connections redesign: official and community groups (D5)
+
+1. Automated, one file at a time from `bodies/ui`: `pnpm exec vitest run src/home/connections-panel.test.tsx`, then `src/home/experts-tab.test.tsx`, `src/home/app-search.test.tsx`, `src/home/app-group-row.test.tsx`, `src/home/check-card.test.tsx`, `src/home/connections-styles.test.ts`, `src/type-audit.test.ts`; and `pnpm --filter @tagalong/desktop exec playwright test e2e/connections.spec.ts` (fake brain).
+2. By hand, Home > Connections > Apps. **Expected:** **Your apps** lists Official ones first, then Community, each row a tile, name, chip, one meta line, a status dot, the switch and quiet Restart and Remove. **Add an app** has the search field, a **Popular** list and "Can't find it? Add it yourself".
+3. Search `notion`, press **Add Notion**. **Expected:** the row itself reads "Notion added." (not a line at the top). Open "N more from other makers" and press **Add…** on one: the warning-fill check card opens; **Back** adds nothing, **Add anyway** adds it.
+4. Search for nonsense: "No apps match ..." with the way to add it yourself. Switch the network off and search: one plain line, not two, and no old results beside it. While a search runs: "Searching…" and Popular dimmed; after it: `Results for "notion"`. A curated app or expert you already added says "✓ Added" in place of Add. Press "Can't find it? Add it yourself": a two-way switch (A web address, A command on this PC), labels above the fields, then **Add app**.
+5. Experts tab. **Expected:** **Your experts** and **Add an expert**. The curated list is open with **Recommended** and "Tested with Scout" or "Not tested with Scout"; **Show more** reveals the rest, and "Only experts that install and run on this PC are listed." An Official one has **Add**; a community one has **Add…** and the check card. While one installs its row shows a progress bar; a failed install shows the plain line with **Try again**.
+6. Tab through the page. **Expected:** every control shows the navy focus ring.
 
 ## Setup fixes: curated lists, installable experts, kept trust (D2)
 
@@ -2573,7 +2604,7 @@ Do not test these here.
 Home > Overview shows a "Scout's brain" card above "Where things run".
 
 1. Start Tagalong with the brain running. The card shows Running, "This PC" and the address, the
-   version, "Tagalong" under Started by, the process id, the data folder and log file with their
+   version, the model name (for example Claude Opus 5.5), "Tagalong" under Started by, the process id, the data folder and log file with their
    Open links, and the places connected.
 2. Click Copy details and paste: the text includes the build id.
 3. Stop the brain from a terminal (`uv run tagalong stop`). The card turns to "Can't reach Scout's
@@ -2586,7 +2617,9 @@ Home > Overview shows a "Scout's brain" card above "Where things run".
 5. Let Tagalong start the brain, then change a `.py` file under `brain/src/brain` and restart only
    the desktop: with no job running the brain restarts quietly once. With a job running, an
    "Update ready" prompt offers "Restart now" and "When your job finishes".
-6. Installer (by hand, Windows): install an older build, start it so the brain runs, then run the
+6. Pick another model under **Settings → Scout's model**: the card's **Model** row shows the new
+   name at once, and while the brain is offline it keeps the last name it showed.
+7. Installer (by hand, Windows): install an older build, start it so the brain runs, then run the
    new installer. The brain process (the id in `brain.pid`) must be gone before files are
    replaced, the install must finish without a "file in use" error, and the new app starts a new
    brain. Do the same for uninstall.

@@ -71,4 +71,68 @@ describe('parseSetupOverview', () => {
     const odd = { ...WIRE, experts: [{ ...WIRE.experts[0], state: 'weird' }] };
     expect(() => parseSetupOverview(odd)).toThrow();
   });
+
+  it('reads popular_more, official on installed apps and the curated expert fields', () => {
+    const overview = parseSetupOverview({
+      ...WIRE,
+      apps: [{ id: 'a', name: 'Notes', state: 'connected', official: true }],
+      popular_more: [ROW],
+      browse_experts: [
+        {
+          id: 'claude-acp',
+          name: 'Claude Code',
+          version: '1',
+          description: 'd',
+          official: true,
+          recommended: true,
+          tested: true,
+        },
+      ],
+      show_more_from: 1,
+    });
+    expect(overview.apps[0]?.official).toBe(true);
+    expect(overview.popularMore[0]?.id).toBe('com.notion/mcp');
+    expect(overview.browseExperts[0]).toMatchObject({ recommended: true, tested: true });
+    expect(overview.showMoreFrom).toBe(1);
+  });
+
+  it('reads added, licence, repo and account on a curated row', () => {
+    const overview = parseSetupOverview({
+      ...WIRE,
+      popular: [{ ...ROW, added: true }],
+      browse_experts: [
+        {
+          id: 'c',
+          name: 'C',
+          version: '1',
+          description: 'd',
+          added: true,
+          account: true,
+          licence: 'MIT',
+          repo: 'https://g/c',
+        },
+      ],
+    });
+    expect(overview.popular[0]?.added).toBe(true);
+    expect(overview.browseExperts[0]).toMatchObject({
+      added: true,
+      account: true,
+      licence: 'MIT',
+      repo: 'https://g/c',
+    });
+    expect(parseSetupOverview(WIRE).browseExperts[0]).toMatchObject({
+      added: false,
+      account: false,
+      licence: '',
+      repo: '',
+    });
+  });
+
+  it('an old brain without them parses: apps not official, nothing hidden behind Show more', () => {
+    const overview = parseSetupOverview(WIRE);
+    expect(overview.apps[0]?.official).toBe(false);
+    expect(overview.popularMore).toEqual([]);
+    expect(overview.browseExperts[0]).toMatchObject({ recommended: false, tested: false });
+    expect(overview.showMoreFrom).toBeNull();
+  });
 });

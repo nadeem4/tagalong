@@ -1,120 +1,178 @@
 /**
- * One service in the app search results: its Official version first (one press connects it),
- * then the community versions behind a toggle, each with its one-line "why" and a check card
- * before it can be connected. Contains AppGroupRow.
+ * One service in the app lists: its Official version first (Add is one press), the versions from
+ * other makers behind a toggle. A community row says "Name, by maker" and opens the check card
+ * before anything is added. One verb per row: Add, or Add… when a card comes first.
+ * Contains AppGroupRow and AppItem.
  */
-import { useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import type { AppGroup, AppRow } from '../shapes';
 import { Button } from '../controls/button';
-import { CheckCard, signInText, whereText } from './check-card';
+import { FactsLine } from '../setup/facts-line';
+import { Icon } from '../setup/icons';
+import { CheckCard } from './check-card';
+import type { Outcome } from './outcome';
 
-function Tile({ name }: { name: string }) {
+export function Tile({ name }: { name: string }) {
   return (
-    <span className="home-conn__initial" aria-hidden="true">
+    <span className="cx-tile" aria-hidden="true">
       {name.slice(0, 1).toUpperCase()}
     </span>
   );
 }
 
-/** One line of facts for a row, worded as the check card words them. */
-const preview = (row: AppRow): string =>
-  [
-    `Made by ${row.publisher}`,
-    `Where it runs: ${whereText(row)}`,
-    `Sign-in: ${signInText(row) ?? 'none needed'}`,
-  ].join(' · ');
+/** What stands on the right of a row after a press: the answer, the wait, or what ended it. */
+export function OutcomeText({ outcome }: { outcome: Outcome }) {
+  return (
+    <span
+      className={outcome.error ? 'cx-outcome cx-outcome--err' : 'cx-outcome'}
+      role={outcome.error ? 'alert' : 'status'}
+    >
+      {outcome.added && <Icon name="check" />}
+      {outcome.error && <Icon name="error" />}
+      {outcome.text}
+    </span>
+  );
+}
+
+export function Waiting() {
+  return (
+    <span className="cx-waiting">
+      <span className="cx-spin" aria-hidden="true" />
+      Waiting for you…
+    </span>
+  );
+}
+
+/** "✓ Added" in place of Add on a curated row for something already installed. */
+export function AddedStatus() {
+  return (
+    <span className="cx-status cx-status--off">
+      <Icon name="check" />
+      Added
+    </span>
+  );
+}
+
+export function AppItem({
+  row,
+  busy,
+  outcome,
+  onAdd,
+  onAddAnyway,
+  children,
+}: {
+  row: AppRow;
+  busy: boolean;
+  outcome: Outcome | undefined;
+  onAdd: (row: AppRow) => void;
+  onAddAnyway: (row: AppRow) => void;
+  children?: ReactNode;
+}) {
+  const [checking, setChecking] = useState(false);
+  const addButton = useRef<HTMLButtonElement>(null);
+  const label = row.official ? row.name : `${row.name}, by ${row.publisher}`;
+
+  return (
+    <li className="cx-item">
+      <div className="cx-row cx-row--top">
+        <Tile name={row.name} />
+        <div className="cx-row__main">
+          <span className="cx-row__name">
+            <span title={row.official ? undefined : row.id}>{label}</span>
+            <span className={row.official ? 'cx-chip cx-chip--official' : 'cx-chip'}>
+              {row.official ? 'Official' : 'Community'}
+            </span>
+          </span>
+          <span className="cx-row__desc">{row.why || row.description}</span>
+          <FactsLine row={row} />
+        </div>
+        <div className="cx-row__side">
+          {outcome !== undefined && <OutcomeText outcome={outcome} />}
+          {busy ? (
+            <Waiting />
+          ) : row.added ? (
+            outcome === undefined && <AddedStatus />
+          ) : (
+            outcome?.added !== true && (
+              <Button
+                ref={addButton}
+                variant="secondary"
+                className="cx-fixed"
+                aria-label={`Add ${label}`}
+                onClick={() => (row.official ? onAdd(row) : setChecking(true))}
+              >
+                {row.official ? 'Add' : 'Add…'}
+              </Button>
+            )
+          )}
+        </div>
+      </div>
+      {checking && (
+        <CheckCard
+          row={row}
+          busy={busy}
+          returnFocus={addButton}
+          onBack={() => setChecking(false)}
+          onAddAnyway={() => {
+            setChecking(false);
+            onAddAnyway(row);
+          }}
+        />
+      )}
+      {children}
+    </li>
+  );
+}
 
 export function AppGroupRow({
   group,
   busy,
-  onConnect,
-  onConnectAnyway,
+  outcomes,
+  onAdd,
+  onAddAnyway,
 }: {
   group: AppGroup;
-  /** Ids whose call is running; their Connect is disabled so a double press adds nothing. */
+  /** Ids whose call is running; they show "Waiting for you…" in place of the button. */
   busy: ReadonlySet<string>;
-  onConnect: (row: AppRow) => void;
-  onConnectAnyway: (row: AppRow) => void;
+  outcomes: ReadonlyMap<string, Outcome>;
+  onAdd: (row: AppRow) => void;
+  onAddAnyway: (row: AppRow) => void;
 }) {
   const { official, others } = group;
-  const [open, setOpen] = useState(official === null);
-  const [checking, setChecking] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const item = (row: AppRow, children?: ReactNode) => (
+    <AppItem
+      key={row.id}
+      row={row}
+      busy={busy.has(row.id)}
+      outcome={outcomes.get(row.id)}
+      onAdd={onAdd}
+      onAddAnyway={onAddAnyway}
+    >
+      {children}
+    </AppItem>
+  );
 
-  return (
-    <li className="conn-group">
-      {official !== null ? (
-        <div className="home-conn__head">
-          <Tile name={official.name} />
-          <span className="home-entry__body">
-            <span className="home-entry__title">
-              {official.name} <span className="tg-chip conn-tag conn-tag--official">Official</span>
-            </span>
-            <span className="home-entry__preview" title={official.description}>
-              {official.description}
-            </span>
-            <span className="home-entry__preview">{preview(official)}</span>
-          </span>
-          <Button
-            variant="primary"
-            aria-label={`Connect ${official.name}`}
-            disabled={busy.has(official.id)}
-            onClick={() => onConnect(official)}
-          >
-            Connect
-          </Button>
-        </div>
-      ) : (
-        <div className="home-conn__head">
-          <Tile name={group.service} />
-          <span className="home-entry__body">
-            <span className="home-entry__title">{group.service}</span>
-            <span className="home-entry__preview">No official version</span>
-          </span>
-        </div>
-      )}
+  // No official version: the community rows stand on their own, there is nothing to nest under.
+  if (official === null) return <>{others.map((row) => item(row))}</>;
 
-      {official !== null && others.length > 0 && (
-        <Button variant="quiet" aria-expanded={open} onClick={() => setOpen(!open)}>
-          {open ? 'Hide other versions' : `Show ${others.length} other versions`}
-        </Button>
-      )}
-
-      {open && (
-        <ul className="home-conns__list conn-group__others">
-          {others.map((row) => (
-            <li key={row.id} className="home-conn">
-              <div className="home-conn__head">
-                <span className="home-entry__body">
-                  <span className="home-entry__title" title={row.id}>
-                    {row.id} <span className="tg-chip conn-tag">Community</span>
-                  </span>
-                  {row.why !== undefined && <span className="home-entry__preview">{row.why}</span>}
-                  <span className="home-entry__preview">{preview(row)}</span>
-                </span>
-                <Button
-                  variant="secondary"
-                  aria-label={`Connect ${row.id}`}
-                  disabled={busy.has(row.id)}
-                  onClick={() => setChecking(row.id)}
-                >
-                  Connect
-                </Button>
-              </div>
-              {checking === row.id && (
-                <CheckCard
-                  row={row}
-                  busy={busy.has(row.id)}
-                  onConnect={() => {
-                    setChecking(null);
-                    onConnectAnyway(row);
-                  }}
-                  onBack={() => setChecking(null)}
-                />
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </li>
+  const count = others.length;
+  const more = count === 1 ? '1 more from another maker' : `${count} more from other makers`;
+  return item(
+    official,
+    count > 0 && (
+      <>
+        <button
+          type="button"
+          className="cx-more"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+        >
+          <Icon name={open ? 'chevDown' : 'chevRight'} />
+          {more}
+        </button>
+        {open && <ul className="cx-others">{others.map((row) => item(row))}</ul>}
+      </>
+    ),
   );
 }

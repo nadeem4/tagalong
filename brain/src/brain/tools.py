@@ -13,6 +13,7 @@ import json
 import logging
 import math
 import re
+import sqlite3
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import asdict, dataclass
@@ -31,6 +32,9 @@ from brain.guardrails import Budget
 from brain.job_records import JobPart, JobRecords, home_state
 from brain.jobs import JobError, Jobs, job_title
 from brain.memory import Memory
+from brain.models import DEFAULT_MODEL_ID, MODELS, PROVIDER
+from brain.models import chosen as chosen_model
+from brain.models import save as save_model
 from brain.outputs import OutputStore
 from brain.permission import Tier, tier
 from brain.protocol import ErrorCode, RpcError
@@ -41,6 +45,7 @@ from brain.store.memory import KINDS, MemoryRefused
 from brain.store.search import Hit
 from brain.store.work import TITLE_CAP, TransitionRefused, WorkEvent, WorkRow, WorkStore
 from brain.timers import MIN_REPEAT_S, Timers, is_return_wake, note_of
+from brain.tool_words import GROUPS, Group, fallback, words_for
 from brain.toolbox import SEP, Handler, Toolbox, ToolSpec
 from brain.voice import VoiceHooks
 
@@ -1163,24 +1168,61 @@ def home_tools(
         origin = {  # name -> where it comes from, built once for the whole list
             s.name: _origin(src, s.name) for src in box.sources for s in src.known_specs()
         }
-        rows = [
-            {
-                "name": s.name,
-                "description": s.description,
-                "effect": s.effect,
-                "mode": box.mode(s),
-                "locked": tier(s) in (Tier.locked, Tier.person_only),
-                "self_asks": s.tier is Tier.auto,
-                "person_only": tier(s) is Tier.person_only,
-                "server_tool": s.server_tool is not None,
-                "online": s.name in current,
-                "source": origin[s.name][0],
-                "source_name": origin[s.name][1],
-            }
-            for s in sorted(box.known_specs(), key=lambda s: s.name)
-            if "scout" in s.audience
-        ]
-        return json.dumps({"tools": rows})
+        rows = []
+        found: dict[str, Group] = {}  # group id -> group, in first-seen order
+        for s in sorted(box.known_specs(), key=lambda s: s.name):
+            if "scout" not in s.audience:
+                continue
+            kind, source_name = origin[s.name]
+            short = s.name.partition(SEP)[2] or s.name
+            words = None if kind.startswith("app:") else words_for(short, s.description)
+            if words is not None:
+                title, line, info, group = words.title, words.line, words.info, words.group
+            else:
+                title, line, info = fallback(short, s.description)
+                group = kind if ":" in kind else "other"
+            if group not in found:
+                found[group] = _group(group, kind, source_name)
+            rows.append(
+                {
+                    "name": s.name,
+                    "description": s.description,
+                    "title": title,
+                    "line": line,
+                    "info": info,
+                    "group": group,
+                    "effect": s.effect,
+                    "mode": box.mode(s),
+                    "locked": tier(s) in (Tier.locked, Tier.person_only),
+                    "self_asks": s.tier is Tier.auto,
+                    "person_only": tier(s) is Tier.person_only,
+                    "server_tool": s.server_tool is not None,
+                    "online": s.name in current,
+                    "source": kind,
+                    "source_name": source_name,
+                }
+            )
+        return json.dumps({"tools": rows, "groups": [asdict(g) for g in _ordered(found)]})
+
+    def _group(group: str, kind: str, source_name: str) -> Group:
+        """One group's heading: the table's wording, else the body or app it comes from. The
+        browser's group is named after the browser body itself and says so as "Your browser"."""
+        table = next((g for g in GROUPS if g.id == group), None)
+        if group == "browser":
+            return Group(group, source_name, "Your browser")
+        if table is not None:
+            return Group(group, table.title, table.note)
+        if group == "other":
+            return Group(group, "Other tools", "Tools without their own wording yet.")
+        return Group(group, source_name, f"From {source_name}")
+
+    def _ordered(found: dict[str, Group]) -> list[Group]:
+        """The table's groups in wording order, then bodies without one, then apps by name."""
+        table = [found[g.id] for g in GROUPS if g.id in found]
+        rest = [g for g in found.values() if g.id not in {t.id for t in GROUPS}]
+        rank = {"body": 0, "app": 2}
+        rest.sort(key=lambda g: (rank.get(g.id.partition(":")[0], 1), g.title.lower()))
+        return table + rest
 
     def _origin(source, name: str) -> tuple[str, str]:
         """Where a tool comes from, so Home can group: (built_in | body:<id> | app:<id>, a name)."""
@@ -1343,6 +1385,59 @@ def _key_tools(budget: Budget, keys: KeySettings) -> list[tuple[ToolSpec, Handle
                 effect="change",
             ),
             set_daily_limit,
+        ),
+    ]
+
+
+def model_tools(
+    db: sqlite3.Connection, env_default: str, notify: Notify
+) -> list[tuple[ToolSpec, Handler]]:
+    """model_state and set_model for Settings: which model Scout thinks with. The choice is
+    saved at once and applies from Scout's next turn."""
+
+    async def model_state(args: dict) -> str:
+        return json.dumps(
+            {
+                "provider": PROVIDER,
+                "model": chosen_model(db, env_default),
+                "default": DEFAULT_MODEL_ID,
+                "models": [asdict(m) for m in MODELS],
+            }
+        )
+
+    async def set_model(args: dict) -> str:
+        model = args.get("model") if isinstance(args, dict) else None
+        if not any(m.id == model for m in MODELS):
+            raise RpcError(ErrorCode.invalid_params, "set_model needs one of the listed models.")
+        save_model(db, model)
+        notify("changed", {"what": "model"})
+        return json.dumps({"model": model})
+
+    home = frozenset({"home"})
+    return [
+        (
+            ToolSpec(
+                "model_state",
+                "The AI model Scout thinks with, its provider and the models to choose from.",
+                {"type": "object", "properties": {}},
+                home,
+                effect="read",
+            ),
+            model_state,
+        ),
+        (
+            ToolSpec(
+                "set_model",
+                "Choose the model Scout thinks with, from its next reply.",
+                {
+                    "type": "object",
+                    "properties": {"model": {"type": "string"}},
+                    "required": ["model"],
+                },
+                home,
+                effect="change",
+            ),
+            set_model,
         ),
     ]
 

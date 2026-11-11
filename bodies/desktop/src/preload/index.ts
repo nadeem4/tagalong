@@ -32,12 +32,19 @@ import type {
   JobRow,
   RunningStep,
   PreferenceRow,
+  PermissionGroup,
   PermissionRow,
   SpendToday,
   KeyStatus,
   KeyResult,
 } from '@tagalong/ui';
-import type { BodiesState, LoopsState, TimerRow, WhatsAppChange } from '@tagalong/ui/shapes';
+import type {
+  BodiesState,
+  LoopsState,
+  ModelState,
+  TimerRow,
+  WhatsAppChange,
+} from '@tagalong/ui/shapes';
 import { IPC } from '../shared/ipc';
 import type { PreloadBridge } from '../shared/ipc';
 import { heldUntilHeard } from './held';
@@ -87,7 +94,11 @@ const bridge: PreloadBridge = {
     ipcRenderer.invoke(IPC.removeConnection, id) as Promise<unknown>,
   listMemories: () => ipcRenderer.invoke(IPC.listMemories) as Promise<MemoryEntry[]>,
   deleteMemory: (id: string) => ipcRenderer.invoke(IPC.deleteMemory, id) as Promise<boolean>,
-  listPermissions: () => ipcRenderer.invoke(IPC.listPermissions) as Promise<PermissionRow[]>,
+  listPermissions: () =>
+    ipcRenderer.invoke(IPC.listPermissions) as Promise<{
+      groups: PermissionGroup[];
+      rows: PermissionRow[];
+    }>,
   loopsState: () => ipcRenderer.invoke(IPC.loopsState) as Promise<LoopsState>,
   setLoopsOn: (app: string, on: boolean) =>
     ipcRenderer.invoke(IPC.loopsSet, app, on) as Promise<void>,
@@ -144,6 +155,8 @@ const bridge: PreloadBridge = {
   keyStatus: () => ipcRenderer.invoke(IPC.keyStatus) as Promise<KeyStatus>,
   setKey: (key: string) => ipcRenderer.invoke(IPC.keySet, key) as Promise<KeyResult>,
   setDailyLimit: (usd: number) => ipcRenderer.invoke(IPC.limitSet, usd) as Promise<void>,
+  modelState: () => ipcRenderer.invoke(IPC.modelState) as Promise<ModelState>,
+  setModel: (model: string) => ipcRenderer.invoke(IPC.modelSet, model) as Promise<void>,
   openWalkthrough: (step?: number) =>
     ipcRenderer.invoke(IPC.walkthroughOpen, { step }) as Promise<void>,
   onBrainChanged: (handler: (what: string) => void) => {

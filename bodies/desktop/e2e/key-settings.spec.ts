@@ -1,7 +1,8 @@
 /**
  * Settings > Anthropic key on the fake brain: with no key the dock says Add key, a refused key
  * is told so and stays in the field, and an accepted key clears the field and reads "already
- * set". The fake brain keeps no key; only a fake one is ever typed here.
+ * set". The fake brain keeps no key; only a fake one is ever typed here. Scout's model: picking
+ * Sonnet saves at once and the fake brain records `set_model`.
  */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -84,9 +85,33 @@ test('valid key clears the field and shows already set', async () => {
   await expect(home.getByText('A key is already set.')).toBeVisible({ timeout: 30_000 });
   await expect(home.getByLabel('API key')).toHaveValue('');
   expect(brain.keyAttempts).toBe(2);
-  // The daily limit shows what is spent today beside it (the fake brain reports $0.42).
-  await expect(home.getByText('Spent today: $0.42')).toBeVisible({ timeout: 30_000 });
+  // The daily limit shows what is spent today against it, with a meter (the fake brain reports $0.42).
+  await expect(home.getByText('$0.42 of $5.00 used today')).toBeVisible({ timeout: 30_000 });
+  await expect(home.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0.42');
   // The no-key mark leaves with the key.
   const avatar = await windowFor('avatar');
   await expect(avatar.getByTestId('status-mark')).toHaveCount(0, { timeout: 30_000 });
+});
+
+test("Scout's model: picking Sonnet saves at once and the brain records set_model", async () => {
+  const home = await windowFor('home');
+  const model = home.getByRole('combobox', { name: 'Model' });
+  await expect(model).toContainText('Claude Opus 5.5', { timeout: 30_000 });
+  await model.click();
+  await home.getByRole('option', { name: /Claude Sonnet 5\.5/ }).click();
+  await expect(home.getByText('Saved.', { exact: true })).toBeVisible();
+  await expect(model).toContainText('Claude Sonnet 5.5');
+  expect(brain.models).toEqual(['claude-sonnet-5-5']);
+});
+
+test('a refused limit and a saved limit both answer next to the field', async () => {
+  const home = await windowFor('home');
+  const field = home.getByLabel('Daily limit (USD)');
+  await field.fill('0');
+  await home.getByRole('button', { name: 'Set', exact: true }).click();
+  await expect(home.getByText('Enter an amount above $0.')).toBeVisible();
+  await field.fill('8');
+  await home.getByRole('button', { name: 'Set', exact: true }).click();
+  await expect(home.getByText('Saved. Scout stops at $8.00 a day.')).toBeVisible();
+  expect(brain.limits).toEqual([8]);
 });

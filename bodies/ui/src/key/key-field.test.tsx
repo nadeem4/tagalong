@@ -247,7 +247,7 @@ describe('LimitField', () => {
     const field = screen.getByLabelText('Daily limit (USD)');
     for (const bad of ['0', '-3', '', 'abc']) {
       fireEvent.change(field, { target: { value: bad } });
-      fireEvent.click(screen.getByRole('button', { name: 'Set limit' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Set' }));
     }
     expect(setDailyLimit).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toHaveTextContent('Enter an amount above $0.');
@@ -271,7 +271,7 @@ describe('LimitField', () => {
       ),
     );
     render(<LimitField host={{ setDailyLimit }} limitUsd={5} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Set limit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Set' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/^Enter an amount above \$0\.$/);
   });
 
@@ -279,27 +279,121 @@ describe('LimitField', () => {
     const setDailyLimit = vi.fn((_usd: number) => Promise.resolve());
     render(<LimitField host={{ setDailyLimit }} limitUsd={5} />);
     fireEvent.change(screen.getByLabelText('Daily limit (USD)'), { target: { value: '7.5' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Set limit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Set' }));
     await waitFor(() => expect(setDailyLimit).toHaveBeenCalledWith(7.5));
-    expect(await screen.findByText('Daily limit saved.')).toBeInTheDocument();
+    expect(await screen.findByText('Saved. Scout stops at $7.50 a day.')).toBeInTheDocument();
+  });
+
+  it('shows the amount with two decimals', () => {
+    render(<LimitField host={{ setDailyLimit: vi.fn(() => Promise.resolve()) }} limitUsd={5} />);
+    expect(screen.getByLabelText('Daily limit (USD)')).toHaveValue('5.00');
+  });
+
+  it('says what the limit is and what happens at it', () => {
+    render(<LimitField host={{ setDailyLimit: vi.fn(() => Promise.resolve()) }} limitUsd={5} />);
+    expect(
+      screen.getByText(
+        'The most Scout spends on this key in a day. When it gets there, Scout pauses until midnight.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('marks the field invalid while the amount is refused', () => {
+    render(<LimitField host={{ setDailyLimit: vi.fn(() => Promise.resolve()) }} limitUsd={5} />);
+    const field = screen.getByLabelText('Daily limit (USD)');
+    fireEvent.change(field, { target: { value: '0' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Set' }));
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('shows spent of limit with a meter', () => {
+    render(
+      <LimitField
+        host={{ setDailyLimit: vi.fn(() => Promise.resolve()) }}
+        limitUsd={5}
+        spentUsd={1.2}
+      />,
+    );
+    expect(screen.getByText('$1.20 of $5.00 used today')).toBeInTheDocument();
+    expect(screen.getByText('24%')).toBeInTheDocument();
+    const meter = screen.getByRole('progressbar');
+    expect(meter).toHaveAttribute('aria-valuenow', '1.2');
+    expect(meter).toHaveAttribute('aria-valuemin', '0');
+    expect(meter).toHaveAttribute('aria-valuemax', '5');
+    expect(meter).not.toHaveClass('tg-spendmeter--full');
+  });
+
+  it('shows no spend line until the spend is known', () => {
+    render(<LimitField host={{ setDailyLimit: vi.fn(() => Promise.resolve()) }} limitUsd={5} />);
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    expect(screen.queryByText(/used today/)).toBeNull();
+  });
+
+  it('limit reached state', () => {
+    render(
+      <LimitField
+        host={{ setDailyLimit: vi.fn(() => Promise.resolve()) }}
+        limitUsd={5}
+        spentUsd={5.3}
+      />,
+    );
+    expect(screen.getByText('$5.30 of $5.00 used today')).toBeInTheDocument();
+    expect(screen.getByText('100%')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toHaveClass('tg-spendmeter--full');
+    expect(
+      screen.getByText(
+        'Today’s $5 is spent; Scout pauses until midnight. Raise the limit to carry on.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the meter on the saved limit while the field is being edited', () => {
+    render(
+      <LimitField
+        host={{ setDailyLimit: vi.fn(() => Promise.resolve()) }}
+        limitUsd={5}
+        spentUsd={1.2}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('Daily limit (USD)'), { target: { value: '8' } });
+    expect(screen.getByText('$1.20 of $5.00 used today')).toBeInTheDocument();
+  });
+
+  it('saved and error states are inline, and the saved line fades', async () => {
+    vi.useFakeTimers();
+    try {
+      const setDailyLimit = vi.fn((_usd: number) => Promise.resolve());
+      render(<LimitField host={{ setDailyLimit }} limitUsd={5} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Set' }));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(screen.getByText('Saved. Scout stops at $5.00 a day.')).toBeInTheDocument();
+      act(() => {
+        vi.advanceTimersByTime(5000);
+      });
+      expect(screen.queryByText(/^Saved\./)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('follows the limit the brain reports', () => {
     const host = { setDailyLimit: () => Promise.resolve() };
     const { rerender } = render(<LimitField host={host} limitUsd={5} />);
     rerender(<LimitField host={host} limitUsd={8} />);
-    expect(screen.getByLabelText('Daily limit (USD)')).toHaveValue('8');
+    expect(screen.getByLabelText('Daily limit (USD)')).toHaveValue('8.00');
   });
 });
 
 describe('inside the Settings form', () => {
-  it('Set limit is the shared button, not plain text', () => {
+  it('Set is the shared button, not plain text', () => {
     render(<LimitField host={{ setDailyLimit: vi.fn(() => Promise.resolve()) }} limitUsd={5} />);
-    expect(screen.getByRole('button', { name: 'Set limit' })).toHaveClass('tg-button--secondary');
+    expect(screen.getByRole('button', { name: 'Set' })).toHaveClass('tg-button--secondary');
   });
 
-  // Settings is one form with one Save: Check key and Set limit must act alone, never submit it.
-  it('Check key, Enter in the key field and Set limit do not submit the form', async () => {
+  // Settings is one form with one Save: Check key and Set must act alone, never submit it.
+  it('Check key, Enter in the key field and Set do not submit the form', async () => {
     const onSubmit = vi.fn((event: { preventDefault(): void }) => event.preventDefault());
     const setDailyLimit = vi.fn(() => Promise.resolve());
     render(
@@ -311,7 +405,7 @@ describe('inside the Settings form', () => {
     const field = await paste(FAKE_KEY);
     fireEvent.keyDown(field, { key: 'Enter' });
     fireEvent.click(await screen.findByRole('button', { name: 'Check key' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Set limit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Set' }));
     await waitFor(() => expect(setDailyLimit).toHaveBeenCalledWith(5));
     expect(onSubmit).not.toHaveBeenCalled();
   });

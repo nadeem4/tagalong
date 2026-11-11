@@ -4,7 +4,7 @@
  * no Restart, and "When your job finishes" waits for the work.
  */
 
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   HostBridgeProvider,
@@ -19,6 +19,7 @@ const RUNNING: BrainCardData = {
   update: 'none',
   version: '0.9.2',
   build: 'a1b2c3d',
+  model: 'Claude Opus 5.5',
   appVersion: '0.9.2',
   appBuild: 'a1b2c3d',
   startedAt: new Date(Date.now() - 25 * 60_000).toISOString(),
@@ -93,6 +94,27 @@ describe('BrainCard', () => {
   it('version row: the app name, the version and the build', async () => {
     renderCard(RUNNING);
     expect(await region()).toHaveTextContent('Tagalong 0.9.2 · build a1b2c3d');
+  });
+
+  it('model row sits between Version and Started by and names the model', async () => {
+    renderCard({ ...RUNNING, model: 'Claude Sonnet 5.5' });
+    const labels = Array.from((await region()).querySelectorAll('dt')).map((dt) => dt.textContent);
+    expect(labels.indexOf('Model')).toBe(labels.indexOf('Version') + 1);
+    expect(labels.indexOf('Started by')).toBe(labels.indexOf('Model') + 1);
+    expect(await region()).toHaveTextContent('ModelClaude Sonnet 5.5');
+  });
+
+  it('model row reads again when the brain says the model changed', async () => {
+    const bridge = renderCard(RUNNING);
+    expect(await region()).toHaveTextContent('Claude Opus 5.5');
+    bridge.brainCard = () => Promise.resolve({ ...RUNNING, model: 'Claude Haiku 5.5' });
+    act(() => bridge.emitChanged('model'));
+    expect(await screen.findByText('Claude Haiku 5.5')).toBeVisible();
+  });
+
+  it('model row shows a dash when the model is not known', async () => {
+    renderCard({ ...RUNNING, model: null });
+    expect(await region()).toHaveTextContent('Model—');
   });
 
   it('update ready: warns, offers Restart now, and drops the plain Restart brain', async () => {

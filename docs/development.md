@@ -26,12 +26,12 @@ tagalong/
     examples/                       # sample frames shared by the TypeScript and Python tests
     ts/                             # @tagalong/contract: zod schemas for contract v1
   brain/                            # the Python brain: uv project, tests/; src/brain/ has protocol.py,
-                                    # config.py, bodies.py, server.py, apps.py, app_tools.py,
+                                    # config.py, models.py (Scout's choosable models), bodies.py, server.py, apps.py, app_tools.py,
                                     # job_records.py (jobs as work rows), retry.py (retry rules),
                                     # main.py and cli.py (the `tagalong` command; see docs/brain.md);
                                     # store/ opens tagalong.db and runs its numbered migrations
                                     # (db.py, search.py, conversation.py, memory.py, connections.py,
-                                    # outputs.py, rules.py, work.py, migrations/; the only code
+                                    # outputs.py, rules.py, settings.py, work.py, migrations/; the only code
                                     # that runs SQL; see docs/storage.md)
   bodies/
     ui/src/
@@ -44,6 +44,7 @@ tagalong/
       home/                         # Home: HomeView and its pages (Overview, Jobs, Connections, Approvals,
                                     # What Scout remembers, Settings, Spend)
       settings/settings-styles.ts   # the Settings sheet's styles
+      model/model-field.tsx         # the Scout model picker (Settings' "Scout's model")
       voice/                        # push to talk, the listen controller, the speech queue, what is spoken aloud
       theme/                        # design tokens, BeanClip (a strip of Bean frames, moving or still)
       test-support/fake-host-bridge.ts
@@ -58,6 +59,7 @@ tagalong/
                                     # (Always listening), asks, permissions and jobs.spec.ts
                                     # (Home's Jobs panel and a job's asks)
       e2e/fixtures/fake-brain.ts    # a ws server speaking contract v1, for smoke, listening, asks, permissions, jobs
+      src/main/ipc/model.ts         # Settings' model_state / set_model calls to the brain
       src/main/                     # index.ts, brain/ (turn-events.ts,
                                     # start.ts), context.ts,
                                     # hotkeys.ts, talk-key.ts, always-listening.ts,
@@ -313,7 +315,7 @@ you normally never call it yourself.
 
 ### Choosing Scout's brain
 
-The Python brain picks Scout's model and holds its keys (see [brain.md](brain.md)). You enter your Anthropic key in the app: the first-run walkthrough asks for it, and **Settings → Anthropic key** changes it and the daily limit. A real `ANTHROPIC_API_KEY` in the environment still works and wins (the developer path). The desktop has no provider or model picker and no sign-in check.
+The Python brain picks Scout's model and holds its keys (see [brain.md](brain.md)). You enter your Anthropic key in the app: the first-run walkthrough asks for it, and **Settings → Anthropic key** changes it and the daily limit. A real `ANTHROPIC_API_KEY` in the environment still works and wins (the developer path). **Settings → Scout's model** picks the Claude model (the brain saves it). The desktop has no provider picker and no sign-in check.
 
 Once running: Scout sits on screen as a small always-on-top window, `Ctrl+Shift+Space` captures the
 selection and the active window and opens the bubble beside it, Escape or focus loss hides the

@@ -24,6 +24,8 @@ const Wire = z.object({
   log_path: z.string(),
   places: z.array(z.object({ id: z.string(), kind: z.string(), name: z.string() })),
   work_running: z.boolean(),
+  // Optional: an older brain does not send it and must still give the card (and the restart check).
+  model: z.string().optional(),
 });
 type Facts = z.infer<typeof Wire>;
 
@@ -66,6 +68,8 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
   let restartedThisRun = false;
   let waitingForWork = false;
   let lastHello: HelloBuild = {};
+  /** The model the brain last named, so the card still shows it while the brain is offline. */
+  let lastModel: string | null = null;
 
   /** The brain's own facts; null offline or from an old brain with no `brain_status`. */
   async function facts(): Promise<Facts | null> {
@@ -79,11 +83,13 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
 
   async function card(): Promise<BrainCard> {
     const f = await facts();
+    if (f !== null) lastModel = f.model ?? null;
     return {
       status: brain.link === 'online' ? 'running' : 'offline',
       update,
       version: f?.version ?? (brain.link === 'online' ? (lastHello.version ?? null) : null),
       build: f?.build ?? (brain.link === 'online' ? (lastHello.build ?? null) : null),
+      model: lastModel,
       appVersion: ours.version,
       appBuild: ours.build,
       startedAt: f?.started_at ?? null,
@@ -155,6 +161,7 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
         `Process ID: ${c.pid ?? 'unknown'}`,
         `Address: ${c.addr}`,
         `Data folder: ${c.dataDir}`,
+        `Model: ${c.model ?? 'unknown'}`,
         `Started by: ${c.startedBy ?? 'unknown'}`,
       ].join('\n'),
     );

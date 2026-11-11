@@ -14,6 +14,7 @@ import type {
   FixTarget,
   LoopsState,
   MemoryEntry,
+  ModelState,
   Pet,
   SetupOverview,
   SetupResult,
@@ -65,6 +66,19 @@ export interface PermissionRow {
   source: string;
   /** The heading to group under: the body's declared name or the app's name. */
   source_name: string;
+  /** What the person reads: a plain name, one line, and the longer text behind the info button. */
+  title: string;
+  line: string;
+  info: string;
+  /** The id of the `PermissionGroup` this row is listed under. */
+  group: string;
+}
+
+/** One collapsible group in the Permissions list, in the order the brain sends them. */
+export interface PermissionGroup {
+  id: string;
+  title: string;
+  note: string;
 }
 
 /** One Claude Code job in Home's Jobs panel, as the brain's list_jobs sends it. */
@@ -201,6 +215,8 @@ export interface BrainCard {
   update: 'none' | 'ready' | 'terminal';
   version: string | null;
   build: string | null;
+  /** The model Scout thinks with, by name; null until the brain has said. */
+  model: string | null;
   /** The app's own version and build, to show beside a brain that differs, and while offline. */
   appVersion: string;
   appBuild: string;
@@ -306,6 +322,10 @@ export interface HostBridge {
   setKey(key: string): Promise<KeyResult>;
   /** Sets the daily spend limit in dollars (finite, above 0). */
   setDailyLimit(usd: number): Promise<void>;
+  /** Settings' Scout's model: the provider, the model in use and the models to pick from. */
+  modelState(): Promise<ModelState>;
+  /** Picks the model Scout thinks with, from its next reply; rejects with the brain's refusal. */
+  setModel(model: string): Promise<void>;
   /** Opens the first-run walkthrough, at a step when one is named (9 is the key). */
   openWalkthrough(step?: number): Promise<void>;
   /** Home's Spend card: what was spent today and the daily limit, as the brain knows them. */
@@ -358,7 +378,7 @@ export interface HostBridge {
    */
   askScout(text: string): Promise<void>;
   /** Home's Permissions: each tool Scout can use and whether it asks first. */
-  listPermissions(): Promise<PermissionRow[]>;
+  listPermissions(): Promise<{ groups: PermissionGroup[]; rows: PermissionRow[] }>;
   /** Sets one tool to off, ask or auto; rejects when the brain refuses (a locked tool, say). */
   setPermission(tool: string, mode: 'off' | 'ask' | 'auto'): Promise<void>;
   /** Home's Jobs panel: recent Claude Code jobs, newest first. */
@@ -398,7 +418,7 @@ export interface HostBridge {
   restartBrainAfterWork(): Promise<void>;
   openBrainFolder(): Promise<void>;
   openBrainLog(): Promise<void>;
-  /** Copies version, build, process id, address, data folder and who started it. */
+  /** Copies version, build, process id, address, data folder, model and who started it. */
   copyBrainDetails(): Promise<void>;
   /**
    * The brain changed something Home shows (`memory`, `permissions`; `link` when the connection

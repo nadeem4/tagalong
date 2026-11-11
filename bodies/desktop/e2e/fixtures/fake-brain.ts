@@ -9,7 +9,7 @@
  * A say that mentions "hand off" replies, then (turn over) opens a job's three
  * asks one after another: a mode, a relayed permission, a question. Every `answer` frame is
  * recorded for the test, free text included. The key tools (`key_status`, `set_api_key`, `spend_today` ($0.42),
- * `set_daily_limit`, `setup_overview`) follow `FakeBrainOptions`; the brain counts key attempts
+ * `set_daily_limit`, `model_state`, `set_model`, `setup_overview`) follow `FakeBrainOptions`; the brain counts key attempts
  * and keeps no key.
  *
  * Voice: `listen` is answered, and a few `mic` frames later it sends `heard` frames (held: the
@@ -75,10 +75,18 @@ export interface FakeBrain {
   setReading(rows: Record<string, unknown>[]): void;
   /** Shot scenes: replace the apps list and/or the setup answers (progress, failed, experts) and tell the bodies. */
   setScene(scene: { apps?: unknown[] | null; setup?: Record<string, unknown> }): void;
+  /**
+   * Add fields to the `setup_overview` answer (progress, failed...), optionally make searches fail
+   * (`true`) or never answer (`'hang'`, for a steady "Searching…" shot), and tell the bodies
+   * `changed: setup`.
+   */
+  setSetup(patch: Record<string, unknown>, failingSearches?: boolean | 'hang'): void;
   /** How many times `set_api_key` was called (the key itself is never recorded). */
   keyAttempts: number;
   /** Every amount Settings sent to `set_daily_limit`, in order. */
   limits: number[];
+  /** Every model id Settings sent to `set_model`, in order. */
+  models: string[];
   /** Every job id Home sent to `stop_job`, in order. */
   stops: string[];
   /** Every expert id the desktop sent to `setup_expert`, in order (the first one installs it). */
@@ -229,13 +237,15 @@ const notionRow = (id: string, official: boolean, publisher: string) => ({
   version: '1',
   description: 'Notion pages',
   official,
+  added: false,
   publisher,
   runs: official ? 'hosted' : 'pc',
   host: official ? 'mcp.notion.com' : null,
   sign_in: official ? 'browser' : 'key',
   licence: official ? 'Proprietary' : 'MIT',
   repo: official ? '' : `https://example.test/${id}`,
-  why: official ? '' : 'Matches the name',
+  // Official rows carry no why-pick: the row falls back to the description.
+  ...(official ? {} : { why: 'Matches the name' }),
 });
 const NOTION_GROUP = {
   service: 'Notion',
@@ -279,6 +289,25 @@ const INSTALL_FACTS: Record<string, Record<string, unknown>> = {
   },
   claude: { expert: 'claude-acp', official: true, publisher: 'Anthropic' },
 };
+const expertChoice = (id: string, name: string, over: Record<string, unknown> = {}) => ({
+  id,
+  name,
+  version: '1',
+  description: `${name} works on long jobs`,
+  official: true,
+  recommended: false,
+  tested: true,
+  added: false,
+  account: false,
+  licence: 'MIT',
+  repo: `https://example.test/${id}`,
+  ...over,
+});
+const BROWSE_EXPERTS = [
+  expertChoice('claude-acp', 'Claude Code', { recommended: true, account: true }),
+  expertChoice('codex-acp', 'Codex', { account: true }),
+  expertChoice('goose', 'Goose', { official: false, tested: false }),
+];
 
 const APPS = [
   {
@@ -382,8 +411,13 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   // A shot scene's own apps and setup answers (null / empty: the defaults).
   let sceneApps: unknown[] | null = null;
   let sceneSetup: Record<string, unknown> = {};
+  // Screenshot states for Connections: extra overview fields, and searches that fail.
+  let setupPatch: Record<string, unknown> = {};
+  let failSearches: boolean | 'hang' = false;
   let gmailConnected = false;
   const limits: number[] = [];
+  const models: string[] = [];
+  let model = 'claude-opus-5-5';
   let hasKey = options.hasKey ?? true;
   let dailyLimitUsd = 5;
   const keyResults = [...(options.keyResults ?? ['ok'])];
@@ -420,80 +454,116 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     ],
   };
   let running: unknown[] = [];
-  // Rows as list_permissions sends them: grouped by source on Home, each with what it allows.
+  // Rows and groups as list_permissions sends them: plain words, grouped, each with what it allows.
+  const row = (
+    name: string,
+    title: string,
+    line: string,
+    info: string,
+    group: string,
+    source: string,
+    source_name: string,
+    flags: Record<string, unknown> = {},
+  ) => ({
+    name,
+    description: `${title} (the model's own description)`,
+    title,
+    line,
+    info,
+    group,
+    effect: 'change',
+    mode: 'ask',
+    locked: false,
+    self_asks: false,
+    person_only: false,
+    online: true,
+    source,
+    source_name,
+    ...flags,
+  });
+  const permissionGroups = [
+    { id: 'memory', title: 'Memory', note: 'Things Scout keeps between chats.' },
+    {
+      id: 'jobs',
+      title: 'Jobs and experts',
+      note: 'Bigger work Scout hands to an expert such as Claude Code.',
+    },
+    {
+      id: 'computer',
+      title: 'This computer',
+      note: 'Windows and files. File tools only work inside folders you allowed.',
+    },
+    {
+      id: 'browser',
+      title: 'Chrome on work PC',
+      note: 'Your browser',
+    },
+    { id: 'app:gmail', title: 'Gmail', note: 'From Gmail' },
+  ];
   const permissions = [
-    {
-      name: 'recall',
-      description: 'Look up what Scout remembers',
-      effect: 'read',
-      mode: 'auto',
-      locked: false,
-      self_asks: false,
-      person_only: false,
-      online: true,
-      source: 'built_in',
-      source_name: 'Built in',
-    },
-    {
-      name: 'hand_off',
-      description: 'Hand a job to an expert',
-      effect: 'change',
-      mode: 'auto',
-      locked: false,
-      self_asks: true,
-      person_only: false,
-      online: true,
-      source: 'built_in',
-      source_name: 'Built in',
-    },
-    {
-      name: 'desktop__move_window',
-      description: 'Move a window on your desktop',
-      effect: 'change',
-      mode: 'ask',
-      locked: false,
-      self_asks: false,
-      person_only: false,
-      online: true,
-      source: 'body:desktop',
-      source_name: 'Desktop',
-    },
-    {
-      name: 'desktop__close_window',
-      description: 'Close a window on your desktop',
-      effect: 'change',
-      mode: 'ask',
-      locked: true,
-      self_asks: false,
-      person_only: false,
-      online: true,
-      source: 'body:desktop',
-      source_name: 'Desktop',
-    },
-    {
-      name: 'extension__open_tab',
-      description: 'Open a browser tab',
-      effect: 'change',
-      mode: 'ask',
-      locked: false,
-      self_asks: false,
-      person_only: false,
-      online: false,
-      source: 'body:extension',
-      source_name: 'Chrome on work PC',
-    },
-    {
-      name: 'gmail__delete_mail',
-      description: 'Delete an email',
-      effect: 'change',
-      mode: 'ask',
-      locked: true,
-      self_asks: false,
-      person_only: true,
-      online: true,
-      source: 'app:gmail',
-      source_name: 'Gmail',
-    },
+    row(
+      'recall',
+      'Look back in memory',
+      'Searches saved notes, past chats and past jobs.',
+      'When something may have come up before, Scout searches what it saved.',
+      'memory',
+      'built_in',
+      'Built in',
+      { effect: 'read', mode: 'auto' },
+    ),
+    row(
+      'hand_off',
+      'Hand work to an expert',
+      'Sends a task to an expert like Claude Code.',
+      'For bigger work, Scout passes the task to an expert.',
+      'jobs',
+      'built_in',
+      'Built in',
+      { mode: 'auto', self_asks: true },
+    ),
+    row(
+      'desktop__list_windows',
+      'See open windows',
+      "Lists your open windows, not what's in them.",
+      "Scout sees each window's name and whether it's in front, behind or minimized.",
+      'computer',
+      'body:desktop',
+      'Desktop',
+      { effect: 'read', mode: 'auto' },
+    ),
+    row(
+      'desktop__open_url',
+      'Open a link',
+      'Opens a web page in your browser.',
+      'Scout opens a secure (https) page, usually a sign-in page for an app.',
+      'computer',
+      'body:desktop',
+      'Desktop',
+      { locked: true },
+    ),
+    row(
+      'extension__tabs',
+      'See and read tabs',
+      'Lists your tabs and reads the one you need.',
+      'Scout finds the tab you mean and reads its text.',
+      'browser',
+      'body:extension',
+      'Chrome on work PC',
+      { effect: 'read', mode: 'auto', online: false },
+    ),
+    row(
+      'gmail__delete_mail',
+      'delete_mail',
+      'Delete an email',
+      '',
+      'app:gmail',
+      'app:gmail',
+      'Gmail',
+      {
+        locked: true,
+        person_only: true,
+      },
+    ),
   ];
 
   server.on('connection', (socket: WebSocket) => {
@@ -709,6 +779,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             id?: number;
             filter?: string;
             usd?: number;
+            model?: string;
             approved?: boolean;
             community_ok?: boolean;
             query?: string;
@@ -791,7 +862,38 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           dailyLimitUsd = Number(params.input?.usd);
           limits.push(dailyLimitUsd);
           notify('changed', { what: 'settings' });
+        } else if (params.tool === 'model_state') {
+          value = {
+            provider: 'anthropic',
+            model,
+            default: 'claude-opus-5-5',
+            models: [
+              { id: 'claude-opus-5-5', name: 'Claude Opus 5.5', line: 'Most capable' },
+              { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5', line: 'Faster and cheaper' },
+              {
+                id: 'claude-haiku-5-5',
+                name: 'Claude Haiku 5.5',
+                line: 'Fastest, for simple tasks',
+              },
+            ],
+          };
+        } else if (params.tool === 'set_model') {
+          model = String(params.input?.model);
+          models.push(model);
+          notify('changed', { what: 'model' });
+          value = { model };
         } else if (params.tool === 'setup_overview') {
+          if (failSearches === 'hang' && String(params.input?.query ?? '') !== '') return;
+          if (failSearches && String(params.input?.query ?? '') !== '') {
+            socket.send(
+              JSON.stringify({
+                jsonrpc: '2.0',
+                id: msg.id,
+                error: { code: -32000, message: 'registry unreachable' },
+              }),
+            );
+            return;
+          }
           value = {
             experts: expertInstalled
               ? [
@@ -801,18 +903,28 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
                     version: '2.0.0',
                     state: 'ready',
                     tested: true,
+                    official: true,
                   },
                 ]
               : [],
-            apps: gmailConnected ? [{ id: 'a1', name: 'Gmail', state: 'connected' }] : [],
-            browse_experts: [],
+            // One installed Official app (Files), so Your apps shows the Official group.
+            apps: [
+              { id: 'files', name: 'Files', state: 'connected', official: true },
+              ...(gmailConnected ? [{ id: 'a1', name: 'Gmail', state: 'connected' }] : []),
+            ],
+            // D5: curated experts first (Claude Code recommended), then what sits behind Show more.
+            browse_experts: expertInstalled
+              ? BROWSE_EXPERTS.filter((e) => e.id !== 'claude-acp')
+              : BROWSE_EXPERTS,
+            show_more_from: expertInstalled ? 1 : 2,
             // The registry answers a search by name; no query is a first page without Gmail.
             browse_apps:
               gmailConnected || !String(params.input?.query ?? '').includes('gmail')
                 ? []
                 : [{ id: 'io.example/gmail', name: 'Gmail', version: '1', description: 'Mail' }],
             // C1 facts: a search for notion is one service, an Official head and two community.
-            popular: [],
+            popular: [notionRow('com.notion/mcp', true, 'Notion')],
+            popular_more: [],
             app_groups: String(params.input?.query ?? '').includes('notion') ? [NOTION_GROUP] : [],
             next_cursor: null,
             sources: null,
@@ -820,6 +932,29 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             progress: null,
             failed: null,
             ...sceneSetup,
+            ...setupPatch,
+          };
+        } else if (params.tool === 'bodies_status') {
+          value = {
+            bodies: [
+              { kind: 'desktop', name: 'Desktop', connected: true },
+              { kind: 'browser', name: 'Browser', connected: true },
+              { kind: 'whatsapp', name: 'WhatsApp', connected: false },
+            ],
+          };
+        } else if (params.tool === 'whatsapp_status') {
+          value = {
+            enabled: false,
+            set: {
+              access_token: false,
+              app_secret: false,
+              verify_token: false,
+              phone_number_id: false,
+              allowed_number: false,
+            },
+            complete: false,
+            state: 'off',
+            port: 8080,
           };
         } else if (params.tool === 'setup_app') {
           appSetups.push(String(params.input?.id));
@@ -911,7 +1046,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           heldLoops = [];
           for (const app of loopApps) app.on = false;
           notify('changed', { what: 'loops' });
-        } else if (params.tool === 'list_permissions') value = { tools: permissions };
+        } else if (params.tool === 'list_permissions')
+          value = { tools: permissions, groups: permissionGroups };
         else if (params.tool === 'set_permission') {
           const row = permissions.find((p) => p.name === params.input?.tool);
           const chosen = String(params.input?.mode);
@@ -968,6 +1104,19 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         );
       }
     },
+    setSetup: (patch, failing = false) => {
+      setupPatch = patch;
+      failSearches = failing;
+      for (const socket of sockets) {
+        socket.send(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'changed',
+            params: { seq: ++seq, what: 'setup' },
+          }),
+        );
+      }
+    },
     readingEvents,
     setScene: (scene) => {
       if (scene.apps !== undefined) sceneApps = scene.apps;
@@ -1000,6 +1149,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
       return keyCalls.attempts;
     },
     limits,
+    models,
     stops,
     expertSetups,
     expertApprovals,

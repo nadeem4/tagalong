@@ -10,6 +10,7 @@ import { ANSWER_CSS } from './answer';
 import { CARD_CSS } from './card-styles';
 import { CHAT_CSS } from './chat-styles';
 import { CONTROLS_CSS } from './controls/controls-styles';
+import { CONNECTIONS_CSS } from './home/connections-styles';
 import { HOME_CSS } from './home/home-styles';
 import { SETTINGS_CSS } from './settings/settings-styles';
 import { themeTokens } from './theme/tokens';
@@ -24,6 +25,7 @@ const sheets: Record<string, string> = {
   'card-styles.ts': CARD_CSS,
   'chat-styles.ts': CHAT_CSS,
   'controls-styles.ts': CONTROLS_CSS,
+  'connections-styles.ts': CONNECTIONS_CSS,
   'home-styles.ts': HOME_CSS,
   'settings-styles.ts': SETTINGS_CSS,
   'walkthrough-styles.ts': WALKTHROUGH_CSS,
@@ -68,7 +70,7 @@ describe('type audit', () => {
       [20, [600]],
       [16, [600]],
       [14, [400, 600]],
-      [13, [400]],
+      [13, [400, 600]],
       [12, [400, 600]],
       [11, [600]],
       [9, [600]],

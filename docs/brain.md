@@ -37,7 +37,7 @@ variable still works and is the developer path.
 | -------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `TAGALONG_BRAIN_ADDR`            | `127.0.0.1:47321`  | `host:port` to listen on. Port `0` picks a free port                                                                                                                              |
 | `TAGALONG_HOME`                  | `~/.tagalong`      | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env`                                                                                                                |
-| `TAGALONG_MODEL`                 | `claude-opus-5-5`  | Model Scout thinks with                                                                                                                                                           |
+| `TAGALONG_MODEL`                 | `claude-opus-5-5`  | Model Scout thinks with until one is chosen in Settings                                                                                                                           |
 | `TAGALONG_DAILY_BUDGET_USD`      | `5`                | Most Scout may spend per local day, in USD                                                                                                                                        |
 | `TAGALONG_READER_MODEL`          | `claude-haiku-5-5` | Model that reads mail for loops (see [Loops](#loops))                                                                                                                             |
 | `TAGALONG_READER_DAILY_USD`      | `0.5`              | Most the mail reader may spend per local day, in USD; its own allowance, apart from Scout's                                                                                       |
@@ -523,6 +523,8 @@ explicit unlock. Off does three things:
 
 `list_permissions` rows carry `source` (`built_in`, `body:<id>` or `app:<id>`) so Home can group them, `source_name` (the body's declared name or the app's name; "Built in" for Scout's own) for the heading, and `person_only` so Home never offers Auto for a tool that always needs the person's yes.
 
+Each row also carries plain words from `tool_words.py`: `title` (the name Home shows), `line` (what it does, in one sentence) and `info` (the longer explanation behind the ⓘ button, possibly empty) and `group` (which group it sits in). One table keyed by the tool's short name serves the built-in, desktop and browser tools; a tool the table does not know (a connected app's, or a new one) falls back to its own text: the short name as `title`, the first sentence of its description as `line`, the rest as `info`, and the group of its app, body or `other`. `description` stays the model's text, unchanged. The reply's `groups` list holds `{id, title, note}` for each group that has a tool, in this order: the table's groups (`memory`, `timers`, `jobs`, `talking`, `held`, `setup`, `web`, `computer`, `browser`), then other bodies, then `other` ("Other tools"), then apps by name. The `browser` group is titled by the connected browser body's own name with the note "Your browser"; an app's group is `app:<id>`, titled by the app, with the note "From <app>". A test checks that every tool Scout can hold has wording.
+
 Shipped defaults match the design: built-in memory, timers, `read_output` and the job tools are
 `auto`; a body's reads are `auto` and its changes `ask` (the desktop's `open_url` and the browser's
 `tab_actions` ask); every app tool asks until changed. `test_tools.py` pins the built-in rows
@@ -797,31 +799,33 @@ so there is one gate and no second path.
   with the fixed text "call needs a tool and an input object." (the pydantic text would quote the
   params, and `set_api_key`'s hold the key).
 
-| Tool               | Input                                          | Result text (JSON)                                                                                                                                                                                                   |
-| ------------------ | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `list_memories`    | `{}`                                           | `{"memories": [{"id", "kind", "text", "at"}]}`, newest first, at most 200                                                                                                                                            |
-| `forget`           | `{"id": int}`                                  | a plain sentence, `forgot <kind> #<id>: <text>` (Scout may call it too)                                                                                                                                              |
-| `watch`            | `{"action", "note?", "every_minutes?", "id?"}` | add returns `{"id", "every_minutes"}`, list `{"watches": [...]}`, the rest a plain sentence (Scout may call it too); see Timers                                                                                      |
-| `spend_today`      | `{}`                                           | `{"spent_usd": float, "limit_usd": float}`                                                                                                                                                                           |
-| `list_permissions` | `{}`                                           | `{"tools": [{"name", "description", "effect", "mode", "locked", "self_asks", "person_only", "server_tool", "online", "source", "source_name"}]}`, sorted by name, Scout tools only; `mode` is `off`, `ask` or `auto` |
-| `set_permission`   | `{"tool": str, "mode": str}`                   | `{"tool", "mode"}`; `mode` is `off`, `ask` or `auto` (`off` works while the body is offline)                                                                                                                         |
-| `speak_sample`     | `{"text", "voice?", "speed?"}`                 | `{"mime": "audio/wav", "data": base64}`, for Settings' Preview (see [Brain mouth](#brain-mouth))                                                                                                                     |
-| `list_jobs`        | `{}`                                           | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Home only, Scout reads `work_status`                                                                                                        |
-| `stop_job`         | `{"job": str, "part?": str}`                   | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                                                                                                                   |
-| `timers_state`     | `{}`                                           | `{"timers": [{id, note, next_at, repeat_minutes, pending}]}`, soonest first; Home only                                                                                                                               |
-| `timer_cancel`     | `{"id": str}`                                  | `{"id"}`; an unknown id or a watch row is `invalid_params`; Home only                                                                                                                                                |
-| `job_activity`     | `{"job?": str, "after_rev?": int}`             | with `job`: a page of its steps (see [Experts](#experts)); without: `{"running": [{job, expert, text, at}]}`; Home only                                                                                              |
-| `job_report`       | `{"job": str, "part": str}`                    | `{"text": str or null}`: one part's report; an unknown job or part is `invalid_params`; Scout's copy is a preview, `read_output` pages the rest                                                                      |
+| Tool               | Input                                          | Result text (JSON)                                                                                                                                                                                                                                                                          |
+| ------------------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_memories`    | `{}`                                           | `{"memories": [{"id", "kind", "text", "at"}]}`, newest first, at most 200                                                                                                                                                                                                                   |
+| `forget`           | `{"id": int}`                                  | a plain sentence, `forgot <kind> #<id>: <text>` (Scout may call it too)                                                                                                                                                                                                                     |
+| `watch`            | `{"action", "note?", "every_minutes?", "id?"}` | add returns `{"id", "every_minutes"}`, list `{"watches": [...]}`, the rest a plain sentence (Scout may call it too); see Timers                                                                                                                                                             |
+| `spend_today`      | `{}`                                           | `{"spent_usd": float, "limit_usd": float}`                                                                                                                                                                                                                                                  |
+| `list_permissions` | `{}`                                           | `{"tools": [{"name", "description", "title", "line", "info", "group", "effect", "mode", "locked", "self_asks", "person_only", "server_tool", "online", "source", "source_name"}], "groups": [{"id", "title", "note"}]}`, sorted by name, Scout tools only; `mode` is `off`, `ask` or `auto` |
+| `set_permission`   | `{"tool": str, "mode": str}`                   | `{"tool", "mode"}`; `mode` is `off`, `ask` or `auto` (`off` works while the body is offline)                                                                                                                                                                                                |
+| `speak_sample`     | `{"text", "voice?", "speed?"}`                 | `{"mime": "audio/wav", "data": base64}`, for Settings' Preview (see [Brain mouth](#brain-mouth))                                                                                                                                                                                            |
+| `list_jobs`        | `{}`                                           | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Home only, Scout reads `work_status`                                                                                                                                                                               |
+| `stop_job`         | `{"job": str, "part?": str}`                   | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                                                                                                                                                                                          |
+| `timers_state`     | `{}`                                           | `{"timers": [{id, note, next_at, repeat_minutes, pending}]}`, soonest first; Home only                                                                                                                                                                                                      |
+| `timer_cancel`     | `{"id": str}`                                  | `{"id"}`; an unknown id or a watch row is `invalid_params`; Home only                                                                                                                                                                                                                       |
+| `job_activity`     | `{"job?": str, "after_rev?": int}`             | with `job`: a page of its steps (see [Experts](#experts)); without: `{"running": [{job, expert, text, at}]}`; Home only                                                                                                                                                                     |
+| `job_report`       | `{"job": str, "part": str}`                    | `{"text": str or null}`: one part's report; an unknown job or part is `invalid_params`; Scout's copy is a preview, `read_output` pages the rest                                                                                                                                             |
 
 `list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
 
-The first-run setup adds four more Home tools (never offered to Scout):
+The first-run setup adds six more Home tools (never offered to Scout):
 
 | Tool              | Input             | Result text (JSON)                                                                                                                                                          |
 | ----------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `key_status`      | `{}`              | `{"has_key", "source": "environment" or "file" or "none", "env_path", "daily_limit_usd"}`; never any part of the key                                                        |
 | `set_api_key`     | `{"key": str}`    | `{"status": "ok" or "invalid" or "unreachable"}`, nothing else; refused with `invalid_params` ("The key is set by the environment.") when the key came from the environment |
 | `set_daily_limit` | `{"usd": number}` | `{"limit_usd": float}`; the number must be finite and above 0                                                                                                               |
+| `model_state`     | `{}`              | `{"provider": "anthropic", "model", "default", "models": [{"id", "name", "line"}]}`; `model` is the choice in force, `default` the one used when none is chosen             |
+| `set_model`       | `{"model": str}`  | `{"model": str}`; `invalid_params` for an id not in `models`; saves it and sends `changed {what: "model"}`; it applies from the next reply, the one running keeps its model |
 
 The Connections page and the tour add three more Home tools (`setup/home_tools.py`, never offered
 to Scout): `setup_overview` (read; `{experts: [{id, name, version, state, tested}], apps,
@@ -845,7 +849,9 @@ forwards `true` from the tour window or Home's own buttons. Each answered card i
 records nothing. An installed expert that needs login is logged in instead of reinstalled (a
 second press after the install: the install and the login are two presses, not one chained
 call); a ready one answers `already_ready`. `browse_apps` leaves out apps already added (matched
-by name, as `install_app` does). Progress rides `changed {what:
+by name, as `install_app` does), but the curated `popular` and `popular_more` and `browse_experts`
+keep an installed item and mark it `added: true`, so its row says "Added" in place of Add.
+Progress rides `changed {what:
 "setup"}`.
 
 `setup_overview` also answers the registry search for Home (all facts, no wording):
@@ -859,14 +865,16 @@ Linear as `app.linear/linear`, Jira and Confluence as `com.atlassian/atlassian-m
 Gmail, Google Calendar, Google Drive, Slack, GitHub and Asana publish no Official one-click entry
 there, so they are not listed until one appears. `browse_experts` is ordered with
 `trust.POPULAR_EXPERTS` first (Claude Code, Gemini CLI, Codex), then the rest; each row has
-`recommended` (Claude Code) and `tested` (`env.is_tested`), and `show_more_from` is the index
-where "Show more" starts. `app_groups` is
+`recommended` (Claude Code), `tested` (`env.is_tested`), `account` (the curated claim that it
+signs in with the person's own account; the registry is silent), `added`, and the registry's
+`licence` and `repo` (its `repository`, else `website`) for the check card. `show_more_from` is the
+index where "Show more" starts. `app_groups` is
 `[{service, official: Row | null, others: [Row]}]` for the query, one group per service, Official
 head first (`setup/grouping.py`); `next_cursor` is the registry's cursor for the next page;
 `sources` names the two registries and their base URLs (`MCP_BASE`, `ACP_URL`) so Settings cannot
 drift from the code. A `Row` is `{id, name, version, description, official, publisher, runs
 ("pc" or "hosted"), host, sign_in ("browser", "key" or "none"), licence, repo, why}`; `why` is on
-community rows only. The installed `apps` rows carry `official`, the trust kept at install
+community rows only, and a curated row adds `added`. The installed `apps` rows carry `official`, the trust kept at install
 (`apps.trust`). Offline with no cache, `app_groups`, `popular` and `popular_more` are empty,
 `stale` is true and the installed lists stay.
 
@@ -1142,12 +1150,12 @@ process of the brain, on Tagalong's own Node only (`ensure_node`; the system Nod
 `bodies_tools.py` gives Home three tools (never offered to Scout; `main.py` passes the bridge
 supervisor as a getter, because it is built once the brain's port is known):
 
-| Tool              | Input                                                          | Result text (JSON)                                                                                                                                                                                                                      |
-| ----------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `brain_status`    | `{}`                                                           | `{"version", "build", "pid", "started_at", "started_by", "addr", "data_dir", "log_path", "places": [{"id", "kind", "name"}], "work_running"}`: the facts on Home's "Scout's brain" card (Home only; `brain_status_tools` in `tools.py`) |
-| `bodies_status`   | `{}`                                                           | `{"bodies": [{"kind", "name", "connected"}]}`, always `desktop`, `browser` and `whatsapp`                                                                                                                                               |
-| `whatsapp_status` | `{}`                                                           | `{"enabled", "set": {access_token, app_secret, verify_token, phone_number_id, allowed_number: bool}, "complete", "state", "port"}`; never a value                                                                                       |
-| `whatsapp_set`    | any of `enabled` (bool), the five strings, `port` (1024-65535) | the same JSON as `whatsapp_status`                                                                                                                                                                                                      |
+| Tool              | Input                                                          | Result text (JSON)                                                                                                                                                                                                                                                                    |
+| ----------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `brain_status`    | `{}`                                                           | `{"version", "build", "pid", "started_at", "started_by", "addr", "data_dir", "log_path", "places": [{"id", "kind", "name"}], "work_running", "model"}` (`model` is the chosen model's name): the facts on Home's "Scout's brain" card (Home only; `brain_status_tools` in `tools.py`) |
+| `bodies_status`   | `{}`                                                           | `{"bodies": [{"kind", "name", "connected"}]}`, always `desktop`, `browser` and `whatsapp`                                                                                                                                                                                             |
+| `whatsapp_status` | `{}`                                                           | `{"enabled", "set": {access_token, app_secret, verify_token, phone_number_id, allowed_number: bool}, "complete", "state", "port"}`; never a value                                                                                                                                     |
+| `whatsapp_set`    | any of `enabled` (bool), the five strings, `port` (1024-65535) | the same JSON as `whatsapp_status`                                                                                                                                                                                                                                                    |
 
 `whatsapp_set` changes only the keys given. They are written together in one atomic replace of
 `<TAGALONG_HOME>/.env` (`upsert_env_values`, `enabled` as `1` or `0`) and to the running environment, then the supervisor
