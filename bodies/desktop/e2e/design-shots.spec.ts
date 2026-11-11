@@ -253,7 +253,7 @@ test('D5 connections', async () => {
     await shot(home, 'D5', 'experts-added');
     brain.setSetup({});
 
-    brain.setSetup({ progress: { expert: 'codex-acp', stage: 'downloading', percent: 40 } });
+    brain.setSetup({ progress: { expert: 'codex-acp', stage: 'node', percent: 40 } });
     await expect(home.getByText('Installing…').first()).toBeVisible({ timeout: 15_000 });
     await shot(home, 'D5', 'experts-installing');
     brain.setSetup({ failed: { expert: 'goose', error: 'download failed' } });

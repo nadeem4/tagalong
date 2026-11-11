@@ -33,18 +33,16 @@ export function SearchField({
           onChange={(event) => onChange(event.target.value)}
         />
       </div>
-      {(loading || note !== undefined) && (
-        <p role="status" className="cx-search__status">
-          {loading ? (
-            <span className="cx-waiting">
-              <span className="cx-spin" aria-hidden="true" />
-              Searching…
-            </span>
-          ) : (
-            <span className="cx-search__note">{note}</span>
-          )}
-        </p>
-      )}
+      <p role="status" className="cx-search__status">
+        {loading ? (
+          <span className="cx-waiting">
+            <span className="cx-spin" aria-hidden="true" />
+            Searching…
+          </span>
+        ) : (
+          note !== undefined && <span className="cx-search__note">{note}</span>
+        )}
+      </p>
     </div>
   );
 }

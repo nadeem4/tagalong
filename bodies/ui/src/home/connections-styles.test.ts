@@ -62,6 +62,14 @@ describe('CONNECTIONS_CSS', () => {
     expect(CONNECTIONS_CSS).toMatch(/\.cx-quiet \.tg-button \{[^}]*padding: 0 8px/);
   });
 
+  it('gives the Popular section the card gap and takes no space for an empty status line', () => {
+    expect(CONNECTIONS_CSS).toMatch(
+      /\.cx-section \{[^}]*display: flex[^}]*flex-direction: column[^}]*gap: 14px/,
+    );
+    expect(CONNECTIONS_CSS).toMatch(/\.cx-search \{[^}]*gap: 0/);
+    expect(CONNECTIONS_CSS).toMatch(/\.cx-search__status:not\(:empty\) \{[^}]*margin-top: 6px/);
+  });
+
   it('draws the search status line only with text, so it has no minimum height', () => {
     expect(CONNECTIONS_CSS).not.toMatch(/\.cx-search__status \{[^}]*min-height/);
   });

@@ -147,7 +147,7 @@ export function AppSearch({
       ) : (
         <>
           {(!typing || (pending && groups.length === 0)) && popular.length > 0 && (
-            <section aria-label="Popular" className={typing ? 'cx-stale' : undefined}>
+            <section aria-label="Popular" className={typing ? 'cx-section cx-stale' : 'cx-section'}>
               <p className="cx-group-label">Popular</p>
               <ul className="cx-list">
                 {popular.map(rowFor)}

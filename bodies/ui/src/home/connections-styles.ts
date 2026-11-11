@@ -89,7 +89,9 @@ export const CONNECTIONS_CSS = `
 }
 .home .cx-check .cx-link { color: ${t.color.warnInk}; }
 
-.home .cx-search { display: flex; flex-direction: column; gap: 6px; }
+.home .cx-section { display: flex; flex-direction: column; gap: 14px; }
+.home .cx-search { display: flex; flex-direction: column; gap: 0; }
+.home .cx-search__status:not(:empty) { margin-top: 6px; }
 .home .cx-search__box {
   display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px; border-radius: 8px;
   border: 1px solid ${t.color.keycapLine}; background: #fff; color: ${t.color.panelMuted};
