@@ -425,7 +425,12 @@ class Engine:
             # Before the row: when the person's answer beat the look, `settled` raises and no
             # approval is written for a yes that decided nothing.
             req.settled("side_check")
-        self._record(req, "approved", grant.decided_by, pref)
+            try:
+                self._record(req, "approved", grant.decided_by, pref)
+            except Exception as err:  # the yes is committed: a missing log row must not undo it
+                log.warning("approval row failed: %s", type(err).__name__)
+        else:
+            self._record(req, "approved", grant.decided_by, pref)
         if always:
             self._set_auto(req.tool)  # now Auto: an offer would be noise
         elif decider == "person" and req.offer and req.tier is not Tier.person_only:

@@ -556,5 +556,5 @@ async def test_voice_status_and_done_survive_past_the_cap():
     bodies.send_live("a", "speech", {"turn": "t", "done": True})
     for frame in peer.frames:
         queue.put(frame)
-    left = [json.loads(await queue.get())["params"] for _ in range(3)]
-    assert {"status": "ready"} in left and {"turn": "t", "done": True} in left
+    left = [json.loads(await queue.get())["params"] for _ in range(2)]
+    assert left == [{"status": "ready"}, {"turn": "t", "done": True}]

@@ -673,7 +673,6 @@ async def test_person_answer_first_stops_the_side_check(mem):
 
 async def test_a_failed_side_check_grant_leaves_the_card_to_the_person(mem):
     gate, person_gate = asyncio.Event(), asyncio.Event()
-    closed = []
 
     async def ask():
         await person_gate.wait()
@@ -689,7 +688,7 @@ async def test_a_failed_side_check_grant_leaves_the_card_to_the_person(mem):
         return real(**kw)
 
     rig.approvals.record = broken
-    task = asyncio.create_task(rig.engine.decide(req(how_to_ask=ask, settled=closed.append)))
+    task = asyncio.create_task(rig.engine.decide(req(how_to_ask=ask)))
     await asyncio.sleep(0)
     gate.set()
     await asyncio.sleep(0.05)
@@ -707,3 +706,18 @@ async def test_settled_refusal_leaves_the_outcome_to_the_person(mem):
     with pytest.raises(AskOpen):
         await rig.engine.decide(req(show_card=lambda: None, settled=refused))
     assert rig.rows() == []  # no approval row for a yes the person beat
+
+
+async def test_a_log_failure_after_settled_keeps_the_yes(mem, caplog):
+    closed = []
+    rig = Rig(mem, [Fake("side_check", Grant("scout"))])
+
+    def broken(**_):
+        raise RuntimeError("log write failed")
+
+    rig.approvals.record = broken
+    with caplog.at_level("WARNING"):
+        d = await rig.engine.decide(req(show_card=lambda: None, settled=closed.append))
+    assert (d.kind, d.decided_by) == ("allow_once", "scout")
+    assert closed == ["side_check"]  # the card was closed once, nothing reopened
+    assert "approval row failed" in caplog.text
