@@ -321,6 +321,33 @@ async def test_restart_reconnects(make):
     assert result.content[0].text == "again"
 
 
+async def test_wait_settled_says_how_a_restart_ended(make):
+    rig = make([stdio_row()])
+    await rig.apps.start()
+    await rig.up("fake")
+    await rig.apps.restart("fake")  # returns before the new process is up
+    assert (await rig.apps.wait_settled("fake", 10)).state == "connected"
+
+
+async def test_wait_settled_reports_a_launch_that_fails(make):
+    rig = make([stdio_row(mode="exit")])
+    await rig.apps.start()
+    status = await rig.apps.wait_settled("fake", 10)
+    assert status.state == "error" and status.error
+
+
+async def test_wait_settled_gives_up_on_a_hang(make):
+    rig = make([stdio_row(mode="hang")], connect_timeout=5)
+    await rig.apps.start()
+    assert (await rig.apps.wait_settled("fake", 0.2)).state == "connecting"
+
+
+async def test_wait_settled_on_an_off_app_returns_at_once(make):
+    rig = make([stdio_row(enabled=False)])
+    await rig.apps.start()
+    assert (await rig.apps.wait_settled("fake", 1)).state == "off"
+
+
 async def test_process_is_gone_after_stop_and_shutdown(make, tmp_path):
     pidfile = tmp_path / "pid"
     rig = make([stdio_row(env={"FAKE_PIDFILE": str(pidfile)})])

@@ -203,7 +203,8 @@ sign-in`, `Not working`, `Off`), the on/off switch, and quiet **Restart** and **
   back as `official` on each connected app, so the tag survives a restart. Apps connected before this was kept read Community until added again.
 - **Experts tab** (`experts-tab.tsx`, `experts-group.tsx`): **Your experts** (installed, Official
   first, each led by the kind of job it does from `jobs-kinds.ts` with the product underneath, a state
-  chip (Ready, Needs login, Update available) and a **Log in** or **Update** button), then **Add an
+  chip (Ready, Needs login) and a **Log in** button; a newer version shows as `v1.2 → v1.3` with
+  an **Update** button from the updates state), then **Add an
   expert**: the brain's curated list is open (`browse_experts`, with Recommended and "Tested with
   Scout" or "Not tested with Scout"), **Show more** reveals the rest (`show_more_from`), and a search
   field covers both. A row says "Signs in with your own account" when the brain's `account` field
@@ -296,9 +297,12 @@ and when Home presses **Check for updates**.
   nobody has reviewed waits for you). A group that is off shows "Waits for you" on its rows and an
   **Update** button; **Update all (n)** updates every row waiting in that tab.
 - **Never mid-job.** An update that is due (automatic, or pressed) while a job runs waits in a
-  queue, the row says "Waiting for a job to finish…", and `tick` applies it once the job ends.
+  queue, the row says "Waiting for a job to finish…", and `tick` applies it once the job ends. A
+  job that starts while an update is being swapped in waits for the swap to end first, so it
+  never meets an expert or app halfway through.
 - **On the row.** Updating…, then "Updated to vX." (the old version stays if it fails, with "The
-  update didn't work." and the button again). The brain sends `changed` with `what: "updates"` on
+  update didn't work." and the button again; an app whose new version does not connect is put
+  back on its old command and started again). The brain sends `changed` with `what: "updates"` on
   every status change and the page reads the state again.
 - **Home calls** (`setup/home_tools.py`, never offered to Scout): `updates_state`,
   `updates_check`, `update_item {kind, id}`, `update_all {kind}` (`{started}`, `{waiting: "job"}`

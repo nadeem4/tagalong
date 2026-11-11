@@ -10,16 +10,6 @@ import sqlite3
 from brain.apps import AppRow
 
 
-def pinned_version(args: list[str]) -> str:
-    """The version pinned in a package command's last argument (`pkg@1.2.0`, `@scope/pkg@1.2.0`,
-    `pkg==1.2.0`), or empty when the package is bare."""
-    spec = args[-1] if args else ""
-    name, sep, version = spec.partition("==")
-    if not sep:
-        name, sep, version = spec.rpartition("@")
-    return version if sep and name and version else ""
-
-
 def list_apps(db: sqlite3.Connection) -> list[AppRow]:
     rows = db.execute(
         "SELECT id, name, transport, config, auth, enabled, trust, version FROM apps ORDER BY rowid"

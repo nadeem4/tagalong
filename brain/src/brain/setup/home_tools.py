@@ -39,7 +39,7 @@ from brain.setup.trust import (
     is_official_expert,
     service_key,
 )
-from brain.setup.updates import Updates, newer
+from brain.setup.updates import Updates
 from brain.setup.why import WhyPick, shorten
 from brain.toolbox import Handler, ToolSpec
 
@@ -143,11 +143,10 @@ def home_setup_tools(
             "repo": facts["repo"],
         }
 
-    def state(expert: InstalledExpert, latest: dict[str, str]) -> str:
+    def state(expert: InstalledExpert) -> str:
+        # A newer version is the updates row's to show, not a state of the expert.
         if expert.source == "custom":
             return "ready"
-        if newer(latest.get(expert.id, ""), expert.version):
-            return "needs_update"
         return "ready" if expert.logged_in is True else "needs_login"
 
     async def curated(
@@ -210,7 +209,6 @@ def home_setup_tools(
             mcp, stale_mcp = await listing(lambda: registry.mcp_servers(query, cursor=cursor))
         else:
             mcp, stale_mcp = None, False
-        latest = {e.id: e.version for e in acp.entries} if acp else {}
         installed = experts()
         added = {a["name"] for a in apps()}
         # Only what can be added here and is not already added; the model writes at most
@@ -267,7 +265,7 @@ def home_setup_tools(
                         "id": e.id,
                         "name": e.name,
                         "version": e.version,
-                        "state": state(e, latest),
+                        "state": state(e),
                         "tested": is_tested(e.id),
                         "official": is_official_expert(e.id),
                     }
@@ -358,9 +356,7 @@ def home_setup_tools(
         found = installed.get(str(args.get("id")))
         tool = "install_expert"
         if found is not None:
-            acp, _ = await listing(registry.acp_agents)
-            latest = {e.id: e.version for e in acp.entries} if acp else {}
-            current = state(found, latest)
+            current = state(found)
             if current == "ready":
                 return json.dumps({"error": "already_ready", "detail": found.id})
             if current == "needs_login":

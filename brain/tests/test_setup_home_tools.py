@@ -152,9 +152,9 @@ async def test_an_expert_not_logged_in_needs_login(tmp_path):
     assert (await rig.call("setup_overview"))["experts"][0]["state"] == "needs_login"
 
 
-async def test_needs_update_when_the_registry_version_is_newer(tmp_path):
-    rig = Rig(tmp_path, [expert(version="1.0.0")])
-    assert (await rig.call("setup_overview"))["experts"][0]["state"] == "needs_update"
+async def test_a_newer_registry_version_is_not_an_expert_state(tmp_path):
+    rig = Rig(tmp_path, [expert(version="1.0.0")])  # the updates row shows it instead
+    assert (await rig.call("setup_overview"))["experts"][0]["state"] == "ready"
 
 
 async def test_the_custom_expert_is_ready_and_never_updated(tmp_path):

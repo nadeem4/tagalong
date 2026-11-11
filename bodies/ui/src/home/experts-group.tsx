@@ -24,11 +24,9 @@ import {
 const STATE_WORDS: Record<SetupExpert['state'], string> = {
   ready: 'Ready',
   needs_login: 'Needs sign-in',
-  needs_update: 'Update available',
 };
 const ACTION: Partial<Record<SetupExpert['state'], string>> = {
   needs_login: 'Sign in',
-  needs_update: 'Update',
 };
 const STAGES: Record<string, string> = {
   checking: 'Checking this computer',
@@ -89,7 +87,7 @@ export function ExpertsGroup({
   onAct,
   updates,
 }: {
-  /** The brain's updates, null when it could not say: needs_update then keeps its own Update. */
+  /** The brain's updates, null when it could not say: the row then shows no update at all. */
   updates: UpdatesControls | null;
   experts: SetupExpert[];
   progress: SetupOverview['progress'];
@@ -102,10 +100,9 @@ export function ExpertsGroup({
 }) {
   const row = (expert: SetupExpert) => {
     const working = progress?.expert === expert.id || asking.has(expert.id);
-    // With the updates state the Update button and the version words come from it, not the state.
+    // The Update button and the version words come from the updates state.
     const update = rowUpdate(updates, 'expert', expert.id);
-    const state = update !== undefined && expert.state === 'needs_update' ? 'ready' : expert.state;
-    const action = ACTION[state];
+    const action = ACTION[expert.state];
     const outcome = outcomes.get(expert.id);
     const versionWords = update === undefined ? null : updateVersion(update);
     return (
@@ -131,7 +128,7 @@ export function ExpertsGroup({
               <ProgressBlock progress={progress} />
             ) : (
               <>
-                <span className="cx-status">{STATE_WORDS[state]}</span>
+                <span className="cx-status">{STATE_WORDS[expert.state]}</span>
                 {update !== undefined && (
                   <UpdateSide
                     row={update}

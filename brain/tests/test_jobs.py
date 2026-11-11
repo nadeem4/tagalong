@@ -161,6 +161,7 @@ class Rig:
         shared: bool = False,
         load: bool | str = False,
         apps=None,
+        before_start=None,
     ) -> None:
         self.bridge = FakeBridge()
         script = tmp_path / "script.json"
@@ -217,6 +218,7 @@ class Rig:
             now=lambda: self.wall,
             on_timers_changed=lambda: setattr(self, "timers_changed", self.timers_changed + 1),
             apps=apps,
+            **({} if before_start is None else {"before_start": before_start}),
         )
 
     def make_run(self, expert, **callbacks) -> ExpertRun:
@@ -2789,3 +2791,18 @@ async def test_resolve_step_stop_stops_running_parts_before_closing(make_rig):
     assert out["goal"] == "failed" and got.closed_at
     assert [p.state for p in got.parts] == ["cancelled", "cancelled"]  # no expert left running
     assert rig.jobs._runs == {}
+
+
+async def test_a_job_waits_for_before_start_and_counts_as_starting_meanwhile(make_rig):
+    gate = asyncio.Event()
+
+    async def before_start():
+        await gate.wait()  # an update is being swapped in
+
+    rig = make_rig(FakeAsks(Answer("Plan")), before_start=before_start)
+    starting = asyncio.ensure_future(rig.jobs.start("one", str(rig.folder)))
+    await asyncio.sleep(0.1)
+    assert not starting.done() and not rig.log.exists()
+    gate.set()
+    await asyncio.wait_for(starting, 10)
+    assert rig.spawns() == 1

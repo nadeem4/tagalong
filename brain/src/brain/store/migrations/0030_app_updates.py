@@ -2,12 +2,21 @@
 
 `version` is backfilled from the package argument the installer pinned in the stored command (an
 app added by hand, or a remote one, has none and stays empty). Uses only `db.execute`: the
-runner holds the transaction.
+runner holds the transaction. The version rule is
+copied in here, so this migration never changes when live code does.
 """
 
 import json
 
-from brain.store.connections import pinned_version
+
+def pinned_version(args: list[str]) -> str:
+    """The version pinned in a package command's last argument (`pkg@1.2.0`, `@scope/pkg@1.2.0`,
+    `pkg==1.2.0`), or empty when the package is bare."""
+    spec = args[-1] if args else ""
+    name, sep, version = spec.partition("==")
+    if not sep:
+        name, sep, version = spec.rpartition("@")
+    return version if sep and name and version else ""
 
 
 def migrate(db) -> None:

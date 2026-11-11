@@ -48,7 +48,7 @@ from brain.setup.home_tools import (
     home_setup_tools,
     home_update_tools,
 )
-from brain.setup.install import NPM_TIMEOUT_S, install_expert, sweep_staging
+from brain.setup.install import NPM_TIMEOUT_S, sweep_staging
 from brain.setup.login import LoginDriver
 from brain.setup.net import http_fetch, real_get_json
 from brain.setup.registry import Registry
@@ -159,7 +159,7 @@ async def _run() -> None:
         config.data_dir, experts, real_open_terminal, emit_event, notify=bodies.notify
     )
     progress = SetupProgress(emit_event)
-    expert_tools, stop_installs = expert_setup_tools(
+    expert_tools, reinstall, stop_installs = expert_setup_tools(
         config.data_dir,
         registry,
         inspect_machine,
@@ -186,18 +186,6 @@ async def _run() -> None:
     )
     login = login_tools(config.data_dir, logins)
 
-    async def reinstall(entry):  # an expert update: the install path's own staging and swap
-        return await install_expert(
-            entry,
-            config.data_dir,
-            await inspect_machine(),
-            partial(real_run_cmd, timeout=NPM_TIMEOUT_S),
-            http_fetch,
-            real_get_json,
-            experts,
-            lambda step: None,
-        )
-
     updates = Updates(
         config.data_dir,
         registry,
@@ -205,7 +193,8 @@ async def _run() -> None:
         experts,
         apps,
         reinstall,
-        lambda: bool(session.records.running_jobs()),  # session exists by the first tick
+        # session exists by the first tick; a hand-off waiting on its card counts too
+        lambda: bool(session.records.running_jobs()) or session.jobs.starting > 0,
         bodies.notify,
         lambda: datetime.now(UTC),
     )
@@ -255,6 +244,7 @@ async def _run() -> None:
         make_run=ExpertHosts(config.expert_idle_s, quiet_s=config.job_quiet_min * 60),
         experts=lambda: all_experts(experts, config.expert_cmd),
         apps=apps,
+        before_job=updates.quiet,  # a job never starts in the middle of an update's swap
         tokens=tokens,
         wakes_per_hour=config.wakes_per_hour,
         turn_timeout=config.turn_timeout,
@@ -343,6 +333,7 @@ async def _run() -> None:
         # memory.
         if update_loop is not None:
             update_loop.cancel()
+            await asyncio.gather(update_loop, return_exceptions=True)
         await updates.stop()  # an update in flight is cancelled like an install
         await stop_installs()  # cancel running installs; each removes what it staged
         await stop_watches()  # before apps.shutdown(), which would end each watch with an event

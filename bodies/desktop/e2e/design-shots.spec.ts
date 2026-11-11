@@ -388,8 +388,103 @@ test('E1 updates', async () => {
       await home.getByRole('region', { name: 'Your apps' }).scrollIntoViewIfNeeded();
       await shot(home, 'E1', state);
     }
-    await home.getByRole('region', { name: 'Notion' }).scrollIntoViewIfNeeded();
-    await shot(home, 'E1', 'remote-row');
+    // The remote row on its own: "Always up to date", no Update button, no version.
+    const notionRow = home.getByRole('region', { name: 'Notion' });
+    await notionRow.scrollIntoViewIfNeeded();
+    const dir = resolve(shotsRoot, 'E1');
+    await notionRow.screenshot({ path: join(dir, 'remote-row.png') });
+  } finally {
+    await closeApp(app);
+    await brain.close();
+    rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+  }
+});
+
+// E1: updates on the Experts tab, on the mockup's experts (Claude Code, Gemini CLI, Foo).
+test('E1 experts updates', async () => {
+  const brain = await startFakeBrain();
+  const dataDir = seedSettings(mkdtempSync(join(tmpdir(), 'tagalong-shot-')));
+  const app = await electron.launch({
+    args: ['.', `--user-data-dir=${dataDir}`],
+    cwd: appDir,
+    env: { ...process.env, TAGALONG_BRAIN_ADDR: brain.addr },
+  });
+  try {
+    const find = async (name: string): Promise<Page> => {
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        const page = app.windows().find((p) => p.url().includes(`${name}.html`));
+        if (page !== undefined) return page;
+        await new Promise((resolveWait) => setTimeout(resolveWait, 250));
+      }
+      throw new Error(`no ${name} window appeared`);
+    };
+    const installed = (id: string, name: string, version: string, official: boolean) => ({
+      id,
+      name,
+      version,
+      state: 'ready',
+      tested: true,
+      official,
+    });
+    brain.setSetup({
+      experts: [
+        installed('claude-acp', 'Claude Code', '1.2.0', true),
+        installed('gemini', 'Gemini CLI', '0.10.0', true),
+        installed('foo', 'Foo', '0.3.0', false),
+      ],
+    });
+    const item = (id: string, name: string, official: boolean, over: Record<string, unknown>) => ({
+      kind: 'expert',
+      id,
+      name,
+      installed: '',
+      latest: null,
+      remote: false,
+      official,
+      auto: official,
+      status: 'idle',
+      ...over,
+    });
+    const states: Record<string, Record<string, unknown>[]> = {
+      'experts-updates-available': [
+        item('claude-acp', 'Claude Code', true, { installed: '1.2', latest: '1.3' }),
+        item('gemini', 'Gemini CLI', true, { installed: '0.10' }),
+        item('foo', 'Foo', false, { installed: '0.3', latest: '0.4' }),
+      ],
+      'experts-updating': [
+        item('claude-acp', 'Claude Code', true, {
+          installed: '1.2',
+          latest: '1.3',
+          status: 'updating',
+        }),
+        item('gemini', 'Gemini CLI', true, { installed: '0.10' }),
+        item('foo', 'Foo', false, { installed: '0.3', latest: '0.4' }),
+      ],
+    };
+    const put = (items: Record<string, unknown>[]) =>
+      brain.setUpdates({
+        checkedAt: new Date(Date.now() - 5 * 60_000).toISOString(),
+        auto: {
+          apps: { official: true, community: false },
+          experts: { official: true, community: false },
+        },
+        items,
+      });
+    put(states['experts-updates-available'] ?? []);
+    const avatar = await find('avatar');
+    await avatar.evaluate(() => window.tagalongHost.openSettings());
+    const home = await find('home');
+    await home.getByRole('button', { name: 'Connections' }).click();
+    await home.getByRole('tab', { name: 'Experts' }).click();
+    for (const [state, items] of Object.entries(states)) {
+      put(items);
+      await home.waitForTimeout(800);
+      const yours = home.getByRole('region', { name: 'Your experts' });
+      await expect(yours).toContainText('Checked', { timeout: 15_000 });
+      await expect(home.getByRole('region', { name: 'Claude Code' })).toBeVisible();
+      await yours.scrollIntoViewIfNeeded();
+      await shot(home, 'E1', state);
+    }
   } finally {
     await closeApp(app);
     await brain.close();

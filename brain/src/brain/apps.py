@@ -270,6 +270,7 @@ class _Slot:
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)  # serialises stop and restart
     open_url: OpenUrl | None = None  # set only while a sign-in the user asked for is running
     signed_out: bool = False  # the server refused our sign-in mid-session
+    settled: asyncio.Event = field(default_factory=asyncio.Event)  # first connect try is over
 
 
 def _root(exc: BaseException) -> BaseException:
@@ -335,6 +336,18 @@ class Apps:
 
     async def restart(self, app_id: str) -> None:
         await self._relaunch(app_id)
+
+    async def wait_settled(self, app_id: str, timeout: float | None = None) -> AppStatus:
+        """Wait for the app's current launch to stop connecting and say how it ended. `restart`
+        returns before the app is up, so only this tells a caller the new command works."""
+        slot = self._slots.get(app_id)
+        if slot is None:
+            return AppStatus("off")
+        try:
+            await asyncio.wait_for(slot.settled.wait(), timeout)
+        except TimeoutError:
+            pass
+        return AppStatus(slot.state, slot.error)
 
     async def sign_in(self, app_id: str, open_url: OpenUrl) -> None:
         """Start a browser sign-in in the background; the outcome shows as the app's state."""
@@ -468,6 +481,7 @@ class Apps:
         )
         self._slots[row.id] = slot
         if not row.enabled:
+            slot.settled.set()
             return
         self._set(slot, "connecting")
         slot.task = asyncio.create_task(self._run(slot))
@@ -475,6 +489,8 @@ class Apps:
     def _set(self, slot: _Slot, state: str, error: str = "") -> None:
         if (slot.state, slot.error) != (state, error):
             slot.state, slot.error = state, error
+            if state != "connecting":
+                slot.settled.set()
             self._notify("changed", {"what": "apps"})
 
     async def _run(self, slot: _Slot) -> None:

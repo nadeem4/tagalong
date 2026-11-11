@@ -123,11 +123,13 @@ class Jobs:
         on_timers_changed: Callable[[], None] = lambda: None,
         outputs: OutputStore | None = None,
         apps=None,
+        before_start: Callable[[], Awaitable[None]] | None = None,
         steps_max_entries: int = DEFAULT_JOB_STEPS_MAX_ENTRIES,
         steps_max_bytes: int = DEFAULT_JOB_STEPS_MAX_BYTES,
     ) -> None:
         self._steps_max_entries = steps_max_entries  # caps of one job's step log (settings)
         self._steps_max_bytes = steps_max_bytes
+        self._before_start = before_start  # awaited before a run starts: no update mid-swap
         self._apps = apps  # the connected apps (ids, names, state); None: none can be handed over
         self._outputs = outputs  # caps the report a wake carries; None leaves it whole
         self._timers_changed = on_timers_changed  # a deleted job timer must re-arm the sleeper
@@ -158,6 +160,11 @@ class Jobs:
         self._progress_sent: dict[str, float] = {}
         self._activity_sent: dict[str, float] = {}
         self._activity_trailing: dict[str, asyncio.Task] = {}
+
+    @property
+    def starting(self) -> int:
+        """Hand-offs that hold a slot but have no row yet (waiting on their card)."""
+        return self._starting
 
     def startup(self) -> list[tuple[str, str]]:
         """Settle what a dead brain left running (the resume scan): a call that saved a session is
@@ -395,6 +402,10 @@ class Jobs:
         """The one seam that starts an expert run: a new job's first part, or (new_job False) a
         further part of an existing job. redo is a part's own row, already active, run again in
         the job's mode: no card, no new row."""
+        if self._before_start is not None:
+            # Nothing between this wait and `_starting += 1` awaits, so an update that looks at
+            # the jobs after it sees this one.
+            await self._before_start()
         running = [
             (j, p)
             for j in self._records.running_jobs()

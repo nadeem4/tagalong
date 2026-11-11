@@ -1499,6 +1499,9 @@ Automated: `uv run pytest tests/test_setup_updates.py`, the UI tests in
 - [ ] Press **Update** on one: the row shows **Updating…**, then "Updated to v1.0." and the new version.
 - [ ] While a job runs, press **Update**: the row says "Waiting for a job to finish…" and the update
       happens once the job ends, never before.
+- [ ] Start a hand-off while an update is mid-swap: the job starts only after the swap ends.
+- [ ] An app update whose new version does not connect: the row says it did not work and the app
+      is back on its old version, connected again.
 - [ ] Turn the Community switch on: its waiting updates apply by themselves at the next check.
 - [ ] The **Experts** tab has the same header, switches and buttons for Claude Code and the others.
 

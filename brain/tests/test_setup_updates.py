@@ -4,13 +4,14 @@ No network, no npm, no real app: the registry body is served by a fake `get`, an
 and an app restart are recorded, and a jobs flag says whether a job runs. Time is a fake clock.
 """
 
+import asyncio
 import json
 import logging
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from brain.apps import AppRow
+from brain.apps import AppRow, AppStatus
 from brain.memory import Memory
 from brain.setup.home_tools import home_update_tools
 from brain.setup.install import InstallError
@@ -81,14 +82,29 @@ class Clock:
 
 
 class FakeApps:
+    """Like the real manager: restart returns at once; how the app then connects is told by
+    `wait_settled`, so a package that cannot start never raises from restart."""
+
     def __init__(self):
         self.restarted: list[str] = []
-        self.fail = False
+        self.bad_launches = 0  # how many next launches fail to connect
+        self.gate: asyncio.Event | None = None  # holds a restart until the test lets it go
+        self._failed: set[str] = set()
 
     async def restart(self, app_id):
-        if self.fail:
-            raise RuntimeError("will not start")
+        if self.gate is not None:
+            await self.gate.wait()
         self.restarted.append(app_id)
+        if self.bad_launches:
+            self.bad_launches -= 1
+            self._failed.add(app_id)
+        else:
+            self._failed.discard(app_id)
+
+    async def wait_settled(self, app_id, timeout=None):
+        if app_id in self._failed:
+            return AppStatus("error", "could not start")
+        return AppStatus("connected")
 
 
 def files_app(version="1.2.0") -> AppRow:
@@ -140,15 +156,20 @@ class Rig:
         self.changed: list[dict] = []
         self.reinstalled: list[str] = []
         self.install_error: Exception | None = None
+        self.install_gate: asyncio.Event | None = None  # holds a reinstall until released
         self.updates = self.make()
 
     async def reinstall(self, entry):
+        if self.install_gate is not None:
+            await self.install_gate.wait()
         if self.install_error:
             raise self.install_error
         self.reinstalled.append(entry.id)
         old = self.store.get(entry.id)
         self.store.add(
-            InstalledExpert(entry.id, entry.name, entry.version, old.command, "registry", None)
+            InstalledExpert(
+                entry.id, entry.name, entry.version, old.command, "registry", old.logged_in
+            )
         )
 
     def make(self) -> Updates:
@@ -353,16 +374,18 @@ async def test_failed_update_keeps_the_old_version(rig, caplog):
     assert "swap_failed" in caplog.text
 
 
-async def test_a_failed_app_restart_puts_the_old_command_back(rig):
+async def test_an_app_that_will_not_connect_puts_the_old_command_back(rig):
     r = rig()
     r.memory.add_app(linear_app("0.4.0"))
-    r.apps.fail = True
+    r.apps.bad_launches = 1
     await r.updates.check(refresh=False)
     await r.updates.update("app", "linear")
     await r.updates.wait()
     (row,) = r.memory.list_apps()
     assert row.version == "0.4.0" and row.config["args"][-1] == "bob-linear@0.4.0"
-    assert r.items()[("app", "linear")]["status"] == "failed"
+    row_state = r.items()[("app", "linear")]
+    assert (row_state["status"], row_state["error"]) == ("failed", "could not start")
+    assert r.apps.restarted == ["linear", "linear"]  # the old command was launched again
 
 
 async def test_set_auto_update_saves_per_group(rig):
@@ -417,3 +440,55 @@ async def test_home_tools_read_check_update_and_set_auto(rig):
     assert await call("update_all", {"kind": "app"}) == {"started": False, "count": 0}
     assert await call("update_item", {"kind": "app", "id": "nope"}) == {"error": "no_update"}
     assert await call("update_item", {"kind": "tool", "id": "x"}) == {"error": "no_update"}
+
+
+async def test_the_daily_check_reads_the_registry_afresh(rig):
+    r = rig()
+    r.store.add(expert("1.2.0"))
+    await check(r.registry, [], r.store.list(), refresh=False)  # primes the cache
+    r.net.acp = acp("1.4.0")
+    await r.updates.tick()
+    assert r.items()[("expert", "claude-acp")]["latest"] == "1.4.0"
+
+
+async def test_a_failing_tick_does_not_end_the_loop(rig, monkeypatch, caplog):
+    import brain.setup.updates as mod
+
+    monkeypatch.setattr(mod, "TICK_S", 0.01)
+    r = rig()
+    calls = []
+
+    async def tick():
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("boom")
+
+    r.updates.tick = tick
+    caplog.set_level(logging.WARNING)
+    task = asyncio.ensure_future(r.updates.run())
+    try:
+        while len(calls) < 3:
+            await asyncio.sleep(0.01)
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+    assert "update tick failed" in caplog.text
+
+
+async def test_quiet_waits_while_an_update_is_being_applied(rig):
+    r = rig()
+    r.store.add(expert("1.2.0"))
+    r.install_gate = asyncio.Event()
+    await r.updates.check(refresh=False)  # auto: starts the reinstall, which blocks
+    await asyncio.sleep(0.05)
+    waiter = asyncio.ensure_future(r.updates.quiet())
+    await asyncio.sleep(0.05)
+    assert not waiter.done()
+    r.install_gate.set()
+    await asyncio.wait_for(waiter, 5)
+    await r.updates.wait()
+
+
+async def test_quiet_returns_at_once_when_nothing_is_applying(rig):
+    r = rig()
+    await asyncio.wait_for(r.updates.quiet(), 1)

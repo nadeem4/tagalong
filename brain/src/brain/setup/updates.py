@@ -32,6 +32,7 @@ log = logging.getLogger("brain")
 Kind = Literal["app", "expert"]
 Key = tuple[str, str]
 DAILY = timedelta(hours=24)
+CONNECT_WAIT_S = 60.0  # how long a restarted app gets to connect before the update is undone
 TICK_S = 30.0  # how often the brain looks for a due check or a waiting update
 Reinstall = Callable[[RegistryEntry], Awaitable[object]]
 Auto = Callable[[str, bool], bool]
@@ -178,6 +179,7 @@ class Updates:
         self._status: dict[Key, dict] = {}  # waiting / updating / updated / failed, per item
         self._queue: list[Key] = []
         self._drain_task: asyncio.Task | None = None
+        self._applying = asyncio.Lock()  # held while one update is swapped in
 
     # ---- the saved check ----
 
@@ -275,17 +277,26 @@ class Updates:
         self._kick()
 
     async def tick(self) -> None:
-        """The brain's heartbeat: the daily check when due, else any update that was waiting
-        for a job to end."""
+        """The brain's heartbeat: the daily check when due (read afresh, a cached answer would
+        hide the update), else any update that was waiting for a job to end."""
         if self._due():
-            await self.check(refresh=False)
+            await self.check(refresh=True)
         else:
             self._kick()
 
     async def run(self) -> None:
         while True:
-            await self.tick()
+            try:
+                await self.tick()
+            except Exception:  # one bad tick must not end the heartbeat
+                log.exception("update tick failed")
             await asyncio.sleep(TICK_S)
+
+    async def quiet(self) -> None:
+        """Returns once no update is being applied. A job waits on this before it starts, so
+        it never meets an expert or app halfway through a swap."""
+        async with self._applying:
+            pass
 
     # ---- applying ----
 
@@ -305,19 +316,22 @@ class Updates:
 
     async def _drain(self) -> None:
         while self._queue:
-            if self._jobs_running():  # a job started since: wait for the next tick
-                for key in self._queue:
-                    self._status[key] = {"state": "waiting"}
-                break
-            key = self._queue.pop(0)
-            self._status[key] = {"state": "updating"}
-            self._notify("changed", {"what": "updates"})
-            try:
-                await self._apply(key)
-                self._status[key] = {"state": "updated"}
-            except Exception as err:  # the old version stays; the row says it failed
-                log.warning("update of %s %s failed: %s", key[0], key[1], err)
-                self._status[key] = {"state": "failed", "error": str(err)}
+            # The lock is taken before the last look at the jobs: a job that starts after that
+            # look waits in `quiet` until the swap is over.
+            async with self._applying:
+                if self._jobs_running():  # a job started since: wait for the next tick
+                    for key in self._queue:
+                        self._status[key] = {"state": "waiting"}
+                    break
+                key = self._queue.pop(0)
+                self._status[key] = {"state": "updating"}
+                self._notify("changed", {"what": "updates"})
+                try:
+                    await self._apply(key)
+                    self._status[key] = {"state": "updated"}
+                except Exception as err:  # the old version stays; the row says it failed
+                    log.warning("update of %s %s failed: %s", key[0], key[1], err)
+                    self._status[key] = {"state": "failed", "error": str(err)}
             self._notify("changed", {"what": "updates"})
         self._notify("changed", {"what": "updates"})
 
@@ -339,10 +353,7 @@ class Updates:
             entry = next((e for e in found.entries if e.id == item_id), None)
             if entry is None:
                 raise LookupError(f"{item_id} is no longer in the registry")
-            before = self._experts.get(item_id)
             await self._reinstall(entry)
-            if before is not None:  # an update is not a new login: the account is the same
-                self._experts.set_login(item_id, before.logged_in)
             return
         row = next(r for r in self._memory.list_apps() if r.id == item_id)
         hit = _app_entry(await self._registry.mcp_servers(row.name), row)
@@ -352,8 +363,13 @@ class Updates:
         self._memory.set_app_package(item_id, {**row.config, "args": args}, item.latest)
         try:
             await self._apps.restart(item_id)
+            settled = await self._apps.wait_settled(item_id, CONNECT_WAIT_S)
+            if settled.state not in ("connected", "needs-sign-in", "off"):
+                raise RuntimeError(settled.error or "the new version did not start")
         except BaseException:
+            # Put the old command back and start it again: the app must not stay down.
             self._memory.set_app_package(item_id, row.config, row.version)
+            await asyncio.shield(self._apps.restart(item_id))
             raise
         self._notify("changed", {"what": "apps"})
 

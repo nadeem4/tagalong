@@ -253,20 +253,14 @@ describe('Experts tab: your experts', () => {
     expect(row.queryByRole('button')).toBeNull();
   });
 
-  it('says Needs sign-in with a Sign in button, and Update available with Update', async () => {
+  it('says Needs sign-in with a Sign in button', async () => {
     const bridge = await open({
-      experts: [
-        installed('claude-acp', 'Claude Code', { state: 'needs_login' }),
-        installed('b', 'Beta', { state: 'needs_update' }),
-      ],
+      experts: [installed('claude-acp', 'Claude Code', { state: 'needs_login' })],
     });
     const claude = within(screen.getByRole('region', { name: 'Claude Code' }));
     expect(claude.getByText('Needs sign-in')).toBeVisible();
     await click(claude.getByRole('button', { name: 'Sign in' }));
     expect(bridge.setupCalls).toEqual([{ kind: 'expert', id: 'claude-acp', approved: false }]);
-    const beta = within(screen.getByRole('region', { name: 'Beta' }));
-    expect(beta.getByText('Update available')).toBeVisible();
-    expect(beta.getByRole('button', { name: 'Update' })).toBeVisible();
   });
 
   it('an untested expert reads Not tested with Scout', async () => {
