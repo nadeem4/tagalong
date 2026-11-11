@@ -245,7 +245,8 @@ The desktop talks to the Python brain. Needs `uv` and an Anthropic key (entered 
 11. **Action:** ask Scout to do something that changes a window (for example "move the Notes
     window to the left").
     **Expected:** the bubble asks in Scout's own words, with **Allow once**, **Always allow** and
-    **Deny**. **Allow once** runs it; the next time the bubble asks again. Scout's words show once, in the card, never also as streaming text above it.
+    **Deny**. **Allow once** runs it; the next time the bubble asks again.
+    (Install asks: ask Scout to set up an app; the chat shows one install card with who made it, where it runs and how it signs in. **Allow** keeps the card and it follows the steps to Connected or a failure with **Try again** and **Not now**; **Not now** denies.) Scout's words show once, in the card, never also as streaming text above it.
 12. **Action:** repeat and press **Always allow**.
     **Expected:** it runs, and later asks for the same tool no longer appear. Press **Deny** on
     another tool's ask: Scout tells you it was told no.

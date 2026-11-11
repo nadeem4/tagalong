@@ -119,3 +119,57 @@ for (const scene of SCENES) {
     }
   });
 }
+
+// E3: the chat window and the install card. One app serves every scene, in order.
+test.describe('E3 chat', () => {
+  test.describe.configure({ mode: 'serial' });
+  let brain: FakeBrain;
+  let app: ElectronApplication;
+  let dataDir: string;
+
+  test.beforeAll(async () => {
+    brain = await startFakeBrain();
+    dataDir = seedSettings(mkdtempSync(join(tmpdir(), 'tagalong-shot-e3-')));
+    app = await electron.launch({
+      args: ['.', `--user-data-dir=${dataDir}`],
+      cwd: appDir,
+      env: { ...process.env, TAGALONG_BRAIN_ADDR: brain.addr },
+    });
+  });
+
+  test.afterAll(async () => {
+    try {
+      await closeApp(app);
+    } finally {
+      await brain.close();
+      rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+    }
+  });
+
+  async function panel(): Promise<Page> {
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const found = app.windows().find((page) => page.url().includes('panel.html'));
+      if (found !== undefined) return found;
+      await new Promise((resolveWait) => setTimeout(resolveWait, 250));
+    }
+    throw new Error('no panel window appeared');
+  }
+
+  test('E3 quick bubble, full chat, install card', async () => {
+    const page = await panel();
+    await page.getByLabel(/^Ask /).waitFor({ state: 'visible', timeout: 30_000 });
+    await shot(page, 'E3', 'quick-bubble');
+    await page.getByRole('button', { name: 'Open full chat' }).click();
+    await page.getByRole('log').waitFor({ state: 'visible' });
+    await shot(page, 'E3', 'header-at-rest');
+    const field = page.getByLabel('Message Scout');
+    await field.fill('please install notion');
+    await field.press('Enter');
+    const card = page.getByRole('group', { name: 'Set up Notion' });
+    await expect(card).toBeVisible({ timeout: 30_000 });
+    await shot(page, 'E3', 'install-allow');
+    await card.getByRole('button', { name: 'Allow' }).click();
+    await expect(card.getByRole('list', { name: 'Steps' })).toBeVisible({ timeout: 15_000 });
+    await shot(page, 'E3', 'install-working');
+  });
+});

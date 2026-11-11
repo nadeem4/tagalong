@@ -587,6 +587,26 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             tool: 'desktop__move_window',
             input: { x: 0 },
           });
+        } else if (msg.params?.text?.includes('install notion')) {
+          // An app install ask: its facts ride in `input`, and the chat draws one install card.
+          const ask = `a${turns}`;
+          held.set(ask, finish);
+          notify('ask', {
+            id: ask,
+            state: 'open',
+            turn,
+            text: 'Install Notion?',
+            options: ['allow', 'deny'],
+            confirm: true,
+            tool: 'install_app',
+            input: {
+              app: 'notion',
+              official: true,
+              publisher: 'Notion',
+              runs: 'hosted',
+              sign_in: 'browser',
+            },
+          });
         } else if (msg.params?.text?.includes('offer')) {
           // The turn ends first; the offer is a plain ask, as the brain sends it.
           finish();

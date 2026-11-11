@@ -77,7 +77,7 @@ export function subjectOf(
       id,
       name: nameFromId(id),
       official: facts.official === true,
-      madeBy: str(facts.publisher),
+      ...(str(facts.publisher) !== undefined ? { madeBy: str(facts.publisher)! } : {}),
       runs: 'pc',
       signIn: 'account',
     };

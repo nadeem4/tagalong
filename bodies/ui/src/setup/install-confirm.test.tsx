@@ -105,7 +105,7 @@ describe('install card in the bubble', () => {
         <CompanionBubble petId="scout" petName="Scout" expanded />
       </HostBridgeProvider>,
     );
-    const ask = { type: 'connector.confirm', turnId: 't1', ...APP_ASK } as never;
+    const ask = { ...APP_ASK, type: 'connector.confirm', turnId: 't1' } as never;
     act(() => bridge.emit(ask));
     act(() => bridge.emit(ask));
     await waitFor(() =>
