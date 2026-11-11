@@ -28,6 +28,13 @@ function renderBubble(bridge: FakeHostBridge, expanded = false) {
   );
 }
 
+// The card's own Send, not the composer's.
+const cardSend = () =>
+  within(screen.getByRole('textbox', { name: 'Your answer' }).closest('section')!).getByRole(
+    'button',
+    { name: 'Send' },
+  );
+
 describe('the connector confirm card', () => {
   it('says which app, which tool and what will happen, and runs only on Allow once', async () => {
     const bridge = createFakeHostBridge();
@@ -324,7 +331,7 @@ describe('the connector confirm card', () => {
         target: { value: 'duckdb' },
       });
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+        fireEvent.click(cardSend());
         await Promise.resolve();
       });
       expect(bridge.jobAnswers).toEqual([
@@ -355,7 +362,7 @@ describe('the connector confirm card', () => {
       const bridge = createFakeHostBridge();
       renderBubble(bridge);
       act(() => bridge.emit(jobAsk({ tool: 'question', question: true, options: [] })));
-      expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
+      expect(cardSend()).toBeDisabled();
     });
 
     describe("Scout's choose ask", () => {
@@ -391,21 +398,25 @@ describe('the connector confirm card', () => {
           target: { value: 'my words' },
         });
         await act(async () => {
-          fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+          fireEvent.click(cardSend());
           await Promise.resolve();
         });
         expect(bridge.jobAnswers).toEqual([{ approvalId: APPROVAL, option: '', text: 'my words' }]);
       });
 
-      it('marks the recommended option and puts it first', () => {
+      it('recommended option is the gold one even when second, in its given order', () => {
         const bridge = createFakeHostBridge();
         renderBubble(bridge);
         act(() => bridge.emit(choose({ recommended: 'Claude Code' })));
-        const buttons = screen.getAllByRole('button');
-        expect(buttons[0]).toHaveTextContent('Claude Code');
-        expect(buttons[0]).toHaveTextContent('Recommended');
-        expect(buttons[1]).toHaveTextContent('Gemini CLI');
-        expect(buttons[1]).not.toHaveTextContent('Recommended');
+        const buttons = within(screen.getByRole('group', { name: 'Options' })).getAllByRole(
+          'button',
+        );
+        expect(buttons[0]).toHaveTextContent('Gemini CLI');
+        expect(buttons[0]).not.toHaveTextContent('Recommended');
+        expect(buttons[0]).toHaveClass('bubble-quiet');
+        expect(buttons[1]).toHaveTextContent('Claude Code');
+        expect(buttons[1]).toHaveTextContent('Recommended');
+        expect(buttons[1]).toHaveClass('bubble-primary');
       });
 
       it('stacks the options as full-width rows with the Recommended tag in its own element', () => {
@@ -416,9 +427,16 @@ describe('the connector confirm card', () => {
         expect(list).toHaveClass('bubble-choices');
         const rows = within(list).getAllByRole('button');
         expect(rows.every((b) => b.classList.contains('bubble-choice'))).toBe(true);
+        expect(within(rows[1]!).getByText('Recommended')).toHaveClass('bubble-tag');
+      });
+
+      it('with nothing recommended the first option stays the gold one', () => {
+        const bridge = createFakeHostBridge();
+        renderBubble(bridge);
+        act(() => bridge.emit(choose()));
+        const rows = within(screen.getByRole('group', { name: 'Options' })).getAllByRole('button');
         expect(rows[0]).toHaveClass('bubble-primary');
         expect(rows[1]).toHaveClass('bubble-quiet');
-        expect(within(rows[0]!).getByText('Recommended')).toHaveClass('bubble-tag');
       });
 
       it('the recommended row reads "Claude Code Recommended" to a screen reader', () => {

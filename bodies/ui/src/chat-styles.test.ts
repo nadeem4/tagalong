@@ -3,6 +3,7 @@
  * Reads the rules as text, so it needs no browser. Uses the helpers in test-support/css-rules.
  */
 import { describe, expect, it } from 'vitest';
+import { CARD_CSS } from './card-styles';
 import { CHAT_CSS } from './chat-styles';
 import { minPadding, ruleOf } from './test-support/css-rules';
 
@@ -62,5 +63,11 @@ describe('CHAT_CSS chat window', () => {
   it('rings the composer in sky and keeps 8px inside it', () => {
     expect(ruleOf(CHAT_CSS, '.bubble-field:focus-within')).toContain('border-color');
     expect(minPadding(CHAT_CSS, '.bubble-field')).toBeGreaterThanOrEqual(8);
+  });
+});
+
+describe('CARD_CSS recommended tag', () => {
+  it('shows the Recommended tag at full strength', () => {
+    expect(ruleOf(CARD_CSS, '.bubble-tag')).not.toContain('opacity');
   });
 });

@@ -51,10 +51,12 @@ export function ConnectorConfirmCard({
     const sendTyped = (): void => {
       onReply({ option: confirm.question === true ? text : '', text });
     };
-    // The recommended option is listed first (so it is first in tab order) and marked.
-    const options = [...(confirm.options ?? [])].sort(
-      (a, b) => Number(b === confirm.recommended) - Number(a === confirm.recommended),
-    );
+    // The options keep the order Scout gave; the recommended one is the gold, marked row.
+    const options = confirm.options ?? [];
+    const gold =
+      confirm.recommended !== undefined && options.includes(confirm.recommended)
+        ? confirm.recommended
+        : options[0];
     // Only a card that came with apps answers with a list, so other asks stay as they were.
     const withApps = confirm.apps !== undefined ? { apps: kept.map((a) => a.id) } : {};
     return (
@@ -94,11 +96,11 @@ export function ConnectorConfirmCard({
           </div>
         )}
         <div className="bubble-choices" role="group" aria-label="Options">
-          {options.map((option, i) => (
+          {options.map((option) => (
             <button
               key={option}
               type="button"
-              className={`bubble-choice ${i === 0 ? 'bubble-primary' : 'bubble-quiet'}`}
+              className={`bubble-choice ${option === gold ? 'bubble-primary' : 'bubble-quiet'}`}
               onClick={() => onReply({ option, ...withApps })}
             >
               <span>{option}</span>
