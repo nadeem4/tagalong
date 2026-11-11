@@ -4,6 +4,8 @@ No socket code: the server's Peer enqueues writes, and connect() returns the bac
 instead of sending it so the hello result can go out first. Outboxes outlive connections
 (kept per body id) so a reconnect can replay what it missed. `use` requests are not
 replayed: each is bound to the peer it was sent on and fails if that peer goes away.
+`WriteQueue` is the bounded write queue each connection owns: live-only audio frames are
+dropped oldest-first when it is over its cap; frames carrying `seq` are never dropped.
 """
 
 import asyncio
@@ -19,6 +21,50 @@ from typing import Protocol
 from brain.protocol import BODY_WHATSAPP, LIMITS, Body, ErrorCode, RpcError, Tool
 
 log = logging.getLogger("brain")
+
+
+# Frames a connection may hold before the oldest audio is dropped. Audio is the only thing that
+# piles up (a slow body, a long reply), and a late speech frame is worth less than a fresh one.
+MAX_QUEUED_FRAMES = 256
+
+
+class LiveFrame(str):
+    """A live-only frame (no `seq`, never replayed): the one kind a full queue may drop."""
+
+
+class WriteQueue:
+    """One connection's frames, in order, for a single writer to drain. `put` never waits."""
+
+    def __init__(self, cap: int = MAX_QUEUED_FRAMES) -> None:
+        self._cap = cap
+        self._items: deque[str | None] = deque()
+        self._wake = asyncio.Event()
+
+    def put(self, frame: str) -> None:
+        self._items.append(frame)
+        if len(self._items) > self._cap:
+            self._drop_oldest_audio()
+        self._wake.set()
+
+    def close(self) -> None:
+        self._items.append(None)
+        self._wake.set()
+
+    async def get(self) -> str | None:
+        while not self._items:
+            self._wake.clear()
+            await self._wake.wait()
+        return self._items.popleft()
+
+    def _drop_oldest_audio(self) -> None:
+        kept: deque[str | None] = deque()
+        excess = len(self._items) - self._cap
+        for item in self._items:
+            if excess > 0 and isinstance(item, LiveFrame):
+                excess -= 1
+            else:
+                kept.append(item)
+        self._items = kept
 
 
 class Peer(Protocol):
@@ -171,7 +217,8 @@ class Bodies:
         current = self._online.get(body_id)
         if current is None:
             return False
-        current.peer.send(json.dumps({"jsonrpc": "2.0", "method": method, "params": params}))
+        frame = json.dumps({"jsonrpc": "2.0", "method": method, "params": params})
+        current.peer.send(LiveFrame(frame))
         return True
 
     def online_ids(self) -> list[str]:

@@ -570,3 +570,101 @@ async def test_an_expired_ask_logs_its_reason(mem):
     work = rig.approvals.work
     [event] = [e for e in work.events(d.ask_id) if e.kind == "decided"]
     assert event.data == {"outcome": "expired", "decided_by": "none", "reason": "no answer"}
+
+
+# --- the card does not wait for the side-check ----------------------------------
+
+
+class Slow:
+    """A decider that waits on an event, then returns its result."""
+
+    def __init__(self, name, result, gate):
+        self.name = name
+        self.result = result
+        self.gate = gate
+        self.cancelled = False
+
+    async def decide(self, req):
+        try:
+            await self.gate.wait()
+        except asyncio.CancelledError:
+            self.cancelled = True
+            raise
+        return self.result
+
+
+async def test_card_shows_before_side_check_returns(mem):
+    gate = asyncio.Event()
+    shown = []
+    side = Slow("side_check", None, gate)
+    rig = Rig(mem, [side, Fake("person")])
+    task = asyncio.create_task(rig.engine.decide(req(show_card=lambda: shown.append(1))))
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    assert shown == [1]  # up while the side-check is still thinking
+    assert not task.done()
+    gate.set()
+    assert (await task).kind == "deny"  # nobody grants: no asker, no decider left
+
+
+async def test_card_shows_before_side_check_on_a_live_ask(mem):
+    side_gate, person_gate = asyncio.Event(), asyncio.Event()
+    started = []
+
+    async def ask():
+        started.append(1)
+        await person_gate.wait()
+        return PersonAnswer("allow")
+
+    rig = Rig(mem, [Slow("side_check", None, side_gate), Person()])
+    task = asyncio.create_task(rig.engine.decide(req(how_to_ask=ask)))
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    assert started == [1]  # the card was asked for before the side-check returned
+    person_gate.set()
+    d = await task
+    assert (d.kind, d.decided_by) == ("allow_once", "person")
+
+
+async def test_side_check_decision_first_closes_card(mem):
+    gate, never = asyncio.Event(), asyncio.Event()
+    closed = []
+    stopped = []
+
+    async def ask():
+        try:
+            await never.wait()
+        except asyncio.CancelledError:
+            stopped.append(1)
+            raise
+
+    rig = Rig(mem, [Slow("side_check", Grant("scout"), gate), Person()])
+    task = asyncio.create_task(rig.engine.decide(req(how_to_ask=ask, settled=closed.append)))
+    await asyncio.sleep(0)
+    gate.set()
+    d = await task
+    assert (d.kind, d.decided_by) == ("allow_once", "scout")
+    assert closed == ["side_check"]
+    assert stopped == [1]  # the person's card was withdrawn
+
+
+async def test_side_check_grant_closes_a_card_shown_for_a_later_answer(mem):
+    closed = []
+    rig = Rig(mem, [Fake("side_check", Grant("scout"))])
+    d = await rig.engine.decide(req(show_card=lambda: None, settled=closed.append))
+    assert d.decided_by == "scout"
+    assert closed == ["side_check"]
+
+
+async def test_person_answer_first_stops_the_side_check(mem):
+    gate = asyncio.Event()
+    side = Slow("side_check", Grant("scout"), gate)
+
+    async def ask():
+        return PersonAnswer("deny")
+
+    rig = Rig(mem, [side, Person()])
+    d = await rig.engine.decide(req(how_to_ask=ask))
+    assert (d.kind, d.code) == ("deny", "denied")
+    await asyncio.sleep(0)
+    assert side.cancelled

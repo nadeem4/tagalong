@@ -920,6 +920,13 @@ class Jobs:
             self._items.finish(ask_id, "answered")
             return answer
 
+        def scouted(by: str) -> None:
+            # Scout's yes came first: the item is answered, not ended with the process.
+            if self._items is not None:
+                with suppress(OpenItemRefused):
+                    self._items.answer(ask_id, "allow", by)
+                    self._items.finish(ask_id, "approved")
+
         decision = await self._engine.decide(
             AskRequest(
                 kind="expert_request",
@@ -930,6 +937,7 @@ class Jobs:
                 input=request.input,
                 tier=Tier.ask,
                 how_to_ask=ask_person,
+                settled=scouted,
                 job_id=job_id,
                 ask_id=ask_id,
                 can_allow_once=once is not None and job is not None,  # never allow_always

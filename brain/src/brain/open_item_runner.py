@@ -88,6 +88,17 @@ class AskRunner:
         self.changed()
         return item
 
+    def settle(self, item: OpenItem, by: str) -> None:
+        """Something other than the person (Scout's side-check) said yes while the card was up:
+        answer the item as `by` and close the card. The caller runs the call itself, so the item
+        is finished here. Refused when the person got there first; that answer runs the call."""
+        self._items.answer(item.id, "allow", by)
+        self._items.finish(item.id, "approved")
+        self._raw.pop(item.id, None)
+        self._noticed.discard(item.id)
+        self._asks.close_answered(item.id, by)
+        self.changed()
+
     # ---- the answer ----
 
     def answered(self, ask_id: str, option: str, body_id: str) -> None:

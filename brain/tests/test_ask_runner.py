@@ -19,8 +19,16 @@ from brain.memory import Memory
 from brain.mind.turn import Call
 from brain.open_item_runner import AskRunner
 from brain.open_items import OpenItems
-from brain.permission import AskOpen, Engine, Person, StandingRule, stored_auto_rules
+from brain.permission import (
+    AskOpen,
+    Engine,
+    Person,
+    SideCheckDecider,
+    StandingRule,
+    stored_auto_rules,
+)
 from brain.protocol import RpcError
+from brain.store import rules
 from brain.store.work import WorkStore
 from brain.toolbox import Toolbox, ToolSpec
 
@@ -394,3 +402,73 @@ async def test_an_ask_opened_while_no_screen_was_up_is_told_on_return():
     [wake] = [e for e in rig.events if e.kind == "asks_waiting"]
     [row] = json.loads(wake.facts["asks"])
     assert (row["ask"], row["age_s"]) == (item.id, 300)
+
+
+class Look:
+    """A side-check that waits for a gate, then grants or passes."""
+
+    def __init__(self, gate, pref):
+        self.gate = gate
+        self.pref = pref
+
+    async def decide(self, facts):
+        await self.gate.wait()
+        return self.pref
+
+
+def with_side_check(rig, look):
+    rig.engine = Engine(
+        [
+            StandingRule(stored_auto_rules(lambda: rig.stored)),
+            SideCheckDecider(look),
+            Person(),
+        ],
+        rig.approvals,
+        None,
+        lambda name: rig.stored.__setitem__(name, "auto"),
+    )
+    rig.box = Toolbox(
+        [rig.source],
+        lambda: rig.stored,
+        rig.stored.__setitem__,
+        rig.asks,
+        rig.engine,
+        runner=rig.runner,
+    )
+
+
+async def test_the_card_is_up_while_the_side_check_still_looks():
+    rig = Rig()
+    gate = asyncio.Event()
+    with_side_check(rig, Look(gate, None))
+    turn = asyncio.create_task(rig.box.run(call()))
+    await rig.settle()
+    [card] = rig.opened()  # on screen before the side-check returned
+    assert not turn.done()
+    gate.set()
+    out = await asyncio.wait_for(turn, 1)
+    assert card["id"] in out  # a pass leaves the same item open for the person
+    assert [i.id for i in rig.items.list_open(kind="ask")] == [card["id"]]
+
+
+async def test_a_side_check_yes_answers_the_item_and_closes_the_card():
+    rig = Rig()
+    gate = asyncio.Event()
+    pref = rules.add_preference(
+        rig.memory.db,
+        sentence="Fine to run t",
+        source=None,
+        tool=None,
+        group_key=None,
+        at="2026-11-11T09:00:00Z",
+    )
+    with_side_check(rig, Look(gate, pref))
+    turn = asyncio.create_task(rig.box.run(call()))
+    await rig.settle()
+    [card] = rig.opened()
+    gate.set()
+    assert await asyncio.wait_for(turn, 1) == "ran t"
+    item = rig.items.get(card["id"])
+    assert (item.state, item.answer) == ("done", "allow")
+    assert rig.closed()[0]["reason"] == "answered" and rig.closed()[0]["by"] == "side_check"
+    assert rig.items.list_open(kind="ask") == []

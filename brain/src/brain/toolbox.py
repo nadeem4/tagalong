@@ -308,7 +308,21 @@ class Toolbox:
             call, spec, source_kind, job_id=job_id, ask_id=uuid.uuid4().hex
         )
         later = wait is not None and self._runner is not None
-        decision = await self._engine.decide(replace(req, how_to_ask=None) if later else req)
+        if later:
+            assert wait is not None and self._runner is not None
+            runner = self._runner
+            opened: list = []
+
+            def show_card() -> None:  # up before the side-check looks, never after
+                opened.append(runner.open(call, req, wait))
+
+            req = replace(
+                req,
+                how_to_ask=None,
+                show_card=show_card,
+                settled=lambda by: runner.settle(opened[0], by),
+            )
+        decision = await self._engine.decide(req)
         if decision.allowed:
             return
         if later and decision.code == "no_decider":  # only the person is left to say

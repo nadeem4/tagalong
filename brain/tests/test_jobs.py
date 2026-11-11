@@ -983,7 +983,7 @@ async def test_claude_code_approval_returns_the_allow_once_option_id(make_rig):
     await until(lambda: rig.finished)
     reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))
     assert reply["result"]["outcome"] == {"outcome": "selected", "optionId": "a1"}
-    assert len(asks.opened) == 1  # only the hand-off ask
+    assert len(asks.opened) == 2  # the hand-off ask, and the card Scout took down again
     [row] = logged(rig)
     assert (row.outcome, row.decided_by, row.source) == ("approved", "scout", "claude_code")
     assert row.rule_id == check.result.id and row.job_id == rig.finished[0].id

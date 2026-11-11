@@ -5,6 +5,7 @@ nothing the model or a preference says changes it. Call sites build an `AskReque
 `Decision`; the outcome mapping and the approvals-log write live here and nowhere else.
 """
 
+import asyncio
 import json
 import logging
 import uuid
@@ -137,6 +138,11 @@ class AskRequest:
     ask_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     can_allow_once: bool = True
     offer: bool = True
+    # The card never waits for Scout's side-check. A live ask (`how_to_ask`) is asked beside it;
+    # an ask Scout parks has no waiter, so `show_card` puts its item on screen first. When the
+    # side-check decides first, `settled("side_check")` closes that card (the open item's answer).
+    show_card: Callable[[], None] | None = None
+    settled: Callable[[str], None] | None = None
 
 
 @dataclass(frozen=True)
@@ -316,19 +322,25 @@ class Engine:
             return Decision("deny", "off", ask_id=req.ask_id)
         if req.tier is Tier.auto:
             return Decision("allow_once", ask_id=req.ask_id)
+        asked = False  # the person's channel already ran beside the side-check
         for decider in self._deciders:
-            if decider.name not in ALLOWED[req.tier]:
+            if decider.name not in ALLOWED[req.tier] or (asked and decider.name == "person"):
                 continue
             if decider.name in _NEEDS_ALLOW_ONCE and not req.can_allow_once:
                 continue
             try:
-                result = await decider.decide(req)
+                if decider.name == "side_check":
+                    person = self._person(req)
+                    asked = person is not None and req.how_to_ask is not None
+                    decider, result = await self._beside_card(decider, person, req)
+                else:
+                    result = await decider.decide(req)
             except Exception as err:  # fail closed: a broken decider is a pass
                 log.warning("decider %s failed: %s", decider.name, type(err).__name__)
                 continue
             if isinstance(result, Grant) and result.decided_by == _GRANTED_BY[decider.name]:
                 try:
-                    return self._granted(req, decider.name, result)
+                    return self._granted(req, decider.name, result, asked)
                 except Exception as err:
                     if decider.name != "side_check":
                         raise
@@ -339,7 +351,49 @@ class Engine:
                 return self._refused(req, result)
         return Decision("deny", "no_decider", ask_id=req.ask_id)
 
-    def _granted(self, req: AskRequest, decider: str, grant: Grant) -> Decision:
+    def _person(self, req: AskRequest) -> Decider | None:
+        allowed = ALLOWED[req.tier]
+        return next((d for d in self._deciders if d.name == "person" and d.name in allowed), None)
+
+    async def _beside_card(
+        self, side: Decider, person: Decider | None, req: AskRequest
+    ) -> tuple[Decider, Grant | Refusal | None]:
+        """Run the side-check with the person's card already up. Whoever settles first decides:
+        Scout's grant withdraws the card, the person's answer stops the look."""
+        if req.show_card is not None:
+            req.show_card()
+        if person is None or req.how_to_ask is None:
+            return side, await side.decide(req)
+        look = asyncio.ensure_future(side.decide(req))
+        card = asyncio.ensure_future(person.decide(req))
+        try:
+            await asyncio.wait({look, card}, return_when=asyncio.FIRST_COMPLETED)
+            if look.done() and not card.done():
+                granted = self._look_result(look)
+                if granted is not None:
+                    if req.settled is not None:
+                        req.settled(
+                            "side_check"
+                        )  # before the card is withdrawn, so it reads as Scout's yes
+                    return side, granted
+                return person, await card  # a pass: only the person is left
+            return person, card.result()  # the card was answered first
+        finally:
+            for task in (look, card):
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(look, card, return_exceptions=True)
+
+    @staticmethod
+    def _look_result(look: "asyncio.Future") -> Grant | None:
+        if look.cancelled() or look.exception() is not None:
+            return None
+        result = look.result()
+        return result if isinstance(result, Grant) else None
+
+    def _granted(
+        self, req: AskRequest, decider: str, grant: Grant, raced: bool = False
+    ) -> Decision:
         # "Always" widens only when the person asks for it, on a tier that can be widened.
         always = (
             grant.always
@@ -350,6 +404,8 @@ class Engine:
         # Only Scout's own look approves under a preference; any other grant carries none.
         pref = grant.preference if decider == "side_check" else None
         self._record(req, "approved", grant.decided_by, pref)
+        if decider == "side_check" and req.settled is not None and not raced:
+            req.settled("side_check")
         if always:
             self._set_auto(req.tool)  # now Auto: an offer would be noise
         elif decider == "person" and req.offer and req.tier is not Tier.person_only:

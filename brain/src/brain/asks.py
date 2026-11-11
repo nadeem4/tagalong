@@ -207,6 +207,15 @@ class Asks:
             ask_event("closed", ask_id, "brain", reason)
             self._bodies.notify("ask", {"id": ask_id, "state": "closed", "reason": "timeout"})
 
+    def close_answered(self, ask_id: str, by: str) -> None:
+        """Close a card that has no waiter because something other than a body answered it (Scout's
+        side-check). Nothing runs from this: the caller owns the item and carries on itself."""
+        if self._open.pop(ask_id, None) is not None:
+            ask_event("answered", ask_id, by, "allow")
+            self._bodies.notify(
+                "ask", {"id": ask_id, "state": "closed", "reason": "answered", "by": by}
+            )
+
     def card_closed(self, ask_id: str) -> None:
         """Tell the bodies a card ended while they were away; one that never showed it ignores
         this. The contract only has `timeout` for a card that ended unanswered, so one whose

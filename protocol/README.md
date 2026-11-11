@@ -131,6 +131,7 @@ The brain hears and speaks; a body only handles sound. Audio rides in the same J
 - If every notification after `last_seq` is still in the outbox, the brain answers `hello` with `resync: false` and then sends them in order before anything new.
 - If some are gone (too old, too many, the brain restarted, or `last_seq` is higher than the brain's latest `seq`), the brain answers `resync: true`. The body drops what it was showing for open turns and asks. The brain then sends only what is still live: an `ask` (`open`) for every open ask and a `turn` (`started`) for every turn that has not ended. These are new notifications with fresh `seq` numbers after the one in the `hello` result.
 - A first `hello` with no `last_seq` gets `resync: false` and only live state, as above.
+- A connection that cannot keep up has a bounded write queue: past its cap the brain drops the oldest live-only audio frames (no `seq`) first. A frame with `seq` is never dropped.
 
 ## Asks and confirm
 
