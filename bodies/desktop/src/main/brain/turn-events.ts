@@ -132,6 +132,8 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
       ...(p.free_text ? { freeText: true } : {}),
       ...(p.recommended !== undefined ? { recommended: p.recommended } : {}),
       ...(Array.isArray(apps) && apps.length > 0 ? { apps } : {}),
+      // The install card draws itself from these; every other card is built from the summary.
+      ...(tool === 'install_app' || tool === 'install_expert' ? { facts: p.input ?? {} } : {}),
     };
     asks.set(p.id, card);
     return [card];

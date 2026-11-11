@@ -435,6 +435,20 @@ describe('createTurnEvents: asks', () => {
       expect(e).not.toHaveProperty('question');
     });
 
+    it('an install ask carries its card facts, so the chat can draw the one install card', () => {
+      const facts = { app: 'Notion', official: true, runs: 'hosted', sign_in: 'browser' };
+      const [e] = make().map(
+        'ask',
+        jobAsk({ text: '', tool: 'install_app', input: facts, options: ['allow', 'deny'] }),
+      );
+      expect(e).toMatchObject({ tool: 'install_app', facts });
+    });
+
+    it('other asks carry no facts', () => {
+      const [e] = make().map('ask', jobAsk({ tool: 'save_preference', input: { a: 1 } }));
+      expect(e).not.toHaveProperty('facts');
+    });
+
     it('an ask without free_text or recommended adds neither field', () => {
       const [e] = make().map('ask', jobAsk());
       expect(e).not.toHaveProperty('freeText');

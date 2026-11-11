@@ -24,6 +24,7 @@ import { ScoutMark } from './scout-mark';
 import { Keycap } from './controls';
 import type { BeanClipData } from './theme/bean-clip';
 import { ConnectorConfirmCard, type JobAnswer } from './connector-confirm';
+import { InstallConfirm } from './setup/install-confirm';
 import { DropCard, type DropOffer } from './drop-card';
 import { useHostBridge } from './host-bridge';
 import { JobLine, useRunningStep } from './job-line';
@@ -135,6 +136,12 @@ type Reply =
   | { state: 'done'; text: string; status?: string }
   | { state: 'failed'; text: string };
 
+/** An app or expert install ask that carries the card's facts. */
+const isInstallAsk = (c: ConnectorConfirmParams): boolean =>
+  (c.tool === 'install_app' || c.tool === 'install_expert') && c.facts !== undefined;
+const installKey = (c: ConnectorConfirmParams): string =>
+  String(c.facts?.app ?? c.facts?.expert ?? c.approvalId);
+
 /**
  * The companion's bubble beside the pet: the quick way to ask about what is on screen.
  * It shows what the pet can see as chips (each one removable), takes one question,
@@ -169,6 +176,9 @@ export function CompanionBubble({
   // The brain can ask about several tools at once, so they queue oldest first and the card
   // shows the head; answering or dismissing it brings up the next.
   const [confirms, setConfirms] = useState<ConnectorConfirmParams[]>([]);
+  // Install asks (an app or an expert) are one card each that stays after Allow and follows the
+  // install, so they live apart: a dismiss or the turn's end must not take them away.
+  const [installs, setInstalls] = useState<ConnectorConfirmParams[]>([]);
   const confirm = confirms[0] ?? null;
   // Asks dismissed since mount, so a late pull of the open cards cannot bring one back.
   const dismissed = useRef(new Set<string>());
@@ -235,6 +245,12 @@ export function CompanionBubble({
     switch (event.type) {
       case 'connector.confirm': {
         const { type: _type, ...params } = event;
+        if (isInstallAsk(params)) {
+          // One card per install: a new ask for the same one replaces it.
+          const key = installKey(params);
+          setInstalls((current) => [...current.filter((c) => installKey(c) !== key), params]);
+          return;
+        }
         // A repeat of a queued ask updates it in place; a new one waits its turn.
         setConfirms((current) =>
           current.some((c) => c.approvalId === params.approvalId)
@@ -244,6 +260,7 @@ export function CompanionBubble({
         return;
       }
       case 'connector.dismiss':
+        // An install card stays through this: it follows the install, then the person closes it.
         // A brain ask closed (answered elsewhere, timed out, cancelled): its card goes.
         dismissed.current.add(event.approvalId);
         dropConfirms((c) => c.approvalId === event.approvalId);
@@ -734,6 +751,15 @@ export function CompanionBubble({
           }}
         />
       )}
+      {installs.map((install) => (
+        <InstallConfirm
+          key={installKey(install)}
+          confirm={install}
+          onGone={() => setInstalls((current) => current.filter((c) => c !== install))}
+          onTry={(text) => submit(text, undefined)}
+          onRetry={(name) => submit(`Set up ${name} again`, undefined)}
+        />
+      ))}
       {confirm !== null && (
         <ConnectorConfirmCard
           key={confirm.approvalId}
