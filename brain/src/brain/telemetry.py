@@ -2,7 +2,9 @@
 
 `timed(step)` times a block (sync or async `with`) into the process-wide `TIMINGS`, a small
 ring buffer per step. `LoopLagMonitor` warns when the loop was blocked past a threshold,
-so a slow turn can be told apart from a blocked loop. Both only observe; nothing decides.
+so a slow turn can be told apart from a blocked loop. `ask_event` writes one ask log line and
+`dump_timings` repeats the timings into the log, so `tagalong perf` can read both from
+brain.log without a running brain. All only observe; nothing decides.
 """
 
 import asyncio
@@ -105,3 +107,31 @@ class LoopLagMonitor:
             if lag > self._threshold:
                 TIMINGS.record("loop_lag", lag, {})
                 self._log.warning("event loop blocked for %.2f s", lag)
+
+
+PERF_EVERY_S = 60.0  # how often the timings are written to the log
+
+
+def ask_event(event: str, ask_id: str, by: str, why: str = "") -> None:
+    """One line per step of an ask's life: `ask.<event> t=<epoch> id=<id> by=<who> why=<why>`."""
+    why = "_".join(why.split())
+    logging.getLogger("brain.asks").info(
+        "ask.%s t=%d id=%s by=%s why=%s", event, time.time(), ask_id, by, why
+    )
+
+
+async def dump_timings(every: float = PERF_EVERY_S) -> None:
+    """Write the current timings to the log, one `perf` line per step, every `every` seconds."""
+    log = logging.getLogger("brain.perf")
+    while True:
+        await asyncio.sleep(every)
+        for step, st in TIMINGS.summary().items():
+            log.info(
+                "perf t=%d step=%s n=%d p50=%.3f p95=%.3f max=%.3f",
+                time.time(),
+                step,
+                st.count,
+                st.p50,
+                st.p95,
+                st.max,
+            )

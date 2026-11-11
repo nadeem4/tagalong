@@ -581,3 +581,34 @@ async def test_open_ask_expired_after_restart():
     assert work.resume_scan(lambda row: None) == []
     with pytest.raises(AskExpired):  # this test's waiter outlived the "crash"; a real one cannot
         await task
+
+
+def _ask_lines(caplog) -> list[str]:
+    return [r.getMessage() for r in caplog.records if r.getMessage().startswith("ask.")]
+
+
+async def test_ask_logs_open_show_answer(caplog):
+    caplog.set_level("INFO", logger="brain.asks")
+    bodies = FakeBodies()
+    asks = Asks(bodies, fresh_work())
+    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
+    params = await opened(bodies)
+    asks.answer(params["id"], "allow", "desktop")
+    await task
+    lines = _ask_lines(caplog)
+    assert [ln.split()[0] for ln in lines] == ["ask.opened", "ask.shown", "ask.answered"]
+    assert all(f"id={params['id']}" in ln for ln in lines)
+    assert "by=desktop" in lines[2] and "why=allow" in lines[2]
+
+
+async def test_cancel_close_is_logged_with_reason_cancelled(caplog):
+    caplog.set_level("INFO", logger="brain.asks")
+    bodies = FakeBodies()
+    asks = Asks(bodies, fresh_work())
+    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
+    params = await opened(bodies)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    [closed] = [ln for ln in _ask_lines(caplog) if ln.startswith("ask.closed")]
+    assert f"id={params['id']}" in closed and "why=cancelled" in closed

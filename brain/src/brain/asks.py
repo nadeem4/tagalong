@@ -18,6 +18,7 @@ from brain.bodies import Bodies
 from brain.mind.turn import Call
 from brain.protocol import ErrorCode, RpcError
 from brain.store.work import State, TransitionRefused, WorkStore
+from brain.telemetry import ask_event
 
 if TYPE_CHECKING:
     from brain.permission import OpenRecord
@@ -140,7 +141,11 @@ class Asks:
         self._open[ask_id] = entry
         if not reopen:
             self._record_open(entry.params, parent_id, record)
+            ask_event("opened", ask_id, "brain", entry.params.get("tool") or "")
         self._bodies.notify("ask", entry.params)
+        shown = self._bodies.display_ids()
+        if shown:
+            ask_event("shown", ask_id, ",".join(shown))
         try:
             async with asyncio.timeout(timeout):
                 return await entry.future
@@ -165,6 +170,7 @@ class Asks:
             # A done future means its waiter was cancelled or timed out; it closes the ask itself.
             if entry is not None and not entry.future.done():
                 del self._open[ask_id]
+                ask_event("closed", ask_id, "brain", "cancelled")
                 entry.future.set_exception(RpcError(ErrorCode.cancelled, "the ask was cancelled"))
                 self._bodies.notify("ask", {"id": ask_id, "state": "closed", "reason": "cancelled"})
                 self._end_row(ask_id, "expired", "ask cancelled")
@@ -187,6 +193,7 @@ class Asks:
         entry.future.set_result(Answer(option, text, None if apps is None else tuple(apps)))
         closed = {"id": ask_id, "state": "closed", "reason": "answered"}
         self._bodies.notify("ask", {**closed, "option": option, "by": body_id})
+        ask_event("answered", ask_id, body_id, option)
         self._end_row(ask_id, "done", "answered", {"option": option})
 
     def park(self, ask_id: str) -> None:
@@ -203,6 +210,7 @@ class Asks:
         if entry is None or entry.future.done():
             return False
         del self._open[ask_id]
+        ask_event("closed", ask_id, "brain", reason)
         entry.future.set_exception(AskExpired(reason))
         self._bodies.notify("ask", {"id": ask_id, "state": "closed", "reason": "timeout"})
         return True
@@ -216,6 +224,7 @@ class Asks:
 
     def _close(self, ask_id: str, reason: str) -> None:
         if self._open.pop(ask_id, None) is not None:
+            ask_event("closed", ask_id, "brain", reason)
             self._bodies.notify("ask", {"id": ask_id, "state": "closed", "reason": reason})
             self._end_row(
                 ask_id, "expired", "timed out" if reason == "timeout" else "ask cancelled"
@@ -230,6 +239,7 @@ class Asks:
                 "parent ended: "
             )
             reason = f"job ended: {why}" if row is not None and row.parent_id else why
+            ask_event("closed", work_id, "brain", reason)
             entry.future.set_exception(AskExpired(reason))
             self._bodies.notify("ask", {"id": work_id, "state": "closed", "reason": "timeout"})
 

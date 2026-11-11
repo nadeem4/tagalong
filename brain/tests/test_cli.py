@@ -459,3 +459,28 @@ def test_install_without_a_tty_or_yes_says_to_pass_yes(tmp_path):
     rig.ask = no_tty
     assert rig.go("install", "claude-acp") == 1
     assert rig.lines[-1] == "Run again with --yes to go ahead without a prompt."
+
+
+# ---- perf ----
+
+
+def test_perf_prints_summary_from_log(tmp_path):
+    now = 10_000.0
+    (tmp_path / "brain.log").write_text(
+        f"perf t={now - 7200} step=turn n=1 p50=9.000 p95=9.000 max=9.000\n"
+        f"perf t={now - 60} step=turn n=4 p50=1.500 p95=3.000 max=4.000\n"
+        f"ask.closed t={now - 30} id=a1 by=brain why=cancelled\n"
+        f"ask.closed t={now - 20} id=a2 by=brain why=timeout\n"
+        f"ask.closed t={now - 7200} id=a3 by=brain why=cancelled\n"
+    )
+    rig = Rig(tmp_path)
+    assert rig.go("perf", "--since", "1h", now=lambda: now) == 0
+    assert "turn" in rig.text and "1.500" in rig.text and "3.000" in rig.text
+    assert "9.000" not in rig.text
+    assert "asks closed by cancel: 1" in rig.text
+
+
+def test_perf_without_a_log_says_so(tmp_path):
+    rig = Rig(tmp_path)
+    assert rig.go("perf", now=lambda: 1.0) == 1
+    assert "brain.log" in rig.text

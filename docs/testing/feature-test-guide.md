@@ -2654,3 +2654,5 @@ Home > Overview shows a "Scout's brain" card above "Where things run".
 1. Start the brain with `TAGALONG_LOOP_LAG_MS=50` and use Scout. Any `event loop blocked for ...`
    line in `brain.log` names a real stall longer than 50 ms.
 2. Start the brain with `TAGALONG_LOOP_LAG_MS=abc`. It refuses to start and names the variable.
+3. Use Scout for a few minutes, answer one card and cancel a turn that is waiting on a card. Within a minute `brain.log` holds `perf ...` lines and `ask.opened`, `ask.shown`, `ask.answered` and `ask.closed ... why=cancelled` lines for those cards.
+4. From `brain/`, run `uv run tagalong perf --since 1h`. It prints a table of steps (count, p50, p95, max in seconds) and `asks closed by cancel: 1`; it works with the brain stopped.
