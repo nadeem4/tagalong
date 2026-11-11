@@ -86,7 +86,7 @@ test('valid key clears the field and shows already set', async () => {
   expect(brain.keyAttempts).toBe(2);
   // The daily limit shows what is spent today against it, with a meter (the fake brain reports $0.42).
   await expect(home.getByText('$0.42 of $5.00 used today')).toBeVisible({ timeout: 30_000 });
-  await expect(home.getByRole('meter')).toHaveAttribute('aria-valuenow', '0.42');
+  await expect(home.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0.42');
   // The no-key mark leaves with the key.
   const avatar = await windowFor('avatar');
   await expect(avatar.getByTestId('status-mark')).toHaveCount(0, { timeout: 30_000 });

@@ -244,7 +244,7 @@ export function LimitField({
             </div>
             <div
               className={full ? 'tg-spendmeter tg-spendmeter--full' : 'tg-spendmeter'}
-              role="meter"
+              role="progressbar"
               aria-label="Spent today"
               aria-valuenow={spentUsd}
               aria-valuemin={0}

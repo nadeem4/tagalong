@@ -316,7 +316,7 @@ describe('LimitField', () => {
     );
     expect(screen.getByText('$1.20 of $5.00 used today')).toBeInTheDocument();
     expect(screen.getByText('24%')).toBeInTheDocument();
-    const meter = screen.getByRole('meter');
+    const meter = screen.getByRole('progressbar');
     expect(meter).toHaveAttribute('aria-valuenow', '1.2');
     expect(meter).toHaveAttribute('aria-valuemin', '0');
     expect(meter).toHaveAttribute('aria-valuemax', '5');
@@ -325,7 +325,7 @@ describe('LimitField', () => {
 
   it('shows no spend line until the spend is known', () => {
     render(<LimitField host={{ setDailyLimit: vi.fn(() => Promise.resolve()) }} limitUsd={5} />);
-    expect(screen.queryByRole('meter')).toBeNull();
+    expect(screen.queryByRole('progressbar')).toBeNull();
     expect(screen.queryByText(/used today/)).toBeNull();
   });
 
@@ -339,7 +339,7 @@ describe('LimitField', () => {
     );
     expect(screen.getByText('$5.30 of $5.00 used today')).toBeInTheDocument();
     expect(screen.getByText('100%')).toBeInTheDocument();
-    expect(screen.getByRole('meter')).toHaveClass('tg-spendmeter--full');
+    expect(screen.getByRole('progressbar')).toHaveClass('tg-spendmeter--full');
     expect(
       screen.getByText(
         'Today’s $5 is spent; Scout pauses until midnight. Raise the limit to carry on.',
