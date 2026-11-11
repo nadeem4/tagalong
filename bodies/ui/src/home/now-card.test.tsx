@@ -175,6 +175,7 @@ describe('NowCard', () => {
             { id: 'fast', name: 'Fastmail', on: false },
           ],
           loops: [],
+          openItems: [],
         },
       }),
     );

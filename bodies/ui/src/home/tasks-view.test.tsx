@@ -60,6 +60,7 @@ describe('TasksView', () => {
         loops: {
           apps: [{ id: 'gmail', name: 'Gmail', on: true }],
           loops: [loop('a'), loop('b', 'done')],
+          openItems: [],
         },
         timers: [timer('t1'), timer('t2'), timer('t3')],
       }),
@@ -93,7 +94,11 @@ describe('TasksView', () => {
 
   it('puts the loops panel inside the Held tab and Forget still works', async () => {
     const bridge = createFakeHostBridge({
-      loops: { apps: [{ id: 'gmail', name: 'Gmail', on: true }], loops: [loop('a')] },
+      loops: {
+        apps: [{ id: 'gmail', name: 'Gmail', on: true }],
+        loops: [loop('a')],
+        openItems: [],
+      },
     });
     open(bridge);
     expect(screen.queryByText('Read my mail for loops')).toBeNull();
