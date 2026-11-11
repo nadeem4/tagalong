@@ -16,7 +16,7 @@ describe('ModelSection', () => {
         <ModelSection />
       </HostBridgeProvider>,
     );
-    expect(html).toContain('home-card');
+    expect(html).toContain('tg-card');
     expect(html).toContain('Scout&#x27;s model</h2>');
     expect(html).toContain('The AI model Scout thinks with, on your Anthropic key.');
   });

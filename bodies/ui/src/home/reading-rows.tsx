@@ -24,12 +24,12 @@ export function ReadingRows({ rows }: { rows: ReadingRowView[] }) {
   if (rows.length === 0) return null;
   return (
     <>
-      <h3 className="home-card__group">How Scout reads your screen</h3>
+      <h3 className="tg-card__group">How Scout reads your screen</h3>
       {rows.map((row) => {
         const look = CHIP[row.state];
         return (
           <div key={row.capability} className="home-reading">
-            <p className="home-card__row home-card__row--app">
+            <p className="tg-card__row tg-card__row--app">
               <span className="home-conn__initial" aria-hidden="true">
                 {row.title.slice(0, 1)}
               </span>

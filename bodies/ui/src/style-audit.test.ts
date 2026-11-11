@@ -1,7 +1,7 @@
 /**
- * Guards the type system: every style sheet sets text in the seven roles only (sizes, weights),
- * with no capitals, no letter spacing and no pixel font. Checks the evaluated sheets that are
- * exported and the source of the rest.
+ * Guards the style system: every style sheet sets text in the seven roles only, spaces on the
+ * space scale, rounds corners with the radius tokens and names colours only through tokens.ts.
+ * Checks the evaluated sheets that are exported and the source of the rest.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -46,7 +46,7 @@ function offenders(test: (css: string) => string[]): string[] {
   return Object.entries(sheets).flatMap(([name, css]) => test(css).map((hit) => `${name}: ${hit}`));
 }
 
-describe('type audit', () => {
+describe('style audit', () => {
   it('has no capitals', () => {
     expect(offenders((css) => css.match(/text-transform:\s*uppercase/g) ?? [])).toEqual([]);
   });
@@ -105,5 +105,72 @@ describe('type audit', () => {
       const line = sheet.split('\n').find((l) => l.startsWith(`${selector} {`)) ?? '';
       expect(line, selector).toContain('tabular-nums');
     }
+  });
+
+  it('spaces every padding, margin and gap on the space scale', () => {
+    const scale = new Set<number>([0, ...Object.values(themeTokens.space)]);
+    const bad = (css: string): string[] =>
+      [
+        ...css.matchAll(
+          /(?:^|[\s;{])(padding|margin|gap|row-gap|column-gap)(?:-[a-z]+)?:\s*([^;},\n]+)/g,
+        ),
+      ].flatMap(([, , value]) =>
+        [...(value ?? '').matchAll(/(-?)(\d+(?:\.\d+)?)px/g)]
+          // A -1px margin lets a tab's underline overlap its border; nothing else is off the scale.
+          .filter(([, sign, px]) => !(sign === '-' && px === '1'))
+          .map(([, , px]) => Number(px))
+          .filter((px) => !scale.has(px))
+          .map((px) => `${px}px in "${(value ?? '').trim()}"`),
+      );
+    expect(offenders(bad)).toEqual([]);
+  });
+
+  it('rounds every corner with a radius token, 50% or 999px', () => {
+    const allowed = new Set<string>([
+      ...Object.values(themeTokens.radius).map((px) => `${px}px`),
+      '0',
+      '50%',
+    ]);
+    const bad = (css: string): string[] =>
+      [...css.matchAll(/border-radius:\s*((?:\$\{[^}]*\}|[^;}\n])+)/g)].flatMap(([, value]) =>
+        (value ?? '')
+          .replace(/\$\{t\.radius\.(?:card|pill|sm)\}px/g, '0')
+          .trim()
+          .split(/\s+/)
+          .filter((part) => !allowed.has(part))
+          .map((part) => `${part} in "${(value ?? '').trim()}"`),
+      );
+    expect(offenders(bad)).toEqual([]);
+  });
+
+  it('has no hex colour literal outside tokens.ts', () => {
+    // The evaluated sheets hold tokens' hex values, so read the files themselves. A stylesheet
+    // may declare a CSS variable from a token's value (a test checks it); nothing else.
+    const files = [
+      ...['answer.tsx', 'card-styles.ts', 'chat-styles.ts', 'companion-bubble.tsx', 'dock-pet.tsx'],
+      ...['health-card.tsx', 'status-mark.tsx', 'scout-mark.tsx'],
+      ...['controls/controls-styles.ts', 'home/connections-styles.ts', 'home/home-styles.ts'],
+      ...[
+        'home/memory-view.tsx',
+        'settings/settings-styles.ts',
+        'walkthrough/walkthrough-styles.ts',
+      ],
+    ].map((f): [string, string] => [f, read(uiSrc, f)]);
+    const desktop = join(bodies, 'desktop', 'src', 'renderer', 'src');
+    const popup = join(bodies, 'browser', 'src');
+    files.push(
+      ['desktop app.css', read(desktop, 'app.css')],
+      ['desktop home.css', read(desktop, 'home.css')],
+      ['popup.css', read(popup, 'popup', 'popup.css')],
+      ['mic.html', read(popup, 'permission', 'mic.html')],
+      ['permission.html', read(popup, 'permission', 'permission.html')],
+    );
+    const hex = /#[0-9a-fA-F]{3,8}\b/g;
+    const bad = files.flatMap(([name, text]) =>
+      (text.replace(/--[a-z0-9-]+:\s*#[0-9a-fA-F]{3,8}\b/g, '').match(hex) ?? []).map(
+        (hit) => `${name}: ${hit}`,
+      ),
+    );
+    expect(bad).toEqual([]);
   });
 });

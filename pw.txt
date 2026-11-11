@@ -1,0 +1,15 @@
+
+Running 11 tests using 1 worker
+
+[1/11] e2e\design-shots.spec.ts:77:3 › D1 normal
+[2/11] e2e\design-shots.spec.ts:77:3 › D1 update-ready
+[3/11] e2e\design-shots.spec.ts:77:3 › D1 started-by-you
+[4/11] e2e\design-shots.spec.ts:77:3 › D1 offline
+[5/11] e2e\design-shots.spec.ts:203:3 › E3 chat › E3 states: quick bubble, header, full chat, every install card state
+[6/11] e2e\design-shots.spec.ts:371:1 › D5 connections
+[7/11] e2e\design-shots.spec.ts:516:1 › E1 updates
+[8/11] e2e\design-shots.spec.ts:657:1 › E1 experts updates
+[9/11] e2e\design-shots.spec.ts:762:1 › E5 model states
+[10/11] e2e\design-shots.spec.ts:864:1 › E2 places states
+[11/11] e2e\design-shots.spec.ts:904:1 › E2 tour step ten and finish card
+  11 passed (1.1m)

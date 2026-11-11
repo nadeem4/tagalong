@@ -213,7 +213,7 @@ export function PlacesView() {
   return (
     <>
       {head}
-      <section className="home-card" aria-label="Places">
+      <section className="tg-card" aria-label="Places">
         <ul className="cx-list">
           <li className="cx-item">
             <Place

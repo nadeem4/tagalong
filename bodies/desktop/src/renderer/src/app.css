@@ -7,6 +7,7 @@
   --muted: #64748b;
   --line: #e2e8f0;
   --surface: #ffffff;
+  --err: #b91c1c;
   font-family: 'Onest', system-ui, sans-serif;
   font-size: 14px;
   line-height: 21px;
@@ -72,9 +73,9 @@ body {
   border: 0;
   border-radius: 999px;
   background: var(--ink);
-  color: #fff;
+  color: var(--surface);
   cursor: pointer;
-  padding: 2px 7px;
+  padding: 2px 8px;
   font-size: 11px;
   line-height: 14px;
 }
@@ -111,16 +112,16 @@ textarea {
   flex: 1;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 6px 8px;
   font: inherit;
 }
 
 button {
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--ink);
-  color: #fff;
+  color: var(--surface);
   padding: 6px 12px;
   font: inherit;
   cursor: pointer;
@@ -138,7 +139,7 @@ button:disabled {
 }
 
 .settings__error {
-  color: #b91c1c;
+  color: var(--err);
   font-size: 12px;
   line-height: 16px;
 }

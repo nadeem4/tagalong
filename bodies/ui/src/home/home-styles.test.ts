@@ -14,10 +14,10 @@ describe('HOME_CSS', () => {
 
   it('shows the where-things-run status dots and keeps the wrap rule to that card', () => {
     expect(HOME_CSS).toContain(
-      '.home-card--run .home-dot { display: inline-block; margin-right: 6px; }',
+      '.tg-card--run .home-dot { display: inline-block; margin-right: 6px; }',
     );
-    expect(HOME_CSS).toContain('.home-card--run .home-card__row strong { min-width: 0;');
-    expect(HOME_CSS).not.toContain('\n.home-card__row strong');
+    expect(HOME_CSS).toContain('.tg-card--run .tg-card__row strong { min-width: 0;');
+    expect(HOME_CSS).not.toContain('\n.tg-card__row strong');
   });
 
   it('caps the page at 920px with one inset from the tokens', () => {

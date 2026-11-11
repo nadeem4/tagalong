@@ -73,8 +73,8 @@ export function PermissionsPanel() {
           .filter((entry) => entry.rows.length > 0);
 
   return (
-    <section className="home-card home-perms" aria-label="Permissions">
-      <h2 className="home-card__label">Permissions</h2>
+    <section className="tg-card home-perms" aria-label="Permissions">
+      <h2 className="tg-card__label">Permissions</h2>
       <p>Off: Scout leaves it alone. Ask: checks with you first. Auto: just does it.</p>
       {failed && list === null && (
         <p role="alert">

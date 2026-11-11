@@ -45,7 +45,7 @@ export function StepNine({
           </button>
         </p>
       </div>
-      <div className="wt-card wt-notes">
+      <div className="tg-card wt-notes">
         <ul className="wt-checks">
           {fromEnv || <li>Saved by Scout’s brain, in one file on the machine it runs on</li>}
           <li>Only sent to Anthropic</li>

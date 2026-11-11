@@ -1181,8 +1181,8 @@ function Speech({ tail, children }: { tail: 'left' | 'right' | undefined; childr
 
 const SPEECH_CSS = `
 .speech { position: relative; box-sizing: border-box; }
-.speech[data-tail='left'] { padding-left: 10px; }
-.speech[data-tail='right'] { padding-right: 10px; }
+.speech[data-tail='left'] { padding-left: ${t.space.lg}px; }
+.speech[data-tail='right'] { padding-right: ${t.space.lg}px; }
 .speech-tail {
   position: absolute; bottom: 34px; width: 14px; height: 14px; background: ${t.color.page};
   border: 1px solid ${t.color.fieldLine}; transform: rotate(45deg);
@@ -1194,48 +1194,48 @@ const SPEECH_CSS = `
 const BUBBLE_CSS = `
 .bubble {
   box-sizing: border-box; display: flex; flex-direction: column; gap: ${t.space.lg}px;
-  padding: 14px 16px; background: ${t.color.page}; color: ${t.color.text};
-  border: 1px solid ${t.color.fieldLine}; border-radius: 12px; font-family: ${t.font.ui};
+  padding: ${t.space.lg}px 16px; background: ${t.color.page}; color: ${t.color.text};
+  border: 1px solid ${t.color.fieldLine}; border-radius: ${t.radius.card}px; font-family: ${t.font.ui};
 }
-.bubble-foot { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-top: 1px solid #262C4A; }
+.bubble-foot { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 12px ${t.space.xl}px; border-top: 1px solid ${t.color.line}; }
 .bubble-top { display: flex; align-items: flex-start; justify-content: flex-end; gap: 8px; }
 .bubble-close {
-  flex: none; width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent;
+  flex: none; width: 28px; height: 28px; border: 0; border-radius: ${t.radius.sm}px; background: transparent;
   color: ${t.color.textMuted}; ${typeCss('title')}; cursor: pointer;
 }
-.bubble-close:hover { background: #222845; color: ${t.color.text}; }
+.bubble-close:hover { background: ${t.color.tileNavy}; color: ${t.color.text}; }
 .bubble-speaking {
   flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 3px;
-  width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent;
+  width: 28px; height: 28px; padding: 0; border: 0; border-radius: ${t.radius.sm}px; background: transparent;
   cursor: pointer;
 }
-.bubble-speaking:hover { background: #222845; }
+.bubble-speaking:hover { background: ${t.color.tileNavy}; }
 .bubble-mic {
   flex: none; display: inline-flex; align-items: center; justify-content: center;
-  width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent;
+  width: 28px; height: 28px; padding: 0; border: 0; border-radius: ${t.radius.sm}px; background: transparent;
   color: ${t.color.textMuted}; cursor: pointer;
 }
-.bubble-mic:hover { background: #222845; color: ${t.color.text}; }
+.bubble-mic:hover { background: ${t.color.tileNavy}; color: ${t.color.text}; }
 .bubble-mic[aria-pressed='true'] { background: ${t.color.gold}; color: ${t.color.goldInk}; }
 .bubble-mic:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 2px; }
 .bubble-heard {
-  align-self: flex-end; max-width: 85%; margin: 0; padding: 6px 10px; border-radius: 10px 10px 4px 10px;
-  background: #222845; color: #C9CEE0; ${typeCss('body')};
+  align-self: flex-end; max-width: 85%; margin: 0; padding: 6px ${t.space.lg}px; border-radius: ${t.radius.card}px ${t.radius.card}px ${t.radius.sm}px ${t.radius.card}px;
+  background: ${t.color.tileNavy}; color: ${t.color.textSoft}; ${typeCss('body')};
 }
 .bubble-listening {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; ${typeCss('small')}; color: #C9CEE0;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; ${typeCss('small')}; color: ${t.color.textSoft};
 }
 .bubble-partial { flex-basis: 100%; ${typeCss('body')}; color: ${t.color.text}; }
 .bubble-listening-dot {
   flex: none; width: 8px; height: 8px; border-radius: 50%; background: ${t.color.gold};
   animation: bubble-pulse 1.2s ease-in-out infinite;
 }
-.bubble-listening[data-state='hearing'] .bubble-listening-dot { background: #7CB8F2; }
+.bubble-listening[data-state='hearing'] .bubble-listening-dot { background: ${t.color.sky}; }
 @keyframes bubble-pulse { 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .bubble-listening-dot { animation: none; } }
 /* The host sets --tg-voice-level (0 to 1) from the audio as it plays. */
 .bubble-speaking span, .bubble-bars span {
-  width: 3px; height: 14px; border-radius: 2px; background: ${t.color.gold};
+  width: 3px; height: 14px; border-radius: ${t.radius.sm}px; background: ${t.color.gold};
   transform: scaleY(calc(0.3 + var(--tg-voice-level, 0.4) * 0.7)); transition: transform 90ms linear;
 }
 .bubble-speaking span:nth-child(2), .bubble-bars span:nth-child(2) { transform: scaleY(calc(0.3 + var(--tg-voice-level, 0.4))); }
@@ -1244,19 +1244,19 @@ const BUBBLE_CSS = `
   .bubble-bars span, .bubble-bars span:nth-child(2) { transform: scaleY(0.6); transition: none; }
 }
 .bubble-text { margin: 0; ${typeCss('bodyLead')}; white-space: pre-wrap; overflow-wrap: anywhere; }
-.bubble-status { margin: 0; color: #C9CEE0; ${typeCss('small')}; }
+.bubble-status { margin: 0; color: ${t.color.textSoft}; ${typeCss('small')}; }
 .bubble-answer { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
 .bubble-error {
-  display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 8px 10px; border-radius: 8px;
-  background: #3a1d2a; color: #ffb4c0; ${typeCss('body')};
+  display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 8px ${t.space.lg}px; border-radius: ${t.radius.sm}px;
+  background: ${t.color.errNavyFill}; color: ${t.color.errNavyInk}; ${typeCss('body')};
 }
 .bubble-error > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .bubble-error .cx-icon { flex: none; width: 16px; height: 16px; margin-top: 2px; }
-.bubble-error .bubble-link { color: #ffd9df; }
+.bubble-error .bubble-link { color: ${t.color.errNavyLink}; }
 .bubble-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .bubble-chip {
   display: inline-flex; align-items: center; gap: 4px; max-width: 100%; min-height: 28px;
-  padding: 0 4px 0 10px; border-radius: 999px; background: #222845; color: #C9CEE0; ${typeCss('small')};
+  padding: 0 4px 0 ${t.space.lg}px; border-radius: 999px; background: ${t.color.tileNavy}; color: ${t.color.textSoft}; ${typeCss('small')};
 }
 .bubble-chip button {
   width: 24px; height: 24px; border: 0; border-radius: 50%; background: transparent;
@@ -1265,12 +1265,12 @@ const BUBBLE_CSS = `
 .bubble-row { display: flex; align-items: center; gap: 12px; }
 .bubble-hints { ${typeCss('caption')}; color: ${t.color.textMuted}; }
 .bubble-primary {
-  height: 36px; padding: 0 16px; border: 0; border-radius: 8px; background: ${t.color.gold};
+  height: 36px; padding: 0 16px; border: 0; border-radius: ${t.radius.sm}px; background: ${t.color.gold};
   color: ${t.color.goldInk}; font: inherit; font-weight: 600; cursor: pointer;
 }
 .bubble-quiet {
-  align-self: flex-start; min-height: 28px; padding: 0 10px; border: 1px solid ${t.color.fieldLine};
-  border-radius: 6px; background: transparent; color: #C9CEE0; font: inherit; ${typeCss('small')}; cursor: pointer;
+  align-self: flex-start; min-height: 28px; padding: 0 ${t.space.lg}px; border: 1px solid ${t.color.fieldLine};
+  border-radius: ${t.radius.sm}px; background: transparent; color: ${t.color.textSoft}; font: inherit; ${typeCss('small')}; cursor: pointer;
 }
 .bubble-primary:focus-visible, .bubble-quiet:focus-visible, .bubble-close:focus-visible, .bubble-say:focus-visible {
   outline: 2px solid var(--tg-focus); outline-offset: 2px;

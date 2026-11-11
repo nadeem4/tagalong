@@ -115,8 +115,8 @@ export function ApprovalHistory({ rows, counts, filter, onFilter, hasMore, onMor
   // Before a successful read there is nothing true to show; the page's alert speaks instead.
   if (rows === null || counts === null) return null;
   return (
-    <section aria-label="Approvals history" className="apv-section">
-      <div className="home-card apv-summary" role="group" aria-label="Summary">
+    <section aria-label="Approvals history" className="tg-card apv-section">
+      <div className="tg-card apv-summary" role="group" aria-label="Summary">
         <div>
           <b>{counts.total}</b>
           <span>asks</span>
@@ -133,7 +133,7 @@ export function ApprovalHistory({ rows, counts, filter, onFilter, hasMore, onMor
         </div>
       </div>
       <div className="apv-bar">
-        <h2 className="home-card__label">History</h2>
+        <h2 className="tg-card__label">History</h2>
         <div className="apv-seg" role="group" aria-label="Filter history">
           {FILTERS.map((item) => (
             <button
@@ -151,7 +151,7 @@ export function ApprovalHistory({ rows, counts, filter, onFilter, hasMore, onMor
       {rows.length === 0 && <p className="home-note">Nothing here yet.</p>}
       {groupByDay(rows).map((group) => (
         <div key={group.label + group.rows[0]?.id}>
-          <h3 className="home-card__label apv-day">{group.label}</h3>
+          <h3 className="tg-card__label apv-day">{group.label}</h3>
           <ul className="apv-rows">
             {group.rows.map((row) => (
               <Row key={row.id} row={row} />

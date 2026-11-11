@@ -85,8 +85,8 @@ export function MemoryView({ name }: { name: string }) {
         <h1 className="home-title">{title}</h1>
         <p>Kept until you delete them. Deleting one is for good.</p>
       </div>
-      <section className="home-card" aria-label="Memories">
-        <h2 className="home-card__label">Memories</h2>
+      <section className="tg-card" aria-label="Memories">
+        <h2 className="tg-card__label">Memories</h2>
         {failed && memories === null && (
           <p role="alert">Tagalong could not read these memories. Reopen Home to try again.</p>
         )}

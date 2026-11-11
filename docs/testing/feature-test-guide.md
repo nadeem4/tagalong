@@ -2562,18 +2562,23 @@ button`; a tap on a closed, unknown or refused ask replies `That question is clo
 
 ## One type system on Onest (D3)
 
-1. Automated: `cd bodies/ui && pnpm exec vitest run src/type-audit.test.ts src/theme/tokens.test.ts src/wordmark.test.ts` (every size on one of seven roles, weights 400 or 600, no capitals, no letter spacing, no pixel font); `cd bodies/browser && pnpm exec vitest run src/popup/popup-font.test.ts`; `cd bodies/desktop && pnpm exec playwright test e2e/smoke.spec.ts` (Onest 400 and 600 load, nothing is bundled as Pixelify Sans).
+1. Automated: `cd bodies/ui && pnpm exec vitest run src/style-audit.test.ts src/theme/tokens.test.ts src/wordmark.test.ts` (every size on one of seven roles, weights 400 or 600, no capitals, no letter spacing, no pixel font); `cd bodies/browser && pnpm exec vitest run src/popup/popup-style.test.ts`; `cd bodies/desktop && pnpm exec playwright test e2e/smoke.spec.ts` (Onest 400 and 600 load, nothing is bundled as Pixelify Sans).
 2. By hand, open Home, Settings, the bubble, the tour and the browser popup. **Expected:** one typeface everywhere; card headings and labels read "Permissions", "Spend", "Read my mail for loops" in sentence case, never in capitals; money and counts line up their digits.
 3. Tab through Home on a light page and through the nav. **Expected:** the focus ring is navy on the light page and gold only on the navy side menu.
 
 ## Connections redesign: official and community groups (D5)
 
-1. Automated, one file at a time from `bodies/ui`: `pnpm exec vitest run src/home/connections-panel.test.tsx`, then `src/home/experts-tab.test.tsx`, `src/home/app-search.test.tsx`, `src/home/app-group-row.test.tsx`, `src/home/check-card.test.tsx`, `src/home/connections-styles.test.ts`, `src/type-audit.test.ts`; and `pnpm --filter @tagalong/desktop exec playwright test e2e/connections.spec.ts` (fake brain).
+1. Automated, one file at a time from `bodies/ui`: `pnpm exec vitest run src/home/connections-panel.test.tsx`, then `src/home/experts-tab.test.tsx`, `src/home/app-search.test.tsx`, `src/home/app-group-row.test.tsx`, `src/home/check-card.test.tsx`, `src/home/connections-styles.test.ts`, `src/style-audit.test.ts`; and `pnpm --filter @tagalong/desktop exec playwright test e2e/connections.spec.ts` (fake brain).
 2. By hand, Home > Connections > Apps. **Expected:** **Your apps** lists Official ones first, then Community, each row a tile, name, chip, one meta line, a status dot, the switch and quiet Restart and Remove. **Add an app** has the search field, a **Popular** list and "Can't find it? Add it yourself".
 3. Search `notion`, press **Add Notion**. **Expected:** the row itself reads "Notion added." (not a line at the top). Open "N more from other makers" and press **Add…** on one: the warning-fill check card opens; **Back** adds nothing, **Add anyway** adds it.
 4. Search for nonsense: "No apps match ..." with the way to add it yourself. Switch the network off and search: one plain line, not two, and no old results beside it. While a search runs: "Searching…" and Popular dimmed; after it: `Results for "notion"`. A curated app or expert you already added says "✓ Added" in place of Add. Press "Can't find it? Add it yourself": a two-way switch (A web address, A command on this PC), labels above the fields, then **Add app**.
 5. Experts tab. **Expected:** **Your experts** and **Add an expert**. The curated list is open with **Recommended** and "Tested with Scout" or "Not tested with Scout"; **Show more** reveals the rest, and "Only experts that install and run on this PC are listed." An Official one has **Add**; a community one has **Add…** and the check card. While one installs its row shows a progress bar; a failed install shows the plain line with **Try again**.
 6. Tab through the page. **Expected:** every control shows the navy focus ring.
+
+## Spacing, radius and colour on tokens (E4)
+
+1. Automated, one file at a time: `cd bodies/ui && pnpm exec vitest run src/style-audit.test.ts src/theme/tokens.test.ts` (every padding, margin and gap on the space scale, every corner a radius token, no hex outside `tokens.ts`); `cd bodies/desktop && pnpm exec vitest run src/renderer/src/app-css.test.ts`; `cd bodies/browser && pnpm exec vitest run src/popup/popup-style.test.ts` (the CSS variables hold the token values).
+2. Visual pass, by hand: open Home (Overview, Connections, Places, Settings), the bubble (chat, an ask card), the tour and the browser popup. **Expected:** every card is the same white box with the same corners and inner space; nothing sits tight against an edge or looks shifted by a pixel or two from before; the three corner sizes (12, 8 and round) are the only ones you see.
 
 ## Setup fixes: curated lists, installable experts, kept trust (D2)
 

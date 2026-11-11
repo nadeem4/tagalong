@@ -17,7 +17,7 @@ export function StepOne() {
         Scout lives on your screen. Ask it anything, any time, and it works with whatever you
         already have open.
       </p>
-      <div className="wt-day">
+      <div className="tg-card wt-day">
         <span className="wt-label">A day with Scout</span>
         <ul>
           {DAY.map((moment) => (

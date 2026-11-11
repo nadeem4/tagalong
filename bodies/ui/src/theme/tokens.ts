@@ -51,6 +51,40 @@ export const themeTokens = {
     warnBar: '#B7791F',
     errFill: '#FDE7E5',
     errInk: '#8A1C12',
+    /** The surface of a card on the light page. */
+    card: '#FFFFFF',
+    /** The lighter tile on navy: chips, hovers, the job bar's track. */
+    tileNavy: '#222845',
+    /** Secondary text on navy, between text and textMuted. */
+    textSoft: '#C9CEE0',
+    /** A stronger line on navy: a hovered bubble, a quote rule. */
+    lineStrong: '#3A4270',
+    /** The code block's well on navy. */
+    codeBg: '#0E1124',
+    /** A quiet mark on navy: the dock's idle tag, a disabled step. */
+    dim: '#6B7290',
+    /** Text of a disabled primary button on the light page. */
+    disabledInk: '#8A90A6',
+    /** A warning word on navy. */
+    warnOnNavy: '#F2D48A',
+    /** An error on navy: its fill, text and link. */
+    errNavyFill: '#3A1D2A',
+    errNavyInk: '#FFB4C0',
+    errNavyLink: '#FFD9DF',
+    /** The Recommended tag. */
+    recFill: '#DCE4FA',
+    recInk: '#24326B',
+    /** The dock's listening dot, and the brighter dot while it hears you. */
+    listening: '#7DD87F',
+    hearing: '#B8F5B9',
+    /** The health card's dots on navy. */
+    healthOk: '#7FD1A4',
+    healthBad: '#FF8A9A',
+    /** The shared renderer sheet (app.css) and its slate. */
+    slateInk: '#0F172A',
+    slateMuted: '#64748B',
+    slateLine: '#E2E8F0',
+    slateErr: '#B91C1C',
   },
   font: {
     ui: "'Onest', system-ui, sans-serif",
@@ -90,8 +124,22 @@ export const themeTokens = {
   /** The dock pet's tag: the one size outside the roles. */
   dockTag: 9,
   fontWeight: { regular: 400, semibold: 600, wordmark: 600 },
-  space: { hair: 3, xxs: 2, xs: 4, sm: 6, md: 8, lg: 12, xl: 16, xxl: 20, xxxl: 24, page: 32 },
-  radius: { field: 8, row: 10, tile: 10, chip: 10, small: 8 },
+  space: {
+    hair: 3,
+    xxs: 2,
+    xs: 4,
+    sm: 6,
+    md: 8,
+    lg: 12,
+    xl: 16,
+    xxl: 20,
+    xxxl: 24,
+    page: 32,
+    section: 40,
+    hero: 48,
+  },
+  /** card: boxes and big tiles; sm: fields, small tiles and buttons; pill: chips and toggles. */
+  radius: { card: 12, pill: 999, sm: 8 },
   size: {
     headerHeight: 64,
     navWidth: 280,

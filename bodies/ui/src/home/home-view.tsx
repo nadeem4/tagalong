@@ -190,10 +190,10 @@ function Overview({ companion, host }: { companion: Pet | undefined; host: HomeH
         <h1 className="home-title">Overview</h1>
         <p>Everything {name} is doing for you.</p>
       </div>
-      <div className="home-cards">
-        <section className="home-card" aria-label={name}>
-          <h2 className="home-card__label">{name}</h2>
-          <p className="home-card__lead">
+      <div className="tg-cards">
+        <section className="tg-card" aria-label={name}>
+          <h2 className="tg-card__label">{name}</h2>
+          <p className="tg-card__lead">
             <span
               className={status.ok ? 'home-dot' : 'home-dot home-dot--warn'}
               aria-hidden="true"

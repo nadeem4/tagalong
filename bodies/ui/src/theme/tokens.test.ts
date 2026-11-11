@@ -89,4 +89,17 @@ describe('design tokens', () => {
   it('draws keycaps readable on their fill', () => {
     expect(contrast(color.keycapInk, color.keycapFill)).toBeGreaterThanOrEqual(4.5);
   });
+
+  it('has three radii and a space scale that only grows', () => {
+    expect(themeTokens.radius).toEqual({ card: 12, pill: 999, sm: 8 });
+    const steps = Object.values(themeTokens.space).sort((a, b) => a - b);
+    expect(steps).toEqual([2, 3, 4, 6, 8, 12, 16, 20, 24, 32, 40, 48]);
+  });
+
+  it('reads on-navy text and the card surface', () => {
+    expect(contrast(color.textSoft, color.page)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(color.errNavyInk, color.errNavyFill)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(color.recInk, color.recFill)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(color.panelText, color.card)).toBeGreaterThanOrEqual(4.5);
+  });
 });

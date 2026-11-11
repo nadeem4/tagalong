@@ -75,13 +75,13 @@ export function WhereThingsRun() {
   if (link === null) return null;
 
   return (
-    <section className="home-card home-card--run" aria-label="Where things run">
-      <h2 className="home-card__label">Where things run</h2>
+    <section className="tg-card tg-card--run" aria-label="Where things run">
+      <h2 className="tg-card__label">Where things run</h2>
       {link.status !== 'online' ? (
         <p>Connected apps show up when the brain is connected.</p>
       ) : (
         apps.map((app) => (
-          <p key={app.id} className="home-card__row home-card__row--app">
+          <p key={app.id} className="tg-card__row tg-card__row--app">
             <span className="home-conn__initial" aria-hidden="true">
               {app.name.slice(0, 1).toUpperCase()}
             </span>
@@ -98,7 +98,7 @@ export function WhereThingsRun() {
       )}
       <ReadingRows rows={reading} />
 
-      <p className="home-card__row home-card__row--app">
+      <p className="tg-card__row tg-card__row--app">
         <span className="home-conn__initial" aria-hidden="true">
           C
         </span>

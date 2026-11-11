@@ -59,8 +59,8 @@ export function PreferencesList({ preferences, onRemove, onEdit }: Props) {
   };
 
   return (
-    <section aria-labelledby="apv-prefs" className="apv-section">
-      <h2 className="home-card__label" id="apv-prefs">
+    <section aria-labelledby="apv-prefs" className="tg-card apv-section">
+      <h2 className="tg-card__label" id="apv-prefs">
         Standing preferences
       </h2>
       {preferences !== null && shown.length === 0 && (
@@ -75,7 +75,7 @@ export function PreferencesList({ preferences, onRemove, onEdit }: Props) {
       )}
       <ul aria-label="Standing preferences" className="apv-prefs">
         {shown.map((pref) => (
-          <li key={pref.id} className="home-card apv-pref">
+          <li key={pref.id} className="tg-card apv-pref">
             {editing === pref.id ? (
               <div className="apv-pref__edit tg-panel">
                 <label>

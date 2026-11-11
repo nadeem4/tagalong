@@ -172,9 +172,9 @@ export function ExpertsGroup({
   const official = experts.filter((expert) => expert.official);
   const community = experts.filter((expert) => !expert.official);
   return (
-    <section className="home-card" aria-label="Your experts">
+    <section className="tg-card" aria-label="Your experts">
       {updates === null ? (
-        <h2 className="home-card__label">Your experts</h2>
+        <h2 className="tg-card__label">Your experts</h2>
       ) : (
         <UpdatesBar title="Your experts" kind="expert" controls={updates} />
       )}

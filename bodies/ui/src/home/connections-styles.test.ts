@@ -50,7 +50,7 @@ describe('CONNECTIONS_CSS', () => {
   });
 
   it('styles the add form: a segmented control, label-above fields, a two-column grid', () => {
-    expect(CONNECTIONS_CSS).toMatch(/\.cx-seg \{[^}]*border-radius: 10px/);
+    expect(CONNECTIONS_CSS).toMatch(/\.cx-seg \{[^}]*border-radius: 12px/);
     expect(CONNECTIONS_CSS).toMatch(/\.cx-input \{[^}]*height: 36px/);
     expect(CONNECTIONS_CSS).toMatch(/\.cx-two \{[^}]*grid-template-columns: 1fr 1fr/);
   });
@@ -69,7 +69,7 @@ describe('CONNECTIONS_CSS', () => {
 
   it('gives the Popular section the card gap and takes no space for an empty status line', () => {
     expect(CONNECTIONS_CSS).toMatch(
-      /\.cx-section \{[^}]*display: flex[^}]*flex-direction: column[^}]*gap: 14px/,
+      /\.cx-section \{[^}]*display: flex[^}]*flex-direction: column[^}]*gap: 16px/,
     );
     expect(CONNECTIONS_CSS).toMatch(/\.cx-search \{[^}]*gap: 0/);
     expect(CONNECTIONS_CSS).toMatch(/\.cx-search__status:not\(:empty\) \{[^}]*margin-top: 6px/);

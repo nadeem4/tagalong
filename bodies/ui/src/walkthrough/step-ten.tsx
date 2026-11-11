@@ -101,7 +101,7 @@ function Group({
         <h2>{title}</h2>
         <p>{note}</p>
       </div>
-      <ul className="cx-list wt-group__card">{children}</ul>
+      <ul className="tg-card cx-list wt-group__card">{children}</ul>
     </div>
   );
 }

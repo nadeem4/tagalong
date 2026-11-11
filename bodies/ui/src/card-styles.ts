@@ -6,13 +6,13 @@
 import { themeTokens as t, typeCss } from './theme/tokens';
 
 export const CARD_CSS = `
-.card { display: flex; flex-direction: column; gap: 10px; }
+.card { display: flex; flex-direction: column; gap: ${t.space.lg}px; }
 /* The ask's facts: a muted label and its value, two columns under a hairline. */
-.card-rows { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 10px 0 0; border-top: 1px solid #262C4A; }
-.card-rows > div { display: grid; grid-template-columns: 56px 1fr; gap: 14px; align-items: start; }
-.card-rows dt { ${typeCss('small')}; color: #A3AAC4; }
+.card-rows { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: ${t.space.md}px 0 0; border-top: 1px solid ${t.color.line}; }
+.card-rows > div { display: grid; grid-template-columns: 56px 1fr; gap: ${t.space.xl}px; align-items: start; }
+.card-rows dt { ${typeCss('small')}; color: ${t.color.textMuted}; }
 .card-rows dd { min-width: 0; margin: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; line-height: 20px; font-weight: 400; overflow-wrap: anywhere; }
-.card-rows dd small { font-size: 11px; line-height: 14px; font-weight: 600; color: #A3AAC4; overflow-wrap: anywhere; }
+.card-rows dd small { font-size: 11px; line-height: 14px; font-weight: 600; color: ${t.color.textMuted}; overflow-wrap: anywhere; }
 .card-rows > div > .bubble-quiet { align-self: center; flex: none; }
 .bubble-choices { display: flex; flex-direction: column; gap: 6px; }
 .bubble-choices .bubble-choice {
@@ -23,23 +23,23 @@ export const CARD_CSS = `
 .bubble-choices .bubble-choice.bubble-quiet:hover { background: rgba(255, 255, 255, 0.06); }
 .bubble-choices .bubble-choice.bubble-primary:hover { filter: brightness(1.06); }
 .bubble-tag {
-  flex: none; padding: 1px 6px; border-radius: 999px; background: rgba(18, 22, 43, 0.14);
+  flex: none; padding: ${t.space.xxs}px 6px; border-radius: 999px; background: rgba(18, 22, 43, 0.14);
   font-size: 11px; line-height: 14px; font-weight: 600;
 }
-.card-brief { font-size: 12px; line-height: 16px; font-weight: 400; color: #C9CEE0; }
+.card-brief { font-size: 12px; line-height: 16px; font-weight: 400; color: ${t.color.textSoft}; }
 .connector-details { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 160px; overflow-y: auto; }
 .card-head { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
 .card-head p { flex: 1 1 200px; margin: 0; font-weight: 600; }
 .card-chip {
 flex: none; display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px;
-background: #222845; color: #C9CEE0; font-size: 11px; line-height: 14px; font-weight: 600;
+background: ${t.color.tileNavy}; color: ${t.color.textSoft}; font-size: 11px; line-height: 14px; font-weight: 600;
 }
 .card-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
-.card-actions button { align-self: auto; height: 32px; min-height: 32px; padding: 0 14px; border-radius: 8px; ${typeCss('body')}; font-weight: 600; }
+.card-actions button { align-self: auto; height: 32px; min-height: 32px; padding: 0 ${t.space.xl}px; border-radius: ${t.radius.sm}px; ${typeCss('body')}; font-weight: 600; }
 .bubble-radio { flex: none; width: 16px; height: 16px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid ${t.color.textMuted}; }
 .bubble-choice-text { flex: 1; min-width: 0; }
 .bubble-choices .bubble-choice, .bubble-choices .bubble-choice.bubble-primary {
-justify-content: flex-start; padding: 10px 12px; border: 1px solid ${t.color.fieldLine}; border-radius: 10px;
+justify-content: flex-start; padding: ${t.space.md}px 12px; border: 1px solid ${t.color.fieldLine}; border-radius: ${t.radius.card}px;
 background: transparent; color: ${t.color.text};
 }
 .bubble-choices .bubble-choice.bubble-primary { border-color: ${t.color.gold}; background: rgba(242, 193, 78, 0.07); }
