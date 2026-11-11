@@ -149,11 +149,12 @@ class OpenItems:
             raise OpenItemRefused("not_found")
         return self._close(item, "expired", "brain", reason)
 
-    def expire_live_only(self) -> list[OpenItem]:
-        """Run at start and when a process ends: its items can no longer run."""
+    def expire_live_only(self, job_id: str | None = None) -> list[OpenItem]:
+        """Run at start (all of them) and when one job's process ends (only that job's): the
+        items tied to a process can no longer run."""
         return [
             self._close(_item(s), "expired", "brain", "process_ended")
-            for s in store.live_only_open(self.db)
+            for s in store.live_only_open(self.db, job_id)
         ]
 
     def list_open(self, origin_body: str | None = None, kind: str | None = None) -> list[OpenItem]:

@@ -1768,6 +1768,18 @@ async def test_question_is_not_counted_against_the_global_cap():
     assert await result == {"question_0": "Blue"}
 
 
+async def test_answer_to_an_expired_expert_ask_says_it_expired():
+    bodies = Bodies()
+    bodies.notify = lambda m, p: None
+    memory = Memory(":memory:")
+    session = Session(Reactive(["hi"]), Open(), bodies, 10, memory)
+    item = session.items.open("expert_ask", "brain", live_only=True, job_id="j1")
+    session.items.expire_live_only(job_id="j1")  # its expert is gone
+    with pytest.raises(RpcError, match="expired") as err:
+        session.answer(item.id, "allow", "desktop")
+    assert err.value.code is ErrorCode.not_found
+
+
 async def test_session_passes_the_turn_timeout():
     class Stall:
         model_id = "m"

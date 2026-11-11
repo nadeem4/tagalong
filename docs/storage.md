@@ -32,7 +32,7 @@ connection from `store.db.open_db`; nothing else opens the file.
 - `store/outputs.py`: owns `tool_outputs` (`put_output`, `get_output`, `prune_outputs`).
 - `store/rules.py`: owns `rules` (modes, preferences, offers).
 - `store/settings.py`: owns `settings` (`get_setting`, `set_setting`), a small key and value table; today it holds the chosen Scout model under `model` and, for updates, `auto_update.{app,expert}.{official,community}` (`"1"` or `"0"`: whether that group updates by itself; absent means Official on, Community off). The last check time and the latest versions seen are a cache file, `<TAGALONG_HOME>/cache/updates.json`, not a table.
-- `store/open_items.py`: owns `open_items` (`insert`, `get`, `close`, `list_open`, `list_answered`, `find_open`, `due`, `live_only_open`) and `StoredItem`.
+- `store/open_items.py`: owns `open_items` (`insert`, `get`, `close`, `list_open`, `list_answered`, `find_open`, `due`, `live_only_open`, `ids_for_job`) and `StoredItem`.
 - `store/work.py`: `WorkStore` over `work`, `work_events`, `work_fts` and the detail tables
   `work_job`, `work_timer`, `work_loop`, `work_ask` and `job_steps`: create, the state machine,
   rollup, retry, due queries, search, the resume scan and the sweep. Jobs, asks, timers and loops
@@ -621,25 +621,25 @@ call; choices (`choice`, live-only), offers (`offer`, the offer as its saved cal
 (`setup`, the event as its saved call) write it too; installs move onto it in a later slice. The
 choice, offer and setup-event waits that lived only in memory are gone.
 
-| Column            | Type             | Meaning                                                                                   |
-| ----------------- | ---------------- | ----------------------------------------------------------------------------------------- |
-| `id`              | TEXT PRIMARY KEY | A random hex id                                                                           |
-| `kind`            | TEXT             | `ask`, `choice`, `install`, `signin`, `expert_ask`, `offer` or `setup` (CHECK)            |
-| `origin_body`     | TEXT             | The body the item came from, so a reply goes back to it                                   |
-| `state`           | TEXT             | `open`, `answered`, `done` or `expired` (CHECK); default `open`                           |
-| `saved_call_json` | TEXT             | The call to run on a later yes, as JSON, or null. Callers mask it before saving           |
-| `live_only`       | INTEGER          | 1 when the item is tied to a running process (an expert's question) and cannot run later  |
-| `job_id`          | TEXT             | The job it belongs to, or null                                                            |
-| `created_at`      | TEXT             | UTC time text                                                                             |
-| `deadline_at`     | TEXT             | UTC time text: `created_at` plus `DEADLINE_S` (one day) unless the item asked for another |
-| `closed_at`       | TEXT             | When it left `open`, or null                                                              |
-| `closed_by`       | TEXT             | Who closed it: the answering body, or `brain`                                             |
-| `answer`          | TEXT             | The person's answer, set when it is `answered` and kept when the item is later `done`     |
-| `reason`          | TEXT             | Why it closed: `answered`, `deadline`, `process_ended`, or the finish reason for `done`   |
+| Column            | Type             | Meaning                                                                                        |
+| ----------------- | ---------------- | ---------------------------------------------------------------------------------------------- |
+| `id`              | TEXT PRIMARY KEY | A random hex id                                                                                |
+| `kind`            | TEXT             | `ask`, `choice`, `install`, `signin`, `expert_ask`, `offer` or `setup` (CHECK)                 |
+| `origin_body`     | TEXT             | The body the item came from, so a reply goes back to it                                        |
+| `state`           | TEXT             | `open`, `answered`, `done` or `expired` (CHECK); default `open`                                |
+| `saved_call_json` | TEXT             | The call to run on a later yes, as JSON, or null. Callers mask it before saving                |
+| `live_only`       | INTEGER          | 1 when the item is tied to a running process (an expert's permission ask) and cannot run later |
+| `job_id`          | TEXT             | The job it belongs to, or null; `Job.open_items` lists a job's ids                             |
+| `created_at`      | TEXT             | UTC time text                                                                                  |
+| `deadline_at`     | TEXT             | UTC time text: `created_at` plus `DEADLINE_S` (one day) unless the item asked for another      |
+| `closed_at`       | TEXT             | When it left `open`, or null                                                                   |
+| `closed_by`       | TEXT             | Who closed it: the answering body, or `brain`                                                  |
+| `answer`          | TEXT             | The person's answer, set when it is `answered` and kept when the item is later `done`          |
+| `reason`          | TEXT             | Why it closed: `answered`, `deadline`, `process_ended`, or the finish reason for `done`        |
 
 - Moves: `open` to `answered`, `done` or `expired`; `answered` to `done`. A person's answer counts
   while the item is `open`, even if the turn that raised it is gone; after the deadline it is
-  refused (`expired`). `live_only` items are expired at start and when their process ends.
+  refused (`expired`). `live_only` items are expired at start and when their process ends (for `expert_ask`, only that job's: `expire_live_only(job_id=...)`).
 - Written by: `open_items.py` `OpenItems` through `store/open_items.py`, for `ask` by the ask runner, `choice` by
   `choices.py`, `offer` by `offers.py` and `setup` by `setup/events.py`. The `rules` table keeps the
   offer's outcome word (the keep-asking window); the open item is the pending offer.

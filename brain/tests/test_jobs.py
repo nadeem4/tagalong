@@ -25,6 +25,7 @@ from brain.job_records import Job, JobPart, JobRecords
 from brain.jobs import JobError, Jobs, job_note
 from brain.masking import Masker, mask_secrets
 from brain.memory import Memory
+from brain.open_items import OpenItems
 from brain.permission import Decision, Engine, Person, SideCheckDecider
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.store import InstalledExpert
@@ -192,6 +193,7 @@ class Rig:
             else None
         )
         self.offers = FakeOffers()
+        self.items = OpenItems(self.memory.db, lambda: self.wall)
         deciders = [*([SideCheckDecider(side_check)] if side_check else []), Person()]
         self.engine = engine or Engine(deciders, self.approvals, self.offers, lambda name: None)
         # shared: the real factory, one warm adapter per expert; its idle wait never ends here.
@@ -218,6 +220,7 @@ class Rig:
             now=lambda: self.wall,
             on_timers_changed=lambda: setattr(self, "timers_changed", self.timers_changed + 1),
             apps=apps,
+            items=self.items,
             **({} if before_start is None else {"before_start": before_start}),
         )
 
@@ -2832,3 +2835,56 @@ async def test_a_job_that_waited_behind_an_update_starts_the_updated_command(mak
     gate.set()
     await asyncio.wait_for(starting, 10)
     assert commands == [[sys.executable, str(AGENT), "--updated"]]
+
+
+# --- expert asks as live open items ---------------------------------------------------------
+
+ASK_STEPS = [{"permission": {"title": "rm x", "input": {"command": "rm x"}}}]
+
+
+def expert_items(rig):
+    return rig.items.list_open(kind="expert_ask")
+
+
+async def two_waiting_jobs(make_rig):
+    """Two jobs, each with an expert ask nobody answers; returns the rig and the two job ids."""
+    rig = make_rig(FakeAsks(Answer("Plan"), None), ASK_STEPS)
+    one = await rig.jobs.start("one", str(rig.folder))
+    await until(lambda: len(expert_items(rig)) == 1)
+    rig.asks.script += [Answer("Plan"), None]
+    two = await rig.jobs.start("two", str(rig.folder))
+    await until(lambda: len(expert_items(rig)) == 2)
+    return rig, str(one), str(two)
+
+
+def open_job_ids(rig):
+    return {i.job_id for i in expert_items(rig)}
+
+
+async def test_expert_ask_is_live_only(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), None), ASK_STEPS)
+    job = await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: expert_items(rig))
+    (item,) = expert_items(rig)
+    assert (item.kind, item.live_only, item.job_id) == ("expert_ask", True, str(job))
+    assert rig.asks.opened[-1]["ask_id"] == item.id  # the card and the item are one ask
+
+
+async def test_process_exit_expires_its_items(make_rig):
+    rig, one, two = await two_waiting_jobs(make_rig)
+    rig.runs[0].process.kill()  # the first expert dies on its own
+    await until(lambda: open_job_ids(rig) == {two})
+
+
+async def test_job_stop_expires_items(make_rig):
+    rig, one, two = await two_waiting_jobs(make_rig)
+    await rig.jobs.stop(one)
+    await until(lambda: open_job_ids(rig) == {two})
+
+
+async def test_job_links_open_item_ids(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), None), ASK_STEPS)
+    job = await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: expert_items(rig))
+    (item,) = expert_items(rig)
+    assert rig.records.get_job(str(job)).open_items == [item.id]

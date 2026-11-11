@@ -64,7 +64,16 @@ from brain.open_item_runner import AskRunner
 from brain.open_items import OpenItems
 from brain.outputs import OutputStore
 from brain.permission import Engine, Person, SideCheckDecider, StandingRule, stored_auto_rules
-from brain.protocol import BODY_DESKTOP, ReadAloudData, ReadingData, SayParams, SayResult, Tool
+from brain.protocol import (
+    BODY_DESKTOP,
+    ErrorCode,
+    ReadAloudData,
+    ReadingData,
+    RpcError,
+    SayParams,
+    SayResult,
+    Tool,
+)
 from brain.questions import ScoutQuestions
 from brain.reading import ReadingStore
 from brain.reading_tools import reading_home_tools
@@ -199,7 +208,7 @@ class Session:
         approvals = self.approvals = Approvals(memory, work, notify, now, guards=self.guards)
         # Scout's look before an ask reaches the person; shares the session's model and budget.
         side_check = SideCheck(model, budget, memory, work, guards=self.guards)
-        items = OpenItems(memory.db, now)
+        items = self.items = OpenItems(memory.db, now)
         items.expire_live_only()  # what a last run left tied to a process can no longer run
         # Scout's offer to approve a repeated kind of ask; one service for tools and experts.
         offer = self._offers = Offers(
@@ -243,6 +252,7 @@ class Session:
             drop=self.scheduler.drop,
             on_timers_changed=lambda: timers.changed(),
             outputs=outputs,
+            items=items,
             apps=apps,
             before_start=before_job,
         )
@@ -881,7 +891,14 @@ class Session:
         text: str | None = None,
         apps: list[str] | None = None,
     ) -> None:
-        self._asks.answer(ask_id, option, body_id, text, apps)
+        try:
+            self._asks.answer(ask_id, option, body_id, text, apps)
+        except RpcError as err:
+            item = self.items.get(ask_id)
+            if err.code is ErrorCode.not_found and item is not None and item.state == "expired":
+                # An expert's ask ends with its process; say so rather than "no open ask".
+                raise RpcError(ErrorCode.not_found, "that ask expired; the expert stopped") from err
+            raise
 
     @property
     def asks(self) -> Asks:

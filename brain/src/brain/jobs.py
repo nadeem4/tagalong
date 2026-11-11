@@ -26,6 +26,7 @@ from brain.guards import Guards
 from brain.job_activity import PAGE_LIMIT, JobActivity, _clip, activity_line, activity_summary
 from brain.job_records import Job, JobPart, JobRecords, home_state
 from brain.masking import mask_json
+from brain.open_items import OpenItems
 from brain.outputs import OutputStore, preview
 from brain.permission import (
     AskRequest,
@@ -122,11 +123,13 @@ class Jobs:
         drop: Callable[[str, str], None] = lambda kind, key: None,
         on_timers_changed: Callable[[], None] = lambda: None,
         outputs: OutputStore | None = None,
+        items: OpenItems | None = None,
         apps=None,
         before_start: Callable[[], Awaitable[None]] | None = None,
         steps_max_entries: int = DEFAULT_JOB_STEPS_MAX_ENTRIES,
         steps_max_bytes: int = DEFAULT_JOB_STEPS_MAX_BYTES,
     ) -> None:
+        self._items = items  # an expert's permission ask is a live-only item; None: none kept
         self._steps_max_entries = steps_max_entries  # caps of one job's step log (settings)
         self._steps_max_bytes = steps_max_bytes
         self._before_start = before_start  # awaited before a run starts: no update mid-swap
@@ -894,7 +897,11 @@ class Jobs:
         folder = job.folder if job is not None else ""
         agent = _prefix(self._agent_of(job, part))
         tool = f"{agent}:{request.title}"
-        ask_id = uuid.uuid4().hex  # the ask's work row is also its log entry
+        # The ask's work row is its log entry and the item is its record for the person: one id.
+        item = None
+        if self._items is not None:
+            item = self._items.open("expert_ask", "brain", live_only=True, job_id=job_id)
+        ask_id = item.id if item is not None else uuid.uuid4().hex
         decision = await self._engine.decide(
             AskRequest(
                 kind="expert_request",
@@ -916,6 +923,8 @@ class Jobs:
                 can_allow_once=once is not None and job is not None,  # never allow_always
             )
         )
+        if item is not None:
+            self._items.finish(item.id, decision.reason or "decided")
         self._changed()
         if decision.allowed:
             # The person's own pick, else the expert's allow-once for a rule or Scout grant.
@@ -1014,6 +1023,8 @@ class Jobs:
                 del books[job_id]
         if job_id in self._runs:
             return False
+        if self._items is not None:  # no process of this job is left to answer its asks
+            self._items.expire_live_only(job_id=job_id)
         self._stop_activity_notes(job_id)
         self._progress_sent.pop(job_id, None)
         return True

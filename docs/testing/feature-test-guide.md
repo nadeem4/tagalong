@@ -842,6 +842,12 @@ restart). It is covered by
 3. An item marked live-only is expired at start; a saved-call item stays open.
 4. Each move (`opened`, `answered`, `done`, `expired`) writes one `open_item.*` line in the log.
 
+Expert permission asks are `expert_ask` live-only items (automated only): `cd brain && uv run pytest tests/test_jobs.py -k "live_only or process_exit or job_stop_expires or links_open" tests/test_sessions.py -k expired_expert_ask -q`.
+
+1. An expert's permission request opens one live-only item with the job's id, and `Job.open_items` lists it.
+2. An expert process that exits, or a job that is stopped, expires only its own job's items; another job's ask stays open.
+3. Answering the card after that gives `not_found` with "that ask expired; the expert stopped".
+
 ## Show, Done, Later and a drafted reply (automated; the journey by hand with real Gmail)
 
 Automated: `cd brain && uv run pytest tests/test_loops_tools.py tests/test_prompt.py -q` on fakes,
