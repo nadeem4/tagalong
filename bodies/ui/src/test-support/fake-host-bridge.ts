@@ -11,6 +11,7 @@ import type {
   TimerRow,
   Pet,
   MemoryEntry,
+  ModelState,
   SetupOverview,
   SetupResult,
   TurnEvent,
@@ -54,6 +55,10 @@ export interface FakeHostBridge extends HostBridge {
   /** Every key handed to setKey, every limit and every walkthrough step opened, in order. */
   readonly keysSet: readonly string[];
   readonly limitsSet: readonly number[];
+  /** Scout's model as the brain reports it, every model handed to setModel, and a refusal to send. */
+  model: ModelState;
+  readonly modelsSet: readonly string[];
+  modelError: string | null;
   readonly walkthroughOpens: readonly (number | undefined)[];
   /** Every setPermission call, in order. */
   readonly permissionSets: readonly { tool: string; mode: 'off' | 'ask' | 'auto' }[];
@@ -242,6 +247,7 @@ export function createFakeHostBridge(
   const reportCalls: [string, string][] = [];
   const keysSet: string[] = [];
   const limitsSet: number[] = [];
+  const modelsSet: string[] = [];
   const walkthroughOpens: (number | undefined)[] = [];
 
   const fake: FakeHostBridge = {
@@ -490,6 +496,27 @@ export function createFakeHostBridge(
     keyResult: 'ok',
     keysSet,
     limitsSet,
+    modelsSet,
+    modelError: null,
+    model: {
+      provider: 'anthropic',
+      model: 'claude-opus-5-5',
+      default: 'claude-opus-5-5',
+      models: [
+        { id: 'claude-opus-5-5', name: 'Claude Opus 5.5', line: 'Most capable' },
+        { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5', line: 'Faster and cheaper' },
+        { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5', line: 'Fastest, for simple tasks' },
+      ],
+    },
+    modelState() {
+      return Promise.resolve({ ...fake.model });
+    },
+    setModel(model) {
+      if (fake.modelError !== null) return Promise.reject(new Error(fake.modelError));
+      modelsSet.push(model);
+      fake.model = { ...fake.model, model };
+      return Promise.resolve();
+    },
     walkthroughOpens,
     keyStatus() {
       return fake.key === 'offline'
@@ -534,6 +561,7 @@ export function createFakeHostBridge(
           update: 'none',
           version: '0.9.2',
           build: 'a1b2c3d',
+          model: 'Claude Opus 5.5',
           appVersion: '0.9.2',
           appBuild: 'a1b2c3d',
           startedAt: new Date(Date.now() - 25 * 60_000).toISOString(),

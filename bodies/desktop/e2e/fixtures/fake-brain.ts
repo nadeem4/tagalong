@@ -9,7 +9,7 @@
  * A say that mentions "hand off" replies, then (turn over) opens a job's three
  * asks one after another: a mode, a relayed permission, a question. Every `answer` frame is
  * recorded for the test, free text included. The key tools (`key_status`, `set_api_key`, `spend_today` ($0.42),
- * `set_daily_limit`, `setup_overview`) follow `FakeBrainOptions`; the brain counts key attempts
+ * `set_daily_limit`, `model_state`, `set_model`, `setup_overview`) follow `FakeBrainOptions`; the brain counts key attempts
  * and keeps no key.
  *
  * Voice: `listen` is answered, and a few `mic` frames later it sends `heard` frames (held: the
@@ -83,6 +83,8 @@ export interface FakeBrain {
   keyAttempts: number;
   /** Every amount Settings sent to `set_daily_limit`, in order. */
   limits: number[];
+  /** Every model id Settings sent to `set_model`, in order. */
+  models: string[];
   /** Every job id Home sent to `stop_job`, in order. */
   stops: string[];
   /** Every expert id the desktop sent to `setup_expert`, in order (the first one installs it). */
@@ -376,6 +378,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   let failSearches: boolean | 'hang' = false;
   let gmailConnected = false;
   const limits: number[] = [];
+  const models: string[] = [];
+  let model = 'claude-opus-5-5';
   let hasKey = options.hasKey ?? true;
   let dailyLimitUsd = 5;
   const keyResults = [...(options.keyResults ?? ['ok'])];
@@ -719,6 +723,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             id?: number;
             filter?: string;
             usd?: number;
+            model?: string;
             approved?: boolean;
             community_ok?: boolean;
             query?: string;
@@ -801,6 +806,26 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           dailyLimitUsd = Number(params.input?.usd);
           limits.push(dailyLimitUsd);
           notify('changed', { what: 'settings' });
+        } else if (params.tool === 'model_state') {
+          value = {
+            provider: 'anthropic',
+            model,
+            default: 'claude-opus-5-5',
+            models: [
+              { id: 'claude-opus-5-5', name: 'Claude Opus 5.5', line: 'Most capable' },
+              { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5', line: 'Faster and cheaper' },
+              {
+                id: 'claude-haiku-5-5',
+                name: 'Claude Haiku 5.5',
+                line: 'Fastest, for simple tasks',
+              },
+            ],
+          };
+        } else if (params.tool === 'set_model') {
+          model = String(params.input?.model);
+          models.push(model);
+          notify('changed', { what: 'model' });
+          value = { model };
         } else if (params.tool === 'setup_overview') {
           if (failSearches === 'hang' && String(params.input?.query ?? '') !== '') return;
           if (failSearches && String(params.input?.query ?? '') !== '') {
@@ -1052,6 +1077,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
       return keyCalls.attempts;
     },
     limits,
+    models,
     stops,
     expertSetups,
     expertApprovals,

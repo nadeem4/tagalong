@@ -13,6 +13,7 @@ import json
 import logging
 import math
 import re
+import sqlite3
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import asdict, dataclass
@@ -31,6 +32,9 @@ from brain.guardrails import Budget
 from brain.job_records import JobPart, JobRecords, home_state
 from brain.jobs import JobError, Jobs, job_title
 from brain.memory import Memory
+from brain.models import DEFAULT_MODEL_ID, MODELS, PROVIDER
+from brain.models import chosen as chosen_model
+from brain.models import save as save_model
 from brain.outputs import OutputStore
 from brain.permission import Tier, tier
 from brain.protocol import ErrorCode, RpcError
@@ -1381,6 +1385,59 @@ def _key_tools(budget: Budget, keys: KeySettings) -> list[tuple[ToolSpec, Handle
                 effect="change",
             ),
             set_daily_limit,
+        ),
+    ]
+
+
+def model_tools(
+    db: sqlite3.Connection, env_default: str, notify: Notify
+) -> list[tuple[ToolSpec, Handler]]:
+    """model_state and set_model for Settings: which model Scout thinks with. The choice is
+    saved at once and applies from Scout's next turn."""
+
+    async def model_state(args: dict) -> str:
+        return json.dumps(
+            {
+                "provider": PROVIDER,
+                "model": chosen_model(db, env_default),
+                "default": DEFAULT_MODEL_ID,
+                "models": [asdict(m) for m in MODELS],
+            }
+        )
+
+    async def set_model(args: dict) -> str:
+        model = args.get("model") if isinstance(args, dict) else None
+        if not any(m.id == model for m in MODELS):
+            raise RpcError(ErrorCode.invalid_params, "set_model needs one of the listed models.")
+        save_model(db, model)
+        notify("changed", {"what": "model"})
+        return json.dumps({"model": model})
+
+    home = frozenset({"home"})
+    return [
+        (
+            ToolSpec(
+                "model_state",
+                "The AI model Scout thinks with, its provider and the models to choose from.",
+                {"type": "object", "properties": {}},
+                home,
+                effect="read",
+            ),
+            model_state,
+        ),
+        (
+            ToolSpec(
+                "set_model",
+                "Choose the model Scout thinks with, from its next reply.",
+                {
+                    "type": "object",
+                    "properties": {"model": {"type": "string"}},
+                    "required": ["model"],
+                },
+                home,
+                effect="change",
+            ),
+            set_model,
         ),
     ]
 

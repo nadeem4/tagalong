@@ -622,7 +622,7 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   Memory view reads again on `memory`, the Jobs panel on `jobs`. The brain link sends `link`
   (online, connecting, offline, outdated) when it changes, so the "Where things run" card reads again.
 - **Scout's brain:** a card above "Where things run" (`bodies/ui/src/home/brain-card.tsx`): status
-  and uptime, where it runs, version, who started it, process id, data folder, log file and the
+  and uptime, where it runs, version, model, who started it, process id, data folder, log file and the
   places connected, with Restart brain and Copy details. States: normal, update ready, started by
   you (no restart offered), offline (Start brain, facts dimmed). It reads `brainCard()` and
   refreshes on `link` and `jobs`.

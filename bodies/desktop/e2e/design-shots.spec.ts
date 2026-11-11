@@ -1,5 +1,5 @@
 /**
- * Design-refresh screenshots of Home's "Scout's brain" card (D1) and the Connections page (D5),
+ * Design-refresh screenshots of Home's "Scout's brain" card (D1), the Connections page (D5) and Scout's model (E5),
  * one per state, for review against the mockups. Skipped unless TAGALONG_SHOTS=1; they are not part of CI. Files land in
  * docs/superpowers/specs/design-refresh/shots/<slice>/ (TAGALONG_SHOTS_DIR overrides the root).
  */
@@ -259,6 +259,56 @@ test('D5 connections', async () => {
     brain.setSetup({ failed: { expert: 'goose', error: 'download failed' } });
     await expect(home.getByText(/didn.t finish/).first()).toBeVisible({ timeout: 15_000 });
     await shot(home, 'D5', 'experts-setup-failed');
+  } finally {
+    await closeApp(app);
+    await brain.close();
+    rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+  }
+});
+// E5: Settings > Scout's model in its four mocked states. The listbox hangs below the card, so
+// the open shot scrolls the card to the top and clips a taller area.
+test('E5 model states', async () => {
+  const dir = resolve(shotsRoot, 'E5');
+  mkdirSync(dir, { recursive: true });
+  const brain = await startFakeBrain({ hasKey: true });
+  const dataDir = seedSettings(mkdtempSync(join(tmpdir(), 'tagalong-shot-')));
+  const app = await electron.launch({
+    args: ['.', `--user-data-dir=${dataDir}`],
+    cwd: appDir,
+    env: { ...process.env, TAGALONG_BRAIN_ADDR: brain.addr },
+  });
+  try {
+    const find = async (name: string): Promise<Page> => {
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        const page = app.windows().find((p) => p.url().includes(`${name}.html`));
+        if (page !== undefined) return page;
+        await new Promise((resolveWait) => setTimeout(resolveWait, 250));
+      }
+      throw new Error(`no ${name} window appeared`);
+    };
+    await (await find('avatar')).evaluate(() => window.tagalongHost.openSettings());
+    const home = await find('home');
+    const model = home.getByRole('combobox', { name: 'Model' });
+    await expect(model).toContainText('Claude Opus 5.5', { timeout: 30_000 });
+    const card = home.locator('section', { has: model });
+    await card.scrollIntoViewIfNeeded();
+    await card.screenshot({ path: join(dir, 'closed.png') });
+    await model.focus();
+    await card.screenshot({ path: join(dir, 'focused.png') });
+    await model.press('Enter');
+    await expect(home.getByRole('listbox')).toBeVisible();
+    await model.press('ArrowDown');
+    await card.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+    const box = (await card.boundingBox())!;
+    await home.screenshot({
+      path: join(dir, 'open.png'),
+      clip: { x: box.x, y: box.y, width: box.width, height: box.height + 200 },
+    });
+    await home.getByRole('option', { name: /Claude Sonnet 5\.5/ }).click();
+    await expect(home.getByText('Saved.', { exact: true })).toBeVisible();
+    // The mockup's Saved state has no focus ring, so let go of the field first.
+    await model.blur();
+    await card.screenshot({ path: join(dir, 'saved.png') });
   } finally {
     await closeApp(app);
     await brain.close();

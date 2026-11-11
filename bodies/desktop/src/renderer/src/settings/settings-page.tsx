@@ -9,6 +9,7 @@ import { SettingsFieldError, buildSettingsPatch } from '../settings-form';
 import { BrowserSection } from './browser-section';
 import { FilesSection } from './files-section';
 import { KeySection } from './key-section';
+import { ModelSection } from './model-section';
 import { PrivacySection } from './privacy-section';
 import { RegistriesSection } from './registries-section';
 import { SettingsUiContext } from './section';
@@ -18,7 +19,7 @@ import { VoiceSection } from './voice-section';
 import type { BrowserFolder, HostView } from '../../../shared/ipc';
 
 /**
- * Sections in page order: the Anthropic key, Privacy, Files, Voice, Shortcuts, the browser. Main re-registers hotkeys on
+ * Sections in page order: the Anthropic key, Scout's model, Privacy, Files, Voice, Shortcuts, the browser. Main re-registers hotkeys on
  * save.
  */
 export function SettingsPage() {
@@ -209,6 +210,7 @@ export function SettingsFormView({
             </div>
           </div>
           <KeySection />
+          <ModelSection />
           <PrivacySection settings={settings} />
           <FilesSection
             folders={settings.fileFolders}

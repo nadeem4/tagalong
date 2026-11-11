@@ -37,7 +37,7 @@ variable still works and is the developer path.
 | -------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `TAGALONG_BRAIN_ADDR`            | `127.0.0.1:47321`  | `host:port` to listen on. Port `0` picks a free port                                                                                                                              |
 | `TAGALONG_HOME`                  | `~/.tagalong`      | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env`                                                                                                                |
-| `TAGALONG_MODEL`                 | `claude-opus-5-5`  | Model Scout thinks with                                                                                                                                                           |
+| `TAGALONG_MODEL`                 | `claude-opus-5-5`  | Model Scout thinks with until one is chosen in Settings                                                                                                                           |
 | `TAGALONG_DAILY_BUDGET_USD`      | `5`                | Most Scout may spend per local day, in USD                                                                                                                                        |
 | `TAGALONG_READER_MODEL`          | `claude-haiku-5-5` | Model that reads mail for loops (see [Loops](#loops))                                                                                                                             |
 | `TAGALONG_READER_DAILY_USD`      | `0.5`              | Most the mail reader may spend per local day, in USD; its own allowance, apart from Scout's                                                                                       |
@@ -817,13 +817,15 @@ so there is one gate and no second path.
 
 `list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
 
-The first-run setup adds four more Home tools (never offered to Scout):
+The first-run setup adds six more Home tools (never offered to Scout):
 
 | Tool              | Input             | Result text (JSON)                                                                                                                                                          |
 | ----------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `key_status`      | `{}`              | `{"has_key", "source": "environment" or "file" or "none", "env_path", "daily_limit_usd"}`; never any part of the key                                                        |
 | `set_api_key`     | `{"key": str}`    | `{"status": "ok" or "invalid" or "unreachable"}`, nothing else; refused with `invalid_params` ("The key is set by the environment.") when the key came from the environment |
 | `set_daily_limit` | `{"usd": number}` | `{"limit_usd": float}`; the number must be finite and above 0                                                                                                               |
+| `model_state`     | `{}`              | `{"provider": "anthropic", "model", "default", "models": [{"id", "name", "line"}]}`; `model` is the choice in force, `default` the one used when none is chosen             |
+| `set_model`       | `{"model": str}`  | `{"model": str}`; `invalid_params` for an id not in `models`; saves it and sends `changed {what: "model"}`; it applies from the next reply, the one running keeps its model |
 
 The Connections page and the tour add three more Home tools (`setup/home_tools.py`, never offered
 to Scout): `setup_overview` (read; `{experts: [{id, name, version, state, tested}], apps,
@@ -1148,12 +1150,12 @@ process of the brain, on Tagalong's own Node only (`ensure_node`; the system Nod
 `bodies_tools.py` gives Home three tools (never offered to Scout; `main.py` passes the bridge
 supervisor as a getter, because it is built once the brain's port is known):
 
-| Tool              | Input                                                          | Result text (JSON)                                                                                                                                                                                                                      |
-| ----------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `brain_status`    | `{}`                                                           | `{"version", "build", "pid", "started_at", "started_by", "addr", "data_dir", "log_path", "places": [{"id", "kind", "name"}], "work_running"}`: the facts on Home's "Scout's brain" card (Home only; `brain_status_tools` in `tools.py`) |
-| `bodies_status`   | `{}`                                                           | `{"bodies": [{"kind", "name", "connected"}]}`, always `desktop`, `browser` and `whatsapp`                                                                                                                                               |
-| `whatsapp_status` | `{}`                                                           | `{"enabled", "set": {access_token, app_secret, verify_token, phone_number_id, allowed_number: bool}, "complete", "state", "port"}`; never a value                                                                                       |
-| `whatsapp_set`    | any of `enabled` (bool), the five strings, `port` (1024-65535) | the same JSON as `whatsapp_status`                                                                                                                                                                                                      |
+| Tool              | Input                                                          | Result text (JSON)                                                                                                                                                                                                                                                                    |
+| ----------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `brain_status`    | `{}`                                                           | `{"version", "build", "pid", "started_at", "started_by", "addr", "data_dir", "log_path", "places": [{"id", "kind", "name"}], "work_running", "model"}` (`model` is the chosen model's name): the facts on Home's "Scout's brain" card (Home only; `brain_status_tools` in `tools.py`) |
+| `bodies_status`   | `{}`                                                           | `{"bodies": [{"kind", "name", "connected"}]}`, always `desktop`, `browser` and `whatsapp`                                                                                                                                                                                             |
+| `whatsapp_status` | `{}`                                                           | `{"enabled", "set": {access_token, app_secret, verify_token, phone_number_id, allowed_number: bool}, "complete", "state", "port"}`; never a value                                                                                                                                     |
+| `whatsapp_set`    | any of `enabled` (bool), the five strings, `port` (1024-65535) | the same JSON as `whatsapp_status`                                                                                                                                                                                                                                                    |
 
 `whatsapp_set` changes only the keys given. They are written together in one atomic replace of
 `<TAGALONG_HOME>/.env` (`upsert_env_values`, `enabled` as `1` or `0`) and to the running environment, then the supervisor

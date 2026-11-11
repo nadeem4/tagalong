@@ -14,6 +14,7 @@ const READY: BrainCard = {
   update: 'ready',
   version: '0.9.1',
   build: '9f8e7d6',
+  model: 'Claude Opus 5.5',
   appVersion: '0.9.2',
   appBuild: 'a1b2c3d',
   startedAt: new Date().toISOString(),

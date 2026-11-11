@@ -78,6 +78,7 @@ function Facts({ card }: { card: BrainCardData }) {
         <span className="brain-mono">{card.addr}</span>
       </Row>
       <Row label="Version">{version}</Row>
+      <Row label="Model">{card.model ?? DASH}</Row>
       <Row label="Started by">{startedBy}</Row>
       <Row label="Process ID">
         <span className="brain-mono">{card.pid ?? DASH}</span>
