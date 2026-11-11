@@ -11,6 +11,8 @@ export const themeTokens = {
     line: '#262C4A',
     sidebar: '#171C33',
     rowActive: '#1E2442',
+    /** Your own message tile in the chat. */
+    mine: '#2A3160',
     field: '#1A1F3A',
     fieldLine: '#2E3558',
     gold: '#F2C14E',

@@ -108,6 +108,23 @@ interface Chip {
   label: string;
 }
 
+/** Scout's reply in the full chat: its mark in a 24px gutter, the words beside it. */
+function ScoutReply({ scout, children }: { scout: BeanClipData | undefined; children: ReactNode }) {
+  return (
+    <div className="bubble-scout">
+      <ScoutMark {...(scout !== undefined ? { clip: scout } : {})} size={24} />
+      <div className="bubble-scout-body">{children}</div>
+    </div>
+  );
+}
+
+/** What Scout is doing while a tool runs, in the mockup's words; the brain sends only the tool's name. */
+function doingOf(tool: string): string {
+  if (/search|web/.test(tool)) return 'searching the web';
+  if (/read|screen|file|look/.test(tool)) return 'reading';
+  return 'working on it';
+}
+
 function chipsOf(snapshot: ContextSnapshot | undefined): Chip[] {
   if (snapshot === undefined) return [];
   const chips: Chip[] = [];
@@ -132,7 +149,7 @@ function without(snapshot: ContextSnapshot, removed: ReadonlySet<Chip['id']>): C
 type Reply =
   | { state: 'idle' }
   // `steps`: where the text stood when each tool call began, to find where an ask's step starts.
-  | { state: 'running'; turnId: string | null; text: string; steps?: number[] }
+  | { state: 'running'; turnId: string | null; text: string; steps?: number[]; doing?: string }
   | { state: 'done'; text: string; status?: string }
   | { state: 'failed'; text: string };
 
@@ -279,6 +296,7 @@ export function CompanionBubble({
             ? {
                 ...current,
                 steps: [...(current.steps ?? []), current.text.length],
+                doing: doingOf(event.tool),
               }
             : current,
         );
@@ -660,8 +678,12 @@ export function CompanionBubble({
           <div className="bubble-live">
             {reply.text === '' ? (
               <span className="bubble-thinking">
-                <span className="bubble-dot" aria-hidden="true" />
-                {petName} is thinking…
+                <span className="bubble-dots" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                {petName} is {reply.doing ?? 'thinking'}…
               </span>
             ) : (
               <span />
@@ -678,7 +700,7 @@ export function CompanionBubble({
       )}
       {reply.state === 'done' && reply.status === undefined && (
         <div className="bubble-answer">
-          <Answer text={reply.text} />
+          <Answer text={reply.text} gist={expanded} />
         </div>
       )}
       {reply.state === 'failed' && (
@@ -878,7 +900,9 @@ export function CompanionBubble({
                 ) : exchange.failed ? (
                   <p className="bubble-error">{exchange.answer}</p>
                 ) : (
-                  <Answer text={exchange.answer} />
+                  <ScoutReply scout={scout}>
+                    <Answer text={exchange.answer} gist />
+                  </ScoutReply>
                 )}
               </div>
             ))}
@@ -886,7 +910,7 @@ export function CompanionBubble({
             {question !== null && (
               <div className="bubble-exchange">
                 <p className="bubble-mine">{question}</p>
-                {answer}
+                <ScoutReply scout={scout}>{answer}</ScoutReply>
               </div>
             )}
             {cards}

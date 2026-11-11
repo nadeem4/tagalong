@@ -80,15 +80,27 @@ export const CHAT_CSS = `
 .bubble-log > :first-child { margin-top: auto; }
 .bubble-exchange { display: flex; flex-direction: column; gap: 12px; }
 .bubble-mine {
-  align-self: flex-end; max-width: 82%; margin: 0; padding: 12px 16px; border-radius: 12px 12px 4px 12px;
-  background: #222845; ${typeCss('bodyLead')}; white-space: pre-wrap; overflow-wrap: anywhere;
+  align-self: flex-end; max-width: 82%; margin: 0; padding: 10px 14px; border-radius: 14px 14px 4px 14px;
+  background: ${t.color.mine}; ${typeCss('bodyLead')}; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.bubble-scout { display: grid; grid-template-columns: 24px 1fr; gap: 12px; align-items: start; max-width: 60ch; }
+.bubble-scout-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.answer-gist { position: relative; max-height: 126px; overflow: hidden; }
+.answer-gist::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 40px; pointer-events: none;
+  background: linear-gradient(to bottom, transparent, ${t.color.page});
 }
 .bubble-scoutmsg { display: flex; flex-direction: column; gap: 6px; }
 
 /* A turn in progress: the thinking row with Stop beside it, then a gold cursor on the text. */
 .bubble-live { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .bubble-thinking { display: flex; align-items: center; gap: 10px; ${typeCss('body')}; color: #C9CEE0; }
-.bubble-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: ${t.color.gold}; }
+.bubble-dots { display: inline-flex; align-items: center; gap: 4px; }
+.bubble-dots i { width: 6px; height: 6px; border-radius: 50%; background: ${t.color.gold}; animation: bubble-dot 1.2s ease-in-out infinite; }
+.bubble-dots i:nth-child(2) { animation-delay: 0.15s; }
+.bubble-dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes bubble-dot { 0%, 80%, 100% { opacity: 0.3; } 40% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .bubble-dots i { animation: none; } }
 .bubble-stop { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px 0 8px; }
 .bubble-stop i { width: 8px; height: 8px; border-radius: 2px; background: #C9CEE0; display: block; }
 .bubble--chat .bubble-answer { max-height: none; overflow: visible; }

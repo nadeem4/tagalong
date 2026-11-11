@@ -20,6 +20,11 @@ function contrast(a: string, b: string): number {
 describe('design tokens', () => {
   const { color } = themeTokens;
 
+  it('has a token for your own message tile, readable text on it', () => {
+    expect(color.mine).toBe('#2A3160');
+    expect(contrast(color.text, color.mine)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('keeps status chips, links and errors readable on the light page', () => {
     expect(contrast(color.okInk, color.okFill)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(color.warnInk, color.warnFill)).toBeGreaterThanOrEqual(4.5);

@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { CARD_CSS } from './card-styles';
 import { CHAT_CSS } from './chat-styles';
 import { minPadding, ruleOf } from './test-support/css-rules';
+import { themeTokens as t } from './theme/tokens';
 
 describe('minPadding', () => {
   it('reads shorthand and ignores the vertical sides of a fixed-height rule', () => {
@@ -22,6 +23,21 @@ describe('CHAT_CSS padding', () => {
 });
 
 describe('CHAT_CSS chat window', () => {
+  it('draws your message on the mine token with the mockup radius', () => {
+    const rule = ruleOf(CHAT_CSS, '.bubble-mine');
+    expect(rule).toContain(t.color.mine);
+    expect(rule).toContain('border-radius: 14px 14px 4px 14px');
+  });
+
+  it("sets Scout's reply behind its mark, capped at 60ch", () => {
+    expect(ruleOf(CHAT_CSS, '.bubble-scout')).toContain('max-width: 60ch');
+    expect(ruleOf(CHAT_CSS, '.bubble-scout')).toContain('grid-template-columns: 24px 1fr');
+  });
+
+  it('folds a long answer to its gist behind a fade', () => {
+    expect(ruleOf(CHAT_CSS, '.answer-gist')).toContain('max-height: 126px');
+    expect(CHAT_CSS).toContain('.answer-gist::after');
+  });
   it('has a 56px header', () => {
     expect(ruleOf(CHAT_CSS, '.bubble-head')).toContain('height: 56px');
   });
@@ -31,8 +47,8 @@ describe('CHAT_CSS chat window', () => {
     expect(ruleOf(CHAT_CSS, '.bubble-exchange')).toContain('gap: 12px');
   });
 
-  it('puts a user message on a tile with at least 12px inside', () => {
-    expect(minPadding(CHAT_CSS, '.bubble-mine')).toBeGreaterThanOrEqual(12);
+  it('puts a user message on a tile with the mockup padding of 10px 14px', () => {
+    expect(minPadding(CHAT_CSS, '.bubble-mine')).toBeGreaterThanOrEqual(10);
   });
 
   it('shows an icon toggle that is on with a gold fill and a muted gold edge', () => {
@@ -63,6 +79,20 @@ describe('CHAT_CSS chat window', () => {
   it('rings the composer in sky and keeps 8px inside it', () => {
     expect(ruleOf(CHAT_CSS, '.bubble-field:focus-within')).toContain('border-color');
     expect(minPadding(CHAT_CSS, '.bubble-field')).toBeGreaterThanOrEqual(8);
+  });
+});
+
+describe('CARD_CSS ask card', () => {
+  it('right-aligns its actions and shows the Always asks chip as a small pill', () => {
+    expect(ruleOf(CARD_CSS, '.card-actions')).toContain('justify-content: flex-end');
+    expect(ruleOf(CARD_CSS, '.card-chip')).toContain('border-radius: 999px');
+  });
+
+  it('draws a choice as a radio row, the recommended one edged in gold', () => {
+    expect(ruleOf(CARD_CSS, '.bubble-radio')).toContain('border-radius: 50%');
+    expect(ruleOf(CARD_CSS, '.bubble-choices .bubble-choice.bubble-primary')).toContain(
+      t.color.gold,
+    );
   });
 });
 

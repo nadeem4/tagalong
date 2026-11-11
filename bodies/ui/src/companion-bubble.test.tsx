@@ -607,7 +607,30 @@ describe('CompanionBubble, a turn in the chat window', () => {
       });
     });
 
-  it('thinking shows a gold dot and Scout is thinking, with Stop on the same row', async () => {
+  it('thinking shows three dots, then says what Scout is doing once it reaches for a tool', async () => {
+    const bridge = createFakeHostBridge();
+    const { container } = render(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" expanded />
+      </HostBridgeProvider>,
+    );
+    await act(async () => askIn('Message Scout', 'why?'));
+    start(bridge);
+    expect(container.querySelectorAll('.bubble-dots i')).toHaveLength(3);
+    act(() =>
+      bridge.emit({
+        type: 'turn.toolRequest',
+        turnId: 'turn-1',
+        approvalId: 'a',
+        callId: 'a',
+        tool: 'search_web',
+        input: {},
+      }),
+    );
+    expect(screen.getByText('Scout is searching the web…')).toBeVisible();
+  });
+
+  it('thinking shows dots and Scout is thinking, with Stop on the same row', async () => {
     const bridge = createFakeHostBridge();
     const { container } = render(
       <HostBridgeProvider bridge={bridge}>
@@ -618,7 +641,7 @@ describe('CompanionBubble, a turn in the chat window', () => {
     start(bridge);
     const row = screen.getByText('Scout is thinking…').closest('.bubble-live');
     expect(row).not.toBeNull();
-    expect(row?.querySelector('.bubble-dot')).not.toBeNull();
+    expect(row?.querySelector('.bubble-dots')).not.toBeNull();
     const stop = screen.getByRole('button', { name: 'Stop' });
     expect(row?.contains(stop)).toBe(true);
     expect(stop.querySelector('i')).not.toBeNull();

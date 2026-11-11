@@ -14,7 +14,8 @@ export type JobAnswer = { option: string; text?: string; apps?: string[] };
 const GATE_OPTIONS = new Set(['allow', 'always', 'deny']);
 
 /**
- * Built like the hand-off card: what will happen, then Allow once, Always allow and Deny.
+ * Built like the hand-off card: what will happen, then Not now, Always allow and Allow.
+ * A tool that cannot be always allowed carries the "Always asks" chip.
  * A brain ask (it carries `options`) leads with Scout's own words and drops Always allow when
  * the tool is locked; an app change keeps the connector wording and offers Allow once or Deny.
  * A job's ask has options of its own (modes, Claude Code's permission names) or is a question,
@@ -103,7 +104,8 @@ export function ConnectorConfirmCard({
               className={`bubble-choice ${option === gold ? 'bubble-primary' : 'bubble-quiet'}`}
               onClick={() => onReply({ option, ...withApps })}
             >
-              <span>{option}</span>
+              <span className="bubble-radio" aria-hidden="true" />
+              <span className="bubble-choice-text">{option}</span>
               {option === confirm.recommended && (
                 <>
                   {' '}
@@ -134,9 +136,12 @@ export function ConnectorConfirmCard({
       className="card"
       aria-label={isAsk ? `Allow ${confirm.tool}?` : `Change something in ${confirm.app}?`}
     >
-      <p className="bubble-text" style={isAsk ? { whiteSpace: 'pre-line' } : undefined}>
-        {isAsk ? what : `Change in ${confirm.app} — allow?`}
-      </p>
+      <div className="card-head">
+        <p className="bubble-text" style={isAsk ? { whiteSpace: 'pre-line' } : undefined}>
+          {isAsk ? what : `Change in ${confirm.app} — allow?`}
+        </p>
+        {!canAlways && <span className="card-chip">Always asks</span>}
+      </div>
       {confirm.risk === 'high' && <p className="card-brief">Can’t be undone</p>}
       <dl className="card-rows">
         <div>
@@ -168,29 +173,17 @@ export function ConnectorConfirmCard({
           </div>
         )}
       </dl>
-      <div className="bubble-choices" role="group" aria-label="Options">
-        <button
-          type="button"
-          className="bubble-choice bubble-primary"
-          onClick={() => onAnswer('once')}
-        >
-          <span>Allow once</span>
+      <div className="card-actions" role="group" aria-label="Options">
+        <button type="button" className="bubble-quiet" onClick={() => onAnswer('deny')}>
+          Not now
         </button>
         {canAlways && (
-          <button
-            type="button"
-            className="bubble-choice bubble-quiet"
-            onClick={() => onAnswer('always')}
-          >
-            <span>Always allow</span>
+          <button type="button" className="bubble-quiet" onClick={() => onAnswer('always')}>
+            Always allow
           </button>
         )}
-        <button
-          type="button"
-          className="bubble-choice bubble-quiet"
-          onClick={() => onAnswer('deny')}
-        >
-          <span>Deny</span>
+        <button type="button" className="bubble-primary" onClick={() => onAnswer('once')}>
+          Allow
         </button>
       </div>
     </section>

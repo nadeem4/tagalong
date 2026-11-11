@@ -1,7 +1,7 @@
 /** Tests for Answer: Markdown rendering, links kept as text, and HTML kept as text. */
 
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { ANSWER_CSS, Answer } from './answer';
 import { minPadding, ruleOf } from './test-support/css-rules';
 
@@ -63,3 +63,41 @@ describe('ANSWER_CSS', () => {
     expect(ruleOf(ANSWER_CSS, '.answer li::marker')).toContain('color: #A3AAC4');
   });
 });
+
+describe('Answer code blocks', () => {
+  it('draws a code block under a bar with its language and a Copy button', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    render(<Answer text={'```ts\nawait engine.stop();\n```'} />);
+    expect(screen.getByTestId('code-bar')).toHaveTextContent('ts');
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    expect(writeText).toHaveBeenCalledWith('await engine.stop();');
+    expect(await screen.findByRole('button', { name: 'Copied' })).toBeVisible();
+  });
+
+  it('keeps inline code as plain code', () => {
+    render(<Answer text="run `pnpm test`" />);
+    expect(screen.queryByTestId('code-bar')).toBeNull();
+  });
+});
+
+describe('Answer gist', () => {
+  const LONG = Array.from({ length: 12 }, (_, i) => `- point number ${i}`).join('\n');
+
+  it('a long answer shows its gist with Show more, and Show less folds it back', () => {
+    const { container } = render(<Answer text={LONG} gist />);
+    expect(container.querySelector('.answer-gist')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show more' }));
+    expect(container.querySelector('.answer-gist')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show less' }));
+    expect(container.querySelector('.answer-gist')).not.toBeNull();
+  });
+
+  it('a short answer has no Show more, and gist is opt-in', () => {
+    render(<Answer text="Short." gist />);
+    expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull();
+    render(<Answer text={LONG} />);
+    expect(screen.queryByRole('button', { name: 'Show more' })).toBeNull();
+  });
+});
+
