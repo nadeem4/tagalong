@@ -50,10 +50,27 @@ describe('HomeView', () => {
       'Overview',
       'TasksNew',
       'Connections',
+      'PlacesNew',
       'Approvals',
       'What Scout remembers',
       'Settings',
     ]);
+  });
+
+  it('Places sits after Connections with a New badge and opens the Places page', async () => {
+    renderHome(createFakeHostBridge({ pets: [SCOUT] }));
+    const nav = await screen.findByRole('navigation', { name: 'Tagalong' });
+    const places = within(nav).getByRole('button', { name: 'Places' });
+    expect(places.querySelector('.home-nav__badge')).toHaveTextContent('New');
+    fireEvent.click(places);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Places' })).toBeInTheDocument();
+  });
+
+  it('Connections has no bodies card', async () => {
+    renderHome(createFakeHostBridge({ pets: [SCOUT] }), { page: 'connections' });
+    await screen.findByRole('navigation', { name: 'Tagalong' });
+    expect(screen.queryByRole('heading', { name: 'Bodies' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Access token/)).not.toBeInTheDocument();
   });
 
   it('nav says Tasks with a New badge and has no Jobs item', async () => {
@@ -67,7 +84,14 @@ describe('HomeView', () => {
   it('every page renders inside one .home-page wrapper', async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     await screen.findByRole('navigation', { name: 'Tagalong' });
-    for (const label of ['Overview', 'Tasks', 'Connections', 'Approvals', 'What Scout remembers']) {
+    for (const label of [
+      'Overview',
+      'Tasks',
+      'Connections',
+      'Places',
+      'Approvals',
+      'What Scout remembers',
+    ]) {
       fireEvent.click(screen.getByRole('button', { name: label }));
       const main = document.querySelector('.home-main') as HTMLElement;
       expect(main.children).toHaveLength(1);

@@ -52,8 +52,15 @@ export interface FakeBrainOptions {
   port?: number;
   /** What hello says of the brain's version and build (default: the app's own, a current brain). */
   hello?: { version: string; build: string };
+  /** After `setup_expert` the install stays at this percent (the tour's "Installing…" row). */
+  expertInstallingPercent?: number;
   /** The `brain_status` answer (snake_case, as the real tool); absent: the tool is unknown, as on an old brain. */
   brainStatus?: Record<string, unknown>;
+  /**
+   * What `bodies_status` and `whatsapp_status` answer, for Places: which bodies are connected and
+   * which WhatsApp values are saved (default: only the desktop, nothing saved, WhatsApp off).
+   */
+  bodies?: { connected?: string[]; whatsappSet?: string[]; whatsappState?: string };
 }
 
 export interface FakeBrain {
@@ -247,6 +254,17 @@ const notionRow = (id: string, official: boolean, publisher: string) => ({
   // Official rows carry no why-pick: the row falls back to the description.
   ...(official ? {} : { why: 'Matches the name' }),
 });
+/** The tour's connect step: one Official row per app it offers (what the registry's popular list holds). */
+const officialRow = (id: string, name: string) => ({
+  ...notionRow(id, true, 'example.test'),
+  name,
+  description: name,
+});
+const TOUR_APPS = [
+  officialRow('io.example/gmail', 'Gmail'),
+  officialRow('io.example/calendar', 'Google Calendar'),
+  officialRow('com.notion/mcp', 'Notion'),
+];
 const NOTION_GROUP = {
   service: 'Notion',
   official: notionRow('com.notion/mcp', true, 'Notion'),
@@ -928,38 +946,19 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
                 ? []
                 : [{ id: 'io.example/gmail', name: 'Gmail', version: '1', description: 'Mail' }],
             // C1 facts: a search for notion is one service, an Official head and two community.
-            popular: [notionRow('com.notion/mcp', true, 'Notion')],
+            popular: TOUR_APPS,
             popular_more: [],
             app_groups: String(params.input?.query ?? '').includes('notion') ? [NOTION_GROUP] : [],
             next_cursor: null,
             sources: null,
             stale: false,
-            progress: null,
+            progress:
+              options.expertInstallingPercent !== undefined && expertSetups.length > 0
+                ? { expert: 'claude-acp', stage: 'node', percent: options.expertInstallingPercent }
+                : null,
             failed: null,
             ...sceneSetup,
             ...setupPatch,
-          };
-        } else if (params.tool === 'bodies_status') {
-          value = {
-            bodies: [
-              { kind: 'desktop', name: 'Desktop', connected: true },
-              { kind: 'browser', name: 'Browser', connected: true },
-              { kind: 'whatsapp', name: 'WhatsApp', connected: false },
-            ],
-          };
-        } else if (params.tool === 'whatsapp_status') {
-          value = {
-            enabled: false,
-            set: {
-              access_token: false,
-              app_secret: false,
-              verify_token: false,
-              phone_number_id: false,
-              allowed_number: false,
-            },
-            complete: false,
-            state: 'off',
-            port: 8080,
           };
         } else if (params.tool === 'setup_app') {
           appSetups.push(String(params.input?.id));
@@ -972,7 +971,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         } else if (params.tool === 'setup_expert') {
           expertSetups.push(String(params.input?.id));
           expertApprovals.push(params.input?.approved);
-          expertInstalled = true;
+          expertInstalled = options.expertInstallingPercent === undefined;
           notify('changed', { what: 'setup' });
         } else if (params.tool === 'list_memories') {
           value = {
@@ -1005,6 +1004,30 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           notify('changed', { what: 'approvals' });
         } else if (params.tool === 'brain_status' && options.brainStatus !== undefined) {
           value = options.brainStatus;
+        } else if (params.tool === 'bodies_status') {
+          const on = options.bodies?.connected ?? ['desktop'];
+          value = {
+            bodies: [
+              { kind: 'desktop', name: 'Desktop', connected: on.includes('desktop') },
+              { kind: 'browser', name: 'Browser', connected: on.includes('browser') },
+              { kind: 'whatsapp', name: 'WhatsApp', connected: on.includes('whatsapp') },
+            ],
+          };
+        } else if (params.tool === 'whatsapp_status') {
+          const saved = options.bodies?.whatsappSet ?? [];
+          const set = Object.fromEntries(
+            ['access_token', 'app_secret', 'verify_token', 'phone_number_id', 'allowed_number'].map(
+              (key) => [key, saved.includes(key)],
+            ),
+          );
+          const complete = Object.values(set).every(Boolean);
+          value = {
+            enabled: complete && options.bodies?.whatsappState === 'running',
+            set,
+            complete,
+            state: options.bodies?.whatsappState ?? (complete ? 'off' : 'incomplete'),
+            port: 47322,
+          };
         } else if (params.tool === 'reading_status') value = { rows: readingRows };
         else if (params.tool === 'timers_state') value = { timers };
         else if (params.tool === 'timer_cancel') {

@@ -1,5 +1,5 @@
 /**
- * The walkthrough's navy side: Bean standing still, the "Scout" wordmark, the nine steps (only
+ * The walkthrough's navy side: Bean standing still, the "Scout" wordmark, the ten steps (only
  * those already reached can be jumped to) and the footnote. Contains SidePanel.
  */
 

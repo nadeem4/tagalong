@@ -1,6 +1,6 @@
 /**
- * Home: the one window for the companion and the app. Scout in the corner and six pages
- * (overview, tasks, connections, approvals, what Scout remembers, settings), each fed by the
+ * Home: the one window for the companion and the app. Scout in the corner and seven pages
+ * (overview, tasks, connections, places, approvals, what Scout remembers, settings), each fed by the
  * Python brain. Contains HomeView, HomeHost and HomePage. Rendered by the
  * desktop `home` page.
  */
@@ -20,19 +20,21 @@ import { CONNECTIONS_CSS } from './connections-styles';
 import { HOME_CSS } from './home-styles';
 import { MemoryView } from './memory-view';
 import { TasksView } from './tasks-view';
-import { BodiesPanel } from './bodies-panel';
+import { PlacesView } from './places-view';
 import { PermissionsPanel } from './permissions-panel';
 import { SpendCard } from './spend-card';
 import { BrainCard } from './brain-card';
 import { UpdateBanner } from './update-banner';
 import { LINK, WhereThingsRun } from './where-things-run';
 
-export type HomePage = 'overview' | 'tasks' | 'connections' | 'approvals' | 'memory' | 'settings';
+export type HomePage =
+  'overview' | 'tasks' | 'connections' | 'places' | 'approvals' | 'memory' | 'settings';
 
 const PAGES: readonly { id: HomePage; label: (name: string) => string }[] = [
   { id: 'overview', label: () => 'Overview' },
   { id: 'tasks', label: () => 'Tasks' },
   { id: 'connections', label: () => 'Connections' },
+  { id: 'places', label: () => 'Places' },
   { id: 'approvals', label: () => 'Approvals' },
   { id: 'memory', label: (name) => `What ${name} remembers` },
   { id: 'settings', label: () => 'Settings' },
@@ -59,8 +61,8 @@ export interface HomeViewProps {
 }
 
 /**
- * Home: the one window for everything. The companion in the corner, and six pages: an
- * overview, its tasks (jobs, held mail, timers), the apps it can use, what it may do alone and
+ * Home: the one window for everything. The companion in the corner, and seven pages: an
+ * overview, its tasks (jobs, held mail, timers), the apps it can use, the places you can talk to it, what it may do alone and
  * what you approved, what it remembers, and the app's settings.
  */
 export function HomeView({ host, scout, settings, page: asked, onPage }: HomeViewProps) {
@@ -111,7 +113,7 @@ export function HomeView({ host, scout, settings, page: asked, onPage }: HomeVie
             onClick={() => go(item.id)}
           >
             {item.label(name)}
-            {item.id === 'tasks' && (
+            {(item.id === 'tasks' || item.id === 'places') && (
               <span className="home-nav__badge" aria-hidden="true">
                 New
               </span>
@@ -125,12 +127,8 @@ export function HomeView({ host, scout, settings, page: asked, onPage }: HomeVie
           {page !== 'overview' && <UpdateBanner />}
           {page === 'overview' && <Overview companion={companion} host={host} />}
           {page === 'tasks' && <TasksView />}
-          {page === 'connections' && (
-            <>
-              <ConnectionsPanel />
-              <BodiesPanel />
-            </>
-          )}
+          {page === 'connections' && <ConnectionsPanel />}
+          {page === 'places' && <PlacesView />}
           {page === 'approvals' && <ApprovalsView />}
           {page === 'memory' && <MemoryView name={name} />}
           {page === 'settings' && (

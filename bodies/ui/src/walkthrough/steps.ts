@@ -1,5 +1,5 @@
 /**
- * The walkthrough's nine steps (the side list) and what Skip does. Contains STEPS,
+ * The walkthrough's ten steps (the side list) and what Skip does. Contains STEPS,
  * KEY_STEP and skipTour.
  */
 
@@ -21,9 +21,10 @@ export const STEPS: readonly StepInfo[] = [
   { id: 7, title: 'Browser', skippable: true },
   { id: 8, title: 'You’re in charge', skippable: true },
   { id: 9, title: 'API key', skippable: false },
+  { id: 10, title: 'Connect your tools', skippable: true },
 ];
 
-/** The last step, where the key is asked for. */
+/** The step where the key is asked for; step ten (connecting tools) follows it. */
 export const KEY_STEP = 9;
 
 /** With a key Skip leaves; without one it jumps to the key, which cannot be skipped. */

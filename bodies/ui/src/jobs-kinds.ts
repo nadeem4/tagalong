@@ -1,6 +1,6 @@
 /**
  * The everyday jobs the tour and Home talk about, and the one app each needs. The one place a job
- * label meets an app, so the tour's Connect buttons and Home's job labels cannot drift apart.
+ * label meets an app, so the tour's app rows and Home's job labels cannot drift apart.
  * Contains JOB_KINDS, EXPERT_JOB, DEFAULT_EXPERT_JOB and the JobKind type. Static screen copy, never Scout's words.
  */
 
@@ -34,7 +34,7 @@ export const JOB_KINDS: readonly JobKind[] = [
   },
   {
     label: 'Fix this code',
-    help: 'A long, many-step job. Scout hands it to an expert, which you can set up below.',
+    help: 'A long, many-step job. Scout hands it to an expert, which you can set up on the last step.',
   },
 ];
 

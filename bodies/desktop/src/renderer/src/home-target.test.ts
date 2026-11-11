@@ -6,6 +6,7 @@ describe('homeTarget', () => {
   it('reads a plain page', () => {
     expect(homeTarget('tasks')).toEqual({ page: 'tasks' });
     expect(homeTarget('settings')).toEqual({ page: 'settings' });
+    expect(homeTarget('places')).toEqual({ page: 'places' });
   });
 
   it('reads settings#voice as the Settings page at its Voice section', () => {
