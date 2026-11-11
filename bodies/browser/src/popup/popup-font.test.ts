@@ -6,7 +6,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const read = (...parts: string[]): string => readFileSync(join(import.meta.dirname, ...parts), 'utf8');
+const read = (...parts: string[]): string =>
+  readFileSync(join(import.meta.dirname, ...parts), 'utf8');
 
 describe('popup and mic page type', () => {
   it('popup and mic page use Onest', () => {

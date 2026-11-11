@@ -207,7 +207,7 @@ card shows a plain line for each, and **Retry** (`IPC.brainSetupRetry`) runs the
 
 ### Shared controls
 
-Every window draws its toggles, selects, sliders, money field, keycaps, buttons and the key field from `bodies/ui/src/controls/` (and `key/key-field.tsx`). Hosts inject `CONTROLS_CSS` beside their own sheet; the focus ring is navy on light surfaces and gold inside `.on-navy`, set by CSS variables rather than props. The renderer sheet `app.css` sets Onest on `body`, and the name "Scout" is Onest 600 everywhere (see bodies/DESIGN.md, Shared controls).
+Every window draws its toggles, selects, sliders, money field, keycaps, buttons and the key field from `bodies/ui/src/controls/` (and `key/key-field.tsx`). Hosts inject `CONTROLS_CSS` beside their own sheet; the focus ring is navy on light surfaces and gold inside `.on-navy`, set by CSS variables rather than props. The renderer sheet `app.css` sets Onest on `body`, and the name "Scout" is Onest 600 everywhere (see bodies/DESIGN.md, Shared controls). Onest 400 and 600 is the only bundled typeface (`@fontsource/onest`; the pixel font is retired): every size is one of seven roles in `themeTokens.type`, labels are sentence case, and `bodies/ui/src/type-audit.test.ts` fails on any other size, weight, capitals or letter spacing (see bodies/DESIGN.md, Typography).
 
 ### The window inventory
 
