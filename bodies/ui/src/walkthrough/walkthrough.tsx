@@ -48,7 +48,7 @@ function body(step: number, host: WalkthroughHost, onValid: (valid: boolean) => 
     case 5:
       return <StepFive host={host} />;
     case 6:
-      return <StepSix host={host} />;
+      return <StepSix />;
     case 7:
       return <StepSeven host={host} />;
     case 8:

@@ -143,13 +143,6 @@ export const WALKTHROUGH_CSS = `
 .wt-job:first-child { border-top: 0; }
 .wt-job h3 { margin: 0; ${typeCss('bodyLead')}; font-weight: ${t.fontWeight.semibold}; }
 .wt-job__text { min-width: 0; }
-.wt-job__act { flex: none; max-width: 200px; text-align: right; }
-.wt-job__act .wt-help { margin: 0; }
-.wt-expert { margin-top: 8px; }
-.wt-sub-label { margin-top: 24px; color: ${t.color.panelMuted}; ${typeCss('caption')}; }
-.wt-steplist { margin: 0; padding: 0; list-style: none; counter-reset: wt-s; display: flex; flex-direction: column; gap: 10px; }
-.wt-steplist li { counter-increment: wt-s; display: flex; align-items: center; gap: 12px; ${typeCss('bodyLead')}; }
-.wt-steplist li::before { content: counter(wt-s); flex: none; width: 22px; height: 22px; border-radius: 11px; display: grid; place-items: center; background: ${t.color.sidebar}; color: ${t.color.text}; ${typeCss('small')}; font-weight: ${t.fontWeight.semibold}; }
 /* The preview cards are illustrations of the navy bubble, not live controls. */
 .wt-handoff { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 14px; background: ${t.color.sidebar}; color: ${t.color.text}; }
 .wt-handoff h3 { margin: 0; ${typeCss('title')}; }

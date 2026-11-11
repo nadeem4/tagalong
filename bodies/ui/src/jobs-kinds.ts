@@ -34,7 +34,7 @@ export const JOB_KINDS: readonly JobKind[] = [
   },
   {
     label: 'Fix this code',
-    help: 'A long, many-step job. Scout hands it to an expert, which you can set up below.',
+    help: 'A long, many-step job. Scout hands it to an expert, which you can set up on the last step.',
   },
 ];
 
