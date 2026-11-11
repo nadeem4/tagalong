@@ -16,6 +16,7 @@ from brain.permission import (
     ASK_WAIT_MAX,
     ASK_WAIT_MIN,
     SUMMARY_MAX,
+    AskOpen,
     AskRequest,
     Decision,
     Engine,
@@ -668,3 +669,41 @@ async def test_person_answer_first_stops_the_side_check(mem):
     assert (d.kind, d.code) == ("deny", "denied")
     await asyncio.sleep(0)
     assert side.cancelled
+
+
+async def test_a_failed_side_check_grant_leaves_the_card_to_the_person(mem):
+    gate, person_gate = asyncio.Event(), asyncio.Event()
+    closed = []
+
+    async def ask():
+        await person_gate.wait()
+        return PersonAnswer("allow")
+
+    rig = Rig(mem, [Slow("side_check", Grant("scout"), gate), Person()])
+
+    real = rig.approvals.record
+
+    def broken(**kw):
+        if kw["decided_by"] == "scout":
+            raise RuntimeError("log write failed")
+        return real(**kw)
+
+    rig.approvals.record = broken
+    task = asyncio.create_task(rig.engine.decide(req(how_to_ask=ask, settled=closed.append)))
+    await asyncio.sleep(0)
+    gate.set()
+    await asyncio.sleep(0.05)
+    assert not task.done()  # Scout's yes did not count; the card is still up for the person
+    person_gate.set()
+    d = await task
+    assert d.decided_by == "person"
+
+
+async def test_settled_refusal_leaves_the_outcome_to_the_person(mem):
+    def refused(_by):
+        raise AskOpen("item1")
+
+    rig = Rig(mem, [Fake("side_check", Grant("scout"))])
+    with pytest.raises(AskOpen):
+        await rig.engine.decide(req(show_card=lambda: None, settled=refused))
+    assert rig.rows() == []  # no approval row for a yes the person beat

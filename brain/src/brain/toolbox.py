@@ -19,6 +19,7 @@ from brain.asks import Asks
 from brain.bodies import Bodies
 from brain.mind.prompt import part_blocks
 from brain.mind.turn import Call
+from brain.open_items import OpenItemRefused
 from brain.outputs import OutputStore, preview
 from brain.permission import (
     ASK_WAIT_ARG,
@@ -316,12 +317,13 @@ class Toolbox:
             def show_card() -> None:  # up before the side-check looks, never after
                 opened.append(runner.open(call, req, wait))
 
-            req = replace(
-                req,
-                how_to_ask=None,
-                show_card=show_card,
-                settled=lambda by: runner.settle(opened[0], by),
-            )
+            def settled(by: str) -> None:
+                try:
+                    runner.settle(opened[0], by)
+                except OpenItemRefused:  # the person answered first: that answer runs the call
+                    raise AskOpen(opened[0].id) from None
+
+            req = replace(req, how_to_ask=None, show_card=show_card, settled=settled)
         decision = await self._engine.decide(req)
         if decision.allowed:
             return

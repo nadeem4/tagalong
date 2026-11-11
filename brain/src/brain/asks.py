@@ -213,7 +213,14 @@ class Asks:
         if self._open.pop(ask_id, None) is not None:
             ask_event("answered", ask_id, by, "allow")
             self._bodies.notify(
-                "ask", {"id": ask_id, "state": "closed", "reason": "answered", "by": by}
+                "ask",
+                {
+                    "id": ask_id,
+                    "state": "closed",
+                    "reason": "answered",
+                    "option": "allow",
+                    "by": by,
+                },
             )
 
     def card_closed(self, ask_id: str) -> None:

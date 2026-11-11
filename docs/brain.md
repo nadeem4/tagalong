@@ -289,8 +289,9 @@ method, params)` writes one frame with no `seq` straight to the body's current c
   returns `False` if it is offline. It never touches the outbox, so a reconnect replays no audio.
 - Writes go through one queue per connection (`WriteQueue` in `bodies.py`). `send` never waits and
   never raises, so one slow body cannot stop the others. The queue is capped
-  (`MAX_QUEUED_FRAMES`, 256 frames). Past the cap the oldest live-only audio frames (`LiveFrame`,
-  what `send_live` writes) are dropped first; a frame carrying `seq` and every reply is never
+  (`MAX_QUEUED_FRAMES`, 256 frames). Past the cap the oldest speech audio chunks (`LiveFrame`: a
+  `speech` frame carrying `pcm`, marked by `send_live`) are dropped first; a frame carrying `seq`,
+  a speech `done`, a text-only speech line, the `voice` status frames and every reply are never
   dropped.
 
 ## The desktop body

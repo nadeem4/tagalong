@@ -523,11 +523,38 @@ async def test_close_marker_is_delivered_after_queued_frames():
     assert await queue.get() is None
 
 
-def test_send_live_marks_its_frame_so_the_connection_may_drop_it():
+def test_send_live_marks_a_speech_chunk_so_the_connection_may_drop_it():
     peer = FakePeer()
     bodies = Bodies()
     bodies.connect(body("a"), [], peer, None)
-    bodies.send_live("a", "speech", {"turn": "t", "text": "x"})
+    bodies.send_live("a", "speech", {"turn": "t", "text": "x", "pcm": "AAAA"})
     bodies.notify_one("a", "say", {"text": "hi"})
     assert isinstance(peer.frames[0], LiveFrame)
     assert not isinstance(peer.frames[1], LiveFrame)
+
+
+def test_only_speech_audio_chunks_are_droppable():
+    peer = FakePeer()
+    bodies = Bodies()
+    bodies.connect(body("a"), [], peer, None)
+    bodies.send_live("a", "speech", {"turn": "t", "text": "x", "pcm": "AAAA"})
+    bodies.send_live("a", "speech", {"turn": "t", "text": "x"})
+    bodies.send_live("a", "speech", {"turn": "t", "done": True})
+    bodies.send_live("a", "voice", {"status": "ready"})
+    bodies.send_live("a", "heard", {"event": "final", "text": "hi"})
+    assert [isinstance(f, LiveFrame) for f in peer.frames] == [True, False, False, False, False]
+
+
+async def test_voice_status_and_done_survive_past_the_cap():
+    queue = WriteQueue(cap=2)
+    peer = FakePeer()
+    bodies = Bodies()
+    bodies.connect(body("a"), [], peer, None)
+    bodies.send_live("a", "voice", {"status": "ready"})
+    for _ in range(4):
+        bodies.send_live("a", "speech", {"turn": "t", "text": "x", "pcm": "AAAA"})
+    bodies.send_live("a", "speech", {"turn": "t", "done": True})
+    for frame in peer.frames:
+        queue.put(frame)
+    left = [json.loads(await queue.get())["params"] for _ in range(3)]
+    assert {"status": "ready"} in left and {"turn": "t", "done": True} in left

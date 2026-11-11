@@ -471,4 +471,32 @@ async def test_a_side_check_yes_answers_the_item_and_closes_the_card():
     item = rig.items.get(card["id"])
     assert (item.state, item.answer) == ("done", "allow")
     assert rig.closed()[0]["reason"] == "answered" and rig.closed()[0]["by"] == "side_check"
+    assert rig.closed()[0]["option"] == "allow"
     assert rig.items.list_open(kind="ask") == []
+
+
+async def test_person_answers_first_then_side_check_yes_changes_nothing():
+    rig = Rig()
+    gate = asyncio.Event()
+    pref = rules.add_preference(
+        rig.memory.db,
+        sentence="Fine to run t",
+        source=None,
+        tool=None,
+        group_key=None,
+        at="2026-11-11T09:00:00Z",
+    )
+    with_side_check(rig, Look(gate, pref))
+    turn = asyncio.create_task(rig.box.run(call()))
+    await rig.settle()
+    [card] = rig.opened()
+    rig.asks.answer(card["id"], "allow", "desktop")  # the person is first
+    await rig.settle()
+    gate.set()
+    out = await asyncio.wait_for(turn, 1)
+    await rig.settle()
+    assert card["id"] in out and "waiting" in out  # the turn is told the ask is open
+    assert len(rig.opened()) == 1  # no second card
+    assert rig.source.ran == [("t", {"n": 1})]  # the saved call ran exactly once
+    rows = rig.work.list_asks("all", 10, None)
+    assert all(r.decided_by != "scout" for r in rows)

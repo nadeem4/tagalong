@@ -5,7 +5,8 @@ instead of sending it so the hello result can go out first. Outboxes outlive con
 (kept per body id) so a reconnect can replay what it missed. `use` requests are not
 replayed: each is bound to the peer it was sent on and fails if that peer goes away.
 `WriteQueue` is the bounded write queue each connection owns: live-only audio frames are
-dropped oldest-first when it is over its cap; frames carrying `seq` are never dropped.
+dropped oldest-first when it is over its cap; frames carrying `seq`, the speech `done` and
+voice status frames are never dropped.
 """
 
 import asyncio
@@ -23,13 +24,16 @@ from brain.protocol import BODY_WHATSAPP, LIMITS, Body, ErrorCode, RpcError, Too
 log = logging.getLogger("brain")
 
 
-# Frames a connection may hold before the oldest audio is dropped. Audio is the only thing that
-# piles up (a slow body, a long reply), and a late speech frame is worth less than a fresh one.
+# Frames a connection may hold before the oldest speech audio chunks are dropped. Audio is the
+# only thing that piles up (a slow body, a long reply), and a late chunk is worth less than a
+# fresh one.
 MAX_QUEUED_FRAMES = 256
 
 
 class LiveFrame(str):
-    """A live-only frame (no `seq`, never replayed): the one kind a full queue may drop."""
+    """A speech audio chunk (live-only, no `seq`): the one kind a full queue may drop. A speech
+    `done`, a text-only line and the voice status frames are live-only too but never droppable:
+    a body that misses one is left waiting."""
 
 
 class WriteQueue:
@@ -218,7 +222,8 @@ class Bodies:
         if current is None:
             return False
         frame = json.dumps({"jsonrpc": "2.0", "method": method, "params": params})
-        current.peer.send(LiveFrame(frame))
+        chunk = method == "speech" and "pcm" in params
+        current.peer.send(LiveFrame(frame) if chunk else frame)
         return True
 
     def online_ids(self) -> list[str]:
