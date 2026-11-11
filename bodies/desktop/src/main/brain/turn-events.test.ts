@@ -289,6 +289,7 @@ describe('createTurnEvents: asks', () => {
         tool: 'desktop__move_window',
         summary: "I'll move the window.",
         options: ['allow', 'always', 'deny'],
+        facts: { x: 1 },
       },
     ]);
   });
@@ -314,6 +315,22 @@ describe('createTurnEvents: asks', () => {
       }),
     );
     expect(e).toMatchObject({ summary: 'Approve it from now on?' });
+  });
+
+  it("a tool-gate ask carries the tool's input as facts for the card's rows", () => {
+    const [e] = make().map(
+      'ask',
+      open({ tool: 'gmail__send_message', text: 'Send it?', input: { to: 'sam@x.example' } }),
+    );
+    expect(e).toMatchObject({ summary: 'Send it?', facts: { to: 'sam@x.example' } });
+  });
+
+  it('an approval offer carries no facts', () => {
+    const [e] = make().map(
+      'ask',
+      open({ tool: 'approval_offer', confirm: false, text: 'Approve?', input: { group: 'g' } }),
+    );
+    expect(e).not.toHaveProperty('facts');
   });
 
   it("a brain tool's ask belongs to Scout", () => {

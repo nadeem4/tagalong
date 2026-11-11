@@ -1355,7 +1355,7 @@ describe('the live job line', () => {
     const bridge = createFakeHostBridge({ runningSteps: [running('npm init -y')] });
     renderBubble(bridge);
     const line = await screen.findByTestId('job-line');
-    expect(line).toHaveTextContent('Claude Code is working');
+    expect(line).toHaveTextContent('Claude Code');
     expect(line.querySelector('code')).toHaveTextContent('npm init -y');
     expect(line.getAttribute('aria-live')).toBe('off');
     const openFix = vi.spyOn(bridge, 'openFix');

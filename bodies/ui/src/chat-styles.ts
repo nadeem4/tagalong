@@ -139,11 +139,11 @@ export const CHAT_CSS = `
   padding: 8px 8px 8px 12px; border: 1px solid ${t.color.fieldLine}; border-radius: 12px; background: ${t.color.field};
 }
 .bubble-field:focus-within { border-color: ${t.color.sky}; box-shadow: 0 0 0 3px rgba(124, 184, 242, 0.18); }
-.bubble-field textarea {
+.bubble-field textarea, .bubble-field input {
   flex: 1; min-width: 0; max-height: 120px; padding: 4px 0; border: 0; outline: 0; resize: none;
   background: transparent; color: ${t.color.text}; font: inherit; ${typeCss('bodyLead')}; overflow-wrap: anywhere;
 }
-.bubble-field textarea::placeholder { color: ${t.color.textMuted}; }
+.bubble-field textarea::placeholder, .bubble-field input::placeholder { color: ${t.color.textMuted}; }
 .bubble-field .bubble-mic, .bubble-send {
   flex: none; position: static; width: 32px; height: 32px; display: grid; place-items: center;
   padding: 0; border: 0; border-radius: 8px; background: transparent; color: ${t.color.textMuted}; cursor: pointer;

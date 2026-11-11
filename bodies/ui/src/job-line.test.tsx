@@ -132,7 +132,7 @@ describe('JobLine', () => {
   it('is a card: the expert working, the command in code, silent, and no bar in the quick bubble', () => {
     render(<JobLine step={step('npm init -y')} onOpenTasks={() => undefined} />);
     const card = screen.getByTestId('job-line');
-    expect(card).toHaveTextContent('Claude Code is working');
+    expect(card).toHaveTextContent('Claude Code');
     expect(card.querySelector('code')).toHaveTextContent('npm init -y');
     expect(card.getAttribute('aria-live')).toBe('off');
     expect(card.hasAttribute('title')).toBe(false);

@@ -15,6 +15,10 @@ export type JobAnswer = { option: string; text?: string; apps?: string[] };
 const toolLabel = (tool: string): string =>
   tool.includes(':') ? tool : tool.replace(/^.*?__/, '').replace(/_/g, ' ');
 
+/** A fact's row label: `to` reads "To", a message `body` reads "Says". */
+const factLabel = (key: string): string =>
+  key === 'body' ? 'Says' : key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
+
 const GATE_OPTIONS = new Set(['allow', 'always', 'deny']);
 
 /**
@@ -167,6 +171,15 @@ export function ConnectorConfirmCard({
             )}
           </dd>
         </div>
+        {isAsk &&
+          Object.entries(confirm.facts ?? {}).map(([key, value]) => (
+            <div key={key}>
+              <dt>{factLabel(key)}</dt>
+              <dd>
+                <span>{typeof value === 'string' ? value : JSON.stringify(value)}</span>
+              </dd>
+            </div>
+          ))}
         {filled.length > 0 && (
           <div>
             <dt>Details</dt>

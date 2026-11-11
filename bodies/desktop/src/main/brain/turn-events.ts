@@ -135,6 +135,10 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
       ...(Array.isArray(apps) && apps.length > 0 ? { apps } : {}),
       // The install card draws itself from these; every other card is built from the summary.
       ...(tool === 'install_app' || tool === 'install_expert' ? { facts: p.input ?? {} } : {}),
+      // A gate ask's input becomes the card's rows (To, Says), since its words are Scout's own.
+      ...(p.confirm && tool !== 'approval_offer' && Object.keys(rest).length > 0
+        ? { facts: rest }
+        : {}),
     };
     asks.set(p.id, card);
     return [card];

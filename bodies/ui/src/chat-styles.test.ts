@@ -76,6 +76,10 @@ describe('CHAT_CSS chat window', () => {
     expect(ruleOf(CHAT_CSS, ".bubble-field textarea[aria-busy='true']")).toContain('opacity');
   });
 
+  it('styles an input in a field like the textarea, so a card answer is no bare box', () => {
+    expect(ruleOf(CHAT_CSS, '.bubble-field textarea, .bubble-field input')).toContain('background');
+  });
+
   it('rings the composer in sky and keeps 8px inside it', () => {
     expect(ruleOf(CHAT_CSS, '.bubble-field:focus-within')).toContain('border-color');
     expect(minPadding(CHAT_CSS, '.bubble-field')).toBeGreaterThanOrEqual(8);

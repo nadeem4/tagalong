@@ -80,7 +80,7 @@ export function JobLine({
           <i />
           <i />
         </span>
-        <b>{title !== '' ? title : `${step.expert} is working`}</b>
+        <b>{title !== '' ? title : step.expert}</b>
         <button type="button" className="bubble-link" onClick={onOpenTasks}>
           Open in Tasks
           <Icon name="chevRight" />

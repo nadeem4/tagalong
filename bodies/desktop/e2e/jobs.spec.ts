@@ -235,7 +235,7 @@ test("the bubble shows a running job's latest step", async () => {
   const step = { job: 'job1', expert: 'Claude Code', text: 'npm test', at: '2026-10-27T10:00:00Z' };
   brain.setRunning([step], 'job_activity');
   const line = panel.getByTestId('job-line');
-  await expect(line).toContainText('Claude Code is working', { timeout: 15_000 });
+  await expect(line).toContainText('Claude Code', { timeout: 15_000 });
   await expect(line).toContainText('npm test');
 
   brain.setRunning([], 'jobs');

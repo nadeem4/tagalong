@@ -107,6 +107,19 @@ describe('the connector confirm card', () => {
       expect(row).not.toHaveTextContent('desktop__');
     });
 
+    it('shows each fact the ask carries as its own row, a body as "Says"', () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() =>
+        bridge.emit(ask({ facts: { to: 'sam@northwind.example', body: 'Running late, sorry.' } })),
+      );
+      const card = screen.getByRole('region', { name: 'Allow desktop__move_window?' });
+      expect(within(card).getByText('To').closest('div')).toHaveTextContent(
+        'sam@northwind.example',
+      );
+      expect(within(card).getByText('Says').closest('div')).toHaveTextContent('Running late');
+    });
+
     it('with no words, shows the tool name and its input', () => {
       const bridge = createFakeHostBridge();
       renderBubble(bridge);

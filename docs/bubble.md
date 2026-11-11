@@ -157,7 +157,7 @@ stateDiagram-v2
   message (or "Tagalong could not reach its brain.") and one **Try again**, which asks the same
   question again (never while another answer is running). An earlier failed exchange keeps the box
   without the button.
-- A running job shows as a card: the job's own title ("Claude Code is working" when it has
+- A running job shows as a card: the job's own title ("Claude Code" when it has
   none), **Open in Tasks** (opens Home on Tasks), the step in body type with only a command in
   mono, and, in the full chat only, a moving bar (the brain reports no share done, so it only
   says the job is moving; it starts inside its track).
@@ -166,7 +166,7 @@ stateDiagram-v2
   is the box's own.
 - An approval offer shows only its question (bold) and its two choices; the sentence and group
   the brain keeps for its record are not shown. The ask card's Tool row reads the tool in words
-  (`gmail__send_message` as "send message").
+  (`gmail__send_message` as "send message"), and a gate ask's input arrives as `facts`, one row each (`to` as To, `body` as Says). A card's text answer box is styled like the composer.
 - The header status keeps one line (an ellipsis when long), so the speaking indicator never makes
   it taller.
 - A long answer shows its gist (whole blocks or list items, never cut mid-sentence) fading out on

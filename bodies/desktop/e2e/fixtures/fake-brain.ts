@@ -676,11 +676,15 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         );
         const base = { turn, body: 'desktop' };
         const spoken = msg.params?.spoken === true || readAloud.on === true;
+        // A scene that streams its own sentence leaves the default reply out.
+        let scripted = false;
         const finish = () => {
           // The shots ask for a long, formatted answer: a gist, a list and a code block.
           const parts = String(msg.params?.text ?? '').includes('explain the failing test')
             ? [LONG_ANSWER]
-            : ['This is the ', 'fake brain.'];
+            : scripted
+              ? []
+              : ['This is the ', 'fake brain.'];
           for (const delta of parts) notify('reply', { ...base, delta });
           notify('reply', { ...base, done: true });
           notify('turn', { ...base, state: 'ended', reason: 'done' });
@@ -735,6 +739,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
                 ? 'Claude Code can take the long jobs. I need to set it up first.'
                 : 'Notion works through its own sign-in. I need to connect it first.';
           notify('reply', { ...base, delta: lead });
+          scripted = true;
           notify('ask', {
             id: ask,
             state: 'open',
@@ -757,7 +762,10 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             options: ['allow', 'deny'],
             confirm: true,
             tool: 'gmail__send_message',
-            input: { to: 'sam@northwind.example' },
+            input: {
+              to: 'sam@northwind.example',
+              body: 'Running 15 minutes late to the design review, sorry.',
+            },
           });
         } else if (msg.params?.text?.includes('choose')) {
           // Scout's own choice: no tool, no confirm, one recommended option.
@@ -769,6 +777,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             options: ['Claude Code', 'Gemini CLI'],
             recommended: 'Claude Code',
             free_text: false,
+            tool: 'choose', // as the brain sends it, so the body shows the choice and no text box
           });
         } else if (msg.params?.text?.includes('offer')) {
           // The turn ends first; the offer is a plain ask, as the brain sends it.

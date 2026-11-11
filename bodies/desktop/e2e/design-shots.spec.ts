@@ -160,6 +160,8 @@ test.describe('E3 chat', () => {
   async function settle(page: Page): Promise<void> {
     const stop = page.getByRole('button', { name: 'Stop speaking' });
     if (await stop.isVisible()) await stop.click();
+    // Away from every control, so no hover tooltip covers the shot.
+    await page.mouse.move(200, 300);
     let last = -1;
     for (let attempt = 0; attempt < 20; attempt += 1) {
       const height = await page.evaluate(() => window.innerHeight);
@@ -211,6 +213,7 @@ test.describe('E3 chat', () => {
       'job_activity',
     );
     await expect(page.getByTestId('job-line')).toBeVisible({ timeout: 15_000 });
+    await settle(page);
     await shot(page, 'E3', 'quick-bubble-job');
     brain.setRunning([], 'jobs');
     await page.getByRole('button', { name: 'Open full chat' }).click();
@@ -298,6 +301,7 @@ test.describe('E3 chat', () => {
     const seeing = page.getByRole('button', { name: 'Seeing your screen' });
     if ((await seeing.getAttribute('aria-pressed')) === 'true') await seeing.click();
     await expect(seeing).toHaveAttribute('aria-pressed', 'false');
+    await settle(page);
     await shot(page, 'E3', 'header-both-off');
     await seeing.click();
     await always.click();
