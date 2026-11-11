@@ -628,6 +628,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             id?: number;
             filter?: string;
             usd?: number;
+            model?: string;
             approved?: boolean;
             community_ok?: boolean;
             query?: string;

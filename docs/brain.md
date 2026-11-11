@@ -37,7 +37,7 @@ variable still works and is the developer path.
 | -------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `TAGALONG_BRAIN_ADDR`            | `127.0.0.1:47321`  | `host:port` to listen on. Port `0` picks a free port                                                                                                                              |
 | `TAGALONG_HOME`                  | `~/.tagalong`      | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env`                                                                                                                |
-| `TAGALONG_MODEL`                 | `claude-opus-5-5`  | Model Scout thinks with until one is chosen in Settings                                                                                                                                                         |
+| `TAGALONG_MODEL`                 | `claude-opus-5-5`  | Model Scout thinks with until one is chosen in Settings                                                                                                                           |
 | `TAGALONG_DAILY_BUDGET_USD`      | `5`                | Most Scout may spend per local day, in USD                                                                                                                                        |
 | `TAGALONG_READER_MODEL`          | `claude-haiku-5-5` | Model that reads mail for loops (see [Loops](#loops))                                                                                                                             |
 | `TAGALONG_READER_DAILY_USD`      | `0.5`              | Most the mail reader may spend per local day, in USD; its own allowance, apart from Scout's                                                                                       |
@@ -816,7 +816,7 @@ The first-run setup adds six more Home tools (never offered to Scout):
 | `key_status`      | `{}`              | `{"has_key", "source": "environment" or "file" or "none", "env_path", "daily_limit_usd"}`; never any part of the key                                                        |
 | `set_api_key`     | `{"key": str}`    | `{"status": "ok" or "invalid" or "unreachable"}`, nothing else; refused with `invalid_params` ("The key is set by the environment.") when the key came from the environment |
 | `set_daily_limit` | `{"usd": number}` | `{"limit_usd": float}`; the number must be finite and above 0                                                                                                               |
-| `model_state`     | `{}`              | `{"provider": "anthropic", "model", "default", "models": [{"id", "name", "line"}]}`; `model` is the choice in force, `default` the one used when none is chosen |
+| `model_state`     | `{}`              | `{"provider": "anthropic", "model", "default", "models": [{"id", "name", "line"}]}`; `model` is the choice in force, `default` the one used when none is chosen             |
 | `set_model`       | `{"model": str}`  | `{"model": str}`; `invalid_params` for an id not in `models`; saves it and sends `changed {what: "model"}`; it applies from the next reply, the one running keeps its model |
 
 The Connections page and the tour add three more Home tools (`setup/home_tools.py`, never offered
