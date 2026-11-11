@@ -258,9 +258,22 @@ describe('started by and stop', () => {
     expect(await stopBrain({ ...options, spawn })).toBe(true);
     expect(spawned[0]).toMatchObject({
       cmd: 'C:/uv.exe',
-      args: ['run', '--frozen', '--no-dev', 'tagalong', 'stop'],
+      args: ['run', '--no-sync', 'tagalong', 'stop'],
     });
     expect(spawned[0]?.opts).toMatchObject({ cwd: 'C:/repo/brain', env: { KEEP: '1' } });
+  });
+
+  it('stopBrain never syncs, even from a source checkout', async () => {
+    // A sync rewrites .venv/Scripts/brain.exe, which the running brain holds open on Windows,
+    // so uv fails before `tagalong stop` runs and the brain can never be restarted.
+    const { options, spawned } = setup({ sync: false });
+    const spawn: LaunchOptions['spawn'] = (cmd, args, opts) => {
+      const child = options.spawn(cmd, args, opts);
+      queueMicrotask(() => child.emit('exit', 0));
+      return child;
+    };
+    await stopBrain({ ...options, spawn });
+    expect(spawned[0]?.args).toEqual(['run', '--no-sync', 'tagalong', 'stop']);
   });
 
   it('stopBrain is false when the command fails or cannot start', async () => {

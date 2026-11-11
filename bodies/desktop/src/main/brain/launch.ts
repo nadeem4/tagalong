@@ -112,7 +112,6 @@ export function realStop(real: RealLaunch): Promise<boolean> {
     env: brainEnv(real),
     brainDir: real.brainDir,
     uv: real.packaged?.uv ?? 'uv',
-    sync: real.packaged !== undefined,
     spawn: nodeSpawn,
   });
 }
@@ -144,12 +143,12 @@ export function realLaunch(real: RealLaunch): Promise<void> {
  * the command exited cleanly. Callers check who started the brain first: never a person's.
  */
 export function stopBrain(
-  options: Pick<LaunchOptions, 'env' | 'brainDir' | 'uv' | 'sync' | 'spawn'>,
+  options: Pick<LaunchOptions, 'env' | 'brainDir' | 'uv' | 'spawn'>,
 ): Promise<boolean> {
-  const { env, brainDir, uv, sync, spawn } = options;
-  const args = sync
-    ? ['run', '--frozen', '--no-dev', 'tagalong', 'stop']
-    : ['run', 'tagalong', 'stop'];
+  const { env, brainDir, uv, spawn } = options;
+  // Never sync here: a sync rewrites .venv/Scripts/brain.exe, which the running brain holds
+  // open on Windows, so uv would fail before `tagalong stop` runs. The relaunch syncs instead.
+  const args = ['run', '--no-sync', 'tagalong', 'stop'];
   return new Promise((resolve) => {
     const child = spawn(uv, args, { cwd: brainDir, env, stdio: 'ignore', windowsHide: true });
     child.once('error', () => resolve(false));
