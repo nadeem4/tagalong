@@ -181,6 +181,31 @@ describe('CompanionBubble', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Please run /login');
   });
 
+  it('a failed answer sits in an error box with an icon and one Try again that asks it again', async () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    await act(async () => ask('why?'));
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 'turn-1',
+        petId: 'scout',
+        conversationId: CONVERSATION,
+      });
+      bridge.emit({
+        type: 'turn.error',
+        turnId: 'turn-1',
+        code: 'auth',
+        message: 'Claude Code could not answer: Please run /login',
+      });
+    });
+    const box = screen.getByRole('alert');
+    expect(box.querySelector('svg')).not.toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Try again' })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(bridge.asks.map((a) => a.text)).toEqual(['why?', 'why?']));
+  });
+
   it('opens the full chat on request', () => {
     const onOpenChat = vi.fn();
     renderBubble(createFakeHostBridge(), { onOpenChat });

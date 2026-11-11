@@ -22,6 +22,7 @@ import { CHAT_CSS } from './chat-styles';
 import { CloseIcon, CollapseIcon, ExpandIcon, EyeIcon, MicIcon, SendIcon } from './chat-icons';
 import { ScoutMark } from './scout-mark';
 import { Keycap } from './controls';
+import { Icon } from './setup/icons';
 import type { BeanClipData } from './theme/bean-clip';
 import { ConnectorConfirmCard, type JobAnswer } from './connector-confirm';
 import { InstallConfirm } from './setup/install-confirm';
@@ -606,6 +607,12 @@ export function CompanionBubble({
       });
   };
 
+  // A card's "try this" or "try again" asks as the person: never over an answer still running.
+  const askAgain = (text: string): void => {
+    if (reply.state === 'running') return;
+    submit(text, undefined);
+  };
+
   const send = (): void => {
     const text = draft.trim();
     if (text === '' || reply.state === 'running') return;
@@ -747,9 +754,15 @@ export function CompanionBubble({
         </div>
       )}
       {reply.state === 'failed' && (
-        <p role="alert" className="bubble-error">
-          {reply.text}
-        </p>
+        <div role="alert" className="bubble-error">
+          <Icon name="error" />
+          <span>{reply.text}</span>
+          {question !== null && (
+            <button type="button" className="bubble-link" onClick={() => askAgain(question)}>
+              Try again
+            </button>
+          )}
+        </div>
       )}
     </>
   );
@@ -808,8 +821,8 @@ export function CompanionBubble({
         on ? allowing.current.add(install.approvalId) : allowing.current.delete(install.approvalId)
       }
       onGone={() => setInstalls((current) => current.filter((c) => c !== install))}
-      onTry={(text) => submit(text, undefined)}
-      onRetry={(name) => submit(`Set up ${name} again`, undefined)}
+      onTry={askAgain}
+      onRetry={(name) => askAgain(`Set up ${name} again`)}
       onWorking={(words) =>
         setInstalling((current) => {
           const key = installKey(install);
@@ -971,7 +984,10 @@ export function CompanionBubble({
                 {exchange.question === null ? (
                   scoutSays(exchange.answer)
                 ) : exchange.failed ? (
-                  <p className="bubble-error">{exchange.answer}</p>
+                  <div className="bubble-error">
+                    <Icon name="error" />
+                    <span>{exchange.answer}</span>
+                  </div>
                 ) : (
                   <ScoutReply scout={scout}>
                     <Answer text={exchange.answer} gist />
@@ -1223,7 +1239,13 @@ const BUBBLE_CSS = `
 .bubble-text { margin: 0; ${typeCss('bodyLead')}; white-space: pre-wrap; overflow-wrap: anywhere; }
 .bubble-status { margin: 0; color: #C9CEE0; ${typeCss('small')}; }
 .bubble-answer { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
-.bubble-error { margin: 0; padding: 8px 12px; border-radius: 6px; background: #3a1d2a; color: #ffb4c0; ${typeCss('body')}; }
+.bubble-error {
+  display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 8px 10px; border-radius: 8px;
+  background: #3a1d2a; color: #ffb4c0; ${typeCss('body')};
+}
+.bubble-error > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.bubble-error .cx-icon { flex: none; width: 16px; height: 16px; margin-top: 2px; }
+.bubble-error .bubble-link { color: #ffd9df; }
 .bubble-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .bubble-chip {
   display: inline-flex; align-items: center; gap: 4px; max-width: 100%; min-height: 28px;
