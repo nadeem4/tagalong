@@ -97,7 +97,7 @@ async def test_run_marks_gap_from_source(mem, tmp_path):
 
 async def test_run_drops_facts_without_evidence(mem, tmp_path):
     model = FakeModel(
-        reply(("work", "Invented", "never in the text"), ("work", "Real", "compilers")),
+        reply(("work", "Invented", "never in the text"), ("work", "Real", "builds compilers")),
         final("Portrait."),
     )
     runner, _ = run([Seeing("one", [material()])], mem, model, tmp_path)
@@ -108,9 +108,9 @@ async def test_run_drops_facts_without_evidence(mem, tmp_path):
 async def test_rerun_replaces_same_source_facts(mem, tmp_path):
     mem.remember("about_you", "Likes tea")
     model = FakeModel(
-        reply(("work", "First", "compilers")),
+        reply(("work", "First", "builds compilers")),
         final("One."),
-        reply(("work", "Second", "compilers")),
+        reply(("work", "Second", "builds compilers")),
         final("Two."),
     )
     runner, _ = run([Seeing("one", [material()])], mem, model, tmp_path)
@@ -122,7 +122,7 @@ async def test_rerun_replaces_same_source_facts(mem, tmp_path):
 
 
 async def test_rerun_skips_dismissed(mem, tmp_path):
-    again = reply(("work", "Builds compilers", "compilers"))
+    again = reply(("work", "Builds compilers", "builds compilers"))
     model = FakeModel(again, final("Portrait."), again)
     runner, _ = run([Seeing("one", [material()])], mem, model, tmp_path)
     await runner._task
@@ -134,7 +134,7 @@ async def test_rerun_skips_dismissed(mem, tmp_path):
 
 async def test_run_stops_at_budget_and_keeps_finished(mem, tmp_path):
     sources = [Seeing(n, [material()]) for n in ("one", "two", "three")]
-    model = FakeModel(reply(("work", "Builds compilers", "compilers")))
+    model = FakeModel(reply(("work", "Builds compilers", "builds compilers")))
     b = budget(tmp_path, 1.0)
     real_spend = b.spend
 
@@ -172,8 +172,8 @@ async def test_web_receives_known_keys_from_github(mem, tmp_path):
     gh = Seeing("github", [material(keys=keys)], needs="username")
     web = Seeing("web", [material()])
     model = FakeModel(
-        reply(("work", "A", "compilers"), name="Alice", employer="Acme"),
-        reply(("work", "B", "builds")),
+        reply(("work", "A", "builds compilers"), name="Alice", employer="Acme"),
+        reply(("work", "B", "builds compilers")),
         final("Portrait."),
     )
     runner, _ = run([gh, web], mem, model, tmp_path)
@@ -186,7 +186,7 @@ async def test_web_receives_known_keys_from_github(mem, tmp_path):
 async def test_source_not_given_is_not_read(mem, tmp_path):
     gh = Seeing("github", needs="username")
     pdf = Seeing("linkedin", [material()], needs="file")
-    model = FakeModel(reply(("work", "A", "compilers")), final("Portrait."))
+    model = FakeModel(reply(("work", "A", "builds compilers")), final("Portrait."))
     runner, _ = run([gh, pdf], mem, model, tmp_path, github=None, pdf=b"%PDF")
     await runner._task
     assert gh.seen == []
@@ -195,7 +195,7 @@ async def test_source_not_given_is_not_read(mem, tmp_path):
 
 
 async def test_status_progress_published_in_order(mem, tmp_path):
-    model = FakeModel(reply(("work", "A", "compilers")), final("Portrait."))
+    model = FakeModel(reply(("work", "A", "builds compilers")), final("Portrait."))
     runner, sent = run([Seeing("one", [material()])], mem, model, tmp_path)
     await runner._task
     states = [f[1]["sources"][0]["state"] for f in sent.frames]
