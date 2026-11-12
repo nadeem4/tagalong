@@ -2,7 +2,7 @@
  * The pure rules behind talk.ts: when a question is over, what words to show, and saying a
  * microphone or ears failure once per run of failures, and when the follow-up window opens.
  * Contains settles, shownPartial, micMark, micNote, FailureStreak, FollowUpCue, EarsNotes,
- * HeardInbox, CutMemory and NOTHING_HEARD.
+ * HeardInbox, CutMemory, TalkOver and NOTHING_HEARD.
  */
 import { STATUS_WORDS, addressedToScout } from '@tagalong/ui/shapes';
 import type { ListenMode } from '@tagalong/ui/shapes';
@@ -157,6 +157,49 @@ export class CutMemory {
 
   clear(): void {
     this.#kept = null;
+  }
+}
+
+/** The part of Scout's voice that talking over it uses. */
+interface Voice {
+  pause(): void;
+  resume(): void;
+  cutOff(): void;
+  interruption(): Interrupted | null;
+}
+
+/**
+ * Talking over Scout, in two steps. The key (or the mic button) only pauses its voice: nothing
+ * is cancelled, since the person may say nothing, or Scout's own echo may be all the mic
+ * hears. Real words cut it off and carry what was heard of it; nothing heard lets it go on.
+ */
+export class TalkOver {
+  readonly #cut = new CutMemory();
+  readonly #voice: () => Voice;
+
+  constructor(voice: () => Voice) {
+    this.#voice = voice;
+  }
+
+  /** What was heard is read first (the player forgets its turn when it stops), then it pauses. */
+  press(): void {
+    const voice = this.#voice();
+    this.#cut.note(voice.interruption());
+    voice.pause();
+  }
+
+  /** Real words: Scout is cut off, and what was heard of it goes with the question. */
+  heard(): Interrupted | undefined {
+    const voice = this.#voice();
+    const heard = this.#cut.take(voice.interruption());
+    voice.cutOff();
+    return heard;
+  }
+
+  /** Noise, echo or nothing: Scout carries on from where it paused. */
+  nothing(): void {
+    this.#cut.clear();
+    this.#voice().resume();
   }
 }
 

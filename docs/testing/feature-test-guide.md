@@ -1268,16 +1268,17 @@ stands in for a real one (the brain still needs to hear something).
    streaming. The answer is a few short sentences with contractions, no list read aloud, at most
    one question back. Any code or long list is in a block in the bubble and is not spoken.
 
-### T.3. Barge-in
+### T.3. Talking over Scout with the talk key
 
 1. **Action:** ask a spoken question that gets a long answer; while Scout speaks, hold the talk key
    (Right Ctrl).
-2. **Expected:** Scout stops speaking at once (the desktop sends `hush` to the brain), the bubble
-   listens, and the new spoken question is answered.
+2. **Expected:** Scout's voice pauses when the key goes down (nothing is cancelled yet). Once your
+   words are heard it stops for good (the desktop sends `hush` to the brain), and the new spoken
+   question is answered.
 3. **Action:** ask a spoken question with a long answer and hold the talk key again while it is
    still streaming, then say nothing and let go.
-4. **Expected:** Scout stops and says nothing more of the old answer; the bubble keeps what was
-   shown so far and no Stop button remains.
+4. **Expected:** Scout's voice carries on from where it paused and the answer keeps streaming; the
+   bubble shows the whole answer. Only the Stop button ends a turn without words.
 
 ### T.3b. Talking over Scout
 
@@ -1290,10 +1291,15 @@ stands in for a real one (the brain still needs to hear something).
 5. **Expected:** the same; the system voice is not muted-out, and Scout does not answer itself.
 6. **Action:** while Scout speaks, cough or tap the desk.
 7. **Expected:** Scout pauses for a moment, then carries on from the same spot, with nothing sent.
-8. **Action:** while Scout speaks, hold the talk key and ask "wait, skip that".
-9. **Expected:** Scout stops at once and, like in step 2, answers knowing what it had and had not said.
-10. **Action:** while Scout speaks, say "Scout, stop listening".
-11. **Expected:** Scout stops and Always listening switches off.
+8. **Action:** while Scout speaks, press the talk key and let go without saying anything.
+9. **Expected:** Scout's voice pauses while the key is down and carries on from the same spot after
+   it. Nothing is cancelled: the answer keeps streaming and no new question is sent.
+10. **Action:** while Scout speaks, hold the talk key and ask "wait, skip that".
+11. **Expected:** Scout's voice holds when the key goes down and stops only once your words are
+    heard. Then, like in step 2, it answers knowing what it had and had not said. A card or
+    sign-in that was waiting for you is still there and still works.
+12. **Action:** while Scout speaks, say "Scout, stop listening".
+13. **Expected:** Scout stops and Always listening switches off.
 
 ### T.3c. Speech state frames (contract, no visible change yet)
 

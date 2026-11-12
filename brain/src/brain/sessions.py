@@ -116,6 +116,7 @@ _ARGS_CAP = 20_000  # raw characters of arguments looked at; the entry is masked
 # Tools that manage the goal itself are not steps of it, so they leave no work row.
 _NOT_STEPS = JOB_TOOLS | {"resolve_step"}
 _SUMMARY_CAP = 300  # characters of a tool result kept on its work row
+_LATE_RESULT_CAP = 2000  # characters of a late tool result put in the news about it
 _STEP_STATUS = {"ok": "done", "failed": "failed", "refused": "refused"}
 
 
@@ -358,6 +359,10 @@ class Session:
         # A wake turn stays Scout's own until then, so its follow-ups still ask.
         self._owner_turn = False
         self._task: asyncio.Task | None = None
+        # Set when the owner talks over the running turn: it stops at once and winds down by itself.
+        self._stop: asyncio.Event | None = None
+        # Tools a paused turn left running; held here so they are not collected before they end.
+        self._background: set[asyncio.Future] = set()
         self._last_turn: str | None = (
             None  # the turn that ended last, which can still be spoken over
         )
@@ -543,22 +548,51 @@ class Session:
 
     def interrupt(self, turn: str, heard: int) -> Interruption | None:
         """The owner spoke over `turn` after the body played `heard` of its sentences. Stops what
-        is still being said and cancels the turn if it is running. Returns what was said and what
-        was left, or None when there is nothing to hand over: a turn this session no longer
-        knows, or one the owner heard to the end (then their words are a plain say)."""
+        is still being said and pauses the turn if it is running: generation ends, tools already
+        running finish in the background (their results come back through the front door) and
+        nothing else is cancelled, open items included. Returns what was said and what was left,
+        or None when there is nothing to hand over: a turn this session no longer knows, or one
+        the owner heard to the end (then their words are a plain say)."""
         live = turn == self._turn_id
         if self.voice is None or not (live or (turn == self._last_turn and not self._busy())):
             return None
         sentences = self.voice.sentences(turn)
         unsaid = " ".join(sentences[heard:])
-        # A turn still running is cut even with nothing unsaid: the model has more to come.
+        # A turn still running is paused even with nothing unsaid: the model has more to come.
         if not unsaid and not (live and self._busy()):
             return None
         if self._turn_body is not None:
             self.voice.hush(self._turn_body)  # queued sentences must not keep coming
-        if live and self._task is not None:
-            self._task.cancel()
+        if live and self._busy() and self._stop is not None:
+            self._stop.set()
         return Interruption(" ".join(sentences[:heard]), unsaid)
+
+    def _detached(self, call: dict, task: asyncio.Future, body_id: str | None) -> None:
+        """A tool the paused turn left running: when it ends, its result enters the front door
+        like any other news, so a later turn (not this one) tells the owner."""
+        self._background.add(task)
+
+        def done(t: asyncio.Future) -> None:
+            self._background.discard(t)
+            if t.cancelled():
+                return
+            result = t.result()
+            content = result["content"]
+            text = (
+                content
+                if isinstance(content, str)
+                else " ".join(b.get("text", "") for b in content if b.get("type") == "text")
+            )
+            facts = {
+                "tool": call["name"],
+                "ok": "is_error" not in result,
+                "result": text[:_LATE_RESULT_CAP],
+            }
+            self.post_event(
+                Event("tool_result", facts, key=call["id"], origin_body=body_id or BRAIN)
+            )
+
+        task.add_done_callback(done)
 
     def _record_cut(self, cut: Interruption) -> None:
         """History keeps what the owner heard, marked as cut off, never the unsaid rest."""
@@ -934,6 +968,7 @@ class Session:
         self._inbox_open = True
         self._turn_job = None
         self._wake_jobs = set()
+        self._stop = stop = asyncio.Event()
         self._owner_turn = started_by == "user"
         self._turn_body = body_id
         lead = [interruption_block(cut.spoken, cut.unsaid)] if cut is not None else []
@@ -996,6 +1031,8 @@ class Session:
                 on_owner_input=self._owner_joined,
                 on_last_read=self._close_inbox,
                 on_rejected=self._reject,
+                stop=stop,
+                on_detached=lambda call, task: self._detached(call, task, body_id),
             )
 
         task = asyncio.create_task(run())

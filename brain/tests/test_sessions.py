@@ -2389,7 +2389,8 @@ async def test_a_nudge_scout_starts_in_a_wake_turn_asks_the_owner():
     session, sent = make(Gate([nudge_call(), "sent"]), kinds=None)
     join(session, "desktop")
     session.body_event("desktop", "back", {"idle_seconds": 600})
-    await settle()
+    for _ in range(4):
+        await settle()
     [ask] = open_asks(sent)
     assert ask["tool"] == "tell_expert"
     assert "waiting for the person's answer" in str(tool_results(session))  # open, not held
@@ -2402,6 +2403,7 @@ async def test_a_nudge_in_the_next_wake_asks_again_after_an_owner_turn():
     await session.say("desktop", say("hi"))
     await idle(session)
     session.body_event("desktop", "back", {"idle_seconds": 600})
+    await settle()
     await settle()
     assert len(open_asks(sent)) == 1  # the stale owner flag did not leak
     await idle(session)
@@ -3120,7 +3122,7 @@ async def test_body_is_kept_if_the_body_leaves_before_the_turn_ends():
     await session.say("wa", say("hello"))
     await settle()
     session._bodies.disconnect("wa", peer)
-    await finish(session)
+    await finish_quietly(session)
     assert _saved_bodies(session) == ["whatsapp"]
 
 

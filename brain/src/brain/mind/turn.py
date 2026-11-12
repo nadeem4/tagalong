@@ -5,6 +5,9 @@ tool_use never goes unanswered, even when the turn is cancelled. A cancelled ste
 words the person already saw as its reply, so the cut-off request counts as answered and the
 next turn does not resume it. The loop writes no words of its own; it only reports why it stopped
 (a timeout ends the turn with `error`; the body says so).
+
+A pause (`stop`) is not a cancel: generation ends at once, but tools already running are handed
+to `on_detached` and finish on their own, so the person talking over Scout destroys no work.
 """
 
 import asyncio
@@ -148,6 +151,8 @@ async def _run_turn(
     on_owner_input: Callable[[], None] | None = None,
     on_last_read: Callable[[], None] | None = None,
     on_rejected: Callable[[], None] | None = None,
+    stop: asyncio.Event | None = None,
+    on_detached: Callable[[dict, asyncio.Future], None] | None = None,
 ) -> str:
     guards = guards or spend_guards(budget, step_cap)
     if begin := getattr(model, "begin_turn", None):
@@ -157,10 +162,14 @@ async def _run_turn(
     shown: list[str] = []  # deltas of the step being streamed, kept if a cancel cuts it off
     spoke = False  # the contract wants exactly one reply.done iff any delta went out
     tail = ""  # the last words sent, so a new step's text can be set apart from them
+    paused = False  # `stop` was set while the model was talking: end now, keeping what was shown
     try:
         try:
             async with asyncio.timeout(turn_timeout) as limit:
                 while True:
+                    if stop is not None and stop.is_set():
+                        reason = "cancelled"
+                        break
                     verdict = await guards.run(
                         Hook.model_call, ModelCallCtx("turn", turn_id, steps)
                     )
@@ -176,7 +185,10 @@ async def _run_turn(
                     shown.clear()
                     while True:
                         try:
-                            item = await anext(stream)
+                            item = await _next(stream, stop)
+                        except _Paused:
+                            paused = True
+                            break
                         except StopAsyncIteration:
                             break
                         except Exception as err:
@@ -201,6 +213,10 @@ async def _run_turn(
                             tail = item or tail
                             shown.append(item)
                             notify("reply", {"turn": turn_id, "body": body_id, "delta": item})
+                    if paused:
+                        reason = "cancelled"
+                        _keep_shown(history, shown)
+                        break
                     if failed or final is None:
                         if not failed:
                             log.error("model stream ended without a final message")
@@ -221,7 +237,9 @@ async def _run_turn(
                         clock = asyncio.get_running_loop().time
                         began, due = clock(), limit.when()
                         limit.reschedule(None)  # a person's slow ask never eats the clock
-                        results = await _run_tools(turn_id, calls, text, run_tool, notify, running)
+                        results = await _run_tools(
+                            turn_id, calls, text, run_tool, notify, running, stop, on_detached
+                        )
                         if due is not None:
                             limit.reschedule(due + clock() - began)
                         history.append(
@@ -260,9 +278,8 @@ async def _run_turn(
         else:
             log.exception("turn failed")
         _close_dangling_tool_use(history)
-        seen = "".join(shown)
-        if cancelled and seen.strip() and history and history[-1]["role"] == "user":
-            history.append({"role": "assistant", "content": [{"type": "text", "text": seen}]})
+        if cancelled:
+            _keep_shown(history, shown)
         for call, name in running.items():
             notify(
                 "tool",
@@ -278,6 +295,36 @@ async def _run_turn(
     return reason
 
 
+class _Paused(Exception):
+    """The stop was set while waiting for the model's next words."""
+
+
+async def _next(stream, stop: asyncio.Event | None):
+    """The stream's next item, or `_Paused` the moment `stop` is set (the stream is closed)."""
+    if stop is None:
+        return await anext(stream)
+    pending = asyncio.ensure_future(anext(stream))
+    waiter = asyncio.ensure_future(stop.wait())
+    try:
+        await asyncio.wait({pending, waiter}, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        waiter.cancel()
+    if pending.done():
+        return pending.result()  # a word that arrived with the stop is still shown
+    pending.cancel()
+    await asyncio.gather(pending, return_exceptions=True)
+    await stream.aclose()
+    raise _Paused
+
+
+def _keep_shown(history: list, shown: list[str]) -> None:
+    """The words the person already saw of a cut-off step are its reply, so the request counts as
+    answered and the next turn does not resume it."""
+    seen = "".join(shown)
+    if seen.strip() and history and history[-1]["role"] == "user":
+        history.append({"role": "assistant", "content": [{"type": "text", "text": seen}]})
+
+
 def _drain(inbox: list, on_owner_input: Callable[[], None] | None = None) -> list[dict]:
     """Move the owner's says into history; `on_owner_input` fires only when there were some."""
     blocks = [block for say in inbox for block in say]
@@ -287,7 +334,9 @@ def _drain(inbox: list, on_owner_input: Callable[[], None] | None = None) -> lis
     return blocks
 
 
-async def _run_tools(turn_id, calls, said, run_tool, notify, running) -> list[dict]:
+async def _run_tools(
+    turn_id, calls, said, run_tool, notify, running, stop=None, on_detached=None
+) -> list[dict]:
     async def one(call: dict) -> dict:
         info = {"turn": turn_id, "call": call["id"], "name": call["name"]}
         running[call["id"]] = call["name"]
@@ -303,18 +352,48 @@ async def _run_tools(turn_id, calls, said, run_tool, notify, running) -> list[di
                 "content": [{"type": "text", "text": text}],
                 "is_error": True,
             }
-        del running[call["id"]]
+        running.pop(call["id"], None)
         notify("tool", {**info, "state": "ended", "ok": "is_error" not in result})
         return result
 
     tasks = [asyncio.ensure_future(one(c)) for c in calls]
+    detached: set[asyncio.Future] = set()
     try:
-        return list(await asyncio.gather(*tasks))
+        gathered = asyncio.gather(*tasks)
+        if stop is None:
+            return list(await gathered)
+        waiter = asyncio.ensure_future(stop.wait())
+        try:
+            await asyncio.wait({gathered, waiter}, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            waiter.cancel()
+        if gathered.done():
+            return list(gathered.result())
+        # Paused: what finished is answered, what still runs goes on in the background and its
+        # result comes back later; history answers its call so it stays valid.
+        results = []
+        for call, task in zip(calls, tasks, strict=True):
+            if task.done():
+                results.append(task.result())
+                continue
+            detached.add(task)
+            running.pop(call["id"], None)
+            if on_detached is not None:
+                on_detached(call, task)
+            results.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": call["id"],
+                    "content": "still running; its result comes back on its own",
+                }
+            )
+        return results
     finally:
-        for task in tasks:
+        left = [t for t in tasks if t not in detached]
+        for task in left:
             task.cancel()  # no-op for finished tasks; stops stragglers when the turn is cancelled
         # A tool raising CancelledError leaves gather early; wait so no sibling outlives the turn.
-        await asyncio.gather(*tasks, return_exceptions=True)
+        await asyncio.gather(*left, return_exceptions=True)
 
 
 def _drop_unanswered_server_tool_use(history: list) -> None:

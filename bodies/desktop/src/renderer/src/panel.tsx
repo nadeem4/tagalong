@@ -95,10 +95,8 @@ function Panel() {
     speaking,
     answering,
     player,
-    onBegin: () => {
-      player.cutOff();
-      clearRemark();
-    },
+    // Scout's voice is paused by the key, and cut off only by real words (talk.ts).
+    onBegin: clearRemark,
   });
 
   useEffect(() => {

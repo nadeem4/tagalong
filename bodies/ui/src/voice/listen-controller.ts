@@ -388,7 +388,10 @@ export class ListenController {
       queueMicrotask(() => (this.#taken = false));
       session.live = false;
       this.#released.delete(session);
-      if (text.trim() !== '') this.#options.onHeard(text.trim());
+      // A key press paused Scout; only its own echo is no question, so it carries on.
+      const heard = text.trim();
+      if (heard !== '' && !echoOf(heard, this.#options.playingText?.() ?? ''))
+        this.#options.onHeard(heard);
       else this.#options.onNothingHeard();
     });
     this.#session = session;

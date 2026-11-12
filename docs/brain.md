@@ -84,7 +84,7 @@ the total can run a little low.
 | `brain/src/brain/masking.py`           | `Masker`, the `mask_secrets` save guard, `mask_message` (chat save), `mask_json` (approvals, jobs) and `SecretLogFilter` (secrets become `[secret]` before they are saved or logged)                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `brain/src/brain/guards.py`            | The guard runner: hooks, verdicts, `Guards.run` and the one log line (see [Guardrails](#guardrails))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `brain/src/brain/builtin_guards.py`    | The built-in guards: `daily_budget` (model_call, emit), `step_cap` (model_call) and `wake_caps` (emit)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `brain/src/brain/sessions.py`          | The one conversation: history, the running turn, `say` joins, `cancel`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `brain/src/brain/sessions.py`          | The one conversation: history, the running turn, `say` joins, `interrupt` (pause, nothing cancelled), `cancel`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `brain/src/brain/mind/resume.py`       | Rebuilds a valid history from the saved chat at start                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `brain/src/brain/memory.py`            | Scout's memory: `Memory`, the one object over `tagalong.db`; chat, memory, apps and outputs delegate to `store/`; it masks memory text on the way in (`Memory.mask`, set by the session to the `save` guard)                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `brain/src/brain/store/`               | The database layer: `db.py` opens `tagalong.db` and runs the numbered migrations in `migrations/`; `search.py` the FTS5 helpers and `search`; `conversation.py`, `memory.py`, `connections.py` and `outputs.py` own the SQL of chat, memory items, apps and tool outputs; `work.py` is `WorkStore`, the work table's state machine (jobs use it today, through `job_records.py`); `rules.py` the `rules` table: tool modes, preferences and offers                                                                                                                                                                           |
@@ -223,7 +223,11 @@ flowchart TD
   own). Only the desktop shows an error for it; WhatsApp sends nothing. History stays valid: an open `tool_use` is closed.
 - If any delta was sent, exactly one `reply` with `done: true` follows, whatever the end reason.
 - History is append-only and always valid: a half-streamed message is never kept, and a
-  `tool_use` always gets a `tool_result`, even on cancel. A cancel is the one case where a
+  `tool_use` always gets a `tool_result`, even on cancel. A pause (the owner talking over Scout,
+  see Spoken over) ends the turn the same way as a cancel, but through the turn's `stop` event: the
+  model stream and the tool wait are raced against it, a tool still running is detached (its call
+  answered with a placeholder, its real result returned later as a `tool_result` event) and the
+  words already streamed are kept. A cancel is the one case where a
   half-streamed step is kept: the words already sent become its assistant reply (nothing if none
   were), so the cut-off request counts as answered and the next `say` is not merged with it. This
   holds in the saved chat and after a restart. A cancel before any word leaves nothing to keep: the request stays in the saved chat, marked
@@ -1517,6 +1521,7 @@ Event kinds (`EVENT_KINDS` in `events.py`):
 | `loop`            | 0 s          | 4            | A held loop needs a look (facts: reason, id, title, asks, direction, people, due); for now only `reason=due`. Its text may come from someone else, so it is data                                                  |
 | `body_online`     | 0 s          | 2            | A body came back after 10+ minutes away                                                                                                                                                                           |
 | `back`            | 0 s          | 2            | The owner returned after 5+ minutes idle                                                                                                                                                                          |
+| `tool_result`     | 0 s          | none         | A tool the owner's talking over left running has finished (facts: tool, ok, result capped at 2,000 characters); the result is data, Scout tells it only if it still matters                                       |
 | `job_question`    | none         | none         | An expert asks a question, or asked while nobody was online (no question id); one wake each, not counted against the global cap                                                                                   |
 | `choice`          | none         | none         | The owner answered a `choose` question (option and text); one wake each, not counted against the global cap                                                                                                       |
 | `focus`           | none         | none         | Which window is in front (context, no wake)                                                                                                                                                                       |
@@ -2301,16 +2306,22 @@ brain sends and falls back to the system voice for a text-only `speech` frame.
   being spoken) and `cancel` does not hush, so a body sends `hush` on Stop.
 - **Spoken over.** A `say` with `interrupted {turn, heard}` means the owner spoke over Scout (see
   [Voice](voice.md#talking-over-scout)). `Session.say` asks `Session.voice.sentences(turn)`;
-  the first `heard` sentences were said, the rest are the unsaid. The running turn is cancelled
-  (and the mouth hushed; it keeps the turn's sentence log through the clear, since a body's own
-  `hush` usually arrives first), and the new turn waits for it to wind down so history stays valid. The
+  the first `heard` sentences were said, the rest are the unsaid. The running turn is paused, not
+  cancelled (`Session.interrupt` sets the turn's `stop` event: generation stops where it is, the
+  partial reply is kept, and the mouth is hushed; it keeps the turn's sentence log through the
+  clear, since a body's own `hush` usually arrives first). A tool call already in flight keeps
+  running in the background (`Session._background`) and its result comes back through the front
+  door as a `tool_result` event, while its call is answered in history with a placeholder so
+  history stays valid. The new turn waits for the paused one to end, so no second turn runs
+  alongside it. Open items (cards, asks, installs) are never touched by an interrupt; only the
+  explicit `cancel` (the Stop button) ends a turn the old way. The
   saved history keeps only the spoken sentences, ending with `[interrupted: the owner spoke over
 this]` (`Memory.replace_last_message` rewrites the cut turn's message), never the unsaid. The
   model sees the unsaid once, as a `<data kind="interruption">` block (`spoken:` and `unsaid:`)
   before the owner's words, only for that next turn; `soul.md` says what the block means, and the
   model decides whether to stop, answer, carry on or offer the rest. A stale or unknown `turn`, or
   an empty unsaid on a turn that already ended, makes it a plain `say`; a turn still running is
-  cancelled even with nothing unsaid. The echo guard lives in the body (`echoOf`), not here.
+  paused even with nothing unsaid. The echo guard lives in the body (`echoOf`), not here.
 - **The spoken note.** For a spoken `say` the user content gets one extra text block, after the
   content: "This reply will be read aloud ... you may open with one short sentence in your own
   words first." That sentence is the spoken ack; code never says it, there is no canned line and no

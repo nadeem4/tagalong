@@ -7,6 +7,7 @@ Fakes only: a scripted model and a voice that remembers the sentences it was giv
 import asyncio
 import copy
 import json
+from types import SimpleNamespace
 
 from test_sessions import (
     Gate,
@@ -22,6 +23,7 @@ from test_sessions import (
 )
 
 from brain.memory import Memory
+from brain.mind.turn import Final
 from brain.protocol import Interrupted, SayParams
 
 MARK = "[interrupted: the owner spoke over this]"
@@ -234,3 +236,89 @@ async def test_a_cut_after_streamed_words_replaces_them_with_the_heard_part():
     assert [m["role"] for m in session.history] == ["user", "assistant", "user", "assistant"]
     assert session.history[1]["content"] == [{"type": "text", "text": f"One.\n\n{MARK}"}]
     assert "Two. Three." not in json.dumps(session.history)
+
+
+def slow_tool_call():
+    block = {"type": "tool_use", "id": "s1", "name": "slow_tool", "input": {}}
+    return Final([block], "tool_use", SimpleNamespace())
+
+
+async def test_interrupt_keeps_partial_and_unsaid():
+    # A pause, not a cancel: the turn task ends by itself, the heard part stays in history with
+    # its mark, and the next turn is told the sentences it had left.
+    gate = asyncio.Event()
+    session, _, voice = make_voiced(SnapGate([gate, "ok"]))
+    first = await session.say("desktop", say("tell me"))
+    voice.logs[first.turn] = ["One.", "Two.", "Three."]
+    await settle()
+    task = session._task
+    await session.say("desktop", over("wait", first.turn, 1))
+    await finish_quietly(session)
+    assert not task.cancelled() and task.result() == "cancelled"
+    assert session.history[1]["content"] == [{"type": "text", "text": f"One.\n\n{MARK}"}]
+
+
+async def test_interrupt_does_not_close_open_items():
+    session, _, voice = make_voiced(SnapGate([asyncio.Event(), "ok"]))
+    item = session.items.open("expert_ask", "desktop", live_only=True, job_id="j1")
+    first = await session.say("desktop", say("tell me"))
+    voice.logs[first.turn] = ["One.", "Two."]
+    await settle()
+    await session.say("desktop", over("wait", first.turn, 1))
+    await finish_quietly(session)
+    assert session.items.get(item.id).state == "open"
+
+
+async def test_inflight_tool_result_returns_via_front_door():
+    release = asyncio.Event()
+
+    async def slow(call, caller="scout", **_):
+        await release.wait()
+        return "the late answer"
+
+    model = SnapGate([slow_tool_call(), "ok", "and the tool says so"])
+    session, sent, voice = make_voiced(model)
+    session.toolbox.run = slow
+    first = await session.say("desktop", say("do it"))
+    voice.logs[first.turn] = ["One."]
+    await settle()
+    await session.say("desktop", over("wait", first.turn, 0))
+    await finish_quietly(session)  # the second turn ends; the tool is still running
+    assert len(model.seen) == 2
+    release.set()
+    for _ in range(20):
+        await settle()
+        await finish_quietly(session)
+    assert "the late answer" in json.dumps(model.seen[-1])
+    assert len(model.seen) == 3  # one wake turn carried it, nothing ran alongside
+
+
+async def test_no_second_turn_alongside():
+    # The tool keeps running in the background, yet the next turn starts only once the paused
+    # one has ended: two turns never write history at the same time.
+    release = asyncio.Event()
+    ended_when_asked = []
+
+    async def slow(call, caller="scout", **_):
+        await release.wait()
+        return "x"
+
+    class Watching(SnapGate):
+        async def stream(self, system, messages, tools):
+            ended_when_asked.append(bool(first_task) and first_task[0].done())
+            async for item in super().stream(system, messages, tools):
+                yield item
+
+    first_task = []
+    model = Watching([slow_tool_call(), "ok"])
+    session, sent, voice = make_voiced(model)
+    session.toolbox.run = slow
+    first = await session.say("desktop", say("do it"))
+    voice.logs[first.turn] = ["One."]
+    await settle()
+    first_task.append(session._task)
+    await session.say("desktop", over("wait", first.turn, 0))
+    await finish_quietly(session)
+    assert ended_when_asked == [False, True]  # the first call was made before the task existed
+    release.set()
+    await settle()

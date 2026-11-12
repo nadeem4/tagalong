@@ -11,7 +11,7 @@ import {
   EarsNotes,
   FailureStreak,
   FollowUpCue,
-  CutMemory,
+  TalkOver,
   HeardInbox,
   NOTHING_HEARD,
   micMark,
@@ -97,26 +97,15 @@ export function useTalk(options: TalkOptions): {
   // mounted waits for it.
   const [inbox] = useState(() => new HeardInbox());
   const [onHeard] = useState(() => (handler: (text: string) => void) => inbox.subscribe(handler));
-  // The bubble listens for each start of listening: talking over Scout stops its answer.
-  const [listeners] = useState(() => new Set<() => void>());
-  const [onListen] = useState(() => (handler: () => void) => {
-    listeners.add(handler);
-    return () => void listeners.delete(handler);
-  });
-
-  // What the person heard of Scout when they talked over it with the key or the mic button;
-  // the question that follows carries it.
-  const [cut] = useState(() => new CutMemory());
+  // Talking over Scout: the key pauses its voice, real words cut it off, nothing lets it go on.
+  // What the person heard of it goes with the question that follows.
+  const [over] = useState(() => new TalkOver(() => latest.current.player));
 
   const [controller] = useState(() => {
-    const bargeIn = (): void => {
-      // What was heard of Scout is read before the player stops: the question that follows
-      // carries it, so the brain can hand the unsaid rest to the model.
-      cut.note(latest.current.player.interruption());
-      // Talking over Scout: its answer is cut off, so it opens no follow-up window.
+    const begin = (): void => {
+      // Talking over Scout: its answer opens no follow-up window. Nothing is cancelled here.
       cue.hushed();
       latest.current.onBegin();
-      for (const listen of listeners) listen();
     };
     /** A question is over; unless the next one has already started, the bubble goes quiet. */
     const done = (line: string | null): void => {
@@ -129,16 +118,14 @@ export function useTalk(options: TalkOptions): {
     const made: ListenController = new ListenController({
       ears: (mode) => new RemoteEars(window.tagalongHost, mode),
       openMic: () => openMic(latest.current.microphoneId),
-      onSpeechStart: bargeIn,
+      onSpeechStart: begin,
       speaking: () => latest.current.player.speaking,
       pause: () => latest.current.player.pause(),
       resume: () => latest.current.player.resume(),
       playingText: () => latest.current.player.text(),
       // Words over Scout: told to the brain with how much was heard, which decides what next.
       onInterrupt: (text) => {
-        const { player } = latest.current;
-        const heard = cut.take(player.interruption());
-        player.cutOff();
+        const heard = over.heard();
         cue.hushed();
         micOk();
         cue.asked();
@@ -153,15 +140,19 @@ export function useTalk(options: TalkOptions): {
         micOk();
         cue.asked();
         done(null);
-        const heard = cut.take();
+        const heard = over.heard();
         // No bubble to ask it (a one-line remark is up): the line
         // gives way and the bubble that mounts asks the question held for it.
         if (!inbox.deliver(text, heard)) latest.current.onBegin();
       },
-      onNothingHeard: () => done(NOTHING_HEARD),
+      onNothingHeard: () => {
+        over.nothing();
+        done(NOTHING_HEARD);
+      },
       onMicFailed: (error) => {
         ptt.end();
         clearTimeout(timer.current);
+        over.nothing();
         if (!micFailures.fail()) return;
         console.warn('[talk] the microphone could not be opened', error);
         micMarked.current = micMark(error);
@@ -173,10 +164,12 @@ export function useTalk(options: TalkOptions): {
         if (mode === 'held' && listening.current) setState('listening');
       },
       // "Scout, stop": switched off as the person would, so main saves it and tells every window.
-      onStopListening: () =>
+      onStopListening: () => {
+        latest.current.player.cutOff();
         void window.tagalongHost
           .setListening(false)
-          .catch((error: unknown) => console.warn('[talk] listening could not stop', error)),
+          .catch((error: unknown) => console.warn('[talk] listening could not stop', error));
+      },
       onDropped: () => setPartial(null),
       // Never the words: only that a question without the name went nowhere.
       onUnaddressed: () => {
@@ -190,7 +183,7 @@ export function useTalk(options: TalkOptions): {
           .setFollowUp(open)
           .catch((error: unknown) => console.warn('[talk] could not share the follow-up', error)),
     });
-    return { made, bargeIn };
+    return { made, begin };
   });
 
   const [control] = useState(() => {
@@ -211,7 +204,8 @@ export function useTalk(options: TalkOptions): {
         // Listening all the time too: the key still asks, without the name, then it resumes.
         micOk();
         earsNotes.clear();
-        controller.bargeIn();
+        over.press();
+        controller.begin();
         listening.current = true;
         // 'listening' (the dot) waits for the mic to open: onMicOpen.
         setNote(null);
@@ -234,7 +228,7 @@ export function useTalk(options: TalkOptions): {
     };
     // The bubble closed: the question goes, always listening goes on.
     const cancel = (): void => {
-      cut.clear();
+      over.nothing();
       cue.hushed();
       controller.made.cancel();
       quiet();
@@ -314,7 +308,6 @@ export function useTalk(options: TalkOptions): {
     talk: {
       state,
       onHeard,
-      onListen,
       note,
       partial,
       keyLabel: options.keyLabel,

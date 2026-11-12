@@ -1,5 +1,5 @@
 /** Tests for the talk rules: settling, partial words, and failures said once. */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   EarsNotes,
   FIRST_TIME,
@@ -8,6 +8,7 @@ import {
   CutMemory,
   HeardInbox,
   NOTHING_HEARD,
+  TalkOver,
   micMark,
   micNote,
   settles,
@@ -286,5 +287,48 @@ describe('HeardInbox', () => {
     leave();
     expect(inbox.deliver('later')).toBe(false);
     expect(asked).toEqual([]);
+  });
+});
+
+describe('TalkOver', () => {
+  const fakePlayer = (turn: { turn: string; heard: number } | null = { turn: 't1', heard: 2 }) => ({
+    pause: vi.fn(),
+    resume: vi.fn(),
+    cutOff: vi.fn(),
+    interruption: vi.fn(() => turn),
+  });
+
+  it('hold_to_talk_press_pauses_not_cancels', () => {
+    const player = fakePlayer();
+    new TalkOver(() => player).press();
+    expect(player.pause).toHaveBeenCalledOnce();
+    expect(player.cutOff).not.toHaveBeenCalled();
+  });
+
+  it('speech_heard_then_posts_say: the words cut Scout off and carry what was heard', () => {
+    const player = fakePlayer();
+    const over = new TalkOver(() => player);
+    over.press();
+    expect(over.heard()).toEqual({ turn: 't1', heard: 2 });
+    expect(player.cutOff).toHaveBeenCalledOnce();
+  });
+
+  it('reads what was heard before the player forgets it', () => {
+    const player = fakePlayer();
+    const over = new TalkOver(() => player);
+    over.press();
+    player.interruption.mockReturnValue(null); // the player is quiet by the time words arrive
+    expect(over.heard()).toEqual({ turn: 't1', heard: 2 });
+  });
+
+  it('echo_resumes_playback: nothing heard lets Scout carry on, and forgets the press', () => {
+    const player = fakePlayer();
+    const over = new TalkOver(() => player);
+    over.press();
+    over.nothing();
+    expect(player.resume).toHaveBeenCalledOnce();
+    expect(player.cutOff).not.toHaveBeenCalled();
+    player.interruption.mockReturnValue(null);
+    expect(over.heard()).toBeUndefined();
   });
 });
