@@ -538,9 +538,12 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   (`tag`, `source`, `sourceRef`, `evidence`, `visibility`, null left out), brain kind `profile` maps
   to Fact, and the portrait comes from the same call through `getPortrait`.
   Get to know me (`ipc/know-me.ts`): `know-me:start` checks the input before the brain does (a
-  username or a PDF; a PDF over 10 MB decoded is refused) and answers `{ joined }` or `{ error }`
-  with a plain sentence (the preload turns `{ error }` into a rejection, because an IPC rejection
-  would wrap the sentence in Electron's own text); the brain's `over_limit` becomes "That PDF is over
+  username, which must look like a GitHub name, or a PDF; a PDF over 10 MB decoded is refused) and
+  answers `{ joined }` or `{ error }` with a plain sentence. The preload turns `{ error }` into a
+  rejection, so `window.tagalong.knowMeStart` rejects with that sentence as the message (an IPC
+  rejection would wrap it in Electron's own text). This differs from `setupExpert`, which returns
+  its failures inside a `SetupResult` and never rejects for them. The brain's pydantic text for
+  bad params never reaches the form. The brain's `over_limit` becomes "That PDF is over
   10 MB." and an offline brain "Scout is not connected right now." Status frames from
   `BrainClient.onKnowMeStatus` are parsed and pushed to every window on `know-me:status`; one that
   does not parse is dropped. The Overview's Scout card shows Brain: Offline (or Connecting, Needs update) while the link is down; the Spend card reads again when the link changes. The spend card uses `spend_today` (`ipc/spend.ts`,

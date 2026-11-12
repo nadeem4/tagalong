@@ -71,6 +71,17 @@ describe('registerKnowMeIpc', () => {
     expect(starts).toEqual([]);
   });
 
+  it.each(['@octo', 'github.com/octo', 'octo hub', '-octo', 'a'.repeat(40)])(
+    'refuses %s as a username without asking the brain',
+    async (github) => {
+      const { invoke, starts } = setup();
+      expect(await invoke(IPC.knowMeStart, { github })).toEqual({
+        error: 'That is not a GitHub username.',
+      });
+      expect(starts).toEqual([]);
+    },
+  );
+
   it('refuses a pdf over 10 MB decoded before calling the brain', async () => {
     const { invoke, starts } = setup();
     const result = await invoke(IPC.knowMeStart, {

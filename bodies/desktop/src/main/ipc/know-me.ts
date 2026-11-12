@@ -15,6 +15,9 @@ import type { IpcHandle } from './handle';
 
 /** The brain's own limit; checked here too so a huge file never crosses the socket. */
 const PDF_MAX_BYTES = 10 * 1024 * 1024;
+// Same rule as the contract's know_me_start username; checked here so the brain's raw
+// invalid_params text never reaches the form.
+const GITHUB_NAME = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
 const OVER_LIMIT = -32008;
 
 type KnowBrain = BrainCall & Pick<BrainClient, 'knowMeStart' | 'onKnowMeStatus'>;
@@ -43,6 +46,9 @@ export function registerKnowMeIpc(
     const pdf = input.success ? input.data.pdf : undefined;
     if (!input.success || (!github && !pdf)) {
       return { error: 'Give a GitHub username or a LinkedIn PDF.' };
+    }
+    if (github && !GITHUB_NAME.test(github)) {
+      return { error: 'That is not a GitHub username.' };
     }
     if (pdf && decodedBytes(pdf.data) > PDF_MAX_BYTES) {
       return { error: 'That PDF is over 10 MB.' };
