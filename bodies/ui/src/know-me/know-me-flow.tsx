@@ -12,6 +12,9 @@ import { RunForm } from './run-form';
 import { useKnowMe } from './use-know-me';
 
 interface Result {
+  /** The done status this was read for, so a later run never shows an earlier result. */
+  run: unknown;
+  acknowledged: boolean;
   portrait: string | null;
   facts: MemoryEntry[];
 }
@@ -31,44 +34,51 @@ export function KnowMeFlow({ onDone, onFinished, doneNote, runningNote }: KnowMe
   const bridge = useHostBridge();
   const { sources, status, running, start, error } = useKnowMe();
   const [result, setResult] = useState<Result | null>(null);
-  const [acknowledged, setAcknowledged] = useState(false);
   const finished = status?.done === true;
 
   useEffect(() => {
-    if (!finished) {
-      setResult(null);
-      setAcknowledged(false);
-      return;
-    }
+    if (!finished) return;
     let alive = true;
     Promise.all([bridge.getPortrait(), bridge.listMemories()])
       .then(([portrait, memories]) => {
         if (!alive) return;
         // Facts told in chat are not what this run read; the view lists only profile facts.
         const facts = memories.filter((m) => m.source !== undefined && m.source !== 'chat');
-        setResult({ portrait: portrait ?? status?.portrait ?? null, facts });
+        setResult({
+          run: status,
+          acknowledged: false,
+          portrait: portrait ?? status?.portrait ?? null,
+          facts,
+        });
         onFinished?.();
       })
       .catch((e: unknown) => {
         console.error('could not read the get to know me result', e);
-        if (alive) setResult({ portrait: status?.portrait ?? null, facts: [] });
+        if (alive)
+          setResult({
+            run: status,
+            acknowledged: false,
+            portrait: status?.portrait ?? null,
+            facts: [],
+          });
       });
     return () => {
       alive = false;
     };
     // The status object changes only when the run's state does; the callbacks are not deps on purpose.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [finished, bridge]);
+  }, [finished, status, bridge]);
 
-  if (finished && result !== null) {
-    if (acknowledged && doneNote !== undefined) return <p className="know__sub">{doneNote}</p>;
+  if (finished && result !== null && result.run === status) {
+    if (result.acknowledged && doneNote !== undefined)
+      return <p className="know__sub">{doneNote}</p>;
     return (
       <ResultView
         portrait={result.portrait}
         gaps={gapsFrom(status)}
         facts={result.facts}
         onDone={() => {
-          setAcknowledged(true);
+          setResult({ ...result, acknowledged: true });
           onDone?.();
         }}
       />
