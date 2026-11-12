@@ -567,6 +567,14 @@ class Session:
             self._stop.set()
         return Interruption(" ".join(sentences[:heard]), unsaid)
 
+    async def stop_background(self) -> None:
+        """The brain is closing: tools a paused turn left running end with it. (The Stop button
+        cannot reach them; a paused turn is gone, so nothing holds their calls any more.)"""
+        left = list(self._background)
+        for task in left:
+            task.cancel()
+        await asyncio.gather(*left, return_exceptions=True)
+
     def _detached(self, call: dict, task: asyncio.Future, body_id: str | None) -> None:
         """A tool the paused turn left running: when it ends, its result enters the front door
         like any other news, so a later turn (not this one) tells the owner."""

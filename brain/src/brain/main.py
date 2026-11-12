@@ -365,6 +365,7 @@ async def _run() -> None:
         await voice.close()
         await session.jobs.shutdown()
         await apps.shutdown()
+        await session.stop_background()  # tools a talked-over turn left running end here
         await session.dispatcher.stop()  # news still waiting is held, so the next run shows it
         memory.close()
         clear_pid(config.data_dir, os.getpid())

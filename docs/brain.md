@@ -226,8 +226,14 @@ flowchart TD
   `tool_use` always gets a `tool_result`, even on cancel. A pause (the owner talking over Scout,
   see Spoken over) ends the turn the same way as a cancel, but through the turn's `stop` event: the
   model stream and the tool wait are raced against it, a tool still running is detached (its call
-  answered with a placeholder, its real result returned later as a `tool_result` event) and the
-  words already streamed are kept. A cancel is the one case where a
+  answered with the placeholder "still running when the turn stopped", its real result returned later as a
+  `tool_result` event) and the words already streamed are kept. A stop already set when the tools are due
+  starts none of them: each call is answered "not run: the person talked over Scout". A real cancel (Stop,
+  close, timeout, disconnect) while the model streams cancels the pending read and closes the stream, so the
+  provider stops billing. The Stop button cannot reach a detached tool (its turn is gone); it ends only when
+  the brain shuts down (`Session.stop_background`, called from `main.py` before the dispatcher stops).
+  A late `tool_result` is held by the dispatcher while the desktop is speaking and delivered at the next
+  sentence break or when speech ends. A cancel is the one case where a
   half-streamed step is kept: the words already sent become its assistant reply (nothing if none
   were), so the cut-off request counts as answered and the next `say` is not merged with it. This
   holds in the saved chat and after a restart. A cancel before any word leaves nothing to keep: the request stays in the saved chat, marked
