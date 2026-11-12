@@ -179,9 +179,10 @@ export function nextDock(state: DockState, event: DockEvent): DockState {
   }
 }
 
-export function dockMood(state: DockState): DockMood {
+/** `hearing`: speech is being heard on the mic (Always listening), which the reducer never sees. */
+export function dockMood(state: DockState, hearing = false): DockMood {
   if (state.flash !== null) return state.flash.mood;
-  if (state.seeing) return 'listening';
+  if (state.seeing || hearing) return 'listening';
   if (state.reading.size > 0) return 'reading';
   if (state.speaking) return 'speaking';
   if (state.turns.size > 0) return 'thinking';

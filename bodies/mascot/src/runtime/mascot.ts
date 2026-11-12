@@ -20,6 +20,7 @@ import type { CharacterSpec, Vec3 } from '../spec/types';
 import { gatedTargets, initialScales, stepPartScales } from '../props/visibility';
 import { albedo, type Palette } from './customize';
 import { moodExpression, moodFace } from './moods';
+import { createPacer } from './pace';
 import { scheduler, type Animated } from './scheduler';
 
 export interface MascotOptions {
@@ -47,6 +48,8 @@ export interface MascotOptions {
   framing?: number;
   /** Respect `prefers-reduced-motion`: hold the state's pose instead of animating. Default true. */
   respectReducedMotion?: boolean;
+  /** Cap on drawn frames per second, for a small always-on mascot. Default 0: the display's rate. */
+  maxFps?: number;
   /** Build the character so `reveal()` can show it a piece at a time, for build-up animations. Default false. */
   revealable?: boolean;
 }
@@ -127,6 +130,7 @@ export class Mascot implements Animated {
   private partVel = new Float32Array(0);
   private visible = true;
   private paused = false;
+  private readonly pace: (dt: number) => number;
   private time = 0;
   private readonly reducedMotion: MediaQueryList | null;
   private stillFrames = 0;
@@ -157,7 +161,9 @@ export class Mascot implements Animated {
       framing: options.framing ?? 1,
       respectReducedMotion: options.respectReducedMotion ?? true,
       revealable: options.revealable ?? false,
+      maxFps: options.maxFps ?? 0,
     };
+    this.pace = createPacer(this.options.maxFps);
     this.renderer = new WebGL2Renderer(canvas);
     this.load(spec, options.state ?? 'idle');
 
@@ -261,7 +267,9 @@ export class Mascot implements Animated {
     return !this.still || this.stillFrames < 2;
   }
 
-  tick(dt: number, _time: number, quality: number) {
+  tick(frameDt: number, _time: number, quality: number) {
+    const dt = this.pace(frameDt);
+    if (dt === 0) return;
     const still = this.still;
     const step = dt * this.options.speed;
     if (still) {

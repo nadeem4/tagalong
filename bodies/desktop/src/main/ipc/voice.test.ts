@@ -277,6 +277,20 @@ describe('what the brain sends back', () => {
     expect(sent).toEqual([]);
   });
 
+  it('ends speaking when the panel page goes away mid-sentence, once, and not otherwise', () => {
+    const { send, brain, bridge, sent } = setup();
+    bridge.panelGone();
+    expect(sent).toEqual([]);
+    send(IPC.speechState, { turn: 't1', n: 1, state: 'started' });
+    sent.length = 0;
+    bridge.panelGone();
+    expect(brain.speechState).toHaveBeenLastCalledWith({ turn: 't1', state: 'idle' });
+    expect(sent).toEqual([[IPC.speakingEvent, { turn: 't1', state: 'idle' }]]);
+    sent.length = 0;
+    bridge.panelGone();
+    expect(sent).toEqual([]);
+  });
+
   it('reports the ears as fine until the brain says they failed', () => {
     const { bridge } = setup();
     expect(bridge.models()).toEqual({ ears: true });

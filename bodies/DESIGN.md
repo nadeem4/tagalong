@@ -455,7 +455,7 @@ Live in `bodies/ui/src/controls/` and are styled by `CONTROLS_CSS`, injected nex
 - **Dock:** the motion is the engine's: Scout breathes and blinks on its own and each mood has its own pose. The mascot fades in once the engine is ready.
 - **Bubble:** the invitation enters over 220ms (fade and 4px rise, ease-out). The invitation types at 22ms a character. The listening dot pulses (1.2s, to 35% opacity); speaking bars follow the voice level with a 90ms linear transition.
 
-Under `prefers-reduced-motion: reduce`: the mascot is unchanged (the engine keeps breathing and blinking; the dock has no reduced-motion handling for it), the bubble appears and leaves without moving, the dot stops pulsing, the bars hold at 60%, and the invitation appears whole.
+Under `prefers-reduced-motion: reduce`: the mascot holds one still pose per mood (the engine's `respectReducedMotion` is on by default), the bubble appears and leaves without moving, the dot stops pulsing, the bars hold at 60%, and the invitation appears whole.
 
 ## Accessibility
 

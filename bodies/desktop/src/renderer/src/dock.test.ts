@@ -6,6 +6,16 @@ import { IDLE_DOCK, dockMood, moveDrag, nextDock, startDrag } from './dock';
 const T = '10000000-0000-4000-8000-000000000001';
 const J = '10000000-0000-4000-8000-0000000000b1';
 
+describe('listening to the mic', () => {
+  it('listens while speech is heard, below short reactions but above thinking', () => {
+    expect(dockMood(IDLE_DOCK, true)).toBe('listening');
+    const thinking = nextDock(IDLE_DOCK, { type: 'turn.started', turnId: T });
+    expect(dockMood(thinking, true)).toBe('listening');
+    expect(dockMood(nextDock(IDLE_DOCK, { type: 'poke' }), true)).toBe('happy');
+    expect(dockMood(IDLE_DOCK, false)).toBe('idle');
+  });
+});
+
 describe('the dock', () => {
   it('is idle to begin with', () => {
     expect(dockMood(IDLE_DOCK)).toBe('idle');

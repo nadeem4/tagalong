@@ -185,7 +185,7 @@ function Avatar() {
       >
         <DockPet
           pet={pet}
-          mood={dockMood(dock)}
+          mood={dockMood(dock, hearing)}
           sightPaused={sightPaused}
           listening={listeningDot(listening, hearing)}
           status={status}

@@ -1061,8 +1061,15 @@ Scout's only faces are the dock moods (idle, listening, reading, thinking, worki
 
 1. **Action:** Windows Settings → Accessibility → Visual effects → **Animation effects** off, restart
    Tagalong (the setting is read when the window opens), then repeat M.1.
-2. **Expected:** the bubble and the listening dot hold still. The live Scout on the dock still
-   breathes and blinks: the mascot engine has no reduced-motion handling.
+2. **Expected:** the bubble and the listening dot hold still. The live Scout on the dock holds one
+   still pose per mood (the engine's `respectReducedMotion` is on by default).
+
+### M.4a. No WebGL2
+
+1. **Action:** start the desktop where WebGL2 is off (a VM or RDP session, or Chromium's
+   `--disable-gpu`).
+2. **Expected:** the dock shows the still Scout head instead of the live mascot; the avatar window
+   stays, and a click still opens the bubble.
 
 ### M.5. Scout's twelve moods on the dock
 
