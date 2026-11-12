@@ -1091,12 +1091,14 @@ words what the person reads (guidance in `mind/soul.md`).
   the OS essentials and proxy settings), never an API key or any `npm_config_*` of the person's;
   the system environment is never changed and nothing is global. Progress is real, not one long
   "installing": npm runs at `loglevel=http` and its output is read line by line (`on_line`, an
-  optional fourth argument of a `RunCmd`), so the stages are `resolving` (before npm's first
-  request), `fetching` (the first `http fetch` line) and `finishing` (npm exited, the program is
-  being checked), each said once with no percent (npm gives no total). A binary entry says
-  `downloading` and then a `percent` from the response's Content-Length (`DOWNLOAD_SIZE` in
-  `setup/net.py`, set by `http_fetch`), at most one update per 5 percent; with no length there is
-  only the stage. `extracting` and `done` follow. The 900 s `NPM_TIMEOUT_S` is the whole install's
+  optional fourth argument of a `RunCmd`), so the stages are `resolving` (until npm logs its first request, the package's
+  metadata, which it does once that answer is in), `fetching` (from then on: it is downloading the
+  package and what it depends on) and `finishing` (npm exited, the program is being checked), each
+  said once with no percent (npm gives no total). A binary entry says `downloading` and then a
+  `percent` from the response's Content-Length (`ByteStream.size` in `setup/net.py`, set by
+  `http_fetch`, read after the first chunk), at most one update per 5 percent (`percent_steps`);
+  with no length there is only the stage. Tagalong's own Node download uses the same percent,
+  filling 5 to 80 percent of the `node` stage. `extracting` and `done` follow. The 900 s `NPM_TIMEOUT_S` is the whole install's
   ceiling, not a stage. A command that is cancelled or
   times out is killed with its whole process tree. The stored command is
   `[node, <the package's bin js>, <registry args>]`, resolved against the final folder. A `binary`

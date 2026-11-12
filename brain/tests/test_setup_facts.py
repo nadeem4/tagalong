@@ -168,6 +168,16 @@ async def test_real_run_cmd_hands_each_line_to_on_line_and_still_returns_all_out
     assert result.out.strip() == "a" and result.err.strip() == "b"
 
 
+async def test_a_line_over_the_limit_is_an_error_and_ends_the_other_pipe():
+    import sys
+
+    from brain.setup.facts import real_run_cmd
+
+    code = "import sys, time; sys.stdout.write('x' * (2 << 20)); sys.stdout.flush(); time.sleep(30)"
+    with pytest.raises(ValueError):
+        await asyncio.wait_for(real_run_cmd([sys.executable, "-c", code], os.environ, None), 10)
+
+
 async def test_a_cancelled_command_kills_its_child(tmp_path):
     import sys
 

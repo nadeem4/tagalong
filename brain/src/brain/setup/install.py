@@ -23,7 +23,7 @@ from urllib.parse import urlparse
 
 from brain.setup.archive import UnsafeArchive, safe_extract
 from brain.setup.facts import Machine, NodePaths, RunCmd, node_paths
-from brain.setup.net import DOWNLOAD_SIZE, GetJson
+from brain.setup.net import GetJson, percent_steps
 from brain.setup.node_runtime import (
     DIST,
     NodeBuildMissing,
@@ -40,7 +40,6 @@ from brain.voice.models import Fetch
 
 NODE_FLOOR = 22  # the highest floor of the experts checked in the 20a spike; one for all
 NPM_TIMEOUT_S = 900.0  # the whole install's ceiling, not a stage
-PERCENT_STEP = 5  # a download reports at most one update per this many percent
 STALE_STAGING_S = 600.0  # a staging folder newer than this may belong to a running install
 # What npm may see of our environment: enough to run and reach the network, never a key.
 _ENV_KEEP = frozenset(
@@ -73,25 +72,6 @@ class Unsupported(InstallError):
 
     def __init__(self, detail: str = "") -> None:
         super().__init__("unsupported", detail)
-
-
-def _percent_reporter(
-    total: int | None, stage: str, on_progress: Callable[[dict], None]
-) -> Callable[[int], None]:
-    """Turn a running byte count into `{stage, percent}` events, a step at a time; with no known
-    total there is nothing to report beyond the stage the caller already said."""
-    last = -PERCENT_STEP
-    if not total:
-        return lambda received: None
-
-    def report(received: int) -> None:
-        nonlocal last
-        percent = min(100, received * 100 // total)
-        if percent >= last + PERCENT_STEP or (percent == 100 and last != 100):
-            last = percent
-            on_progress({"stage": stage, "percent": percent})
-
-    return report
 
 
 def _major(version: str) -> int:
@@ -341,7 +321,7 @@ async def _npm_install(
 
     try:
         result = await run(argv, _npm_env(node.node), staged, on_line)
-    except (OSError, TimeoutError) as err:
+    except (OSError, TimeoutError, ValueError) as err:  # ValueError: a line npm made too long
         raise InstallError("npm_failed", f"{type(err).__name__}: {err}") from err
     if result.code != 0:
         raise InstallError("npm_failed", (result.err or result.out).strip()[-400:])
@@ -373,7 +353,6 @@ async def _binary_install(
     if not dist.sha256:
         raise InstallError("integrity", "the registry lists no checksum")
     on_progress({"stage": "downloading"})
-    DOWNLOAD_SIZE.set(None)  # a stale size from an earlier download must not leak in
     download.mkdir(parents=True)
     archive = download / (Path(urlparse(dist.url or "").path).name or "download")
     digest = hashlib.sha256()
@@ -381,9 +360,13 @@ async def _binary_install(
     report = None
     try:
         with archive.open("wb") as out:
-            async for chunk in fetch(str(dist.url)):
+            stream = fetch(str(dist.url))
+            async for chunk in stream:
                 if report is None:  # the size is known once the first chunk has arrived
-                    report = _percent_reporter(DOWNLOAD_SIZE.get(), "downloading", on_progress)
+                    report = percent_steps(
+                        getattr(stream, "size", None),
+                        lambda p: on_progress({"stage": "downloading", "percent": p}),
+                    )
                 digest.update(chunk)
                 await asyncio.to_thread(out.write, chunk)
                 received += len(chunk)

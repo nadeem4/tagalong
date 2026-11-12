@@ -41,6 +41,17 @@ class RunCmd(Protocol):
     ) -> Awaitable[CmdResult]: ...
 
 
+async def _all(*parts):
+    """Run the parts together; when one fails the others are cancelled, not left running."""
+    tasks = [asyncio.ensure_future(part) for part in parts]
+    try:
+        return list(await asyncio.gather(*tasks))
+    except BaseException:
+        for task in tasks:
+            task.cancel()
+        raise
+
+
 async def _pump(stream: asyncio.StreamReader, on_line: OnLine | None) -> str:
     """Read a pipe to its end, handing each line on as it arrives."""
     text: list[str] = []
@@ -73,8 +84,7 @@ async def real_run_cmd(
     assert proc.stdout is not None and proc.stderr is not None
     try:
         out, err, _ = await asyncio.wait_for(
-            asyncio.gather(_pump(proc.stdout, on_line), _pump(proc.stderr, on_line), proc.wait()),
-            timeout,
+            _all(_pump(proc.stdout, on_line), _pump(proc.stderr, on_line), proc.wait()), timeout
         )
     except BaseException:
         # A timeout, a cancel or anything else: npm and the scripts it started die with it.

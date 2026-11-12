@@ -44,7 +44,7 @@ from brain.setup.install import (
     install_expert,
     sweep_staging,
 )
-from brain.setup.net import DOWNLOAD_SIZE
+from brain.setup.net import ByteStream
 from brain.setup.paths import cache_file, node_dir, tools_dir
 from brain.setup.registry import Distribution, Registry, RegistryEntry
 from brain.setup.store import ExpertStore
@@ -191,6 +191,16 @@ async def test_npx_install_runs_npm_with_the_private_node_prefix_and_explicit_en
     assert expert.source == "registry" and expert.logged_in is None
     assert expert.node == "private"
     assert ExpertStore(tmp_path).get("claude-acp") == expert
+
+
+async def test_an_unreadable_npm_line_is_npm_failed(tmp_path, ensure):
+    class Spewing(Npm):
+        async def __call__(self, argv, env, cwd, on_line=None):
+            raise ValueError("Separator is not found, and chunk exceed the limit")
+
+    with pytest.raises(InstallError) as err:
+        await go(tmp_path, npx_entry(), machine(), Spewing())
+    assert err.value.kind == "npm_failed"
 
 
 async def test_npm_install_emits_stages(tmp_path, ensure):
@@ -408,11 +418,14 @@ async def test_download_reports_percent(tmp_path):
     data = make_zip({"pad.bin": b"x" * 5000})
     entry = binary_entry(hashlib.sha256(data).hexdigest())
 
-    async def fetch(url):
-        DOWNLOAD_SIZE.set(len(data))  # what the response's Content-Length would say
+    def fetch(url):
         step = len(data) // 100 + 1
-        for i in range(0, len(data), step):
-            yield data[i : i + step]
+
+        async def chunks(stream):
+            for i in range(0, len(data), step):
+                yield data[i : i + step]
+
+        return ByteStream(chunks, len(data))  # the size a Content-Length would give
 
     seen: list[dict] = []
     await go(tmp_path, entry, machine(), Npm(), fetch=fetch, progress=seen.append)
@@ -877,10 +890,10 @@ async def test_an_install_joins_an_update_of_the_same_expert_that_runs(tmp_path,
     class Gated(Npm):
         started = asyncio.Event()
 
-        async def __call__(self, argv, env, cwd):
+        async def __call__(self, argv, env, cwd, on_line=None):
             self.started.set()
             await gate.wait()
-            return await super().__call__(argv, env, cwd)
+            return await super().__call__(argv, env, cwd, on_line)
 
     npm, updaters = Gated(), []
     tools, emitted, notes, stop = make_tools(tmp_path, npm, updaters=updaters)
