@@ -58,6 +58,7 @@ def capability_picture(
     experts: list[ExpertCaps],
     ocr: ReadingRow | None = None,
     asks: bool = False,
+    know_me_offer: bool = False,
 ) -> str:
     lines = ["What you can do:", _names("Built in: ", builtin)]
     if bodies:
@@ -82,6 +83,11 @@ def capability_picture(
         lines.append(
             "A tool in ask mode takes ask_wait_hours (1 to 168, default 72): how long the ask "
             "waits for the person's yes if they are away."
+        )
+    if know_me_offer:  # fixed text; code decides when it is due, Scout the wording
+        lines.append(
+            "You do not know the owner yet. You may offer once, in your own words, to read their "
+            "public profiles (get_to_know_me, action offered), and only if it fits the moment."
         )
     if experts:
         lines.append(
