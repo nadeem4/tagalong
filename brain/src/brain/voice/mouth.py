@@ -48,6 +48,7 @@ class _Turn:
         self.voice = voice
         self.speed = speed
         self.unsent: list[str] = []  # sentences made but not yet sent: still Scout's to say
+        self.muted = False  # its writer is still going, but what it writes is no longer said
         self.stream = SpokenStream(lambda line: enqueue(self, line))
         self.ended = False
 
@@ -117,7 +118,7 @@ class Mouth:
             return
         if params.get("done"):
             self._finish(st)
-        elif delta := params.get("delta"):
+        elif (delta := params.get("delta")) and not st.muted:
             st.stream.push(delta)
 
     def end_turn(self, turn: str) -> None:
@@ -125,6 +126,29 @@ class Mouth:
         st = self._turns.get(turn)
         if st is not None and not st.ended:
             self._finish(st)
+
+    def queued(self, body_id: str) -> tuple[str | None, list[str]]:
+        """The live turn on `body_id` that owns the queue (the newest) and what it has not said."""
+        turns = self.turns_on(body_id)
+        return (turns[-1], self.unsaid(turns[-1])) if turns else (None, [])
+
+    def replace(self, turn: str, body_id: str, text: str) -> None:
+        """Drop what `turn` has not said, including what it is still writing, and say `text`
+        instead in the same voice. A turn that is gone is started again, so the words are said."""
+        fresh = turn not in self._turns
+        if fresh:
+            self.spoken(turn, body_id, None, None)
+        st = self._turns[turn]
+        st.unsent.clear()
+        self._queue = deque(i for i in self._queue if i[0] != turn)
+        st.muted = True
+        st.stream = SpokenStream(lambda line: self._enqueue(st, line))
+        st.stream.push(text)
+        st.stream.end()
+        if st.ended or fresh:  # its done marker went with the rest: closing follows the new words
+            st.ended = True
+            self._queue.append((turn, None))
+        self._poke()
 
     def pause(self) -> None:
         """Stop after the sentence being made is sent; what is queued waits for `resume`."""

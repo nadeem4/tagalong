@@ -1314,6 +1314,18 @@ stands in for a real one (the brain still needs to hear something).
 5. **Expected:** `speech_state` `paused`, then `started` for the same sentence when it carries on;
    no sentence plays twice.
 
+### T.3d. Interjection at a sentence break
+
+1. **Setup:** Kokoro voice picked; a timer set for a few seconds ahead ("remind me to stretch in
+   10 seconds"); then a spoken question whose answer runs several sentences.
+2. **Action:** let the timer fire while Scout is answering.
+3. **Expected:** the answer does not stop mid-sentence. At the next sentence break the voice holds for a
+   moment, then either carries on with the rest of the answer, or Scout drops the rest and says a short
+   word about the timer instead. Either way the voice is never left silent, the answer's text still
+   shows in full, and the brain log shows one extra short model call (not a second turn).
+4. **Action:** repeat with only a typed chat open (no voice).
+5. **Expected:** no interjection: the timer is told as its own turn after the reply finishes.
+
 ### T.4. Reply, never an open mic
 
 1. **Setup:** Always listening is off.

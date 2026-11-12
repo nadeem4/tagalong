@@ -63,7 +63,7 @@ class Guard:
 
 @dataclass(frozen=True)
 class ModelCallCtx:
-    kind: Literal["turn", "side_check", "offer"]
+    kind: Literal["turn", "side_check", "offer", "interjection"]
     turn_id: str | None
     steps: int
 

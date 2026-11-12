@@ -1,7 +1,8 @@
 """The seam between the brain and its voice models.
 
 The server routes `listen`, `mic`, `unlisten` and `hush` here; the session reports spoken turns
-(`spoken`, `reply`, `turn_ended`) and asks for a turn's `sentences`;
+(`spoken`, `reply`, `turn_ended`), asks for a turn's `sentences` and, for an interjection, takes
+the queue (`queued`, `pause`, `replace`, `resume`);
 Home asks for a `sample`. Neither knows about models.
 """
 
@@ -31,5 +32,19 @@ class VoiceHooks(Protocol):
     def turn_ended(self, turn: str) -> None: ...
 
     def sentences(self, turn: str) -> list[str]: ...
+
+    def queued(self, body_id: str) -> tuple[str | None, list[str]]:
+        """The turn that owns `body_id`'s speech queue and the sentences it has not said."""
+        ...
+
+    def pause(self) -> None:
+        """Hold the queue at the sentence break (an interjection borrows it)."""
+        ...
+
+    def resume(self) -> None: ...
+
+    def replace(self, turn: str, body_id: str, text: str) -> None:
+        """Drop the turn's unsaid sentences and say `text` in their place."""
+        ...
 
     async def sample(self, text: str, voice: str | None, speed: float | None) -> bytes: ...

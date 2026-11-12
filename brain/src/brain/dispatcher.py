@@ -8,8 +8,11 @@ when speech is idle and no conversation is active, `hold` is kept as an open ite
 nobody registered is refused, so no source can bypass the rules by inventing one.
 
 Past that gate a waking kind is batched per kind (`batch_seconds`), capped per hour, and started
-as one wake turn on a body that can show it, one turn at a time. Words and card answers are
-handed to `deliver` instead. Nothing is dropped silently: when the budget is spent, in quiet
+as one wake turn on a body that can show it, one turn at a time. A `next_pause` kind that is
+due at a sentence break while Scout is speaking is not a turn: it borrows the speech queue as an
+interjection (`interject`, one at a time; when it cannot run the wake waits for the turn, as
+before). Words and card answers are handed to `deliver` instead.
+Nothing is dropped silently: when the budget is spent, in quiet
 hours, once an item has waited too long (no body, a person away), when a delivery gives up and
 when the brain stops, the news becomes a `held` open item that shows on return and on Home.
 Facts come from outside (job reports, window titles), so a wake's body is fenced and cannot
@@ -76,6 +79,7 @@ class _Group:
     opened: datetime
     posted: datetime  # when its oldest item was posted: staleness counts from here
     items: list[Item] = field(default_factory=list)
+    tried: bool = False  # an interjection could not run for it: it waits for a plain wake
 
 
 def wake_text(kind: EventKind, items: list[Item], note: str, at: datetime) -> str:
@@ -114,6 +118,7 @@ class Dispatcher:
         kinds: dict[str, EventKind] = EVENT_KINDS,
         notes: dict[str, str] | None = None,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        interject: Callable[[str, list], Awaitable[bool]] | None = None,
     ) -> None:
         self.deliver = deliver  # for the kinds that never wake: a say, a card answer
         self._open_items = open_items
@@ -128,6 +133,10 @@ class Dispatcher:
         self._kinds = kinds
         self._notes = load_notes() if notes is None else notes
         self._sleep = sleep
+        # The session's short turn at a sentence break: True when it ran, False when there was
+        # nothing to borrow (no voice, nothing queued).
+        self._interject = interject
+        self._interjecting: tuple[asyncio.Task, _Group] | None = None
         self._queue: asyncio.Queue[_Entry] = asyncio.Queue()
         self._waiting: list[_Entry] = []  # past the post, not yet through the gate
         self._inflight: list[_Entry] = []
@@ -258,6 +267,11 @@ class Dispatcher:
         if self._timer is not None:
             self._timer.cancel()
             self._timer = None
+        running, self._interjecting = self._interjecting, None
+        if running is not None:  # its news is kept like any waiting group's
+            running[0].cancel()
+            await asyncio.gather(running[0], return_exceptions=True)
+            self._groups.append(running[1])
         if self._task:
             self._task.cancel()
             await asyncio.gather(self._task, return_exceptions=True)
@@ -443,14 +457,55 @@ class Dispatcher:
         self._changed.set()
         try:
             self._hold_groups()
-            if self._groups and not self._busy():
+            if self._groups and self._interjecting is None:
                 group = next((g for g in self._groups if self._remaining(g) <= 0), None)
                 body_id = self._choose_body(group) if group is not None else None
                 if group is not None and body_id is not None:
-                    self._groups.remove(group)
-                    self._run_group(group, body_id)
+                    if self._at_break(group):
+                        self._groups.remove(group)
+                        self._start_interjection(group, body_id)
+                    elif not self._busy():
+                        self._groups.remove(group)
+                        self._run_group(group, body_id)
         finally:
             self._arm_timer()
+
+    def _at_break(self, group: _Group) -> bool:
+        # Only news that may speak at the next pause borrows a break; everything else waits for
+        # its own turn, so a sentence is never cut for something that could wait.
+        return (
+            self._interject is not None
+            and not group.tried
+            and group.kind.urgency == "next_pause"
+            and self._state == "sentence_break"
+        )
+
+    def _start_interjection(self, group: _Group, body_id: str) -> None:
+        text = wake_text(group.kind, group.items, self._notes.get(group.kind.name, ""), self._now())
+        task = asyncio.get_running_loop().create_task(
+            self._interjection(group, body_id, [{"type": "text", "text": text}])
+        )
+        self._interjecting = (task, group)
+
+    async def _interjection(self, group: _Group, body_id: str, content: list) -> None:
+        taken = False
+        try:
+            taken = await self._interject(body_id, content)  # type: ignore[misc]
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            _log.exception("dispatcher.interject_failed kind=%s", group.kind.name)
+        self._interjecting = None
+        label = f"{group.kind.name} wake"
+        if taken:
+            if group.kind.max_per_hour is not None:
+                self._wakes.append((self._now(), group.kind.name))
+            self._call([i.on_start for i in group.items], "on_start", label)
+            self._call([i.on_end for i in group.items], "on_end", label, "done")
+        else:  # nothing to borrow, or it broke: the news waits for a plain wake
+            group.tried = True
+            self._groups.insert(0, group)
+        self.pump()
 
     def _run_group(self, group: _Group, body_id: str) -> None:
         # A raising start must not propagate: pump runs from done callbacks and body connects.

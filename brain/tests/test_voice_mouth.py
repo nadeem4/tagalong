@@ -515,3 +515,30 @@ async def test_clear_trims_the_sentence_log_too():
         m._turns[f"t{i}"].unsent.append("x")
         m.clear(f"t{i}")
     assert m.sentences("t0") == [] and m.sentences("t4") == ["x"]
+
+
+async def test_replace_drops_what_was_not_said_and_says_the_new_text_in_the_same_turn():
+    sent = Sent()
+    m, _ = mouth(sent)
+    await ready(m)
+    sent.frames.clear()
+    m.spoken("t", "d", "af_bella", 1.2)
+    m.pause()  # an interjection holds the queue
+    m.reply("t", {"delta": f"{ONE} {TWO} "})
+    m.replace("t", "d", "Sam wrote back.")
+    m.reply("t", {"delta": "More from the old reply. "})  # the turn still writing: not said
+    m.resume()
+    m.reply("t", {"done": True})
+    await settle()
+    assert [p.get("text") for p in sent.speech()] == ["Sam wrote back.", None]
+    assert m.unsaid("t") == []
+
+
+async def test_replace_with_no_live_turn_starts_one():
+    sent = Sent()
+    m, _ = mouth(sent)
+    await ready(m)
+    sent.frames.clear()
+    m.replace("gone", "d", "Quick word first.")
+    await settle()
+    assert [p.get("text") for p in sent.speech()] == ["Quick word first.", None]

@@ -86,8 +86,10 @@ flowchart LR
 `sentence_break` (a reply is still open but nothing is queued), `paused` or `idle`; `on_state` is
 called on each change (the brain wires it to the dispatcher as the fallback when no body reports
 what it plays; the desktop's `speech_state` wins). `pause()` and `resume()` also send
-`speech_control` to the body playing the turn (nothing calls them yet: F18's interjection
-turns will). `unsaid(turn)` is what was made but not yet sent. A body's `hush` clears
+`speech_control` to the body playing the turn; an interjection calls them (docs/brain.md,
+Interjections). `queued(body_id)` is the turn that owns the queue with its unsaid sentences, and
+`replace(turn, body_id, text)` drops the unsaid sentences and the turn's later words and says `text`
+in the same voice. `unsaid(turn)` is what was made but not yet sent. A body's `hush` clears
 every turn spoken on that body.
 
 ### What crosses to the brain
@@ -106,7 +108,7 @@ Contract v1 (see [protocol/README.md](../protocol/README.md)):
 | `voice { status, message?, progress? }`          | brain to body | The ears' models: `loading` (with `progress`), `ready` or `failed`. Only the ears send it; the mouth sends none.                                                                                                                                                                                                                               |
 | `speech { turn, n?, text?, pcm?, sample_rate? }` | brain to body | One sentence: `n` (1-based within its turn), `text`, plus `pcm` (16-bit, 24,000 Hz, base64) when Kokoro spoke it. A frame with `text` only means use the system voice.                                                                                                                                                                         |
 | `speech { turn, done: true }`                    | brain to body | The last sentence of that turn has been sent.                                                                                                                                                                                                                                                                                                  |
-| `speech_control { action, turn? }`               | brain to body | `pause` holds the player where it is, `resume` carries on from the held sentence, `clear` drops what is queued (one turn's, if `turn` is given). Live only. The mouth sends `pause` and `resume` to the body playing the turn when it pauses or resumes (nothing calls those yet, F18 will); `clear` is not sent yet.                          |
+| `speech_control { action, turn? }`               | brain to body | `pause` holds the player where it is, `resume` carries on from the held sentence, `clear` drops what is queued (one turn's, if `turn` is given). Live only. The mouth sends `pause` and `resume` to the body playing the turn when it pauses or resumes (an interjection holds the queue this way); `clear` is not sent yet.                   |
 
 `heard`, `voice`, `speech`, `speech_state` and `speech_control` are live only (no `seq`), so they are not replayed after a
 reconnect. `createVoiceBridge` remembers the open listening mode (also when `listen` found the
