@@ -39,10 +39,8 @@ const BRAIN_OFFLINE = 'brain offline';
 type Words = { text: string; error: boolean };
 const SETUP_REFUSALS: Record<string, Words> = {
   denied: { text: 'Okay, nothing was changed.', error: false },
-  already_installing: { text: 'That is already being set up.', error: false },
   already_ready: { text: 'That is already set up.', error: false },
   already_added: { text: 'That app is already added.', error: false },
-  already_logged_in: { text: 'Already logged in.', error: false },
   version_changed: {
     text: 'The list changed while you were deciding. Have another look, then try again.',
     error: true,
@@ -165,8 +163,6 @@ export function ConnectionsPanel() {
           outcome = { ...(SETUP_REFUSALS[error] ?? SETUP_FAILED), added: false };
         } else if (state === 'waiting') {
           outcome = { text: LOGIN_WAITING, error: false, added: false };
-        } else if (state === 'logged_in') {
-          outcome = { text: 'Already logged in.', error: false, added: false };
         } else if (added !== undefined) {
           outcome = { text: added, error: false, added: true };
         }
