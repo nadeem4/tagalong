@@ -301,6 +301,45 @@ export const SpeechControlParams = z.object({
 });
 export type SpeechControlParams = z.infer<typeof SpeechControlParams>;
 
+// Get to know me: the body starts a run from a GitHub username, a LinkedIn "Save to PDF" file or
+// both; the brain reports each source's progress. `data` is base64, at most 10 MB decoded.
+export const KNOW_ME_PDF_B64_MAX = 13_981_016;
+
+export const KnowMePdf = z.object({
+  name: z.string().min(1).max(255),
+  data: z.string().max(KNOW_ME_PDF_B64_MAX),
+});
+
+export const KnowMeStartParams = z
+  .object({
+    github: z
+      .string()
+      .regex(/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/)
+      .optional(),
+    pdf: KnowMePdf.optional(),
+  })
+  .refine((p) => p.github !== undefined || p.pdf !== undefined, {
+    message: 'give a GitHub username, a PDF, or both',
+  });
+export type KnowMeStartParams = z.infer<typeof KnowMeStartParams>;
+
+export const KnowMeStartResult = z.object({ joined: z.boolean() });
+export type KnowMeStartResult = z.infer<typeof KnowMeStartResult>;
+
+// Live-only, no seq: a run does not survive a restart, so a status is never replayed.
+export const KnowMeStatusParams = z.object({
+  sources: z.array(
+    z.object({
+      name: z.string(),
+      state: z.enum(['waiting', 'reading', 'done', 'failed']),
+      gap: z.string().max(200).optional(),
+    }),
+  ),
+  done: z.boolean(),
+  portrait: z.string().max(1500).optional(),
+});
+export type KnowMeStatusParams = z.infer<typeof KnowMeStatusParams>;
+
 export interface MethodSchemas {
   params: ZodType;
   result?: ZodType;
@@ -321,6 +360,7 @@ export const bodyToBrain = {
   unlisten: { params: EmptyParams },
   hush: { params: EmptyParams },
   speech_state: { params: SpeechStateParams, live: true },
+  know_me_start: { params: KnowMeStartParams, result: KnowMeStartResult },
 } satisfies Record<string, MethodSchemas>;
 
 export const brainToBody = {
@@ -336,6 +376,7 @@ export const brainToBody = {
   voice: { params: VoiceParams, live: true },
   speech: { params: SpeechParams, live: true },
   speech_control: { params: SpeechControlParams, live: true },
+  know_me_status: { params: KnowMeStatusParams, live: true },
 } satisfies Record<string, MethodSchemas>;
 
 export type BodyToBrainMethod = keyof typeof bodyToBrain;

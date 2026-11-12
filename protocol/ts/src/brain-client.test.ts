@@ -823,3 +823,33 @@ describe('voice', () => {
     expect(s.sent[1]!.params).toEqual({ text: 'hi', spoken: true, voice: 'bm_george', speed: 1.2 });
   });
 });
+
+describe('BrainClient know me', () => {
+  it('knowMeStart sends a request and returns joined', async () => {
+    const { client, s } = await online();
+    const p = client.knowMeStart({ github: 'octocat' });
+    const req = s.sent[1]!;
+    expect(req).toMatchObject({ method: 'know_me_start', params: { github: 'octocat' } });
+    s.receive({ jsonrpc: '2.0', id: req.id, result: { joined: true } });
+    await expect(p).resolves.toEqual({ joined: true });
+  });
+  it('knowMeStart rejects BrainOffline when not online', async () => {
+    const { client } = setup();
+    await expect(client.knowMeStart({ github: 'octocat' })).rejects.toThrow('brain offline');
+  });
+  it('delivers know_me_status to listeners until unsubscribed', async () => {
+    const { client, s, notes } = await online();
+    const seen: unknown[] = [];
+    const off = client.onKnowMeStatus((st) => seen.push(st));
+    const frame = (done: boolean) => ({
+      jsonrpc: '2.0',
+      method: 'know_me_status',
+      params: { sources: [{ name: 'GitHub', state: 'reading' }], done },
+    });
+    s.receive(frame(false));
+    off();
+    s.receive(frame(true));
+    expect(seen).toHaveLength(1);
+    expect(notes.filter(([m]) => m === 'know_me_status')).toHaveLength(2);
+  });
+});

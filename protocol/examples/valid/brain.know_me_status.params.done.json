@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "method": "know_me_status",
+  "params": {
+    "sources": [
+      { "name": "GitHub", "state": "done" },
+      { "name": "The web", "state": "failed", "gap": "Stopped: daily limit reached" }
+    ],
+    "done": true,
+    "portrait": "Builds desktop tools in TypeScript."
+  }
+}

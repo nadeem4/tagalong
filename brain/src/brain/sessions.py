@@ -46,6 +46,7 @@ from brain.expert_apps import ExpertApps
 from brain.experts import ExpertHosts, ExpertRun
 from brain.job_records import Job, JobRecords
 from brain.jobs import Jobs
+from brain.know.runner import KnowMeRunner
 from brain.loops.service import LoopService
 from brain.masking import Masker, mask_json, mask_message, mask_secrets
 from brain.memory import Memory
@@ -167,6 +168,8 @@ class Session:
         outputs_keep: int = DEFAULT_OUTPUTS_KEEP,
     ) -> None:
         self._model = model
+        # Scout getting to know the person; its status goes out live to the body that asked.
+        self.know_me = KnowMeRunner([], lambda b, p: bodies.send_live(b, "know_me_status", p))
         self.reading = ReadingStore()  # how the connected body reads the screen, for Home
         self._apps_live = apps  # read each turn for the capability picture
         self._experts_live = experts or (lambda: [])
@@ -801,6 +804,7 @@ class Session:
 
     def body_gone(self, body_id: str) -> None:
         """A body disconnected for good: its reading status must not outlive it."""
+        self.know_me.drop_watcher(body_id)
         if self.reading.forget(body_id):
             self._bodies.notify("changed", {"what": "reading"})
 

@@ -13,6 +13,9 @@ import {
   DownloadEventData,
   FocusEventData,
   HeardParams,
+  KnowMeStartParams,
+  KnowMeStartResult,
+  KnowMeStatusParams,
   ListenParams,
   ReadAloudEventData,
   ReadingEventData,
@@ -48,6 +51,7 @@ describe('method maps', () => {
       | 'unlisten'
       | 'hush'
       | 'speech_state'
+      | 'know_me_start'
     >();
   });
   it('has literal brain to body method names', () => {
@@ -64,6 +68,7 @@ describe('method maps', () => {
       | 'voice'
       | 'speech'
       | 'speech_control'
+      | 'know_me_status'
     >();
   });
 });
@@ -214,5 +219,55 @@ describe('approved notification', () => {
   it('rejects an approved notification without a preference', () => {
     const { preference: _, ...rest } = ok;
     expect(ApprovedParams.safeParse(rest).success).toBe(false);
+  });
+});
+
+describe('know_me frames', () => {
+  const sample = (name: string): unknown => JSON.parse(readFileSync(join(examples, name), 'utf8'));
+  it('marks know_me_status live, with no seq', () => {
+    expect('live' in brainToBody.know_me_status && brainToBody.know_me_status.live).toBe(true);
+    expect('seq' in KnowMeStatusParams.shape).toBe(false);
+    expect('live' in bodyToBrain.know_me_start).toBe(false);
+  });
+  it('parses the know_me examples', () => {
+    const start = sample('body.know_me_start.params.json') as { params: unknown };
+    expect(KnowMeStartParams.parse(start.params).github).toBe('octocat');
+    const only = sample('body.know_me_start.params.github-only.json') as { params: unknown };
+    expect(KnowMeStartParams.parse(only.params).pdf).toBeUndefined();
+    const result = sample('body.know_me_start.result.json') as { result: unknown };
+    expect(KnowMeStartResult.parse(result.result)).toEqual({ joined: false });
+    const done = sample('brain.know_me_status.params.done.json') as { params: unknown };
+    expect(KnowMeStatusParams.parse(done.params).done).toBe(true);
+  });
+  it('refuses a start with neither github nor pdf', () => {
+    expect(KnowMeStartParams.safeParse({}).success).toBe(false);
+    expect(KnowMeStartParams.safeParse({ pdf: { name: 'a.pdf', data: 'AA==' } }).success).toBe(
+      true,
+    );
+  });
+  it('refuses a username over 39 chars or with a space', () => {
+    expect(KnowMeStartParams.safeParse({ github: 'a'.repeat(39) }).success).toBe(true);
+    expect(KnowMeStartParams.safeParse({ github: 'a'.repeat(40) }).success).toBe(false);
+    expect(KnowMeStartParams.safeParse({ github: 'a b' }).success).toBe(false);
+  });
+  it('bounds the pdf name and the base64 size', () => {
+    expect(KnowMeStartParams.safeParse({ pdf: { name: '', data: 'AA==' } }).success).toBe(false);
+    const big = 'A'.repeat(13_981_017);
+    expect(KnowMeStartParams.safeParse({ pdf: { name: 'a.pdf', data: big } }).success).toBe(false);
+  });
+  it('bounds status states, gap and portrait', () => {
+    const src = { name: 'GitHub', state: 'done' };
+    expect(KnowMeStatusParams.safeParse({ sources: [src], done: false }).success).toBe(true);
+    expect(
+      KnowMeStatusParams.safeParse({ sources: [{ ...src, state: 'running' }], done: false })
+        .success,
+    ).toBe(false);
+    expect(
+      KnowMeStatusParams.safeParse({ sources: [{ ...src, gap: 'x'.repeat(201) }], done: true })
+        .success,
+    ).toBe(false);
+    expect(
+      KnowMeStatusParams.safeParse({ sources: [], done: true, portrait: 'x'.repeat(1501) }).success,
+    ).toBe(false);
   });
 });
