@@ -160,3 +160,31 @@ def test_remember_with_tag_sets_visibility(mem):
         "my dog Rex",
     )
     assert mem.remember("about_you", "Likes tea").visibility == "free"
+
+
+def test_prompt_never_shows_asked_chat_facts(mem):
+    from brain.mind.prompt import render_know
+
+    mem.remember("about_you", "Has a dog", tag="personal")
+    mem.remember("about_you", "Likes tea")
+    out = render_know(mem.always_loaded())
+    assert "Likes tea" in out and "dog" not in out
+
+
+def test_profile_text_over_cap_or_empty_skipped(mem):
+    saved = mem.save_source_facts(
+        "github", [fact("  padded  "), fact("   "), fact("x" * 501), fact("x" * 500, "e2")]
+    )
+    assert texts(saved) == ["padded", "x" * 500]
+
+
+def test_withheld_evidence_stored_as_none_on_remember(tmp_path):
+    m = Memory(tmp_path / "w.db", mask=lambda t: "[withheld]" if "bad" in t else t)
+    assert m.remember("about_you", "ok", evidence="bad words").evidence is None
+    m.close()
+
+
+@pytest.mark.parametrize("text", ["", "   "])
+def test_empty_portrait_refused(mem, text):
+    with pytest.raises(MemoryRefused):
+        mem.set_portrait(text)

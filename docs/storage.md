@@ -199,15 +199,16 @@ What Scout remembers across restarts, by kind.
 
 `memory_dismissed(source, evidence)` (primary key both columns) holds the profile facts the person forgot, evidence normalised (whitespace collapsed, case folded), so a re-run skips them.
 
-- Written by: `store/memory.py` `remember`, `add_summary`, `forget` (called from `tools.py` and the
-  compaction in `sessions.py`).
+- Written by: `store/memory.py` `remember`, `add_summary`, `forget`, `save_source_facts`,
+  `set_portrait` (called from `tools.py`, the compaction in `sessions.py` and get to know me).
 - Read by: `store/memory.py` `always_loaded` (the prompt), `list_items`; `store/search.py` `search`.
 - Retention: kept until forgotten or replaced. Caps per kind: `instruction` 50 items of 300
   characters, `about_you` 50 of 300, `project` 200 of 500; `summary` is
   uncapped and written by code; `profile` 500 of 500 and one `portrait` of 1,500, both written by
   code.
-- Masked: yes. `Memory` masks the text on its way in (`remember`, `add_summary`) with the
-  session's `save` guard, so a pasted key is stored as `[secret]`.
+- Masked: yes. `Memory` masks the text on its way in (`remember`, `add_summary`, `save_source_facts`,
+  `set_portrait`; evidence too) with the session's `save` guard, so a pasted key is stored as
+  `[secret]`. Always-loaded kinds skip `asked` rows.
 - Upgrade: migration `0025_memory_layers` adds the layer columns. Every old row is `core`
   except `summary` rows, which become `episodic`, period `day`, spanning their `created_at`.
   `kind` is untouched, so Home's list is the same.

@@ -81,6 +81,8 @@ class Memory:
             # A blocking save guard: saving "[withheld]" would store noise.
             raise MemoryRefused("A save guard withheld this text, so it was not remembered.")
         masked_evidence = self.mask(evidence) if evidence else None
+        if masked_evidence == WITHHELD:
+            masked_evidence = None
         return memory_store.remember(self._db, kind, masked, replaces, at, tag, masked_evidence)
 
     def forget(self, item_id: int) -> Item:

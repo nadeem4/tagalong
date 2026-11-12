@@ -165,13 +165,19 @@ def forget(db: sqlite3.Connection, item_id: int) -> Item:
         raise MemoryRefused(
             "The portrait is rewritten, not deleted: correct a fact or run get to know me again."
         )
-    db.execute("DELETE FROM memories WHERE id=?", (item_id,))
-    if item.kind == "profile" and item.evidence:
-        # Remembered per source so a later run does not bring the forgotten fact back.
-        db.execute(
-            "INSERT OR IGNORE INTO memory_dismissed(source, evidence) VALUES (?,?)",
-            (item.source, normalise(item.evidence)),
-        )
+    db.execute("BEGIN IMMEDIATE")
+    try:
+        db.execute("DELETE FROM memories WHERE id=?", (item_id,))
+        if item.kind == "profile" and item.evidence:
+            # Remembered per source so a later run does not bring the forgotten fact back.
+            db.execute(
+                "INSERT OR IGNORE INTO memory_dismissed(source, evidence) VALUES (?,?)",
+                (item.source, normalise(item.evidence)),
+            )
+    except BaseException:
+        db.execute("ROLLBACK")
+        raise
+    db.execute("COMMIT")
     return item
 
 
@@ -201,8 +207,12 @@ def save_source_facts(
         }
         count = len(known)
         saved: list[Item] = []
+        max_chars = KINDS["profile"].max_chars or 0
         for f in facts:
-            key = normalise(f.text)
+            text = f.text.strip()
+            if not text or len(text) > max_chars:
+                continue
+            key = normalise(text)
             if normalise(f.evidence) in dismissed or key in known:
                 continue
             if count >= cap:
@@ -211,7 +221,7 @@ def save_source_facts(
             cur = db.execute(
                 "INSERT INTO memories(kind, text, created_at, updated_at, tag, source,"
                 " source_ref, evidence, visibility) VALUES ('profile',?,?,?,?,?,?,?,?)",
-                (f.text, at, at, tag, source, f.source_ref, f.evidence, visibility_for(tag)),
+                (text, at, at, tag, source, f.source_ref, f.evidence, visibility_for(tag)),
             )
             known.add(key)
             count += 1
@@ -233,6 +243,8 @@ def profile_facts(db: sqlite3.Connection, include_asked: bool = True) -> list[It
 def set_portrait(db: sqlite3.Connection, text: str, at: str) -> Item:
     text = text.strip()
     cap = KINDS["portrait"].max_chars or 0
+    if not text:
+        raise MemoryRefused("The portrait is empty.")
     if len(text) > cap:
         raise MemoryRefused(f"That is {len(text)} characters; the portrait is at most {cap}.")
     db.execute("BEGIN IMMEDIATE")
@@ -271,7 +283,8 @@ def always_loaded(db: sqlite3.Connection) -> dict[str, list[Item]]:
         if not spec.always_loaded:
             continue
         rows = db.execute(
-            f"SELECT {_COLUMNS} FROM memories WHERE kind=? ORDER BY id", (spec.name,)
+            f"SELECT {_COLUMNS} FROM memories WHERE kind=? AND visibility='free' ORDER BY id",
+            (spec.name,),
         ).fetchall()
         if rows:
             out[spec.name] = [Item(*r) for r in rows]
