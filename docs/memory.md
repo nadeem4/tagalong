@@ -44,6 +44,14 @@ Migration 33 gives every memory row `tag`, `source`, `source_ref`, `evidence` an
 
 One `portrait` row (up to 1,500 characters, written by code) is a short description of the owner. It is always loaded and leads the "What you know" block as `Who the owner is:` with no id. `recall` never returns it, and `forget` refuses it: it is rewritten, not deleted. Home's `list_memories` leaves it out of the rows and returns it as a separate `portrait` text (null when unset); each row also carries `tag`, `source`, `source_ref`, `evidence` and `visibility`.
 
+### A run, corrections and the offer
+
+A run (`know_me_start` from Home, or `get_to_know_me` with a GitHub username) reads the sources in order: GitHub, the LinkedIn PDF, then the web last, since it searches with what the others found. Each source's facts are saved as soon as that source finishes, replacing that source's earlier facts and leaving chat memories alone. A source the person did not give (no username, no PDF) is skipped without a gap. If the daily limit is reached, finished sources stay saved and the rest report "Stopped: daily limit reached". Then the portrait is written from the saved `free` facts only (never `asked` ones), at most 1,500 characters, cut at a sentence end; with nothing to write from, or when the limit is reached, the old portrait is kept.
+
+To correct something, use `forget` on the fact: a forgotten fact is remembered per source and does not come back on a re-run. `remember` adds a fact the person told Scout (source `chat`). Then `rewrite_portrait` writes the portrait again from what is left. Nothing rewrites the portrait on its own except a run.
+
+Scout may offer to do all this at most once a week, never after the person said no, and never once a run has happened. The state is one settings row, `know_me_offer`; the code refuses an `offered` call that is not due, so the rule does not depend on Scout's wording.
+
 ### Masking on save
 
 `remember` and the compaction summary mask their text with the session's `save` guard before it is stored, so a key or token the person pasted is stored as `[secret]` (see [storage.md](storage.md#masking)). The cap is checked on the masked text. If a blocking save guard withholds the whole text, `remember` refuses with a `MemoryRefused` message (the model reads it as a tool error) and stores nothing.

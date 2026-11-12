@@ -90,8 +90,8 @@ def test_groups_order_and_titles():
     assert {w.group for w in WORDS.values()} == {g.id for g in GROUPS}
 
 
-def test_there_are_52_tools():
-    assert len(WORDS) == 52
+def test_there_are_54_tools():
+    assert len(WORDS) == 54
 
 
 def test_words_match_the_wording_page_spot_checks():

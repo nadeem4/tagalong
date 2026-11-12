@@ -436,6 +436,13 @@ Nothing runs until you ask. When you do, Scout reads only what you point it at:
   are dropped.
 - **What is kept.** Only facts with a quote from the material to back them; the rest is thrown
   away. Gathered text is masked for secrets before it is saved.
+- **Cost and consent.** A run costs a few cents to about thirty (one model call per source, plus
+  the portrait and up to 5 web uses) and counts against your daily limit. If the limit is reached
+  it stops, keeps what was already saved and says so. Pressing the button or saying yes is the
+  consent; Scout may offer at most once a week and never after you said no.
+- **Only free facts shape the portrait.** Facts about family, health or home are kept for when
+  you ask and never go into the portrait or Scout's prompt. Forget a fact and it does not come
+  back on the next run.
 
 ## Your mail: the loops switch
 

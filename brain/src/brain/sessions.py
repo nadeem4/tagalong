@@ -46,7 +46,10 @@ from brain.expert_apps import ExpertApps
 from brain.experts import ExpertHosts, ExpertRun
 from brain.job_records import Job, JobRecords
 from brain.jobs import Jobs
+from brain.know import offer
 from brain.know.runner import KnowMeRunner
+from brain.know.source import default_sources
+from brain.know.tools import know_me_tools
 from brain.loops.service import LoopService
 from brain.masking import Masker, mask_json, mask_message, mask_secrets
 from brain.memory import Memory
@@ -166,10 +169,9 @@ class Session:
         job_steps_max_bytes: int = DEFAULT_JOB_STEPS_MAX_BYTES,
         work_keep_days: int = DEFAULT_WORK_KEEP_DAYS,
         outputs_keep: int = DEFAULT_OUTPUTS_KEEP,
+        know_sources: list | None = None,  # tests pass fakes; None reads GitHub, PDF and the web
     ) -> None:
         self._model = model
-        # Scout getting to know the person; its status goes out live to the body that asked.
-        self.know_me = KnowMeRunner([], lambda b, p: bodies.send_live(b, "know_me_status", p))
         self.reading = ReadingStore()  # how the connected body reads the screen, for Home
         self._apps_live = apps  # read each turn for the capability picture
         self._experts_live = experts or (lambda: [])
@@ -296,8 +298,19 @@ class Session:
             notify=notify,
         )
         choices = Choices(self._asks, self.post_event, items)
+        # Scout getting to know the person; its status goes out live to the body that asked.
+        self.know_me = KnowMeRunner(
+            default_sources(model, budget) if know_sources is None else know_sources,
+            memory,
+            model,
+            budget,
+            lambda b, p: bodies.send_live(b, "know_me_status", p),
+            now,
+            lambda: notify("changed", {"what": "memory"}),
+        )
         tools = (
             brain_tools(memory, notify)
+            + know_me_tools(self.know_me, memory, now, notify)
             + home_tools(budget, lambda: self.toolbox, keys)
             + model_tools(memory.db, model_default, notify)
             + voice_tools(lambda: self.voice)
@@ -1134,7 +1147,13 @@ class Session:
             if "scout" in s.audience and s.server_tool is None
         )
         return capability_picture(
-            builtin, bodies, apps, experts, self.reading.ocr_problem(), asks=asking
+            builtin,
+            bodies,
+            apps,
+            experts,
+            self.reading.ocr_problem(),
+            asks=asking,
+            know_me_offer=offer.allowed(offer.load(self._memory.db), self._now()),
         )
 
     def cancel(self, turn_id: str) -> None:

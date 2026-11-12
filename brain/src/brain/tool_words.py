@@ -67,6 +67,18 @@ WORDS: dict[str, Words] = {
         "Scout removes one saved note when it's wrong, old, or you ask. Once deleted it's gone, but you can always tell Scout again.",
         "memory",
     ),
+    "get_to_know_me": Words(
+        "Get to know you",
+        "Reads your public profiles to learn who you are.",
+        "When you say yes (or press Get to know me in Home), Scout reads your public GitHub profile and the web, plus a LinkedIn PDF if you give one. It keeps only facts it can quote, and writes a short portrait you can see in Home → Memory. It uses a little of your daily spending limit.",
+        "memory",
+    ),
+    "rewrite_portrait": Words(
+        "Rewrite your portrait",
+        "Writes the short portrait of you again from saved facts.",
+        "After a fact is corrected or forgotten, Scout writes the portrait again using only the facts it still has. Facts you keep for when you ask never go in it.",
+        "memory",
+    ),
     "read_output": Words(
         "Read long results",
         "Reads the rest of a long result, a page at a time.",

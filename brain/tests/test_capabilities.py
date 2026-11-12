@@ -127,6 +127,12 @@ def test_the_picture_says_not_working_without_offering_the_install_tool():
     assert "install_ocr_language" not in out
 
 
+def test_capability_picture_offer_line_only_when_flagged():
+    assert "get_to_know_me" not in picture()
+    line = next(ln for ln in picture(know_me_offer=True).splitlines() if "get_to_know_me" in ln)
+    assert "offer once" in line and "action offered" in line
+
+
 def test_capabilities_mention_work_status():
     assert "work_status" in picture()
 

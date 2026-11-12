@@ -5,8 +5,10 @@ websocket path (`know_me_start` validated, answered, its status sent live to the
 import asyncio
 import base64
 import json
+from pathlib import Path
 
 import pytest
+from know_fakes import FakeModel, budget
 from test_server import Open, ScriptedModel, call, hello, request
 from websockets.asyncio.client import connect
 
@@ -20,6 +22,11 @@ from brain.sessions import Session
 
 class _Source:
     name = "GitHub"
+    label = "GitHub"
+    needs = "username"
+
+    async def read(self, given, known):
+        return []  # nothing to extract, so no model is asked
 
 
 class _Sent:
@@ -32,7 +39,9 @@ class _Sent:
 
 def make_runner(sources=None):
     sent = _Sent()
-    return KnowMeRunner(sources if sources is not None else [], sent), sent
+    memory = Memory(":memory:")
+    runner = KnowMeRunner(sources or [], memory, FakeModel(), budget(Path(".")), sent)
+    return runner, sent
 
 
 async def test_start_without_input_is_invalid_params():
@@ -49,7 +58,10 @@ async def test_second_start_joins_running_run():
     assert runner.start("phone", "octocat", None) is True
     assert runner._task is task  # one task ever
     assert sent.frames[-1][0] == "phone"  # the joiner gets the current status at once
-    assert sent.frames[-1][1]["sources"] == [{"name": "GitHub", "state": "waiting"}]
+    assert sent.frames[-1][1]["sources"] == [
+        {"name": "GitHub", "state": "waiting"},
+        {"name": "portrait", "state": "waiting"},
+    ]
     await task
 
 
@@ -60,7 +72,10 @@ async def test_status_goes_to_every_watcher_and_ends_done():
     await runner._task
     last = {body: params for body, params in sent.frames}
     assert last["desktop"]["done"] is True and last["phone"]["done"] is True
-    assert last["desktop"]["sources"] == [{"name": "GitHub", "state": "done"}]
+    assert last["desktop"]["sources"] == [
+        {"name": "GitHub", "state": "done"},
+        {"name": "portrait", "state": "done", "gap": "Not enough found to write a portrait."},
+    ]
     assert "portrait" not in last["desktop"]  # None values are left out
 
 
@@ -83,7 +98,9 @@ async def test_dropped_watcher_gets_no_more_frames():
 @pytest.fixture
 async def know_env():
     bodies = Bodies()
-    session = Session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
+    session = Session(
+        ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"), know_sources=[]
+    )
     server = await start_server("127.0.0.1", 0, bodies, "s1", session)
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     yield session, url
@@ -141,10 +158,19 @@ async def test_status_sent_live_to_starter_only(know_env):
         result = next(f for f in frames if f.get("id") == 2)
         status = next(f for f in frames if f.get("method") == "know_me_status")
         assert result["result"] == {"joined": False}
-        assert status["params"] == {"sources": [], "done": False}
+        assert status["params"] == {
+            "sources": [{"name": "portrait", "state": "waiting"}],
+            "done": False,
+        }
         assert "seq" not in status
-        reply = await call(ws2, request("tools", {"tools": []}))
-        assert reply.get("id") == 2  # no status frame came first
+        seen = []
+        await ws2.send(json.dumps(request("tools", {"tools": []})))
+        while True:  # the finished run's "changed" goes to every body; a status must not
+            frame = json.loads(await ws2.recv())
+            seen.append(frame.get("method"))
+            if frame.get("id") == 2:
+                break
+        assert "know_me_status" not in seen
 
 
 async def test_second_start_over_the_wire_joins(know_env):

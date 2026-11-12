@@ -199,6 +199,8 @@ What Scout remembers across restarts, by kind.
 
 `memory_dismissed(source, evidence)` (primary key both columns) holds the profile facts the person forgot, evidence normalised (whitespace collapsed, case folded), so a re-run skips them.
 
+The `settings` row `know_me_offer` (JSON text: `offered_at`, `declined`, `last_run_at`) holds whether Scout may offer get to know me; written by `know/offer.py`, read when the capability picture is built.
+
 - Written by: `store/memory.py` `remember`, `add_summary`, `forget`, `save_source_facts`,
   `set_portrait` (called from `tools.py`, the compaction in `sessions.py` and get to know me).
 - Read by: `store/memory.py` `always_loaded` (the prompt), `list_items`; `store/search.py` `search`.

@@ -2829,3 +2829,21 @@ Still no screen; `brain/tests/test_know_extract.py`, `test_know_web.py`, `test_k
 - The web source asks for at most 5 searches and 5 page reads, and spends the day's budget; a spent budget stops it before any call.
 - GitHub: forks are skipped, 30 repos at most; an unknown user, a rate limit and a network error each give a plain gap; a missing README does not.
 - LinkedIn: an image-only PDF or a file that is not a PDF gives a gap, not facts.
+
+## Get to know me (K4 run, portrait, tools and offer)
+
+Automated: `brain/tests/test_know_runner.py`, `test_know_portrait.py`, `test_know_offer.py`, `test_know_tools.py` and `test_capabilities.py`, all on fakes (no real call):
+
+- Each source's facts are saved as it finishes; a source that fails leaves the earlier ones saved; a source not given is not read.
+- A fact without evidence is not saved; a secret in a fact is masked; a forgotten fact does not return on a re-run; a re-run replaces that source's facts and leaves chat memories alone.
+- The daily limit reached mid-run keeps finished sources and shows "Stopped: daily limit reached" for the rest; a bug inside the run is logged and the run still ends `done`.
+- The portrait is written only from `free` facts (an `asked` fact never reaches the model), trimmed to 1,500 characters at a sentence end; with nothing to write from or at the limit the old portrait stays.
+- `offered` is refused after a run, after a decline, and within 7 days of the last offer; a start clears a decline; the capability picture carries the offer line only while an offer is allowed.
+
+**Manual, real brain and real key (costs a few cents).**
+
+1. **Setup:** `cd brain && uv run brain`, the desktop open, a real Anthropic key saved, no earlier run (or a fresh `TAGALONG_HOME`).
+2. **Action:** tell Scout "get to know me, my GitHub is <your username>" and say yes to the offer.
+3. **Expected:** Scout starts the run; Home shows the portrait and facts in Memory when it finishes; every fact has a quote that is really on your GitHub profile; a page of someone with the same name is not used; any source that gave nothing says why.
+4. **Action:** forget one fact in Home, then run get to know me again.
+5. **Expected:** the forgotten fact is not back; the other GitHub facts are replaced by the new run's. Ask Scout to rewrite the portrait: it no longer mentions the forgotten fact.

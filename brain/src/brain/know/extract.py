@@ -21,8 +21,24 @@ EVIDENCE_MIN_WORDS = 3  # a short quote ("Acme") proves nothing; this or EVIDENC
 EVIDENCE_MIN_CHARS = 12
 
 
+LIMIT_GAP = "Stopped: daily limit reached"
+NO_KEY_GAP = "Add your Anthropic key first."
+
+
 class BudgetStop(Exception):
-    """The daily limit is spent or there is no key: nothing more may be asked of the model."""
+    """Nothing more may be asked of the model; str(e) is the plain line to show why."""
+
+    def __init__(self, gap: str = LIMIT_GAP) -> None:
+        super().__init__(gap)
+
+
+def stop_reason(model: Model, budget: Budget) -> BudgetStop | None:
+    """Why the model may not be asked now: no key is not the same as a spent day."""
+    if not model.ready:
+        return BudgetStop(NO_KEY_GAP)
+    if not budget.allows():
+        return BudgetStop()
+    return None
 
 
 @dataclass
@@ -41,8 +57,8 @@ async def complete(
     model: Model, budget: Budget, system: str, content: list[dict], max_tokens: int = 4000
 ) -> str:
     """One model call whose cost counts against the day; returns the reply's text."""
-    if not model.ready or not budget.allows():
-        raise BudgetStop
+    if (stop := stop_reason(model, budget)) is not None:
+        raise stop
     last: Final | None = None
     messages = [{"role": "user", "content": content}]
     async for part in model.stream(system, messages, [], max_tokens):

@@ -777,6 +777,7 @@ async def test_hello_lists_home_tools_as_contract_records(env):
         "job_activity",
         "job_report",
         "key_status",
+        "know_me_sources",
         "list_approvals",
         "list_experts",
         "list_jobs",
