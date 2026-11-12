@@ -124,7 +124,7 @@ dozing, idle.
 | `sad`         | a job stopped, or a turn was cancelled, a short flash                                                                                                     | none                |
 | `happy`       | the person clicks Scout, a short flash                                                                                                                    | none                |
 
-If the panel page reloads, crashes or closes while Scout is speaking, main sends the dock (and the
+If the panel page reloads or crashes while Scout is speaking, main sends the dock (and the
 brain) an `idle` speech state, so `speaking` never sticks.
 
 Not wired yet: an install-finished celebration (no install-finished signal exists), a distinct signal
