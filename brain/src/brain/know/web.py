@@ -20,12 +20,15 @@ PAGE_MAX = 20_000  # characters kept of one page
 
 def matches(text: str, known: Known) -> bool:
     body = normalise(text)
-    if known.handle and re.search(
-        rf"(?<![\w-]){re.escape(known.handle.casefold())}(?![\w-])", body
-    ):
-        return True
-    if any(u.strip().rstrip("/").casefold() in body for u in known.urls if u.strip()):
-        return True
+    # A handle counts only in handle form (@h, github.com/h): "amy" as a plain word is a first name.
+    if known.handle:
+        h = re.escape(known.handle.casefold())
+        if re.search(rf"(?<![\w@])@{h}(?![\w-])|github\.com/{h}(?![\w-])", body):
+            return True
+    for u in known.urls:
+        u = u.strip().rstrip("/").casefold()
+        if u and re.search(re.escape(u) + r"(?![\w-]|\.\w)", body):
+            return True
     return bool(
         known.name
         and known.employer
@@ -44,7 +47,10 @@ def _pages(content: list[dict]) -> list[tuple[str, str]]:
         if not isinstance(result, dict) or result.get("type") != "web_fetch_result":
             continue
         doc = result.get("content") or {}
-        text = (doc.get("source") or {}).get("data") if isinstance(doc, dict) else None
+        source = doc.get("source") if isinstance(doc, dict) else None
+        if not isinstance(source, dict) or source.get("type") != "text":
+            continue  # a PDF or other file comes base64: not readable text
+        text = source.get("data")
         if isinstance(text, str) and text.strip():
             pages.append((str(result.get("url", "")), text[:PAGE_MAX]))
     return pages
@@ -75,9 +81,7 @@ class WebSource:
             if v
         ]
         details += [f"Link: {u}" for u in known.urls]
-        messages = [
-            {"role": "user", "content": prompt("know_web.md") + "\n\n" + "\n".join(details)}
-        ]
+        messages = [{"role": "user", "content": "\n".join(details)}]
         tools = [s.server_tool for s in SPECS]
         last: Final | None = None
         async for part in self._model.stream(prompt("know_web.md"), messages, tools, 4000):

@@ -17,6 +17,8 @@ from brain.mind.turn import Final, Model
 from brain.store.memory import normalise
 
 TEXT_MAX = 500
+EVIDENCE_MIN_WORDS = 3  # a short quote ("Acme") proves nothing; this or EVIDENCE_MIN_CHARS
+EVIDENCE_MIN_CHARS = 12
 
 
 class BudgetStop(Exception):
@@ -75,7 +77,10 @@ def check(candidates: list[Candidate], material: Material) -> list[Candidate]:
     for c in candidates:
         evidence = normalise(c.evidence)
         text = c.text.strip()
-        if not text or len(text) > TEXT_MAX or not evidence or evidence not in haystack:
+        # The model sees the material with "<" escaped as "&lt;", so evidence quoted from that
+        # view never matches the raw text: it is dropped, which is the safe side.
+        thin = len(evidence.split()) < EVIDENCE_MIN_WORDS and len(evidence) < EVIDENCE_MIN_CHARS
+        if not text or len(text) > TEXT_MAX or thin or evidence not in haystack:
             continue
         kept.append(Candidate(normalise_tag(c.tag), text, c.evidence.strip(), c.ref))
     return kept
@@ -87,6 +92,14 @@ def _quoted(value: object, material: Material) -> str | None:
     return None
 
 
+def _ref(given: object, material: Material, source: str) -> str:
+    """Where a fact came from. The model may only narrow the material's own ref (a PDF page);
+    a page's URL is never taken from it, so a fenced page cannot point a fact elsewhere."""
+    if source != "web" and isinstance(given, str) and given.startswith(material.ref):
+        return given
+    return material.ref
+
+
 async def extract(model: Model, budget: Budget, material: Material, source: str) -> Extraction:
     content: list[dict] = []
     if material.document is not None:
@@ -94,14 +107,15 @@ async def extract(model: Model, budget: Budget, material: Material, source: str)
     content.append({"type": "text", "text": f"Source: {source}\n{fenced(material)}"})
     reply = await complete(model, budget, prompt("know_extract.md"), content)
     data = _json(reply)
+    facts = data.get("facts")
     raw = [
         Candidate(
             str(f.get("tag", "")),
             str(f.get("text", "")),
             str(f.get("evidence", "")),
-            str(f.get("ref") or material.ref),
+            _ref(f.get("ref"), material, source),
         )
-        for f in data.get("facts", [])
+        for f in (facts if isinstance(facts, list) else [])
         if isinstance(f, dict)
     ]
     return Extraction(

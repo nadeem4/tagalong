@@ -2825,7 +2825,7 @@ Still no screen; `brain/tests/test_know_extract.py`, `test_know_web.py`, `test_k
 
 - A fact whose quote is not in the material is dropped; a quote that differs only in whitespace or case is kept.
 - Text in a page, README or PDF that tries to instruct the extractor is fenced as untrusted data, with its angle brackets escaped.
-- A web page that shares only the person's name (or only their employer) is dropped; handle, a listed link, or name plus employer keeps it.
-- The web source asks for at most 5 searches or fetches, and spends the day's budget; a spent budget stops it before any call.
+- A web page that shares only the person's name (or only their employer) is dropped; the handle as `@h` or `github.com/h` (a plain word does not count), a listed link (matched to its end), or name plus employer keeps it.
+- The web source asks for at most 5 searches and 5 page reads, and spends the day's budget; a spent budget stops it before any call.
 - GitHub: forks are skipped, 30 repos at most; an unknown user, a rate limit and a network error each give a plain gap; a missing README does not.
 - LinkedIn: an image-only PDF or a file that is not a PDF gives a gap, not facts.

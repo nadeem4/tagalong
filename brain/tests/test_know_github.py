@@ -109,3 +109,9 @@ async def test_github_makes_no_request_with_bad_username():
     with pytest.raises(SourceGap, match="No GitHub user"):
         await source(handler).read("bad name/../x", Known())
     assert calls == []
+
+
+async def test_github_server_error_is_unreachable_not_unknown_user():
+    handler = lambda request: httpx2.Response(500)  # noqa: E731
+    with pytest.raises(SourceGap, match="Couldn't reach GitHub"):
+        await source(handler).read("amyb", Known())

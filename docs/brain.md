@@ -2546,7 +2546,7 @@ the portrait come in a later slice.
   `pypdf` (so evidence can be checked) and the PDF also goes to the model as a document block.
   Not a PDF, or a PDF with no text (an image), is a gap.
 - **`know/web.py`**: one model request with the capped web search and fetch tools
-  (`web_tools.MAX_USES`, 5). A fetched page is kept only if it holds the handle (whole word), a
+  (`web_tools.MAX_USES`, 5). A fetched page is kept only if it holds the handle in handle form (`@h` or `github.com/h`, never a plain word), a
   link the person listed, or both their name and employer; a name alone is a namesake and is
   dropped. No keys, or no page kept, is a gap. The budget counts the call and its searches.
 - **`know/extract.py`**: `extract` sends the material (fenced as `<material untrusted="true">`,

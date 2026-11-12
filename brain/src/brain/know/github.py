@@ -47,8 +47,10 @@ class GithubSource:
         client = self._client or httpx2.AsyncClient(timeout=TIMEOUT)
         try:
             profile = await self._get(client, f"/users/{user}")
-            if profile.status_code != 200:
+            if profile.status_code == 404:
                 raise SourceGap(f"No GitHub user '{user}'.")
+            if profile.status_code != 200:
+                raise SourceGap("Couldn't reach GitHub.")
             repos = await self._get(
                 client, f"/users/{user}/repos", type="owner", sort="pushed", per_page=100
             )

@@ -431,8 +431,8 @@ Nothing runs until you ask. When you do, Scout reads only what you point it at:
   profile README). No sign-in, no token.
 - **LinkedIn.** Only the PDF you save from your own profile and give Scout. It is read here for
   its text and sent to Anthropic with the text. Scout does not open LinkedIn.
-- **The web.** Anthropic's search and fetch tools, up to 5 uses, looking for pages that mention
-  your handle, a link you listed, or both your name and employer. Pages that only share your name
+- **The web.** Anthropic's search and fetch tools, up to 5 searches and 5 page reads, looking for pages that mention
+  your handle (as `@name` or a github.com link), a link you listed, or both your name and employer. Pages that only share your name
   are dropped.
 - **What is kept.** Only facts with a quote from the material to back them; the rest is thrown
   away. Gathered text is masked for secrets before it is saved.

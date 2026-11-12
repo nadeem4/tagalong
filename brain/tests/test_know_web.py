@@ -37,6 +37,21 @@ def test_web_matches_rejects_employer_only():
     assert not matches("Acme Corp announced a sale", Known(name="Amy Brown", employer="Acme Corp"))
 
 
+def test_web_matches_github_url_form():
+    assert matches("see github.com/AmyB for code", KNOWN)
+
+
+def test_web_matches_rejects_plain_word_handle():
+    # a handle like "amy" is also a first name: only handle forms count
+    assert not matches("Amy, a dentist in Ohio", Known(handle="amy"))
+
+
+def test_web_matches_rejects_url_prefix():
+    assert not matches("see x.com/amybrown", Known(urls=("https://x.com/amy",)))
+    assert not matches("visit amy.devious.com", Known(urls=("https://amy.dev",)))
+    assert matches("visit https://amy.dev.", Known(urls=("https://amy.dev",)))
+
+
 def test_web_matches_handle_is_whole_word():
     assert not matches("bobby tables", Known(handle="bob"))
 
@@ -63,14 +78,29 @@ async def test_web_read_skips_without_keys_as_gap(tmp_path):
 async def test_web_read_keeps_only_matching_pages(tmp_path):
     blocks = [
         {"type": "text", "text": "done"},
-        fetch("https://amy.dev/about", "I am amyb and I build CLIs."),
+        fetch("https://amy.dev/about", "I am @amyb and I build CLIs."),
         fetch("https://other.example/amy", "Amy Brown, dentist."),
         fetch("https://news.example/acme", "Acme Corp quarterly results."),
     ]
     model = FakeModel(final(content=blocks))
     out = await WebSource(model, budget(tmp_path)).read(None, KNOWN)
     assert [m.ref for m in out] == ["https://amy.dev/about"]
-    assert "amyb" in out[0].text
+    assert "@amyb" in out[0].text
+
+
+async def test_web_read_skips_non_text_sources(tmp_path):
+    pdf = fetch("https://amy.dev/cv.pdf", "@amyb")
+    pdf["content"]["content"]["source"]["type"] = "base64"
+    model = FakeModel(final(content=[pdf, fetch("https://amy.dev/a", "@amyb")]))
+    out = await WebSource(model, budget(tmp_path)).read(None, KNOWN)
+    assert [m.ref for m in out] == ["https://amy.dev/a"]
+
+
+async def test_web_prompt_is_sent_once(tmp_path):
+    model = FakeModel(final(content=[fetch("https://amy.dev/a", "@amyb")]))
+    await WebSource(model, budget(tmp_path)).read(None, KNOWN)
+    system, messages, _t, _c = model.calls[0]
+    assert system not in messages[0]["content"]
 
 
 async def test_web_read_none_matched_is_gap(tmp_path):
@@ -80,7 +110,7 @@ async def test_web_read_none_matched_is_gap(tmp_path):
 
 
 async def test_web_read_requests_capped_web_tools(tmp_path):
-    model = FakeModel(final(content=[fetch("https://amy.dev/a", "amyb")]))
+    model = FakeModel(final(content=[fetch("https://amy.dev/a", "@amyb")]))
     await WebSource(model, budget(tmp_path)).read(None, KNOWN)
     tools = model.calls[0][2]
     assert {t["name"] for t in tools} == {"web_search", "web_fetch"}
@@ -89,7 +119,7 @@ async def test_web_read_requests_capped_web_tools(tmp_path):
 
 async def test_web_read_spends_budget(tmp_path):
     b = budget(tmp_path)
-    model = FakeModel(final(content=[fetch("https://amy.dev/a", "amyb")]))
+    model = FakeModel(final(content=[fetch("https://amy.dev/a", "@amyb")]))
     await WebSource(model, b).read(None, KNOWN)
     assert b.spent > 0
 

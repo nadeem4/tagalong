@@ -5,6 +5,7 @@ against it; the PDF itself also goes to the model as a document block. An image-
 non-PDF file is a gap, never guessed facts.
 """
 
+import asyncio
 import base64
 import io
 
@@ -30,7 +31,7 @@ class LinkedinSource:
     async def read(self, given: str | bytes | None, known: Known) -> list[Material]:
         if not isinstance(given, bytes) or not given.startswith(b"%PDF"):
             raise SourceGap("Couldn't read the PDF.")
-        pages = pdf_text(given)
+        pages = await asyncio.to_thread(pdf_text, given)  # a big PDF must not stall the loop
         if not any(p.strip() for p in pages):
             raise SourceGap("The PDF has no readable text (is it an image?).")
         document = {

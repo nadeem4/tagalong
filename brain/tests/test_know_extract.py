@@ -29,12 +29,48 @@ def test_check_drops_invented_evidence():
 
 
 def test_check_drops_empty_and_overlong_text():
-    bad = [cand("Acme Corp", text=""), cand("", text="x"), cand("Acme Corp", text="x" * 501)]
+    bad = [
+        cand("Worked at Acme Corp", text=""),
+        cand("", text="x"),
+        cand("Worked at Acme Corp", text="x" * 501),
+    ]
     assert check(bad, MATERIAL) == []
 
 
 def test_check_normalises_tag():
-    assert check([cand("Acme Corp", tag=" Side Projects ")], MATERIAL)[0].tag == "side_projects"
+    assert (
+        check([cand("Worked at Acme Corp", tag=" Side Projects ")], MATERIAL)[0].tag
+        == "side_projects"
+    )
+
+
+def test_check_drops_trivial_evidence():
+    # a short quote ("Acme", "CLI") proves nothing: needs 3 words or 12 characters
+    assert check([cand("Acme"), cand("a CLI"), cand("Built Foo")], MATERIAL) == []
+    assert len(check([cand("Acme Corp since"), cand("Worked at Acme")], MATERIAL)) == 2
+
+
+@pytest.mark.parametrize("facts", [None, "text", 5, {"a": 1}])
+async def test_extract_non_list_facts_gives_nothing(tmp_path, facts):
+    reply = json.dumps({"facts": facts, "name": None})
+    out = await extract(FakeModel(final(reply)), budget(tmp_path), MATERIAL, "x")
+    assert out.facts == []
+
+
+def _reply(ref):
+    fact = {"tag": "work", "text": "Works at Acme", "evidence": "Acme Corp since", "ref": ref}
+    return final(json.dumps({"facts": [fact]}))
+
+
+async def test_extract_ref_is_the_materials_own(tmp_path):
+    web = Material("Worked at Acme Corp since 2021", "https://amy.dev/a")
+    out = await extract(FakeModel(_reply("https://evil.example")), budget(tmp_path), web, "web")
+    assert out.facts[0].ref == "https://amy.dev/a"
+    pdf = Material("Worked at Acme Corp since 2021", "linkedin.pdf")
+    out = await extract(FakeModel(_reply("linkedin.pdf#p2")), budget(tmp_path), pdf, "linkedin")
+    assert out.facts[0].ref == "linkedin.pdf#p2"
+    out = await extract(FakeModel(_reply("elsewhere")), budget(tmp_path), pdf, "linkedin")
+    assert out.facts[0].ref == "linkedin.pdf"
 
 
 async def test_extract_prompt_fences_material(tmp_path):
@@ -58,7 +94,9 @@ async def test_extract_includes_document_block_first_when_present(tmp_path):
 
 async def test_extract_returns_checked_parts(tmp_path):
     answer = {
-        "facts": [{"tag": "work", "text": "Works at Acme", "evidence": "Acme Corp", "ref": "r"}],
+        "facts": [
+            {"tag": "work", "text": "Works at Acme", "evidence": "Worked at Acme Corp", "ref": "r"}
+        ],
         "name": "Amy",
         "employer": "Acme Corp",
     }
