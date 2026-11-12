@@ -8,6 +8,8 @@ import sqlite3
 from dataclasses import dataclass
 from typing import Literal
 
+from brain.know.facts import normalise_tag, visibility_for
+
 
 @dataclass(frozen=True)
 class Kind:
@@ -141,14 +143,105 @@ def forget(db: sqlite3.Connection, item_id: int) -> Item:
     item = _item(db, item_id)
     if item is None:
         raise MemoryRefused(f"no memory with id {item_id}.")
+    if item.kind == "portrait":
+        raise MemoryRefused(
+            "The portrait is rewritten, not deleted: correct a fact or run get to know me again."
+        )
     db.execute("DELETE FROM memories WHERE id=?", (item_id,))
+    if item.kind == "profile" and item.evidence:
+        # Remembered per source so a later run does not bring the forgotten fact back.
+        db.execute(
+            "INSERT OR IGNORE INTO memory_dismissed(source, evidence) VALUES (?,?)",
+            (item.source, normalise(item.evidence)),
+        )
     return item
 
 
+@dataclass(frozen=True)
+class NewFact:
+    tag: str
+    text: str
+    evidence: str
+    source_ref: str
+
+
+def save_source_facts(
+    db: sqlite3.Connection, source: str, facts: list[NewFact], at: str
+) -> list[Item]:
+    """Replace one source's profile facts. Facts the person forgot, ones another source
+    already holds and any past the cap are skipped."""
+    cap = KINDS["profile"].max_items or 0
+    db.execute("BEGIN IMMEDIATE")
+    try:
+        db.execute("DELETE FROM memories WHERE kind='profile' AND source=?", (source,))
+        dismissed = {
+            r[0]
+            for r in db.execute("SELECT evidence FROM memory_dismissed WHERE source=?", (source,))
+        }
+        known = {
+            normalise(r[0]) for r in db.execute("SELECT text FROM memories WHERE kind='profile'")
+        }
+        count = len(known)
+        saved: list[Item] = []
+        for f in facts:
+            key = normalise(f.text)
+            if normalise(f.evidence) in dismissed or key in known:
+                continue
+            if count >= cap:
+                break
+            tag = normalise_tag(f.tag)
+            cur = db.execute(
+                "INSERT INTO memories(kind, text, created_at, updated_at, tag, source,"
+                " source_ref, evidence, visibility) VALUES ('profile',?,?,?,?,?,?,?,?)",
+                (f.text, at, at, tag, source, f.source_ref, f.evidence, visibility_for(tag)),
+            )
+            known.add(key)
+            count += 1
+            saved.append(_item(db, cur.lastrowid))  # type: ignore[arg-type]
+    except BaseException:
+        db.execute("ROLLBACK")
+        raise
+    db.execute("COMMIT")
+    return saved
+
+
+def profile_facts(db: sqlite3.Connection, include_asked: bool = True) -> list[Item]:
+    sql = f"SELECT {_COLUMNS} FROM memories WHERE kind='profile'"
+    if not include_asked:
+        sql += " AND visibility='free'"
+    return [Item(*r) for r in db.execute(sql + " ORDER BY id")]
+
+
+def set_portrait(db: sqlite3.Connection, text: str, at: str) -> Item:
+    text = text.strip()
+    cap = KINDS["portrait"].max_chars or 0
+    if len(text) > cap:
+        raise MemoryRefused(f"That is {len(text)} characters; the portrait is at most {cap}.")
+    db.execute("BEGIN IMMEDIATE")
+    try:
+        db.execute("DELETE FROM memories WHERE kind='portrait'")
+        cur = db.execute(
+            "INSERT INTO memories(kind, text, created_at, updated_at, source) VALUES"
+            " ('portrait',?,?,?,'know')",
+            (text, at, at),
+        )
+    except BaseException:
+        db.execute("ROLLBACK")
+        raise
+    db.execute("COMMIT")
+    return _item(db, cur.lastrowid)  # type: ignore[arg-type,return-value]
+
+
+def get_portrait(db: sqlite3.Connection) -> Item | None:
+    row = db.execute(f"SELECT {_COLUMNS} FROM memories WHERE kind='portrait'").fetchone()
+    return Item(*row) if row else None
+
+
 def list_items(db: sqlite3.Connection, limit: int) -> list[Item]:
-    """Every kind, newest first (by last change); for Home's memory list."""
+    """Every kind but the portrait, newest first (by last change); for Home's memory list."""
     rows = db.execute(
-        f"SELECT {_COLUMNS} FROM memories ORDER BY updated_at DESC, id DESC LIMIT ?",
+        f"SELECT {_COLUMNS} FROM memories WHERE kind != 'portrait'"
+        " ORDER BY updated_at DESC, id DESC LIMIT ?",
         (limit,),
     ).fetchall()
     return [Item(*r) for r in rows]
