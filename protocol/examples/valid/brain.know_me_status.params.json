@@ -1,1 +1,12 @@
-{"jsonrpc":"2.0","method":"know_me_status","params":{"sources":[{"name":"GitHub","state":"done"},{"name":"LinkedIn PDF","state":"reading"},{"name":"The web","state":"waiting"}],"done":false}}
+{
+  "jsonrpc": "2.0",
+  "method": "know_me_status",
+  "params": {
+    "sources": [
+      { "name": "GitHub", "state": "done" },
+      { "name": "LinkedIn PDF", "state": "reading" },
+      { "name": "The web", "state": "waiting" }
+    ],
+    "done": false
+  }
+}

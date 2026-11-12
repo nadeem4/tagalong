@@ -1,1 +1,5 @@
-{"jsonrpc":"2.0","method":"know_me_status","params":{"sources":[{"name":"GitHub","state":"running"}],"done":false}}
+{
+  "jsonrpc": "2.0",
+  "method": "know_me_status",
+  "params": { "sources": [{ "name": "GitHub", "state": "running" }], "done": false }
+}

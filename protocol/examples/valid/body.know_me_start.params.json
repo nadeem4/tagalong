@@ -1,1 +1,6 @@
-{"jsonrpc":"2.0","id":7,"method":"know_me_start","params":{"github":"octocat","pdf":{"name":"Profile.pdf","data":"JVBERi0xLjQK"}}}
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "method": "know_me_start",
+  "params": { "github": "octocat", "pdf": { "name": "Profile.pdf", "data": "JVBERi0xLjQK" } }
+}
