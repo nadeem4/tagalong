@@ -23,6 +23,7 @@ from brain.mind.turn import Call, Final
 from brain.protocol import Body, ErrorCode, RpcError, SayParams, Tool
 from brain.sessions import Session
 from brain.store import rules
+from brain.store.memory import NewFact
 from brain.store.work import ActivityEntry
 from brain.toolbox import BrainSource, ToolSpec
 
@@ -357,6 +358,17 @@ async def test_what_you_know_in_system_prompt():
     await session.say("desktop", say("hello"))
     await finish(session)
     assert "What you know" in model.systems[0] and "answer in French" in model.systems[0]
+
+
+async def test_system_prompt_names_asked_topics_but_never_the_fact():
+    memory = Memory(":memory:")
+    memory.save_source_facts("web", [NewFact("lives_in_chicago", "Lives in Chicago", "e", "r")])
+    model = Gate(["hi"])
+    session, _ = make(model, memory)
+    await session.say("desktop", say("hello"))
+    await finish(session)
+    assert "personal (where they live, family, health)" in model.systems[0]
+    assert "Chicago" not in model.systems[0]
 
 
 async def test_session_passes_current_preferences_each_turn():

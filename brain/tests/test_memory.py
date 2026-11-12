@@ -174,7 +174,19 @@ def test_asked_topics_are_the_distinct_tags_of_asked_facts(mem):
             NewFact("skills", "Writes Go", "e", "r4"),  # free: not an asked topic
         ],
     )
-    assert mem.asked_topics() == ["family", "location"]
+    assert mem.asked_topics() == ["personal"]  # model-made tags never reach the prompt
+
+
+def test_asked_topics_hide_model_made_tags_and_count_chat_facts(mem):
+    mem.save_source_facts("web", [NewFact("lives_in_chicago", "x", "e", "r1")])
+    assert mem.asked_topics() == ["personal"]
+    mem.remember("about_you", "Has a sister", tag="sister_amy")
+    assert mem.asked_topics() == ["personal"]
+
+
+def test_asked_topics_count_a_chat_fact_alone(mem):
+    mem.remember("about_you", "Has a sister", tag="family")
+    assert mem.asked_topics() == ["personal"]
 
 
 def test_always_loaded_groups_in_kind_order(mem):

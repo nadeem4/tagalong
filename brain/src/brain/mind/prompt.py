@@ -43,6 +43,10 @@ _KNOW_HEADINGS = {
 }
 
 
+# What each held topic covers, so a question like "where am I based?" maps to it.
+_TOPIC_GLOSS = {"personal": "personal (where they live, family, health)"}
+
+
 def render_know(groups: dict[str, list[Item]], asked_topics: list[str] | None = None) -> str:
     blocks = []
     portrait = groups.get("portrait")
@@ -57,8 +61,9 @@ def render_know(groups: dict[str, list[Item]], asked_topics: list[str] | None = 
         blocks.append(f"{heading}:\n" + "\n".join(lines))
     if asked_topics:
         # Topics only, never the facts: the model must fetch them, not guess from the portrait.
+        glossed = [_TOPIC_GLOSS.get(t, t) for t in asked_topics]
         blocks.append(
-            f"Personal facts the owner keeps back, held on: {', '.join(asked_topics)}. "
+            f"Facts the owner keeps back, held on: {', '.join(glossed)}. "
             "The portrait does not cover them. Call recall with include_personal before "
             "answering anything about these topics."
         )

@@ -31,7 +31,9 @@ const cap = (word: string): string => word.charAt(0).toUpperCase() + word.slice(
 
 /** The chip: a tagged fact says what it is about (Work, Skills), anything else its kind. */
 function chipLabel(memory: MemoryEntry): string {
-  return memory.kind === 'fact' && memory.tag ? cap(memory.tag) : KIND_LABELS[memory.kind];
+  return memory.kind === 'fact' && memory.tag
+    ? cap(memory.tag.replace(/_/g, ' '))
+    : KIND_LABELS[memory.kind];
 }
 
 /** A fact's small line: where it was read, and whether it is only used when asked. */

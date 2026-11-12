@@ -173,15 +173,9 @@ def test_prompt_has_no_tracking_heading():
 
 
 def test_render_know_names_asked_topics_without_content():
-    out = render_know({}, asked_topics=["location", "family"])
-    assert "location, family" in out
+    out = render_know({}, asked_topics=["personal"])
+    assert "personal (where they live, family, health)" in out
     assert "include_personal" in out and "portrait" in out
-
-
-def test_render_know_asked_line_leaks_no_fact_text():
-    asked = Item(3, "profile", "Lives in Chicago", "a", "b", tag="location", visibility="asked")
-    out = render_know({"profile": [asked]}, asked_topics=["location"])
-    assert "Chicago" not in out and "location" in out
 
 
 def test_render_know_no_asked_topics_has_no_line():
