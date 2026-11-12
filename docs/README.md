@@ -22,6 +22,7 @@ source of truth; each doc cites the files it describes. How to build and run fro
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | [desktop.md](desktop.md)           | The Electron host: windows, tray, hotkeys, IPC modules, the platform adapter, settings applied live, packaging, the log file   |
 | [bubble.md](bubble.md)             | The companion bubble in `bodies/ui`: status marks, drops                                                                       |
+| [mascot.md](mascot.md)             | The mascot engine in `bodies/mascot`: the wobnimo fork, specs, moods, custom moods, parts per mood, props                      |
 | [voice.md](voice.md)               | Hearing and speaking: the talk key, always listening, follow-up, talking over Scout, the system voice                          |
 | [browser-body.md](browser-body.md) | The browser body: identity, its four tools, right-click and address-bar asks, permissions, popup, install                      |
 | [whatsapp.md](whatsapp.md)         | The WhatsApp body: one-time Meta setup, Home > Connections > Bodies, webhook rules, Graph send, 24-hour window, build and test |

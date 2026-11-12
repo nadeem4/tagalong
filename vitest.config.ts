@@ -9,7 +9,14 @@ const uiFloor = { statements: 91, branches: 83, functions: 90, lines: 93 };
 export default defineConfig({
   test: {
     // Directories only: bodies/ also holds PRODUCT.md and DESIGN.md.
-    projects: ['bodies/browser', 'bodies/desktop', 'bodies/ui', 'bodies/whatsapp', 'protocol/ts'],
+    projects: [
+      'bodies/browser',
+      'bodies/desktop',
+      'bodies/mascot',
+      'bodies/ui',
+      'bodies/whatsapp',
+      'protocol/ts',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],

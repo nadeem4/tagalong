@@ -12,7 +12,10 @@
   },
   "include": [
     "bodies/*/src/test-setup.ts",
-    "bodies/*/src/**/*.test.ts",
+    "bodies/desktop/src/**/*.test.ts",
+    "bodies/browser/src/**/*.test.ts",
+    "bodies/ui/src/**/*.test.ts",
+    "bodies/whatsapp/src/**/*.test.ts",
     "bodies/*/src/**/*.test.tsx",
     "bodies/*/src/**/*.test-d.ts",
     "protocol/ts/src/**/*.test.ts",
