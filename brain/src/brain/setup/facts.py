@@ -1,7 +1,8 @@
 """Read-only facts about this machine: OS, CPU and the tools Scout may need.
 
 Every probe is `<tool> --version`; a missing or failing tool is None, never an error. The
-command runner is a seam (`RunCmd`) so tests never start a real process.
+command runner is a seam (`RunCmd`) so tests never start a real process. A runner may hand each
+output line to `on_line` as it arrives (an install shows npm's progress that way).
 """
 
 import asyncio
@@ -12,7 +13,7 @@ import shutil
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Protocol
 
 from brain.experts import kill_tree
 from brain.setup.paths import node_dir
@@ -27,13 +28,46 @@ class CmdResult:
     err: str
 
 
-RunCmd = Callable[[list[str], Mapping[str, str], Path | None], Awaitable[CmdResult]]
+OnLine = Callable[[str], None]
+
+
+class RunCmd(Protocol):
+    def __call__(
+        self,
+        argv: list[str],
+        env: Mapping[str, str],
+        cwd: Path | None,
+        on_line: OnLine | None = None,
+    ) -> Awaitable[CmdResult]: ...
+
+
+async def _all(*parts):
+    """Run the parts together; when one fails the others are cancelled, not left running."""
+    tasks = [asyncio.ensure_future(part) for part in parts]
+    try:
+        return list(await asyncio.gather(*tasks))
+    except BaseException:
+        for task in tasks:
+            task.cancel()
+        raise
+
+
+async def _pump(stream: asyncio.StreamReader, on_line: OnLine | None) -> str:
+    """Read a pipe to its end, handing each line on as it arrives."""
+    text: list[str] = []
+    async for raw in stream:
+        line = raw.decode(errors="replace")
+        text.append(line)
+        if on_line is not None:
+            on_line(line.rstrip())
+    return "".join(text)
 
 
 async def real_run_cmd(
     argv: list[str],
     env: Mapping[str, str],
     cwd: Path | None,
+    on_line: OnLine | None = None,
     timeout: float = PROBE_TIMEOUT_S,
 ) -> CmdResult:
     """The only place a setup command starts a process: no shell. The default timeout suits a
@@ -45,16 +79,18 @@ async def real_run_cmd(
         stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        limit=1 << 20,  # one long npm line must not end the read
     )
+    assert proc.stdout is not None and proc.stderr is not None
     try:
-        out, err = await asyncio.wait_for(proc.communicate(), timeout)
+        out, err, _ = await asyncio.wait_for(
+            _all(_pump(proc.stdout, on_line), _pump(proc.stderr, on_line), proc.wait()), timeout
+        )
     except BaseException:
         # A timeout, a cancel or anything else: npm and the scripts it started die with it.
         await asyncio.shield(kill_tree(proc))
         raise
-    return CmdResult(
-        proc.returncode or 0, out.decode(errors="replace"), err.decode(errors="replace")
-    )
+    return CmdResult(proc.returncode or 0, out, err)
 
 
 @dataclass(frozen=True)

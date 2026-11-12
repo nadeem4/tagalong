@@ -7,11 +7,10 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ConnectorConfirmParams } from '../shapes';
-import { stageWords } from '../home/experts-group';
 import { useHostBridge } from '../host-bridge';
 import type { HostBridge } from '../host-bridge';
 import { InstallCard, subjectOf, type InstallSubject, type InstallView } from './install-card';
-import { appView, findApp } from './install-progress';
+import { appView, expertWorking, findApp } from './install-progress';
 
 /** How long an error row that has not changed since Allow is trusted to be this install's own. */
 const STALE_ERROR_MS = 8000;
@@ -29,13 +28,7 @@ function expertView(
   }
   const p = overview.progress;
   if (p !== null && (p.expert === undefined || p.expert === s.id)) {
-    const words = stageWords({ stage: p.stage });
-    return {
-      phase: 'working',
-      label: `${words}…`,
-      ...(p.percent !== undefined ? { percent: p.percent } : {}),
-      note: "Into Tagalong's own folder, about 60 MB",
-    };
+    return { ...expertWorking(p), note: "Into Tagalong's own folder, about 60 MB" };
   }
   const row = overview.experts.find((e) => e.id === s.id);
   if (row?.state === 'needs_login') return { phase: 'signin' };

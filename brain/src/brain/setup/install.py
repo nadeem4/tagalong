@@ -5,6 +5,8 @@ Tagalong's own); a binary entry is downloaded, hash-checked and safely extracted
 staged in `tools/<id>.part` and swapped into place only on success, so a failure or cancel
 leaves the old install and record (or nothing) and never a half-installed expert.
 Failures are `InstallError(kind, detail)`: facts for Scout to word, not sentences.
+Progress is real: npm's own output sets the stage (resolving, fetching, finishing) and a
+download's byte count sets a throttled percent, so the card never sits on one word.
 """
 
 import asyncio
@@ -21,7 +23,7 @@ from urllib.parse import urlparse
 
 from brain.setup.archive import UnsafeArchive, safe_extract
 from brain.setup.facts import Machine, NodePaths, RunCmd, node_paths
-from brain.setup.net import GetJson
+from brain.setup.net import GetJson, percent_steps
 from brain.setup.node_runtime import (
     DIST,
     NodeBuildMissing,
@@ -37,7 +39,7 @@ from brain.setup.trust import RECOMMENDED_EXPERT
 from brain.voice.models import Fetch
 
 NODE_FLOOR = 22  # the highest floor of the experts checked in the 20a spike; one for all
-NPM_TIMEOUT_S = 900.0
+NPM_TIMEOUT_S = 900.0  # the whole install's ceiling, not a stage
 STALE_STAGING_S = 600.0  # a staging folder newer than this may belong to a running install
 # What npm may see of our environment: enough to run and reach the network, never a key.
 _ENV_KEEP = frozenset(
@@ -287,7 +289,10 @@ def _npm_env(node: Path) -> dict[str, str]:
     env = {k: v for k, v in os.environ.items() if k.upper() in _ENV_KEEP}
     env["PATH"] = str(node.parent) + os.pathsep + env.get("PATH", "")
     env.update(
-        npm_config_update_notifier="false", npm_config_fund="false", npm_config_audit="false"
+        npm_config_update_notifier="false",
+        npm_config_fund="false",
+        npm_config_audit="false",
+        npm_config_loglevel="http",  # one line per request: what the stages are read from
     )
     return env
 
@@ -301,17 +306,26 @@ async def _npm_install(
     run: RunCmd,
     on_progress,
 ) -> list[str]:
-    on_progress({"stage": "installing"})
+    on_progress({"stage": "resolving"})
     staged.mkdir(parents=True)
     version = _version(entry, dist)
     spec = f"{dist.package}@{version}" if version else str(dist.package)
     argv = [str(node.node), str(node.npm_cli), "install", "--prefix", str(staged), spec]
+    fetching = False
+
+    def on_line(line: str) -> None:
+        nonlocal fetching
+        if not fetching and "http fetch" in line:  # the first request: resolving is over
+            fetching = True
+            on_progress({"stage": "fetching"})
+
     try:
-        result = await run(argv, _npm_env(node.node), staged)
-    except (OSError, TimeoutError) as err:
+        result = await run(argv, _npm_env(node.node), staged, on_line)
+    except (OSError, TimeoutError, ValueError) as err:  # ValueError: a line npm made too long
         raise InstallError("npm_failed", f"{type(err).__name__}: {err}") from err
     if result.code != 0:
         raise InstallError("npm_failed", (result.err or result.out).strip()[-400:])
+    on_progress({"stage": "finishing"})
     return [str(node.node), str(_bin_js(staged, final, str(dist.package))), *dist.args]
 
 
@@ -342,11 +356,21 @@ async def _binary_install(
     download.mkdir(parents=True)
     archive = download / (Path(urlparse(dist.url or "").path).name or "download")
     digest = hashlib.sha256()
+    received = 0
+    report = None
     try:
         with archive.open("wb") as out:
-            async for chunk in fetch(str(dist.url)):
+            stream = fetch(str(dist.url))
+            async for chunk in stream:
+                if report is None:  # the size is known once the first chunk has arrived
+                    report = percent_steps(
+                        getattr(stream, "size", None),
+                        lambda p: on_progress({"stage": "downloading", "percent": p}),
+                    )
                 digest.update(chunk)
                 await asyncio.to_thread(out.write, chunk)
+                received += len(chunk)
+                report(received)
     except OSError as err:
         raise InstallError("download_failed", str(err)) from err
     if digest.hexdigest() != dist.sha256.lower():
