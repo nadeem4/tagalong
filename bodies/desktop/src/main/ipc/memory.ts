@@ -1,6 +1,6 @@
 /**
- * IPC for Home's What Scout remembers: list it, delete one memory. Both go through the brain's
- * tools (list_memories, forget). Contains registerMemoryIpc.
+ * IPC for Home's What Scout remembers: list it, read the portrait, delete one memory. All go
+ * through the brain's tools (list_memories, forget). Contains registerMemoryIpc.
  */
 
 import type { MemoryEntry } from '@tagalong/ui/shapes';
@@ -15,6 +15,11 @@ interface BrainMemory {
   kind: string;
   text: string;
   at: string;
+  tag?: string | null;
+  source?: string | null;
+  source_ref?: string | null;
+  evidence?: string | null;
+  visibility?: string | null;
 }
 
 /** Home labels three kinds; the brain keeps more, so each lands on the nearest one. */
@@ -23,21 +28,35 @@ function homeKind(kind: string): MemoryEntry['kind'] {
   return kind === 'instruction' ? 'preference' : 'fact';
 }
 
-function parseMemories(value: unknown): MemoryEntry[] {
+/** Provenance fields the brain leaves null for old rows are left out, not sent as null. */
+function parseMemories(value: unknown): { entries: MemoryEntry[]; portrait: string | null } {
   const list = (value as { memories?: unknown } | null)?.memories;
   if (!Array.isArray(list)) throw new Error('brain sent bad memories');
-  return (list as BrainMemory[]).map((m) => ({
+  const portrait = (value as { portrait?: unknown }).portrait;
+  const entries = (list as BrainMemory[]).map((m): MemoryEntry => ({
     id: String(m.id),
     kind: homeKind(m.kind),
     text: m.text,
     createdAt: m.at,
+    ...(m.tag ? { tag: m.tag } : {}),
+    ...(m.source ? { source: m.source } : {}),
+    ...(m.source_ref ? { sourceRef: m.source_ref } : {}),
+    ...(m.evidence ? { evidence: m.evidence } : {}),
+    ...(m.visibility === 'free' || m.visibility === 'asked' ? { visibility: m.visibility } : {}),
   }));
+  return { entries, portrait: typeof portrait === 'string' && portrait !== '' ? portrait : null };
 }
 
 export function registerMemoryIpc(handle: IpcHandle, deps: { brain: BrainCall }): void {
   const { brain } = deps;
   // The brain returns the newest 200: what Home shows in one page.
-  handle(IPC.listMemories, async () => parseMemories(await callJson(brain, 'list_memories')));
+  handle(IPC.listMemories, async () => {
+    return parseMemories(await callJson(brain, 'list_memories')).entries;
+  });
+  // The portrait rides on the same brain call as the list.
+  handle(IPC.getPortrait, async () => {
+    return parseMemories(await callJson(brain, 'list_memories')).portrait;
+  });
   handle(IPC.deleteMemory, async (_event, id: string) => {
     // Brain ids are integers; anything else is not a memory it could have issued.
     if (!/^\d+$/.test(id)) return false;

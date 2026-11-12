@@ -2159,6 +2159,15 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
    **Expected:** the row appears without reopening Home.
 5. **Usage.** Open Home → **Overview**. **Expected:** **Spend** shows today's spend and the limit. Stop the brain: the **Scout** card says **Brain: Offline**, not Ready. Start it again: the card says Ready and **Spend** shows the numbers again without leaving the page.
 
+## Get to know me (K5 result view and bridge, automated only)
+
+The form and result view are not on any screen yet (the tour step and Home's button come next); `bodies/ui/src/know-me/*.test.tsx`, `src/shapes/know-me.test.ts` and `bodies/desktop/src/main/ipc/know-me.test.ts` cover them:
+
+- The form shows an input per source from what it needs, keeps Start off until a username or PDF is given, refuses a PDF over 10 MB, reads a PDF as base64, and tells how to save it from LinkedIn.
+- Progress rows follow the status, including the last `portrait` row and its gap.
+- The result shows the portrait and the fact count first; "What's this based on?" opens the facts, filterable by kind, with each fact's source and "only if asked"; with no portrait it says nothing was found.
+- The desktop refuses no input and a PDF over 10 MB without calling the brain, turns `over_limit` into "That PDF is over 10 MB.", pushes each status to every window and drops a bad one; the memory list keeps provenance and gives the portrait.
+
 ## Web search and fetch _(real brain, real key: this spends a few cents)_
 
 1. Ask Scout something current ("what changed in the latest Node release?"). It searches and

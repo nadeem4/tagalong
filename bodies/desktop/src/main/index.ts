@@ -89,6 +89,7 @@ import type { WalkthroughGate } from './walkthrough-gate';
 import { forwardConnectionsChanged, registerConnectionIpc } from './ipc/connections';
 import { SCOUT_ID, registerScoutIpc } from './ipc/scout';
 import { fromWindow, type IpcHandle } from './ipc/handle';
+import { registerKnowMeIpc } from './ipc/know-me';
 import { registerMemoryIpc } from './ipc/memory';
 import { registerApprovalsIpc } from './ipc/approvals';
 import { registerJobsIpc } from './ipc/jobs';
@@ -978,6 +979,15 @@ function registerIpc(): void {
     },
   });
   registerMemoryIpc(handle, { brain: required().brain });
+  registerKnowMeIpc(handle, {
+    brain: required().brain,
+    // The run's status goes to every window: the tour and Home may both show it.
+    broadcast: (channel, payload) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) window.webContents.send(channel, payload);
+      }
+    },
+  });
   registerPermissionsIpc(handle, { brain: required().brain });
   registerLoopsIpc(handle, { brain: required().brain });
   registerTimersIpc(handle, { brain: required().brain });

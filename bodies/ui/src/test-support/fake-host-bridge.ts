@@ -12,6 +12,9 @@ import type {
   UpdateResult,
   UpdatesState,
   Pet,
+  KnowMeInput,
+  KnowMeStatus,
+  KnowSourceInfo,
   MemoryEntry,
   ModelState,
   SetupOverview,
@@ -47,6 +50,13 @@ export interface FakeHostBridge extends HostBridge {
   readonly interrupts: readonly string[];
   /** What Scout remembers, newest first; delete edits it. */
   memories: MemoryEntry[];
+  /** Scout's portrait of the person. */
+  portrait: string | null;
+  /** Every knowMeStart input, in order, and how many onKnowMeStatus listeners are attached. */
+  readonly knowStarts: readonly KnowMeInput[];
+  readonly knowStatusListeners: number;
+  /** Pushes a run status to every onKnowMeStatus subscriber. */
+  emitKnowStatus(status: KnowMeStatus): void;
   /** Home's Permissions rows; setPermission edits them, a test may swap them. */
   permissions: PermissionRow[];
   /** Home's Permissions groups, in order; derived from the rows' `group` when a test sets none. */
@@ -192,6 +202,12 @@ export function createFakeHostBridge(
     listFails?: string;
     /** What Scout remembers, newest first. */
     memories?: MemoryEntry[];
+    /** Scout's portrait of the person; none by default. */
+    portrait?: string | null;
+    /** The sources get to know me lists. */
+    knowSources?: KnowSourceInfo[];
+    /** Makes knowMeStart reject with this sentence. */
+    knowStartError?: string;
     /** Home's Permissions rows. */
     permissions?: PermissionRow[];
     /** The groups those rows sit in; one per distinct `group`, titled by it, when left out. */
@@ -227,6 +243,8 @@ export function createFakeHostBridge(
 ): FakeHostBridge {
   const handlers = new Set<(event: TurnEvent) => void>();
   const changedHandlers = new Set<(what: string) => void>();
+  const knowHandlers = new Set<(status: KnowMeStatus) => void>();
+  const knowStarts: KnowMeInput[] = [];
   const approvedHandlers = new Set<
     (n: { tool: string; text: string; preference: string; cameUp?: boolean }) => void
   >();
@@ -384,6 +402,41 @@ export function createFakeHostBridge(
       return Promise.resolve({ id, removed: true });
     },
     memories: [...(options.memories ?? [])],
+    portrait: options.portrait ?? null,
+    knowStarts,
+    get knowStatusListeners() {
+      return knowHandlers.size;
+    },
+    emitKnowStatus(status) {
+      for (const handler of [...knowHandlers]) handler(status);
+    },
+    getPortrait() {
+      return Promise.resolve(fake.portrait);
+    },
+    knowMeSources() {
+      return Promise.resolve(
+        structuredClone(
+          options.knowSources ?? [
+            { name: 'GitHub', needs: 'username', label: 'Your GitHub username' },
+            { name: 'LinkedIn PDF', needs: 'file', label: 'Your LinkedIn PDF' },
+            { name: 'The web', needs: 'none', label: 'The web' },
+          ],
+        ),
+      );
+    },
+    knowMeStart(input) {
+      knowStarts.push(input);
+      if (options.knowStartError !== undefined) {
+        return Promise.reject(new Error(options.knowStartError));
+      }
+      return Promise.resolve({ joined: false });
+    },
+    onKnowMeStatus(handler) {
+      knowHandlers.add(handler);
+      return () => {
+        knowHandlers.delete(handler);
+      };
+    },
     listMemories() {
       return Promise.resolve([...fake.memories]);
     },

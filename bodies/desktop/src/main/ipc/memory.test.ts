@@ -41,6 +41,50 @@ describe('registerMemoryIpc', () => {
     expect(calls).toEqual([['list_memories', {}]]);
   });
 
+  it('maps a profile fact to a fact and keeps where it came from', async () => {
+    const { invoke } = setup(() =>
+      text({
+        memories: [
+          {
+            id: 4,
+            kind: 'profile',
+            text: 'Software engineer',
+            at: AT,
+            tag: 'work',
+            source: 'linkedin',
+            source_ref: 'cv.pdf',
+            evidence: 'Software Engineer at Acme',
+            visibility: 'free',
+          },
+          { id: 5, kind: 'about_you', text: 'Likes tea', at: AT, tag: null, source: 'chat' },
+        ],
+        portrait: 'You build things.',
+      }),
+    );
+    expect(await invoke(IPC.listMemories)).toEqual([
+      {
+        id: '4',
+        kind: 'fact',
+        text: 'Software engineer',
+        createdAt: AT,
+        tag: 'work',
+        source: 'linkedin',
+        sourceRef: 'cv.pdf',
+        evidence: 'Software Engineer at Acme',
+        visibility: 'free',
+      },
+      { id: '5', kind: 'fact', text: 'Likes tea', createdAt: AT, source: 'chat' },
+    ]);
+  });
+
+  it('reads the portrait from the same brain call, or null when there is none', async () => {
+    const withPortrait = setup(() => text({ memories: [], portrait: 'You build things.' }));
+    expect(await withPortrait.invoke(IPC.getPortrait)).toBe('You build things.');
+    expect(withPortrait.calls).toEqual([['list_memories', {}]]);
+    const without = setup(() => text({ memories: [], portrait: null }));
+    expect(await without.invoke(IPC.getPortrait)).toBeNull();
+  });
+
   it('deletes one memory by the brain id, and says it worked', async () => {
     const { invoke, calls } = setup(() => [{ type: 'text', text: 'forgot fact #2: x' }]);
     expect(await invoke(IPC.deleteMemory, '2')).toBe(true);
@@ -69,7 +113,9 @@ describe('registerMemoryIpc', () => {
     await expect(invoke(IPC.listMemories)).rejects.toThrow('brain sent bad memories');
   });
 
-  it('handles its two channels and nothing else', () => {
-    expect(setup(() => []).channels()).toEqual([IPC.deleteMemory, IPC.listMemories].sort());
+  it('handles its three channels and nothing else', () => {
+    expect(setup(() => []).channels()).toEqual(
+      [IPC.deleteMemory, IPC.getPortrait, IPC.listMemories].sort(),
+    );
   });
 });

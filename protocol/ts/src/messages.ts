@@ -310,12 +310,12 @@ export const KnowMePdf = z.object({
   data: z.string().max(KNOW_ME_PDF_B64_MAX),
 });
 
+// A GitHub username; the desktop checks the form's input with this same schema.
+export const KnowMeGithub = z.string().regex(/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/);
+
 export const KnowMeStartParams = z
   .object({
-    github: z
-      .string()
-      .regex(/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/)
-      .optional(),
+    github: KnowMeGithub.optional(),
     pdf: KnowMePdf.optional(),
   })
   .refine((p) => p.github !== undefined || p.pdf !== undefined, {

@@ -17,6 +17,9 @@ import type {
   Pet,
   PetRemarkParams,
   StatusMark,
+  KnowMeInput,
+  KnowMeStatus,
+  KnowSourceInfo,
   MemoryEntry,
   TurnEvent,
 } from '@tagalong/ui/shapes';
@@ -106,6 +109,21 @@ const bridge: PreloadBridge = {
     ipcRenderer.invoke(IPC.removeConnection, id) as Promise<unknown>,
   listMemories: () => ipcRenderer.invoke(IPC.listMemories) as Promise<MemoryEntry[]>,
   deleteMemory: (id: string) => ipcRenderer.invoke(IPC.deleteMemory, id) as Promise<boolean>,
+  getPortrait: () => ipcRenderer.invoke(IPC.getPortrait) as Promise<string | null>,
+  knowMeSources: () => ipcRenderer.invoke(IPC.knowMeSources) as Promise<KnowSourceInfo[]>,
+  // Main answers a refusal as `{ error }` (an IPC rejection would wrap the sentence); the
+  // renderer gets it back as a rejection carrying just the sentence.
+  knowMeStart: async (input: KnowMeInput) => {
+    const answer = (await ipcRenderer.invoke(IPC.knowMeStart, input)) as
+      { joined: boolean } | { error: string };
+    if ('error' in answer) throw new Error(answer.error);
+    return answer;
+  },
+  onKnowMeStatus: (handler: (status: KnowMeStatus) => void) => {
+    const listener = (_event: IpcRendererEvent, status: KnowMeStatus): void => handler(status);
+    ipcRenderer.on(IPC.knowMeStatusEvent, listener);
+    return () => void ipcRenderer.off(IPC.knowMeStatusEvent, listener);
+  },
   listPermissions: () =>
     ipcRenderer.invoke(IPC.listPermissions) as Promise<{
       groups: PermissionGroup[];
