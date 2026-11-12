@@ -25,6 +25,7 @@ from datetime import datetime
 from brain.bodies import Bodies
 from brain.events import EVENT_KINDS, Event, EventKind, Urgency, load_notes
 from brain.guards import EmitCtx, Guards, Hook
+from brain.masking import mask_json
 from brain.open_items import OpenItems
 from brain.tools import _fence_safe
 
@@ -64,6 +65,7 @@ class _Entry:
     rank: int
     seq: int
     item: Item
+    posted: datetime
     fails: int = 0
 
 
@@ -71,6 +73,7 @@ class _Entry:
 class _Group:
     kind: EventKind
     opened: datetime
+    posted: datetime  # when its oldest item was posted: staleness counts from here
     items: list[Item] = field(default_factory=list)
 
 
@@ -83,6 +86,10 @@ def wake_text(kind: EventKind, items: list[Item], note: str, at: datetime) -> st
             lines.append(f"  {name}: {first}")
             lines.extend(f"    {r}" for r in rest)
     return f'<data kind="event">\n{_fence_safe(chr(10).join(lines))}\n</data>'
+
+
+def _age(now: datetime, since: datetime) -> float:
+    return (now - since).total_seconds()
 
 
 def _label(item: Item) -> str:
@@ -130,6 +137,7 @@ class Dispatcher:
         self._seq = 0
         self._state = "idle"
         self._conversation = False
+        self._stopped = False
         self._changed = asyncio.Event()
         self._task: asyncio.Task | None = None
         self._timer: asyncio.TimerHandle | None = None
@@ -143,12 +151,19 @@ class Dispatcher:
             _log.warning("dropped item of disabled kind %r", item.kind)
             return
         item = replace(item, urgency=kind.urgency)
+        if item.key is not None:
+            self._close_held(item.kind, item.key)  # a re-emit supersedes its held row
+        if self._stopped:  # nothing runs any more: keep the news, tell the session
+            if kind.wakes:
+                self._hold(item, "stopped")
+            self._tell_gave_up(item)
+            return
         self.start()  # a source may post before the server's loop ran
         if kind.urgency == "hold":
             self._hold(item, "held_kind")
             return
         self._seq += 1
-        self._queue.put_nowait(_Entry(_RANK[kind.urgency], self._seq, item))
+        self._queue.put_nowait(_Entry(_RANK[kind.urgency], self._seq, item, self._now()))
         self._changed.set()
 
     def record(self, event: Event) -> None:
@@ -164,6 +179,7 @@ class Dispatcher:
         self._waiting = [
             w for w in self._waiting if not (w.item.kind == kind and w.item.key == key)
         ]
+        self._close_held(kind, key)
         kind_obj = self._kinds.get(kind)
         if kind_obj is not None:
             self._replace_held(kind_obj, key)
@@ -189,7 +205,9 @@ class Dispatcher:
         self._task = loop.create_task(self._run())
 
     async def stop(self) -> None:
-        """End delivering. What is left waiting is held as open items, never lost."""
+        """End delivering. News left waiting is held as open items, never lost; a say or card
+        answer is only reported to the session as given up."""
+        self._stopped = True
         if self._timer is not None:
             self._timer.cancel()
             self._timer = None
@@ -203,7 +221,8 @@ class Dispatcher:
         left += [i for g in self._groups for i in g.items]
         self._inflight, self._waiting, self._groups = [], [], []
         for item in left:
-            self._hold(item, "stopped")
+            if self._kinds[item.kind].wakes:
+                self._hold(item, "stopped")
             self._tell_gave_up(item)
 
     # The hold: news that cannot be told now is kept where the person will see it.
@@ -211,6 +230,7 @@ class Dispatcher:
     def _hold(self, item: Item, why: str) -> None:
         # Scalars only: the payload may carry futures or a person's words, never saved here.
         facts = {k: v for k, v in item.payload.items() if isinstance(v, str | int | float | bool)}
+        facts = mask_json(self._guards, "held", facts)  # facts come from outside: secrets go
         saved = {"event": item.kind, "key": item.key, "why": why, "facts": facts}
         try:
             self._open_items.open("held", item.origin_body, saved_call=saved)
@@ -218,6 +238,11 @@ class Dispatcher:
             _log.exception("dispatcher.hold_failed item=%s why=%s", _label(item), why)
             return
         _log.info("dispatcher.held item=%s why=%s", _label(item), why)
+
+    def _close_held(self, kind: str, key: str) -> None:
+        """News with this event and key is being told or forgotten: its held row is stale."""
+        while (row := self._open_items.find_open("held", {"event": kind, "key": key})) is not None:
+            self._open_items.finish(row.id, "superseded")
 
     def _hold_group(self, group: _Group, why: str) -> None:
         for item in group.items:
@@ -238,19 +263,39 @@ class Dispatcher:
             _log.exception("dispatcher.gave_up_callback_failed item=%s", _label(item))
 
     def _hold_groups(self) -> None:
+        self._hold_stale_waiting()
         if not self._groups:
             return
         now = self._now()
         why = None
         if self._guards.run_sync(Hook.emit, EmitCtx(None, now, self._wakes)).code == "over_budget":
             why = "budget_spent"
-        elif self._quiet is not None and self._quiet(now):
-            why = "quiet_hours"
+        quiet = why is None and self._quiet is not None and self._quiet(now)
         for group in list(self._groups):
-            reason = why or ("stale" if (now - group.opened).total_seconds() > STALE_S else None)
+            # A kind with no hourly cap (an expert's question) is never held for quiet hours.
+            if quiet and group.kind.max_per_hour is not None:
+                reason = "quiet_hours"
+            else:
+                reason = why or ("stale" if _age(now, group.posted) > STALE_S else None)
             if reason is not None:
                 self._groups.remove(group)
                 self._hold_group(group, reason)
+
+    def _hold_stale_waiting(self) -> None:
+        # News stuck at the gate (talking, paused) goes stale too, not only news past it.
+        self._intake()
+        now = self._now()
+        old = [
+            w
+            for w in self._waiting
+            if self._kinds[w.item.kind].wakes and _age(now, w.posted) > STALE_S
+        ]
+        if not old:
+            return
+        self._waiting = [w for w in self._waiting if w not in old]
+        for w in old:
+            self._hold(w.item, "stale")
+        self._call([w.item.on_drop for w in old], "on_drop", "stale wake")
 
     # The gate: when an item may be told, by speech state.
 
@@ -287,7 +332,7 @@ class Dispatcher:
             while self._inflight:
                 w = self._inflight[0]
                 if self._kinds[w.item.kind].wakes:
-                    self._stage(w.item)
+                    self._stage(w.item, w.posted)
                 else:
                     try:
                         await self.deliver(w.item)
@@ -309,7 +354,7 @@ class Dispatcher:
 
     # The wake: batch per kind, cap per hour, one turn at a time, on a body that can show it.
 
-    def _stage(self, item: Item) -> None:
+    def _stage(self, item: Item, posted: datetime) -> None:
         kind = self._kinds[item.kind]
         group = None
         if kind.batch_seconds is not None:  # a waiting group of the kind absorbs the item
@@ -317,8 +362,9 @@ class Dispatcher:
         if item.key is not None:  # a never-merged kind holds each item in its own group
             self._replace_held(kind, item.key)
         if group is None or group not in self._groups:
-            group = _Group(kind, self._now())
+            group = _Group(kind, self._now(), posted)
             self._groups.append(group)
+        group.posted = min(group.posted, posted)
         group.items.append(item)
 
     def _replace_held(self, kind: EventKind, key: str) -> None:
@@ -348,15 +394,14 @@ class Dispatcher:
 
     def _run_group(self, group: _Group, body_id: str) -> None:
         # A raising start must not propagate: pump runs from done callbacks and body connects.
-        # The batch is held so a broken start cannot loop; with no key it is dropped quietly,
-        # and unreported jobs re-emit at the next brain start.
+        # The batch is held so a broken start cannot loop.
         if group.kind.max_per_hour is not None:
             self._wakes.append((self._now(), group.kind.name))
         text = wake_text(group.kind, group.items, self._notes.get(group.kind.name, ""), self._now())
         try:
             turn_id = self._start(body_id, [{"type": "text", "text": text}])
-        except WakeSkipped:
-            self._call([i.on_drop for i in group.items], "on_drop", f"{group.kind.name} wake")
+        except WakeSkipped:  # no key yet: kept, so it is not lost
+            self._hold_group(group, "no_key")
             return
         except Exception:
             _log.exception("could not start a %s wake", group.kind.name)
@@ -411,7 +456,8 @@ class Dispatcher:
             self._timer.cancel()
             self._timer = None
         waits = [r for g in self._groups if (r := self._remaining(g)) > 0]
-        waits += [STALE_S - (self._now() - g.opened).total_seconds() + 1 for g in self._groups]
+        waits += [STALE_S - _age(self._now(), g.posted) + 1 for g in self._groups]
+        waits += [STALE_S - _age(self._now(), w.posted) + 1 for w in self._waiting]
         waits = [w for w in waits if w > 0]
         if not waits:
             return

@@ -2670,6 +2670,10 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 4. Away: close every body for over two hours (or set the clock forward), let a job end, then open the desktop. The report is a held item on Home, and Scout does not start a late wake turn.
 5. Stop: with a job report waiting (no body online), run `uv run tagalong stop`. After the next start the report shows as held news.
 6. A word spoken while the brain is stopping fails (no hang), and a wake still starts on the next run.
+7. Quiet hours and a running job: during `TAGALONG_QUIET_HOURS`, an expert's question to the person still reaches Scout (it is never held), while a timer is held.
+8. No key: with no Anthropic key, let a timer fire. It shows as held news ("there is no Anthropic key yet") and is not lost.
+9. A held line names what it is about, for example `job_ended (Job a1 ended.): held during quiet hours`. A held job report that is told later (after a restart) leaves the list.
+10. A job output containing a key-like secret that was held shows `[secret]` in the Held line, never the secret.
 
 ## Live-test fixes (F12)
 

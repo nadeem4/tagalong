@@ -2386,19 +2386,23 @@ One hold decision, in the dispatcher, for every wake kind. A wake is held, not d
 | Why (`saved_call.why`) | When |
 | ---------------------- | ---- |
 | `budget_spent`         | the `emit` guard says `over_budget` (the daily budget is spent) |
-| `quiet_hours`          | the local time is inside `TAGALONG_QUIET_HOURS` (`HH:MM-HH:MM`, may wrap midnight; unset means never) |
-| `stale`                | it has waited more than `STALE_S` (two hours): no body online, or a person away |
+| `quiet_hours`          | the local time is inside `TAGALONG_QUIET_HOURS` (`HH:MM-HH:MM`, may wrap midnight; unset means never). A kind with no hourly cap (`job_question`, so a running job is not failed overnight) is exempt |
+| `stale`                | it has waited more than `STALE_S` (two hours) since it was posted, at the gate (talking, paused) or after it (no body online, a person away) |
 | `start_failed`         | its wake turn could not start (a hook or the start callback raised) |
+| `no_key`               | no Anthropic key is set, so the wake could not run (kept, not lost) |
 | `gave_up`              | a delivery failed `MAX_FAILS` times |
-| `stopped`              | the brain is stopping with news still waiting (`Dispatcher.stop()`) |
+| `stopped`              | the brain is stopping with news still waiting, or news is posted after `stop()` (`Dispatcher.stop()`) |
 | `held_kind`            | the kind's urgency is `hold` |
 
 Each becomes an `open_items` row of kind `held` (migration `0032_open_items_held`) whose
 `saved_call` is `{event, key, why, facts}`; `facts` keeps scalars only, so no future and no word the
-person said is saved. A held item shows on return and in Home's Held list as "Held news" with the
-reason in plain words. The newest row per kind and key replaces an older one. A wake that cannot
-run for lack of an API key is still dropped quietly. Snoozing stays with the loop service, which
-holds a snoozed loop itself, so the dispatcher has no snooze rule of its own.
+person said is saved, and the facts pass the save guard first (a secret in a job's output is saved
+as `[secret]`). A held item shows on return and in Home's Held list as "Held news" with the event, a
+short gist of its first text fact (title, task or report) and the reason in plain words. Posting
+or dropping news with the same event and key closes its open held row, so a re-emitted
+`job_ended` is told once and not also listed. Only wake kinds are held when the brain stops; a
+`say` or card answer is just reported to the session as given up. Snoozing stays with the loop
+service, which holds a snoozed loop itself, so the dispatcher has no snooze rule of its own.
 
 There is one deadline rule: `DEADLINE_S` in `open_items.py` for what waits on a person, and
 `STALE_S` in the dispatcher for what waits on a body. The ask wait in `asks.py` (`ASK_TIMEOUT_S`)
