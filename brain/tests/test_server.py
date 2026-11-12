@@ -218,7 +218,7 @@ class _Recorder:
     def __init__(self) -> None:
         self.calls: list[tuple] = []
 
-    def set_speech_state(self, state, body_id):
+    def set_speech_state(self, state, body_id, turn=None, n=None):
         self.calls.append(("state", state, body_id))
 
     def speech_body_gone(self, body_id):

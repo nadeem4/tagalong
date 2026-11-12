@@ -85,7 +85,11 @@ class Rig:
         guards=None,
         quiet=None,
         fail=0,
+        interject=False,
     ) -> None:
+        self.interjects: list[tuple[str, list]] = []
+        self.interject_took = True  # what the session's interjection answers: handled or not
+        self.interject_gate: asyncio.Event | None = None
         self.bodies = FakeBodies(list(online))
         self.starts: list[tuple[str, list]] = []
         self.delivered: list[Item] = []
@@ -113,7 +117,14 @@ class Rig:
             kinds=kinds,
             notes={k: f"note for {k}" for k in kinds},
             sleep=self._sleep,
+            interject=self._interject if interject else None,
         )
+
+    async def _interject(self, body_id: str, content: list) -> bool:
+        self.interjects.append((body_id, content))
+        if self.interject_gate is not None:
+            await self.interject_gate.wait()
+        return self.interject_took
 
     async def _deliver(self, item: Item) -> None:
         if self.fail > 0:
@@ -1043,3 +1054,88 @@ async def test_a_waiting_say_or_later_turn_keeps_idle_closed_for_next_pause(make
     rig.d.set_speech_state("idle")
     await rig.emit(ev("soon"))
     assert rig.starts == []
+
+
+# ---- interjections: a next_pause item at a sentence break borrows the speech queue ----
+
+
+async def test_interjection_pauses_at_sentence_break(make):
+    rig = make(interject=True)
+    rig.busy = True  # Scout is mid-reply, so a plain wake would have to wait for the turn
+    rig.d.set_speech_state("talking")
+    await rig.emit(ev("soon"))
+    assert rig.interjects == [] and rig.starts == []
+    rig.d.set_speech_state("sentence_break")
+    await settle()
+    assert [b for b, _ in rig.interjects] == ["desktop"]
+    assert "Event: soon" in rig.interjects[0][1][0]["text"]
+    assert rig.starts == []  # no second turn alongside the speaking one
+
+
+async def test_interjection_only_for_next_pause_kinds_at_a_break(make):
+    rig = make(interject=True)
+    rig.busy = True
+    rig.d.set_speech_state("sentence_break")
+    await rig.emit(ev("ping"))  # idle urgency: waits for a quiet moment, never interrupts
+    await rig.emit(ev("urgent"))  # now: a turn of its own, not an interjection
+    assert rig.interjects == []
+
+
+async def test_an_interjection_that_could_not_run_falls_back_to_a_wake(make):
+    rig = make(interject=True)
+    rig.interject_took = False  # no voice, or nothing to borrow
+    rig.busy = True
+    rig.d.set_speech_state("talking")
+    await rig.emit(ev("soon"))
+    rig.d.set_speech_state("sentence_break")
+    await settle()
+    assert len(rig.interjects) == 1 and rig.starts == []
+    rig.d.set_speech_state("talking")
+    rig.d.set_speech_state("sentence_break")  # not tried again: it waits for the turn
+    await settle()
+    assert len(rig.interjects) == 1
+    rig.busy = False
+    rig.d.turn_ended("t0")
+    await settle()
+    assert len(rig.starts) == 1
+
+
+async def test_one_interjection_at_a_time_and_no_wake_alongside(make):
+    rig = make(interject=True)
+    rig.interject_gate = asyncio.Event()
+    rig.busy = True
+    rig.d.set_speech_state("talking")
+    await rig.emit(ev("soon"))
+    rig.d.set_speech_state("sentence_break")
+    await settle()
+    await rig.emit(ev("soon", key="two"))
+    rig.busy = False
+    rig.d.turn_ended("t0")
+    await settle()
+    assert len(rig.interjects) == 1 and rig.starts == []
+    rig.interject_gate.set()
+    await settle()
+    assert len(rig.interjects) == 2  # the next one borrows the following break
+
+
+async def test_an_interjection_counts_as_a_told_wake(make):
+    rig = make(interject=True)
+    rig.busy = True
+    rig.d.set_speech_state("talking")
+    told: list[str] = []
+    await rig.emit(ev("soon"), on_start=lambda: told.append("start"), on_end=told.append)
+    rig.d.set_speech_state("sentence_break")
+    await settle()
+    assert told == ["start", "done"]
+
+
+async def test_stop_holds_the_news_of_a_running_interjection(make):
+    rig = make(interject=True)
+    rig.interject_gate = asyncio.Event()
+    rig.busy = True
+    rig.d.set_speech_state("talking")
+    await rig.emit(ev("soon", text="mail"))
+    rig.d.set_speech_state("sentence_break")
+    await settle()
+    await rig.d.stop()
+    assert [h["why"] for h in rig.held()] == ["stopped"]

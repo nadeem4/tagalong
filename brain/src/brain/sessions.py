@@ -53,6 +53,7 @@ from brain.mind.capabilities import AppCaps, BodyCaps, ExpertCaps, capability_pi
 from brain.mind.prompt import (
     INTERRUPTED_MARK,
     check_part_sizes,
+    interjection_block,
     interruption_block,
     render_know,
     render_preferences,
@@ -83,6 +84,7 @@ from brain.reading_tools import reading_home_tools
 from brain.retry import classify, safe_to_retry
 from brain.setup.store import InstalledExpert
 from brain.side_check import SideCheck
+from brain.speech_tools import interject
 from brain.store import rules
 from brain.store.conversation import compaction_text
 from brain.store.work import TransitionRefused, WorkRow, WorkStore
@@ -118,6 +120,7 @@ _NOT_STEPS = JOB_TOOLS | {"resolve_step"}
 _SUMMARY_CAP = 300  # characters of a tool result kept on its work row
 _LATE_RESULT_CAP = 2000  # characters of a late tool result put in the news about it
 _STEP_STATUS = {"ok": "done", "failed": "failed", "refused": "refused"}
+INTERJECTION_TIMEOUT_S = 5.0  # the queue is held meanwhile, so a slow call must not keep it
 
 
 @dataclass(frozen=True)
@@ -218,7 +221,10 @@ class Session:
             gave_up=self._say_gave_up,
             quiet=quiet,
             kinds=self._kinds,
+            interject=self._interject,
         )
+        self._interjection_cut = False  # the person talked over Scout during an interjection
+        self._carried: list[dict] = []  # what an interjection changed, shown to the next turn
         self._says_waiting: set[str] = set()  # says posted, not yet delivered: wakes wait for them
         # Says from another body that arrived mid-turn: each starts a turn when that one ends.
         self._later: list[tuple[str | None, str, list, SayParams]] = []
@@ -536,6 +542,38 @@ class Session:
         finally:
             self._says_waiting.discard(item.payload["token"])  # the dispatcher pumps wakes next
 
+    async def _interject(self, body_id: str, content: list) -> bool:
+        """News due at a sentence break while Scout speaks: the queue holds, one short call sees
+        the news and the sentences the body has not finished, and Scout continues or says new
+        words instead (no choice resumes). The turn that owns the queue keeps it; this only
+        borrows it. True only when words replaced the rest, which is what tells the news; a
+        continue (or no voice, no ready model, no live turn) leaves it for a plain wake."""
+        voice = self.voice
+        turn = self._turn_id or self._last_turn
+        if voice is None or turn is None or not self._ready() or not voice.speaking(turn, body_id):
+            return False
+        sentences = voice.sentences(turn)
+        heard = self.dispatcher.heard(body_id, turn)
+        spoken, unsaid = sentences[:heard], sentences[heard:]
+        self._interjection_cut = False
+        voice.pause()
+        words = None
+        try:
+            _, words = await asyncio.wait_for(
+                interject(self._model, self._budget, self.guards, content, unsaid),
+                INTERJECTION_TIMEOUT_S,
+            )
+        finally:
+            # The person talked over Scout meanwhile (or the turn was cleared): the pause is
+            # theirs now and the turn is gone, so nothing is replaced and the player is left alone.
+            cut = self._interjection_cut or not voice.speaking(turn, body_id)
+            if words is not None and not cut and voice.replace(turn, body_id, words) is not None:
+                self._carried.append(interjection_block(content, " ".join(spoken), words, unsaid))
+            else:
+                words = None
+            voice.resume(tell=not cut)  # whatever happened, the queue never stays held
+        return words is not None
+
     def _turn_origin(self, turn_id: str | None = None) -> str:
         """The body showing the running turn (or the given one), "brain" when none."""
         if turn_id is not None and turn_id != self._turn_id:
@@ -561,6 +599,7 @@ class Session:
         # A turn still running is paused even with nothing unsaid: the model has more to come.
         if not unsaid and not (live and self._busy()):
             return None
+        self._interjection_cut = True
         if self._turn_body is not None:
             self.voice.hush(self._turn_body)  # queued sentences must not keep coming
         if live and self._busy() and self._stop is not None:
@@ -980,6 +1019,8 @@ class Session:
         self._owner_turn = started_by == "user"
         self._turn_body = body_id
         lead = [interruption_block(cut.spoken, cut.unsaid)] if cut is not None else []
+        lead = [*self._carried, *lead]  # what an interjection changed, once
+        self._carried = []
 
         def prepare() -> None:
             if cut is not None:

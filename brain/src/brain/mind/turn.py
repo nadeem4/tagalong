@@ -45,12 +45,26 @@ class Model(Protocol):
     model_id: str
     ready: bool  # False until a key is set; the session does not call a model that is not ready
 
-    def stream(self, system: str, messages: list, tools: list) -> AsyncIterator[str | Final]:
-        """Yield text deltas, then one Final."""
+    def stream(
+        self, system: str, messages: list, tools: list, max_tokens: int | None = None
+    ) -> AsyncIterator[str | Final]:
+        """Yield text deltas, then one Final. A `max_tokens` marks a short side call: a small
+        cap, no thinking and no compaction (a turn leaves it out and gets the full allowance)."""
         ...
 
 
-def _request(model_id: str, system: str, messages: list, tools: list) -> dict:
+def _request(
+    model_id: str, system: str, messages: list, tools: list, max_tokens: int | None = None
+) -> dict:
+    if max_tokens is not None:
+        return {
+            "model": model_id,
+            "system": system,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "output_config": {"effort": "low"},
+            "tools": tools,
+        }
     kwargs: dict = {
         "model": model_id,
         "system": system,
@@ -102,10 +116,12 @@ class AnthropicModel:
     def set_key(self, key: str) -> None:
         self._client = self._make_client(key)
 
-    async def stream(self, system: str, messages: list, tools: list) -> AsyncIterator[str | Final]:
+    async def stream(
+        self, system: str, messages: list, tools: list, max_tokens: int | None = None
+    ) -> AsyncIterator[str | Final]:
         if self._client is None:
             raise RuntimeError("no Anthropic key yet")
-        kwargs = _request(self.model_id, system, messages, tools)
+        kwargs = _request(self.model_id, system, messages, tools, max_tokens)
         async with self._client.beta.messages.stream(**kwargs) as stream:
             async for text in stream.text_stream:
                 yield text

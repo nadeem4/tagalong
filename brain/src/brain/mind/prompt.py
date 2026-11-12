@@ -186,6 +186,15 @@ def interruption_block(spoken: str, unsaid: str) -> dict[str, Any]:
     return _text(f'<data kind="interruption">\n{body}\n</data>')
 
 
+def interjection_block(news: list, spoken: str, said: str, dropped: list[str]) -> dict[str, Any]:
+    """Scout cut its own speech short for news and said `said` instead: the news, what the owner
+    had heard, and the sentences dropped, for the next turn to know why the reply stops there."""
+    text = "\n".join(b.get("text", "") for b in news if b.get("type") == "text")
+    body = f"spoken: {spoken}\nsaid instead: {said}\ndropped: {' '.join(dropped)}\nnews: {text}"
+    body = re.sub(r"</(?=data)", "&lt;/", body, flags=re.IGNORECASE)
+    return _text(f'<data kind="interjection">\n{body}\n</data>')
+
+
 def is_interruption_block(block: Any) -> bool:
     return (
         isinstance(block, dict)
