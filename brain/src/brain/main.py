@@ -194,6 +194,7 @@ async def _run() -> None:
         real_get_json,
         os.environ,
         emit_event,
+        setup_items,
     )
     login = login_tools(config.data_dir, logins)
 

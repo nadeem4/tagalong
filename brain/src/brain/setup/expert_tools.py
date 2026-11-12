@@ -76,7 +76,10 @@ def expert_setup_tools(
             # Facts only, as the error text Scout reads; nothing was asked or installed.
             raise RpcError(ErrorCode.tool_failed, failure(*_facts(err))) from err
 
-    async def run_install(entry: RegistryEntry) -> None:
+    async def run_install(entry: RegistryEntry) -> InstalledExpert:
+        """Install and tell the front door how it ended; the failure is raised after telling, for
+        `update`, which waits on the same flight (a joiner of either kind gets the same events)."""
+
         def progress(step: dict) -> None:
             facts = {"expert": entry.id, **{k: v for k, v in step.items() if v is not None}}
             emit(Event("setup_progress", facts, key=entry.id))
@@ -86,16 +89,26 @@ def expert_setup_tools(
             expert = await install_expert(
                 entry, home, await inspect_fn(), run, fetch, get_json, store, progress
             )
-            facts = {"expert": entry.id, "ok": True, "installed": json.dumps(asdict(expert))}
-        except InstallError as err:
-            log.warning("install of %s failed: %s: %s", entry.id, err.kind, err.detail)
-            facts = {"expert": entry.id, "ok": False, "error": err.kind, "detail": err.detail}
         except Exception as err:  # the person is told something, never left waiting
-            log.warning("install of %s failed: %r", entry.id, err)
-            facts = {"expert": entry.id, "ok": False, "error": "failed", "detail": repr(err)}
-        # A cancel (shutdown) skips this: nobody is left to tell.
+            if isinstance(err, InstallError):
+                log.warning("install of %s failed: %s: %s", entry.id, err.kind, err.detail)
+                facts = {"expert": entry.id, "ok": False, "error": err.kind, "detail": err.detail}
+            else:
+                log.warning("install of %s failed: %r", entry.id, err)
+                facts = {"expert": entry.id, "ok": False, "error": "failed", "detail": repr(err)}
+            emit(Event("setup_done", facts, key=entry.id))
+            notify("changed", {"what": "setup"})
+            raise
+        facts = {"expert": entry.id, "ok": True, "installed": json.dumps(asdict(expert))}
         emit(Event("setup_done", facts, key=entry.id))
         notify("changed", {"what": "setup"})
+        return expert
+
+    async def background_install(entry: RegistryEntry) -> None:
+        try:
+            await run_install(entry)
+        except Exception:  # already told and logged by run_install
+            pass
 
     async def install(args: dict) -> str:
         try:
@@ -109,22 +122,16 @@ def expert_setup_tools(
         was = shown.pop(entry.id, None)
         if was is not None and was != entry.version:
             return failure("version_changed", f"{was} -> {entry.version}")
-        flight = flights.start(entry.id, lambda: run_install(entry))
+        flight = flights.start(entry.id, lambda: background_install(entry))
         out: dict = {"started": entry.id, "item": flight.item.id}
         if flight.joined:  # already installing: the one running install is the answer
             out["joined"] = True
         return json.dumps(out)
 
     async def update(entry: RegistryEntry) -> InstalledExpert:
-        machine = await inspect_fn()
         if flights.has(entry.id):
             raise InstallError("already_installing", entry.id)
-        flight = flights.start(
-            entry.id,
-            lambda: install_expert(
-                entry, home, machine, run, fetch, get_json, store, lambda step: None
-            ),
-        )
+        flight = flights.start(entry.id, lambda: run_install(entry))
         return await flight.task  # a cancel of the caller cancels the install, which cleans up
 
     spec = ToolSpec(

@@ -25,9 +25,11 @@ from brain.apps import AppError, Apps, OpenUrl, TokenFile
 from brain.bodies import Bodies
 from brain.events import Event
 from brain.memory import Memory
+from brain.open_items import OpenItems
 from brain.permission import Tier
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.facts import Machine
+from brain.setup.flights import Flights
 from brain.setup.install import (
     InstallError,
     NoBuild,
@@ -199,6 +201,7 @@ def app_setup_tools(
     get_json: GetJson,
     env: Mapping[str, str],
     emit: Callable[[Event], None],
+    items: OpenItems,
     wait_s: float = CONNECT_WAIT_S,
     sign_in_wait_s: float = SIGN_IN_WAIT_S,
     opener: Callable[[str], OpenUrl | None] | None = None,
@@ -266,7 +269,7 @@ def app_setup_tools(
         watching.add(task)
         task.add_done_callback(watching.discard)
 
-    inflight: dict[str, asyncio.Task[str]] = {}  # one add per app; a repeat joins it
+    flights = Flights(items, "install")  # one add per app; a repeat joins it
 
     async def install(args: dict) -> str:
         try:
@@ -275,12 +278,8 @@ def app_setup_tools(
             return fail("registry_unavailable", str(err))
         if entry is None:
             return fail("unknown_app", str(args.get("id")))
-        if (running := inflight.get(entry.id)) is not None:
-            return await asyncio.shield(running)  # the joiner leaving never cancels the add
-        task = asyncio.ensure_future(add(entry))
-        inflight[entry.id] = task
-        task.add_done_callback(lambda _: inflight.pop(entry.id, None))
-        return await task
+        # Both callers wait on the shared add through a shield: a cancelled turn leaves it running.
+        return await asyncio.shield(flights.start(entry.id, lambda: add(entry)).task)
 
     async def add(entry: RegistryEntry) -> str:
         try:
@@ -341,5 +340,6 @@ def app_setup_tools(
         for task in pending:
             task.cancel()
         await asyncio.gather(*pending, return_exceptions=True)
+        await flights.stop()
 
     return [(spec, install)], stop_watches

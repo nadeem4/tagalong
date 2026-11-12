@@ -30,11 +30,12 @@ class Flights:
         self._running: dict[str, tuple[str, asyncio.Task]] = {}
 
     def has(self, key: str) -> bool:
-        return key in self._running
+        return key in self._running and not self._running[key][1].done()
 
     def start(self, key: str, run: Callable[[], Awaitable[Any]]) -> Flight:
         """Join the running flight for `key`, or open its item and start `run` in the background."""
-        if (current := self._running.get(key)) is not None:
+        # A task that is done but whose `_ended` has not run yet is over: not joined.
+        if (current := self._running.get(key)) is not None and not current[1].done():
             item_id, task = current
             item = self._items.get(item_id)
             assert item is not None  # an open item is only closed when its task ends

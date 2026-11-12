@@ -1073,8 +1073,9 @@ words what the person reads (guidance in `mind/soul.md`).
   install runs in the background, outside the turn, one flight per expert id (`setup/flights.py`):
   a second ask for the same id while it runs joins it and gets the same item back with
   `"joined": true`; the item closes when the install ends (done) or is cancelled at shutdown
-  (expired). `update` (the updates check) shares the flight and still refuses with
-  `already_installing` rather than join. `tagalong stop` ends the
+  (expired). `update` (the updates check) runs as the same flight, with the same `setup_progress` and
+  `setup_done` events, so an install that joins a running update gets its result; it still refuses
+  with `already_installing` rather than join a running install. `tagalong stop` ends the
   brain by killing it on Windows, so a start removes any `tools/*.part` and `tools/*.dl` staging
   folder a killed brain left (`sweep_staging`). If the registry moved on after the card named a version, it returns
   `version_changed` (`"<shown> -> <now>"`) and installs nothing. It emits non-waking `setup_progress` events (`expert`, `stage`,
@@ -1136,8 +1137,9 @@ words what the person reads (guidance in `mind/soul.md`).
   and sends `changed setup` so Home and the tour reload. A login already done ends the same way
   with `logged_in` and nothing opened. A second request for the same expert while the flight
   runs joins it: the same item comes back with `"joined": true`, no second window opens, the
-  running waiter is never cancelled, and there is one event for all the requests (earlier, a
-  failing expert gave three `setup_login` events in 33 s). The item closes when the flight ends;
+  running waiter is never cancelled, and there is one event for all the requests (earlier, requests
+  that overlapped each cancelled the previous waiter, and one failing expert gave three
+  `setup_login` events in 33 s; a retry after a flight has ended is a new request, by design). The item closes when the flight ends;
   shutdown cancels the flights; every adapter process tree is killed on the way out. No link or code passes through
   Scout or the brain, so nothing is masked. `env.py` holds the per-expert table of keys that would
   switch an expert to an API key (Claude, Codex; an unknown expert loses all of them; every expert also loses

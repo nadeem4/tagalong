@@ -872,14 +872,39 @@ async def test_an_update_is_refused_while_an_install_of_the_same_expert_runs(tmp
 
 
 async def test_an_install_joins_an_update_of_the_same_expert_that_runs(tmp_path, ensure):
-    hang, updaters = Hang(), []
-    tools, _, _, stop = make_tools(tmp_path, hang, updaters=updaters)
+    gate = asyncio.Event()
+
+    class Gated(Npm):
+        started = asyncio.Event()
+
+        async def __call__(self, argv, env, cwd):
+            self.started.set()
+            await gate.wait()
+            return await super().__call__(argv, env, cwd)
+
+    npm, updaters = Gated(), []
+    tools, emitted, notes, stop = make_tools(tmp_path, npm, updaters=updaters)
     updating = asyncio.ensure_future(updaters[0](npx_entry()))
-    await asyncio.wait_for(hang.started.wait(), 5)
+    await asyncio.wait_for(npm.started.wait(), 5)
     again = json.loads(await tools["install_expert"][1]({"id": "claude-acp"}))
     assert again["joined"] is True  # one npm run for the expert, never two on one .part folder
+    gate.set()
+    expert = await updating
+    assert expert.id == "claude-acp"
+    done = await settled(emitted)  # the joiner is told the end, as for any install
+    assert done.facts["ok"] is True and done.facts["expert"] == "claude-acp"
+    assert any(e.kind == "setup_progress" for e in emitted)
     await stop()
-    await asyncio.gather(updating, return_exceptions=True)
+
+
+async def test_a_failing_update_still_raises_and_tells_the_joiner(tmp_path, ensure):
+    updaters = []
+    tools, emitted, _, stop = make_tools(tmp_path, Npm(code=1), updaters=updaters)
+    with pytest.raises(InstallError):
+        await updaters[0](npx_entry())
+    done = await settled(emitted)
+    assert done.facts["ok"] is False
+    await stop()
 
 
 async def test_an_update_installs_and_frees_the_guard(tmp_path, ensure):
