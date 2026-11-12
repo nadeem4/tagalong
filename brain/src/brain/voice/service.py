@@ -108,6 +108,10 @@ class VoiceService:
         else:
             session.silence()
 
+    def follow_speech(self, on_state: Callable[[str], None]) -> None:
+        """Report the mouth's own state (the fallback when no body reports what it plays)."""
+        self._mouth.on_state = on_state
+
     def hush(self, body_id: str) -> None:
         for turn in self._mouth.turns_on(body_id):
             self._mouth.clear(turn)

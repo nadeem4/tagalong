@@ -4,6 +4,7 @@ Each connection owns one bounded queue drained by a single writer task, so Peer.
 or awaits (Bodies.notify loops over peers) and the hello result always precedes its backlog.
 Hello, tools, say, call, answer and cancel are handled, and listen, mic, unlisten and hush
 go to the voice seam (Session.voice); any other request answers method_not_found.
+`speech_state` (the desktop's speaker) feeds the dispatcher, which follows it over the mouth.
 `call` runs in its own task and replies through the peer queue.
 A body that joins without a usable backlog is sent the asks still open.
 Response frames (a body's answer to `use`) go to Bodies.resolve.
@@ -35,6 +36,7 @@ from brain.protocol import (
     MicParams,
     RpcError,
     SayParams,
+    SpeechStateParams,
     ToolsParams,
 )
 from brain.sessions import Session
@@ -125,6 +127,8 @@ async def _handler(
                 body_id = _hello(message, req_id, peer, bodies, session_id, session, build)
                 if body_id is None:
                     break
+                # A new connection of this body: what an older one reported no longer holds.
+                session.dispatcher.speech_body_gone(body_id)
                 continue
             if not isinstance(method, str):
                 try:
@@ -143,6 +147,10 @@ async def _handler(
                     task = asyncio.create_task(_call(message, req_id, peer, session))
                     calls.add(task)
                     task.add_done_callback(calls.discard)
+                continue
+            if method == "speech_state":  # a notification: a bad shape is dropped
+                if bodies.is_current(body_id, peer):
+                    _speech_state(message, body_id, session)
                 continue
             try:
                 if method in VOICE_METHODS:
@@ -168,8 +176,29 @@ async def _handler(
             # A replaced connection must not tear down the listening its successor started.
             if was_current and body_id in listening and session.voice is not None:
                 session.voice.unlisten(body_id)  # a gone body's mic must not keep a session
+            if was_current:  # a replaced connection's claim was cleared by its successor's hello
+                session.dispatcher.speech_body_gone(body_id)
         peer.close()
         await asyncio.gather(writer, return_exceptions=True)
+
+
+# The speaker's frames in the dispatcher's words: a sentence started is talking, one ended is a
+# break until the next starts.
+_SPEECH_STATES = {
+    "started": "talking",
+    "ended": "sentence_break",
+    "paused": "paused",
+    "idle": "idle",
+}
+
+
+def _speech_state(message: dict, body_id: str, session: Session) -> None:
+    try:
+        params = SpeechStateParams.model_validate(message.get("params"))
+    except ValidationError as exc:
+        log.debug("dropped a bad speech_state frame: %s", exc)
+        return
+    session.dispatcher.set_speech_state(_SPEECH_STATES[params.state], body_id)
 
 
 def _hello(
