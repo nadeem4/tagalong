@@ -33,6 +33,7 @@ KINDS = {
     "focus": EventKind("focus", wakes=False),
     "off": EventKind("off", enabled=False),
     "parked": EventKind("parked", urgency="hold"),
+    "chime": EventKind("chime", urgency="next_pause", wakes=False),
 }
 
 
@@ -212,6 +213,65 @@ async def test_next_pause_goes_at_a_brief_sentence_break(make):
     rig.d.set_speech_state("talking")  # the break is over before anything else could happen
     await settle()
     assert len(rig.starts) == 1
+
+
+async def test_a_seen_break_is_latched_until_the_next_take(make):
+    rig = make()
+    rig.d.set_speech_state("talking")
+    await rig.emit(ev("soon"))
+    # Two frames handled back to back, no await between: the break must not be lost.
+    rig.d.set_speech_state("sentence_break")
+    rig.d.set_speech_state("talking")
+    await settle()
+    assert len(rig.starts) == 1
+    await rig.emit(ev("soon"))  # the latch was spent by that take
+    assert len(rig.starts) == 1
+
+
+async def test_desktop_state_overrides_brain_state(make):
+    rig = make()
+    rig.d.set_speech_state("talking")  # the desktop is playing audio
+    rig.d.set_mouth_state("idle")  # the brain's synth ran ahead of the speaker
+    await rig.emit(ev("soon"))
+    assert rig.starts == []
+    rig.d.set_mouth_state("sentence_break")
+    await settle()
+    assert rig.starts == []  # still the desktop that decides
+    rig.d.set_speech_state("sentence_break")
+    await settle()
+    assert len(rig.starts) == 1
+
+
+async def test_fallback_to_mouth_state_without_audio_body(make):
+    rig = make()
+    rig.d.set_mouth_state("talking")
+    await rig.emit(ev("soon"))
+    assert rig.starts == []
+    rig.d.set_mouth_state("sentence_break")
+    await settle()
+    assert len(rig.starts) == 1
+
+
+async def test_mouth_state_is_the_fallback_again_when_the_desktop_leaves(make):
+    rig = make()
+    rig.d.set_speech_state("talking")
+    await rig.emit(ev("soon"))
+    assert rig.starts == []
+    rig.d.speech_body_gone()  # nobody plays audio now; the mouth says idle
+    await settle()
+    assert len(rig.starts) == 1
+
+
+async def test_typed_only_next_pause_waits_for_reply_end(make):
+    rig = make()
+    rig.busy = True  # a typed reply is running; no speech state exists for it
+    rig.d.post(Item("chime", "desktop", {}, "next_pause"))
+    await settle()
+    assert rig.delivered == []
+    rig.busy = False
+    rig.d.turn_ended("t0")
+    await settle()
+    assert [i.kind for i in rig.delivered] == ["chime"]
 
 
 async def test_idle_waits_for_quiet_and_no_conversation(make):
@@ -939,3 +999,47 @@ def test_one_deadline_rule_everywhere():
         assert not found, f"{path.name} keeps its own wait: {found}"
     assert "DEADLINE_S" in (_SRC / "open_items.py").read_text(encoding="utf-8")
     assert "STALE_S" in (_SRC / "dispatcher.py").read_text(encoding="utf-8")
+
+
+async def test_one_of_several_reporting_bodies_leaving_keeps_the_others(make):
+    rig = make()
+    rig.d.set_speech_state("talking", "desktop")
+    rig.d.set_speech_state("talking", "browser")
+    await rig.emit(ev("soon"))
+    rig.d.speech_body_gone("browser")
+    await settle()
+    assert rig.starts == []  # the desktop still plays
+    rig.d.speech_body_gone("desktop")
+    await settle()
+    assert len(rig.starts) == 1  # the mouth (idle) is the source again
+
+
+async def test_a_desktop_idle_hands_the_source_back_to_the_mouth(make):
+    rig = make()
+    rig.d.set_speech_state("talking")
+    rig.d.set_speech_state("idle")  # the desktop is done; a browser turn is the mouth's
+    rig.d.set_mouth_state("talking")
+    await rig.emit(ev("soon"))
+    assert rig.starts == []
+    rig.d.set_mouth_state("sentence_break")
+    await settle()
+    assert len(rig.starts) == 1
+
+
+async def test_a_latched_break_does_not_outlive_its_dropped_item(make):
+    rig = make()
+    rig.d.set_speech_state("talking")
+    await rig.emit(ev("soon", key="a"))
+    rig.d.set_speech_state("sentence_break")
+    rig.d.drop("soon", "a")  # gone before the loop took the break
+    rig.d.set_speech_state("talking")
+    await rig.emit(ev("soon", key="b"))
+    assert rig.starts == []
+
+
+async def test_a_waiting_say_or_later_turn_keeps_idle_closed_for_next_pause(make):
+    rig = make()
+    rig.busy = True  # the session's _busy_for_wakes: a turn, a waiting say or a later entry
+    rig.d.set_speech_state("idle")
+    await rig.emit(ev("soon"))
+    assert rig.starts == []

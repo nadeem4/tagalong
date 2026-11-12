@@ -122,6 +122,8 @@ export interface FakeBrain {
     readAloud: Record<string, unknown>[];
     /** The params of every `say` the desktop sent, in order. */
     says: Record<string, unknown>[];
+    /** Every `speech_state` the player reported (playing, paused, idle...), in order. */
+    speechStates: string[];
   };
   /** The ears hear something now: a live `heard` frame to every connected body. */
   hear(event: string, text?: string): void;
@@ -494,6 +496,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     spokenSays: 0,
     readAloud: [],
     says: [],
+    speechStates: [],
   };
   // 3 s of silence at the mouth's 24 kHz: long enough for a test to see the panel speaking
   // and press Stop before it ends on its own.
@@ -649,6 +652,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           option?: string;
           spoken?: boolean;
           mode?: string;
+          state?: string;
           apps?: string[];
           name?: string;
           data?: unknown;
@@ -699,6 +703,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         mode = null;
       } else if (msg.method === 'hush') {
         voice.hushes += 1;
+      } else if (msg.method === 'speech_state') {
+        voice.speechStates.push(String(msg.params?.state));
       } else if (msg.method === 'event') {
         if (msg.params?.name === 'reading') {
           readingEvents.push((msg.params.data ?? {}) as Record<string, unknown>);

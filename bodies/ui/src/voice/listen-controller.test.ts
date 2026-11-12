@@ -112,6 +112,18 @@ describe('ListenController, held', () => {
     expect(controller.mode).toBeNull();
   });
 
+  it('echo_resumes_playback: a held question that is only Scout echo counts as nothing', async () => {
+    const { controller, ears, calls } = setup(undefined, {
+      playingText: () => 'Here is the answer',
+    });
+    controller.hold();
+    await tick();
+    controller.release();
+    ears.say('turnEnd', 'here is the answer');
+    expect(calls.nothing).toHaveBeenCalledOnce();
+    expect(calls.heard).not.toHaveBeenCalled();
+  });
+
   it('listens with the open mic itself', async () => {
     const mic = fakeMic();
     const { controller, ears } = setup(vi.fn(async () => mic));

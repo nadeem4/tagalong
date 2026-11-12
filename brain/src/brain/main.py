@@ -308,6 +308,7 @@ async def _run() -> None:
         bodies, ears_loader(config.data_dir), tts_loader(config.data_dir)
     )
     session.voice = voice
+    voice.follow_speech(session.dispatcher.set_mouth_state)
     session.loops = loops  # focus and tab events also surface loops
     setup_events.resume()  # news of an install or login the last run never told
     loops.start()  # wakes Scout for a loop already due, and arms the next one
@@ -367,6 +368,7 @@ async def _run() -> None:
         await voice.close()
         await session.jobs.shutdown()
         await apps.shutdown()
+        await session.stop_background()  # tools a talked-over turn left running end here
         await session.dispatcher.stop()  # news still waiting is held, so the next run shows it
         memory.close()
         clear_pid(config.data_dir, os.getpid())

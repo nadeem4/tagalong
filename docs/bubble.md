@@ -135,7 +135,6 @@ stateDiagram-v2
   idle --> running: submit (ask sent)
   running --> running: turn.started (own turn), turn.delta
   running --> done: turn.completed
-  running --> done: barge-in (keeps the text so far)
   running --> failed: turn.error, or ask rejected
   done --> running: next question
   failed --> running: next question
@@ -177,11 +176,13 @@ stateDiagram-v2
 - A spoken question (`talk.onHeard`) asks with `asSpoken`, so the ask carries `spoken: true`. The
   brain speaks the answer and the panel plays it ([voice.md](voice.md)). After the turn completes
   the hints show "Hold <key> to reply".
-- **Talking over a spoken answer** (Always listening) does not go through `onListen`: the panel
+- **Talking over a spoken answer** (Always listening or the key): the panel
   pauses Scout, and words that are not noise or Scout's echo arrive as an ordinary heard question
   whose `say` carries `interrupted` (see [Voice](voice.md#talking-over-scout)).
-- **Barge-in** (`talk.onListen` while running) interrupts the turn, clears `mine` and keeps what
-  was said so far as `done`. The panel's `SpeechPlayer.stop()` tells the brain to `hush`.
+- **No barge-in on listening.** Starting to listen no longer interrupts the turn: the talk key
+  only pauses Scout's voice (see [Voice](voice.md#talking-over-scout)). Real words are asked like
+  any question; the brain pauses the old turn, and `submit` shows the new one. Only the Stop button
+  and the close interrupt a turn on their own.
 
 **Chips.** `chipsOf(snapshot)` makes up to two removable chips: the app (`name · window title`),
 and `Selected text`. Removing one leaves that part out of the ask (`without`). A new snapshot
@@ -437,7 +438,7 @@ The nav lists six pages (`HomePage`), the companion's name filling in where it a
 
 - `HostBridge`, `AskInput`, `TurnEvent` (`host-bridge.ts`).
 - `CompanionBubbleProps`, `BubbleTalk { state: 'idle' | 'listening' | 'hearing', onHeard,
-onListen?, note, partial?, keyLabel, onMic, always? }`, `GreetingLineProps`.
+note, partial?, keyLabel, onMic, always? }`, `GreetingLineProps`.
 - `DropOffer = { dropped, explain } | { refusal }` (`drop-card.tsx`).
 - `DockPetProps { pet, mood, figure, sightPaused?, listening?, blinkEveryMs?,
 status? }`, `DockMood`, `ListeningDot`, `BeanFigure`, `BeanClipData`.
@@ -486,7 +487,7 @@ marks and the health card are shown, never spoken. See [privacy.md](privacy.md).
 
 | Test (under `bodies/ui/src/` unless noted)                                                          | Pins                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `companion-bubble.test.tsx`                                                                         | chips and `without`; streaming with Stop; formatted answers; continuing the conversation; failures; full chat; background turns ignored; × close; the tail side; `GreetingLine` timing, hold and offers; the header switches; mic, partials, spoken questions and barge-in; typed questions unspoken                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `companion-bubble.test.tsx`                                                                         | chips and `without`; streaming with Stop; formatted answers; continuing the conversation; failures; full chat; background turns ignored; × close; the tail side; `GreetingLine` timing, hold and offers; the header switches; mic, partials and spoken questions; typed questions unspoken                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `chat-styles.test.ts`, `scout-mark.test.tsx`, `answer.test.tsx`                                     | the chat's padding minimums, 56 px header, rhythm, pill, thinking row, cursor, field and empty-state rules; the mark's size; code block and marker styles                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `companion-bubble-health.test.tsx`                                                                  | the health card instead of a turn, nothing said aloud, Fix it, Open logs folder, real questions left to Scout, a host without the check, failure, late results dropped                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `health-ask.test.ts`, `health.test.ts`, `health-card.test.tsx`                                      | which questions match; rows and the headline; the card                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |

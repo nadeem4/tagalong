@@ -195,6 +195,8 @@ async def test_say_after_a_cancel_is_read_aloud_on_its_own_body():
     first = await session.say("desktop", say("tell me"))
     await settle()
     session.cancel(first.turn)
+    # Ending the turn now closes the model stream first, which takes a few loop ticks.
+    await until(lambda: not session._busy())
     joined = await session.say("desktop", SayParams(text="actually X", spoken=True))
     assert joined.joined is False  # the cut turn is over by then: it gets a turn of its own
     await finish_quietly(session)
@@ -595,6 +597,7 @@ async def test_a_say_after_a_cancelled_turn_gets_its_own_answer(tmp_path):
     first = await session.say("desktop", say("long story"))
     await settle()
     session.cancel(first.turn)
+    await until(lambda: not session._busy())  # ending closes the model stream first
     joined = await session.say("desktop", say("actually do X"))
     assert joined.joined is False  # the cut turn is over by then: it gets a turn of its own
     await finish_quietly(session)
@@ -1025,6 +1028,15 @@ def wake_started(sent):
 async def settle():
     for _ in range(5):
         await asyncio.sleep(0)
+
+
+async def until(condition, timeout=1.0):
+    # Poll for the thing the test waits on, instead of guessing how many loop ticks it takes.
+    async def poll():
+        while not condition():
+            await asyncio.sleep(0)
+
+    await asyncio.wait_for(poll(), timeout)
 
 
 async def idle(session):
@@ -2389,7 +2401,7 @@ async def test_a_nudge_scout_starts_in_a_wake_turn_asks_the_owner():
     session, sent = make(Gate([nudge_call(), "sent"]), kinds=None)
     join(session, "desktop")
     session.body_event("desktop", "back", {"idle_seconds": 600})
-    await settle()
+    await until(lambda: open_asks(sent) and tool_results(session))
     [ask] = open_asks(sent)
     assert ask["tool"] == "tell_expert"
     assert "waiting for the person's answer" in str(tool_results(session))  # open, not held
@@ -2402,7 +2414,7 @@ async def test_a_nudge_in_the_next_wake_asks_again_after_an_owner_turn():
     await session.say("desktop", say("hi"))
     await idle(session)
     session.body_event("desktop", "back", {"idle_seconds": 600})
-    await settle()
+    await until(lambda: open_asks(sent))
     assert len(open_asks(sent)) == 1  # the stale owner flag did not leak
     await idle(session)
 
@@ -3120,7 +3132,7 @@ async def test_body_is_kept_if_the_body_leaves_before_the_turn_ends():
     await session.say("wa", say("hello"))
     await settle()
     session._bodies.disconnect("wa", peer)
-    await finish(session)
+    await finish_quietly(session)  # waits for the done-callback that saves the bodies too
     assert _saved_bodies(session) == ["whatsapp"]
 
 
@@ -3144,3 +3156,14 @@ async def test_silent_reply_after_a_tool_round_resumes_without_a_duplicate_tool_
     assert ids == ["t1"]
     resumed, _ = make(Gate(["ok"]), memory)
     assert [m["role"] for m in resumed.history][-2:] == ["user", "assistant"]
+
+
+async def test_a_waiting_say_or_later_entry_keeps_next_pause_closed():
+    session, _ = make(Gate(["ok"]))
+    session.dispatcher.set_speech_state("idle")
+    assert session.dispatcher._can_deliver("next_pause")
+    session._says_waiting.add("tok")
+    assert not session.dispatcher._can_deliver("next_pause")
+    session._says_waiting.clear()
+    session._later.append((None, "t", [], say("x")))
+    assert not session.dispatcher._can_deliver("next_pause")

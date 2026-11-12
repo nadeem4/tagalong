@@ -24,7 +24,7 @@ leaves it.
 | Renderer, hearing       | `bodies/desktop/src/renderer/src/mic.ts`, `mic-worklet.js`, `remote-ears.ts`, `talk.ts` (`useTalk`), `talk-rules.ts`, `mic-failure.ts`, `voice-seam.ts`                                                                                                                                                                                                                                                                               |
 | Renderer, speaking      | `bodies/desktop/src/renderer/src/voice-player.ts` (`SpeechPlayer`, `previewVoice`, `playWav`, `speakWithSystem`, `pickSystemVoice`)                                                                                                                                                                                                                                                                                                   |
 | UI package              | `bodies/ui/src/voice/listen-controller.ts`, `push-to-talk.ts`                                                                                                                                                                                                                                                                                                                                                                         |
-| Wiring                  | `bodies/desktop/src/renderer/src/panel.tsx` (the panel's `SpeechPlayer` and `useTalk`), `bodies/ui/src/companion-bubble.tsx` (asks a heard question as spoken, barge-in)                                                                                                                                                                                                                                                              |
+| Wiring                  | `bodies/desktop/src/renderer/src/panel.tsx` (the panel's `SpeechPlayer` and `useTalk`), `bodies/ui/src/companion-bubble.tsx` (asks a heard question as spoken)                                                                                                                                                                                                                                                                        |
 | Brain side              | The brain's ears and mouth: [brain.md](brain.md)                                                                                                                                                                                                                                                                                                                                                                                      |
 
 ## How it works
@@ -60,7 +60,7 @@ flowchart LR
   RE --> LC -->|"onHeard(text)"| CB["CompanionBubble: say with spoken: true"]
   CB -->|"say spoken"| MOUTH
   MOUTH -->|"speech"| VB -->|"IPC speechChunk, speechDone"| SP
-  SP -->|"Stop or barge-in: hush"| IPC -->|"hush"| MOUTH
+  SP -->|"Stop or words over Scout: hush"| IPC -->|"hush"| MOUTH
   SP -->|"speech_state: started, ended, paused, idle"| IPC -->|"speech_state"| MOUTH
   MOUTH -->|"speech_control: pause, resume, clear"| VB -->|"IPC speechControl"| SP
 ```
@@ -69,7 +69,7 @@ flowchart LR
 
 Every spoken sentence of every turn goes into one queue and one worker says them in order: it
 makes the audio in a thread, waits for it, then sends the `speech` frame. Two syntheses therefore
-never overlap, and a barge-in or a pause never has to cancel a synth thread.
+never overlap, and a talk-over or a pause never has to cancel a synth thread.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
@@ -84,26 +84,29 @@ flowchart LR
 
 `Mouth.state` is `talking` (a sentence is being made or sent, or more are queued),
 `sentence_break` (a reply is still open but nothing is queued), `paused` or `idle`; `on_state` is
-called on each change. `unsaid(turn)` is what was made but not yet sent. A body's `hush` clears
+called on each change (the brain wires it to the dispatcher as the fallback when no body reports
+what it plays; the desktop's `speech_state` wins). `pause()` and `resume()` also send
+`speech_control` to the body playing the turn (nothing calls them yet: F18's interjection
+turns will). `unsaid(turn)` is what was made but not yet sent. A body's `hush` clears
 every turn spoken on that body.
 
 ### What crosses to the brain
 
 Contract v1 (see [protocol/README.md](../protocol/README.md)):
 
-| Frame                                            | Direction     | Meaning                                                                                                                                                                                         |
-| ------------------------------------------------ | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `listen { mode: 'held' or 'always' }`            | body to brain | Request: start hearing. Rejected with `BrainOffline` while the brain is down; the desktop then shows "Listening could not start" or the offline words.                                          |
-| `mic { pcm }`                                    | body to brain | A frame of 16 kHz mono 16-bit samples, base64. Main converts the renderer's Float32 frame (clamped, rounded).                                                                                   |
-| `unlisten`                                       | body to brain | Notification: stop hearing. In held mode the brain then ends the turn with what it heard.                                                                                                       |
-| `hush`                                           | body to brain | Notification: stop speaking now.                                                                                                                                                                |
-| `speech_state { turn, n?, state }`               | body to brain | Notification: the player started or ended sentence `n`, paused, or went idle (`started`, `ended`, `paused`, `idle`). Live only. The brain does not act on it yet: it only accepts and drops it. |
-| `say { ..., spoken: true, voice, speed }`        | body to brain | A heard question is asked as spoken, with the voice and speed from Settings. Other turns are spoken per `read_aloud`.                                                                           |
-| `heard { event, text? }`                         | brain to body | `speech_start`, `partial`, `final`, `turn_end`. Main maps these to the renderer's `speechStart`, `partial`, `final`, `turnEnd`.                                                                 |
-| `voice { status, message?, progress? }`          | brain to body | The ears' models: `loading` (with `progress`), `ready` or `failed`. Only the ears send it; the mouth sends none.                                                                                |
-| `speech { turn, n?, text?, pcm?, sample_rate? }` | brain to body | One sentence: `n` (1-based within its turn), `text`, plus `pcm` (16-bit, 24,000 Hz, base64) when Kokoro spoke it. A frame with `text` only means use the system voice.                          |
-| `speech { turn, done: true }`                    | brain to body | The last sentence of that turn has been sent.                                                                                                                                                   |
-| `speech_control { action, turn? }`               | brain to body | `pause` holds the player where it is, `resume` carries on from the held sentence, `clear` drops what is queued (one turn's, if `turn` is given). Live only. The brain does not send it yet.     |
+| Frame                                            | Direction     | Meaning                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------ | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `listen { mode: 'held' or 'always' }`            | body to brain | Request: start hearing. Rejected with `BrainOffline` while the brain is down; the desktop then shows "Listening could not start" or the offline words.                                                                                                                                                                                         |
+| `mic { pcm }`                                    | body to brain | A frame of 16 kHz mono 16-bit samples, base64. Main converts the renderer's Float32 frame (clamped, rounded).                                                                                                                                                                                                                                  |
+| `unlisten`                                       | body to brain | Notification: stop hearing. In held mode the brain then ends the turn with what it heard.                                                                                                                                                                                                                                                      |
+| `hush`                                           | body to brain | Notification: stop speaking now.                                                                                                                                                                                                                                                                                                               |
+| `speech_state { turn, n?, state }`               | body to brain | Notification: the player started or ended sentence `n`, paused, or went idle (`started`, `ended`, `paused`, `idle`). Live only. The brain feeds it to the dispatcher (`started` is talking, `ended` a sentence break, then `paused` or `idle`); it wins over the mouth's own state while a body reports it, and `idle` ends that body's claim. |
+| `say { ..., spoken: true, voice, speed }`        | body to brain | A heard question is asked as spoken, with the voice and speed from Settings. Other turns are spoken per `read_aloud`.                                                                                                                                                                                                                          |
+| `heard { event, text? }`                         | brain to body | `speech_start`, `partial`, `final`, `turn_end`. Main maps these to the renderer's `speechStart`, `partial`, `final`, `turnEnd`.                                                                                                                                                                                                                |
+| `voice { status, message?, progress? }`          | brain to body | The ears' models: `loading` (with `progress`), `ready` or `failed`. Only the ears send it; the mouth sends none.                                                                                                                                                                                                                               |
+| `speech { turn, n?, text?, pcm?, sample_rate? }` | brain to body | One sentence: `n` (1-based within its turn), `text`, plus `pcm` (16-bit, 24,000 Hz, base64) when Kokoro spoke it. A frame with `text` only means use the system voice.                                                                                                                                                                         |
+| `speech { turn, done: true }`                    | brain to body | The last sentence of that turn has been sent.                                                                                                                                                                                                                                                                                                  |
+| `speech_control { action, turn? }`               | brain to body | `pause` holds the player where it is, `resume` carries on from the held sentence, `clear` drops what is queued (one turn's, if `turn` is given). Live only. The mouth sends `pause` and `resume` to the body playing the turn when it pauses or resumes (nothing calls those yet, F18 will); `clear` is not sent yet.                          |
 
 `heard`, `voice`, `speech`, `speech_state` and `speech_control` are live only (no `seq`), so they are not replayed after a
 reconnect. `createVoiceBridge` remembers the open listening mode (also when `listen` found the
@@ -225,7 +228,7 @@ Addressing in always mode (`#addressed`):
 - **Bare speech.** A plain `speechStart` with Scout quiet does nothing in always mode. Talk in the
   room must not cut Scout off. With Scout speaking (`speaking()`), any `speechStart` calls `pause()`
   instead, with no name needed; see [Talking over Scout](#talking-over-scout).
-- **Partials.** The first addressed `partial` of a turn calls `onSpeechStart` once (barge-in), and
+- **Partials.** The first addressed `partial` of a turn calls `onSpeechStart` once (it brings the bubble up; nothing is cancelled), and
   each addressed partial shows. A partial that may still grow into "stop listening"
   (`mightBeStop`, for example "Scout, st") neither cuts Scout off nor shows.
 - **Addressed `turnEnd`.** It closes the follow-up window. If the question is "stop" or "stop
@@ -264,8 +267,8 @@ into `start`, `stop` or `none`. It has four modes: `idle`, `held`, `clicked` and
 - **`onTalkCancel`** calls `release()`. Only if that returns `stop` (the key was holding a question
   open) does it cancel. A question from the mic button stays. So does one the 30 s cap already
   sent.
-- **`start`** cuts Scout off at once (`bargeIn` → `onBegin` → `player.cutOff()`) and clears the note
-  and the partial. It calls `hold()` and arms the `MAX_LISTEN_MS` (30 s) cap. The bubble state
+- **`start`** pauses Scout's voice (`TalkOver.press()`: `player.pause()`, nothing cancelled), brings
+  the bubble up (`begin` → `onBegin`) and clears the note and the partial. It calls `hold()` and arms the `MAX_LISTEN_MS` (30 s) cap. The bubble state
   becomes `listening` only in `onMicOpen`.
 - **`stop`** with a held question pending sets state `hearing`, shown as "Turning that into
   text…", and calls `release()`. With nothing pending it goes straight to `idle`.
@@ -275,8 +278,10 @@ into `start`, `stop` or `none`. It has four modes: `idle`, `held`, `clicked` and
   the controller, and `onInterrupt` delivers the words like any heard question, with what was heard
   of Scout (`interrupted {turn, heard}`) riding on the question itself. "Scout, stop listening"
   over Scout still switches Always listening off (and cuts Scout off), and is not sent to the brain.
-  The talk key and mic button read `SpeechPlayer.interruption()` before the player stops
-  (`CutMemory` in `talk-rules.ts`), so a held question carries it too.
+  The talk key and mic button read `SpeechPlayer.interruption()` before the player pauses
+  (`TalkOver` in `talk-rules.ts`), so a held question carries it too.
+  A pause from the talk key always ends: in a cut-off (words heard) or a resume (nothing heard, or the
+  mic or ears failed, which calls `TalkOver.nothing()`).
 - **Delivery.** A heard question goes through `HeardInbox`. If no bubble is mounted (a one-line
   hello or remark is up, or Scout is still waking), the question is held, the line
   gives way through `onBegin`, and the bubble asks it as it subscribes. Only the latest is held.
@@ -413,7 +418,7 @@ or for a partial that `mightBeStop`. Main and the panel apply the same addressin
 - **Opening.** The window opens when Scout's answer to a question asked by voice has finished
   both streaming and speaking, and some of it was said aloud. A gap between sentences does not
   open it.
-- **What opens nothing.** A barge-in (`cue.hushed()` in `bargeIn`), the stop button or stop key
+- **What opens nothing.** Talking over Scout (`cue.hushed()` in `begin`), the stop button or stop key
   (`hush`), and the bubble's close (`cancel`).
 - **While open.** `openFollowUp()` takes effect only while `always && !paused`. For the next 20 s,
   one reply needs no name.
@@ -427,39 +432,40 @@ or for a partial that `mightBeStop`. Main and the panel apply the same addressin
 
   Each open and close goes to main through `IPC.setFollowUp` (`onFollowUp`).
 
-### Barge-in
-
-- **Held.** `hold()` (the talk key or the mic button) cuts Scout off at once. So does the ears'
-  `speechStart` in a held session. Both go through `onBegin`, which calls `player.cutOff()` and clears
-  any one-line hello or remark.
-- **Always.** With Scout speaking, any speech pauses it (see Talking over Scout). With Scout quiet,
-  only the first addressed partial, or the addressed `turnEnd`, of a turn barges in.
-- **The bubble.** It subscribes to `talk.onListen`. If an answer is still streaming, the bubble
-  calls `bridge.interrupt(turnId)`. It keeps the text shown so far and ignores the rest of the
-  stopped turn.
-- **Stop.** Cancelling a turn does not hush its speech on the brain. So `turns.ts#interrupt` cancels
-  the turn and then broadcasts the stop-voice event, and the panel's `player.cutOff()` sends `hush`.
-  The Stop button, the stop key, the bubble's close and a barge-in all end in `player.cutOff()`.
-
 ### Talking over Scout
 
-The mic stays open while Scout speaks, and the system voice no longer deafens it. Any speech over
-Scout pauses it; what the person said then decides what happens. The decision is mechanical
-where it can be and the brain's where it matters:
+Talking over Scout pauses it; nothing is destroyed. The mic stays open while Scout speaks, and the
+system voice no longer deafens it. What the person said then decides what happens. The decision
+is mechanical where it can be and the brain's where it matters:
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 flowchart TD
-  A["speechStart while Scout speaks"] --> B["SpeechPlayer.pause: sound held, nothing lost"]
+  K["talk key or mic button pressed"] --> B
+  A["speechStart while Scout speaks (always listening)"] --> B["SpeechPlayer.pause: sound held, nothing lost, nothing cancelled"]
   B --> C{"turnEnd text"}
   C -->|"empty"| R["SpeechPlayer.resume"]
   C -->|"echoOf: Scout's own words"| R
   C -->|"other words"| D["read interruption {turn, heard}, player.cutOff"]
   D --> E["say { text, interrupted: {turn, heard} }"]
-  E --> F["brain: cancel the turn, keep only what was said, hand over the unsaid once"]
+  E --> F["brain: pause the turn, keep what was said and the unsaid, tell the next turn"]
   F --> G["Scout decides: stop, answer, carry on or offer the rest"]
 ```
 
+- **Held.** The talk key (or the mic button) only pauses Scout's voice, through `TalkOver.press()`
+  in `talk-rules.ts`, and brings the bubble up (`onBegin` clears any one-line remark). No turn is
+  cancelled and nothing is hushed before words arrive. The held session's `turnEnd` runs the
+  same echo check as Always: empty or Scout's own echo calls `TalkOver.nothing()`, which resumes
+  playback; real words call `TalkOver.heard()`, which reads what was heard, cuts Scout off
+  (`player.cutOff()`, so the brain hushes) and sends the question with `interrupted`.
+- **Always.** With Scout speaking, any speech pauses it. With Scout quiet, only the first
+  addressed partial, or the addressed `turnEnd`, of a turn brings the bubble up.
+- **The bubble.** It no longer stops the running reply when listening starts. The Stop button and
+  the close still do (`bridge.interrupt`, which cancels the turn: an explicit stop). Real words
+  reach the brain as a `say` with `interrupted`, and the brain pauses the turn.
+- **Stop.** Cancelling a turn does not hush its speech on the brain. So `turns.ts#interrupt` cancels
+  the turn and then broadcasts the stop-voice event, and the panel's `player.cutOff()` sends `hush`.
+  The Stop button, the stop key and the bubble's close end in `player.cutOff()`.
 - **Pause is local.** `SpeechPlayer.pause()` suspends the WebAudio clock and pauses
   `speechSynthesis`; `resume()` undoes it, and `clear()` releases a pause. A partial transcript
   neither resumes nor sends; only the turn's end decides.
@@ -473,12 +479,12 @@ flowchart TD
   later question. The player's `cutOff()` hushes the brain first, so the mouth keeps the turn's
   sentence log (sent and made-but-unsent) through the hush: the unsaid rest survives.
   `SpeechPlayer.text()` (the echo check) is only the sentence playing and the one before it.
-- **What the brain does.** `Session.say` cancels that turn, saves only the sentences that were
-  said, marked `[interrupted: the owner spoke over this]`, and gives the model the unsaid
-  sentences once, in a `<data kind="interruption">` block with the owner's words. See
-  [Brain](brain.md).
-- **Held questions** still cut Scout off at once, but send `interrupted` too, so the brain cuts
-  the turn and the model gets the unsaid rest.
+- **What the brain does.** `Session.say` pauses that turn (`Session.interrupt`: generation stops,
+  nothing is cancelled and no open item is closed), saves only the sentences that were said,
+  marked `[interrupted: the owner spoke over this]`, and gives the model the unsaid sentences
+  once, in a `<data kind="interruption">` block with the owner's words. A tool still running
+  finishes in the background and its result comes back through the front door as a
+  `tool_result` event. See [Brain](brain.md).
 
 ### The mouth
 
@@ -495,7 +501,7 @@ flowchart LR
   VB -->|"IPC speechDone"| SD["SpeechPlayer.done(turn)"]
   SP -->|"mouth kokoro and pcm present"| WA["WebAudio + AnalyserNode"]
   SP -->|"system voice, or text only"| SY["speechSynthesis"]
-  ST["Stop, barge-in, close"] --> PS["SpeechPlayer.cutOff"] -->|"hush"| B
+  ST["Stop, words over Scout, close"] --> PS["SpeechPlayer.cutOff"] -->|"hush"| B
   CT["speech_control from the brain"] --> AC["pause, resume, clear"] --> SP
   SP -->|"onSpeech"| SS["speech_state to the brain"]
 ```
@@ -697,11 +703,11 @@ The full statement is in `privacy.md`.
 | `bodies/desktop/src/main/ipc/turns.test.ts`                                                                               | A spoken ask carries `spoken`, `voice` and `speed`; a cancelled turn also stops the voice.                                                                                                                                                                                                                                                                                      |
 | `bodies/desktop/src/main/talk-key.test.ts`                                                                                | The 250 ms confirm, shortcuts sending nothing, taps, repeats, cancel, key change, keycodes, and a hook that will not load.                                                                                                                                                                                                                                                      |
 | `bodies/desktop/src/main/always-listening.test.ts`, `status-marks.test.ts`                                                | State, follow-up gating, pause reasons, the guard timing and logging, saving in order, `listening-on` and `say-name` marks.                                                                                                                                                                                                                                                     |
-| `bodies/ui/src/voice/listen-controller.test.ts`                                                                           | Hold, release and cancel, late mics, `turnEnd` ownership, the always session lifecycle, addressing, stop, barge-in once per turn, the follow-up window, speech over Scout (pause, resume on noise or echo, interrupt), retry back-off.                                                                                                                                          |
+| `bodies/ui/src/voice/listen-controller.test.ts`                                                                           | Hold, release and cancel, late mics, `turnEnd` ownership, the always session lifecycle, addressing, stop, speech start once per turn, a held question that is only Scout's echo, the follow-up window, speech over Scout (pause, resume on noise or echo, interrupt), retry back-off.                                                                                           |
 | `bodies/ui/src/voice/push-to-talk.test.ts`                                                                                | Repeats, missed release, the mic button, spent holds.                                                                                                                                                                                                                                                                                                                           |
 | `bodies/ui/src/shapes/addressing.test.ts`, `voice.test.ts`; `bodies/desktop/src/shared/voice.test.ts`, `settings.test.ts` | "Scout"-like words, possessives, follow-up, stop, `chosenMouth`, `Pushable`.                                                                                                                                                                                                                                                                                                    |
 | `bodies/desktop/src/renderer/src/mic.test.ts`, `remote-ears.test.ts`, `voice-seam.test.ts`                                | The mic closed on audio failure and a worklet failure not read as busy, handlers kept until a held `turnEnd`, the seam.                                                                                                                                                                                                                                                         |
-| `bodies/desktop/src/renderer/src/talk-rules.test.ts`, `mic-failure.test.ts`                                               | `FollowUpCue`, `EarsNotes`, `FailureStreak`, `HeardInbox`, `micFailure`.                                                                                                                                                                                                                                                                                                        |
+| `bodies/desktop/src/renderer/src/talk-rules.test.ts`, `mic-failure.test.ts`                                               | `FollowUpCue`, `EarsNotes`, `FailureStreak`, `HeardInbox`, `TalkOver` (the key pauses, real words cut off, nothing resumes), `micFailure`.                                                                                                                                                                                                                                      |
 | `bodies/desktop/src/renderer/src/voice-player.test.ts`                                                                    | `SpeechPlayer` order, answering and speaking state, cutOff dropping late chunks and sending `hush`, pause and resume (the held sentence is not replayed, the queue is kept), clear (no `hush`), the `speech_state` events per sentence, `applySpeechControl`, the sentences played to the end, the turn's text, the system-voice fallback, `previewVoice`, system voice choice. |
 | `bodies/desktop/e2e/smoke.spec.ts`                                                                                        | Talking to Scout on the fake brain's `heard` and `speech` frames and Chromium's fake mic, ending with the "Hold Right Ctrl to reply" hint and a spoken `say`.                                                                                                                                                                                                                   |
 | `bodies/desktop/e2e/listening.spec.ts`                                                                                    | Always listening off at launch, on only when switched (the brain gets `listen` and mic frames), a "Scout, ..." turn answered, then off again (`unlisten`).                                                                                                                                                                                                                      |

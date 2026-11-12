@@ -202,7 +202,8 @@ The same call backs **Start brain** on the offline card, so it also runs when th
 - **Asking.** The `ask` IPC (`ipc/turns.ts`) sends `say` with the text, the pending screenshot as an
   image part, dropped items as parts and the active window title as `context.window`, and returns
   `{ turnId }`. While the brain is offline it throws "Scout's brain is not running." Interrupt sends
-  `cancel`.
+  `cancel`: the explicit Stop only. Talking over Scout pauses its voice and sends the words as
+  a `say` with `interrupted` (see [voice.md](voice.md#talking-over-scout)).
 - **Turn events.** The brain's `reply` and `turn` notifications are mapped to the UI's turn events
   and go to `forwardToRenderers`, which keeps `activeTurns` for the bubble's blur rule and sends the
   events to every window on `IPC.turnEvent`. After a reconnect the client reports `resync`, and
