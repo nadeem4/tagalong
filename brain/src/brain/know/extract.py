@@ -55,7 +55,8 @@ async def complete(
 def fenced(material: Material) -> str:
     # No angle bracket in the text, so it cannot close its own fence.
     body = material.text.replace("<", "&lt;")
-    return f'<material untrusted="true" ref="{material.ref.replace(chr(34), "")}">\n{body}\n</material>'
+    ref = material.ref.replace('"', "")
+    return f'<material untrusted="true" ref="{ref}">\n{body}\n</material>'
 
 
 def _json(text: str) -> dict:
