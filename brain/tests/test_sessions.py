@@ -3146,3 +3146,14 @@ async def test_silent_reply_after_a_tool_round_resumes_without_a_duplicate_tool_
     assert ids == ["t1"]
     resumed, _ = make(Gate(["ok"]), memory)
     assert [m["role"] for m in resumed.history][-2:] == ["user", "assistant"]
+
+
+async def test_a_waiting_say_or_later_entry_keeps_next_pause_closed():
+    session, _ = make(Gate(["ok"]))
+    session.dispatcher.set_speech_state("idle")
+    assert session.dispatcher._can_deliver("next_pause")
+    session._says_waiting.add("tok")
+    assert not session.dispatcher._can_deliver("next_pause")
+    session._says_waiting.clear()
+    session._later.append((None, "t", [], say("x")))
+    assert not session.dispatcher._can_deliver("next_pause")

@@ -298,6 +298,41 @@ async def test_state_callback_sequence():
     await asyncio.sleep(0.3)
     assert seen == ["sentence_break", "talking", "sentence_break", "paused", "sentence_break",
                     "talking", "idle"]  # fmt: skip
+
+
+async def test_pause_and_resume_tell_the_body_that_plays_the_turn():
+    sent = Sent()
+    m, _ = mouth(sent, FakeTts(sleep=0.03))
+    await ready(m)
+    sent.frames.clear()
+    m.spoken("t", "d", None, None)
+    m.pause()
+    m.resume()
+    controls = [(b, p) for b, meth, p in sent.frames if meth == "speech_control"]
+    assert controls == [("d", {"action": "pause"}), ("d", {"action": "resume"})]
+
+
+async def test_pause_still_reaches_the_body_after_the_last_sentence_was_sent():
+    sent = Sent()
+    m, _ = mouth(sent, FakeTts())
+    await ready(m)
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": f"{ONE} "})
+    m.reply("t", {"done": True})
+    await asyncio.sleep(0.2)  # every frame is out, the turn is dropped, the body still plays
+    sent.frames.clear()
+    m.pause()
+    assert [(b, p) for b, meth, p in sent.frames if meth == "speech_control"] == [
+        ("d", {"action": "pause"})
+    ]
+
+
+async def test_pause_with_nothing_spoken_sends_no_control():
+    sent = Sent()
+    m, _ = mouth(sent, FakeTts())  # nothing was ever sent, so nobody plays anything
+    m.pause()
+    m.resume()
+    assert sent.frames == []
     assert m.state == "idle"
 
 

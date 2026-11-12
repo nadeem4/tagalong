@@ -2,9 +2,10 @@
 this one module decides when it is told, who tells it and when it is held instead.
 
 Urgency comes from the event kind (events.py), never from the payload or the model. `now` goes
-at once, `next_pause` at a sentence break or when speech is idle, `idle` only when speech is idle
-and no conversation is active, `hold` is kept as an open item. A kind nobody registered is
-refused, so no source can bypass the rules by inventing one.
+at once, `next_pause` at a sentence break or when speech is idle (the desktop's speech state,
+else the mouth's; for a body with no audio, once the running reply has ended), `idle` only
+when speech is idle and no conversation is active, `hold` is kept as an open item. A kind
+nobody registered is refused, so no source can bypass the rules by inventing one.
 
 Past that gate a waking kind is batched per kind (`batch_seconds`), capped per hour, and started
 as one wake turn on a body that can show it, one turn at a time. Words and card answers are
@@ -135,7 +136,11 @@ class Dispatcher:
         self._wakes: list[tuple[datetime, str]] = []  # capped wakes in the rolling hour
         self._on_ends: dict[str, list[Callable[[str], None]]] = {}  # by the turn id start returned
         self._seq = 0
-        self._state = "idle"
+        # Who plays the audio says what Scout's speech is doing: the body that reported last,
+        # else the brain's own mouth (a body with no audio, or none connected).
+        self._reported: dict[str, str] = {}  # body id -> its last state; idle is not kept
+        self._mouth = "idle"
+        self._break_seen = False  # a break or idle was seen; spent by the next take
         self._conversation = False
         self._stopped = False
         self._changed = asyncio.Event()
@@ -180,15 +185,57 @@ class Dispatcher:
             w for w in self._waiting if not (w.item.kind == kind and w.item.key == key)
         ]
         self._close_held(kind, key)
+        self._trim_latch()
         kind_obj = self._kinds.get(kind)
         if kind_obj is not None:
             self._replace_held(kind_obj, key)
             self.pump()
 
-    def set_speech_state(self, state: str) -> None:
-        """`talking`, `sentence_break`, `paused` or `idle`, as the mouth reports it."""
-        self._state = state
+    @property
+    def _state(self) -> str:
+        # The body that reported last is the one playing now; with none reporting, the mouth.
+        return next(reversed(self._reported.values()), self._mouth)
+
+    def set_speech_state(self, state: str, body_id: str = "desktop") -> None:
+        """A body's speech state (`talking`, `sentence_break`, `paused`, `idle`): the speaker
+        that plays the audio is the truth, so it wins over the mouth while it reports. `idle`
+        means it has nothing left, so its claim ends and the mouth speaks for any other body."""
+        self._reported.pop(body_id, None)
+        if state != "idle":
+            self._reported[body_id] = state
+        self._seen(self._state)
+
+    def set_mouth_state(self, state: str) -> None:
+        """The mouth's own state, followed only while no body reports one."""
+        self._mouth = state
+        if not self._reported:
+            self._seen(state)
+
+    def speech_body_gone(self, body_id: str = "desktop") -> None:
+        """A body left or said hello again: what it last reported no longer holds."""
+        self._reported.pop(body_id, None)
+        self._seen(self._state)
+
+    def _seen(self, state: str) -> None:
+        # Two frames can be handled with no await between, so a break is latched, not just read.
+        self._intake()
+        if self._break_open(state) and self._next_pause_waiting():
+            self._break_seen = True
         self._changed.set()
+
+    def _next_pause_waiting(self) -> bool:
+        return any(w.item.urgency == "next_pause" for w in self._waiting)
+
+    def _trim_latch(self) -> None:
+        # A latched break belongs to the item that waited for it: once none waits (dropped,
+        # held, superseded) it must not let a later item through mid-sentence.
+        if self._break_seen and not self._next_pause_waiting():
+            self._break_seen = False
+
+    def _break_open(self, state: str) -> bool:
+        # Idle with a reply still running is no pause: a body with no audio has no speech
+        # state, so its next pause is the end of the reply.
+        return state == "sentence_break" or (state == "idle" and not self._busy())
 
     def set_conversation_active(self, active: bool) -> None:
         self._conversation = active
@@ -298,6 +345,7 @@ class Dispatcher:
         if not old:
             return
         self._waiting = [w for w in self._waiting if w not in old]
+        self._trim_latch()
         for w in old:
             self._hold(w.item, "stale")
         self._call([w.item.on_drop for w in old], "on_drop", "stale wake")
@@ -308,7 +356,7 @@ class Dispatcher:
         if urgency == "now":
             return True
         if urgency == "next_pause":
-            return self._state in ("sentence_break", "idle")
+            return self._break_seen or self._break_open(self._state)
         return self._state == "idle" and not self._conversation
 
     def _intake(self) -> None:
@@ -327,10 +375,13 @@ class Dispatcher:
         while True:
             self._changed.clear()
             self._intake()
+            self._trim_latch()
             ready = [w for w in self._waiting if self._can_deliver(w.item.urgency)]
             if not ready:
                 await self._changed.wait()
                 continue
+            if any(w.item.urgency == "next_pause" for w in ready):
+                self._break_seen = False  # the break was taken
             self._waiting = [w for w in self._waiting if w not in ready]
             self._inflight = ready
             failed = False
@@ -386,6 +437,10 @@ class Dispatcher:
     def pump(self) -> None:
         """Hold what must not be told, then start the next wake that is due. Run again by the
         session when a turn ends or a body connects."""
+        # The "reply ended" signal of the typed-only rule: a body with no audio has no speech
+        # state, so a turn ending (turn_ended, a body connecting) wakes the loop to re-read the
+        # gate, where `idle` opens next_pause once nothing is busy.
+        self._changed.set()
         try:
             self._hold_groups()
             if self._groups and not self._busy():
