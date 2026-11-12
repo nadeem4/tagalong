@@ -67,13 +67,21 @@ class Memory:
     def remove_app(self, app_id: str) -> None:
         connections.remove_app(self._db, app_id)
 
-    def remember(self, kind: str, text: str, replaces: int | None = None) -> Item:
+    def remember(
+        self,
+        kind: str,
+        text: str,
+        replaces: int | None = None,
+        tag: str = "",
+        evidence: str | None = None,
+    ) -> Item:
         at = self._now().isoformat()
         masked = self.mask(text)
         if masked == WITHHELD:
             # A blocking save guard: saving "[withheld]" would store noise.
             raise MemoryRefused("A save guard withheld this text, so it was not remembered.")
-        return memory_store.remember(self._db, kind, masked, replaces, at)
+        masked_evidence = self.mask(evidence) if evidence else None
+        return memory_store.remember(self._db, kind, masked, replaces, at, tag, masked_evidence)
 
     def forget(self, item_id: int) -> Item:
         return memory_store.forget(self._db, item_id)
@@ -120,5 +128,11 @@ class Memory:
     def load_messages(self, include_cut: bool = False) -> list[dict]:
         return conversation.load_messages(self._db, include_cut)
 
-    def search(self, query: str, kind: str | None = None, limit: int = 10) -> list[Hit]:
-        return search_store.search(self._db, query, kind, limit)
+    def search(
+        self,
+        query: str,
+        kind: str | None = None,
+        limit: int = 10,
+        include_personal: bool = False,
+    ) -> list[Hit]:
+        return search_store.search(self._db, query, kind, limit, include_personal)

@@ -26,9 +26,16 @@ def fts_query(text: str) -> str:
     return " OR ".join(f'"{w}"' for w in re.findall(r"\w+", text.lower()))
 
 
-def search(db: sqlite3.Connection, query: str, kind: str | None, limit: int) -> list[Hit]:
+def search(
+    db: sqlite3.Connection,
+    query: str,
+    kind: str | None,
+    limit: int,
+    include_personal: bool = False,
+) -> list[Hit]:
     """Memory items, saved chat and work (jobs, steps) matching `query`; `kind` narrows to one
-    memory kind, "chat" or "work"."""
+    memory kind, "chat" or "work". Personal (asked) facts only come back with
+    `include_personal`; the portrait never does, it is already in the prompt."""
     match = fts_query(query)
     if not match or (kind is not None and kind not in ("chat", "work") and kind not in KINDS):
         return []
@@ -38,6 +45,9 @@ def search(db: sqlite3.Connection, query: str, kind: str | None, limit: int) -> 
             "SELECT m.id, m.kind, m.updated_at, m.text FROM memories_fts"
             " JOIN memories m ON m.id = memories_fts.rowid WHERE memories_fts MATCH ?"
         )
+        sql += " AND m.kind != 'portrait'"
+        if not include_personal:
+            sql += " AND m.visibility = 'free'"
         args: list = [match]
         if kind is not None:
             sql += " AND m.kind = ?"

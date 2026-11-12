@@ -120,3 +120,43 @@ def test_withheld_fact_dropped(tmp_path):
     saved = m.save_source_facts("github", [fact("bad one"), fact("good one")])
     assert texts(saved) == ["good one"]
     m.close()
+
+
+def _seed_profile(mem):
+    mem.save_source_facts(
+        "github",
+        [fact("Ships widgets", tag="work"), fact("Widgets for the family", tag="family")],
+    )
+
+
+def test_recall_hides_asked_facts_by_default(mem):
+    _seed_profile(mem)
+    assert [h.text for h in mem.search("widgets")] == ["Ships widgets"]
+
+
+def test_recall_include_personal_shows_them(mem):
+    _seed_profile(mem)
+    assert len(mem.search("widgets", include_personal=True)) == 2
+
+
+def test_recall_never_returns_portrait(mem):
+    mem.set_portrait("Makes widgets")
+    assert mem.search("widgets", include_personal=True) == []
+    assert mem.search("widgets", kind="portrait", include_personal=True) == []
+
+
+@pytest.mark.parametrize("kind", ["profile", "portrait"])
+def test_remember_cannot_write_profile_or_portrait(mem, kind):
+    with pytest.raises(MemoryRefused, match="written by code"):
+        mem.remember(kind, "x")
+
+
+def test_remember_with_tag_sets_visibility(mem):
+    item = mem.remember("about_you", "Has a dog", tag="personal", evidence="my dog Rex")
+    assert (item.visibility, item.source, item.tag, item.evidence) == (
+        "asked",
+        "chat",
+        "personal",
+        "my dog Rex",
+    )
+    assert mem.remember("about_you", "Likes tea").visibility == "free"

@@ -91,11 +91,13 @@ def remember(
     text: str,
     replaces: int | None,
     at: str,
+    tag: str = "",
+    evidence: str | None = None,
 ) -> Item:
     spec, text = _validate(kind, text)
     db.execute("BEGIN IMMEDIATE")
     try:
-        item = _write(db, spec, text, replaces, at)
+        item = _write(db, spec, text, replaces, at, tag, evidence)
     except BaseException:
         db.execute("ROLLBACK")
         raise
@@ -109,7 +111,12 @@ def _write(
     text: str,
     replaces: int | None,
     now: str,
+    tag: str = "",
+    evidence: str | None = None,
 ) -> Item:
+    # A chat fact with no tag stays free; a tag decides (personal is asked).
+    tag = normalise_tag(tag) if tag.strip() else ""
+    visibility = visibility_for(tag) if tag else "free"
     twin = db.execute(
         "SELECT id FROM memories WHERE kind=? AND text=? AND id IS NOT ?",
         (spec.name, text, replaces),
@@ -124,8 +131,9 @@ def _write(
                 "Use replaces=<id> to update one or forget one first."
             )
         cur = db.execute(
-            "INSERT INTO memories(kind, text, created_at, updated_at) VALUES (?,?,?,?)",
-            (spec.name, text, now, now),
+            "INSERT INTO memories(kind, text, created_at, updated_at, tag, evidence, visibility)"
+            " VALUES (?,?,?,?,?,?,?)",
+            (spec.name, text, now, now, tag, evidence, visibility),
         )
         return _item(db, cur.lastrowid)  # type: ignore[arg-type,return-value]
     old = _item(db, replaces)
@@ -135,7 +143,17 @@ def _write(
         # The new text already exists as another item: drop the old one, keep that one.
         db.execute("DELETE FROM memories WHERE id=?", (replaces,))
         return _item(db, twin[0])  # type: ignore[return-value]
-    db.execute("UPDATE memories SET text=?, updated_at=? WHERE id=?", (text, now, replaces))
+    db.execute(
+        "UPDATE memories SET text=?, updated_at=?, tag=?, evidence=?, visibility=? WHERE id=?",
+        (
+            text,
+            now,
+            tag or old.tag,
+            evidence or old.evidence,
+            visibility if tag else old.visibility,
+            replaces,
+        ),
+    )
     return _item(db, replaces)  # type: ignore[return-value]
 
 

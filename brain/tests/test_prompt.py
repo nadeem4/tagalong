@@ -143,6 +143,30 @@ def test_render_know_groups_with_ids():
     )
 
 
+def test_render_know_puts_portrait_first():
+    out = render_know(
+        {
+            "instruction": [item(1, "instruction", "Reply in French")],
+            "portrait": [item(9, "portrait", "A backend engineer.")],
+        }
+    )
+    assert out == (
+        "Who the owner is:\nA backend engineer.\n\nInstructions from the owner:\n"
+        "- [1] Reply in French"
+    )
+
+
+def test_render_know_without_portrait_unchanged():
+    assert render_know({"about_you": [item(2, "about_you", "Works nights")]}) == (
+        "About the owner:\n- [2] Works nights"
+    )
+
+
+def test_prompt_never_shows_asked_profile_facts():
+    asked = Item(3, "profile", "Has a dog", "a", "b", visibility="asked")
+    assert render_know({"profile": [asked]}) == ""
+
+
 def test_prompt_has_no_tracking_heading():
     out = render_know({"instruction": [item(1, "instruction", "Be brief")]})
     assert "keep an eye on" not in out and "tracking" not in out.lower()

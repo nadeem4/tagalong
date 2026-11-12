@@ -45,6 +45,10 @@ _KNOW_HEADINGS = {
 
 def render_know(groups: dict[str, list[Item]]) -> str:
     blocks = []
+    portrait = groups.get("portrait")
+    if portrait:
+        # No [id]: the portrait is rewritten by code, never forgotten or replaced by id.
+        blocks.append(f"Who the owner is:\n{portrait[0].text}")
     for kind, heading in _KNOW_HEADINGS.items():
         items = groups.get(kind)
         if not items:
