@@ -2,11 +2,13 @@
 
 Each asks the person through the normal Allow card, with facts built here so the card names
 what will be downloaded. Only the person can allow it: no preference, no Always. An install
-runs in the background, outside the turn: the tool returns at once and the end arrives as a
-`setup_done` event of facts; a login likewise ends in a `setup_login` event. Scout words them.
+runs in the background, outside the turn: the tool returns at once with its `install` open item
+and the end arrives as a `setup_done` event of facts; a login likewise returns a `signin` item
+and ends in a `setup_login` event. A second request for the same expert joins the one running
+(the same item comes back), and a card needs no check first, so it shows at once.
+Scout words the events.
 """
 
-import asyncio
 import json
 import logging
 from collections.abc import Awaitable, Callable
@@ -14,23 +16,16 @@ from dataclasses import asdict
 from pathlib import Path
 
 from brain.events import Event
+from brain.open_items import OpenItems
 from brain.permission import Tier
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.facts import Machine, RunCmd
+from brain.setup.flights import Flights
 from brain.setup.install import InstallError, install_card, install_expert
-from brain.setup.login import (
-    Failed,
-    LoggedIn,
-    LoginDriver,
-    NotLoggedIn,
-    Unknown,
-    Waiting,
-    pick_method,
-)
+from brain.setup.login import LoginDriver
 from brain.setup.net import GetJson
 from brain.setup.registry import Registry, RegistryEntry, RegistryUnavailable
 from brain.setup.store import ExpertStore, InstalledExpert
-from brain.setup.terminal import NoTerminal
 from brain.toolbox import Handler, ToolSpec
 from brain.voice.models import Fetch
 
@@ -49,15 +44,16 @@ def expert_setup_tools(
     get_json: GetJson,
     emit: Callable[[Event], None],
     notify: Callable[[str, dict], None],
+    items: OpenItems,
 ) -> tuple[
     list[tuple[ToolSpec, Handler]],
     Callable[[RegistryEntry], Awaitable[InstalledExpert]],
     Callable[[], Awaitable[None]],
 ]:
     """The tools, `update` (a reinstall for the updates check, under the same one-per-expert
-    guard, so two installs never share `tools/<id>.part`), and a `stop` that cancels running
+    flight, so two installs never share `tools/<id>.part`), and a `stop` that cancels running
     installs (each cleans up) at shutdown."""
-    running: dict[str, asyncio.Task] = {}
+    flights = Flights(items, "install")
     shown: dict[str, str] = {}  # the version each Allow card named, until its install starts
 
     async def entry_for(args: dict) -> RegistryEntry | None:
@@ -73,8 +69,6 @@ def expert_setup_tools(
             entry = await entry_for(args)
             if entry is None:
                 raise InstallError("unknown_expert", str(args.get("id")))
-            if entry.id in running:  # refuse before asking the person to allow it
-                raise InstallError("already_installing", entry.id)
             card_facts = await install_card(entry, home, await inspect_fn(), get_json)
             shown[entry.id] = entry.version
             return card_facts
@@ -82,7 +76,10 @@ def expert_setup_tools(
             # Facts only, as the error text Scout reads; nothing was asked or installed.
             raise RpcError(ErrorCode.tool_failed, failure(*_facts(err))) from err
 
-    async def run_install(entry: RegistryEntry) -> None:
+    async def run_install(entry: RegistryEntry) -> InstalledExpert:
+        """Install and tell the front door how it ended; the failure is raised after telling, for
+        `update`, which waits on the same flight (a joiner of either kind gets the same events)."""
+
         def progress(step: dict) -> None:
             facts = {"expert": entry.id, **{k: v for k, v in step.items() if v is not None}}
             emit(Event("setup_progress", facts, key=entry.id))
@@ -92,16 +89,26 @@ def expert_setup_tools(
             expert = await install_expert(
                 entry, home, await inspect_fn(), run, fetch, get_json, store, progress
             )
-            facts = {"expert": entry.id, "ok": True, "installed": json.dumps(asdict(expert))}
-        except InstallError as err:
-            log.warning("install of %s failed: %s: %s", entry.id, err.kind, err.detail)
-            facts = {"expert": entry.id, "ok": False, "error": err.kind, "detail": err.detail}
         except Exception as err:  # the person is told something, never left waiting
-            log.warning("install of %s failed: %r", entry.id, err)
-            facts = {"expert": entry.id, "ok": False, "error": "failed", "detail": repr(err)}
-        # A cancel (shutdown) skips this: nobody is left to tell.
+            if isinstance(err, InstallError):
+                log.warning("install of %s failed: %s: %s", entry.id, err.kind, err.detail)
+                facts = {"expert": entry.id, "ok": False, "error": err.kind, "detail": err.detail}
+            else:
+                log.warning("install of %s failed: %r", entry.id, err)
+                facts = {"expert": entry.id, "ok": False, "error": "failed", "detail": repr(err)}
+            emit(Event("setup_done", facts, key=entry.id))
+            notify("changed", {"what": "setup"})
+            raise
+        facts = {"expert": entry.id, "ok": True, "installed": json.dumps(asdict(expert))}
         emit(Event("setup_done", facts, key=entry.id))
         notify("changed", {"what": "setup"})
+        return expert
+
+    async def background_install(entry: RegistryEntry) -> None:
+        try:
+            await run_install(entry)
+        except Exception:  # already told and logged by run_install
+            pass
 
     async def install(args: dict) -> str:
         try:
@@ -110,48 +117,35 @@ def expert_setup_tools(
             return failure("registry_unavailable", str(err))
         if entry is None:
             return failure("unknown_expert", str(args.get("id")))
-        if entry.id in running:
-            return failure("already_installing", entry.id)
         # The person allowed the version the card named; a registry that moved on since then
         # needs a fresh card, not a silent install of something else.
         was = shown.pop(entry.id, None)
         if was is not None and was != entry.version:
             return failure("version_changed", f"{was} -> {entry.version}")
-        task = asyncio.ensure_future(run_install(entry))
-        running[entry.id] = task
-        task.add_done_callback(lambda _: running.pop(entry.id, None))
-        return json.dumps({"started": entry.id})
+        flight = flights.start(entry.id, lambda: background_install(entry))
+        out: dict = {"started": entry.id, "item": flight.item.id}
+        if flight.joined:  # already installing: the one running install is the answer
+            out["joined"] = True
+        return json.dumps(out)
 
     async def update(entry: RegistryEntry) -> InstalledExpert:
-        if entry.id in running:
+        if flights.has(entry.id):
             raise InstallError("already_installing", entry.id)
-        task = asyncio.ensure_future(
-            install_expert(
-                entry, home, await inspect_fn(), run, fetch, get_json, store, lambda step: None
-            )
-        )
-        running[entry.id] = task
-        task.add_done_callback(lambda _: running.pop(entry.id, None))
-        return await task  # a cancel of the caller cancels the install, which cleans up
-
-    async def stop() -> None:
-        tasks = list(running.values())
-        for task in tasks:
-            task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
+        flight = flights.start(entry.id, lambda: run_install(entry))
+        return await flight.task  # a cancel of the caller cancels the install, which cleans up
 
     spec = ToolSpec(
         "install_expert",
         "Install one expert (coding agent) from the registry, by its id from find_experts. "
         "Downloads into Tagalong's own folder, never the system. The owner sees an Allow card "
-        "naming everything it will download. It returns at once with {started}; the end comes "
-        "later as a setup_done event.",
+        "naming everything it will download. It returns at once with {started, item}; asking "
+        "again while it runs joins it ({joined}). The end comes later as a setup_done event.",
         _ID_SCHEMA,
         effect="change",
         tier=Tier.person_only,  # only the person allows it, every time; no Always button
         card=card,
     )
-    return [(spec, install)], update, stop
+    return [(spec, install)], update, flights.stop
 
 
 def _facts(err: Exception) -> tuple[str, str]:
@@ -163,7 +157,8 @@ def _facts(err: Exception) -> tuple[str, str]:
 def login_tools(home: Path, driver: LoginDriver) -> list[tuple[ToolSpec, Handler]]:
     """`login_expert`: the person logs in on their own subscription, in a terminal window or the
     browser the expert opens. No link or code passes through Scout. Like install, it asks every
-    time, and the window or browser opens only after the OK."""
+    time, and the window or browser opens only after the OK. The card needs no check, so it
+    shows at once; the checks run after the OK, in the background flight."""
 
     def found(args: dict):
         return ExpertStore(home).get(str(args.get("id")))
@@ -172,39 +167,24 @@ def login_tools(home: Path, driver: LoginDriver) -> list[tuple[ToolSpec, Handler
         expert = found(args)
         if expert is None:
             raise RpcError(ErrorCode.tool_failed, json.dumps({"error": "unknown_expert"}))
-        state = await driver.check(expert)
-        method = pick_method(state.methods) if isinstance(state, NotLoggedIn) else None
-        if method is None:
-            if isinstance(state, LoggedIn):
-                driver.record_logged_in(expert.id)
-                error = "already_logged_in"
-            elif isinstance(state, Unknown):
-                error = "unknown"
-            else:
-                error = "no_login_method"
-            raise RpcError(ErrorCode.tool_failed, json.dumps({"error": error}))
-        opens = "terminal window" if method.kind == "terminal" else "browser"
-        return {"expert": expert.id, "method": method.id, "opens": opens}
+        return {"expert": expert.id}
 
     async def login(args: dict) -> str:
         expert = found(args)
         if expert is None:
             return json.dumps({"error": "unknown_expert", "detail": str(args.get("id"))})
-        try:
-            state = await driver.start(expert)
-        except NoTerminal as err:
-            return json.dumps({"error": "no_terminal", "command": err.command})
-        if isinstance(state, Waiting):
-            return json.dumps({"state": "waiting", "kind": state.kind})
-        if isinstance(state, Failed):
-            return json.dumps({"state": "failed", "detail": state.detail})
-        return json.dumps({"state": "logged_in" if isinstance(state, LoggedIn) else "unknown"})
+        item, joined = driver.start(expert)
+        out: dict = {"state": "waiting", "item": item.id}
+        if joined:  # a sign-in is already running: it is the answer
+            out["joined"] = True
+        return json.dumps(out)
 
     spec = ToolSpec(
         "login_expert",
         "Log an installed expert in, by its id. Opens a terminal window or the browser for the "
-        "owner to sign in on their own subscription, after they allow it. It returns at once; "
-        "the end comes later as a setup_login event. Never ask for or relay a code or link.",
+        "owner to sign in on their own subscription, after they allow it. It returns at once "
+        "with {state: waiting, item}; asking again while it runs joins it ({joined}). The end "
+        "comes later as a setup_login event. Never ask for or relay a code or link.",
         _ID_SCHEMA,
         effect="change",
         tier=Tier.person_only,

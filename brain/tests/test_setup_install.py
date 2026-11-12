@@ -14,12 +14,14 @@ import sys
 import time
 import zipfile
 from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
 from brain.events import Event
 from brain.mind.turn import Call
+from brain.open_items import OpenItems
 from brain.permission import (
     Engine,
     Person,
@@ -46,6 +48,7 @@ from brain.setup.paths import cache_file, node_dir, tools_dir
 from brain.setup.registry import Distribution, Registry, RegistryEntry
 from brain.setup.store import ExpertStore
 from brain.setup.tools import setup_tools
+from brain.store.db import open_db
 from brain.toolbox import BrainSource
 from brain.toolbox import Toolbox as RealToolbox
 
@@ -477,7 +480,11 @@ class Net:
         return ACP if "agentclientprotocol" in url else NODE_INDEX
 
 
-def make_tools(tmp_path, npm, mach=None, updaters=None):
+def new_items(tmp_path) -> OpenItems:
+    return OpenItems(open_db(tmp_path / "items.db"), lambda: datetime.now(UTC))
+
+
+def make_tools(tmp_path, npm, mach=None, updaters=None, items=None):
     emitted: list[Event] = []
     notes: list[tuple[str, dict]] = []
 
@@ -494,6 +501,7 @@ def make_tools(tmp_path, npm, mach=None, updaters=None):
         Net(),
         emitted.append,
         lambda m, p: notes.append((m, p)),
+        items or new_items(tmp_path),
     )
     if updaters is not None:
         updaters.append(update)
@@ -524,7 +532,7 @@ async def test_install_tool_returns_at_once_and_the_install_finishes_in_the_back
 ):
     tools, emitted, notes, stop = make_tools(tmp_path, Npm())
     out = json.loads(await tools["install_expert"][1]({"id": "claude-acp"}))
-    assert out == {"started": "claude-acp"}
+    assert out["started"] == "claude-acp"
     done = await settled(emitted)
     assert done.facts["expert"] == "claude-acp" and done.facts["ok"] is True
     assert json.loads(done.facts["installed"])["id"] == "claude-acp"
@@ -549,7 +557,7 @@ async def test_setup_done_is_a_waking_kind_with_a_note():
 async def test_install_failure_arrives_as_setup_done_facts(tmp_path, ensure):
     tools, emitted, _, stop = make_tools(tmp_path, Npm(code=1))
     out = json.loads(await tools["install_expert"][1]({"id": "claude-acp"}))
-    assert out == {"started": "claude-acp"}
+    assert out["started"] == "claude-acp"
     done = await settled(emitted)
     assert done.facts["ok"] is False and done.facts["error"] == "npm_failed"
     assert "detail" in done.facts
@@ -573,15 +581,34 @@ async def test_install_tool_knows_an_unknown_id(tmp_path, ensure):
     assert out == {"error": "unknown_expert", "detail": "nope"}
 
 
-async def test_one_install_per_expert_at_a_time(tmp_path, ensure):
-    hang = Hang()
-    tools, emitted, _, stop = make_tools(tmp_path, hang)
+async def test_second_install_request_joins_first(tmp_path, ensure):
+    hang, items = Hang(), new_items(tmp_path)
+    tools, emitted, _, stop = make_tools(tmp_path, hang, items=items)
     handler = tools["install_expert"][1]
-    assert json.loads(await handler({"id": "claude-acp"})) == {"started": "claude-acp"}
+    first = json.loads(await handler({"id": "claude-acp"}))
+    assert first["started"] == "claude-acp" and "joined" not in first
     await asyncio.wait_for(hang.started.wait(), 5)
     again = json.loads(await handler({"id": "claude-acp"}))
-    assert again["error"] == "already_installing"
+    assert again == {**first, "joined": True}  # the same open item, not a second install
+    item = items.get(first["item"])
+    assert item.kind == "install" and item.state == "open"
     await stop()
+    assert items.get(first["item"]).state == "expired"  # shutdown ends the flight's item
+
+
+async def test_a_finished_install_closes_its_item_and_the_next_is_new(tmp_path, ensure):
+    items = new_items(tmp_path)
+    tools, emitted, _, _ = make_tools(tmp_path, Npm(), items=items)
+    handler = tools["install_expert"][1]
+    first = json.loads(await handler({"id": "claude-acp"}))
+    await settled(emitted)
+    for _ in range(100):  # the item closes with the task, just after the event
+        if items.get(first["item"]).state == "done":
+            break
+        await asyncio.sleep(0.01)
+    assert items.get(first["item"]).state == "done"
+    second = json.loads(await handler({"id": "claude-acp"}))
+    assert second["item"] != first["item"] and "joined" not in second
 
 
 async def test_brain_shutdown_cancels_a_running_install_and_cleans_up(tmp_path, ensure):
@@ -700,15 +727,14 @@ async def test_install_refuses_when_the_registry_version_changed_after_the_card(
     await stop()
 
 
-async def test_a_second_install_is_refused_before_any_card_is_shown(tmp_path, ensure):
+async def test_the_card_of_a_second_install_still_shows_and_the_handler_joins(tmp_path, ensure):
     hang = Hang()
     tools, _, _, stop = make_tools(tmp_path, hang)
     spec, handler = tools["install_expert"]
     await handler({"id": "claude-acp"})
     await asyncio.wait_for(hang.started.wait(), 5)
-    with pytest.raises(RpcError) as err:
-        await spec.card({"id": "claude-acp"})  # the card is built before the person is asked
-    assert json.loads(err.value.message)["error"] == "already_installing"
+    assert (await spec.card({"id": "claude-acp"}))["version"] == "0.99.1"  # no refusal first
+    assert json.loads(await handler({"id": "claude-acp"}))["joined"] is True
     await stop()
 
 
@@ -799,15 +825,40 @@ async def test_an_update_is_refused_while_an_install_of_the_same_expert_runs(tmp
     await stop()
 
 
-async def test_an_install_is_refused_while_an_update_of_the_same_expert_runs(tmp_path, ensure):
-    hang, updaters = Hang(), []
-    tools, _, _, stop = make_tools(tmp_path, hang, updaters=updaters)
+async def test_an_install_joins_an_update_of_the_same_expert_that_runs(tmp_path, ensure):
+    gate = asyncio.Event()
+
+    class Gated(Npm):
+        started = asyncio.Event()
+
+        async def __call__(self, argv, env, cwd):
+            self.started.set()
+            await gate.wait()
+            return await super().__call__(argv, env, cwd)
+
+    npm, updaters = Gated(), []
+    tools, emitted, notes, stop = make_tools(tmp_path, npm, updaters=updaters)
     updating = asyncio.ensure_future(updaters[0](npx_entry()))
-    await asyncio.wait_for(hang.started.wait(), 5)
+    await asyncio.wait_for(npm.started.wait(), 5)
     again = json.loads(await tools["install_expert"][1]({"id": "claude-acp"}))
-    assert again["error"] == "already_installing"
+    assert again["joined"] is True  # one npm run for the expert, never two on one .part folder
+    gate.set()
+    expert = await updating
+    assert expert.id == "claude-acp"
+    done = await settled(emitted)  # the joiner is told the end, as for any install
+    assert done.facts["ok"] is True and done.facts["expert"] == "claude-acp"
+    assert any(e.kind == "setup_progress" for e in emitted)
     await stop()
-    await asyncio.gather(updating, return_exceptions=True)
+
+
+async def test_a_failing_update_still_raises_and_tells_the_joiner(tmp_path, ensure):
+    updaters = []
+    tools, emitted, _, stop = make_tools(tmp_path, Npm(code=1), updaters=updaters)
+    with pytest.raises(InstallError):
+        await updaters[0](npx_entry())
+    done = await settled(emitted)
+    assert done.facts["ok"] is False
+    await stop()
 
 
 async def test_an_update_installs_and_frees_the_guard(tmp_path, ensure):
@@ -816,4 +867,4 @@ async def test_an_update_installs_and_frees_the_guard(tmp_path, ensure):
     expert = await updaters[0](npx_entry())
     assert expert.id == "claude-acp"
     again = json.loads(await tools["install_expert"][1]({"id": "claude-acp"}))
-    assert again == {"started": "claude-acp"}
+    assert again["started"] == "claude-acp" and "joined" not in again

@@ -2,8 +2,10 @@
 
 A terminal method (Claude's `claude auth login`) opens a visible window running the adapter's
 own command; a browser method (Codex) is ACP `authenticate`, and the adapter opens the
-browser. Either way a background task waits, re-checks login through ACP, records it and emits
-one waking `setup_login` event of facts. API-key methods are never picked.
+browser. `start` returns at once with a `signin` open item; one background flight per expert
+checks login through ACP (so the card never waits on it), signs in, re-checks, records it and
+emits one waking `setup_login` event of facts. A second request joins the running flight.
+API-key methods are never picked.
 """
 
 import asyncio
@@ -13,7 +15,6 @@ import tempfile
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass, field
-from functools import partial
 from pathlib import Path
 from typing import Literal
 
@@ -27,10 +28,12 @@ from acp.schema import (
 
 from brain.events import Event
 from brain.experts import kill_tree
+from brain.open_items import OpenItem, OpenItems
 from brain.setup.env import expert_env
+from brain.setup.flights import Flights
 from brain.setup.paths import login_done_file
 from brain.setup.store import ExpertStore, InstalledExpert
-from brain.setup.terminal import OpenTerminal
+from brain.setup.terminal import NoTerminal, OpenTerminal
 
 LOGIN_TIMEOUT_S = 600.0
 CHECK_TIMEOUT_S = 60.0
@@ -59,21 +62,11 @@ class NotLoggedIn:
 
 
 @dataclass(frozen=True)
-class Waiting:
-    kind: Literal["terminal", "browser"]
-
-
-@dataclass(frozen=True)
-class Failed:
-    detail: str
-
-
-@dataclass(frozen=True)
 class Unknown:
     pass
 
 
-LoginState = LoggedIn | NotLoggedIn | Waiting | Failed | Unknown
+LoginState = LoggedIn | NotLoggedIn | Unknown
 
 
 def _is_key(method: Method) -> bool:
@@ -165,6 +158,7 @@ class LoginDriver:
         store: ExpertStore,
         open_terminal: OpenTerminal,
         emit: Callable[[Event], None],
+        items: OpenItems,
         timeout_s: float = LOGIN_TIMEOUT_S,
         poll_s: float = 0.5,
         notify: Callable[[str, dict], None] | None = None,
@@ -172,7 +166,8 @@ class LoginDriver:
         self._home, self._store, self._open = home, store, open_terminal
         self._emit, self._timeout, self._poll = emit, timeout_s, poll_s
         self._notify = notify or (lambda *_: None)
-        self._tasks: dict[str, asyncio.Task] = {}
+        self._items = items
+        self._flights = Flights(items, "signin")
 
     async def check(self, expert: InstalledExpert) -> LoginState:
         """Is the expert logged in? Starts a session and sends no prompt."""
@@ -190,50 +185,47 @@ class LoginDriver:
         except Exception:  # cannot start or answer: we do not know
             return Unknown()
 
-    async def start(self, expert: InstalledExpert) -> LoginState:
-        """Begin a login and return at once; the end arrives as a `setup_login` event.
-        Raises NoTerminal where no window can open (Scout then gives the command)."""
-        state = await self.check(expert)
-        if isinstance(state, LoggedIn):
-            self.record_logged_in(expert.id)
-        if not isinstance(state, NotLoggedIn):
-            return state
-        method = pick_method(state.methods)
-        if method is None:
-            return Failed("no subscription login method this computer can run")
-        if method.kind == "terminal":
-            done = login_done_file(self._home, expert.id)
-            done.parent.mkdir(parents=True, exist_ok=True)
-            done.unlink(missing_ok=True)
-            argv = [*expert.command, *method.args]
-            await self._open(argv, {**expert_env(expert.id, os.environ), **method.env}, done)
-            wait = partial(self._wait_window, done)
-            waiting = Waiting("terminal")
-        else:
-            wait = partial(self._wait_browser, expert, method)
-            waiting = Waiting("browser")
-        await self._cancel(expert.id)  # only now: a failed opener must not end a working login
-        self._tasks[expert.id] = task = asyncio.ensure_future(self._finish(expert, wait))
-        task.add_done_callback(
-            lambda t: self._tasks.get(expert.id) is t and self._tasks.pop(expert.id)
-        )
-        return waiting
-
-    def record_logged_in(self, expert_id: str) -> None:
-        """A check found the login done: save it, and Home's chip and the tour reload."""
-        self._store.set_login(expert_id, True)
-        self._notify("changed", {"what": "setup"})
+    def start(self, expert: InstalledExpert) -> tuple[OpenItem, bool]:
+        """Begin a sign-in and return at once with its open item (and whether it joined one
+        already running). Every check and the window run in the background; the end arrives
+        as one `setup_login` event."""
+        flight = self._flights.start(expert.id, lambda: self._run(expert))
+        return flight.item, flight.joined
 
     async def stop(self) -> None:
-        tasks = list(self._tasks.values())
-        for task in tasks:
-            task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
+        await self._flights.stop()
 
-    async def _cancel(self, expert_id: str) -> None:
-        if task := self._tasks.pop(expert_id, None):
-            task.cancel()
-            await asyncio.gather(task, return_exceptions=True)
+    async def _run(self, expert: InstalledExpert) -> None:
+        state = await self.check(expert)
+        detail = ""
+        if isinstance(state, NotLoggedIn):
+            method = pick_method(state.methods)
+            if method is None:
+                self._conclude(
+                    expert.id, state, "no subscription login method this computer can run"
+                )
+                return
+            try:
+                detail = await self._sign_in(expert, method)
+            except NoTerminal as err:  # Scout gives the person the command to run themselves
+                self._tell(expert.id, "failed", "no_terminal", command=err.command)
+                return
+            if detail == "timeout":
+                self._tell(expert.id, "failed", "timeout")
+                return
+            state = await self.check(expert)
+        self._conclude(expert.id, state, detail)
+
+    async def _sign_in(self, expert: InstalledExpert, method: Method) -> str:
+        """Open the window (or start the browser method) and wait; '' when it ended well."""
+        if method.kind == "browser":
+            return await self._wait_browser(expert, method)
+        done = login_done_file(self._home, expert.id)
+        done.parent.mkdir(parents=True, exist_ok=True)
+        done.unlink(missing_ok=True)
+        argv = [*expert.command, *method.args]
+        await self._open(argv, {**expert_env(expert.id, os.environ), **method.env}, done)
+        return await self._wait_window(done)
 
     async def _wait_window(self, done: Path) -> str:
         """'' when the window's command ended with 0, else what went wrong."""
@@ -258,28 +250,25 @@ class LoginDriver:
             return f"{type(err).__name__}: {err}" if str(err) else type(err).__name__
         return ""
 
-    async def _finish(self, expert: InstalledExpert, wait) -> None:
-        detail = await wait()
-        if detail == "timeout":
-            self._tell(expert.id, "failed", "timeout")
-            return
-        state = await self.check(expert)
+    def _conclude(self, expert_id: str, state: LoginState, detail: str) -> None:
         try:
             if isinstance(state, LoggedIn):
-                self._store.set_login(expert.id, True)
-                self._tell(expert.id, "logged_in")
+                self._store.set_login(expert_id, True)
+                self._tell(expert_id, "logged_in")
             elif isinstance(state, Unknown):
-                self._store.set_login(expert.id, None)
-                self._tell(expert.id, "unknown", detail)
+                self._store.set_login(expert_id, None)
+                self._tell(expert_id, "unknown", detail)
             else:
-                self._store.set_login(expert.id, False)
-                self._tell(expert.id, "failed", detail or "still not logged in")
+                self._store.set_login(expert_id, False)
+                self._tell(expert_id, "failed", detail or "still not logged in")
         except OSError as err:
-            self._tell(expert.id, "failed", f"could not save the result: {err}")
+            self._tell(expert_id, "failed", f"could not save the result: {err}")
 
-    def _tell(self, expert_id: str, state: str, detail: str = "") -> None:
+    def _tell(self, expert_id: str, state: str, detail: str = "", command: str = "") -> None:
         facts: dict[str, str | int] = {"expert": expert_id, "state": state}
         if detail:
             facts["detail"] = detail
+        if command:
+            facts["command"] = command
         self._emit(Event("setup_login", facts, key=expert_id))
         self._notify("changed", {"what": "setup"})  # Home's chip and the tour reload

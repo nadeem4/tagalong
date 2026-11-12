@@ -319,16 +319,25 @@ describe('Experts tab: your experts', () => {
     ).toBeNull();
   });
 
-  it('a login that is waiting says where to finish it, on that row', async () => {
+  it('a login that is waiting says it is checking, on that row', async () => {
     await open(
       { experts: [installed('claude-acp', 'Claude Code', { state: 'needs_login' })] },
       { state: 'waiting' },
     );
     await click(screen.getByRole('button', { name: 'Sign in' }));
     expect(
-      within(screen.getByRole('region', { name: 'Claude Code' })).getByText(
-        /Finish logging in in the window that opened/,
-      ),
+      within(screen.getByRole('region', { name: 'Claude Code' })).getByText(/Checking the sign-in/),
+    ).toBeVisible();
+  });
+
+  it('a login that joined one already running reads the same as a new one', async () => {
+    await open(
+      { experts: [installed('claude-acp', 'Claude Code', { state: 'needs_login' })] },
+      { state: 'waiting', item: 'item-1', joined: true },
+    );
+    await click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(
+      within(screen.getByRole('region', { name: 'Claude Code' })).getByText(/Checking the sign-in/),
     ).toBeVisible();
   });
 
