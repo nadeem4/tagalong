@@ -429,7 +429,7 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 
 - [Engineering docs](docs/README.md): the index of every subsystem doc, with a reading order.
 - [Developer guide](docs/development.md): build, run, test and package from source.
-- [Architecture](docs/architecture.md): how the brain and its bodies fit together.
+- [Architecture](docs/architecture.md): how the brain and its bodies fit together, and how everything that wants Scout's attention reaches Scout (the front door, open items and the speech queue).
 - [Feature test guide](docs/testing/feature-test-guide.md): manual tests for this build.
 - [Product](bodies/PRODUCT.md) and [design system](bodies/DESIGN.md).
 - [Privacy in detail](docs/privacy.md): exactly what is read, when, and what never is.

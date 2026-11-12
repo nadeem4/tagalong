@@ -171,10 +171,40 @@ records a clean close and closes the brain client.
 ## What wakes Scout
 
 Everything that wants Scout's attention (the person's own words, a timer, a finished job, a loop, a
-card answer) will enter the brain through one front door, `brain/src/brain/dispatcher.py`. Each event kind carries an
-urgency set by code (`now`, `next_pause`, `idle`, `hold`), and the dispatcher delivers by the
-speech state: at once, at the next sentence break, only when quiet, or kept as an open item. The
-every source posts here, and `dispatcher.py` batches and caps the wakes it receives and holds what it cannot tell. See [brain.md](brain.md#front-door-and-urgency).
+card answer, setup news) enters the brain through one front door, `brain/src/brain/dispatcher.py`.
+Each event kind carries an urgency set by code (`now`, `next_pause`, `idle`, `hold`); neither the
+model nor the payload can raise it. The dispatcher delivers by the speech state, which the desktop
+reports because it plays the audio (the brain's own mouth only when no body plays): at once, at the
+next sentence break, only when quiet, or kept as a `held` open item. It also batches and caps the
+wakes it hands on.
+
+Turns are short. A turn that needs the person (a permission card, a choice, a sign-in, an install)
+opens an open item (`open_items.py`, saved in `tagalong.db`) and ends; the person's answer arrives
+later through the front door and runs the saved call, even after a restart. Talking over Scout
+pauses the speech queue and cancels nothing: the next turn sees what was said, what was left and
+what was heard, and decides. A short interjection turn at a sentence break works a due item into
+speech, then continues or replaces the queued sentences.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+flowchart LR
+  SRC["Sources: say, timers, loops,<br/>jobs, setup news, card answers"] --> FD["Front door<br/>dispatcher.py: the kind sets the urgency"]
+  FD -->|"now, or idle when quiet"| TURN["Scout's turn (short)"]
+  FD -->|"next_pause"| INT["Interjection at a sentence break"]
+  FD -->|"hold: away, quiet hours, no key"| OI
+  TURN -->|"needs the person"| OI["Open items<br/>saved, one lifecycle"]
+  OI -->|"answer or result"| FD
+  TURN -->|"reply sentences"| SQ["Speech queue<br/>mouth.py: one worker"]
+  INT -->|"continue or replace"| SQ
+  SQ -->|"speech frames"| BODY["Body plays the audio"]
+  BODY -->|"speech_state"| FD
+  FD -->|"speech_control: pause, resume, clear"| BODY
+```
+
+Words go in through the front door; replies go out through the one speech queue; open items sit
+beside the turn and hand their answers and results back through the same door. See
+[brain.md](brain.md#front-door-and-urgency), [voice.md](voice.md#the-mouths-queue) and
+[storage.md](storage.md#open-items).
 
 ## Subsystem map
 

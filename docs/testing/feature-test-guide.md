@@ -848,8 +848,9 @@ on fakes. To see it by hand, add a loop with an anchor to a test store and open 
 
 ## Open items (automated only)
 
-Nothing shows an open item yet, so there is nothing to click. Choices, offers and setup events also
-use it: `tests/test_choices.py` (a timed-out choice expires its item and tells Scout),
+Permission cards, choices, installs and sign-ins are open items, and Home's Held list shows the held
+ones, so there is little to click here beyond the live checks under "Attention framework: live
+checks" below. Choices, offers and setup events also use it: `tests/test_choices.py` (a timed-out choice expires its item and tells Scout),
 `tests/test_offers.py` and `tests/test_setup_events.py` (an offer and an install's news survive a
 restart). It is covered by
 `cd brain && uv run pytest tests/test_open_items_store.py tests/test_open_items.py -q` on a temporary database:
@@ -2718,6 +2719,17 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 3. Tables: on a Wikipedia article with a table or infobox holding a `<style>` element, ask "Show me the tables". The cells read as words and numbers, with no CSS text.
 4. Permission window: remove `history` in the popup's Allowed list, ask Scout to search history and leave the window alone for over 25 seconds. Scout says you have not allowed it and the window closes by itself; asking again opens a fresh one.
 5. Closed tabs: allow `sessions`, close a whole window of two tabs, ask for recently closed tabs. They show today's date and time, never 1970-01-01.
+
+## Attention framework: live checks (real brain, desktop with voice)
+
+The four moments the framework was built for. Run them on a real brain and desktop once per release.
+
+1. Automated: `cd brain && uv run pytest tests/test_no_leftovers.py tests/test_dispatcher.py tests/test_open_items.py -q` (the removed names, the scheduler module and the in-turn card wait stay gone).
+2. Card during speech: ask Scout a question with a long spoken answer, and while it speaks ask it to connect an app or install an expert so a card appears. Scout mentions the card at the next sentence break and carries on; the card stays until you answer. Click Allow after Scout has finished: it counts (no "not found").
+3. Talk over Scout: while Scout speaks a long answer, hold the talk key and say something. Speech pauses at once and nothing is cancelled (a running tool call finishes). Real words are answered by Scout's own judgment: it carries on, answers you, or drops what it was saying. Silence or echo resumes the speech. Open cards are untouched.
+4. Restart with open items: leave a permission card and an install card unanswered, run `uv run tagalong stop`, start the desktop again and open the bubble. Saved-call cards show again and answering one runs the call. An expert's own permission ask (tied to the live process) shows as expired. Held news shows on Home's Tasks > Held tab.
+5. WhatsApp only: close the desktop and every other body, leave only WhatsApp connected, and have a job ask you a question. The question reaches WhatsApp (no hang), and a reply typed in WhatsApp answers it. A WhatsApp message sent while the desktop is mid-turn is answered on WhatsApp, not on the desktop.
+6. Install progress: install an expert from the chat. The card shows real steps (checking this computer, getting what it needs, finding the version, downloading with a percent, unpacking, setting it up), never one "Installing" line for minutes. Asking twice for the same expert joins the one install.
 
 ## Not supported
 
