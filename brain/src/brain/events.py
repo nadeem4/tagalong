@@ -58,6 +58,8 @@ _KINDS = (
     EventKind("loop", urgency="idle", batch_seconds=0, max_per_hour=4),
     EventKind("body_online", urgency="next_pause", batch_seconds=0, max_per_hour=2),
     EventKind("back", urgency="next_pause", batch_seconds=0, max_per_hour=2),
+    # A tool the owner's talking over left running has finished; its result returns here.
+    EventKind("tool_result", urgency="next_pause", batch_seconds=0, max_per_hour=None),
     EventKind("job_question", urgency="next_pause", batch_seconds=None, max_per_hour=None),
     EventKind("choice", urgency="next_pause", batch_seconds=None, max_per_hour=None),
     EventKind("setup_progress", urgency="idle", wakes=False),

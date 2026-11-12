@@ -78,6 +78,8 @@ def start(
     step_cap=10,
     guards=None,
     turn_timeout=None,
+    stop=None,
+    on_detached=None,
 ):
     return run_turn(
         turn_id="t1",
@@ -93,6 +95,8 @@ def start(
         step_cap=step_cap,
         guards=guards,
         turn_timeout=turn_timeout,
+        stop=stop,
+        on_detached=on_detached,
     )
 
 
@@ -739,3 +743,150 @@ async def test_stream_without_a_key_raises_a_clear_error():
     model = AnthropicModel(lambda key: object(), "claude-sonnet-5-5")
     with pytest.raises(RuntimeError, match="no Anthropic key"):
         [item async for item in model.stream("s", [], [])]
+
+
+async def test_stop_while_streaming_ends_cancelled_and_keeps_the_words_shown():
+    # A pause is not a task cancel: the loop notices the stop, keeps what was shown, and ends.
+    stop = asyncio.Event()
+    hold = asyncio.Event()
+
+    first = asyncio.Event()
+
+    class Slow(FakeModel):
+        async def stream(self, system, messages, tools):
+            yield "Once "
+            first.set()
+            await hold.wait()
+            yield "more"
+
+    history = [{"role": "user", "content": "go"}]
+    task = asyncio.ensure_future(start(Slow([]), history, [], stop=stop))
+    await asyncio.wait_for(first.wait(), 1)
+    stop.set()
+    assert await asyncio.wait_for(task, 1) == "cancelled"
+    assert not task.cancelled()
+    assert history[1:] == [{"role": "assistant", "content": [{"type": "text", "text": "Once "}]}]
+
+
+async def test_stop_while_a_tool_runs_detaches_it_and_answers_its_call_in_history():
+    stop = asyncio.Event()
+    release = asyncio.Event()
+    detached = []
+
+    started = asyncio.Event()
+
+    async def slow(call):
+        started.set()
+        await release.wait()
+        return "late result"
+
+    history = [{"role": "user", "content": "go"}]
+    model = FakeModel([tool_step(("c1", "slow")), text_step("never")])
+    task = asyncio.ensure_future(
+        start(
+            model,
+            history,
+            [],
+            run_tool=slow,
+            stop=stop,
+            on_detached=lambda c, t: detached.append((c, t)),
+        )
+    )
+    await asyncio.wait_for(started.wait(), 1)
+    stop.set()
+    assert await asyncio.wait_for(task, 1) == "cancelled"
+    assert model.calls == 1  # no second model step after the stop
+    answer = history[-1]["content"][0]
+    assert answer["tool_use_id"] == "c1" and answer["type"] == "tool_result"
+    assert [c["id"] for c, _ in detached] == ["c1"]
+    pending = detached[0][1]
+    assert not pending.done()  # still running: the stop did not cancel it
+    release.set()
+    result = await asyncio.wait_for(pending, 1)
+    assert result["content"] == "late result"
+
+
+async def test_stop_keeps_a_tool_that_already_finished_and_detaches_only_the_rest():
+    stop = asyncio.Event()
+    release = asyncio.Event()
+    detached = []
+
+    started = asyncio.Event()
+
+    async def mixed(call):
+        if call.name == "quick":
+            return "fast"
+        started.set()
+        await release.wait()
+        return "slow"
+
+    history = [{"role": "user", "content": "go"}]
+    model = FakeModel([tool_step(("a", "quick"), ("b", "slow"))])
+    task = asyncio.ensure_future(
+        start(
+            model,
+            history,
+            [],
+            run_tool=mixed,
+            stop=stop,
+            on_detached=lambda c, t: detached.append(c["id"]),
+        )
+    )
+    await asyncio.wait_for(started.wait(), 1)
+    await asyncio.sleep(0)  # the quick one finishes too
+    stop.set()
+    assert await asyncio.wait_for(task, 1) == "cancelled"
+    answers = {b["tool_use_id"]: b["content"] for b in history[-1]["content"]}
+    assert answers["a"] == "fast" and set(answers) == {"a", "b"}
+    assert detached == ["b"]
+    release.set()
+    await asyncio.sleep(0.01)
+
+
+async def test_a_real_cancel_while_waiting_for_the_stream_closes_it():
+    # Stop, close, timeout or a dropped body cancel the task: the model stream must be closed
+    # (its finally runs), or the provider keeps streaming and billing.
+    stop_now = asyncio.Event()
+    hold = asyncio.Event()
+    closed = []
+    first = asyncio.Event()
+
+    class Slow(FakeModel):
+        async def stream(self, system, messages, tools):
+            try:
+                yield "Once "
+                first.set()
+                await hold.wait()
+                yield "more"
+            finally:
+                closed.append(True)
+
+    history = [{"role": "user", "content": "go"}]
+    task = asyncio.ensure_future(start(Slow([]), history, [], stop=stop_now))
+    await asyncio.wait_for(first.wait(), 1)
+    task.cancel()
+    assert await asyncio.wait_for(task, 1) == "cancelled"
+    assert closed == [True]
+
+
+async def test_stop_already_set_runs_no_tool_and_answers_each_call():
+    stop_now = asyncio.Event()
+    ran = []
+
+    async def tool(call):
+        ran.append(call.name)
+        return "ran"
+
+    class Stopping(FakeModel):
+        async def stream(self, system, messages, tools):
+            async for item in super().stream(system, messages, tools):
+                yield item
+            stop_now.set()  # the person talks over Scout as the model finishes its step
+
+    history = [{"role": "user", "content": "go"}]
+    model = Stopping([tool_step(("a", "one"), ("b", "two"))])
+    assert await start(model, history, [], run_tool=tool, stop=stop_now) == "cancelled"
+    assert ran == []
+    answers = {b["tool_use_id"]: b["content"] for b in history[-1]["content"]}
+    assert set(answers) == {"a", "b"}
+    assert "not run" in answers["a"] and "talked over" in answers["a"]
