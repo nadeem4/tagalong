@@ -93,13 +93,13 @@ async def test_portrait_budget_stop_keeps_old(mem, tmp_path):
 async def test_portrait_input_has_free_chat_facts_but_not_asked_ones(mem, tmp_path):
     seed(mem)
     mem.remember("about_you", "Works at Initech, not Acme")
-    mem.remember("project", "Building a garden planner")
+    mem.remember("project", "Building a garden planner")  # a work note, not about the person
     mem.remember("about_you", "Has a sister named Zed", tag="personal")
     mem.remember("instruction", "Answer in short sentences")
     model = FakeModel(final("Alice works at Initech."))
     await write_portrait(model, budget(tmp_path), mem)
     sent = str(model.calls[0][1])
-    assert "Works at Initech, not Acme" in sent and "garden planner" in sent
+    assert "Works at Initech, not Acme" in sent and "garden planner" not in sent
     assert "Zed" not in sent and "daughters" not in sent and "short sentences" not in sent
 
 

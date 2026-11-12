@@ -155,6 +155,15 @@ async def test_bad_username_gets_a_plain_message(know_env):
     assert reply["error"]["message"] == "That is not a GitHub username."
 
 
+async def test_bad_pdf_payload_gets_a_pdf_message(know_env):
+    _, url = know_env
+    async with connect(url) as ws:
+        await call(ws, hello())
+        reply = await call(ws, request("know_me_start", {"pdf": {"name": 5}}))
+    assert reply["error"]["code"] == ErrorCode.invalid_params
+    assert reply["error"]["message"] == "That PDF could not be read."
+
+
 async def test_status_sent_live_to_starter_only(know_env):
     _, url = know_env
     other = {"id": "ext", "kind": "extension", "name": "Chrome"}

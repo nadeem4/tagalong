@@ -2873,7 +2873,7 @@ Automated: `brain/tests/test_know_runner.py`, `test_know_portrait.py`, `test_kno
 Automated: `brain/tests/test_know_extract.py`, `test_know_portrait.py`, `test_know_tools.py`, `test_know_start.py`, `test_capabilities.py` and `test_tools.py`.
 
 - A fact whose text or quote holds a phone number or an email address is dropped; the extractor prompt says not to extract them.
-- The portrait input holds free profile facts and free chat memories (`about_you`, `project`), never asked ones; the prompt says a chat statement wins over a conflicting source fact.
+- The portrait input holds free profile facts and free `about_you` chat memories, never asked ones; the prompt says a chat statement wins over a conflicting source fact.
 - `recall` says to set `include_personal` when the person asks about themselves.
 - The capability offer line says to offer early or when asked what Scout can do, rarely, and to call `get_to_know_me` with `declined` on a no; the line still appears only while an offer is allowed.
 - `know_me_start` with a bad username or nothing to read returns `invalid_params` with a short plain message, no pydantic text or URL.

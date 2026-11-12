@@ -2535,7 +2535,7 @@ come in a later slice.
   makes that and every later source `failed` with its reason ("Stopped: daily limit reached", or "Add your Anthropic key first." when there is no key); any other error
   is logged and shown as "Something went wrong reading <label>.". The web source gets a `Known`
   built from every material's `keys` plus the `name` and `employer` the extractor found (the
-  earliest non-empty wins). `extract.check` also drops any fact whose text or evidence holds a phone number or an email address. After the sources the portrait is written (`portrait.py`, from free profile facts plus free chat memories, which win a conflict; never asked facts) and shown as
+  earliest non-empty wins). `extract.check` also drops any fact whose text or evidence holds a phone number or an email address. After the sources the portrait is written (`portrait.py`, from free profile facts plus free `about_you` chat memories, which win a conflict; never asked facts) and shown as
   a last status row named `portrait` (its gap: "Not enough found to write a portrait." or the
   daily limit); `status.portrait` carries the saved text, the old one if a new one could not be
   written. `done: true` is always sent, even when the task hits a bug (it is logged), and the run

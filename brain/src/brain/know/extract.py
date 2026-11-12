@@ -87,7 +87,9 @@ def _json(text: str) -> dict:
 
 
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
-_PHONE = re.compile(r"(?<!\w)\+?\d[\d ().-]{7,}\d(?!\w)")
+# Phone shape: optional +, then 9 or more digits with at most two separators between digits,
+# so year ranges, dotted dates and version numbers (8 digits or fewer) pass.
+_PHONE = re.compile(r"(?<!\w)\+?\d(?:[ ().-]{0,2}\d){8,}(?!\w)")
 
 
 def has_contact_details(text: str) -> bool:
@@ -96,8 +98,8 @@ def has_contact_details(text: str) -> bool:
 
 
 def check(candidates: list[Candidate], material: Material) -> list[Candidate]:
-    """Keep a candidate only if its evidence is in the material (whitespace and case aside),
-    and neither it nor its evidence holds contact details."""
+    """Keep a candidate only if its evidence is in the material (whitespace and case aside)
+    and neither its text nor its evidence holds contact details."""
     haystack = normalise(material.text)
     kept = []
     for c in candidates:

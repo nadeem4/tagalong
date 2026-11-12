@@ -162,6 +162,24 @@ def test_check_drops_contact_details(evidence, text):
     assert check([c], CONTACT) == []
 
 
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Computer Science (2015 - 2019)",
+        "Acme 2019-2023",
+        "(2019) (2020)",
+        "released 2023.01.15",
+        "version 10.0.26200",
+        "+13318149771 (Home)",
+        "(331) 814-9771",
+    ],
+)
+def test_phone_shape_needs_nine_digits(line):
+    from brain.know.extract import has_contact_details
+
+    assert has_contact_details(line) == line.startswith(("+", "(331"))
+
+
 def test_check_keeps_a_fact_with_no_contact_details():
     c = Candidate("projects", "Built Foo", "I built Foo, a CLI tool", "github:amy")
     assert check([c], CONTACT) == [c]

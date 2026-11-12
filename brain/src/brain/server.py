@@ -284,6 +284,8 @@ async def _call(message: dict, req_id: Any, peer: _Peer, session: Session) -> No
 def _bad_start(exc: ValidationError) -> str:
     if any(e["loc"] == ("github",) for e in exc.errors()):
         return "That is not a GitHub username."
+    if any(e["loc"][:1] == ("pdf",) for e in exc.errors()):
+        return "That PDF could not be read."
     return "Give a GitHub username or a LinkedIn PDF."
 
 
