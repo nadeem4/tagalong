@@ -348,3 +348,16 @@ async def test_a_spoken_reply_is_sent_as_speech_and_hush_stops_it():
 async def test_sample_returns_a_wav():
     svc, _, _ = service(Sent())
     assert (await svc.sample("Hello.", None, None))[:4] == b"RIFF"
+
+
+async def test_follow_speech_reports_the_mouths_state():
+    svc, _, _ = service(Sent())
+    seen: list[str] = []
+    svc.follow_speech(seen.append)
+    svc.spoken("t", "d", None, None)
+    svc.reply("t", "d", {"delta": "Hello there my friend. "})
+    await settle()
+    svc.turn_ended("t")
+    await settle()
+    await svc.close()
+    assert "talking" in seen and seen[-1] == "idle"

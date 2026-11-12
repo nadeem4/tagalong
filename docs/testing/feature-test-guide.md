@@ -1295,13 +1295,15 @@ stands in for a real one (the brain still needs to hear something).
 10. **Action:** while Scout speaks, say "Scout, stop listening".
 11. **Expected:** Scout stops and Always listening switches off.
 
-### T.3c. Speech state frames (contract, no visible change yet)
+### T.3c. Speech state frames (the front door follows the speaker)
 
 1. **Setup:** Kokoro voice picked; the brain's log at debug level.
 2. **Action:** ask a spoken question whose answer runs several sentences, and let it finish.
 3. **Expected:** the desktop sends the brain one `speech_state` per sentence started and one per
-   sentence ended (`n` counting from 1), then `idle` when the last one ends. The brain accepts and
-   drops them: Scout behaves as before.
+   sentence ended (`n` counting from 1), then `idle` when the last one ends. The brain's front door
+   follows them: a timer that fires mid-reply (a `next_pause` item) is told at a sentence break, not
+   in the middle of a sentence. With the desktop closed and only a typed chat open, the same timer
+   waits until the running reply has finished.
 4. **Action:** while Scout speaks, say "wait" with Always listening on, then stay quiet.
 5. **Expected:** `speech_state` `paused`, then `started` for the same sentence when it carries on;
    no sentence plays twice.
