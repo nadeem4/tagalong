@@ -10,6 +10,7 @@ import asyncio
 import base64
 import io
 import logging
+import uuid
 import wave
 from collections import deque
 from collections.abc import Awaitable, Callable
@@ -127,28 +128,28 @@ class Mouth:
         if st is not None and not st.ended:
             self._finish(st)
 
-    def queued(self, body_id: str) -> tuple[str | None, list[str]]:
-        """The live turn on `body_id` that owns the queue (the newest) and what it has not said."""
-        turns = self.turns_on(body_id)
-        return (turns[-1], self.unsaid(turns[-1])) if turns else (None, [])
+    def speaking(self, turn: str, body_id: str) -> bool:
+        """`turn` is still live on `body_id`: it owns the queue and can be replaced."""
+        st = self._turns.get(turn)
+        return st is not None and st.body_id == body_id
 
-    def replace(self, turn: str, body_id: str, text: str) -> None:
-        """Drop what `turn` has not said, including what it is still writing, and say `text`
-        instead in the same voice. A turn that is gone is started again, so the words are said."""
-        fresh = turn not in self._turns
-        if fresh:
-            self.spoken(turn, body_id, None, None)
-        st = self._turns[turn]
+    def replace(self, turn: str, body_id: str, text: str) -> str | None:
+        """Drop what `turn` has not said (the body is told to clear it too, since sentences
+        already sent sit in its player) and say `text` in the same voice as a turn of its own,
+        whose id is returned. The old turn is muted, not ended: its writer still owns it. None
+        when `turn` is no longer live, so nothing is said in a voice it cannot name."""
+        st = self._turns.get(turn)
+        if st is None or st.body_id != body_id:
+            return None
         st.unsent.clear()
-        self._queue = deque(i for i in self._queue if i[0] != turn)
+        self._queue = deque(i for i in self._queue if i[0] != turn or i[1] is None)
         st.muted = True
-        st.stream = SpokenStream(lambda line: self._enqueue(st, line))
-        st.stream.push(text)
-        st.stream.end()
-        if st.ended or fresh:  # its done marker went with the rest: closing follows the new words
-            st.ended = True
-            self._queue.append((turn, None))
-        self._poke()
+        self._bodies.send_live(body_id, "speech_control", {"action": "clear", "turn": turn})
+        new = f"{turn}-{uuid.uuid4().hex[:8]}"  # the body silences a cleared turn id for good
+        self.spoken(new, body_id, st.voice, st.speed, st.system_voice)
+        self.reply(new, {"delta": text})
+        self.end_turn(new)
+        return new
 
     def pause(self) -> None:
         """Stop after the sentence being made is sent; what is queued waits for `resume`."""
@@ -156,9 +157,11 @@ class Mouth:
         self._control("pause")
         self._poke()
 
-    def resume(self) -> None:
+    def resume(self, tell: bool = True) -> None:
+        """Carry on. `tell=False` keeps the body's player as it is: the person paused it."""
         self._paused = False
-        self._control("resume")
+        if tell:
+            self._control("resume")
         self._poke()
 
     def _control(self, action: str) -> None:

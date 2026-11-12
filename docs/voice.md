@@ -87,9 +87,10 @@ flowchart LR
 called on each change (the brain wires it to the dispatcher as the fallback when no body reports
 what it plays; the desktop's `speech_state` wins). `pause()` and `resume()` also send
 `speech_control` to the body playing the turn; an interjection calls them (docs/brain.md,
-Interjections). `queued(body_id)` is the turn that owns the queue with its unsaid sentences, and
-`replace(turn, body_id, text)` drops the unsaid sentences and the turn's later words and says `text`
-in the same voice. `unsaid(turn)` is what was made but not yet sent. A body's `hush` clears
+Interjections). `speaking(turn, body_id)` says the turn is still live and owns the queue, and
+`replace(turn, body_id, text)` sends the body a `clear` for the turn, mutes the turn's later words
+and says `text` in the same voice as a new turn (its id is returned; `None` when the turn is gone).
+`resume(tell=False)` carries on without telling the body, for when the person paused it. `unsaid(turn)` is what was made but not yet sent. A body's `hush` clears
 every turn spoken on that body.
 
 ### What crosses to the brain
