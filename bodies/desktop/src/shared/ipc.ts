@@ -47,6 +47,11 @@ export const IPC = {
   restartConnection: 'tagalong:connections:restart',
   listMemories: 'tagalong:memory:list',
   deleteMemory: 'tagalong:memory:delete',
+  getPortrait: 'tagalong:memory:portrait',
+  knowMeSources: 'tagalong:know-me:sources',
+  knowMeStart: 'tagalong:know-me:start',
+  // Progress of a get-to-know-me run: pushed to every window.
+  knowMeStatusEvent: 'tagalong:know-me:status',
   listPermissions: 'tagalong:permissions:list',
   setPermission: 'tagalong:permissions:set',
   loopsState: 'tagalong:loops:state',

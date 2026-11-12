@@ -13,6 +13,9 @@ import type {
   ContextSnapshot,
   FixTarget,
   LoopsState,
+  KnowMeInput,
+  KnowMeStatus,
+  KnowSourceInfo,
   MemoryEntry,
   ModelState,
   Pet,
@@ -335,6 +338,18 @@ export interface HostBridge {
    */
   listMemories(): Promise<MemoryEntry[]>;
   deleteMemory(id: string): Promise<boolean>;
+  /** Scout's portrait of the person, written by get to know me; null before there is one. */
+  getPortrait(): Promise<string | null>;
+  /** The sources get to know me can read, and what each needs from the person. */
+  knowMeSources(): Promise<KnowSourceInfo[]>;
+  /**
+   * Starts a get-to-know-me run, or joins the one going. Rejects with a plain sentence when the
+   * brain refuses (a PDF over 10 MB, nothing given) or is away. Subscribe with onKnowMeStatus
+   * first: the first status arrives before this resolves.
+   */
+  knowMeStart(input: KnowMeInput): Promise<{ joined: boolean }>;
+  /** Progress of the run this window started or joined; returns the unsubscribe function. */
+  onKnowMeStatus(listener: (status: KnowMeStatus) => void): () => void;
   /** The brain's key facts (never the key); rejects while the brain is away. */
   keyStatus(): Promise<KeyStatus>;
   /** Hands the pasted key to the brain once and keeps no copy; resolves how the check ended. */

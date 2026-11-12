@@ -21,4 +21,28 @@ describe('MemoryEntry', () => {
       MemoryEntry.safeParse({ id: 'm', kind: 'secret', text: 'x', createdAt: AT }).success,
     ).toBe(false);
   });
+
+  it('carries where a profile fact came from, and who may see it', () => {
+    const entry = MemoryEntry.parse({
+      id: 'm1',
+      kind: 'fact',
+      text: 'Software engineer',
+      createdAt: AT,
+      tag: 'work',
+      source: 'linkedin',
+      sourceRef: 'cv.pdf',
+      evidence: 'Software Engineer at Acme',
+      visibility: 'free',
+    });
+    expect(entry).toMatchObject({ tag: 'work', source: 'linkedin', visibility: 'free' });
+    expect(
+      MemoryEntry.safeParse({
+        id: 'm',
+        kind: 'fact',
+        text: 'x',
+        createdAt: AT,
+        visibility: 'secret',
+      }).success,
+    ).toBe(false);
+  });
 });
