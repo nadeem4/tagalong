@@ -164,13 +164,13 @@ describe('MemoryView, get to know me', () => {
   it('the button opens the run form', async () => {
     renderView(createFakeHostBridge({ memories: [] }));
     fireEvent.click(await screen.findByRole('button', { name: 'Get to know me' }));
-    expect(await screen.findByLabelText('Your GitHub username')).toBeInTheDocument();
+    expect(await screen.findByLabelText('GitHub')).toBeInTheDocument();
   });
 
   it('the form is hidden until the button is pressed', async () => {
     renderView(createFakeHostBridge({ memories: [] }));
     await screen.findByRole('button', { name: 'Get to know me' });
-    expect(screen.queryByLabelText('Your GitHub username')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('GitHub')).not.toBeInTheDocument();
   });
 
   it('says "again" when a portrait exists, and shows it above the list without a delete', async () => {
@@ -212,7 +212,7 @@ describe('MemoryView, get to know me', () => {
     const bridge = createFakeHostBridge({ memories: [] });
     renderView(bridge);
     fireEvent.click(await screen.findByRole('button', { name: 'Get to know me' }));
-    fireEvent.change(await screen.findByLabelText('Your GitHub username'), {
+    fireEvent.change(await screen.findByLabelText('GitHub'), {
       target: { value: 'octocat' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Get to know me' }));
@@ -234,7 +234,7 @@ describe('MemoryView, get to know me', () => {
     const bridge = createFakeHostBridge({ memories: [FROM_GITHUB], portrait: 'You build things.' });
     renderView(bridge);
     fireEvent.click(await screen.findByRole('button', { name: 'Get to know me again' }));
-    fireEvent.change(await screen.findByLabelText('Your GitHub username'), {
+    fireEvent.change(await screen.findByLabelText('GitHub'), {
       target: { value: 'octocat' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Get to know me' }));

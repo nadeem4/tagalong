@@ -101,11 +101,11 @@ export interface FakeBrain {
   /** Every job id Home sent to `stop_job`, in order. */
   stops: string[];
   /** Every expert id the desktop sent to `setup_expert`, in order (the first one installs it). */
-  /** Every `know_me_start` params the desktop sent, in order. */
-  knowStarts: Record<string, unknown>[];
   expertSetups: string[];
   /** The `approved` flag of each setup_expert call: the tour's press must send true. */
   expertApprovals: unknown[];
+  /** Every `know_me_start` params the desktop sent, in order. */
+  knowStarts: Record<string, unknown>[];
   /** Every app id the desktop sent to `setup_app`, in order (the tour's Connect). */
   appSetups: string[];
   /** The `approved` and `community_ok` flags of each setup_app call, in order. */
@@ -887,16 +887,28 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         socket.send(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { joined: false } }));
         // Reading first, then done a moment later, like a run: the status is live-only.
         live('know_me_status', {
-          sources: [{ name: 'GitHub', state: 'reading' }],
+          sources: [
+            { name: 'github', state: 'reading' },
+            { name: 'linkedin', state: 'waiting' },
+            { name: 'web', state: 'waiting' },
+            { name: 'portrait', state: 'waiting' },
+          ],
           done: false,
         });
         setTimeout(() => {
           knowDone = true;
           live('know_me_status', {
-            sources: [{ name: 'GitHub', state: 'done' }],
+            sources: [
+              { name: 'github', state: 'done' },
+              { name: 'linkedin', state: 'done' },
+              { name: 'web', state: 'done' },
+              { name: 'portrait', state: 'done' },
+            ],
             done: true,
             portrait: KNOW_PORTRAIT,
           });
+          // The brain says so when a run ends, so a mounted memory list reloads.
+          notify('changed', { what: 'memory' });
         }, 400);
       } else if (msg.method === 'call') {
         // Home's tools: the permission pair and the jobs pair, kept in memory like the real brain.
@@ -1086,8 +1098,9 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           notify('changed', { what: 'setup' });
         } else if (params.tool === 'know_me_sources') {
           value = [
-            { name: 'GitHub', needs: 'username', label: 'Your GitHub username' },
-            { name: 'LinkedIn PDF', needs: 'file', label: 'Your LinkedIn PDF' },
+            { name: 'github', needs: 'username', label: 'GitHub' },
+            { name: 'linkedin', needs: 'file', label: 'LinkedIn PDF' },
+            { name: 'web', needs: 'none', label: 'The web' },
           ];
         } else if (params.tool === 'list_memories') {
           value = {

@@ -131,8 +131,10 @@ export function MemoryView({ name }: { name: string }) {
         </section>
       )}
       {portrait !== null && (
-        <section className="tg-card memory-portrait" aria-label="Scout’s portrait of you">
-          <h2 className="tg-card__label">{name}’s portrait of you</h2>
+        <section className="tg-card memory-portrait" aria-labelledby="memory-portrait-title">
+          <h2 id="memory-portrait-title" className="tg-card__label">
+            {name}’s portrait of you
+          </h2>
           {portrait
             .split(/\n\s*\n/)
             .filter((paragraph) => paragraph.trim() !== '')

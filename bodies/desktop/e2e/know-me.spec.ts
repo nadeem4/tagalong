@@ -65,7 +65,7 @@ test('know me: tour, start a run, move on, the finish card is still reached', as
   await expect(tour.getByText('A key is already set.')).toBeVisible({ timeout: 30_000 });
   await tour.getByRole('button', { name: 'Next' }).click();
   await expect(tour.getByRole('heading', { name: 'Let Scout get to know you' })).toBeVisible();
-  await tour.getByLabel('Your GitHub username').fill('octocat');
+  await tour.getByLabel('GitHub', { exact: true }).fill('octocat');
   await tour.getByRole('button', { name: 'Get to know me' }).click();
   await expect(tour.getByText('Reading GitHub…')).toBeVisible();
   expect(brain!.knowStarts).toEqual([{ github: 'octocat' }]);
@@ -86,7 +86,7 @@ test('know me: Home, press the button, see Reading GitHub then the portrait and 
     .getByRole('button', { name: 'What Scout remembers', exact: true })
     .click();
   await home.getByRole('button', { name: 'Get to know me', exact: true }).click();
-  await home.getByLabel('Your GitHub username').fill('octocat');
+  await home.getByLabel('GitHub', { exact: true }).fill('octocat');
   await home.getByRole('button', { name: 'Get to know me', exact: true }).click();
   await expect(home.getByText('Reading GitHub…')).toBeVisible();
   await expect(home.getByRole('heading', { name: "Here's who I think you are" })).toBeVisible({

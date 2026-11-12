@@ -26,7 +26,7 @@ describe('StepKnowMe', () => {
     expect(
       screen.getByText('Scout reads only public pages and the file you pick.'),
     ).toBeInTheDocument();
-    expect(await screen.findByLabelText('Your GitHub username')).toBeInTheDocument();
+    expect(await screen.findByLabelText('GitHub')).toBeInTheDocument();
   });
 
   it('starts nothing on its own, so skipping leaves nothing started', async () => {
@@ -36,7 +36,7 @@ describe('StepKnowMe', () => {
         <StepKnowMe />
       </HostBridgeProvider>,
     );
-    await screen.findByLabelText('Your GitHub username');
+    await screen.findByLabelText('GitHub');
     expect(bridge.knowStarts).toHaveLength(0);
   });
 
@@ -47,7 +47,7 @@ describe('StepKnowMe', () => {
         <StepKnowMe />
       </HostBridgeProvider>,
     );
-    fireEvent.change(await screen.findByLabelText('Your GitHub username'), {
+    fireEvent.change(await screen.findByLabelText('GitHub'), {
       target: { value: 'octocat' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Get to know me' }));
@@ -76,7 +76,7 @@ describe('StepKnowMe', () => {
         <StepKnowMe />
       </HostBridgeProvider>,
     );
-    fireEvent.change(await screen.findByLabelText('Your GitHub username'), {
+    fireEvent.change(await screen.findByLabelText('GitHub'), {
       target: { value: 'octocat' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Get to know me' }));
@@ -84,7 +84,7 @@ describe('StepKnowMe', () => {
     act(() => bridge.emitKnowStatus(DONE));
     expect(await screen.findByText('You build things end to end.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /based on\? \(1 fact\)/ })).toBeInTheDocument();
-    expect(screen.queryByLabelText('Your GitHub username')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('GitHub')).not.toBeInTheDocument();
   });
 
   it('shows a refused start in plain words and keeps the form', async () => {
@@ -94,11 +94,11 @@ describe('StepKnowMe', () => {
         <StepKnowMe />
       </HostBridgeProvider>,
     );
-    fireEvent.change(await screen.findByLabelText('Your GitHub username'), {
+    fireEvent.change(await screen.findByLabelText('GitHub'), {
       target: { value: 'octocat' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Get to know me' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('That PDF is over 10 MB.');
-    expect(screen.getByLabelText('Your GitHub username')).toBeInTheDocument();
+    expect(screen.getByLabelText('GitHub')).toBeInTheDocument();
   });
 });

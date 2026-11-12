@@ -14,7 +14,7 @@ export function StepKnowMe() {
       <p className="wt-help">
         It keeps just the facts it can quote, so what it remembers is yours to check and delete.
       </p>
-      <div style={{ marginTop: 24, maxWidth: 560 }}>
+      <div className="wt-know">
         <KnowMeFlow
           runningNote="You can move on; Scout keeps reading and saves what it finds."
           doneNote="Saved. You can run this again any time in Home, under Memory."

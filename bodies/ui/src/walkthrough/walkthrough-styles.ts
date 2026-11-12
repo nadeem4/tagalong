@@ -66,6 +66,7 @@ export const WALKTHROUGH_CSS = `
 .wt-facts li:first-child { border-top: 0; padding-top: 0; }
 .wt-facts h3 { margin: 0; ${typeCss('bodyLead')}; font-weight: ${t.fontWeight.semibold}; }
 .wt-facts p, .wt-help { margin: 4px 0 0; ${typeCss('body')}; color: ${t.color.panelMuted}; max-width: 62ch; }
+.wt-know { margin-top: ${t.space.xxxl}px; max-width: 560px; }
 .wt-note { margin: ${t.space.xxxl}px 0 0; padding-top: 16px; border-top: 1px solid ${t.color.panelLine}; ${typeCss('body')}; color: ${t.color.panelMuted}; max-width: 64ch; }
 .wt-label { display: block; margin: 0 0 8px; ${typeCss('small')}; font-weight: ${t.fontWeight.semibold}; }
 .wt-link { background: none; border: 0; padding: 0; color: ${t.color.panelText}; font-size: inherit; text-decoration: underline; cursor: pointer; }
@@ -179,7 +180,7 @@ export const WALKTHROUGH_CSS = `
 .wt-final { min-width: 96px; }
 .wt-text { border: 0; background: none; color: ${t.color.panelMuted}; padding: 0 4px; }
 .wt-text:hover:not(:disabled) { color: ${t.color.panelText}; }
-/* Step ten and the finish card's ready list reuse Home's connection rows (cx-*). */
+/* Step eleven and the finish card's ready list reuse Home's connection rows (cx-*). */
 .wt-group { display: flex; flex-direction: column; gap: 8px; margin-top: 24px; }
 .wt-group__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .wt-group__head h2 { margin: 0; ${typeCss('title')}; }

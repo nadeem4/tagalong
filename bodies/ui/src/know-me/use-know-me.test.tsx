@@ -19,11 +19,7 @@ describe('useKnowMe', () => {
   it('loads the sources once', async () => {
     const { result } = setup();
     await waitFor(() =>
-      expect(result.current.sources.map((s) => s.name)).toEqual([
-        'GitHub',
-        'LinkedIn PDF',
-        'The web',
-      ]),
+      expect(result.current.sources.map((s) => s.name)).toEqual(['github', 'linkedin', 'web']),
     );
   });
 

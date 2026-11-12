@@ -2172,11 +2172,12 @@ The form and result view are mounted by the tour step and Home (K6, next section
 
 Automated: `bodies/ui/src/walkthrough/step-know-me.test.tsx`, `src/home/memory-view.test.tsx` and `bodies/desktop/e2e/know-me.spec.ts` (fake brain). By hand:
 
-1. **Action:** start the tour with a key set and press **Next** to step 10, "Let Scout get to know you". **Expected:** the form shows a GitHub username box and the LinkedIn PDF picker, and nothing runs until you press **Get to know me**.
-2. **Action:** enter your GitHub username and press **Get to know me**, then press **Next** straight away. **Expected:** a "Reading GitHub…" row shows; **Next** is never blocked and the tour goes on to step 11 and the finish card. The run keeps going in the brain.
+1. **Action:** start the tour with a key set and press **Next** to step 10, "Let Scout get to know you". **Expected:** the form shows a "GitHub" username box and a "LinkedIn PDF" picker, and nothing runs until you press **Get to know me**.
+2. **Action:** enter your GitHub username and press **Get to know me**, then press **Next** straight away. **Expected:** a "Reading GitHub…" row (the progress rows use the source names, "GitHub", "LinkedIn PDF", "The web", and a last "Portrait" row) shows; **Next** is never blocked and the tour goes on to step 11 and the finish card. The run keeps going in the brain.
 3. **Action:** open Home, **What Scout remembers**. **Expected:** once the run ends the page shows a portrait card above the list and new facts, each with a tag, its source (GitHub) and "only if asked" on personal ones. The portrait has no Delete.
-4. **Action:** press **Get to know me again**, enter a username and start; at the end press **Looks right** or **What's this based on?**. **Expected:** the progress rows, then the portrait and its facts; **Looks right** closes the panel and the list and portrait are refreshed.
-5. **Action:** tell Scout in chat that one fact is wrong, then run it again. **Expected:** the correction is kept as a chat fact and the rewritten portrait follows it.
+4. **Action:** delete one GitHub fact on Home, then run **Get to know me** again. **Expected:** that fact does not come back.
+5. **Action:** press **Get to know me again**, enter a username and start; at the end press **Looks right** or **What's this based on?**. **Expected:** the progress rows, then the portrait and its facts; **Looks right** closes the panel and the list and portrait are refreshed.
+6. **Action:** tell Scout in chat that one fact is wrong, then run it again. **Expected:** the correction is kept as a chat fact and the rewritten portrait follows it.
 
 ## Web search and fetch _(real brain, real key: this spends a few cents)_
 

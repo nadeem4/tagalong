@@ -929,3 +929,60 @@ test('E2 tour connect step and finish card', async () => {
     await done();
   }
 });
+
+test('K6 get to know me: tour step and Home portrait, light and dark', async () => {
+  const dir = shotDir('K6');
+  mkdirSync(dir, { recursive: true });
+  const { find, done } = await launchShot({ hasKey: true }, false);
+  try {
+    const tour = await find('walkthrough');
+    for (let at = 1; at < 9; at += 1) {
+      await tour.getByRole('button', { name: /^(Get started|Next)$/ }).click();
+    }
+    await expect(tour.getByText('A key is already set.')).toBeVisible({ timeout: 30_000 });
+    await tour.getByRole('button', { name: 'Next' }).click();
+    await expect(tour.getByRole('heading', { name: 'Let Scout get to know you' })).toBeVisible();
+    for (const scheme of ['light', 'dark'] as const) {
+      await tour.emulateMedia({ colorScheme: scheme });
+      await tour.waitForTimeout(800);
+      await tour.screenshot({ path: join(dir, `tour-step-10-${scheme}.png`) });
+    }
+    await tour.getByLabel('GitHub', { exact: true }).fill('octocat');
+    await tour.getByRole('button', { name: 'Get to know me' }).click();
+    await expect(tour.getByText('Reading GitHub…')).toBeVisible();
+    await tour.screenshot({ path: join(dir, 'tour-step-10-running.png') });
+  } finally {
+    await done();
+  }
+  const second = await launchShot({ hasKey: true });
+  try {
+    await (await second.find('avatar')).evaluate(() => window.tagalongHost.openSettings());
+    const home = await second.find('home');
+    await home
+      .getByRole('navigation')
+      .getByRole('button', { name: 'What Scout remembers', exact: true })
+      .click();
+    await home.getByRole('button', { name: 'Get to know me', exact: true }).click();
+    await home.getByLabel('GitHub', { exact: true }).fill('octocat');
+    await home.getByRole('button', { name: 'Get to know me', exact: true }).click();
+    await expect(home.getByRole('heading', { name: "Here's who I think you are" })).toBeVisible({
+      timeout: 15_000,
+    });
+    for (const scheme of ['light', 'dark'] as const) {
+      await home.emulateMedia({ colorScheme: scheme });
+      await home.waitForTimeout(500);
+      await home.screenshot({ path: join(dir, `home-result-${scheme}.png`) });
+    }
+    await home.getByRole('button', { name: /What's this based on\?/ }).click();
+    await home.screenshot({ path: join(dir, 'home-facts.png') });
+    await home.getByRole('button', { name: 'Done' }).click();
+    await expect(home.getByRole('region', { name: 'Scout’s portrait of you' })).toBeVisible();
+    for (const scheme of ['light', 'dark'] as const) {
+      await home.emulateMedia({ colorScheme: scheme });
+      await home.waitForTimeout(500);
+      await home.screenshot({ path: join(dir, `home-portrait-${scheme}.png`) });
+    }
+  } finally {
+    await second.done();
+  }
+});

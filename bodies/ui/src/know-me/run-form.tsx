@@ -21,7 +21,12 @@ function readBase64(file: File): Promise<string> {
   });
 }
 
-function rowText(name: string, state: KnowMeStatus['sources'][number]['state']): string {
+/** A row is named by the brain's source name; the person reads the source's label. */
+function rowText(
+  name: string,
+  state: KnowMeStatus['sources'][number]['state'],
+  sources: KnowSourceInfo[],
+): string {
   if (name === 'portrait') {
     return {
       waiting: 'Portrait: waiting',
@@ -30,11 +35,12 @@ function rowText(name: string, state: KnowMeStatus['sources'][number]['state']):
       failed: 'No portrait written',
     }[state];
   }
+  const label = sources.find((s) => s.name === name)?.label ?? name;
   return {
-    waiting: `${name}: waiting`,
-    reading: `Reading ${name}…`,
-    done: `${name}: done`,
-    failed: `${name}: not read`,
+    waiting: `${label}: waiting`,
+    reading: `Reading ${label}…`,
+    done: `${label}: done`,
+    failed: `${label}: not read`,
   }[state];
 }
 
@@ -63,7 +69,7 @@ export function RunForm({ sources, onStart, running, status = null, error = null
           ).map((row) => (
             <li key={row.name} className="know__row" data-state={row.state}>
               <span className="know__dot" aria-hidden="true" />
-              <span>{rowText(row.name, row.state)}</span>
+              <span>{rowText(row.name, row.state, sources)}</span>
               {'gap' in row && row.gap && <span className="know__row-gap">{row.gap}</span>}
             </li>
           ))}

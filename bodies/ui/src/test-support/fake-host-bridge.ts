@@ -417,9 +417,9 @@ export function createFakeHostBridge(
       return Promise.resolve(
         structuredClone(
           options.knowSources ?? [
-            { name: 'GitHub', needs: 'username', label: 'Your GitHub username' },
-            { name: 'LinkedIn PDF', needs: 'file', label: 'Your LinkedIn PDF' },
-            { name: 'The web', needs: 'none', label: 'The web' },
+            { name: 'github', needs: 'username', label: 'GitHub' },
+            { name: 'linkedin', needs: 'file', label: 'LinkedIn PDF' },
+            { name: 'web', needs: 'none', label: 'The web' },
           ],
         ),
       );

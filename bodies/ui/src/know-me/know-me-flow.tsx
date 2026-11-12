@@ -6,14 +6,14 @@
 
 import { useEffect, useState } from 'react';
 import { useHostBridge } from '../host-bridge';
-import type { MemoryEntry } from '../shapes';
+import type { KnowMeStatus, MemoryEntry } from '../shapes';
 import { ResultView, gapsFrom } from './result-view';
 import { RunForm } from './run-form';
 import { useKnowMe } from './use-know-me';
 
 interface Result {
   /** The done status this was read for, so a later run never shows an earlier result. */
-  run: unknown;
+  run: KnowMeStatus | null;
   acknowledged: boolean;
   portrait: string | null;
   facts: MemoryEntry[];
@@ -75,7 +75,7 @@ export function KnowMeFlow({ onDone, onFinished, doneNote, runningNote }: KnowMe
     return (
       <ResultView
         portrait={result.portrait}
-        gaps={gapsFrom(status)}
+        gaps={gapsFrom(status, sources)}
         facts={result.facts}
         onDone={() => {
           setResult({ ...result, acknowledged: true });

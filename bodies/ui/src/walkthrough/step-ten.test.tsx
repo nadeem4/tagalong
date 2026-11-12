@@ -1,5 +1,5 @@
 /**
- * Tests for step 10, Connect your tools: Gmail, Google Calendar, Notion and Claude Code as
+ * Tests for step 11, Connect your tools: Gmail, Google Calendar, Notion and Claude Code as
  * Connections-style rows with their states, and the finish card's "Ready to use" list built
  * from the same overview.
  */
