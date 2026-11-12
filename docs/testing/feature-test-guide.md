@@ -2800,3 +2800,13 @@ Home > Overview shows a "Scout's brain" card above "Where things run".
 2. Start the brain with `TAGALONG_LOOP_LAG_MS=abc`. It refuses to start and names the variable.
 3. Use Scout for a few minutes, answer one card and cancel a turn that is waiting on a card. Within a minute `brain.log` holds `perf ...` lines and `ask.opened`, `ask.shown`, `ask.answered` and `ask.closed ... why=cancelled` lines for those cards.
 4. From `brain/`, run `uv run tagalong perf --since 1h`. It prints a table of steps (count, p50, p95, max in seconds) and `asks closed by cancel: 1`; it works with the brain stopped.
+
+## Get to know me (K1 storage, automated only)
+
+No screen yet; the tests in `brain/tests/test_know_store.py` and `test_migrate_memory_profile.py` cover it:
+
+- Old memory rows read as chat facts, free to use (migration 33).
+- Saving a source replaces only that source's profile facts; chat memories and other sources stay.
+- Forgetting a profile fact stops a re-run bringing it back, even if its whitespace or case differs.
+- Personal (`asked`) facts are left out of `recall` unless `include_personal` is set; the portrait is never recalled, never forgotten, and leads the prompt.
+- `remember` cannot write `profile` or `portrait`; secrets in saved facts and the portrait are masked.
