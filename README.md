@@ -98,7 +98,7 @@ brain to be running. `uv run tagalong perf` prints how long the brain's steps ta
 Upgrading: if you installed the Claude Code adapter globally with npm before, set
 `TAGALONG_EXPERT_CMD=claude-agent-acp` to keep using it, or let Scout install it.
 
-Scout remembers instructions and facts about you across restarts (facts can carry where they came from, the words behind them, and whether Scout may raise them unasked), in `~/.tagalong/tagalong.db` (the one file for memory, chat, jobs, timers, loops and the approval log; finished work is swept after 30 days), and picks the conversation back up after a restart. Scout can also use the desktop's window tools. Under the hood, "get to know me" can read your GitHub, a LinkedIn PDF and the web into facts that each quote their evidence (PDF text is read with `pypdf`).
+Scout remembers instructions and facts about you across restarts (facts can carry where they came from, the words behind them, and whether Scout may raise them unasked), in `~/.tagalong/tagalong.db` (the one file for memory, chat, jobs, timers, loops and the approval log; finished work is swept after 30 days), and picks the conversation back up after a restart. Scout can also use the desktop's window tools. Under the hood, "get to know me" can read your GitHub, a LinkedIn PDF and the web into facts that each quote their evidence (PDF text is read with `pypdf`), then writes a short portrait from the facts it may raise freely; a run saves each source as it finishes, stops cleanly at your daily limit, and a fact you forget does not come back. Scout may offer it once, at most weekly, and never after a no.
 
 If the brain is not running, the desktop still opens and shows "Scout's brain is not running." It
 connects by itself once the brain is up.
