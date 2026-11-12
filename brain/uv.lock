@@ -71,6 +71,7 @@ source = { editable = "." }
 dependencies = [
     { name = "agent-client-protocol" },
     { name = "anthropic" },
+    { name = "httpx2" },
     { name = "kokoro-onnx" },
     { name = "mcp" },
     { name = "moonshine-voice" },
@@ -92,6 +93,7 @@ dev = [
 requires-dist = [
     { name = "agent-client-protocol", specifier = "==0.12.1" },
     { name = "anthropic", specifier = ">=2.3.0" },
+    { name = "httpx2", specifier = ">=2.16.0" },
     { name = "kokoro-onnx", specifier = "==0.6.1" },
     { name = "mcp", specifier = "==2.3.0" },
     { name = "moonshine-voice", specifier = "==0.1.5" },
