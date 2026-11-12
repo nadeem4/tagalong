@@ -29,10 +29,14 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 const cap = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
 
-/** A fact's small line: its tag, where it was read, and whether it is only used when asked. */
+/** The chip: a tagged fact says what it is about (Work, Skills), anything else its kind. */
+function chipLabel(memory: MemoryEntry): string {
+  return memory.kind === 'fact' && memory.tag ? cap(memory.tag) : KIND_LABELS[memory.kind];
+}
+
+/** A fact's small line: where it was read, and whether it is only used when asked. */
 function provenance(memory: MemoryEntry): string[] {
   const parts: string[] = [];
-  if (memory.tag) parts.push(cap(memory.tag));
   if (memory.source && memory.source !== 'chat') {
     parts.push(SOURCE_LABELS[memory.source] ?? cap(memory.source));
   }
@@ -122,12 +126,11 @@ export function MemoryView({ name }: { name: string }) {
       </div>
       {knowOpen && (
         <section className="tg-card" aria-label="Get to know me">
-          <KnowMeFlow onDone={() => setKnowOpen(false)} onFinished={refresh} />
-          <div className="memory-head-actions">
-            <Button variant="quiet" onClick={() => setKnowOpen(false)}>
-              Close
-            </Button>
-          </div>
+          <KnowMeFlow
+            onDone={() => setKnowOpen(false)}
+            onClose={() => setKnowOpen(false)}
+            onFinished={refresh}
+          />
         </section>
       )}
       {portrait !== null && (
@@ -153,7 +156,7 @@ export function MemoryView({ name }: { name: string }) {
           <ul aria-label={title} className="memory-list">
             {memories.map((memory) => (
               <li key={memory.id} className="memory-row">
-                <span className="tg-chip">{KIND_LABELS[memory.kind]}</span>
+                <span className="tg-chip">{chipLabel(memory)}</span>
                 <span className="memory-row__text">
                   {memory.text}
                   {provenance(memory).length > 0 && (

@@ -240,6 +240,15 @@ def profile_facts(db: sqlite3.Connection, include_asked: bool = True) -> list[It
     return [Item(*r) for r in db.execute(sql + " ORDER BY id")]
 
 
+def asked_topics(db: sqlite3.Connection) -> list[str]:
+    """Tags of the asked facts, never their text: the prompt may name what is held, not say it."""
+    rows = db.execute(
+        "SELECT DISTINCT tag FROM memories WHERE kind='profile' AND visibility='asked'"
+        " AND tag!='' ORDER BY tag"
+    )
+    return [r[0] for r in rows]
+
+
 def chat_facts(db: sqlite3.Connection) -> list[Item]:
     """Free facts the person told Scout in chat (about_you); asked ones stay out."""
     sql = (

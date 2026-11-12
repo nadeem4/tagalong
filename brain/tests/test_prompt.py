@@ -172,6 +172,23 @@ def test_prompt_has_no_tracking_heading():
     assert "keep an eye on" not in out and "tracking" not in out.lower()
 
 
+def test_render_know_names_asked_topics_without_content():
+    out = render_know({}, asked_topics=["location", "family"])
+    assert "location, family" in out
+    assert "include_personal" in out and "portrait" in out
+
+
+def test_render_know_asked_line_leaks_no_fact_text():
+    asked = Item(3, "profile", "Lives in Chicago", "a", "b", tag="location", visibility="asked")
+    out = render_know({"profile": [asked]}, asked_topics=["location"])
+    assert "Chicago" not in out and "location" in out
+
+
+def test_render_know_no_asked_topics_has_no_line():
+    assert "include_personal" not in render_know({"about_you": [item(2, "about_you", "x")]})
+    assert render_know({}, asked_topics=[]) == ""
+
+
 def test_render_know_empty_is_blank():
     assert render_know({}) == ""
     assert render_know({"instruction": []}) == ""

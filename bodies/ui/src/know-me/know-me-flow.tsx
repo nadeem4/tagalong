@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from 'react';
 import { useHostBridge } from '../host-bridge';
+import { Button } from '../controls/button';
 import type { KnowMeStatus, MemoryEntry } from '../shapes';
 import { ResultView, gapsFrom } from './result-view';
 import { RunForm } from './run-form';
@@ -22,6 +23,8 @@ interface Result {
 interface KnowMeFlowProps {
   /** The person pressed Looks right or Done. */
   onDone?: () => void;
+  /** A quiet Close under the form and progress; the result view has its own Done, so none there. */
+  onClose?: () => void;
   /** The run finished and its portrait and facts were read, so a list behind it can refresh. */
   onFinished?: () => void;
   /** Shown after Done when the parent does not close the flow itself. */
@@ -30,7 +33,13 @@ interface KnowMeFlowProps {
   runningNote?: string;
 }
 
-export function KnowMeFlow({ onDone, onFinished, doneNote, runningNote }: KnowMeFlowProps) {
+export function KnowMeFlow({
+  onDone,
+  onClose,
+  onFinished,
+  doneNote,
+  runningNote,
+}: KnowMeFlowProps) {
   const bridge = useHostBridge();
   const { sources, status, running, start, error } = useKnowMe();
   const [result, setResult] = useState<Result | null>(null);
@@ -96,6 +105,13 @@ export function KnowMeFlow({ onDone, onFinished, doneNote, runningNote }: KnowMe
         error={error}
       />
       {busy && runningNote !== undefined && <p className="know__sub">{runningNote}</p>}
+      {onClose && (
+        <div className="memory-head-actions">
+          <Button variant="quiet" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      )}
     </>
   );
 }

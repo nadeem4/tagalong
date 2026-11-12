@@ -2879,3 +2879,9 @@ Automated: `brain/tests/test_know_extract.py`, `test_know_portrait.py`, `test_kn
 - `know_me_start` with a bad username or nothing to read returns `invalid_params` with a short plain message, no pydantic text or URL.
 
 **Manual, real brain.** On a fresh home, ask "what can you do": Scout may offer to get to know you once; say no and it records the decline instead of a memory. After a run, tell Scout "I work at Initech, not Acme" and ask it to rewrite the portrait: the portrait names Initech. Ask "where am I based?": Scout searches personal notes and answers.
+
+## Get to know me live-test fixes (KF2)
+
+Automated: `brain/tests/test_prompt.py` (the asked-topics line lists tags only, leaks no fact text, is absent with none), `test_memory.py` (`asked_topics`), `bodies/ui/src/home/memory-view.test.tsx` (a tagged fact's chip is its tag; Close only before the result).
+
+**Manual, real brain.** After a run that saved a location fact, ask "where am I based?": Scout calls `recall` with `include_personal` and answers from the saved fact, not the portrait. In Home's Memories list a GitHub fact shows a "Skills" or "Work" chip instead of "Fact". When the result view shows, only "Looks right" or "Done" is offered, no Close.

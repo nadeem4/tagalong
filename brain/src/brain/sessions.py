@@ -1052,7 +1052,7 @@ class Session:
         if after is None:
             prepare()
         # Read once per turn so the system prompt stays identical across its steps (cache).
-        know = render_know(self._memory.always_loaded())
+        know = render_know(self._memory.always_loaded(), self._memory.asked_topics())
         prefs = render_preferences(rules.list_preferences(self._memory.db))
         notify = self._bodies.notify
         # Deferred a tick so the say result goes out before the started notification.

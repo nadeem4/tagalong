@@ -43,7 +43,7 @@ _KNOW_HEADINGS = {
 }
 
 
-def render_know(groups: dict[str, list[Item]]) -> str:
+def render_know(groups: dict[str, list[Item]], asked_topics: list[str] | None = None) -> str:
     blocks = []
     portrait = groups.get("portrait")
     if portrait:
@@ -55,6 +55,13 @@ def render_know(groups: dict[str, list[Item]]) -> str:
             continue
         lines = [f"- [{i.id}] {i.text}" for i in items]
         blocks.append(f"{heading}:\n" + "\n".join(lines))
+    if asked_topics:
+        # Topics only, never the facts: the model must fetch them, not guess from the portrait.
+        blocks.append(
+            f"Personal facts the owner keeps back, held on: {', '.join(asked_topics)}. "
+            "The portrait does not cover them. Call recall with include_personal before "
+            "answering anything about these topics."
+        )
     return "\n\n".join(blocks)
 
 
