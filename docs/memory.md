@@ -52,6 +52,10 @@ To correct something, use `forget` on the fact: a forgotten fact is remembered p
 
 Scout may offer to do all this at most once a week, never after the person said no, and never once a run has happened. The state is one settings row, `know_me_offer`; the code refuses an `offered` call that is not due, so the rule does not depend on Scout's wording.
 
+### Result view in the UI
+
+`bodies/ui/src/know-me/` holds the shared pieces; the tour step and Home's button that mount them come later. `useKnowMe` loads the sources (`know_me_sources`), subscribes to the run's status when it mounts (before any start, since the first status arrives before the start reply) and says whether a run is going until a status has `done`. `RunForm` draws one input per source from what it needs (a GitHub username, the LinkedIn PDF, nothing for the web); a PDF over 10 MB is refused in the form, before it is read, and while a run goes it shows one progress row per source. The status has one more row than there are sources, named `portrait`, which carries the portrait's own gap ("Not enough found to write a portrait.", the daily-limit line). `ResultView` is two steps: the portrait with its gaps and "Looks right", then "What's this based on?" with the facts, filterable by kind, each showing its source and, for an `asked` fact, "only if asked". With no portrait it says "I did not find enough to write a portrait." and shows no filler. The facts are the memory rows whose `source` is not `chat`. When a run ends the brain sends `changed memory`, so a mounted memory list reloads.
+
 ### Masking on save
 
 `remember` and the compaction summary mask their text with the session's `save` guard before it is stored, so a key or token the person pasted is stored as `[secret]` (see [storage.md](storage.md#masking)). The cap is checked on the masked text. If a blocking save guard withholds the whole text, `remember` refuses with a `MemoryRefused` message (the model reads it as a tool error) and stores nothing.
