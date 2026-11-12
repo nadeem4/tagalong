@@ -8,7 +8,7 @@ sources supply those keys, so the web runs last and is skipped when there are no
 import re
 
 from brain.guardrails import Budget
-from brain.know.extract import BudgetStop, prompt
+from brain.know.extract import prompt, stop_reason
 from brain.know.facts import Known, Material
 from brain.know.source import SourceGap
 from brain.mind.turn import Final, Model
@@ -69,8 +69,8 @@ class WebSource:
         has_keys = known.handle or known.urls or (known.name and known.employer)
         if not has_keys:
             raise SourceGap("No GitHub name or employer to search with, so the web was skipped.")
-        if not self._model.ready or not self._budget.allows():
-            raise BudgetStop
+        if (stop := stop_reason(self._model, self._budget)) is not None:
+            raise stop
         details = [
             f"{k}: {v}"
             for k, v in (

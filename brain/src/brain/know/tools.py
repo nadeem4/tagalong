@@ -40,7 +40,11 @@ def know_me_tools(
             state = offer.load(memory.db)
             state.declined = False  # they asked, so an earlier no no longer stands
             offer.save(memory.db, state)
-            runner.start(None, github, None)
+            if runner.start(None, github, None):
+                return (
+                    f"A run was already going, so '{github}' was not used; it will finish "
+                    "with what it was given."
+                )
             return _STARTED
         if action == "offered":
             if not offer.allowed(offer.load(memory.db), now()):
@@ -57,10 +61,8 @@ def know_me_tools(
     async def rewrite_portrait(args: dict) -> str:
         try:
             text = await runner.rewrite_portrait()
-        except BudgetStop:
-            raise MemoryRefused(
-                "The daily limit is reached, so the portrait was not rewritten."
-            ) from None
+        except BudgetStop as stop:
+            raise MemoryRefused(f"{stop} The portrait was not rewritten.") from None
         if text is None:
             return "There is nothing to write a portrait from yet."
         notify("changed", {"what": "memory"})

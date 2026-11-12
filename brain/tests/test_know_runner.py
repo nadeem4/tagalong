@@ -218,3 +218,22 @@ async def test_unexpected_failure_is_logged_and_ends_the_run(mem, tmp_path, capl
     last = sent.frames[-1][1]
     assert last["done"] is True
     assert last["sources"][0]["state"] == "failed"
+
+
+async def test_no_key_says_so_not_daily_limit(mem, tmp_path):
+    sources = [Seeing("one", [material()]), Seeing("two", [material()])]
+    runner, _ = run(sources, mem, FakeModel(ready=False), tmp_path)
+    await runner._task
+    gaps = [s.gap for s in runner.status().sources]
+    assert gaps == ["Add your Anthropic key first."] * 3  # both sources and the portrait row
+
+
+async def test_crash_before_portrait_leaves_portrait_row_failed(mem, tmp_path):
+    runner, sent = run([Seeing("one")], mem, FakeModel(), tmp_path)
+
+    async def boom(*args):
+        raise RuntimeError("bug")
+
+    runner._work = boom
+    await runner._task
+    assert sent.frames[-1][1]["sources"][-1]["state"] == "failed"

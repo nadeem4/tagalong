@@ -110,3 +110,19 @@ def test_scout_tools_are_auto_scout_changes(mem, tmp_path):
         spec = tools[name][0]
         assert spec.audience == frozenset({"scout"})
         assert (spec.effect, spec.default_mode) == ("change", "auto")
+
+
+async def test_rewrite_portrait_without_key_says_so(mem, tmp_path):
+    mem.save_source_facts("github", [NewFact("work", "Builds compilers", "compilers", "r")])
+    _, tools, _ = build(mem, tmp_path, FakeModel(ready=False))
+    with pytest.raises(MemoryRefused, match="key"):
+        await tools["rewrite_portrait"][1]({})
+
+
+async def test_start_that_joins_a_run_says_the_username_was_not_used(mem, tmp_path):
+    runner, tools, _ = build(mem, tmp_path)
+    handler = tools["get_to_know_me"][1]
+    await handler({"action": "start", "github": "octocat"})
+    out = await handler({"action": "start", "github": "someone"})
+    assert "already" in out and "someone" in out
+    await runner._task

@@ -2532,7 +2532,7 @@ come in a later slice.
   source in order, a source whose input was not given is skipped (`done`, no gap); otherwise it is
   `reading`, then `read`, `extract` per material and `check`, then `Memory.save_source_facts` at
   once (so the Masker runs), then `done`. A `SourceGap` is `failed` with its line; `BudgetStop`
-  makes that and every later source `failed` with "Stopped: daily limit reached"; any other error
+  makes that and every later source `failed` with its reason ("Stopped: daily limit reached", or "Add your Anthropic key first." when there is no key); any other error
   is logged and shown as "Something went wrong reading <label>.". The web source gets a `Known`
   built from every material's `keys` plus the `name` and `employer` the extractor found (the
   earliest non-empty wins). After the sources the portrait is written (`portrait.py`) and shown as

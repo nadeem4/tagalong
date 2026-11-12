@@ -25,7 +25,6 @@ from brain.store.memory import NewFact
 log = logging.getLogger("brain.know")
 
 PORTRAIT = "portrait"
-STOPPED = "Stopped: daily limit reached"
 NOT_ENOUGH = "Not enough found to write a portrait."
 
 
@@ -103,7 +102,7 @@ class KnowMeRunner:
 
     async def _work(self, github: str | None, pdf: bytes | None) -> None:
         known = Known()
-        stopped = False
+        stopped: str | None = None  # why the model may not be asked any more
         rows = {r.name: r for r in self._status.sources}
         for source in self._sources:
             row = rows[source.name]
@@ -115,7 +114,7 @@ class KnowMeRunner:
                 self._send()
                 continue
             if stopped:
-                row.state, row.gap = "failed", STOPPED
+                row.state, row.gap = "failed", stopped
                 self._send()
                 continue
             row.state = "reading"
@@ -125,9 +124,9 @@ class KnowMeRunner:
                 row.state = "done"
             except SourceGap as gap:
                 row.state, row.gap = "failed", str(gap)[:200]
-            except BudgetStop:
-                row.state, row.gap = "failed", STOPPED
-                stopped = True
+            except BudgetStop as stop:
+                row.state, row.gap = "failed", str(stop)
+                stopped = str(stop)
             except Exception:
                 log.exception("know-me source failed: %s", source.name)
                 row.state, row.gap = "failed", f"Something went wrong reading {source.label}."
@@ -150,9 +149,9 @@ class KnowMeRunner:
         self._memory.save_source_facts(source.name, facts)
         return Known(handle, tuple(urls), name, employer)
 
-    async def _portrait(self, row: SourceProgress, stopped: bool) -> None:
+    async def _portrait(self, row: SourceProgress, stopped: str | None) -> None:
         if stopped:
-            row.state, row.gap = "failed", STOPPED
+            row.state, row.gap = "failed", stopped
         else:
             row.state = "reading"
             self._send()
@@ -161,8 +160,8 @@ class KnowMeRunner:
                 row.state = "done"
                 if text is None:
                     row.gap = NOT_ENOUGH
-            except BudgetStop:
-                row.state, row.gap = "failed", STOPPED
+            except BudgetStop as stop:
+                row.state, row.gap = "failed", str(stop)
             except Exception:
                 log.exception("know-me portrait failed")
                 row.state, row.gap = "failed", "Something went wrong writing the portrait."
