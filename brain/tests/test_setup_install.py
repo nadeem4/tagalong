@@ -44,6 +44,7 @@ from brain.setup.install import (
     install_expert,
     sweep_staging,
 )
+from brain.setup.net import DOWNLOAD_SIZE
 from brain.setup.paths import cache_file, node_dir, tools_dir
 from brain.setup.registry import Distribution, Registry, RegistryEntry
 from brain.setup.store import ExpertStore
@@ -89,13 +90,16 @@ def binary_entry(sha: str | None, archive: str = "https://x.invalid/agent.zip") 
 class Npm:
     """A fake RunCmd standing in for `node npm-cli.js install`: writes what npm would."""
 
-    def __init__(self, code=0, bin_value=None):
+    def __init__(self, code=0, bin_value=None, lines=()):
+        self.lines = list(lines)  # what npm would print, fed to the caller as it goes
         self.calls: list[tuple[list[str], dict, Path | None]] = []
         self.code = code
         self.bin_value = {"claude-agent-acp": "dist/index.js"} if bin_value is None else bin_value
 
-    async def __call__(self, argv, env, cwd):
+    async def __call__(self, argv, env, cwd, on_line=None):
         self.calls.append((argv, dict(env), cwd))
+        for line in self.lines if on_line else ():
+            on_line(line)
         prefix = Path(argv[argv.index("--prefix") + 1])
         pkg = prefix / "node_modules" / Path(*PKG.split("/"))
         (pkg / "dist").mkdir(parents=True)  # a half install exists even when npm then fails
@@ -187,6 +191,21 @@ async def test_npx_install_runs_npm_with_the_private_node_prefix_and_explicit_en
     assert expert.source == "registry" and expert.logged_in is None
     assert expert.node == "private"
     assert ExpertStore(tmp_path).get("claude-acp") == expert
+
+
+async def test_npm_install_emits_stages(tmp_path, ensure):
+    lines = [
+        "npm http fetch GET 200 https://registry.npmjs.org/pkg 40ms (cache miss)",
+        "npm http fetch GET 200 https://registry.npmjs.org/pkg/-/pkg-1.tgz 90ms",
+        "npm http fetch GET 200 https://registry.npmjs.org/dep 30ms",
+    ]
+    seen: list[dict] = []
+    await go(tmp_path, npx_entry(), machine(), Npm(lines=lines), progress=seen.append)
+    stages = [d["stage"] for d in seen]
+    assert "installing" not in stages
+    npm_stages = [s for s in stages if s in ("resolving", "fetching", "finishing")]
+    assert npm_stages == ["resolving", "fetching", "finishing"]  # once each, in order
+    assert stages[-1] == "done"
 
 
 async def test_a_string_bin_is_used_as_is(tmp_path, ensure):
@@ -310,8 +329,8 @@ async def test_a_bin_that_points_outside_the_package_is_refused(tmp_path, ensure
 
 async def test_a_cancelled_install_also_cleans_up(tmp_path, ensure):
     class Hang(Npm):
-        async def __call__(self, argv, env, cwd):
-            await super().__call__(argv, env, cwd)
+        async def __call__(self, argv, env, cwd, on_line=None):
+            await super().__call__(argv, env, cwd, on_line)
             await asyncio.Event().wait()
 
     task = asyncio.ensure_future(go(tmp_path, npx_entry(), machine(), Hang()))
@@ -383,6 +402,33 @@ def fetch_of(data: bytes):
         yield data[half:]
 
     return fetch
+
+
+async def test_download_reports_percent(tmp_path):
+    data = make_zip({"pad.bin": b"x" * 5000})
+    entry = binary_entry(hashlib.sha256(data).hexdigest())
+
+    async def fetch(url):
+        DOWNLOAD_SIZE.set(len(data))  # what the response's Content-Length would say
+        step = len(data) // 100 + 1
+        for i in range(0, len(data), step):
+            yield data[i : i + step]
+
+    seen: list[dict] = []
+    await go(tmp_path, entry, machine(), Npm(), fetch=fetch, progress=seen.append)
+    percents = [d["percent"] for d in seen if d["stage"] == "downloading" and "percent" in d]
+    assert percents == sorted(percents) and percents[-1] == 100
+    assert 2 <= len(percents) <= 22  # throttled: a step of 5 or more, not one per chunk
+    assert [d["stage"] for d in seen][-2:] == ["extracting", "done"]
+
+
+async def test_download_without_a_size_reports_the_stage_only(tmp_path):
+    data = make_zip()
+    entry = binary_entry(hashlib.sha256(data).hexdigest())
+    seen: list[dict] = []
+    await go(tmp_path, entry, machine(), Npm(), fetch=fetch_of(data), progress=seen.append)
+    assert {"stage": "downloading"} in seen
+    assert not [d for d in seen if d["stage"] == "downloading" and "percent" in d]
 
 
 async def test_binary_distribution_verifies_sha256_and_extracts_safely(tmp_path):
@@ -521,8 +567,8 @@ class Hang(Npm):
         super().__init__()
         self.started = asyncio.Event()
 
-    async def __call__(self, argv, env, cwd):
-        await super().__call__(argv, env, cwd)
+    async def __call__(self, argv, env, cwd, on_line=None):
+        await super().__call__(argv, env, cwd, on_line)
         self.started.set()
         await asyncio.Event().wait()
 

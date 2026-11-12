@@ -2442,6 +2442,10 @@ Brain tests only; nothing here installs anything.
    permission switch for `install_expert` cannot make it automatic.
 5. Ask for the same install twice while the first runs: the second is refused as already
    installing. Quit the brain mid-install: no `tools/claude-acp.part` is left.
+   While an expert installs, watch the card: it moves through Checking this computer, (Getting what
+   it needs to run, with a percent, when Tagalong's own Node is needed), Finding the right version,
+   Downloading its files and Setting it up, never sitting on one word. `tagalong install <expert>`
+   in a terminal prints the same stages.
 6. Install again over an existing expert and cut the network: the old `tools/claude-acp` and its
    `experts.json` entry are unchanged.
 

@@ -2,7 +2,7 @@
  * "Your experts" on Home's Connections page: the installed experts grouped Official then
  * Community, each with its version and the kind of job it does, its state and the action that
  * fits it (Sign in, Update). Also the pieces both expert lists share: the install card
- * (the chat's own, in its Working state) and the "didn't finish" line. Contains ExpertsGroup, InstallingCard, stageWords and FailLine.
+ * (the chat's own, in its Working state) and the "didn't finish" line. Contains ExpertsGroup, InstallingCard and FailLine.
  * The brain sends short tokens; the words are this page's.
  */
 
@@ -11,6 +11,7 @@ import { Button } from '../controls/button';
 import { DEFAULT_EXPERT_JOB, EXPERT_JOB } from '../jobs-kinds';
 import { Icon } from '../setup/icons';
 import { InstallCard } from '../setup/install-card';
+import { stageWords } from '../setup/install-progress';
 import { OutcomeText, Tile } from './app-group-row';
 import type { Outcome } from './outcome';
 import {
@@ -29,21 +30,7 @@ const STATE_WORDS: Record<SetupExpert['state'], string> = {
 const ACTION: Partial<Record<SetupExpert['state'], string>> = {
   needs_login: 'Sign in',
 };
-const STAGES: Record<string, string> = {
-  checking: 'Checking this computer',
-  node: 'Getting what it needs to run',
-  installing: 'Installing',
-  downloading: 'Downloading',
-  extracting: 'Unpacking',
-  done: 'Finishing up',
-};
-
 type Progress = NonNullable<SetupOverview['progress']>;
-
-/** The stage in this page's words; the install card in the chat uses them too. */
-export function stageWords(progress: { stage: string }): string {
-  return STAGES[progress.stage] ?? 'Working';
-}
 
 /** An install under way: the one install card in its Working state, on the light page. */
 export function InstallingCard({

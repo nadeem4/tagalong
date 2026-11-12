@@ -1088,7 +1088,15 @@ words what the person reads (guidance in `mind/soul.md`).
   Node that is new enough (and has its own npm), else Tagalong's own Node; the Node floor is 22 for
   every npx expert. npm gets a minimal environment of its own (PATH with the chosen Node first,
   the OS essentials and proxy settings), never an API key or any `npm_config_*` of the person's;
-  the system environment is never changed and nothing is global. A command that is cancelled or
+  the system environment is never changed and nothing is global. Progress is real, not one long
+  "installing": npm runs at `loglevel=http` and its output is read line by line (`on_line`, an
+  optional fourth argument of a `RunCmd`), so the stages are `resolving` (before npm's first
+  request), `fetching` (the first `http fetch` line) and `finishing` (npm exited, the program is
+  being checked), each said once with no percent (npm gives no total). A binary entry says
+  `downloading` and then a `percent` from the response's Content-Length (`DOWNLOAD_SIZE` in
+  `setup/net.py`, set by `http_fetch`), at most one update per 5 percent; with no length there is
+  only the stage. `extracting` and `done` follow. The 900 s `NPM_TIMEOUT_S` is the whole install's
+  ceiling, not a stage. A command that is cancelled or
   times out is killed with its whole process tree. The stored command is
   `[node, <the package's bin js>, <registry args>]`, resolved against the final folder. A `binary`
   entry is streamed to `tools/<id>.dl`, checked against its listed sha256 and extracted with `safe_extract` into `tools/<id>.part`. The staged tree is swapped
@@ -1532,7 +1540,7 @@ Event kinds (`EVENT_KINDS` in `events.py`):
 | `download`        | none         | none         | The latest finished or failed browser download (context, no wake)                                                                                                                                                 |
 | `setup_progress`  | none         | none         | How far an expert install is (expert, stage, percent; context, no wake)                                                                                                                                           |
 | `setup_done`      | none         | none         | An install ended: an expert (expert, ok, installed or error, detail) or an app that connected later (app, name, ok, state, tools and tools_total, or detail); wakes Scout                                         |
-| `setup_login`     | none         | none         | An expert login ended (expert, state, detail, command); wakes Scout to say so                                                                                                                                              |
+| `setup_login`     | none         | none         | An expert login ended (expert, state, detail, command); wakes Scout to say so                                                                                                                                     |
 
 A kind can also set `wakes` (false: keep only the latest fact, no turn) and `enabled`. An event with
 a `key` replaces an older held event of the same kind and key (also for kinds with no batch window). Held events live in memory only: a

@@ -3,11 +3,41 @@
  * shows (Checking it, Connecting, Signing in), the card's view for each status, and the prompts
  * to try when it ends. The chat's card and Connections' installing row both read it, so the two
  * never say different things. Contains appView, appWorking, findApp, promptsFor, stepsAt,
- * subjectOfRow and APP_STEPS.
+ * subjectOfRow and APP_STEPS. An expert install has no steps of its own: the brain says which
+ * stage it is in (and a percent while it downloads), and expertWorking and stageWords put that in
+ * words for the chat's card and Connections. Also holds expertWorking and stageWords.
  */
 import type { AppInfo, AppRow } from '../shapes';
 import { JOB_KINDS } from '../jobs-kinds';
 import type { InstallStep, InstallSubject, InstallView } from './install-card';
+
+const STAGES: Record<string, string> = {
+  checking: 'Checking this computer',
+  node: 'Getting what it needs to run',
+  resolving: 'Finding the right version',
+  fetching: 'Downloading its files',
+  finishing: 'Setting it up',
+  downloading: 'Downloading',
+  extracting: 'Unpacking',
+  done: 'Finishing up',
+};
+
+/** The stage in plain words; a stage the UI does not know is just "Working". */
+export function stageWords(progress: { stage: string }): string {
+  return STAGES[progress.stage] ?? 'Working';
+}
+
+/** The card's Working view for an expert install, from the brain's stage and optional percent. */
+export function expertWorking(progress: {
+  stage: string;
+  percent?: number | undefined;
+}): Extract<InstallView, { phase: 'working' }> {
+  return {
+    phase: 'working',
+    label: `${stageWords(progress)}…`,
+    ...(progress.percent !== undefined ? { percent: progress.percent } : {}),
+  };
+}
 
 export const APP_STEPS = ['Checking it', 'Connecting', 'Signing in'] as const;
 /** What each step failing means, in the words of "Notion didn't …". */

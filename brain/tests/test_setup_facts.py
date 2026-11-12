@@ -156,6 +156,18 @@ async def test_real_run_cmd_timeout_is_a_parameter():
         )
 
 
+async def test_real_run_cmd_hands_each_line_to_on_line_and_still_returns_all_output():
+    import sys
+
+    from brain.setup.facts import real_run_cmd
+
+    code = "import sys; print('a'); print('b', file=sys.stderr)"
+    lines: list[str] = []
+    result = await real_run_cmd([sys.executable, "-c", code], os.environ, None, lines.append)
+    assert sorted(lines) == ["a", "b"]
+    assert result.out.strip() == "a" and result.err.strip() == "b"
+
+
 async def test_a_cancelled_command_kills_its_child(tmp_path):
     import sys
 

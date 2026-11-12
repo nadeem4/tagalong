@@ -17,7 +17,7 @@ import pytest
 
 from brain.setup.archive import UnsafeArchive, safe_extract
 from brain.setup.facts import node_paths
-from brain.setup.net import http_fetch
+from brain.setup.net import DOWNLOAD_SIZE, http_fetch
 from brain.setup.node_runtime import (
     NodeBuildMissing,
     NodeIntegrityError,
@@ -371,6 +371,7 @@ async def test_two_concurrent_calls_download_once(tmp_path):
 class FakeResponse:
     def __init__(self, url="https://nodejs.org/x", status=200, size=3 * 1024 * 1024):
         self.url, self.status, self.left = url, status, size
+        self.headers = {"Content-Length": str(size)}
 
     def read(self, n):
         got = min(n, self.left)
@@ -390,6 +391,7 @@ async def test_http_fetch_streams_chunks(monkeypatch):
     chunks = [c async for c in http_fetch("https://nodejs.org/x")]
     assert len(chunks) > 1
     assert sum(len(c) for c in chunks) == 3 * 1024 * 1024
+    assert DOWNLOAD_SIZE.get() == 3 * 1024 * 1024  # the Content-Length, for a download percent
 
 
 async def test_http_fetch_raises_on_a_non_200(monkeypatch):
