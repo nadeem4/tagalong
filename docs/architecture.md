@@ -189,16 +189,16 @@ speech, then continues or replaces the queued sentences.
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 flowchart LR
   SRC["Sources: say, timers, loops,<br/>jobs, setup news, card answers"] --> FD["Front door<br/>dispatcher.py: the kind sets the urgency"]
-  FD -->|"now, or idle when quiet"| TURN["Scout's turn (short)"]
+  FD -->|"now, or idle when speech is idle"| TURN["Scout's turn (short)"]
   FD -->|"next_pause"| INT["Interjection at a sentence break"]
-  FD -->|"hold: away, quiet hours, no key"| OI
+  FD -->|"hold, or a wake it cannot tell (budget, quiet hours, stale, no key)"| OI
   TURN -->|"needs the person"| OI["Open items<br/>saved, one lifecycle"]
   OI -->|"answer or result"| FD
   TURN -->|"reply sentences"| SQ["Speech queue<br/>mouth.py: one worker"]
   INT -->|"continue or replace"| SQ
   SQ -->|"speech frames"| BODY["Body plays the audio"]
   BODY -->|"speech_state"| FD
-  FD -->|"speech_control: pause, resume, clear"| BODY
+  SQ -->|"speech_control: pause, resume, clear"| BODY
 ```
 
 Words go in through the front door; replies go out through the one speech queue; open items sit
@@ -226,6 +226,8 @@ flowchart LR
   subgraph Foundations
     PR["protocol/README.md"]
     SS["settings-and-secrets.md"]
+    ST["storage.md"]
+    WA["whatsapp.md"]
   end
   DK --> BU
   DK --> VO
@@ -234,6 +236,8 @@ flowchart LR
   BR --> CA
   Bodies --> PR
   DK --> SS
+  BR --> ST
+  Bodies --> WA
 ```
 
 | Doc                                                | Covers                                                                              | Main code                                                                                                                            |

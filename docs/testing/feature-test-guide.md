@@ -2724,7 +2724,7 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 
 The four moments the framework was built for. Run them on a real brain and desktop once per release.
 
-1. Automated: `cd brain && uv run pytest tests/test_no_leftovers.py tests/test_dispatcher.py tests/test_open_items.py -q` (the removed names, the scheduler module and the in-turn card wait stay gone).
+1. Automated: `cd brain && uv run pytest tests/test_no_leftovers.py tests/test_dispatcher.py tests/test_open_items.py -q` (it pins that the removed names, the scheduler and waiting modules stay gone; the dispatcher and open-item tests cover their own rules).
 2. Card during speech: ask Scout a question with a long spoken answer, and while it speaks ask it to connect an app or install an expert so a card appears. Scout mentions the card at the next sentence break and carries on; the card stays until you answer. Click Allow after Scout has finished: it counts (no "not found").
 3. Talk over Scout: while Scout speaks a long answer, hold the talk key and say something. Speech pauses at once and nothing is cancelled (a running tool call finishes). Real words are answered by Scout's own judgment: it carries on, answers you, or drops what it was saying. Silence or echo resumes the speech. Open cards are untouched.
 4. Restart with open items: leave a permission card and an install card unanswered, run `uv run tagalong stop`, start the desktop again and open the bubble. Saved-call cards show again and answering one runs the call. An expert's own permission ask (tied to the live process) shows as expired. Held news shows on Home's Tasks > Held tab.

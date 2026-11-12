@@ -40,3 +40,9 @@ def test_the_scheduler_module_is_gone_and_nothing_imports_it():
     src = ROOT / "brain" / "src" / "brain"
     assert not (src / "scheduler.py").exists()
     assert _hits(r"\bscheduler\b", src, (".py",)) == []
+
+
+def test_the_waiting_module_and_park_path_are_gone():
+    src = ROOT / "brain" / "src" / "brain"
+    assert not (src / "waiting.py").exists()
+    assert _hits(r"def park|\.park\(", src, (".py",)) == []
