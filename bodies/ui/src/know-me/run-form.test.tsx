@@ -6,9 +6,9 @@ import type { KnowMeStatus, KnowSourceInfo } from '../shapes';
 import { RunForm } from './run-form';
 
 const SOURCES: KnowSourceInfo[] = [
-  { name: 'GitHub', needs: 'username', label: 'Your GitHub username' },
-  { name: 'LinkedIn PDF', needs: 'file', label: 'Your LinkedIn PDF' },
-  { name: 'The web', needs: 'none', label: 'The web' },
+  { name: 'github', needs: 'username', label: 'GitHub' },
+  { name: 'linkedin', needs: 'file', label: 'LinkedIn PDF' },
+  { name: 'web', needs: 'none', label: 'The web' },
 ];
 
 function form(over: Partial<Parameters<typeof RunForm>[0]> = {}) {
@@ -22,16 +22,13 @@ const pdf = (bytes: number | string, name = 'cv.pdf') =>
     type: 'application/pdf',
   });
 const choose = (file: File) =>
-  fireEvent.change(screen.getByLabelText('Your LinkedIn PDF'), { target: { files: [file] } });
+  fireEvent.change(screen.getByLabelText('LinkedIn PDF'), { target: { files: [file] } });
 
 describe('RunForm', () => {
   it('renders one input per source from what it needs, and nothing for "none"', () => {
     form();
-    expect(screen.getByLabelText('Your GitHub username')).toHaveAttribute('type', 'text');
-    expect(screen.getByLabelText('Your LinkedIn PDF')).toHaveAttribute(
-      'accept',
-      '.pdf,application/pdf',
-    );
+    expect(screen.getByLabelText('GitHub')).toHaveAttribute('type', 'text');
+    expect(screen.getByLabelText('LinkedIn PDF')).toHaveAttribute('accept', '.pdf,application/pdf');
     expect(screen.getAllByRole('textbox')).toHaveLength(1);
     expect(screen.queryByText('The web')).not.toBeInTheDocument();
   });
@@ -40,11 +37,11 @@ describe('RunForm', () => {
     form();
     const start = screen.getByRole('button', { name: 'Get to know me' });
     expect(start).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('Your GitHub username'), { target: { value: '  ' } });
+    fireEvent.change(screen.getByLabelText('GitHub'), { target: { value: '  ' } });
     expect(start).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('Your GitHub username'), { target: { value: 'octo' } });
+    fireEvent.change(screen.getByLabelText('GitHub'), { target: { value: 'octo' } });
     expect(start).toBeEnabled();
-    fireEvent.change(screen.getByLabelText('Your GitHub username'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('GitHub'), { target: { value: '' } });
     choose(pdf('hello'));
     await waitFor(() => expect(start).toBeEnabled());
   });
@@ -58,7 +55,7 @@ describe('RunForm', () => {
 
   it('reads the file as base64 and passes it with the username', async () => {
     const { onStart } = form();
-    fireEvent.change(screen.getByLabelText('Your GitHub username'), {
+    fireEvent.change(screen.getByLabelText('GitHub'), {
       target: { value: ' octo ' },
     });
     choose(pdf('hi'));
@@ -78,13 +75,37 @@ describe('RunForm', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows the source label, not the brain name, in the progress rows', () => {
+    const sources: KnowSourceInfo[] = [
+      { name: 'github', needs: 'username', label: 'GitHub' },
+      { name: 'linkedin', needs: 'file', label: 'LinkedIn PDF' },
+      { name: 'web', needs: 'none', label: 'The web' },
+    ];
+    const status: KnowMeStatus = {
+      done: false,
+      sources: [
+        { name: 'github', state: 'reading' },
+        { name: 'linkedin', state: 'done' },
+        { name: 'web', state: 'failed' },
+        { name: 'portrait', state: 'waiting' },
+      ],
+    };
+    form({ running: true, status, sources });
+    const rows = screen.getByRole('list', { name: 'Progress' });
+    expect(rows).toHaveTextContent('Reading GitHub…');
+    expect(rows).toHaveTextContent('LinkedIn PDF: done');
+    expect(rows).toHaveTextContent('The web: not read');
+    expect(rows).not.toHaveTextContent('github');
+    expect(rows).toHaveTextContent('Portrait: waiting');
+  });
+
   it('follows the status with a row per source, including the portrait row', () => {
     const status: KnowMeStatus = {
       done: false,
       sources: [
-        { name: 'GitHub', state: 'done' },
-        { name: 'LinkedIn PDF', state: 'reading' },
-        { name: 'The web', state: 'failed', gap: 'Nothing matched you.' },
+        { name: 'github', state: 'done' },
+        { name: 'linkedin', state: 'reading' },
+        { name: 'web', state: 'failed', gap: 'Nothing matched you.' },
         { name: 'portrait', state: 'waiting' },
       ],
     };
@@ -95,7 +116,7 @@ describe('RunForm', () => {
     expect(rows).toHaveTextContent('The web: not read');
     expect(rows).toHaveTextContent('Nothing matched you.');
     expect(rows).toHaveTextContent('Portrait: waiting');
-    expect(screen.queryByLabelText('Your GitHub username')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('GitHub')).not.toBeInTheDocument();
   });
 
   it('says so when the file cannot be read', async () => {

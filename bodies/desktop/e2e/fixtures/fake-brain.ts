@@ -104,6 +104,8 @@ export interface FakeBrain {
   expertSetups: string[];
   /** The `approved` flag of each setup_expert call: the tour's press must send true. */
   expertApprovals: unknown[];
+  /** Every `know_me_start` params the desktop sent, in order. */
+  knowStarts: Record<string, unknown>[];
   /** Every app id the desktop sent to `setup_app`, in order (the tour's Connect). */
   appSetups: string[];
   /** The `approved` and `community_ok` flags of each setup_app call, in order. */
@@ -239,6 +241,7 @@ const TWO_PART_STEPS = [
   exit: null,
 }));
 
+const KNOW_PORTRAIT = 'You build things end to end, mostly in TypeScript.';
 // A memory with one unbroken word, the worst case for the memory row's width.
 const LONG_FACT = `Remembers ${'supercalifragilistic'.repeat(8)} and a long story about the launch.`;
 
@@ -427,6 +430,9 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   const loopApps = [{ id: 'gmail', name: 'Gmail', on: false }];
   let heldLoops: Record<string, unknown>[] = [];
   const stops: string[] = [];
+  // Get to know me: every `know_me_start` params, and whether a run has finished (it then has facts).
+  const knowStarts: Record<string, unknown>[] = [];
+  let knowDone = false;
   const expertSetups: string[] = [];
   const expertApprovals: unknown[] = [];
   const appSetups: string[] = [];
@@ -876,6 +882,34 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             relayed,
           );
         } else finish();
+      } else if (msg.method === 'know_me_start') {
+        knowStarts.push({ ...msg.params });
+        socket.send(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { joined: false } }));
+        // Reading first, then done a moment later, like a run: the status is live-only.
+        live('know_me_status', {
+          sources: [
+            { name: 'github', state: 'reading' },
+            { name: 'linkedin', state: 'waiting' },
+            { name: 'web', state: 'waiting' },
+            { name: 'portrait', state: 'waiting' },
+          ],
+          done: false,
+        });
+        setTimeout(() => {
+          knowDone = true;
+          live('know_me_status', {
+            sources: [
+              { name: 'github', state: 'done' },
+              { name: 'linkedin', state: 'done' },
+              { name: 'web', state: 'done' },
+              { name: 'portrait', state: 'done' },
+            ],
+            done: true,
+            portrait: KNOW_PORTRAIT,
+          });
+          // The brain says so when a run ends, so a mounted memory list reloads.
+          notify('changed', { what: 'memory' });
+        }, 400);
       } else if (msg.method === 'call') {
         // Home's tools: the permission pair and the jobs pair, kept in memory like the real brain.
         const params = msg.params as {
@@ -1062,12 +1096,33 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           expertApprovals.push(params.input?.approved);
           expertInstalled = options.expertInstallingPercent === undefined;
           notify('changed', { what: 'setup' });
+        } else if (params.tool === 'know_me_sources') {
+          value = [
+            { name: 'github', needs: 'username', label: 'GitHub' },
+            { name: 'linkedin', needs: 'file', label: 'LinkedIn PDF' },
+            { name: 'web', needs: 'none', label: 'The web' },
+          ];
         } else if (params.tool === 'list_memories') {
           value = {
             memories: [
+              ...(knowDone
+                ? [
+                    {
+                      id: 'p1',
+                      kind: 'profile',
+                      text: 'Writes TypeScript',
+                      at: '2026-11-12T10:00:00Z',
+                      tag: 'skills',
+                      source: 'github',
+                      evidence: 'TypeScript 62%',
+                      visibility: 'free',
+                    },
+                  ]
+                : []),
               { id: 'm1', kind: 'summary', text: LONG_FACT, at: '2026-10-27T10:00:00Z' },
               { id: 'm2', kind: 'fact', text: 'Prefers green tea', at: '2026-10-26T10:00:00Z' },
             ],
+            ...(knowDone ? { portrait: KNOW_PORTRAIT } : {}),
           };
         } else if (params.tool === 'list_apps') value = { apps: sceneApps ?? appRows };
         else if (params.tool === 'updates_state') value = updatesState;
@@ -1319,6 +1374,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     limits,
     models,
     stops,
+    knowStarts,
     expertSetups,
     expertApprovals,
     appSetups,

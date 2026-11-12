@@ -125,6 +125,7 @@ test('existing user with a key sees it once, can skip the key step, then never a
   await nextTo(tour, 9);
   await expect(tour.getByText('A key is already set.')).toBeVisible({ timeout: 30_000 });
   await tour.getByRole('button', { name: 'Next' }).click();
+  await tour.getByRole('button', { name: 'Next' }).click();
   await tour.getByRole('button', { name: 'Finish' }).click();
   await expect(tour.getByRole('heading', { name: 'Scout is on your screen' })).toBeVisible();
   await tour.getByRole('button', { name: 'Done' }).click();
@@ -192,6 +193,7 @@ test('invalid key then valid key finishes; the key never reaches settings.json',
   await expect(tour.getByLabel('API key')).toHaveValue('');
   expect(brain!.keyAttempts).toBe(2);
   await tour.getByRole('button', { name: 'Next' }).click();
+  await tour.getByRole('button', { name: 'Next' }).click();
   await tour.getByRole('button', { name: 'Finish' }).click();
   await tour.getByRole('button', { name: 'Done' }).click();
   await expectClosedAndDone();
@@ -214,6 +216,7 @@ test('Finish marks the tour seen at once, so closing the card with X never bring
   const tour = await windowFor('walkthrough');
   await nextTo(tour, 9);
   await expect(tour.getByText('A key is already set.')).toBeVisible({ timeout: 30_000 });
+  await tour.getByRole('button', { name: 'Next' }).click();
   await tour.getByRole('button', { name: 'Next' }).click();
   await tour.getByRole('button', { name: 'Finish' }).click();
   await expect(tour.getByRole('heading', { name: 'Scout is on your screen' })).toBeVisible();
@@ -282,10 +285,10 @@ test('step 6 only explains: no Connect or Set up buttons', async () => {
   await expect(page.getByText('Claude Code')).toHaveCount(0);
 });
 
-test('step 10 installs Claude Code on the fake brain and shows it ready', async () => {
+test('step 11 installs Claude Code on the fake brain and shows it ready', async () => {
   await launchWith({ hasKey: true });
   const tour = await windowFor('walkthrough');
-  await nextTo(tour, 10);
+  await nextTo(tour, 11);
   const row = tour.getByRole('listitem').filter({ hasText: 'Claude Code' });
   await row.getByRole('button', { name: 'Add' }).click();
   await expect(row.getByText('Ready')).toBeVisible({ timeout: 15_000 });
@@ -293,10 +296,10 @@ test('step 10 installs Claude Code on the fake brain and shows it ready', async 
   expect(brain!.expertApprovals).toEqual([true]); // the press is the OK, so no Allow card
 });
 
-test('step 10 connects Gmail on the fake brain', async () => {
+test('step 11 connects Gmail on the fake brain', async () => {
   await launchWith({ hasKey: true });
   const tour = await windowFor('walkthrough');
-  await nextTo(tour, 10);
+  await nextTo(tour, 11);
   await tour.getByRole('button', { name: 'Add Gmail' }).click();
   await expect(
     tour.getByRole('listitem').filter({ hasText: 'Gmail' }).getByText('Connected'),
@@ -304,10 +307,10 @@ test('step 10 connects Gmail on the fake brain', async () => {
   expect(brain!.appSetups).toEqual(['io.example/gmail']);
 });
 
-test('step 10 can be finished without connecting anything, and the card has no ready list', async () => {
+test('step 11 can be finished without connecting anything, and the card has no ready list', async () => {
   await launchWith({ hasKey: true });
   const tour = await windowFor('walkthrough');
-  await nextTo(tour, 10);
+  await nextTo(tour, 11);
   await tour.getByRole('button', { name: 'I’ll do this later' }).click();
   await expect(tour.getByRole('heading', { name: 'Scout is on your screen' })).toBeVisible();
   await expect(tour.getByText('Ready to use')).toHaveCount(0);
@@ -317,7 +320,7 @@ test('step 10 can be finished without connecting anything, and the card has no r
 test('every step fits the window: footer in view, nothing wider than the page (150% scaling)', async () => {
   await launchWith({ hasKey: true }, ['--force-device-scale-factor=1.5']);
   const tour = await windowFor('walkthrough');
-  for (let step = 1; step <= 10; step += 1) {
+  for (let step = 1; step <= 11; step += 1) {
     const fit = await tour.evaluate(() => {
       const footer = document.querySelector('.wt-footer')!.getBoundingClientRect();
       const body = document.querySelector('.wt-body')!;
@@ -328,7 +331,7 @@ test('every step fits the window: footer in view, nothing wider than the page (1
       };
     });
     expect(fit, `step ${step}`).toEqual({ footerInView: true, noSideScroll: true });
-    if (step < 10) await tour.getByRole('button', { name: /^(Get started|Next)$/ }).click();
+    if (step < 11) await tour.getByRole('button', { name: /^(Get started|Next)$/ }).click();
   }
 });
 
@@ -360,11 +363,11 @@ test('a small work area still keeps the footer in view and nothing wider than th
       .find((w) => w.webContents.getURL().includes('walkthrough.html'))
       ?.setContentSize(682, 512),
   );
-  for (let step = 1; step <= 10; step += 1) {
+  for (let step = 1; step <= 11; step += 1) {
     await expect
       .poll(() => fitOf(tour), { message: `step ${step}` })
       .toEqual({ footerInView: true, noSideScroll: true });
-    if (step < 10) await tour.getByRole('button', { name: /^(Get started|Next)$/ }).click();
+    if (step < 11) await tour.getByRole('button', { name: /^(Get started|Next)$/ }).click();
   }
 });
 
@@ -377,13 +380,16 @@ test('step 8 and the finish screen fit at 1040x680 with no horizontal scroll', a
   await tour.getByRole('button', { name: 'Next' }).click();
   await expect(tour.getByText('A key is already set.')).toBeVisible({ timeout: 30_000 });
   await tour.getByRole('button', { name: 'Next' }).click();
+  await expect(tour.getByRole('heading', { name: 'Let Scout get to know you' })).toBeVisible();
+  await expect.poll(() => fitOf(tour)).toEqual({ footerInView: true, noSideScroll: true });
+  await tour.getByRole('button', { name: 'Next' }).click();
   await expect(tour.getByRole('heading', { name: 'Connect your tools' })).toBeVisible();
   await tour.getByRole('button', { name: 'Finish' }).click();
   await expect(tour.getByRole('heading', { name: 'Scout is on your screen' })).toBeVisible();
   await expect.poll(() => fitOf(tour)).toEqual({ footerInView: true, noSideScroll: true });
 });
 
-test('a 910x512 window (150 percent on 1366x768) keeps Skip on step 8 and Finish on step 10 in view', async () => {
+test('a 910x512 window (150 percent on 1366x768) keeps Skip on step 8 and Finish on step 11 in view', async () => {
   await launchWith({ hasKey: true }, ['--force-device-scale-factor=1.5']);
   const tour = await windowFor('walkthrough');
   // 1366x768 at 150% leaves about 910x512 DIPs.
@@ -392,11 +398,12 @@ test('a 910x512 window (150 percent on 1366x768) keeps Skip on step 8 and Finish
       .find((w) => w.webContents.getURL().includes('walkthrough.html'))
       ?.setContentSize(910, 512),
   );
-  // Skip is on every step but the key and the last, so check it on step 8 and Finish on step 10.
+  // Skip is on every step but the key and the last, so check it on step 8 and Finish on step 11.
   await nextTo(tour, 8);
   await expect(tour.getByRole('button', { name: 'Skip' })).toBeInViewport();
   await tour.getByRole('button', { name: 'Next' }).click();
   await expect(tour.getByText('A key is already set.')).toBeVisible({ timeout: 30_000 });
+  await tour.getByRole('button', { name: 'Next' }).click();
   await tour.getByRole('button', { name: 'Next' }).click();
   await expect(tour.getByRole('button', { name: 'Finish' })).toBeInViewport();
 });

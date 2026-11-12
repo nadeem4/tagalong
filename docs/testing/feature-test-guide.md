@@ -2161,12 +2161,23 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
 
 ## Get to know me (K5 result view and bridge, automated only)
 
-The form and result view are not on any screen yet (the tour step and Home's button come next); `bodies/ui/src/know-me/*.test.tsx`, `src/shapes/know-me.test.ts` and `bodies/desktop/src/main/ipc/know-me.test.ts` cover them:
+The form and result view are mounted by the tour step and Home (K6, next section); `bodies/ui/src/know-me/*.test.tsx`, `src/shapes/know-me.test.ts` and `bodies/desktop/src/main/ipc/know-me.test.ts` cover them:
 
 - The form shows an input per source from what it needs, keeps Start off until a username or PDF is given, refuses a PDF over 10 MB, reads a PDF as base64, and tells how to save it from LinkedIn.
 - Progress rows follow the status, including the last `portrait` row and its gap.
 - The result shows the portrait and the fact count first; "What's this based on?" opens the facts, filterable by kind, with each fact's source and "only if asked"; with no portrait it says nothing was found.
 - The desktop refuses no input and a PDF over 10 MB without calling the brain, turns `over_limit` into "That PDF is over 10 MB.", pushes each status to every window and drops a bad one; the memory list keeps provenance and gives the portrait.
+
+## Get to know me (K6 tour step and Home button, real brain, real key: this spends a few cents)
+
+Automated: `bodies/ui/src/walkthrough/step-know-me.test.tsx`, `src/home/memory-view.test.tsx` and `bodies/desktop/e2e/know-me.spec.ts` (fake brain). By hand:
+
+1. **Action:** start the tour with a key set and press **Next** to step 10, "Let Scout get to know you". **Expected:** the form shows a "GitHub" username box and a "LinkedIn PDF" picker, and nothing runs until you press **Get to know me**.
+2. **Action:** enter your GitHub username and press **Get to know me**, then press **Next** straight away. **Expected:** a "Reading GitHub…" row (the progress rows use the source names, "GitHub", "LinkedIn PDF", "The web", and a last "Portrait" row) shows; **Next** is never blocked and the tour goes on to step 11 and the finish card. The run keeps going in the brain.
+3. **Action:** open Home, **What Scout remembers**. **Expected:** once the run ends the page shows a portrait card above the list and new facts, each with a tag, its source (GitHub) and "only if asked" on personal ones. The portrait has no Delete.
+4. **Action:** delete one GitHub fact on Home, then run **Get to know me** again. **Expected:** that fact does not come back.
+5. **Action:** press **Get to know me again**, enter a username and start; at the end press **Looks right** or **What's this based on?**. **Expected:** the progress rows, then the portrait and its facts; **Looks right** closes the panel and the list and portrait are refreshed.
+6. **Action:** tell Scout in chat that one fact is wrong, then run it again. **Expected:** the correction is kept as a chat fact and the rewritten portrait follows it.
 
 ## Web search and fetch _(real brain, real key: this spends a few cents)_
 
@@ -2360,7 +2371,7 @@ brain; this checks it on the real one.
    the walkthrough opens by itself; no pet, bubble or dock shows. Escape does not close it.
 2. **Action:** press **Get started**, then **Next** through the steps. **Expected:** step 1 reads
    "One companion for everything you do" and has no Back; the footer shows Back, a quiet **Skip**
-   link (not on steps 9 and 10) and the primary button; the side list (step 6 is "Everyday jobs", step 10 "Connect your tools") jumps only to steps you
+   link (not on steps 9 and 11) and the primary button; the side list (step 6 is "Everyday jobs", step 10 "Let Scout get to know you", step 11 "Connect your tools") jumps only to steps you
    have reached; Skip with no key goes to step 9 and saves nothing. Steps 1 to 3 are text only; step
    4 shows the ask and pause keys as keycaps (never "CommandOrControl").
 3. **Action:** on step 4 press **Change**, type `Ctrl+Shift+K`, press **Next**. **Expected:** the ask
@@ -2386,7 +2397,7 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
    and write me a summary", "Tidy this folder", "Fix this code"); it only explains: no **Connect**
    button, no Claude Code anywhere, and "Fix this code" says "which you can set up on the last
    step."
-2. **Action:** on step 10 ("Connect your tools", after the key step) look at the page, then press
+2. **Action:** on step 11 ("Connect your tools", after the key step) look at the page, then press
    **Add Gmail** (and answer the Allow card). **Expected:** one card lists Gmail, Google Calendar
    and Notion (each with its kind of job, how it signs in and an **Official** chip where it is one)
    and a second card offers Claude Code (Official, Recommended). **Add Gmail** reads "Waiting for
@@ -2395,7 +2406,7 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
    that is not saved is not listed. Press **Add** on Claude Code: an "Installing…" block with a
    percent and bar shows, then "Needs sign-in" with a **Sign in** button (the login window opens),
    then "Ready". With the brain stopped the page says Tagalong could not read this and that you can
-   connect your tools later in Home, under Connections. Step 10 has no Skip: **I’ll do this later**
+   connect your tools later in Home, under Connections. Step 11 has no Skip: **I’ll do this later**
    and **Finish** both end the tour. On Home's **Connections** page **Your experts** lists
    Claude Code with its state; the **Experts** tab's **Add an expert** offers more (an Official one has **Add** and opens an Allow card first; a community one shows the check card first, and **Add anyway** is that approval, so it opens no further Allow card) (Log in on a Claude Code you already logged into elsewhere opens no card: it says "Already logged in." and the chip turns ready).
 3. **Action:** on step 7 press **Copy chrome://extensions**, paste it somewhere; press **Show
@@ -2415,9 +2426,9 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
    Anthropic", "Never written to Scout's history or logs", and so on).
 7. **Action:** with a real `ANTHROPIC_API_KEY` in the environment (developers). **Expected:**
    step 9 reads "Set by your environment" and Next is on.
-8. **Action:** on step 10 press **Finish** (or **I’ll do this later**). **Expected:** the card "Scout is on your screen" shows the ask
+8. **Action:** on step 11 press **Finish** (or **I’ll do this later**). **Expected:** the card "Scout is on your screen" shows the ask
    and talk keys as keycaps (never "CommandOrControl"), three things to try and, if you connected
-   anything on step 10, a "Ready to use" list (Connected / "Still installing…" / "Needs sign-in…"), and the tour is
+   anything on step 11, a "Ready to use" list (Connected / "Still installing…" / "Needs sign-in…"), and the tour is
    marked seen at once. **Done** (or **Open Home**) closes the
    window and the pet appears; closing the card with the window's X does the same. Either way the
    tour does not open at the next launch (closing part-way, before Finish, brings it back).

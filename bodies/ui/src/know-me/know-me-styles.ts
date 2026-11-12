@@ -31,7 +31,7 @@ export const KNOW_ME_CSS = `
 
 .know__filters { display: flex; flex-wrap: wrap; gap: ${t.space.sm}px; }
 .know__filter {
-  height: 28px; padding: 0 ${t.space.lg}px; border: 1px solid ${t.color.panelLine}; border-radius: ${t.radius.pill}px;
+  height: 36px; padding: 0 ${t.space.lg}px; border: 1px solid ${t.color.panelLine}; border-radius: ${t.radius.pill}px;
   background: ${t.color.controlFill}; color: ${t.color.chipFreeInk}; cursor: pointer;
   font-family: ${t.font.ui}; ${typeCss('small')}; font-variant-numeric: tabular-nums;
 }

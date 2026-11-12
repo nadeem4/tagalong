@@ -122,4 +122,13 @@ describe('gapsFrom', () => {
     ]);
     expect(gapsFrom(null)).toEqual([]);
   });
+
+  it('uses the source label when the sources are given', () => {
+    const status: KnowMeStatus = {
+      done: true,
+      sources: [{ name: 'linkedin', state: 'failed', gap: 'No text found in the PDF.' }],
+    };
+    const sources = [{ name: 'linkedin', needs: 'file' as const, label: 'LinkedIn PDF' }];
+    expect(gapsFrom(status, sources)).toEqual(['LinkedIn PDF: No text found in the PDF.']);
+  });
 });

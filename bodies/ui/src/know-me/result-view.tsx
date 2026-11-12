@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '../controls/button';
 import { ScoutMark } from '../scout-mark';
-import type { KnowMeStatus, MemoryEntry } from '../shapes';
+import type { KnowMeStatus, KnowSourceInfo, MemoryEntry } from '../shapes';
 import { KNOW_ME_CSS } from './know-me-styles';
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -24,10 +24,14 @@ const sourceLabel = (source: string | undefined): string =>
 const tagOf = (fact: MemoryEntry): string => fact.tag ?? 'other';
 
 /** One line per gap the run reported; the portrait's own gap needs no source name. */
-export function gapsFrom(status: KnowMeStatus | null): string[] {
+export function gapsFrom(status: KnowMeStatus | null, sources: KnowSourceInfo[] = []): string[] {
   return (status?.sources ?? [])
     .filter((row) => row.gap !== undefined && row.gap !== '')
-    .map((row) => (row.name === 'portrait' ? row.gap! : `${row.name}: ${row.gap!}`));
+    .map((row) =>
+      row.name === 'portrait'
+        ? row.gap!
+        : `${sources.find((s) => s.name === row.name)?.label ?? row.name}: ${row.gap!}`,
+    );
 }
 
 function tagsOf(facts: MemoryEntry[]): string[] {

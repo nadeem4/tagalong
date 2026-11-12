@@ -1,5 +1,5 @@
 /**
- * Walkthrough step 10: connect your tools. The apps the everyday jobs need (Gmail, Google
+ * Walkthrough step 11: connect your tools. The apps the everyday jobs need (Gmail, Google
  * Calendar, Notion) and Claude Code for long jobs, as the same rows the Connections page draws.
  * Nothing here blocks Finish. Also holds readyOf, which turns the same overview into the finish
  * card's "Ready to use" list. Contains StepTen, readyOf and ReadyItem.
