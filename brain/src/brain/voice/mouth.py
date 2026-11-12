@@ -70,6 +70,7 @@ class Mouth:
         self._worker: asyncio.Task | None = None
         self._paused = False
         self._saying = False
+        self._last_body: str | None = None  # the body the last frame went to
         self.state: State = "idle"
         self.on_state: Callable[[str], None] | None = None
         # What each turn sent, in order. Apart from `_turns` because a turn is dropped once its
@@ -139,7 +140,11 @@ class Mouth:
     def _control(self, action: str) -> None:
         """Tell each body that plays a turn to hold or go on: sentences already sent sit in its
         player, so pausing only the queue would not stop the sound."""
-        for body_id in dict.fromkeys(st.body_id for st in self._turns.values()):
+        # A turn is dropped once its last sentence is sent while the body still plays it, so the
+        # body of the last frame sent is a target too.
+        live = (st.body_id for st in self._turns.values())
+        targets = dict.fromkeys([*live, *([self._last_body] if self._last_body else [])])
+        for body_id in targets:
             self._bodies.send_live(body_id, "speech_control", {"action": action})
 
     def clear(self, turn: str | None = None) -> None:
@@ -291,6 +296,7 @@ class Mouth:
             self._failed = True
 
     def _send(self, st: _Turn, params: dict) -> None:
+        self._last_body = st.body_id
         self._bodies.send_live(st.body_id, "speech", params)
 
 

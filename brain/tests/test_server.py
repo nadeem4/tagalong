@@ -218,11 +218,11 @@ class _Recorder:
     def __init__(self) -> None:
         self.calls: list[tuple] = []
 
-    def set_speech_state(self, state):
-        self.calls.append(("state", state))
+    def set_speech_state(self, state, body_id):
+        self.calls.append(("state", state, body_id))
 
-    def speech_body_gone(self):
-        self.calls.append(("gone",))
+    def speech_body_gone(self, body_id):
+        self.calls.append(("gone", body_id))
 
 
 async def test_speech_state_frames_feed_the_dispatcher():
@@ -249,12 +249,37 @@ async def test_speech_state_frames_feed_the_dispatcher():
             await call(ws, request("tools", {"tools": []}))  # in order: all were handled
         await asyncio.sleep(0.05)
         assert rec.calls == [
-            ("state", "talking"),
-            ("state", "sentence_break"),
-            ("state", "paused"),
-            ("state", "idle"),
-            ("gone",),  # the body that reported left
+            ("gone", "desktop"),  # its hello: nothing it said before counts
+            ("state", "talking", "desktop"),
+            ("state", "sentence_break", "desktop"),
+            ("state", "paused", "desktop"),
+            ("state", "idle", "desktop"),
+            ("gone", "desktop"),  # the body that reported left
         ]
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
+async def test_a_reconnect_clears_the_old_connections_speech_state():
+    bodies = Bodies()
+    session = Session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
+    server = await start_server("127.0.0.1", 0, bodies, "s1", session)
+    url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+    try:
+        async with connect(url) as first:
+            await call(first, hello())
+            frame = {"turn": "t", "n": 1, "state": "started"}
+            await first.send(
+                json.dumps({"jsonrpc": "2.0", "method": "speech_state", "params": frame})
+            )
+            await call(first, request("tools", {"tools": []}))
+            assert session.dispatcher._state == "talking"
+            async with connect(url) as second:  # replaces the first before any frame
+                await call(second, hello())
+                assert session.dispatcher._state == "idle"
+            await asyncio.sleep(0.05)
+        assert session.dispatcher._state == "idle"
     finally:
         server.close()
         await server.wait_closed()

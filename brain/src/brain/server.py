@@ -110,7 +110,6 @@ async def _handler(
     body_id: str | None = None
     calls: set[asyncio.Task] = set()
     listening: set[str] = set()  # holds the body id once this connection has listened
-    reporting: set[str] = set()  # holds the body id once this connection reported speech state
     try:
         async for raw in ws:
             message = _parse(raw)
@@ -128,6 +127,8 @@ async def _handler(
                 body_id = _hello(message, req_id, peer, bodies, session_id, session, build)
                 if body_id is None:
                     break
+                # A new connection of this body: what an older one reported no longer holds.
+                session.dispatcher.speech_body_gone(body_id)
                 continue
             if not isinstance(method, str):
                 try:
@@ -149,7 +150,7 @@ async def _handler(
                 continue
             if method == "speech_state":  # a notification: a bad shape is dropped
                 if bodies.is_current(body_id, peer):
-                    _speech_state(message, body_id, session, reporting)
+                    _speech_state(message, body_id, session)
                 continue
             try:
                 if method in VOICE_METHODS:
@@ -175,8 +176,8 @@ async def _handler(
             # A replaced connection must not tear down the listening its successor started.
             if was_current and body_id in listening and session.voice is not None:
                 session.voice.unlisten(body_id)  # a gone body's mic must not keep a session
-            if was_current and body_id in reporting:
-                session.dispatcher.speech_body_gone()  # nobody plays audio: the mouth is the source
+            if was_current:  # a replaced connection's claim was cleared by its successor's hello
+                session.dispatcher.speech_body_gone(body_id)
         peer.close()
         await asyncio.gather(writer, return_exceptions=True)
 
@@ -191,14 +192,13 @@ _SPEECH_STATES = {
 }
 
 
-def _speech_state(message: dict, body_id: str, session: Session, reporting: set[str]) -> None:
+def _speech_state(message: dict, body_id: str, session: Session) -> None:
     try:
         params = SpeechStateParams.model_validate(message.get("params"))
     except ValidationError as exc:
         log.debug("dropped a bad speech_state frame: %s", exc)
         return
-    reporting.add(body_id)
-    session.dispatcher.set_speech_state(_SPEECH_STATES[params.state])
+    session.dispatcher.set_speech_state(_SPEECH_STATES[params.state], body_id)
 
 
 def _hello(

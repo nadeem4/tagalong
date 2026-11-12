@@ -999,3 +999,47 @@ def test_one_deadline_rule_everywhere():
         assert not found, f"{path.name} keeps its own wait: {found}"
     assert "DEADLINE_S" in (_SRC / "open_items.py").read_text(encoding="utf-8")
     assert "STALE_S" in (_SRC / "dispatcher.py").read_text(encoding="utf-8")
+
+
+async def test_one_of_several_reporting_bodies_leaving_keeps_the_others(make):
+    rig = make()
+    rig.d.set_speech_state("talking", "desktop")
+    rig.d.set_speech_state("talking", "browser")
+    await rig.emit(ev("soon"))
+    rig.d.speech_body_gone("browser")
+    await settle()
+    assert rig.starts == []  # the desktop still plays
+    rig.d.speech_body_gone("desktop")
+    await settle()
+    assert len(rig.starts) == 1  # the mouth (idle) is the source again
+
+
+async def test_a_desktop_idle_hands_the_source_back_to_the_mouth(make):
+    rig = make()
+    rig.d.set_speech_state("talking")
+    rig.d.set_speech_state("idle")  # the desktop is done; a browser turn is the mouth's
+    rig.d.set_mouth_state("talking")
+    await rig.emit(ev("soon"))
+    assert rig.starts == []
+    rig.d.set_mouth_state("sentence_break")
+    await settle()
+    assert len(rig.starts) == 1
+
+
+async def test_a_latched_break_does_not_outlive_its_dropped_item(make):
+    rig = make()
+    rig.d.set_speech_state("talking")
+    await rig.emit(ev("soon", key="a"))
+    rig.d.set_speech_state("sentence_break")
+    rig.d.drop("soon", "a")  # gone before the loop took the break
+    rig.d.set_speech_state("talking")
+    await rig.emit(ev("soon", key="b"))
+    assert rig.starts == []
+
+
+async def test_a_waiting_say_or_later_turn_keeps_idle_closed_for_next_pause(make):
+    rig = make()
+    rig.busy = True  # the session's _busy_for_wakes: a turn, a waiting say or a later entry
+    rig.d.set_speech_state("idle")
+    await rig.emit(ev("soon"))
+    assert rig.starts == []
