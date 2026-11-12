@@ -50,7 +50,7 @@ const SETUP_REFUSALS: Record<string, Words> = {
     error: true,
   },
 };
-const LOGIN_WAITING = 'Finish logging in in the window that opened.';
+const LOGIN_WAITING = 'Checking the sign-in…';
 const SETUP_FAILED: Words = { text: 'Setting that up didn’t work.', error: true };
 
 /**
