@@ -10,8 +10,10 @@ nobody registered is refused, so no source can bypass the rules by inventing one
 Past that gate a waking kind is batched per kind (`batch_seconds`), capped per hour, and started
 as one wake turn on a body that can show it, one turn at a time. A `next_pause` kind that is
 due at a sentence break while Scout is speaking is not a turn: it borrows the speech queue as an
-interjection (`interject`, one at a time; when it cannot run the wake waits for the turn, as
-before). Words and card answers are handed to `deliver` instead.
+interjection (`interject`, one at a time). It counts as told only when Scout replaced the rest
+of the speech with words of its own; on a continue, no choice or no way to run, the news waits
+for its plain wake after the turn, as before. Words and card answers are handed to `deliver`
+instead.
 Nothing is dropped silently: when the budget is spent, in quiet
 hours, once an item has waited too long (no body, a person away), when a delivery gives up and
 when the brain stops, the news becomes a `held` open item that shows on return and on Home.
@@ -133,8 +135,8 @@ class Dispatcher:
         self._kinds = kinds
         self._notes = load_notes() if notes is None else notes
         self._sleep = sleep
-        # The session's short turn at a sentence break: True when it ran, False when there was
-        # nothing to borrow (no voice, nothing queued).
+        # The session's short turn at a sentence break: True only when Scout said the news in
+        # words of its own; False for a continue or when there was nothing to borrow.
         self._interject = interject
         self._interjecting: tuple[asyncio.Task, _Group] | None = None
         self._queue: asyncio.Queue[_Entry] = asyncio.Queue()
@@ -149,6 +151,7 @@ class Dispatcher:
         # else the brain's own mouth (a body with no audio, or none connected).
         self._reported: dict[str, str] = {}  # body id -> its last state; idle is not kept
         self._mouth = "idle"
+        self._heard: dict[str, tuple[str, int]] = {}  # body id -> (turn, sentences it finished)
         self._break_seen = False  # a break or idle was seen; spent by the next take
         self._conversation = False
         self._stopped = False
@@ -205,13 +208,22 @@ class Dispatcher:
         # The body that reported last is the one playing now; with none reporting, the mouth.
         return next(reversed(self._reported.values()), self._mouth)
 
-    def set_speech_state(self, state: str, body_id: str = "desktop") -> None:
+    def heard(self, body_id: str, turn: str) -> int:
+        """How many sentences of `turn` the body last reported finished (0 when none)."""
+        said_turn, n = self._heard.get(body_id, ("", 0))
+        return n if said_turn == turn else 0
+
+    def set_speech_state(
+        self, state: str, body_id: str = "desktop", turn: str | None = None, n: int | None = None
+    ) -> None:
         """A body's speech state (`talking`, `sentence_break`, `paused`, `idle`): the speaker
         that plays the audio is the truth, so it wins over the mouth while it reports. `idle`
         means it has nothing left, so its claim ends and the mouth speaks for any other body."""
         self._reported.pop(body_id, None)
         if state != "idle":
             self._reported[body_id] = state
+        if state == "sentence_break" and turn is not None and n is not None:
+            self._heard[body_id] = (turn, n)
         self._seen(self._state)
 
     def set_mouth_state(self, state: str) -> None:
@@ -502,7 +514,7 @@ class Dispatcher:
                 self._wakes.append((self._now(), group.kind.name))
             self._call([i.on_start for i in group.items], "on_start", label)
             self._call([i.on_end for i in group.items], "on_end", label, "done")
-        else:  # nothing to borrow, or it broke: the news waits for a plain wake
+        else:  # continued, or nothing to borrow: the news still has to be told, by a plain wake
             group.tried = True
             self._groups.insert(0, group)
         self.pump()

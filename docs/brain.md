@@ -2412,22 +2412,36 @@ started as a turn: it borrows the speech queue. `Dispatcher._at_break` decides (
 speech state, an `interject` callback, and the group not already `tried`); `Session._interject` does
 it, one at a time, and no wake turn starts alongside it.
 
-1. `voice.queued(body_id)` names the turn that owns the queue and the sentences it has not said. No
-   voice, no ready model or no live turn on that body: the interjection returns `False`, the group is
-   marked `tried` and waits for a plain wake after the turn, as before.
-2. `voice.pause()` holds the queue (the desktop is told with `speech_control`).
-3. One short model call (`speech_tools.interject`): `max_tokens` 300, no thinking, no compaction
+1. `Session._interject` takes the live turn (`_turn_id`, else `_last_turn`) and asks
+   `voice.speaking(turn, body_id)`. No voice, no ready model or no live turn on that body (the
+   Mouth already dropped it): it returns `False` and the group is marked `tried`, so a plain wake
+   tells it after the turn. It never starts speech of its own in a default voice.
+2. What the body has played comes from the body: `speech_state { state: "ended", n }` reaches the
+   dispatcher as a `sentence_break` with `(turn, n)` (`Dispatcher.heard`). The unsaid sentences are
+   `voice.sentences(turn)[heard:]` and the spoken ones the rest.
+3. `voice.pause()` holds the queue (the desktop is told with `speech_control`).
+4. One short model call (`speech_tools.interject`): `max_tokens` 300, no thinking, no compaction
    (`_request(..., max_tokens=)`), no chat history, only the fenced event and the unsaid sentences, and
    two tools, `speech_continue` and `speech_replace(text)`. It passes the `model_call` guard (kind
-   `interjection`) and is spent on the budget like any call. The wording is `mind/interjection.md`;
-   there is no canned line in code. They are not toolbox tools (only this call sees them), so Home's
-   Permissions has no row for them.
-4. `speech_replace` calls `Mouth.replace(turn, body_id, text)`: the unsaid sentences are dropped, the
-   turn's own later words are muted (the turn still owns the queue and still ends normally) and the
-   new text is said in the same voice. `speech_continue`, no tool, an empty replacement, an error or
-   the 15 s `INTERJECTION_TIMEOUT_S` all leave the queue as it was. Always, `voice.resume()` runs last.
-5. The wake's hooks run as for a turn (`on_start`, then `on_end("done")`) and it counts toward the
-   hourly cap. Stopping the brain mid-interjection cancels it and holds its news.
+   `interjection`) and is spent on the budget like any call, but it is cut off after
+   `INTERJECTION_TIMEOUT_S` (5 s) because the queue is held meanwhile. A call cancelled by that
+   timeout is not charged: the model seam does not report usage for a cancelled stream. The wording
+   is `mind/interjection.md`; there is no canned line in code. The tools are not toolbox tools
+   (only this call sees them), so Home's Permissions has no row for them.
+5. `speech_replace` calls `Mouth.replace(turn, body_id, text)`: the body is sent
+   `speech_control { action: "clear", turn }` (sentences already sent sit in its player), the old
+   turn is muted (it still owns its writer and ends normally) and the new text is said as a new
+   turn id in the same voice (the desktop silences a cleared turn id for good). The next turn gets an
+   `interjection` block (`prompt.interjection_block`: the news, what was spoken, what was said
+   instead, what was dropped) at its start, once, like F17's interruption block.
+6. Only a real replace counts as telling the news: `_interject` returns `True`, the wake's hooks run
+   (`on_start`, then `on_end("done")`) and it counts toward the hourly cap. A `speech_continue`, no
+   tool, an empty replacement, an error or the timeout returns `False`: the group goes back to the
+   front, marked `tried`, and a plain wake tells the news after the turn. Continuing defers the news,
+   it does not drop it. Stopping the brain mid-interjection cancels it and holds its news.
+7. Talking over Scout during the call: `interrupt` marks the interjection cut, and the Mouth no
+   longer has the turn. Nothing is replaced, the pause that is now the person's is left alone
+   (`resume(tell=False)`) and the news waits for its plain wake.
 
 The old path that took an item between model steps is gone: items now only reach Scout as a wake turn
 or an interjection, and what a turn drains between steps is the owner's own words (`inbox`).

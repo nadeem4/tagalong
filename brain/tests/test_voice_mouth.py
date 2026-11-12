@@ -517,7 +517,7 @@ async def test_clear_trims_the_sentence_log_too():
     assert m.sentences("t0") == [] and m.sentences("t4") == ["x"]
 
 
-async def test_replace_drops_what_was_not_said_and_says_the_new_text_in_the_same_turn():
+async def test_replace_clears_the_body_and_says_the_new_text_as_a_turn_of_its_own():
     sent = Sent()
     m, _ = mouth(sent)
     await ready(m)
@@ -525,20 +525,41 @@ async def test_replace_drops_what_was_not_said_and_says_the_new_text_in_the_same
     m.spoken("t", "d", "af_bella", 1.2)
     m.pause()  # an interjection holds the queue
     m.reply("t", {"delta": f"{ONE} {TWO} "})
-    m.replace("t", "d", "Sam wrote back.")
+    new = m.replace("t", "d", "Sam wrote back.")
     m.reply("t", {"delta": "More from the old reply. "})  # the turn still writing: not said
     m.resume()
     m.reply("t", {"done": True})
     await settle()
-    assert [p.get("text") for p in sent.speech()] == ["Sam wrote back.", None]
+    controls = [p for b, meth, p in sent.frames if meth == "speech_control"]
+    assert {"action": "clear", "turn": "t"} in controls  # the player holds sent sentences
+    assert new is not None and new != "t"  # the body silences a cleared turn id for good
+    said = [(p["turn"], p["text"]) for p in sent.speech() if p.get("text")]
+    assert said == [(new, "Sam wrote back.")]  # nothing of the old turn is said
     assert m.unsaid("t") == []
 
 
-async def test_replace_with_no_live_turn_starts_one():
+async def test_replace_of_a_turn_that_is_gone_says_nothing():
     sent = Sent()
     m, _ = mouth(sent)
     await ready(m)
     sent.frames.clear()
-    m.replace("gone", "d", "Quick word first.")
+    assert m.replace("gone", "d", "Quick word first.") is None
     await settle()
-    assert [p.get("text") for p in sent.speech()] == ["Quick word first.", None]
+    assert sent.frames == []
+
+
+async def test_speaking_is_true_only_for_a_live_turn_on_that_body():
+    m, _ = mouth(Sent())
+    m.spoken("t", "d", None, None)
+    assert m.speaking("t", "d") and not m.speaking("t", "other") and not m.speaking("x", "d")
+
+
+async def test_resume_without_telling_leaves_the_body_player_alone():
+    sent = Sent()
+    m, _ = mouth(sent, FakeTts(sleep=0.03))
+    await ready(m)
+    m.spoken("t", "d", None, None)
+    m.pause()
+    sent.frames.clear()
+    m.resume(tell=False)  # the person paused it
+    assert [f for f in sent.frames if f[1] == "speech_control"] == []

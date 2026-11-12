@@ -198,7 +198,9 @@ def _speech_state(message: dict, body_id: str, session: Session) -> None:
     except ValidationError as exc:
         log.debug("dropped a bad speech_state frame: %s", exc)
         return
-    session.dispatcher.set_speech_state(_SPEECH_STATES[params.state], body_id)
+    session.dispatcher.set_speech_state(
+        _SPEECH_STATES[params.state], body_id, params.turn, params.n
+    )
 
 
 def _hello(
