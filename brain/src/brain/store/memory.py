@@ -26,6 +26,8 @@ KINDS: dict[str, Kind] = {
         Kind("about_you", "model", True, 50, 300),
         Kind("project", "model", False, 200, 500),
         Kind("summary", "code", False, None, None),
+        Kind("profile", "code", False, 500, 500),
+        Kind("portrait", "code", True, 1, 1500),
     )
 }
 
@@ -41,9 +43,19 @@ class Item:
     text: str
     created_at: str
     updated_at: str
+    tag: str = ""
+    source: str = "chat"
+    source_ref: str | None = None
+    evidence: str | None = None
+    visibility: str = "free"
 
 
-_COLUMNS = "id, kind, text, created_at, updated_at"
+_COLUMNS = "id, kind, text, created_at, updated_at, tag, source, source_ref, evidence, visibility"
+
+
+def normalise(text: str) -> str:
+    """Whitespace collapsed and case folded: how evidence and duplicates are compared."""
+    return " ".join(text.split()).casefold()
 
 
 def _model_kinds() -> str:
