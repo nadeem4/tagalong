@@ -32,6 +32,8 @@ from brain.protocol import (
     EventParams,
     HelloParams,
     HelloResult,
+    KnowMeStartParams,
+    KnowMeStartResult,
     ListenParams,
     MicParams,
     RpcError,
@@ -42,6 +44,7 @@ from brain.protocol import (
 from brain.sessions import Session
 
 MAX_FRAME = 28_000_000
+KNOW_ME_PDF_MAX = 10 * 1024 * 1024  # decoded bytes
 VOICE_METHODS = {"listen", "mic", "unlisten", "hush"}
 log = logging.getLogger("brain")
 
@@ -145,6 +148,14 @@ async def _handler(
             if method == "call":
                 if "id" in message:  # a notification has nowhere to reply
                     task = asyncio.create_task(_call(message, req_id, peer, session))
+                    calls.add(task)
+                    task.add_done_callback(calls.discard)
+                continue
+            if method == "know_me_start":
+                if "id" in message:  # a notification has nowhere to reply
+                    task = asyncio.create_task(
+                        _know_me_start(message, req_id, body_id, peer, session)
+                    )
                     calls.add(task)
                     task.add_done_callback(calls.discard)
                 continue
@@ -267,6 +278,34 @@ async def _call(message: dict, req_id: Any, peer: _Peer, session: Session) -> No
         raise
     except Exception as exc:
         reply = _error(req_id, ErrorCode.tool_failed, str(exc) or type(exc).__name__)
+    peer.send(reply)
+
+
+async def _know_me_start(
+    message: dict, req_id: Any, body_id: str, peer: _Peer, session: Session
+) -> None:
+    """Check the start, then begin the run or join the one going; the reply says which."""
+    try:
+        params = KnowMeStartParams.model_validate(message.get("params"))
+        pdf = None
+        if params.pdf is not None:
+            try:
+                pdf = base64.b64decode(params.pdf.data, validate=True)
+            except ValueError:
+                raise RpcError(ErrorCode.invalid_params, "pdf.data is not base64.") from None
+            if len(pdf) > KNOW_ME_PDF_MAX:
+                raise RpcError(ErrorCode.over_limit, "The PDF is over 10 MB.")
+        joined = session.know_me.start(body_id, params.github, pdf)
+        reply = _result(req_id, KnowMeStartResult(joined=joined))
+    except ValidationError as exc:
+        reply = _error(req_id, ErrorCode.invalid_params, str(exc))
+    except RpcError as exc:  # invalid_params, over_limit
+        reply = _error(req_id, exc.code, str(exc))
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        log.exception("handler failed for know_me_start")
+        reply = _error(req_id, ErrorCode.internal_error, "Internal error")
     peer.send(reply)
 
 
