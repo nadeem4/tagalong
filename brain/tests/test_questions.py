@@ -1,5 +1,5 @@
 """ScoutQuestions: an expert's question is offered to Scout first; Scout answers or passes.
-The emit callable is a fake that records the event and its hooks, so no scheduler runs here.
+The emit callable is a fake that records the event and its hooks, so no dispatcher runs here.
 """
 
 import asyncio

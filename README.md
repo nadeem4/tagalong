@@ -128,7 +128,8 @@ skips the Allow card for an install or a change.
 
 Scout can speak first. When a background job ends, the brain wakes Scout once (jobs that end within
 30 seconds share one wake), and Scout decides whether it has anything to say. The wake limit is
-`TAGALONG_WAKES_PER_HOUR` (default 12). Scout can also set its own timers (a reminder, or a
+`TAGALONG_WAKES_PER_HOUR` (default 12). `TAGALONG_QUIET_HOURS` (`HH:MM-HH:MM`, default none) keeps
+Scout quiet in those hours: what it would say is held and listed on Home. Scout can also set its own timers (a reminder, or a
 repeating check, no more often than every 5 minutes); they survive a brain restart, and a timer can name a running job to check back on it (it goes when the job ends). Scout also
 notices when you come back after 5 minutes away or reopen the app after a long break, and knows
 which app is in front (never one you excluded, and none while sight is paused); it may greet you or

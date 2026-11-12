@@ -1,7 +1,7 @@
 """The one conversation: shared history and at most one running turn.
 Every source enters through the Dispatcher (a say, a timer, a job's question or result, a card
 answer); a say that arrives mid-turn gets a turn of its own after it, shown on the body it came
-from. It also owns the Scheduler, which starts the wakes the dispatcher hands over.
+from. The Dispatcher also starts the wake turns; the session only says whether it is busy.
 
 Turn bookkeeping lives in a done callback, not in the task body, so `ended` is sent and the
 turn cleared even if the task is cancelled before it ever ran.
@@ -40,7 +40,7 @@ from brain.config import (
     DEFAULT_WAKES_PER_HOUR,
     DEFAULT_WORK_KEEP_DAYS,
 )
-from brain.dispatcher import Dispatcher, Item
+from brain.dispatcher import Dispatcher, Item, WakeSkipped
 from brain.events import BRAIN, EVENT_KINDS, Event, EventKind, from_body, from_connect
 from brain.expert_apps import ExpertApps
 from brain.experts import ExpertHosts, ExpertRun
@@ -81,7 +81,6 @@ from brain.questions import ScoutQuestions
 from brain.reading import ReadingStore
 from brain.reading_tools import reading_home_tools
 from brain.retry import classify, safe_to_retry
-from brain.scheduler import Scheduler, WakeSkipped
 from brain.setup.store import InstalledExpert
 from brain.side_check import SideCheck
 from brain.store import rules
@@ -149,6 +148,7 @@ class Session:
         tokens: TokenFile | None = None,
         wakes_per_hour: int = DEFAULT_WAKES_PER_HOUR,
         kinds: dict[str, EventKind] | None = None,
+        quiet: Callable[[datetime], bool] | None = None,
         offers: OfferSettings = DEFAULT_OFFER_SETTINGS,
         turn_timeout: float = DEFAULT_TURN_TIMEOUT_S,
         masker: Masker | None = None,
@@ -179,7 +179,7 @@ class Session:
         # open asks and questions with it, which only holds when they share the store's hooks.
         work = WorkStore(memory.db, now, lambda text: mask_json(self.guards, "work", text))
         self._asks = Asks(bodies, work)
-        # One set of spend guards for the loop, the scheduler, the side-check and offers.
+        # One set of spend guards for the loop, the dispatcher, the side-check and offers.
         self.guards = spend_guards(budget, step_cap)
         self.guards.add(wake_caps(wakes_per_hour))
         if masker is not None:  # what reaches disk (chat, approvals, job results) is masked
@@ -196,26 +196,28 @@ class Session:
         make_run = make_run or ExpertHosts()
         # Built first: the questions and the timers emit through it. It only calls back into the
         # session once an event arrives, by which time the rest of __init__ has run.
-        self.scheduler = Scheduler(
-            bodies=bodies,
-            budget=budget,
-            guards=self.guards,
-            busy=self._busy_for_wakes,
-            last_body=lambda: self._last_body,
-            start=self._start_wake,
-            now=now,
-            wakes_per_hour=wakes_per_hour,
-            kinds=kinds or EVENT_KINDS,
-        )
         questions = ScoutQuestions(self.post_event, work)
         approvals = self.approvals = Approvals(memory, work, notify, now, guards=self.guards)
         # Scout's look before an ask reaches the person; shares the session's model and budget.
         side_check = SideCheck(model, budget, memory, work, guards=self.guards)
         items = self.items = OpenItems(memory.db, now)
-        # The front door. A test's own kinds join the real ones, so a say still has its kind. The
-        # scheduler already batches per kind, so the door adds no wait of its own (F12 joins them).
+        # The front door, the one place that decides when news is told or held. A test's own
+        # kinds join the real ones, so a say still has its kind. Built before the questions and
+        # timers post to it, but they only do so once an event arrives.
         self._kinds = {**EVENT_KINDS, **(kinds or {})}
-        self.dispatcher = Dispatcher(self._deliver, items, kinds=self._kinds, batch_s=0)
+        self.dispatcher = Dispatcher(
+            self._deliver,
+            items,
+            bodies=bodies,
+            guards=self.guards,
+            busy=self._busy_for_wakes,
+            last_body=lambda: self._last_body,
+            start=self._start_wake,
+            now=now,
+            gave_up=self._say_gave_up,
+            quiet=quiet,
+            kinds=self._kinds,
+        )
         self._says_waiting: set[str] = set()  # says posted, not yet delivered: wakes wait for them
         # Says from another body that arrived mid-turn: each starts a turn when that one ends.
         self._later: list[tuple[str | None, str, list, SayParams]] = []
@@ -438,7 +440,7 @@ class Session:
         on_end: Callable[[str], None] | None = None,
         retell: bool = False,
     ) -> None:
-        """Every wake source posts here: the dispatcher decides when, the scheduler batches and
+        """Every wake source posts here: the dispatcher decides when, batches and
         caps it, and the wake turn is shown on the event's origin body when it can."""
         ended = on_end
         if on_end is not None and retell:
@@ -463,21 +465,27 @@ class Session:
     def _post_card_answer(self, ask_id: str, option: str, body_id: str) -> None:
         self.dispatcher.post(Item("card_answer", body_id, {"ask": ask_id, "option": option}, "now"))
 
-    async def _deliver(self, items: list[Item]) -> None:
-        """The dispatcher's hand-over: a say becomes a turn, a card answer runs its saved call,
-        and anything else goes to the scheduler as a wake."""
-        for item in items:
-            if item.kind == "say":
-                await self._deliver_say(item)
-            elif item.kind == "card_answer":
-                self.ask_runner.answered(
-                    item.payload["ask"], item.payload["option"], item.origin_body
-                )
-            else:
-                event = Event(item.kind, item.payload, key=item.key, origin_body=item.origin_body)
-                self.scheduler.emit(
-                    event, on_start=item.on_start, on_drop=item.on_drop, on_end=item.on_end
-                )
+    async def _deliver(self, item: Item) -> None:
+        """The dispatcher's hand-over for kinds that never wake: a say becomes a turn, a card
+        answer runs its saved call, and context (focus, tab, setup progress) is kept."""
+        if item.kind == "say":
+            await self._deliver_say(item)
+        elif item.kind == "card_answer":
+            self.ask_runner.answered(item.payload["ask"], item.payload["option"], item.origin_body)
+        else:
+            self.dispatcher.record(
+                Event(item.kind, item.payload, key=item.key, origin_body=item.origin_body)
+            )
+
+    def _say_gave_up(self, item: Item) -> None:
+        """The dispatcher gave up on a say (or is stopping): its caller hears it failed, and its
+        token goes, else `_busy_for_wakes` would stay true and no wake would ever start."""
+        if item.kind != "say":
+            return
+        self._says_waiting.discard(item.payload["token"])
+        result: asyncio.Future[SayResult] = item.payload["result"]
+        if not result.done():
+            result.set_exception(RuntimeError("the say could not be delivered"))
 
     async def _deliver_say(self, item: Item) -> None:
         """Never waits on a turn: words arriving mid-turn join it at its next step (same body, and
@@ -521,8 +529,7 @@ class Session:
                 raise
             log.exception("could not deliver a say")
         finally:
-            self._says_waiting.discard(item.payload["token"])
-            self.scheduler.pump()  # wakes held back for this say may go now
+            self._says_waiting.discard(item.payload["token"])  # the dispatcher pumps wakes next
 
     def _turn_origin(self, turn_id: str | None = None) -> str:
         """The body showing the running turn (or the given one), "brain" when none."""
@@ -531,7 +538,7 @@ class Session:
         return self._turn_body or BRAIN
 
     def _busy_for_wakes(self) -> bool:
-        # A say waiting its turn goes before any wake: the scheduler holds its batch meanwhile.
+        # A say waiting its turn goes before any wake: the dispatcher holds its batch meanwhile.
         return self._busy() or bool(self._says_waiting) or bool(self._later)
 
     def interrupt(self, turn: str, heard: int) -> Interruption | None:
@@ -658,9 +665,8 @@ class Session:
         self.voice.spoken(turn, shown_on, voice, speed, ask.system_voice if ask else False)
 
     def _drop_news(self, kind: str, key: str) -> None:
-        """A held event is superseded: forget it wherever it waits, at the door or the scheduler."""
+        """A waiting event is superseded: the dispatcher forgets it wherever it waits."""
         self.dispatcher.drop(kind, key)
-        self.scheduler.drop(kind, key)
 
     def _display_target(self) -> str | None:
         shown = self._bodies.display_ids()
@@ -710,7 +716,7 @@ class Session:
         if self._kinds.get(event.kind, EventKind(event.kind, wakes=False)).wakes:
             self.post_event(event)
         else:
-            self.scheduler.emit(event)
+            self.dispatcher.record(event)
 
     def body_gone(self, body_id: str) -> None:
         """A body disconnected for good: its reading status must not outlive it."""
@@ -727,7 +733,7 @@ class Session:
                 except Exception:
                     log.exception("loops.saw failed")
             self._from_body(replace(event, origin_body=body_id))
-        self.scheduler.pump()  # also starts a wake that was waiting for a body
+        self.dispatcher.pump()  # also starts a wake that was waiting for a body
         body = self._bodies.body(body_id)
         if body is not None and body.display is not False:
             self.ask_runner.returned(away)  # cards come back, ended ones close, Scout is told
@@ -1050,7 +1056,7 @@ class Session:
             shown = next(b for b, turn, _, _ in self._later if turn == turn_id)
             self._later = [x for x in self._later if x[1] != turn_id]
             self._end_cancelled(turn_id, shown)
-            self.scheduler.pump()
+            self.dispatcher.pump()
 
     def answer(
         self,
@@ -1086,7 +1092,7 @@ class Session:
         return out if isinstance(out, str) else json.dumps(out)
 
     def _latest(self, kind: str) -> dict:
-        return {key: ev.facts for key, ev in self.scheduler.latest(kind).items()}
+        return {key: ev.facts for key, ev in self.dispatcher.latest(kind).items()}
 
     def _append_user(self, content: list) -> None:
         # Input arriving while the last user message is still unsaved joins it, so one burst is
@@ -1158,7 +1164,7 @@ class Session:
             "turn", {"turn": turn_id, "body": body_id, "state": "ended", "reason": reason}
         )
         # after ended, so the next turn's started comes second
-        self.scheduler.turn_ended(turn_id, reason)
+        self.dispatcher.turn_ended(turn_id, reason)
         if pending:
             shown, params = joined if joined is not None else (body_id, None)
             self._speak(self._start_turn(shown, pending), shown, params)

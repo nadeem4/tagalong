@@ -140,8 +140,8 @@ class Jobs:
         self._outputs = outputs  # caps the report a wake carries; None leaves it whole
         self._timers_changed = on_timers_changed  # a deleted job timer must re-arm the sleeper
         self._now = now  # wall time for activity stamps and how long a step has run
-        self._emit = emit  # the Scheduler's emit: a quiet job wakes Scout through it
-        self._drop = drop  # the Scheduler's drop: a held job event goes when the job ends
+        self._emit = emit  # the dispatcher's post_event: a quiet job wakes Scout through it
+        self._drop = drop  # the dispatcher's drop: a held job event goes when the job ends
         self._records = records  # the jobs themselves: goal and expert-call rows
         self._setup_facts = setup_facts  # machine and registry facts for a setup refusal
         self._asks = asks
@@ -792,7 +792,7 @@ class Jobs:
         self._emit(Event("job_quiet", event_facts, key=f"job:{job_id}"))
 
     def _step_failed(self, job_id: str, entry: ActivityEntry) -> None:
-        """A command failed: tell Scout the facts (batched and capped by the scheduler)."""
+        """A command failed: tell Scout the facts (batched and capped by the dispatcher)."""
         facts: dict[str, str | int] = {
             "job": job_id,
             **self._part_fact(job_id, entry.part),

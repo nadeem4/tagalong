@@ -1,7 +1,7 @@
 """Timers: runs the due `timer` and `watch` work rows as `timer` events and keeps one wake armed.
 
 Rows live in the work table so they survive a restart; this class only decides when to emit.
-The scheduler decides when Scout actually hears it. It also hands a due `tool_call` or
+The dispatcher decides when Scout actually hears it. It also hands a due `tool_call` or
 `expert_call` step (a retry that waited out its backoff) to `rerun`.
 """
 

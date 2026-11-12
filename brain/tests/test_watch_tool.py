@@ -108,7 +108,7 @@ async def test_paused_watches_wake_once():
         model = Gate(["ok"])
         session, _ = make(model, memory, kinds=kinds)
         join(session, "desktop")
-        session.scheduler.pump()
+        session.dispatcher.pump()
         await idle(session)
         told += [m[-1]["content"][-1]["text"] for m in model.seen]
     assert len(told) == 1
@@ -135,7 +135,7 @@ async def test_a_watch_the_person_paused_is_not_announced():
         model = Gate(["ok"])
         session, _ = make(model, memory, kinds=kinds)
         join(session, "desktop")
-        session.scheduler.pump()
+        session.dispatcher.pump()
         await idle(session)
         assert model.seen == []
 
@@ -149,7 +149,7 @@ async def test_paused_watch_facts_cut_on_whole_entries():
     model = Gate(["ok"])
     session, _ = make(model, memory, kinds=kinds)
     join(session, "desktop")
-    session.scheduler.pump()
+    session.dispatcher.pump()
     await idle(session)
     text = model.seen[0][-1]["content"][-1]["text"]
     sizes = [len(m) for m in re.findall(r"x{5,}", text)]

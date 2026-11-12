@@ -10,6 +10,7 @@ import shlex
 import uuid
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
+from datetime import datetime, time
 from pathlib import Path
 from typing import Literal
 
@@ -61,6 +62,7 @@ class Config:
     expert_idle_s: float = DEFAULT_EXPERT_IDLE_S  # warm adapter after its last session
     turn_timeout: float = DEFAULT_TURN_TIMEOUT_S
     wakes_per_hour: int = DEFAULT_WAKES_PER_HOUR
+    quiet_hours: tuple[time, time] | None = None  # news is held, not told, between these
     offer_min_approvals: int = DEFAULT_OFFER_MIN_APPROVALS
     offer_window_days: int = DEFAULT_OFFER_WINDOW_DAYS
     keep_asking_days: int = DEFAULT_KEEP_ASKING_DAYS
@@ -123,6 +125,7 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
         expert_idle_s=_expert_idle(env.get("TAGALONG_EXPERT_IDLE_S")),
         turn_timeout=_turn_timeout(env.get("TAGALONG_TURN_TIMEOUT_S")),
         wakes_per_hour=_wakes_per_hour(env.get("TAGALONG_WAKES_PER_HOUR")),
+        quiet_hours=_quiet_hours(env.get("TAGALONG_QUIET_HOURS")),
         offer_min_approvals=_positive_int(
             env, "TAGALONG_OFFER_MIN_APPROVALS", DEFAULT_OFFER_MIN_APPROVALS
         ),
@@ -227,6 +230,27 @@ def _wakes_per_hour(text: str | None) -> int:
     if value < 1:
         raise ValueError(f"TAGALONG_WAKES_PER_HOUR must be at least 1: {text!r}")
     return value
+
+
+def _quiet_hours(text: str | None) -> tuple[time, time] | None:
+    """`HH:MM-HH:MM`, local time; the end may be earlier than the start (it wraps midnight)."""
+    if not text:
+        return None
+    try:
+        start, end = (time.fromisoformat(part.strip()) for part in text.split("-"))
+    except ValueError:
+        raise ValueError(f"bad TAGALONG_QUIET_HOURS, want HH:MM-HH:MM: {text!r}") from None
+    if start == end:
+        raise ValueError(f"TAGALONG_QUIET_HOURS needs two different times: {text!r}")
+    return start, end
+
+
+def in_quiet_hours(hours: tuple[time, time] | None, at: datetime) -> bool:
+    if hours is None:
+        return False
+    start, end = hours
+    now = at.time().replace(second=0, microsecond=0)
+    return start <= now < end if start < end else now >= start or now < end
 
 
 def _positive_int(env: Mapping[str, str], name: str, default: int) -> int:

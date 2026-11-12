@@ -20,7 +20,7 @@ class SetupEvents:
         self, items: OpenItems, emit: Callable[..., None], now: Callable[[], datetime]
     ) -> None:
         self._items = items
-        self._emit = emit  # the scheduler's emit: takes the event and on_start
+        self._emit = emit  # the session's post_event: takes the event and on_start
         self._now = now
 
     def emit(self, event: Event) -> None:

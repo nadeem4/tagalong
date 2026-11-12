@@ -54,7 +54,7 @@ class AskRunner:
         items: OpenItems,
         asks: Asks,
         toolbox: "Callable[[], Toolbox]",
-        emit: Callable[..., None],  # the scheduler's emit
+        emit: Callable[..., None],  # the session's post_event
         now: Callable[[], datetime],
         approvals: Approvals,
         origin: Callable[[str], str] = lambda turn: BRAIN,

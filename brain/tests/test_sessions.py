@@ -21,7 +21,6 @@ from brain.memory import Memory
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Call, Final
 from brain.protocol import Body, ErrorCode, RpcError, SayParams, Tool
-from brain.scheduler import Scheduler
 from brain.sessions import Session
 from brain.store import rules
 from brain.store.work import ActivityEntry
@@ -1255,7 +1254,7 @@ async def test_job_ended_default_batches_30_seconds():
     await settle()
     assert states(sent) == [] and not records_for(memory).get_job("j1").parts[-1].reported
     clock[0] += datetime.timedelta(seconds=30)
-    session.scheduler.pump()
+    session.dispatcher.pump()
     await settle()
     assert states(sent)[:1] == ["started"]
     await idle(session)
@@ -1296,7 +1295,7 @@ async def test_restart_queues_only_finished_unreported_jobs():
     )  # stopped by the restart
     model = Gate(["a"])
     session, _ = make(model, memory)
-    await settle()  # both reach the scheduler before a body is there
+    await settle()  # both reach the dispatcher before a body is there
     join(session, "desktop")
     await idle(session)
     told = [m[-1]["content"][-1]["text"] for m in model.seen]
@@ -1336,7 +1335,7 @@ async def test_a_due_timer_wakes_scout_with_its_note():
     model = Gate(["ok"])
     session, _ = make(model, memory, kinds=kinds, now=lambda: now)
     join(session, "desktop")
-    session.scheduler.pump()
+    session.dispatcher.pump()
     await idle(session)
     text = model.seen[-1][-1]["content"][-1]["text"]
     assert "Event: timer" in text
@@ -1361,7 +1360,7 @@ async def test_session_job_timer_wake_includes_watching_and_activity():
     )
     session.timers.fire_due()
     join(session, "desktop")
-    session.scheduler.pump()
+    session.dispatcher.pump()
     await idle(session)
     text = model.seen[-1][-1]["content"][-1]["text"]
     assert "check the job" in text
@@ -1507,7 +1506,7 @@ async def _returns_after_an_hour(body_id, kind):
 async def test_a_browser_body_returning_after_an_hour_starts_no_wake():
     model, session = await _returns_after_an_hour("chrome-7k2f", "browser")
     assert model.seen == []
-    assert not session.scheduler._groups
+    assert not session.dispatcher._groups
 
 
 async def test_a_desktop_body_returning_after_an_hour_wakes():
@@ -1754,7 +1753,7 @@ def test_toolbox_and_jobs_share_one_engine():
     assert session.engine is not None
 
 
-async def test_session_shares_one_guards_with_scheduler_and_loop():
+async def test_session_shares_one_guards_with_dispatcher_and_loop():
     class Broke(Open):
         def allows(self):
             return False
@@ -1766,7 +1765,7 @@ async def test_session_shares_one_guards_with_scheduler_and_loop():
     model = Gate(["never"])
     session = Session(model, Broke(), bodies, 10, memory)
     join(session, "desktop")
-    assert session.guards is session.scheduler._guards
+    assert session.guards is session.dispatcher._guards
     await session.say("desktop", say("hi"))
     await finish_quietly(session)
     assert sent[-1][1]["state"] == "ended" and sent[-1][1]["reason"] == "over_budget"
@@ -1774,7 +1773,19 @@ async def test_session_shares_one_guards_with_scheduler_and_loop():
     session.jobs._on_finished(end_job(memory))
     await settle()
     brain_started = [p for m, p in sent if m == "turn" and p.get("started_by") == "brain"]
-    assert brain_started == [] and session.scheduler._groups == []
+    assert brain_started == [] and session.dispatcher._groups == []
+
+
+async def test_a_say_the_dispatcher_gives_up_on_fails_its_caller_and_frees_wakes():
+    session, _ = make(Gate(["never"]))
+    join(session, "desktop")
+    caller = asyncio.ensure_future(session.say("desktop", say("hi")))
+    await asyncio.sleep(0)  # the say is posted, not yet delivered
+    assert session._says_waiting
+    await session.dispatcher.stop()  # stopping holds what is left and gives up on the say
+    with pytest.raises(RuntimeError):
+        await caller
+    assert not session._says_waiting  # else no wake would ever start again
 
 
 # --- the person hears what an expert did while they were away (G3) ---
@@ -2248,7 +2259,7 @@ async def test_failures_inside_one_batch_window_wake_scout_once():
     await settle()
     assert states(sent) == []  # still inside the 120 s batch
     clock[0] += datetime.timedelta(seconds=120)
-    session.scheduler.pump()
+    session.dispatcher.pump()
     await idle(session)
     assert states(sent) == ["started", "ended"]
     text = model.seen[-1][-1]["content"][-1]["text"]
@@ -2278,7 +2289,7 @@ async def test_closing_a_job_cancels_its_timers_and_the_ended_wake_still_comes()
     model = Gate(["ok"])
     session, _ = make(model, memory, kinds=kinds, now=lambda: now)
     records_for(memory).add_job("j1", "claude_code", "t", "C:/x", "default")
-    # A fired one-off, held by the scheduler (no body online), and a future repeating timer
+    # A fired one-off, held by the dispatcher (no body online), and a future repeating timer
     # that keeps the sleeper armed.
     work = records_for(memory).work
     fired = add_timer(work, "look", now - datetime.timedelta(minutes=1), parent_id="j1")
@@ -2294,7 +2305,7 @@ async def test_closing_a_job_cancels_its_timers_and_the_ended_wake_still_comes()
     assert work.get(later.id).state == "cancelled"
     assert session.timers._handle is None  # the sleeper was re-armed for nothing
     join(session, "desktop")
-    session.scheduler.pump()
+    session.dispatcher.pump()
     await idle(session)
     texts = [m[-1]["content"][-1]["text"] for m in model.seen]
     assert any("Job j1 ended" in t for t in texts)
@@ -2561,13 +2572,13 @@ async def flaky_wake(app, clock, masker=None, **args):
     )
     session.toolbox.sources.insert(1, app)
     events = []
-    emit = session.scheduler.emit
+    emit = session.post_event
 
     def spy(event, **hooks):
         events.append(event)
         return emit(event, **hooks)
 
-    session.scheduler.emit = spy
+    session.post_event = spy
     join(session, "desktop")
     session.jobs._on_finished(end_job(memory))
     await idle(session)
@@ -2627,8 +2638,8 @@ async def test_expert_call_that_cannot_restart_is_reported_as_given_up():
     clock = Clock()
     session, _ = make(Gate(["ok"]), now=clock)
     events = []
-    emit = session.scheduler.emit
-    session.scheduler.emit = lambda event, **hooks: (events.append(event), emit(event, **hooks))
+    emit = session.post_event
+    session.post_event = lambda event, **hooks: (events.append(event), emit(event, **hooks))
     records = session.records
     records.add_job("j1", "claude_code", "fix", "C:/x", "default")
     records.update_part("j1", "p1", state="failed", reason="crash")
@@ -2679,8 +2690,8 @@ async def test_a_begin_failure_that_already_ended_the_row_is_reported_once():
     clock = Clock()
     session, _ = make(Gate(["ok"]), now=clock)
     events = []
-    emit = session.scheduler.emit
-    session.scheduler.emit = lambda event, **hooks: (events.append(event), emit(event, **hooks))
+    emit = session.post_event
+    session.post_event = lambda event, **hooks: (events.append(event), emit(event, **hooks))
     records = session.records
     records.add_job("j1", "claude_code", "fix", "C:/x", "default")
     records.update_part("j1", "p1", state="failed", reason="crash")
@@ -2699,21 +2710,21 @@ async def test_a_begin_failure_that_already_ended_the_row_is_reported_once():
 
 def work_failed_emits(monkeypatch):
     seen = []
-    emit = Scheduler.emit
+    emit = Session.post_event
 
     def spy(self, event, **hooks):
         if event.kind == "work_failed":
             seen.append(event)
         return emit(self, event, **hooks)
 
-    monkeypatch.setattr(Scheduler, "emit", spy)
+    monkeypatch.setattr(Session, "post_event", spy)
     return seen
 
 
 async def restart(memory):
     session, _ = make(Gate(["ok"]), memory, kinds=None)
     join(session, "desktop")
-    session.scheduler.pump()
+    session.dispatcher.pump()
     await idle(session)
     return session
 
@@ -2832,7 +2843,7 @@ async def test_a_batched_wake_for_two_jobs_binds_to_the_first_job_tool_not_the_l
     session.jobs._on_finished(end_job(memory, "j2"))
     await settle()
     clock[0] += datetime.timedelta(seconds=31)
-    session.scheduler.pump()
+    session.dispatcher.pump()
     await idle(session)
     # recall ran before any job was named, so it is unbound; close_job names j1 and lands there
     assert [s.source for s in steps_of(memory, "j1")] == ["scout:close_job"]
@@ -2907,7 +2918,7 @@ async def test_web_tools_are_offered_and_listed_in_the_capability_picture():
     assert "web_search" in model.systems[0]
 
 
-async def test_a_loops_store_error_does_not_stop_the_event_reaching_the_scheduler():
+async def test_a_loops_store_error_does_not_stop_the_event_reaching_the_dispatcher():
     class Broken:
         def saw(self, event):
             raise RuntimeError("db")
@@ -2917,7 +2928,7 @@ async def test_a_loops_store_error_does_not_stop_the_event_reaching_the_schedule
     join(session, "desktop")
     session.loops = Broken()
     emitted = []
-    session.scheduler.emit = emitted.append
+    session.dispatcher.record = emitted.append
     session.body_event("desktop", "focus", {"app": "Code", "title": "x"})
     assert [e.kind for e in emitted] == ["focus"]
 
@@ -2971,7 +2982,7 @@ def test_a_reading_event_does_not_wake_scout():
     session, _ = make(Gate([]))
     join(session, "desktop")
     emitted = []
-    session.scheduler.emit = emitted.append
+    session.dispatcher.record = session.post_event = emitted.append
     session.body_event("desktop", "reading", reading())
     assert emitted == []
 

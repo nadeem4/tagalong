@@ -2571,7 +2571,7 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 1. `cd brain && uv run pytest tests/test_bridges.py -q`: off or incomplete setup runs nothing, a
    bridge that exits is restarted after 1, 2, 4, 8, 16, 30 s, `stop` ends the child, and a secret in
    the child's output is masked in the log.
-2. `uv run pytest tests/test_bodies.py tests/test_scheduler.py tests/test_sessions.py -q -k "whatsapp or display_ids"` and `tests/test_front_door_routing.py`:
+2. `uv run pytest tests/test_bodies.py tests/test_dispatcher.py tests/test_sessions.py -q -k "whatsapp or display_ids"` and `tests/test_front_door_routing.py`:
    a body's say or event is answered on that body (a WhatsApp say during a desktop turn is answered
    on WhatsApp), a timer or held-mail wake prefers a screen to a phone, and a job's question
    reaches a phone-only setup.
@@ -2661,6 +2661,19 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 5. Decline the mode card of a hand-off: Scout says the person declined it (not a guess).
 6. Ask Scout to stop a job with a blank job id: the refusal reads `stop_job needs job as non-empty text.` in every blank or missing case.
 7. Clear the focus after Scout answered from it and ask again: Scout says it can no longer see it, not that its earlier answer was made up.
+
+## Held news: one front door, one set of rules (F12 attention framework)
+
+1. Automated: `cd brain && uv run pytest tests/test_dispatcher.py tests/test_open_items.py tests/test_loops_home_tools.py tests/test_config.py -q`, then `tests/test_sessions.py -q -k "gives_up"`.
+2. Budget spent: set `TAGALONG_DAILY_BUDGET_USD=0.01`, spend it, then let a job end. Scout stays silent, and Home's Held list shows "Held news" for the job (`job_ended: held because the daily budget was spent`). Nothing is logged as dropped.
+3. Quiet hours: set `TAGALONG_QUIET_HOURS` to a window around the current time (for example `14:00-15:00`, or `22:00-07:00` across midnight) and let a timer fire. Scout does not speak, and the timer shows as held news. Outside the window the same timer wakes Scout.
+4. Away: close every body for over two hours (or set the clock forward), let a job end, then open the desktop. The report is a held item on Home, and Scout does not start a late wake turn.
+5. Stop: with a job report waiting (no body online), run `uv run tagalong stop`. After the next start the report shows as held news.
+6. A word spoken while the brain is stopping fails (no hang), and a wake still starts on the next run.
+7. Quiet hours and a running job: during `TAGALONG_QUIET_HOURS`, an expert's question to the person still reaches Scout (it is never held), while a timer is held.
+8. No key: with no Anthropic key, let a timer fire. It shows as held news ("there is no Anthropic key yet") and is not lost.
+9. A held line names what it is about, for example `job_ended (Job a1 ended.): held during quiet hours`. A held job report that is told later (after a restart) leaves the list.
+10. A job output containing a key-like secret that was held shows `[secret]` in the Held line, never the secret.
 
 ## Live-test fixes (F12)
 

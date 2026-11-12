@@ -1,6 +1,6 @@
 """Built-in guards: the spend caps (daily budget, step cap) and the wake caps.
 
-The budget also sits on emit so the scheduler drops wakes; model_call guards the turn loop.
+The budget also sits on emit so the dispatcher holds wakes; model_call guards the turn loop.
 Budget comes first so a spent day reports over_budget even when the step cap is also reached.
 Asks are not here: the permission engine decides every one of them.
 """
@@ -20,7 +20,7 @@ def daily_budget(budget) -> Guard:
 
 
 def daily_budget_on_emit(budget) -> Guard:
-    # Same check and name on the emit hook, so the scheduler drops wakes once the day is spent.
+    # Same check and name on the emit hook, so the dispatcher holds wakes once the day is spent.
     return dataclasses.replace(daily_budget(budget), hook=Hook.emit)
 
 

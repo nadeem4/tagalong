@@ -258,6 +258,43 @@ async def test_home_loop_done_and_later_unknown_id_are_invalid_params(rig):
         assert err.value.code == ErrorCode.invalid_params
 
 
+async def test_held_list_shows_news_the_dispatcher_held_with_its_reason(rig):
+    rig.items.open("held", "brain", saved_call={"event": "timer", "why": "quiet_hours"})
+    rig.items.open("held", "brain", saved_call={"event": "job_ended", "why": "budget_spent"})
+    rows = (await rig.call("loops_state"))["open_items"]
+    assert [(r["kind"], r["title"]) for r in rows] == [
+        ("Held news", "timer: held during quiet hours"),
+        ("Held news", "job_ended: held because the daily budget was spent"),
+    ]
+
+
+async def test_held_line_says_what_the_news_is_about(rig):
+    rig.items.open(
+        "held",
+        "brain",
+        saved_call={
+            "event": "job_ended",
+            "why": "quiet_hours",
+            "facts": {"report": "Job a1 ended.\nfolder C:/x", "n": 3},
+        },
+    )
+    rig.items.open(
+        "held",
+        "brain",
+        saved_call={"event": "timer", "why": "stale", "facts": {"title": "Stand up " + "x" * 200}},
+    )
+    titles = [r["title"] for r in (await rig.call("loops_state"))["open_items"]]
+    assert titles[0] == "job_ended (Job a1 ended.): held during quiet hours"
+    assert titles[1].startswith("timer (Stand up xxx") and len(titles[1]) < 140
+    assert titles[1].endswith("): held because nobody was there to hear it")
+
+
+async def test_a_held_news_no_key_reason_is_plain(rig):
+    rig.items.open("held", "brain", saved_call={"event": "timer", "why": "no_key"})
+    (row,) = (await rig.call("loops_state"))["open_items"]
+    assert row["title"] == "timer: held because there is no Anthropic key yet"
+
+
 async def test_held_list_names_each_open_item_plainly_and_leaves_out_setup_news(rig):
     saved = {"name": "delete_files", "input": {}, "text": "I'll delete 3 old logs."}
     rig.items.open("ask", "desktop", saved_call=saved)

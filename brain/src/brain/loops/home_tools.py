@@ -25,7 +25,30 @@ _KINDS = {
     "choice": ("Question", "Scout is waiting for your choice"),
     "expert_ask": ("Expert request", "An expert wants your OK"),
     "offer": ("Offer", ""),
+    "held": ("Held news", ""),
 }
+# Why the dispatcher kept news instead of telling it (dispatcher.py), in plain words.
+_HELD_WHY = {
+    "budget_spent": "held because the daily budget was spent",
+    "quiet_hours": "held during quiet hours",
+    "stale": "held because nobody was there to hear it",
+    "gave_up": "held because it could not be delivered",
+    "stopped": "held because Scout was stopping",
+    "start_failed": "held because Scout could not start on it",
+    "no_key": "held because there is no Anthropic key yet",
+}
+# Facts worth showing first so the person can tell which news it is; then any text fact.
+_GIST_KEYS = ("title", "task", "report", "name", "app", "activity")
+
+
+def _gist(facts: dict) -> str:
+    """The first line of the first useful text fact, cut short; empty when there is none."""
+    texts = {k: v for k, v in facts.items() if isinstance(v, str) and v.strip()}
+    key = next((k for k in _GIST_KEYS if k in texts), next(iter(texts), None))
+    if key is None:
+        return ""
+    line = texts[key].strip().split("\n")[0]
+    return line if len(line) <= 60 else line[:57] + "..."
 
 
 def _row(item: OpenItem, now: datetime) -> dict:
@@ -35,6 +58,10 @@ def _row(item: OpenItem, now: datetime) -> dict:
         line = summarise(saved.get("text") or "", saved.get("name") or "", saved.get("input") or {})
     elif item.kind == "offer":
         line = saved.get("sentence") or "An offer from Scout"
+    elif item.kind == "held":
+        gist = _gist(saved.get("facts") or {})
+        what = f"{saved.get('event', 'news')} ({gist})" if gist else saved.get("event", "news")
+        line = f"{what}: {_HELD_WHY.get(saved.get('why'), 'held')}"
     return {
         "id": item.id,
         "kind": word,
