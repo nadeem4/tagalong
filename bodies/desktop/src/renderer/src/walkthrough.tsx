@@ -11,7 +11,6 @@ import '@fontsource/onest/latin-400.css';
 import '@fontsource/onest/latin-600.css';
 import '../../shared/ipc';
 import type { SettingsPatch } from '../../shared/settings';
-import { FIGURE } from './bean-assets';
 import { fullBridge } from './full-bridge';
 import { listMicrophones, openMic } from './mic';
 import { watchLevel } from './mic-level';
@@ -64,7 +63,7 @@ if (container !== null) {
   createRoot(container).render(
     <StrictMode>
       <HostBridgeProvider bridge={bridge}>
-        <Walkthrough host={walkthroughHost} scout={FIGURE.idle} initialStep={initialStep} />
+        <Walkthrough host={walkthroughHost} initialStep={initialStep} />
       </HostBridgeProvider>
     </StrictMode>,
   );

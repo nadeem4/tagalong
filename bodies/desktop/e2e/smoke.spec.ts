@@ -11,7 +11,6 @@ import type { ElectronApplication, Page } from '@playwright/test';
 // Imported only for the `declare global` it carries: it is what types `window.tagalongHost`
 // inside the page evaluate below, so a renamed host method fails the typecheck, not the run.
 import type {} from '../src/shared/ipc';
-import { stripLoaded } from './bean-strip';
 import { closeApp } from './fixtures/close-app';
 import { seedSettings } from './fixtures/seed-settings';
 import { startFakeBrain, type FakeBrain } from './fixtures/fake-brain';
@@ -93,11 +92,9 @@ test('the app launches with its avatar and its panel', async () => {
   expect(windows.find((w) => w.url.includes('panel.html'))?.visible).toBe(false);
 });
 
-test('Bean draws on the dock: its strip loads past the window CSP', async () => {
+test('Scout draws on the dock: the mascot canvas mounts past the window CSP', async () => {
   const avatar = await windowFor('avatar');
-  const clip = avatar.getByTestId('bean-clip').first();
-  await expect(clip).toBeAttached();
-  expect(await stripLoaded(clip)).toBe('loaded');
+  await expect(avatar.locator('[role=img][data-mood] canvas')).toBeAttached();
 });
 
 test('clicking Scout opens its bubble, and clicking again keeps it open', async () => {
@@ -355,10 +352,8 @@ test('Home is one window: Scout, jobs, connections and settings', async () => {
     'Never at its blind spots.',
   );
 
-  // Bean, still, in the nav tile: its strip loads past Home's CSP.
-  const navBean = nav.locator('.home-nav__tile [data-testid=bean-clip]');
-  await expect(navBean).toBeVisible();
-  expect(await stripLoaded(navBean)).toBe('loaded');
+  // Scout's head in the nav tile.
+  await expect(nav.locator('.home-nav__tile svg')).toBeVisible();
 
   // Settings is a page of Home: opening Settings anywhere lands here.
   await panel.evaluate(() => window.tagalongHost.openSettings());

@@ -165,7 +165,10 @@ export function createVoiceBridge(deps: BridgeDeps): VoiceBridge {
     },
     speechState: (params) => {
       const parsed = SpeechStateParams.safeParse(params);
-      if (parsed.success) brain.speechState(parsed.data);
+      if (!parsed.success) return;
+      brain.speechState(parsed.data);
+      // The dock shows Scout speaking from the same word.
+      send(IPC.speakingEvent, parsed.data);
     },
     // The brain's `voice` frames come from the ears alone; the mouth has no status to show.
     models: () => ({ ears: !voiceFailed }),

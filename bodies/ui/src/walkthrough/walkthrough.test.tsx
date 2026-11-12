@@ -5,13 +5,11 @@ import { describe, expect, it } from 'vitest';
 import { HAS_KEY, makeWalkthroughHost } from './test-host';
 import { Walkthrough } from './walkthrough';
 
-const SCOUT = { src: 'bean.webp', frames: 1, fps: 1, loop: false };
-
 function open(host = makeWalkthroughHost(), initialStep?: number) {
   render(
     <Walkthrough
       host={host}
-      scout={SCOUT}
+
       {...(initialStep === undefined ? {} : { initialStep })}
     />,
   );
@@ -32,7 +30,7 @@ describe('Walkthrough', () => {
   });
 
   it('labels the API key step Required without a key and Key set with one', async () => {
-    const { unmount } = render(<Walkthrough host={makeWalkthroughHost()} scout={SCOUT} />);
+    const { unmount } = render(<Walkthrough host={makeWalkthroughHost()} />);
     expect(sideButton('API key')).toHaveTextContent('Required');
     unmount();
     open(makeWalkthroughHost({ key: HAS_KEY }));
@@ -133,7 +131,7 @@ describe('Walkthrough', () => {
 
 describe('Walkthrough, a non-coder path', () => {
   it('never says Claude Code on steps 1 to 6', async () => {
-    const { container } = render(<Walkthrough host={makeWalkthroughHost()} scout={SCOUT} />);
+    const { container } = render(<Walkthrough host={makeWalkthroughHost()} />);
     expect(container.textContent).not.toMatch(/Claude Code/);
     fireEvent.click(screen.getByRole('button', { name: 'Get started' }));
     for (let step = 2; step <= 5; step += 1) {

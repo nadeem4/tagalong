@@ -7,7 +7,7 @@
 import { themeTokens as t, typeCss } from './theme/tokens';
 
 export const CHAT_CSS = `
-/* Who is talking: Bean's still tile and the name, only on lines Scout starts. */
+/* Who is talking: Scout's still tile and the name, only on lines Scout starts. */
 .scout-mark {
   flex: none; display: flex; align-items: center; justify-content: center; overflow: hidden;
   border-radius: ${t.radius.sm}px; background: ${t.color.tileNavy};
@@ -153,7 +153,7 @@ export const CHAT_CSS = `
 .bubble-send:disabled { background: ${t.color.tileNavy}; color: ${t.color.textMuted}; cursor: default; }
 .bubble-send:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 1px; }
 
-/* The empty chat: Bean, the one sentence, and the real talk key. */
+/* The empty chat: Scout, the one sentence, and the real talk key. */
 .bubble-empty {
   margin: auto 0; display: flex; flex-direction: column; align-items: center; gap: 12px;
   padding: 24px 40px; text-align: center;

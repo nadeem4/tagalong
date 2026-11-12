@@ -247,10 +247,13 @@ describe('what the brain sends back', () => {
     ]);
   });
 
-  it('sends the player’s speech_state to the brain, and the brain’s speech_control to the panel alone', () => {
+  it('sends the player’s speech_state to the brain and every window, and the brain’s speech_control to the panel alone', () => {
     const { send, brain, bridge, sent, toPanel } = setup();
     send(IPC.speechState, { turn: 't1', n: 2, state: 'ended' });
     expect(brain.speechState).toHaveBeenCalledWith({ turn: 't1', n: 2, state: 'ended' });
+    // The dock reads it too, to show Scout speaking.
+    expect(sent).toEqual([[IPC.speakingEvent, { turn: 't1', n: 2, state: 'ended' }]]);
+    sent.length = 0;
     bridge.onNotification('speech_control', { action: 'pause' });
     bridge.onNotification('speech_control', { action: 'clear', turn: 't1' });
     expect(sent).toEqual([]);
@@ -261,10 +264,11 @@ describe('what the brain sends back', () => {
   });
 
   it('drops a speech_state the panel sent in a bad shape', () => {
-    const { send, brain } = setup();
+    const { send, brain, sent } = setup();
     send(IPC.speechState, { turn: 't1', state: 'playing' });
     send(IPC.speechState, 'idle');
     expect(brain.speechState).not.toHaveBeenCalled();
+    expect(sent).toEqual([]);
   });
 
   it('ignores notifications that are not voice ones', () => {

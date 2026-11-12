@@ -9,8 +9,7 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Pet } from '../shapes';
 import { useHostBridge } from '../host-bridge';
-import { BeanClip } from '../theme/bean-clip';
-import type { BeanClipData } from '../theme/bean-clip';
+import { ScoutGlyph } from '../scout-mark';
 import { Button } from '../controls/button';
 import { CONTROLS_CSS } from '../controls/controls-styles';
 import { SETTINGS_CSS } from '../settings/settings-styles';
@@ -51,8 +50,6 @@ export interface HomeHost {
 
 export interface HomeViewProps {
   host: HomeHost;
-  /** Bean's idle strip, drawn still in the nav tile. */
-  scout: BeanClipData;
   /** The host's settings form: keys, hotkey, sight, memory. */
   settings: ReactNode;
   /** The page to show; the host sets it when the tray or the bubble opens a page. */
@@ -65,7 +62,7 @@ export interface HomeViewProps {
  * overview, its tasks (jobs, held mail, timers), the apps it can use, the places you can talk to it, what it may do alone and
  * what you approved, what it remembers, and the app's settings.
  */
-export function HomeView({ host, scout, settings, page: asked, onPage }: HomeViewProps) {
+export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps) {
   const bridge = useHostBridge();
   const [page, setPage] = useState<HomePage>(asked ?? 'overview');
   const [pets, setPets] = useState<Pet[]>([]);
@@ -96,8 +93,7 @@ export function HomeView({ host, scout, settings, page: asked, onPage }: HomeVie
       <nav aria-label="Tagalong" className="home-nav on-navy">
         <div className="home-nav__who">
           <span className="home-nav__tile">
-            {/* Larger than the tile, which crops it: Bean fills about two thirds of a frame. */}
-            {companion !== undefined && <BeanClip clip={scout} still size={76} name="idle" />}
+            {companion !== undefined && <ScoutGlyph size={44} />}
           </span>
           <span>
             <strong>{name}</strong>

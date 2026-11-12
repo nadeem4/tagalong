@@ -19,7 +19,6 @@ import type { PanelSettings } from './panel-settings';
 import { useTalk } from './talk';
 import { installVoiceSeam } from './voice-seam';
 import { fullBridge } from './full-bridge';
-import { FIGURE } from './bean-assets';
 
 /** The full chat's height; the bubble measures its own. Matches main's PANEL_HEIGHT. */
 const CHAT_HEIGHT = 520;
@@ -265,7 +264,6 @@ function Panel() {
               petName={petName}
               text={remark.text}
               speaking={speaking}
-              scout={FIGURE.idle}
               tail={side === 'left' ? 'right' : 'left'}
               holdMs={12_000}
               onDone={() => {
@@ -280,7 +278,6 @@ function Panel() {
             />
           ) : (
             <CompanionBubble
-              scout={FIGURE.idle}
               petId={petId}
               petName={petName}
               expanded={mode === 'chat'}

@@ -19,7 +19,7 @@ decides to hand to it.
 | `host-bridge.ts`                                     | `HostBridge`, `TurnEvent`, `AskInput`, `HostBridgeProvider`, `useHostBridge`                                                                                                   |
 | `test-support/fake-host-bridge.ts`                   | `createFakeHostBridge`, `FakeHostBridge` (exported for host tests)                                                                                                             |
 | `companion-bubble.tsx`                               | `CompanionBubble`, `GreetingLine`, `BubbleTalk`                                                                                                                                |
-| `chat-styles.ts`, `chat-icons.tsx`, `scout-mark.tsx` | `CHAT_CSS` (the chat window's look), the close and collapse icons, `ScoutMark` (Bean's still tile)                                                                             |
+| `chat-styles.ts`, `chat-icons.tsx`, `scout-mark.tsx` | `CHAT_CSS` (the chat window's look), the close and collapse icons, `ScoutMark` (the still SVG head)                                                                            |
 | `answer.tsx`                                         | `Answer` (Markdown), `ANSWER_CSS`                                                                                                                                              |
 | `connector-confirm.tsx`, `drop-card.tsx`             | The other cards in the bubble; the confirm card also shows Scout's `choose` asks (a text field for `free_text`, the `recommended` option first with a quiet "Recommended" tag) |
 | `approved-card.tsx`                                  | `ApprovedReport` (the panel's host of the "Approved for you" card), `ApprovedCard`                                                                                             |
@@ -27,7 +27,7 @@ decides to hand to it.
 | `stop-status.ts`                                     | `stopStatus`: the quiet line for a turn that ended with nothing said                                                                                                           |
 | `status-mark.tsx`                                    | `StatusMark` (`tag` and `row`)                                                                                                                                                 |
 | `job-line.tsx`                                       | `useRunningStep`, `JobLine`: the live job line                                                                                                                                 |
-| `dock-pet.tsx`, `theme/bean-clip.tsx`                | `DockPet`, `DockMood`, `BeanFigure`, `ListeningDot`; `BeanClip`                                                                                                                |
+| `dock-pet.tsx`, `scout-face.tsx`, `mascot/`          | `DockPet`, `DockMood`, `ListeningDot`; `ScoutFace`, Scout's character, `MOOD_STATE`                                                                                            |
 | `home/`                                              | `HomeView` and its pages                                                                                                                                                       |
 | `voice/`                                             | `PushToTalk`, `ListenController` (see [voice.md](voice.md))                                                                                                                    |
 | `theme/tokens.ts`, `settings/settings-styles.ts`     | Theme tokens; `SETTINGS_CSS`                                                                                                                                                   |
@@ -106,7 +106,7 @@ and seeded from the `remark` prop when the person clicks the quiet line open (`G
 `onOpen(text)`; the panel hands the text over, see [desktop.md](desktop.md)). A `pet.remark` turn
 event while the bubble is open sets it too. Asking anything moves it into `past` as an `Exchange`
 with `question: null`, so a follow-up keeps it and the full chat shows it first, with no user tile.
-Lines Scout starts show `ScoutMark` (Bean's still, from the `scout` prop, 20 px) and the name above
+Lines Scout starts show `ScoutMark` (the still SVG head, 20 px) and the name above
 the words; replies to the person's own questions show neither. The quiet line also shows a muted
 "Click to reply" and three bars while Scout reads it aloud.
 
@@ -120,7 +120,7 @@ row; streamed text ends in a gold cursor; the field is dimmed (`aria-busy`) but 
 Enter is ignored. The approval card in the chat takes the card surface with 16 px inside. The footer
 puts the status row above the field, with the mic inside it and a 2 px gold focus ring. The
 placeholder is "Reply to Scout" after Scout's line, otherwise "Ask Scout anything". An empty chat
-shows a 48 px Bean, "Ask Scout anything about what is on your screen." and, when talking is wired,
+shows a 48 px Scout head, "Ask Scout anything about what is on your screen." and, when talking is wired,
 "Hold [key] to talk" with the real key from `talk.keyLabel`. Padding rule: anything bordered or
 filled that holds text keeps at least 8 px inside (12 to 16 px for cards and message tiles).
 
@@ -331,32 +331,39 @@ A turn that ends with nothing said is not a status mark; it shows `stopStatus`'s
 
 ### DockPet and the moods
 
-`DockPet` (`dock-pet.tsx`) draws Bean, the 3D Scout, in a 96 px box from pre-rendered clips. The
-host bundles the strips and hands them in as `figure: BeanFigure` (one `BeanClipData { src, frames,
-fps, loop }` per mood plus `idle-blink` and `listening-blink`). On desktop the strips are 192 px
-frames at 12 fps (`renderer/src/bean/manifest.json`), loaded by `bean-assets.ts`.
+`DockPet` (`dock-pet.tsx`) draws the live Scout in a 96 px box: `ScoutFace` (`scout-face.tsx`), the
+mascot engine's `<Mascot>` (see [mascot.md](mascot.md)) with the character in `mascot/scout.ts`,
+not interactive, pixel ratio capped at 1, fading in when ready. `MOOD_STATE`
+(`mascot/mood-states.ts`, pure) turns a `DockMood` into the engine's mood: `dozing` becomes
+`sleeping`, every other mood keeps its name. The engine blinks and breathes by itself, so the dock
+has no frame or blink logic.
 
-`BeanClip` (`theme/bean-clip.tsx`) shows one strip as a CSS background stepped with `steps()`: a
-loop runs forever; a one-shot (a blink) runs `steps(n-1)` with `forwards` and holds
-its last frame. With `still` (reduced motion) it shows frame 0 of a loop or the last frame of a
-one-shot. Each clip is keyed by mood, so a one-shot always plays from its first frame.
+**The moods** (`DockMood`, `DOCK_MOODS`, twelve) and what the dock shows. Props and triggers are in
+[mascot.md](mascot.md#scout-on-the-dock).
 
-**The moods** (`DockMood`) and what the dock shows:
-
-| Mood        | Tag (9 px, top right) | Means                                                   | Label words                    |
-| ----------- | --------------------- | ------------------------------------------------------- | ------------------------------ |
-| `idle`      | none                  | nothing going on                                        | is idle                        |
-| `listening` | Seeing (blue)         | a capture just happened, or a drop is held over the pet | is looking at your screen      |
-| `reading`   | none                  | a screen tool is in flight                              | is reading your screen         |
-| `thinking`  | none                  | Scout is answering the person                           | is thinking                    |
-| `working`   | Working (gold)        | one of Scout's own background turns (a job)             | is working on a job of its own |
-| `dozing`    | none                  | the person is away or the screen is locked              | is dozing                      |
+| Mood          | Tag (9 px, top right) | Means                                                       |
+| ------------- | --------------------- | ----------------------------------------------------------- |
+| `idle`        | none                  | nothing going on                                            |
+| `listening`   | Seeing (blue)         | the mic is open, a capture just happened, or a drop is held |
+| `reading`     | none                  | a screen tool is in flight                                  |
+| `thinking`    | none                  | Scout is answering the person                               |
+| `speaking`    | none                  | Scout's voice is playing                                    |
+| `working`     | Working (gold)        | an expert job or one of Scout's background turns            |
+| `dozing`      | none                  | the person is away or the screen is locked                  |
+| `celebrating` | none                  | a job finished (a flash of about 2.2 s)                     |
+| `error`       | none                  | a job or turn failed (a short flash)                        |
+| `surprised`   | none                  | Scout speaks up on its own (a short flash)                  |
+| `sad`         | none                  | a job stopped or a turn was cancelled (a short flash)       |
+| `happy`       | none                  | the person clicked Scout (a short flash)                    |
 
 **Where the mood comes from.** The desktop avatar page keeps `DockState` with a pure reducer,
 `nextDock` (`bodies/desktop/src/renderer/src/dock.ts`), over every `TurnEvent`, main's
 `presence.away` / `presence.back`, and its own events (`seeing` and `seen` around a capture
 notice, `dropHover`, `dropLeave`). `dockMood(state)` picks, in
-order: seeing, reading, thinking, working, a held drop (Seeing), dozing, idle.
+order (highest first): a flash (celebrating, error, surprised, sad, happy), seeing, reading, speaking,
+thinking, working, a held drop (Seeing), dozing, idle. Speech comes from the panel player's
+`speech_state`, which main mirrors to every window (`onSpeaking`); jobs come from `listJobs`, refetched on
+`onBrainChanged('jobs')`.
 
 - A `turn.started` without `background` adds to `turns` (thinking); with `background: true` to
   `jobs` (working). `turn.completed` and `turn.error` remove the turn from both and from `reading`
@@ -381,11 +388,6 @@ order: seeing, reading, thinking, working, a held drop (Seeing), dozing, idle.
 The `aria-label` reads `<name> <mood words>`, then ", sight paused",
 ", listening" (or "listening paused", "listening for your reply") and the status mark's detail.
 
-**Blinking.** In `idle` and `listening` only, a blink is due every 3 to 6 s (random, or
-`blinkEveryMs`). It waits for the loop's `animationiteration` (frame 0, the pose the blink was
-rendered from), then shows the blink clip over the hidden loop for `frames / fps` (2/12 s), so
-nothing jumps. A mood change cancels a waiting blink; reduced motion turns blinking off.
-
 **Input.** The avatar page wraps `DockPet` in a button. A press that moves more than
 `DRAG_THRESHOLD` (4 px, `dock.ts#moveDrag`) is a drag: each step goes to main as `dragAvatar(dx,
 dy)` and the release as `dropAvatar()`. A press that does not move is a click: `looked`, then
@@ -395,8 +397,8 @@ a drag of the pet. Drops are in [desktop.md](desktop.md#the-ipc-modules) (`dropO
 ### Home
 
 `HomeView` (`home/home-view.tsx`) is the whole Home window. The desktop page (`renderer/src/
-home.tsx`) gives it `window.tagalong` as the bridge, a `HomeHost`, Bean's idle clip as `scout`
-(drawn still in the nav tile) and the settings form as the `settings`
+home.tsx`) gives it `window.tagalong` as the bridge, a `HomeHost`
+and the settings form as the `settings`
 slot.
 
 `HomeHost`: an optional `status()` (the overview's line: "Ready", or "Ready, sight paused"
@@ -441,7 +443,7 @@ The nav lists six pages (`HomePage`), the companion's name filling in where it a
 note, partial?, keyLabel, onMic, always? }`, `GreetingLineProps`.
 - `DropOffer = { dropped, explain } | { refusal }` (`drop-card.tsx`).
 - `DockPetProps { pet, mood, figure, sightPaused?, listening?, blinkEveryMs?,
-status? }`, `DockMood`, `ListeningDot`, `BeanFigure`, `BeanClipData`.
+status? }`, `DockMood`, `ListeningDot`.
 - `useRunningStep(bridge): RunningStep | null`, `JobLine({ step })` (`job-line.tsx`).
 - `StatusMarkProps { mark, variant: 'tag' | 'row', onFix? }`; `StatusId`, `StatusMark`,
   `STATUS_WORDS`, `FixTarget` (protocol).
@@ -495,8 +497,8 @@ marks and the health card are shown, never spoken. See [privacy.md](privacy.md).
 | `companion-bubble-header.test.tsx`, `setup/install-card.test.tsx`, `setup/install-confirm.test.tsx` | the header toggles, expand, composer and no-clip rules; each install card state and wording; the card following an install and surviving dismiss and turn end; a repeat ask replacing its card; the error box and Try again; the job card and Open in Tasks; the drawn mic tooltip. `setup/install-progress.ts` is the one place an app row becomes install steps and an expert's brain stage becomes words (`stageWords`, `expertWorking`: Checking this computer, Getting what it needs to run, Finding the right version, Downloading its files, Setting it up, Downloading with a percent, Unpacking; there is no single "Installing" stage), shared by the chat card and Connections' installing row; `setup/install-progress.test.ts` covers it |
 | `connector-confirm.test.tsx`, `drop-card.test.tsx`                                                  | each card's buttons and bridge calls; the drop card's asks and secrets refusal                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `status-mark.test.tsx`                                                                              | the tag, its tooltip and tone, the percent, its position above the dots; the row with or without Fix it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `dock-pet.test.tsx`, `theme/bean-clip.test.tsx`                                                     | the 96 px box, tags and their place, the paused, listening and status marks, labels, blinking at frame 0, reduced motion, one-shots from their start                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `dock-pet.test.tsx`, `mascot/mood-states.test.ts`                                                   | the 96 px box, tags and their place, the paused, listening and status marks, labels, the mood to engine mapping                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `bodies/desktop/src/renderer/src/dock.test.ts`                                                      | the mood reducer and its order, reading tools, background turns, drag threshold                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `home/home-view.test.tsx`                                                                           | six pages, Bean in the nav, the overview, the status line, page routing, the removed pages absent                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `home/home-view.test.tsx`                                                                           | six pages, the still head in the nav, the overview, the status line, page routing, the removed pages absent                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | the other `home/*.test.tsx`                                                                         | each page's list, actions, live re-reads, empty and failure states                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `host-bridge.test.tsx`, `test-support/fake-host-bridge.test.ts`, `index.test.ts`                    | the provider and its loud failure, the public surface                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |

@@ -12,7 +12,6 @@ import '@fontsource/onest/latin-400.css';
 import '@fontsource/onest/latin-600.css';
 import './home.css';
 import '../../shared/ipc';
-import { FIGURE } from './bean-assets';
 import { fullBridge } from './full-bridge';
 import { SettingsPage } from './settings/settings-page';
 import { homeTarget, scrollToSection } from './home-target';
@@ -60,7 +59,6 @@ function Home() {
     <HostBridgeProvider bridge={fullBridge()}>
       <HomeView
         host={homeHost}
-        scout={FIGURE.idle}
         settings={<SettingsPage />}
         {...(page === undefined ? {} : { page })}
         onPage={setPage}

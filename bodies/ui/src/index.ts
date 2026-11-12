@@ -30,9 +30,8 @@ export { CompanionBubble, GreetingLine } from './companion-bubble';
 export { ApprovedReport } from './approved-card';
 export type { DropOffer } from './drop-card';
 export { DockPet } from './dock-pet';
-export type { BeanFigure, DockMood, DockPetProps, ListeningDot } from './dock-pet';
-export { BeanClip } from './theme/bean-clip';
-export type { BeanClipData } from './theme/bean-clip';
+export { DOCK_MOODS } from './dock-pet';
+export type { DockMood, DockPetProps, ListeningDot } from './dock-pet';
 export type { BubbleTalk, CompanionBubbleProps, GreetingLineProps } from './companion-bubble';
 
 /** Exported so hosts can test their renderer wiring without booting a brain. */

@@ -1,7 +1,7 @@
 # Mascot engine
 
 `bodies/mascot` (`@tagalong/mascot`, private, never published) is the WebGL engine that draws Scout as a
-live 3D character. It is not wired into the UI yet; the dock pet moves onto it in the next slice.
+live 3D character. The desktop dock draws Scout with it (see [Scout on the dock](#scout-on-the-dock)).
 
 ## Where it comes from
 
@@ -92,3 +92,38 @@ From `@tagalong/mascot`: `mount(element, spec, options)` or `new Mascot(canvas, 
 
 `pnpm --filter @tagalong/mascot build` (plain `tsc -b`, run by `pnpm build` too) and
 `pnpm --filter @tagalong/mascot test` (vitest in node; the tests cover the pure logic, no WebGL).
+
+## Scout on the dock
+
+Scout is wobnimo's Volt recoloured gold, navy and sky, with a sky chest lamp. The character spec is
+`bodies/ui/src/mascot/scout.ts`. `DockPet` renders `ScoutFace` (`bodies/ui/src/scout-face.tsx`), the
+engine's `<Mascot>` in a 96 px box: not interactive, pixel ratio capped at 1, fading in when ready.
+`MOOD_STATE` (`bodies/ui/src/mascot/mood-states.ts`, pure and tested) maps a dock mood to the engine's:
+`dozing` becomes `sleeping`, the rest keep their name. Every other place Scout appears (chat lines, Home's
+nav tile, the tour's side panel) is the still SVG head `ScoutGlyph` / `ScoutMark` (`scout-mark.tsx`), so
+no WebGL canvas is created per chat line.
+
+The renderer reducer (`bodies/desktop/src/renderer/src/dock.ts`, `nextDock` and `dockMood`) picks the
+mood. Priority, highest first: a flash, seeing, reading, speaking, thinking, working, a drop hover,
+dozing, idle.
+
+| Mood          | Trigger                                                                                                                                                   | Prop                |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| `idle`        | nothing going on                                                                                                                                          | none                |
+| `listening`   | the mic is open, or Seeing                                                                                                                                | headphones          |
+| `reading`     | a screen-reading tool runs (`list_windows`, `read_window_text`, `look_at_window`)                                                                         | tablet              |
+| `thinking`    | a turn started                                                                                                                                            | lightbulb           |
+| `speaking`    | Scout's voice is playing (the panel player's `speech_state`, mirrored by main to every window as `tagalong:voice:speaking`, `onSpeaking` on the host API) | none                |
+| `working`     | an expert job is running (`listJobs`, refetched on `onBrainChanged('jobs')`) or a background turn                                                         | laptop and desk     |
+| `dozing`      | the person is away (the engine's `sleeping`)                                                                                                              | nightcap and pillow |
+| `celebrating` | a job finished (running to done), a flash of about 2.2 s                                                                                                  | party hat, confetti |
+| `error`       | a job failed, or a turn errored (including a brain restart), a short flash                                                                                | wrench              |
+| `surprised`   | Scout speaks up on its own (`pet.remark`), a short flash                                                                                                  | none                |
+| `sad`         | a job stopped, or a turn was cancelled, a short flash                                                                                                     | none                |
+| `happy`       | the person clicks Scout, a short flash                                                                                                                    | none                |
+
+Not wired yet: an install-finished celebration (no install-finished signal exists) and a distinct
+signal for an urgent interjection (`pet.remark` is used for `surprised`).
+
+The engine breathes and blinks on its own, so the dock has no frame or blink logic, and the dock has no
+reduced-motion handling for it.

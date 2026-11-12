@@ -117,7 +117,7 @@ its result.
 - Name: **Tagalong**. The companion: **Scout**.
 - Voice: **warm and playful**. A companion with personality, friendly and a little fun, never
   childish. Anything about privacy, keys, cost or errors stays plain and exact.
-- Look: Scout is **Bean**, a soft clay-like 3D figure, moving on the dock and still everywhere else;
+- Look: Scout is a live 3D mascot (gold, navy and sky, with a sky chest lamp) on the dock and a still head everywhere else;
   Onest at 600 for names and titles. No logo yet.
 
 ## Evidence on Hand

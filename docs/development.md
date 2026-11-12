@@ -39,6 +39,8 @@ tagalong/
       shapes/                       # @tagalong/ui/shapes, React-free: addressing, apps, context, memory,
                                     # pet, status, turn-events, voice (also imported by desktop main)
       dock-pet.tsx, companion-bubble.tsx
+      scout-face.tsx, scout-mark.tsx # the live Scout on the dock; the still SVG head everywhere else
+      mascot/                       # scout.ts (Scout's character spec), mood-states.ts (dock mood to engine mood)
       connector-confirm.tsx, drop-card.tsx,
       health-card.tsx, status-mark.tsx, answer.tsx
       home/                         # Home: HomeView and its pages (Overview, Jobs, Connections, Approvals,
@@ -46,7 +48,7 @@ tagalong/
       settings/settings-styles.ts   # the Settings sheet's styles
       model/model-field.tsx         # the Scout model picker (Settings' "Scout's model")
       voice/                        # push to talk, the listen controller, the speech queue, what is spoken aloud
-      theme/                        # design tokens, BeanClip (a strip of Bean frames, moving or still)
+      theme/                        # design tokens
       test-support/fake-host-bridge.ts
     desktop/
       electron.vite.config.ts       # main / preload / renderer builds
@@ -75,9 +77,6 @@ tagalong/
       src/renderer/                 # avatar (Scout), panel (the bubble),
                                     # and home (Home) HTML, src/*.tsx
       src/renderer/src/settings/    # the Settings page, one file per section
-      src/renderer/src/bean/        # Bean's WebP strips and manifest.json
-      src/renderer/src/bean-assets.ts # FIGURE: the strips bundled once for the dock and Home
-      scripts/bean/                 # bean.py (Blender) and pack.py: regenerate Bean's strips
       src/shared/ipc.ts             # IPC channel names and the host-only API type
       src/shared/                   # settings.ts (Settings schema and defaults), blind-spots.ts, voice.ts
     browser/                        # browser body (Chromium MV3), built by Vite into dist/ (load unpacked)

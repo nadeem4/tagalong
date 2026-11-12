@@ -1,6 +1,6 @@
 ---
 name: Tagalong
-description: Scout, one AI companion on your screen (Bean, a soft 3D figure, on the dock and still in Home), with Home as its calm control centre.
+description: Scout, one AI companion on your screen (a live 3D mascot on the dock, a still head in Home), with Home as its calm control centre.
 colors:
   shell-navy: '#12162B'
   shell-text: '#E9ECF5'
@@ -267,21 +267,21 @@ components:
 
 ## Overview
 
-**Creative North Star: "A Clay Friend in Modern Chrome"**
+**Creative North Star: "A Live Friend in Modern Chrome"**
 
-Tagalong is one companion, Scout. On the desktop it is Bean, a soft clay-like 3D figure (round orange body, cream belly, pointed ears) drawn from pre-rendered WebP strips. Bean is the one figure everywhere: it moves on the dock and stands still (the first idle frame) beside Scout's line in Home's nav. It sits on the desktop and opens a speech bubble beside itself. The figure is the only game-like thing in the product; everything around it is calm, modern product chrome: a deep ink-navy for Scout's own surfaces (the dock tags, the bubble, Home's nav), a cool off-white for reading (Home's pages and Settings), clean Onest type and one warm gold.
+Tagalong is one companion, Scout. On the desktop it is a live 3D mascot, a round-faced figure in gold, navy and sky with a sky lamp on its chest, drawn in real time by `@tagalong/mascot` (the forked wobnimo engine, `docs/mascot.md`). The live figure is only on the dock; everywhere else Scout is a still SVG head. It sits on the desktop and opens a speech bubble beside itself. The figure is the only game-like thing in the product; everything around it is calm, modern product chrome: a deep ink-navy for Scout's own surfaces (the dock tags, the bubble, Home's nav), a cool off-white for reading (Home's pages and Settings), clean Onest type and one warm gold.
 
-Tokens live in `bodies/ui/src/theme/tokens.ts` (`themeTokens`). Most components read from it, but not all: the bubble, the cards inside it, the dock tags, Home's nav hard-code several hex values, recorded below as hard-coded. Scout is drawn from one WebP strip per mood (192px frames, 12 fps, in `bodies/desktop/src/renderer/src/bean/`) by `BeanClip`: stepped through with CSS `steps()` on the dock, held on frame 0 of the idle strip everywhere else. No canvas, no live 3D, no pixel sprites.
+Tokens live in `bodies/ui/src/theme/tokens.ts` (`themeTokens`). Most components read from it, but not all: the bubble, the cards inside it, the dock tags, Home's nav hard-code several hex values, recorded below as hard-coded. The dock draws Scout with `ScoutFace` (`bodies/ui/src/scout-face.tsx`, the engine's `<Mascot>`, character in `bodies/ui/src/mascot/scout.ts`); every still mark is the inline SVG head `ScoutGlyph` / `ScoutMark` (`scout-mark.tsx`), so no WebGL canvas is created per chat line.
 
-Scout's state is always a pose plus a word: Bean's clip changes per mood (with a floating sign for some: a thought cloud, glasses, a gear, z's, waves), a small tag says Seeing or Working for the states that last, and the accessible name says it in full. Motion is baked into the frames (a breath, typing, a page turn) and becomes a still frame for reduced motion.
+Scout's state is always a pose plus a word: the mascot's mood changes the pose, and some moods bring a prop (a lightbulb, a tablet, headphones, a laptop and desk, a nightcap and pillow, a party hat, a wrench), a small tag says Seeing or Working for the states that last, and the accessible name says it in full. The engine does the motion itself (breathing, blinking, mood poses); the dock has no frame or blink logic of its own. The twelve moods and what triggers each are in `docs/mascot.md`.
 
 **Key Characteristics:**
 
-- One figure, Bean, everywhere (moving on the dock, still elsewhere); modern chrome around it.
+- One figure, Scout, everywhere (live on the dock, a still head elsewhere); modern chrome around it.
 - Navy for Scout's surfaces, off-white for reading.
 - Gold for the primary action, an on state and Scout's active marks; sky blue for focus and fields inside the bubble.
 - One typeface, Onest, in seven roles; rank comes from size and weight, never capitals.
-- Bean outside the dock is always a still frame: 56px in Home's nav.
+- Scout outside the dock is always the still SVG head: 56px in Home's nav.
 - Flat: tone and hairlines, no drop shadows.
 
 ## Colors
@@ -332,7 +332,7 @@ A cool ink-navy family and a cool off-white family, one warm gold, and a few sig
 
 Every window bundles Onest 400 and 600 from `@fontsource` (Latin subset), nothing fetched; the browser add-on bundles the same two files into its popup and mic page. Weights are 400 and 600 only. Rank comes from size and weight; muted colour means "extra detail". No capitals, no letter spacing, no second typeface.
 
-**Character:** One clean geometric sans. Scout's name and voice come from the words and Bean, not from a different face.
+**Character:** One clean geometric sans. Scout's name and voice come from the words and the mascot, not from a different face.
 
 ### Hierarchy
 
@@ -349,7 +349,7 @@ Seven roles in `themeTokens.type` (size/line in px, weight); `typeCss(role)` wri
 | caption   | 11/14       | 600        | Chips, status words, hints                                                                     |
 
 - **Wordmark** ("Scout" in Home's nav, the walkthrough side and the chat header): title role, Onest 600. Class `tg-wordmark`, tokens `font.wordmark` and `fontWeight.wordmark`.
-- **Dock tag** (Onest 600, 9px, 11px line, `themeTokens.dockTag`): Seeing and Working on the dock, small so they sit beside Bean's floating sign rather than on it. The one size outside the roles.
+- **Dock tag** (Onest 600, 9px, 11px line, `themeTokens.dockTag`): Seeing and Working on the dock, small so they sit beside the mascot's props rather than on it. The one size outside the roles.
 - **Mono** (12px): an expert's live steps in the hand-off card; inline code in answers is 12px.
 - **Sentence case:** every label, card heading and button is sentence case ("Permissions", "Read my mail for loops"). Nothing is set in capitals.
 - **Tabular numerals:** money and counts (spend card, daily limit, tab counts, times) use `font-variant-numeric: tabular-nums` so digits line up.
@@ -358,24 +358,24 @@ Seven roles in `themeTokens.type` (size/line in px, weight); `typeCss(role)` wri
 
 **The Seven Roles Rule.** Every font size is one of the seven roles, or the 9px dock tag. `bodies/ui/src/style-audit.test.ts` reads every style sheet and fails on any other size, any weight other than 400 or 600, any capitals, any letter spacing (except the display role's -0.015em), any line height off its role and any pixel font.
 
-**The 11px Floor Rule.** No functional text below 11px (`type.caption`). The one exception is the dock tags (9px, a user decision, 2026-10-17): at 11px they covered Bean's sign in the 96px window, and the accessible name says the state in full.
+**The 11px Floor Rule.** No functional text below 11px (`type.caption`). The one exception is the dock tags (9px, a user decision, 2026-10-17): at 11px they covered the mascot's props in the 96px window, and the accessible name says the state in full.
 
 **The Focus Ring Rule.** Keyboard focus is a 2px ring: navy (`focusOnLight`) on light surfaces, gold (`focusOnNavy`) on navy ones only. Both come from the `--tg-focus` variable that `.on-navy` flips; no sheet sets a fixed gold focus ring.
 
 ## Layout
 
-- **Dock:** the avatar window's button is 96px square, and so is one frame of Bean, with no padding. Bean stands about 55px tall at the bottom, its floating sign above; the tag sits in the top right corner, 4px down and flush right, the Paused chip 4px from the top and 12px from the left, the listening dot 8px up and 16px in from the bottom corner, and the status tag 18px up, centred.
+- **Dock:** the avatar window's button is 96px square, and so is the live mascot fills it, with no padding (interactive off, pixel ratio capped at 1); the tag sits in the top right corner, 4px down and flush right, the Paused chip 4px from the top and 12px from the left, the listening dot 8px up and 16px in from the bottom corner, and the status tag 18px up, centred.
 - **Bubble:** a 420px-wide window (`PANEL_WIDTH`) that sizes its own height (80 to 520px; the full chat takes 520px). It has 10px of padding on the side the tail points to.
 - **Home:** a 1440x800 window (min 880x600). A fixed 232px nav (20px by 12px padding) and a fluid main column (24px by 32px padding, 20px between blocks). Overview cards sit in an auto-fit grid (min 260px, 16px gap); routine templates in an auto-fill grid (min 220px, 8px gap). Embedded Settings sits in the same 920px page as every other tab.
 
 Spacing runs on the token scale (2, 3, 4, 6, 8, 12, 16, 20, 24, 32, 40, 48; `themeTokens.space`). Every padding, margin and gap is a step of it (a -1px margin that lets a tab underline overlap its border is the one exception), and `bodies/ui/src/style-audit.test.ts` fails on any other value. **The Card Box.** One `.tg-card` class (from `CONTROLS_CSS`) draws every card on Home, Settings and the tour: Card White, 1px Panel Line, 12px radius, 16px by 20px padding. Pages add layout (gap, margin) around it, never their own box. Controls are 40px tall in Home and Settings, 36px for the bubble's primary button, 44px for the bubble field, 28px for quiet bubble controls.
 
-**The Still Bean Rule.** Outside the dock Bean is the idle strip's first frame, never animated, smoothly scaled: in Home's 56px nav tile it is drawn larger (76px) and cropped by the tile (`overflow: hidden`, nudged to centre), since Bean fills only about two thirds of a frame.
+**The Still Scout Rule.** Only the dock is live. Everywhere else (the chat line mark, Home's nav tile, the tour's side panel) Scout is `ScoutGlyph`, a still inline SVG head, never animated and never a WebGL canvas: in Home's 56px nav tile it fills the tile.
 
 **The companion chat.** A 56 px header (Scout's mark, Onest name over a muted status line, 32 px icon toggles for listening and seeing that turn gold when on and show a tooltip, icon buttons for back and close). The composer is a bordered multiline field with the mic and a send button inside. The install card (`setup/install-card.tsx`) is one card: a tile, name with an Official or Community chip, a muted facts line, the steps with done, now, failed and todo marks, and quiet Not now with a gold Allow. 24 px between turns, 12 px inside a turn. Your
 messages sit on an avatar-tile bubble (12 px by 16 px inside), Scout's replies run full width, code
-blocks have a 1 px field-line edge and 12 px inside, list markers are muted. Scout's mark (Bean's
-still, 20 px, 48 px when the chat is empty) and name appear only on lines Scout starts. The footer
+blocks have a 1 px field-line edge and 12 px inside, list markers are muted. Scout's mark (the still
+SVG head, 20 px, 48 px when the chat is empty) and name appear only on lines Scout starts. The footer
 field has at least 12 px inside and a 2 px focus ring (navy on light, gold on navy). Anything bordered or filled that holds
 text keeps at least 8 px inside, 12 to 16 px for cards and tiles; only keycaps and small pills are
 tighter.
@@ -396,7 +396,7 @@ Three radius tokens (`themeTokens.radius`), nothing else: **card** 12px (the bub
 
 ### Scout on the dock (signature)
 
-`DockPet` draws Bean, the 3D Scout, with `role="img"` and a full label ("Scout is looking at your screen, sight paused"). Each mood is its own pre-rendered clip from one fixed camera, so Bean never jumps between them: idle (a breath, a tail sway), listening (waves ripple out, ears perk), reading (glasses on, reading), thinking (a thought cloud), working (typing at a laptop, a gear turns) and dozing (rising z's). Bean's colours (in `bodies/desktop/scripts/bean/bean.py`): fur `#F39B5E`, belly `#FFF3E6`, ear tips `#5A3A2C`, cheeks `#F2A9A0`. Home's nav shows the idle clip's frame 0, still (see The Still Bean Rule). A tag sits top right: **Seeing** on Sky, **Working** on Gold (Scout's own job); thinking and reading have none, as they last seconds and the bubble is already answering; all in Gold Ink, Onest 600 9px. **Paused** is a Paused Grey pill top left, and while it shows the tag gives way (the two would overlap; the pose and the label still say the mood).
+`DockPet` draws the live Scout (`ScoutFace`) with `role="img"` and a full label ("Scout is looking at your screen, sight paused"). The dock's twelve moods map to engine moods through `MOOD_STATE` (`bodies/ui/src/mascot/mood-states.ts`; dozing is the engine's sleeping): idle, listening (headphones), reading (tablet), thinking (lightbulb), speaking, working (laptop and desk), dozing (nightcap and pillow), celebrating (party hat and confetti), error (wrench), surprised, sad and happy; the last four are short flashes. Triggers are in `docs/mascot.md`. A tag sits top right: **Seeing** on Sky, **Working** on Gold (Scout's own job); thinking and reading have none, as they last seconds and the bubble is already answering; all in Gold Ink, Onest 600 9px. **Paused** is a Paused Grey pill top left, and while it shows the tag gives way (the two would overlap; the pose and the label still say the mood).
 
 ### The bubble
 
@@ -416,7 +416,7 @@ The connector confirm card shares the card CSS (`CARD_CSS`): a lead sentence, th
 
 ### Home
 
-- **Nav:** Sidebar Navy, 232px. Scout's 56px Avatar Tile tile (Bean, still, cropped to fill it) with the name and "Your companion" in Sky, then the six pages (Overview, Tasks, Connections, Approvals, What Scout remembers, Settings) as 40px buttons in Onest 14px Shell Muted; hover Frost Text; current (`aria-current="page"`) on Active Row Navy in 600.
+- **Nav:** Sidebar Navy, 232px. Scout's 56px Avatar Tile tile (the still head) with the name and "Your companion" in Sky, then the six pages (Overview, Tasks, Connections, Approvals, What Scout remembers, Settings) as 40px buttons in Onest 14px Shell Muted; hover Frost Text; current (`aria-current="page"`) on Active Row Navy in 600.
 - **Cards:** white, 1px Panel Line, 12px radius, 16px by 20px padding, a 14px Onest card label at 600, 13px Panel Muted text and a quiet button. The Overview card leads with a status dot and a word ("Ready"; with the brain down the dot turns warn and the word reads "Brain: Offline", "Brain: Connecting" or "Brain: Needs update", the same words as Where things run).
 - **Page:** every tab sits in one `.home-page` box, 920px wide at most, centred, with one 32px inset (`space.page`), so the left edge never moves between tabs. Each page opens with a 20px title and one muted line (Overview: "Everything Scout is doing for you."). The nav carries `on-navy`, so shared controls take the gold focus ring there.
 - **Jobs and Connections:** rows between Panel Line hairlines. A job row has the title (truncated, full text in `title`), a state chip and a no-wrap time on the left and its Watch, Stop or Show result button on the right. **Watch** opens the job page in place of the list (a quiet "Jobs" button above the title, named "Back to Jobs", goes back; focus moves to the title on Watch and returns to that Watch button): the title, the same state chip, the elapsed time and Stop, over a read-only log on Page Navy with a Line border and the 10px row radius, Mono 12px/1.55. `$ command` lines are 600 with a glyph (check in green, cross in red, a Gold spinner that stands still for reduced motion), output is Text Muted with the 16 ANSI colours tuned for the navy, edits are Sky, said lines start `# ` and are muted, the end line (`# done`, `# stopped`, `# error: ...`) is 600. A **Jump to latest** pill (Gold, 32px, pill) floats at the bottom when the person has scrolled up. A command with an exit code shows `exit N` after its text (400 weight, ANSI green for 0, red otherwise); with no code, only the glyph. Named Rule: a running command with no output says "output appears when the command finishes" rather than looking stuck. The Connections page has two tabs, Apps and Experts, each with a "Your ..." card and an "Add ..." card. A row is a 36px Panel Tile initial tile (10px radius), the name in 14px 600 with its chip (Official in the ok fill, Community in Panel Tile, Recommended in a pale navy, a quiet outlined chip for "Not tested with Scout"), one 12px Panel Muted meta line, a status dot and word, the shared On/Off switch, and quiet Restart and Remove. One verb per row: **Add** for an Official entry, **Add...** for one that needs the check card first. The search field is 40px, 8px radius, white, with the shared navy focus ring (`var(--tg-focus)`); "Can't find it? Add it yourself" is a link-weight button below it. A community entry opens the check card in place: Warn Fill, a 1px warm line, a 14px 600 title, 13px facts and Back beside Add anyway. How an add ended ("Notion added.", or the refusal with the button kept for a retry) sits on the row itself in 14px 600 (ok or error ink), not in a line at the top; an install shows a 4px bar and the stage words on its row, a failed one an error-fill line with Try again. Updates: a "Your ..." card opens with its title and, on the right, "Checked N minutes ago" in meta, a quiet **Check for updates** and, only when something waits, a secondary **Update all (n)**; under it a Panel-filled block holds two switch rows ("Keep Official ... up to date automatically", "Keep Community ... up to date automatically" with a 12px note). A row's meta line ends `v1.2 → v1.3` (and "Waits for you" when its group is off); its side shows a fixed-width secondary **Update**, a spinner with "Updating...", or "Updated to v1.3." in ok ink. A web app says "Always up to date" and has no update control.
@@ -452,24 +452,24 @@ Live in `bodies/ui/src/controls/` and are styled by `CONTROLS_CSS`, injected nex
 
 ## Motion
 
-- **Dock:** the motion is in Bean's frames, 12 fps, stepped with CSS `steps()`: loops of 2 to 4 seconds. Blinks are a 2-frame clip (about 170ms) every 3 to 6 seconds in idle and listening only, started when the loop comes back to frame 0, the pose the blink was rendered from.
+- **Dock:** the motion is the engine's: Scout breathes and blinks on its own and each mood has its own pose. The mascot fades in once the engine is ready.
 - **Bubble:** the invitation enters over 220ms (fade and 4px rise, ease-out). The invitation types at 22ms a character. The listening dot pulses (1.2s, to 35% opacity); speaking bars follow the voice level with a 90ms linear transition.
 
-Under `prefers-reduced-motion: reduce`: Bean shows one still frame per mood (frame 0 of a loop) and does not blink, the bubble appears and leaves without moving, the dot stops pulsing, the bars hold at 60%, and the invitation appears whole.
+Under `prefers-reduced-motion: reduce`: the mascot is unchanged (the engine keeps breathing and blinking; the dock has no reduced-motion handling for it), the bubble appears and leaves without moving, the dot stops pulsing, the bars hold at 60%, and the invitation appears whole.
 
 ## Accessibility
 
 - **Reduced motion** is honoured everywhere above.
 - **Status is never colour alone:** dock tags are words, the Paused chip says Paused, chips carry words, the Overview dot sits beside "Ready".
 - **Focus rings:** 2px at 2px offset, from `--tg-focus`: navy on Home's and Settings' light pages, Gold under `.on-navy`, and Sky in the bubble.
-- **The figure:** `BeanClip` is `aria-hidden`; on the dock the wrapper is `role="img"` with Scout's name and state. The invitation is announced whole through a hidden status line while the visible text types; the bubble's status row is `role="status"`. The chat log is `role="log"`; errors are `role="alert"`; expert steps are `aria-live="polite"`.
+- **The figure:** the still head is `aria-hidden`; on the dock the wrapper is `role="img"` with Scout's name and state. The invitation is announced whole through a hidden status line while the visible text types; the bubble's status row is `role="status"`. The chat log is `role="log"`; errors are `role="alert"`; expert steps are `aria-live="polite"`.
 
 ## Do's and Don'ts
 
 ### Do:
 
 - **Do** take colours, sizes, spacing and radii from `themeTokens`; add a token before adding another hard-coded value.
-- **Do** draw Scout as Bean through `BeanClip`: moving on the dock, still (`still`, sized with `size`) everywhere else.
+- **Do** draw Scout as the live mascot on the dock (`ScoutFace`) and as the still `ScoutGlyph` everywhere else.
 - **Do** keep gold for the one primary action, an on or pressed control, and Scout's active marks.
 - **Do** pair every status with a word (and an icon where there is room).
 - **Do** set every size on one of the seven type roles, in sentence case, with tabular numerals for money and counts.
@@ -478,7 +478,7 @@ Under `prefers-reduced-motion: reduce`: Bean shows one still frame per mood (fra
 
 ### Don't:
 
-- **Don't** draw Scout any other way than Bean's strips.
+- **Don't** draw Scout any other way than the mascot engine (dock) or `ScoutGlyph` (still).
 - **Don't** use gold for decoration or fills larger than a button.
 - **Don't** signal state by colour alone.
 - **Don't** use capitals, letter spacing, a second typeface or any text below 11px (the dock tag aside).

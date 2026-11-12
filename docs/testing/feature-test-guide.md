@@ -1051,8 +1051,8 @@ Scout's only faces are the dock moods (idle, listening, reading, thinking, worki
 ### M.1. Scout dozes while you are away
 
 1. **Action:** touch nothing for five minutes (or lock the screen with `Win+L`).
-2. **Expected:** within about fifteen seconds of the five minutes (at once on lock), Bean closes its
-   eyes and breathes slowly while small z's rise above it; no tag. Its name reads "Scout is dozing".
+2. **Expected:** within about fifteen seconds of the five minutes (at once on lock), Scout falls asleep
+   (nightcap and pillow); no tag. Its name reads "Scout is dozing".
    Move the mouse (or unlock): it wakes within fifteen seconds (at once on unlock).
 3. **Action:** with Always listening on, repeat.
 4. **Expected:** the green listening dot stays on Scout the whole time it dozes.
@@ -1061,36 +1061,47 @@ Scout's only faces are the dock moods (idle, listening, reading, thinking, worki
 
 1. **Action:** Windows Settings → Accessibility → Visual effects → **Animation effects** off, restart
    Tagalong (the setting is read when the window opens), then repeat M.1.
-2. **Expected:** Bean's pose changes per mood but each is a still frame, nothing moves and Bean never
-   blinks.
+2. **Expected:** the bubble and the listening dot hold still. The live Scout on the dock still
+   breathes and blinks: the mascot engine has no reduced-motion handling.
 
-### M.5. Bean on the dock
+### M.5. Scout's twelve moods on the dock
 
-1. **Action:** watch Scout idle for half a minute, then press the hotkey to capture (Seeing), and ask a
-   question while a screen tool reads. Do it on a light wallpaper and on a dark one.
-2. **Expected:** Bean breathes and blinks now and then in idle and while Seeing, never mid-pose: a
-   blink never makes Bean jump. Each mood has its own pose (waves for Seeing, glasses while reading,
-   a thought cloud while thinking, a laptop for a job of Scout's own). The small tag at the top right
-   reads clearly on both wallpapers. Turn sight off: the Paused chip shows at the top left and the
-   Working tag goes, so the two never overlap.
+1. **Action:** watch Scout idle for half a minute, then trigger each mood below. Do it on a light
+   wallpaper and on a dark one.
+2. **Expected:** Scout is a live 3D figure that breathes and blinks by itself and never jumps between
+   moods. The small tag at the top right reads clearly on both wallpapers.
+   - idle: nothing going on, no prop.
+   - listening: open the mic (hold the talk key) or capture the screen (Seeing); headphones.
+   - reading: ask "what does this window say?"; a tablet while the screen tool runs.
+   - thinking: ask any question; a lightbulb until the answer ends.
+   - speaking: with Scout talks on, while it reads an answer aloud; no prop.
+   - working: start an expert job; a laptop on a desk while it runs.
+   - dozing: touch nothing for five minutes or lock the screen; nightcap and pillow (M.1).
+   - celebrating: when the job finishes; party hat and confetti for about 2 s.
+   - error: make a job or a turn fail (stop the brain mid-turn); a wrench, briefly.
+   - surprised: let Scout speak up on its own; a short flash.
+   - sad: stop a running job or cancel a turn; a short flash.
+   - happy: click Scout; a short flash.
+3. **Action:** turn sight off. **Expected:** the Paused chip shows at the top left and the Working tag
+   goes, so the two never overlap.
 
 ### M.6. What Scout is busy with
 
 1. **Action:** ask Scout a plain question (no screen needed), for example "what is a monad?".
-2. **Expected:** while it answers Bean holds its chin under a thought cloud, with **no tag**; the
+2. **Expected:** while it answers Scout shows a lightbulb, with **no tag**; the
    name reads "Scout is thinking". It goes back to idle when the answer ends.
 3. **Action:** ask "what does this window say?" with a text-heavy window in front.
-4. **Expected:** a screenshot first shows Seeing for 2.5 s; while the screen tool still runs Bean
-   wears glasses and reads, with **no tag** ("Scout is reading your screen"), then thinks again until
-   the answer ends. Stop a turn mid-read: Bean never stays reading.
+4. **Expected:** a screenshot first shows Seeing for 2.5 s; while the screen tool still runs Scout
+   holds a tablet, with **no tag** ("Scout is reading your screen"), then thinks again until
+   the answer ends. Stop a turn mid-read: Scout never stays reading.
 
-### M.5a. Bean, still, in Home
+### M.5a. Scout, still, in Home
 
-1. **Action:** open Home after asking Scout one question. Turn on Windows' reduce-motion setting and look
-   again.
-2. **Expected:** Bean (still) shows beside Scout's line in the panel, and in the nav tile: the same
-   rest pose as the dock, smooth (not pixelated), filling the nav tile without its ears or feet
-   cut off. Neither ever moves, with or without reduced motion. No pixel-art Scout appears anywhere.
+1. **Action:** open Home after asking Scout one question, and open the first-run tour. Turn on
+   Windows' reduce-motion setting and look again.
+2. **Expected:** a still head of Scout (an SVG, not the live figure) shows beside Scout's line in the
+   panel, in the nav tile and in the tour's side panel, smooth (not pixelated) and filling the nav
+   tile. None of them ever moves, with or without reduced motion.
 
 ## Voice: Scout talks
 
@@ -2405,7 +2416,7 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
 4. **Action:** ask something that takes a moment. **Expected:** a gold dot, "Scout is thinking…" and
    **Stop** on one row; the text box is dimmed but you can still click into it; a gold cursor ends
    the streaming text and goes when the answer is done.
-5. **Action:** in a fresh chat with no messages. **Expected:** Bean, "Ask Scout anything about what
+5. **Action:** in a fresh chat with no messages. **Expected:** Scout's head, "Ask Scout anything about what
    is on your screen." and "Hold [your talk key] to talk" with the key from Settings.
 6. **Action:** check the header icons. **Expected:** the collapse and close buttons are drawn
    icons with the names "Back to bubble" and "Close".
