@@ -78,8 +78,8 @@ const scout = attachProps(base, [
 shows) and `colors` (recolour its materials by local name). A prop's materials join the character as
 `name.material`. Props may not carve (`op: 'sub'`), since a carve would cut the body.
 
-The library: `laptop` (its lid opens while `working`), `desk`, `lightbulb`, `tablet`, `headphones`,
-`nightcap`, `partyHat`, `wrench`. Confetti is not a prop but the built-in `celebrating` effect.
+The library: `laptop` (its lid opens while `working`), `desk`, `lightbulb`, `tablet`, `notepad`,
+`headphones`, `pillow`, `nightcap`, `partyHat`, `wrench`. Confetti is not a prop but the built-in `celebrating` effect.
 
 ## Public API
 

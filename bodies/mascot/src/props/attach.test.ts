@@ -8,7 +8,9 @@ import {
   laptop,
   lightbulb,
   nightcap,
+  notepad,
   partyHat,
+  pillow,
   tablet,
   wrench,
   type PropSpec,
@@ -100,7 +102,18 @@ describe('attachProps', () => {
 });
 
 describe('the prop library', () => {
-  const library = { laptop, desk, lightbulb, tablet, headphones, nightcap, partyHat, wrench };
+  const library = {
+    laptop,
+    desk,
+    lightbulb,
+    tablet,
+    notepad,
+    headphones,
+    pillow,
+    nightcap,
+    partyHat,
+    wrench,
+  };
   it.each(Object.entries(library))('%s compiles on a character', (_name, prop) => {
     const spec = attachProps(base, [[prop, { bone: 'head', moods: ['coding'] }]]);
     const compiled = compile(spec);

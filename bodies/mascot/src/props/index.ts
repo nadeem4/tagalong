@@ -5,6 +5,8 @@ export { laptop } from './laptop';
 export { desk } from './desk';
 export { lightbulb } from './lightbulb';
 export { tablet } from './tablet';
+export { notepad } from './notepad';
+export { pillow } from './pillow';
 export { headphones } from './headphones';
 export { nightcap } from './nightcap';
 export { partyHat } from './party-hat';
