@@ -86,8 +86,18 @@ def _json(text: str) -> dict:
     return data if isinstance(data, dict) else {}
 
 
+_EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+_PHONE = re.compile(r"(?<!\w)\+?\d[\d ().-]{7,}\d(?!\w)")
+
+
+def has_contact_details(text: str) -> bool:
+    """A phone number or an email address: Scout has no use for them and Home would show them."""
+    return bool(_EMAIL.search(text) or _PHONE.search(text))
+
+
 def check(candidates: list[Candidate], material: Material) -> list[Candidate]:
-    """Keep a candidate only if its evidence is in the material (whitespace and case aside)."""
+    """Keep a candidate only if its evidence is in the material (whitespace and case aside),
+    and neither it nor its evidence holds contact details."""
     haystack = normalise(material.text)
     kept = []
     for c in candidates:
@@ -97,6 +107,8 @@ def check(candidates: list[Candidate], material: Material) -> list[Candidate]:
         # view never matches the raw text: it is dropped, which is the safe side.
         thin = len(evidence.split()) < EVIDENCE_MIN_WORDS and len(evidence) < EVIDENCE_MIN_CHARS
         if not text or len(text) > TEXT_MAX or thin or evidence not in haystack:
+            continue
+        if has_contact_details(text) or has_contact_details(c.evidence):
             continue
         kept.append(Candidate(normalise_tag(c.tag), text, c.evidence.strip(), c.ref))
     return kept

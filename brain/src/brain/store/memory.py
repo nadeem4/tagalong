@@ -240,6 +240,15 @@ def profile_facts(db: sqlite3.Connection, include_asked: bool = True) -> list[It
     return [Item(*r) for r in db.execute(sql + " ORDER BY id")]
 
 
+def chat_facts(db: sqlite3.Connection) -> list[Item]:
+    """Free facts the person told Scout in chat (about_you, project); asked ones stay out."""
+    sql = (
+        f"SELECT {_COLUMNS} FROM memories WHERE kind IN ('about_you','project')"
+        " AND visibility='free' ORDER BY id"
+    )
+    return [Item(*r) for r in db.execute(sql)]
+
+
 def set_portrait(db: sqlite3.Connection, text: str, at: str) -> Item:
     text = text.strip()
     cap = KINDS["portrait"].max_chars or 0

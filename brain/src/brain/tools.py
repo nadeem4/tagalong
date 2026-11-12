@@ -204,7 +204,9 @@ def brain_tools(
                 "recall",
                 "Search your long-term memory, the saved chat and past jobs by words. Use it when "
                 "something not in your prompt may have been saved, said or done earlier. "
-                "Set include_personal only when the person brought that topic up themselves.",
+                "Set include_personal when the person asks about themselves (where they live, "
+                "family, health, anything private) or brought that topic up; a fact kept for "
+                "being asked shows only then. Search before saying you do not know.",
                 {
                     "type": "object",
                     "properties": {

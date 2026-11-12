@@ -281,6 +281,12 @@ async def _call(message: dict, req_id: Any, peer: _Peer, session: Session) -> No
     peer.send(reply)
 
 
+def _bad_start(exc: ValidationError) -> str:
+    if any(e["loc"] == ("github",) for e in exc.errors()):
+        return "That is not a GitHub username."
+    return "Give a GitHub username or a LinkedIn PDF."
+
+
 async def _know_me_start(
     message: dict, req_id: Any, body_id: str, peer: _Peer, session: Session
 ) -> None:
@@ -303,7 +309,8 @@ async def _know_me_start(
             e["loc"] == ("pdf", "data") and e["type"] == "string_too_long" for e in exc.errors()
         )
         code = ErrorCode.over_limit if too_big else ErrorCode.invalid_params
-        reply = _error(req_id, code, "The PDF is over 10 MB." if too_big else str(exc))
+        # Plain words only: pydantic's own text carries a docs URL the person should not see.
+        reply = _error(req_id, code, "The PDF is over 10 MB." if too_big else _bad_start(exc))
     except RpcError as exc:  # invalid_params, over_limit
         reply = _error(req_id, exc.code, str(exc))
     except asyncio.CancelledError:

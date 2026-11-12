@@ -141,3 +141,33 @@ async def test_complete_stops_when_budget_spent(tmp_path):
 async def test_complete_stops_when_model_not_ready(tmp_path):
     with pytest.raises(BudgetStop):
         await complete(FakeModel(ready=False), budget(tmp_path), "sys", [])
+
+
+CONTACT = Material(
+    "Reach me on +1 331 814 9771 or at amy@example.com. I built Foo, a CLI tool.", "github:amy"
+)
+
+
+@pytest.mark.parametrize(
+    "evidence,text",
+    [
+        ("+1 331 814 9771", "Has a home phone"),
+        ("amy@example.com", "Has an email"),
+        ("I built Foo, a CLI tool", "Phone is 331-814-9771"),
+        ("I built Foo, a CLI tool", "Mail amy@example.com about Foo"),
+    ],
+)
+def test_check_drops_contact_details(evidence, text):
+    c = Candidate("personal", text, evidence, "github:amy")
+    assert check([c], CONTACT) == []
+
+
+def test_check_keeps_a_fact_with_no_contact_details():
+    c = Candidate("projects", "Built Foo", "I built Foo, a CLI tool", "github:amy")
+    assert check([c], CONTACT) == [c]
+
+
+def test_extractor_prompt_forbids_contact_details():
+    from brain.know.extract import prompt
+
+    assert "phone" in prompt("know_extract.md") and "email" in prompt("know_extract.md")

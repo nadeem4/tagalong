@@ -126,3 +126,9 @@ async def test_start_that_joins_a_run_says_the_username_was_not_used(mem, tmp_pa
     out = await handler({"action": "start", "github": "someone"})
     assert "already" in out and "someone" in out
     await runner._task
+
+
+def test_tool_description_says_decline_uses_declined_not_remember(mem, tmp_path):
+    _, tools, _ = build(mem, tmp_path)
+    d = tools["get_to_know_me"][0].description
+    assert "declined" in d and "never `remember`" in d
