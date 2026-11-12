@@ -321,6 +321,15 @@ describe('TalkOver', () => {
     expect(over.heard()).toEqual({ turn: 't1', heard: 2 });
   });
 
+  it('press_then_ears_fail_resumes: a pause with no words coming always ends in a resume', () => {
+    const player = fakePlayer(null); // nothing of a turn is reported while paused
+    const over = new TalkOver(() => player);
+    over.press();
+    over.nothing(); // what talk.ts does when the ears fail
+    expect(player.resume).toHaveBeenCalledOnce();
+    expect(player.cutOff).not.toHaveBeenCalled();
+  });
+
   it('echo_resumes_playback: nothing heard lets Scout carry on, and forgets the press', () => {
     const player = fakePlayer();
     const over = new TalkOver(() => player);

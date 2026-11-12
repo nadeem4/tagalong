@@ -323,6 +323,13 @@ async def _next(stream, stop: asyncio.Event | None):
     waiter = asyncio.ensure_future(stop.wait())
     try:
         await asyncio.wait({pending, waiter}, return_when=asyncio.FIRST_COMPLETED)
+    except BaseException:
+        # A real cancel (Stop, close, timeout, disconnect) must not leave the read running or
+        # the provider's stream open: it would keep streaming, and billing.
+        pending.cancel()
+        await asyncio.gather(pending, return_exceptions=True)
+        await stream.aclose()
+        raise
     finally:
         waiter.cancel()
     if pending.done():
@@ -372,6 +379,16 @@ async def _run_tools(
         notify("tool", {**info, "state": "ended", "ok": "is_error" not in result})
         return result
 
+    if stop is not None and stop.is_set():
+        # The person already talked over Scout: nothing new starts.
+        return [
+            {
+                "type": "tool_result",
+                "tool_use_id": c["id"],
+                "content": "not run: the person talked over Scout",
+            }
+            for c in calls
+        ]
     tasks = [asyncio.ensure_future(one(c)) for c in calls]
     detached: set[asyncio.Future] = set()
     try:
@@ -400,7 +417,7 @@ async def _run_tools(
                 {
                     "type": "tool_result",
                     "tool_use_id": call["id"],
-                    "content": "still running; its result comes back on its own",
+                    "content": "still running when the turn stopped",
                 }
             )
         return results

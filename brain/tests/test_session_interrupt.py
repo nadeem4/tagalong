@@ -271,8 +271,10 @@ async def test_interrupt_does_not_close_open_items():
 
 async def test_inflight_tool_result_returns_via_front_door():
     release = asyncio.Event()
+    started = asyncio.Event()
 
     async def slow(call, caller="scout", **_):
+        started.set()
         await release.wait()
         return "the late answer"
 
@@ -281,7 +283,7 @@ async def test_inflight_tool_result_returns_via_front_door():
     session.toolbox.run = slow
     first = await session.say("desktop", say("do it"))
     voice.logs[first.turn] = ["One."]
-    await settle()
+    await asyncio.wait_for(started.wait(), 1)  # the tool is really running
     await session.say("desktop", over("wait", first.turn, 0))
     await finish_quietly(session)  # the second turn ends; the tool is still running
     assert len(model.seen) == 2
@@ -291,6 +293,39 @@ async def test_inflight_tool_result_returns_via_front_door():
         await finish_quietly(session)
     assert "the late answer" in json.dumps(model.seen[-1])
     assert len(model.seen) == 3  # one wake turn carried it, nothing ran alongside
+
+
+async def test_a_late_tool_result_waits_for_the_next_turns_speech_then_arrives():
+    # A paused turn's tool ends while Scout is still speaking the next turn: the news is held
+    # (it must not talk over the reply), then delivered at the first sentence break.
+    release = asyncio.Event()
+    started = asyncio.Event()
+
+    async def slow(call, caller="scout", **_):
+        started.set()
+        await release.wait()
+        return "the late answer"
+
+    model = SnapGate([slow_tool_call(), "ok", "and the tool says so"])
+    session, sent, voice = make_voiced(model)
+    session.toolbox.run = slow
+    first = await session.say("desktop", say("do it"))
+    voice.logs[first.turn] = ["One."]
+    await asyncio.wait_for(started.wait(), 1)
+    await session.say("desktop", over("wait", first.turn, 0))
+    await finish_quietly(session)  # the second turn ended; its reply is still being played
+    session.dispatcher.set_speech_state("talking")
+    release.set()
+    for _ in range(20):
+        await settle()
+        await finish_quietly(session)
+    assert len(model.seen) == 2  # held: no wake turn while the desktop is speaking
+    session.dispatcher.set_speech_state("sentence_break")
+    for _ in range(20):
+        await settle()
+        await finish_quietly(session)
+    assert len(model.seen) == 3
+    assert "the late answer" in json.dumps(model.seen[-1])
 
 
 async def test_no_second_turn_alongside():
@@ -322,3 +357,31 @@ async def test_no_second_turn_alongside():
     assert ended_when_asked == [False, True]  # the first call was made before the task existed
     release.set()
     await settle()
+
+
+async def test_stopping_the_session_cancels_tools_left_running():
+    # The Stop button cannot reach a detached tool, but shutting the brain down must end it.
+    release = asyncio.Event()
+    started = asyncio.Event()
+    cancelled = []
+
+    async def slow(call, caller="scout", **_):
+        started.set()
+        try:
+            await release.wait()
+        except asyncio.CancelledError:
+            cancelled.append(True)
+            raise
+        return "never told"
+
+    model = SnapGate([slow_tool_call(), "ok"])
+    session, sent, voice = make_voiced(model)
+    session.toolbox.run = slow
+    first = await session.say("desktop", say("do it"))
+    voice.logs[first.turn] = ["One."]
+    await asyncio.wait_for(started.wait(), 1)  # the tool is really running
+    await session.say("desktop", over("wait", first.turn, 0))
+    await finish_quietly(session)
+    await session.stop_background()
+    assert cancelled == [True]
+    assert not session._background

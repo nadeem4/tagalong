@@ -250,12 +250,14 @@ export function useTalk(options: TalkOptions): {
           setNote(earsNotes.status(noteNow.current, status));
           return;
         }
+        // A key press paused Scout; the ears died, so no words will come to decide: it carries on.
+        over.nothing();
         const asking = listening.current;
         if (controller.made.earsFailed() !== 'always' && !asking) return;
         control.quiet();
         setNote(earsNotes.failed(noteNow.current, message));
       }),
-    [control, controller, earsNotes, setNote],
+    [control, controller, earsNotes, over, setNote],
   );
 
   // Always listening, as switched in the bubble or Settings, and paused for a call.

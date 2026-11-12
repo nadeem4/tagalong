@@ -280,6 +280,8 @@ into `start`, `stop` or `none`. It has four modes: `idle`, `held`, `clicked` and
   over Scout still switches Always listening off (and cuts Scout off), and is not sent to the brain.
   The talk key and mic button read `SpeechPlayer.interruption()` before the player pauses
   (`TalkOver` in `talk-rules.ts`), so a held question carries it too.
+  A pause from the talk key always ends: in a cut-off (words heard) or a resume (nothing heard, or the
+  mic or ears failed, which calls `TalkOver.nothing()`).
 - **Delivery.** A heard question goes through `HeardInbox`. If no bubble is mounted (a one-line
   hello or remark is up, or Scout is still waking), the question is held, the line
   gives way through `onBegin`, and the bubble asks it as it subscribes. Only the latest is held.
