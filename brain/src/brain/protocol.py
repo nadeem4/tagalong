@@ -457,6 +457,44 @@ class SpeechControlParams(Model):
     turn: Id | None = None
 
 
+# Get to know me: the body starts a run from a GitHub username, a LinkedIn "Save to PDF" file or
+# both; the brain reports each source's progress. `data` is base64 of at most 10 MB decoded.
+KNOW_ME_PDF_B64_MAX = 13_981_016
+
+
+class KnowMePdf(Model):
+    name: Annotated[str, Field(min_length=1, max_length=255)]
+    data: Annotated[str, Field(max_length=KNOW_ME_PDF_B64_MAX)]
+
+
+class KnowMeStartParams(Model):
+    github: Annotated[str, Field(pattern=r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$")] | None = None
+    pdf: KnowMePdf | None = None
+
+    @model_validator(mode="after")
+    def _something(self) -> "KnowMeStartParams":
+        if self.github is None and self.pdf is None:
+            raise ValueError("give a GitHub username, a PDF, or both")
+        return self
+
+
+class KnowMeStartResult(Model):
+    joined: bool
+
+
+# Live-only, no `seq`: a run does not survive a restart, so a status is never replayed.
+class KnowMeSourceStatus(Model):
+    name: str
+    state: Literal["waiting", "reading", "done", "failed"]
+    gap: Annotated[str, Field(max_length=200)] | None = None
+
+
+class KnowMeStatusParams(Model):
+    sources: list[KnowMeSourceStatus]
+    done: bool
+    portrait: Annotated[str, Field(max_length=1500)] | None = None
+
+
 # Method name -> (params model, result model or None for notifications).
 type MethodMap = dict[str, tuple[type[BaseModel], type[BaseModel] | None]]
 
@@ -473,6 +511,7 @@ BODY_TO_BRAIN: MethodMap = {
     "unlisten": (EmptyParams, None),
     "hush": (EmptyParams, None),
     "speech_state": (SpeechStateParams, None),
+    "know_me_start": (KnowMeStartParams, KnowMeStartResult),
 }
 
 BRAIN_TO_BODY: MethodMap = {
@@ -488,4 +527,5 @@ BRAIN_TO_BODY: MethodMap = {
     "voice": (VoiceParams, None),
     "speech": (SpeechParams, None),
     "speech_control": (SpeechControlParams, None),
+    "know_me_status": (KnowMeStatusParams, None),
 }

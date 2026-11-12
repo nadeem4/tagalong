@@ -404,3 +404,30 @@ def test_reading_data_parses_the_example_and_rejects_bad_state_and_language():
         ReadingData.model_validate(
             {"rows": [{**row, "state": "needs-language-pack", "language": "en-US; calc"}]}
         )
+
+
+def test_know_me_start_needs_something():
+    from brain.protocol import KnowMeStartParams
+
+    with pytest.raises(ValidationError):
+        KnowMeStartParams.model_validate({})
+    assert KnowMeStartParams.model_validate({"github": "octocat"}).pdf is None
+    pdf = {"name": "p.pdf", "data": "AA=="}
+    assert KnowMeStartParams.model_validate({"pdf": pdf}).github is None
+    for bad in ("a b", "a" * 40, "-a"):
+        with pytest.raises(ValidationError):
+            KnowMeStartParams.model_validate({"github": bad})
+
+
+def test_know_me_status_bounds():
+    from brain.protocol import KNOW_ME_PDF_B64_MAX, KnowMePdf, KnowMeStatusParams
+
+    ok = {"sources": [{"name": "GitHub", "state": "done"}], "done": False}
+    KnowMeStatusParams.model_validate(ok)
+    bad_state = {"sources": [{"name": "GitHub", "state": "running"}], "done": False}
+    long_gap = {"sources": [{"name": "G", "state": "failed", "gap": "x" * 201}], "done": True}
+    for bad in (bad_state, long_gap, {"sources": [], "done": True, "portrait": "x" * 1501}):
+        with pytest.raises(ValidationError):
+            KnowMeStatusParams.model_validate(bad)
+    with pytest.raises(ValidationError):
+        KnowMePdf.model_validate({"name": "p.pdf", "data": "A" * (KNOW_ME_PDF_B64_MAX + 1)})

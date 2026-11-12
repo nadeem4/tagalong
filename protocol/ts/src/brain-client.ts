@@ -9,9 +9,12 @@ import { ErrorCode, PROTOCOL, type Body, type Part, type Tool } from './shapes.j
 import {
   CallResult,
   HelloResult,
+  KnowMeStartResult,
   SayResult,
   UseParams,
   brainToBody,
+  type KnowMeStartParams,
+  type KnowMeStatusParams,
   type ListenParams,
   type MethodSchemas,
   type SayParams,
@@ -83,6 +86,7 @@ export class BrainClient {
   private keepaliveTimer: ReturnType<typeof setInterval> | undefined;
   private pending = new Map<string, Pending>();
   private retryTimer: ReturnType<typeof setTimeout> | undefined;
+  private knowMeListeners = new Set<(s: KnowMeStatusParams) => void>();
 
   constructor(private readonly options: BrainClientOptions) {}
 
@@ -165,6 +169,22 @@ export class BrainClient {
   /** What this body's speaker is doing. Live-only: dropped unless online. */
   speechState(params: SpeechStateParams): void {
     this.notify('speech_state', params);
+  }
+
+  /** Starts a get-to-know-me run, or joins the running one. Rejects BrainOffline unless online. */
+  knowMeStart(params: KnowMeStartParams): Promise<KnowMeStartResult> {
+    if (this.status !== 'online') return Promise.reject(new BrainOffline());
+    return this.request('know_me_start', params).then((r) => {
+      const parsed = KnowMeStartResult.safeParse(r);
+      if (!parsed.success) throw new Error('brain sent a bad know_me_start result');
+      return parsed.data;
+    });
+  }
+
+  /** Progress of the run this body started or joined. Returns the unsubscribe function. */
+  onKnowMeStatus(listener: (s: KnowMeStatusParams) => void): () => void {
+    this.knowMeListeners.add(listener);
+    return () => this.knowMeListeners.delete(listener);
   }
 
   private notify(method: string, params: object = {}): void {
@@ -365,6 +385,9 @@ export class BrainClient {
     if (!parsed.success) return;
     if (entry.live) {
       // Audio and voice status belong to this connection only: no seq, no replay bookkeeping.
+      if (method === 'know_me_status') {
+        for (const l of this.knowMeListeners) l(parsed.data as KnowMeStatusParams);
+      }
       this.options.onNotification(method, parsed.data);
       return;
     }
