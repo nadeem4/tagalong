@@ -141,8 +141,8 @@ export function ResultView({ portrait, gaps, facts, onDone }: ResultViewProps) {
       </div>
       {gaps.length > 0 && (
         <ul className="know__gaps" aria-label="What I could not read">
-          {gaps.map((gap) => (
-            <li key={gap}>{gap}</li>
+          {gaps.map((gap, i) => (
+            <li key={i}>{gap}</li>
           ))}
         </ul>
       )}

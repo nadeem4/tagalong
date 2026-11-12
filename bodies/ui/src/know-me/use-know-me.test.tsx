@@ -27,6 +27,18 @@ describe('useKnowMe', () => {
     );
   });
 
+  it('says the brain is away when the sources cannot load, and loads them when it is back', async () => {
+    const { bridge, result } = setup();
+    const real = bridge.knowMeSources;
+    bridge.knowMeSources = () => Promise.reject(new Error('offline'));
+    act(() => bridge.emitChanged('link'));
+    await waitFor(() => expect(result.current.error).toBe('Scout is not connected right now.'));
+    bridge.knowMeSources = real;
+    act(() => bridge.emitChanged('link'));
+    await waitFor(() => expect(result.current.sources).toHaveLength(3));
+    expect(result.current.error).toBeNull();
+  });
+
   it('subscribes on mount, before any start, and unsubscribes on unmount', () => {
     const { bridge, unmount } = setup();
     expect(bridge.knowStatusListeners).toBe(1);

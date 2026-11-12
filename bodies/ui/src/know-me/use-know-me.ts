@@ -8,6 +8,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useHostBridge } from '../host-bridge';
 import type { KnowMeInput, KnowMeStatus, KnowSourceInfo } from '../shapes';
 
+const NOT_CONNECTED = 'Scout is not connected right now.';
+
 export interface KnowMe {
   sources: KnowSourceInfo[];
   status: KnowMeStatus | null;
@@ -25,22 +27,35 @@ export function useKnowMe(): KnowMe {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Loaded on mount and again whenever the brain says something changed, so a window opened
+  // before the brain was up recovers by itself.
   useEffect(() => {
     let alive = true;
-    bridge
-      .knowMeSources()
-      .then((list) => alive && setSources(list))
-      .catch((e: unknown) => console.error('could not list the get to know me sources', e));
-    // Subscribed before any start, so the first status is never missed. A run another window
-    // started shows here too.
-    const off = bridge.onKnowMeStatus((next) => {
+    const load = (): void => {
+      bridge
+        .knowMeSources()
+        .then((list) => {
+          if (!alive) return;
+          setSources(list);
+          setError((prev) => (prev === NOT_CONNECTED ? null : prev));
+        })
+        .catch(() => alive && setError(NOT_CONNECTED));
+    };
+    load();
+    const offChanged = bridge.onBrainChanged(load);
+    return () => {
+      alive = false;
+      offChanged();
+    };
+  }, [bridge]);
+
+  // Subscribed before any start, so the first status is never missed. A run another window
+  // started shows here too.
+  useEffect(() => {
+    return bridge.onKnowMeStatus((next) => {
       setStatus(next);
       setRunning(!next.done);
     });
-    return () => {
-      alive = false;
-      off();
-    };
   }, [bridge]);
 
   const start = useCallback(

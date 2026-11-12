@@ -98,6 +98,24 @@ describe('RunForm', () => {
     expect(screen.queryByLabelText('Your GitHub username')).not.toBeInTheDocument();
   });
 
+  it('says so when the file cannot be read', async () => {
+    form();
+    class BrokenReader {
+      onerror: (() => void) | null = null;
+      readAsDataURL() {
+        queueMicrotask(() => this.onerror?.());
+      }
+    }
+    vi.stubGlobal('FileReader', BrokenReader);
+    try {
+      choose(pdf('hi'));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Could not read that file.');
+      expect(screen.getByRole('button', { name: 'Get to know me' })).toBeDisabled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('shows the start error as an alert', () => {
     form({ error: 'Scout is not connected right now.' });
     expect(screen.getByRole('alert')).toHaveTextContent('Scout is not connected right now.');

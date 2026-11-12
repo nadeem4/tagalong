@@ -51,7 +51,7 @@ export const KNOW_ME_CSS = `
 .know__quote { display: block; margin-top: ${t.space.xxs}px; color: ${t.color.panelMuted}; ${typeCss('small')}; }
 .know__meta { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: ${t.space.xs}px; flex: none; }
 .know__chip {
-  padding: 1px ${t.space.md}px; border-radius: ${t.radius.pill}px; white-space: nowrap;
+  padding: ${t.space.xxs}px ${t.space.md}px; border-radius: ${t.radius.pill}px; white-space: nowrap;
   background: ${t.color.chipFree}; color: ${t.color.chipFreeInk}; ${typeCss('caption')};
 }
 .know__chip--asked { background: ${t.color.warnFill}; color: ${t.color.warnInk}; }
@@ -75,7 +75,7 @@ export const KNOW_ME_CSS = `
 
 .know__progress { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: ${t.space.lg}px; }
 .know__row { display: grid; grid-template-columns: 10px minmax(0, 1fr); column-gap: ${t.space.lg}px; align-items: start; ${typeCss('bodyLead')}; }
-.know__dot { width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; border: 2px solid ${t.color.disabledChev}; box-sizing: border-box; }
+.know__dot { width: 10px; height: 10px; margin-top: ${t.space.xs}px; border-radius: 50%; border: 2px solid ${t.color.disabledChev}; box-sizing: border-box; }
 .know__row[data-state='reading'] .know__dot { background: ${t.color.gold}; border-color: ${t.color.gold}; animation: know-pulse 1.2s ease-in-out infinite; }
 .know__row[data-state='done'] .know__dot { background: ${t.color.okDot}; border-color: ${t.color.okDot}; }
 .know__row[data-state='failed'] .know__dot { background: ${t.color.warnBar}; border-color: ${t.color.warnBar}; }
