@@ -2818,3 +2818,14 @@ Still no screen; `brain/tests/test_know_start.py`, `test_protocol.py` and the co
 - `know_me_start` with neither a GitHub username nor a PDF, a username over 39 characters or with a space, or bad base64 is refused with `invalid_params`; a PDF over 10 MB decoded is `over_limit`.
 - A second start while a run is going joins it (`joined: true`); once the run is done a new start begins again.
 - `know_me_status` goes live (no `seq`) to the body that started or joined the run, not to other bodies, and not to a body that has gone.
+
+## Get to know me (K3 sources and extraction, automated only)
+
+Still no screen; `brain/tests/test_know_extract.py`, `test_know_web.py`, `test_know_github.py`, `test_know_linkedin.py` and `test_know_source.py` cover it, all on fakes (a mock GitHub transport, a scripted model, no real call):
+
+- A fact whose quote is not in the material is dropped; a quote that differs only in whitespace or case is kept.
+- Text in a page, README or PDF that tries to instruct the extractor is fenced as untrusted data, with its angle brackets escaped.
+- A web page that shares only the person's name (or only their employer) is dropped; the handle as `@h` or `github.com/h` (a plain word does not count), a listed link (matched to its end), or name plus employer keeps it.
+- The web source asks for at most 5 searches and 5 page reads, and spends the day's budget; a spent budget stops it before any call.
+- GitHub: forks are skipped, 30 repos at most; an unknown user, a rate limit and a network error each give a plain gap; a missing README does not.
+- LinkedIn: an image-only PDF or a file that is not a PDF gives a gap, not facts.

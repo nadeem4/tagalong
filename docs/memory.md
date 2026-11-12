@@ -36,6 +36,10 @@ Migration 33 gives every memory row `tag`, `source`, `source_ref`, `evidence` an
 - `Memory.save_source_facts(source, facts)` replaces that source's `profile` rows in one transaction, skipping a fact whose evidence was dismissed, whose text another source already holds, or any past the 500 cap. Text and evidence are masked first.
 - Forgetting a `profile` fact (chat or Home) also records `(source, evidence)` in `memory_dismissed`, compared after collapsing whitespace and case, so a re-run does not bring it back.
 
+### Sources of profile facts
+
+"Get to know me" reads GitHub (public API), the PDF the person saves from LinkedIn, and the web, one `KnowSource` each (see [brain.md](brain.md#get-to-know-me-know)). A model proposes facts from each source's material, but a fact is kept only when the words it quotes as evidence are in that material (whitespace and case ignored); anything else is dropped. A web page counts only when it holds the person's handle, a link they listed, or both their name and employer, so a namesake's page is dropped. Material is fenced as untrusted data, so text in a README or page cannot instruct the extractor.
+
 ### Portrait
 
 One `portrait` row (up to 1,500 characters, written by code) is a short description of the owner. It is always loaded and leads the "What you know" block as `Who the owner is:` with no id. `recall` never returns it, and `forget` refuses it: it is rewritten, not deleted. Home's `list_memories` leaves it out of the rows and returns it as a separate `portrait` text (null when unset); each row also carries `tag`, `source`, `source_ref`, `evidence` and `visibility`.
