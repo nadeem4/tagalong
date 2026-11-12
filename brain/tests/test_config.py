@@ -5,11 +5,13 @@ so every body sees one session across brain restarts.
 """
 
 import os
+from datetime import datetime, time
 from pathlib import Path
 
 import pytest
 
 from brain.config import (
+    in_quiet_hours,
     load_config,
     load_env_file,
     session_id,
@@ -177,6 +179,30 @@ def test_split_command_posix_still_honours_quotes():
 def test_wakes_per_hour_default_and_override():
     assert load_config({}).wakes_per_hour == 12
     assert load_config({"TAGALONG_WAKES_PER_HOUR": "4"}).wakes_per_hour == 4
+
+
+def test_quiet_hours_default_off_and_override():
+    assert load_config({}).quiet_hours is None
+    assert load_config({"TAGALONG_QUIET_HOURS": "22:00-07:00"}).quiet_hours == (
+        time(22, 0),
+        time(7, 0),
+    )
+
+
+@pytest.mark.parametrize("value", ["22:00", "25:00-07:00", "x-y", "07:00-07:00"])
+def test_quiet_hours_must_be_two_different_times(value):
+    with pytest.raises(ValueError, match="TAGALONG_QUIET_HOURS"):
+        load_config({"TAGALONG_QUIET_HOURS": value})
+
+
+def test_in_quiet_hours_wraps_midnight():
+    night = (time(22, 0), time(7, 0))
+    day = (time(9, 0), time(17, 0))
+    at = lambda h, m=0: datetime(2026, 11, 11, h, m)  # noqa: E731
+    assert in_quiet_hours(night, at(23)) and in_quiet_hours(night, at(6, 59))
+    assert not in_quiet_hours(night, at(7)) and not in_quiet_hours(night, at(12))
+    assert in_quiet_hours(day, at(9)) and not in_quiet_hours(day, at(17))
+    assert not in_quiet_hours(None, at(3))
 
 
 @pytest.mark.parametrize("value", ["0", "x"])

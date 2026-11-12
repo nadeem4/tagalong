@@ -25,6 +25,16 @@ _KINDS = {
     "choice": ("Question", "Scout is waiting for your choice"),
     "expert_ask": ("Expert request", "An expert wants your OK"),
     "offer": ("Offer", ""),
+    "held": ("Held news", ""),
+}
+# Why the dispatcher kept news instead of telling it (dispatcher.py), in plain words.
+_HELD_WHY = {
+    "budget_spent": "held because the daily budget was spent",
+    "quiet_hours": "held during quiet hours",
+    "stale": "held because nobody was there to hear it",
+    "gave_up": "held because it could not be delivered",
+    "stopped": "held because Scout was stopping",
+    "start_failed": "held because Scout could not start on it",
 }
 
 
@@ -35,6 +45,8 @@ def _row(item: OpenItem, now: datetime) -> dict:
         line = summarise(saved.get("text") or "", saved.get("name") or "", saved.get("input") or {})
     elif item.kind == "offer":
         line = saved.get("sentence") or "An offer from Scout"
+    elif item.kind == "held":
+        line = f"{saved.get('event', 'news')}: {_HELD_WHY.get(saved.get('why'), 'held')}"
     return {
         "id": item.id,
         "kind": word,

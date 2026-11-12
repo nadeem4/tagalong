@@ -258,6 +258,16 @@ async def test_home_loop_done_and_later_unknown_id_are_invalid_params(rig):
         assert err.value.code == ErrorCode.invalid_params
 
 
+async def test_held_list_shows_news_the_dispatcher_held_with_its_reason(rig):
+    rig.items.open("held", "brain", saved_call={"event": "timer", "why": "quiet_hours"})
+    rig.items.open("held", "brain", saved_call={"event": "job_ended", "why": "budget_spent"})
+    rows = (await rig.call("loops_state"))["open_items"]
+    assert [(r["kind"], r["title"]) for r in rows] == [
+        ("Held news", "timer: held during quiet hours"),
+        ("Held news", "job_ended: held because the daily budget was spent"),
+    ]
+
+
 async def test_held_list_names_each_open_item_plainly_and_leaves_out_setup_news(rig):
     saved = {"name": "delete_files", "input": {}, "text": "I'll delete 3 old logs."}
     rig.items.open("ask", "desktop", saved_call=saved)

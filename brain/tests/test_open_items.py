@@ -1,11 +1,12 @@
 """OpenItems: one lifecycle (open to answered, done or expired), one deadline, every move logged."""
 
+import sqlite3
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from brain.open_items import DEADLINE_S, OpenItemRefused, OpenItems
-from brain.store.db import open_db
+from brain.store.db import migrate, open_db
 
 T0 = datetime(2026, 11, 11, 9, 0, 0, tzinfo=UTC)
 
@@ -155,3 +156,22 @@ def test_expired_since_lists_what_ended_while_away(tmp_path):
     items.expire_live_only()
     items.open("ask", "desktop", saved_call={"tool": "x"})
     assert [i.id for i in items.expired_since(T0 + timedelta(minutes=30))] == [new.id]
+
+
+def test_held_news_is_an_open_item_kind(tmp_path):
+    # Migration 0032 widens the kind list so the dispatcher can hold any event's news.
+    items, _ = make(tmp_path)
+    item = items.open("held", "desktop", saved_call={"event": "timer", "why": "budget_spent"})
+    assert items.list_open(kind="held") == [item]
+
+
+def test_migration_0032_keeps_existing_rows(tmp_path):
+    raw = sqlite3.connect(tmp_path / "old.db", isolation_level=None)
+    migrate(raw, upto=31)
+    raw.execute(
+        "INSERT INTO open_items(id, kind, origin_body, created_at, deadline_at)"
+        " VALUES ('a', 'ask', 'desktop', 't', 't')"
+    )
+    migrate(raw)
+    assert raw.execute("SELECT id, kind FROM open_items").fetchall() == [("a", "ask")]
+    assert raw.execute("SELECT name FROM sqlite_master WHERE name = 'open_items_open'").fetchone()

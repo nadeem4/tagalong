@@ -22,7 +22,7 @@ from brain.bodies import Bodies
 from brain.bodies_tools import bodies_tools
 from brain.bridges import ENTRY, WHATSAPP_SECRETS, BridgeSupervisor, private_node, real_spawn
 from brain.build_info import app_version, build_id
-from brain.config import load_config, load_env_file, session_id
+from brain.config import in_quiet_hours, load_config, load_env_file, session_id
 from brain.experts import ExpertHosts
 from brain.guardrails import Budget
 from brain.lifecycle import clear_pid, real_started, write_pid
@@ -256,6 +256,7 @@ async def _run() -> None:
         before_job=updates.quiet,  # a job never starts in the middle of an update's swap
         tokens=tokens,
         wakes_per_hour=config.wakes_per_hour,
+        quiet=lambda at: in_quiet_hours(config.quiet_hours, at),
         turn_timeout=config.turn_timeout,
         preview_chars=config.tool_preview_chars,
         job_steps_max_entries=config.job_steps_max_entries,
@@ -363,6 +364,7 @@ async def _run() -> None:
         await voice.close()
         await session.jobs.shutdown()
         await apps.shutdown()
+        await session.dispatcher.stop()  # news still waiting is held, so the next run shows it
         memory.close()
         clear_pid(config.data_dir, os.getpid())
 

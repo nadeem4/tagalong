@@ -441,7 +441,7 @@ sequenceDiagram
   participant X as Browser body
   participant S as Brain Session
   participant L as LoopService.saw
-  participant Q as Scheduler
+  participant Q as Dispatcher
   D->>S: event focus {app, title}
   X->>S: event tab {title, url}
   S->>L: focus or tab

@@ -41,7 +41,7 @@ def rig(steps, memory=None):
     async def install_app(args):
         installs.append(args)
         # sign-in finishes later, in the browser: the app reports through an event
-        session.scheduler.emit(
+        session.post_event(
             Event(
                 "setup_done",
                 {"app": "gcal", "name": "Google Calendar", "ok": True, "tools": "create_event"},
@@ -118,7 +118,7 @@ async def test_after_a_restart_nothing_resumes():
     )
     session, model, installs = rig([], memory=saved)
     join(session, "desktop")
-    session.scheduler.pump()
+    session.dispatcher.pump()
     await idle(session)
     assert len(session.history) == 2  # rebuilt through mind/resume.py, as saved text only
     assert session._task is None and model.seen == [] and installs == []

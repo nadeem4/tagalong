@@ -50,6 +50,7 @@ variable still works and is the developer path.
 | `TAGALONG_JOB_QUIET_MIN`         | `20`               | Minutes a running job may show no new step or message before Scout is woken to decide (a positive number). A job has no run limit                                                 |
 | `TAGALONG_EXPERT_IDLE_S`         | `300`              | Seconds an expert's adapter stays running after its last job ends, so a follow-up reuses it (0 stops it at once)                                                                  |
 | `TAGALONG_WAKES_PER_HOUR`        | `12`               | Most wakes per hour, all capped kinds together (whole number, 1 or more)                                                                                                          |
+| `TAGALONG_QUIET_HOURS`           | none               | Local hours when Scout holds what it would say (`HH:MM-HH:MM`, may wrap midnight, e.g. `22:00-07:00`); held news shows on Home |
 | `TAGALONG_OFFER_MIN_APPROVALS`   | `3`                | Times you must allow the same kind of ask before Scout may offer a preference (whole number, 1 or more)                                                                           |
 | `TAGALONG_OFFER_WINDOW_DAYS`     | `14`               | How far back those approvals are counted, in days (whole number, 1 or more)                                                                                                       |
 | `TAGALONG_KEEP_ASKING_DAYS`      | `7`                | Days without an offer for a kind of ask after you answer "Keep asking" (whole number, 1 or more)                                                                                  |
@@ -100,7 +101,7 @@ the total can run a little low.
 | `brain/src/brain/expert_apps.py`       | `ExpertApps`: the loopback MCP bridge that lets an expert reach chosen connected apps through the brain's gate; one token per job part                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `brain/src/brain/experts.py`           | `ExpertHost` (one adapter process per expert, shared by its sessions) and `ExpertRun` (one session over ACP; callbacks for permissions, questions, progress and the end)                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `brain/src/brain/events.py`            | The event kinds registry (batch window, per-hour cap) and the loader for `mind/events.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `brain/src/brain/scheduler.py`         | `Scheduler.emit`: holds events in batches, applies the caps and the budget, starts one wake turn per batch                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `brain/src/brain/dispatcher.py`         | `Scheduler.emit`: holds events in batches, applies the caps and the budget, starts one wake turn per batch                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `brain/src/brain/loops/`               | Loops: `loop.py` the shape, `store.py` the SQLite store over Memory's connection, `service.py` the due timer that emits `loop` events, `reader.py` the mail reader, `tools.py` Scout's loop tools (see [Loops](#loops))                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `brain/src/brain/retry.py`             | `classify` (transient or permanent) and `safe_to_retry`: which failures and tools may be tried again                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `brain/src/brain/timers_home.py`       | `timer_home_tools`: Home-only `timers_state` (every timer, soonest first) and `timer_cancel {id}` (an unknown id, or a `watch` row, is `invalid_params`); `Timers.cancel` ends the row and emits `changed { what: "timers" }`, as does any other timer change                                                                                                                                                                                                                                                                                                                                                                |
@@ -757,7 +758,7 @@ never showed it ignores the frame. Every open `ask` item whose card is not live 
 leaves none) gets its card shown again, with the same ask id and no `turn`, for every body. A tool
 that has gone ends the ask `failed` ("that tool is gone"). Then, if any card was shown again (or, when the absence is known, an open ask created during it, for
 example one opened while no screen was up), one
-`asks_waiting` event goes to the scheduler: `count` and `asks`, a JSON list of `ask`, `tool`,
+`asks_waiting` event goes to the dispatcher: `count` and `asks`, a JSON list of `ask`, `tool`,
 `summary` and `age_s` (seconds waited), oldest first, so Scout can say how old each is in his own
 words. A card that cannot be built is logged and skipped; the others still show. Nothing is decided without the
 person on return: the rule and side-check ran when the ask opened. The Held tab lists the open
@@ -1472,13 +1473,14 @@ when the job has any rows (one query, `WorkStore.jobs_with_activity`).
 never left unannounced, and the job's end cancels the trailing send; the `end` entry's own change
 is the one notice, sent after that row. The Jobs list keeps its own 2 s `changed {what: "jobs"}`.
 
-**Wake and the finish turn.** `Session.scheduler` (`scheduler.py`) is the entry point for events that
-are not the user talking: `emit(Event)`. It holds events in per-kind batches (`events.py`; a job
+**Wake and the finish turn.** `Session.dispatcher` (`dispatcher.py`) is the entry point for events that
+are not the user talking: `Session.post_event(Event)`. It holds events in per-kind batches (`events.py`; a job
 ending batches for 30 s, at most 10 wakes an hour, and `TAGALONG_WAKES_PER_HOUR` caps all capped kinds
 together). When no turn runs and a batch is due, it starts one turn per batch through the same path
-as `say` (same budget, step cap and turn notifications); with the daily budget spent the held
-events are dropped and logged. A job report dropped this way stays untold until the brain
-next starts, even after the budget resets. The turn goes to the body Scout last talked to if it is online, else
+as `say` (same budget, step cap and turn notifications); with the daily budget spent, in quiet hours (`TAGALONG_QUIET_HOURS`) or once an event has
+waited two hours (no body, a person away) the held events are not dropped: each becomes a `held`
+open item that shows on return and in Home's Held list (see [Held news](#held-news)). A job
+report held this way stays untold (a `job_ended` is emitted again at the next start). The turn goes to the body Scout last talked to if it is online, else
 any online body that displays (`Bodies.display_ids()`; a body that said `display: false` never counts);
 with none, the batch waits until a body connects. A batch held while a turn
 runs starts when that turn ends, whichever way it ends. The text is fenced as `<data kind="event">`
@@ -1572,11 +1574,11 @@ flowchart TD
   B -- no --> X[log and drop]
   B -- yes --> C[add to the kind's batch, key replaces older]
   C --> D{daily budget spent?}
-  D -- yes --> X2[drop held events, log]
+  D -- yes --> X2[hold as open items]
   D -- no --> E{turn running?}
   E -- yes --> W[wait for turn end]
   E -- no --> F{batch window over and caps ok?}
-  F -- no --> T[timer wakes the scheduler later]
+  F -- no --> T[timer wakes the dispatcher later]
   F -- yes --> G{a body online?}
   G -- no --> W2[wait for a body to connect]
   G -- yes --> H[start one turn, fenced data kind=event]
@@ -1640,7 +1642,7 @@ shows them as Scout does.
   `no open question <id>.`
 - **Known gap (questions).** A question whose job ends while its wake is still queued behind a busy
   turn still wakes Scout once; that spends budget and `answer_expert` then gets "no open question".
-  The scheduler cannot recall a queued event (the same gap timers document). If the body goes
+  The dispatcher cannot recall a queued event (the same gap timers document). If the body goes
   offline after the question is queued, the question waits for a body to reconnect or for the job
   to time out.
 - **Limits.** At most 2 jobs run at once (a hand-off waiting on its ask holds a slot); a third
@@ -1744,7 +1746,7 @@ item`, one per line, only when a list exists), so `job_ended`, `job_quiet` and `
   `Jobs` emits `job_step_failed` (facts: job, step, exit, activity), keyed by the job. Failures
   batch for 120 s and a newer one for the same job replaces the held one, so ten red commands in a
   burst are one wake showing the latest; the cap is 4 an hour. When the job ends, `Jobs` calls
-  `Scheduler.drop` so a held `job_step_failed` or `job_quiet` for it is forgotten (no hook runs)
+  `Dispatcher.drop` so a held `job_step_failed` or `job_quiet` for it is forgotten (no hook runs)
   and `job_ended`, which carries the same summary, is the only wake.
 
 ```mermaid
@@ -1753,7 +1755,7 @@ flowchart LR
     A[step turns failed] --> F[job_step_failed, key job]
     Q[job_quiet] --> W
     F -->|120 s batch, newest replaces| W[wake with activity summary]
-    J[job ends] -->|Scheduler.drop| X[held failed and quiet events gone]
+    J[job ends] -->|Dispatcher.drop| X[held failed and quiet events gone]
     J --> E[job_ended with the same summary]
 ```
 
@@ -1819,7 +1821,7 @@ flowchart TD
 ## Timers
 
 Scout can leave itself a message for later. `Timers` (`timers.py`) fires the due `timer` and
-`watch` rows of the `work` table as `timer` events; the scheduler (see
+`watch` rows of the `work` table as `timer` events; the dispatcher (see
 [Jobs and tools](#jobs-and-tools)) decides when Scout hears them. A timer has a 0 s batch window
 (timer events held together share one wake) and wakes at most 6 times an hour.
 
@@ -1860,7 +1862,7 @@ is not running is refused (`no job with id j9.`, `job j9 is not running (done).`
   the old time. After a long outage it fires once, not once per missed interval.
 - **Known gap.** Timers fire only while the brain runs. One that came due while it was off fires
   once at the next start. There is no heartbeat: Scout wakes only for events and its own timers.
-  Cancelling a timer whose event the scheduler already holds (busy turn, cap, or no body online)
+  Cancelling a timer whose event the dispatcher already holds (busy turn, cap, or no body online)
   does not recall that event: Scout is still woken with the note of the cancelled timer.
 
 ### Watches
@@ -1899,7 +1901,7 @@ creates a loop before that.
 - **Service** (`loops/service.py`). `LoopService(store, emit, now)` is built and started in
   `main.py` beside the session (`session.loops` is the same object). It emits a `loop` event with the
   loop's id, title, asks, direction, people and due, and a `reason` (see Triggers). Each surface is
-  recorded in the store before the event goes out, so a restart never repeats it. Known limit: if the scheduler then drops
+  recorded in the store before the event goes out, so a restart never repeats it. Known limit: if the dispatcher then drops
   the wake (the hourly wake budget is spent, or no key is set), that surface is not retried; a due
   loop stays visible in Home's Held list but Scout does not bring it up again. One `call_later` is
   armed for the earliest unfired due or quiet time, re-checked at least hourly (the same pattern as
@@ -2081,7 +2083,7 @@ so the next message gets valid history.
 The budget, the step cap, the tool gate's ask, the ask chain and the wake caps go through one
 runner, `guards.py`, so precedence and logging live once. A guard is
 a plain function that gets a context and returns a verdict. `sessions.py` builds one `Guards` set
-and hands it to the turn loop, the scheduler, the side-check and offers. The budget ledger stays in
+and hands it to the turn loop, the dispatcher, the side-check and offers. The budget ledger stays in
 `guardrails.py`; the guards that use it are in `builtin_guards.py`.
 
 ### Hooks
@@ -2089,7 +2091,7 @@ and hands it to the turn loop, the scheduler, the side-check and offers. The bud
 | Hook         | Runs                                          | Built in                                                                                                                                                                            |
 | ------------ | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `model_call` | Before each model call                        | `daily_budget`, `step_cap`                                                                                                                                                          |
-| `emit`       | In the scheduler's pump, before a wake starts | `daily_budget` (code `over_budget`: the scheduler drops all queued events), then `wake_caps` (a `held` block: the wake waits until the per-kind or the overall hourly cap frees up) |
+| `emit`       | In the dispatcher's pump, before a wake starts | `daily_budget` (code `over_budget`: the dispatcher holds every queued wake as a `held` open item), then `wake_caps` (a `held` block: the wake waits until the per-kind or the overall hourly cap frees up) |
 | `save`       | Before text is stored                         | `mask_secrets` (`masking.py`): a `rewrite` with secrets replaced by `[secret]`                                                                                                      |
 
 There is no `ask` hook: every permission ask, Scout's and Claude Code's, goes through the
@@ -2261,7 +2263,7 @@ brain sends and falls back to the system voice for a text-only `speech` frame.
   `read_aloud {on, voice?, speed?, system_voice?}` event; `Session` keeps the latest per body
   across reconnects (the desktop resends it on every connect) and, while `on` is true, speaks every
   turn that body displays: typed replies, the hello, wake remarks and `pet.remark` lines (`_speak`,
-  also called by the scheduler's wake start). The event arrives after the connect, so when it turns
+  also called by the dispatcher's wake start). The event arrives after the connect, so when it turns
   read-aloud on while a turn is already running on that body (a connect wake), that turn starts
   speaking then. A typed `say` that joins a turn re-arms speech after a hush, as a spoken one does.
   A bad event shape is ignored. With `system_voice` the turn is
@@ -2330,8 +2332,9 @@ this]` (`Memory.replace_last_message` rewrites the cut turn's message), never th
 ## Front door and urgency
 
 `dispatcher.py` is the one queue everything that wants Scout's attention enters: say, timers, loops, job
-questions and results, install results and card answers all `post` here, and `scheduler.py` batches
-and caps the wakes it hands on. `drop(kind, key)` forgets a waiting item whose news is superseded.
+questions and results, install results and card answers all `post` here. It also batches and caps
+the wakes it hands on and starts them (it took over what `scheduler.py` did, with one set of
+rules). `drop(kind, key)` forgets a waiting item whose news is superseded.
 An `Item` has a kind, an origin body, a payload, an urgency and an optional key. The urgency is a
 field of the event kind in `events.py`: code sets it, and neither the payload nor the model can raise
 it. `post` looks the kind up and overrides the item's own urgency; only a kind not yet registered
@@ -2352,29 +2355,55 @@ flowchart TD
   U -- now, next_pause, idle --> Q["priority queue"]
   Q --> L["one loop"]
   S["speech state and conversation flag"] --> L
-  L -- "deliverable now" --> B["wait BATCH_S, then one batch"]
+  L -- "deliverable now" --> B["wait the kind's batch window, then one batch"]
   B --> D["deliver(items)"]
   L -- "not yet" --> W["keep waiting"]
 ```
 
 A newer waiting item with the same kind and key replaces the older one. An item that had to wait
 for its gate (a sentence break, quiet) goes the moment the gate opens, because a break can end
-before any window would; items that are deliverable on arrival wait out `BATCH_S` from the oldest
-post so close arrivals share one `deliver` call, ordered by urgency then arrival. A `now` item, or
-any state change, cuts that wait short. A delivery that raises is logged and its items go back with
-their original order (a newer same-key item still replaces them); after `MAX_FAILS` failures an item
-is logged as `dispatcher.gave_up` and dropped. `stop()` logs everything still waiting as
-`dispatcher.dropped`. F12 turns both into holding open items. `Session._deliver` is the `deliver`
-callback. `Dispatcher` requires the
-`OpenItems` store so a `hold` can never be lost. The event notes in `mind/events.md` do not mention
-urgency: the model cannot act on delivery timing.
+before any window would; items that are deliverable on arrival wait out the kind's `batch_seconds`
+from the oldest post so close arrivals share one batch, ordered by urgency then arrival. A `now`
+item, or any state change, cuts that wait short. Words and card answers go to `Session._deliver`;
+the kinds that wake Scout are grouped per kind, capped per hour (`wake_caps`), started one turn at a
+time on a body that can show them (the body Scout last talked to, else any that displays), and
+fenced as `<data kind="event">`. A delivery that raises is logged and its items go back with their
+original order (a newer same-key item still replaces them); after `MAX_FAILS` failures the item is
+held and `Session` is told through the `gave_up` callback, which fails a `say`'s caller and frees its
+token so wakes can still start. `Dispatcher` requires the `OpenItems` store so news is never lost.
 
-The WhatsApp body's two moments are event kinds with urgency `next_pause`: `ask_closed` (a tap or
+WhatsApp body's two moments are event kinds with urgency `next_pause`: `ask_closed` (a tap or
 answer met a question the brain no longer holds; fact `via`) and `many_pending` (a typed reply with
 several questions open; fact `asks`). `from_body` in `events.py` validates them like any body event;
 the notes in `mind/events.md` leave the wording to Scout. Both kinds are capped at 6 an hour: an
 event over the cap is held, not dropped, so Scout can speak of a tap long after it happened. The cap
 stays on purpose. Scout's words reach the phone only when the wake runs on the origin body (F11).
+
+### Held news
+
+One hold decision, in the dispatcher, for every wake kind. A wake is held, not dropped, when
+
+| Why (`saved_call.why`) | When |
+| ---------------------- | ---- |
+| `budget_spent`         | the `emit` guard says `over_budget` (the daily budget is spent) |
+| `quiet_hours`          | the local time is inside `TAGALONG_QUIET_HOURS` (`HH:MM-HH:MM`, may wrap midnight; unset means never) |
+| `stale`                | it has waited more than `STALE_S` (two hours): no body online, or a person away |
+| `start_failed`         | its wake turn could not start (a hook or the start callback raised) |
+| `gave_up`              | a delivery failed `MAX_FAILS` times |
+| `stopped`              | the brain is stopping with news still waiting (`Dispatcher.stop()`) |
+| `held_kind`            | the kind's urgency is `hold` |
+
+Each becomes an `open_items` row of kind `held` (migration `0032_open_items_held`) whose
+`saved_call` is `{event, key, why, facts}`; `facts` keeps scalars only, so no future and no word the
+person said is saved. A held item shows on return and in Home's Held list as "Held news" with the
+reason in plain words. The newest row per kind and key replaces an older one. A wake that cannot
+run for lack of an API key is still dropped quietly. Snoozing stays with the loop service, which
+holds a snoozed loop itself, so the dispatcher has no snooze rule of its own.
+
+There is one deadline rule: `DEADLINE_S` in `open_items.py` for what waits on a person, and
+`STALE_S` in the dispatcher for what waits on a body. The ask wait in `asks.py` (`ASK_TIMEOUT_S`)
+is a live card tied to one turn, not a stored wait.
+
 Tests: `tests/test_dispatcher.py` (fake clock) and `tests/test_events.py`.
 
 ## Not built yet
