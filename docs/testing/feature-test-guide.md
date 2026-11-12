@@ -1073,12 +1073,17 @@ Scout's only faces are the dock moods (idle, listening, reading, thinking, worki
 
 ### M.5. Scout's twelve moods on the dock
 
-1. **Action:** watch Scout idle for half a minute, then trigger each mood below. Do it on a light
-   wallpaper and on a dark one.
+1. **Action:** start the app and watch the dock. **Expected:** the still Scout head is there from the
+   first moment and the live Scout takes its place within a few seconds (the first launch on a slow
+   GPU can take a little longer, and the dock is never empty). Then watch Scout idle for half a minute
+   and trigger each mood below. Do it on a light wallpaper and on a dark one.
 2. **Expected:** Scout is a live 3D figure that breathes and blinks by itself and never jumps between
-   moods. The small tag at the top right reads clearly on both wallpapers.
+   moods. Idle and dozing draw slowly (about 4 frames a second) and look the same; a hop, a blink, a head glance or
+   a mood change is smooth. The small tag at the top right reads clearly on both wallpapers.
    - idle: nothing going on, no prop.
-   - listening: open the mic (hold the talk key) or capture the screen (Seeing); headphones.
+   - listening: open the mic (hold the talk key) or capture the screen (Seeing); headphones. Seeing
+     shows the Seeing tag and the name "Scout is looking at your screen". Speech heard on the mic
+     with Always listening on shows **no tag**; the name reads "Scout is listening".
    - reading: ask "what does this window say?"; a tablet while the screen tool runs.
    - thinking: ask any question; a lightbulb until the answer ends.
    - speaking: with Scout talks on, while it reads an answer aloud; no prop.

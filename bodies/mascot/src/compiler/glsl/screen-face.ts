@@ -75,9 +75,15 @@ bool is(float state, float id) { return abs(state - id) < 0.5; }
 
 float faceFor(float state, vec2 c, float t, float soft) {
   float v = 0.0;
+  /* the eyes and the mouth are shared by several states, so each is written once: the compiler
+     inlines every call, and each extra copy adds seconds to building the shader */
+  bool ownEyes = is(state, E_SLEEPING) || is(state, E_ERROR) || is(state, E_SURPRISED) || is(state, E_CELEBRATING) || is(state, E_SAD) || is(state, E_HAPPY);
+  float eyes = ownEyes ? 0.0 : faceEyes(c, soft);
+  bool grin = is(state, E_CELEBRATING);
+  float mouth = (grin || is(state, E_SPEAKING)) ? faceMouth(grin ? c - vec2(0.0, 0.6) : c, grin ? 2.6 : uFaceB.x * 3.4, grin ? 0.0 : uFaceD.y, grin ? 0.7 : 0.0, soft) : 0.0;
   if (is(state, E_THINKING)) {
     /* heavy-lidded eyes looking up, three dots pulsing in turn */
-    v = faceEyes(c, soft);
+    v = eyes;
     for (int i = 0; i < 3; i++) {
       float fi = float(i);
       float pulse = 0.5 + 0.5 * sin(t * 4.2 - fi * 1.1);
@@ -86,7 +92,7 @@ float faceFor(float state, vec2 c, float t, float soft) {
     }
   } else if (is(state, E_LISTENING)) {
     /* alert eyes over a live equaliser */
-    v = faceEyes(c, soft);
+    v = eyes;
     for (int i = 0; i < 7; i++) {
       float fi = float(i);
       float level = abs(sin(t * (5.0 + fi * 1.3) + fi * 1.7)) * (0.55 + 0.45 * sin(t * 2.3 + fi));
@@ -95,7 +101,7 @@ float faceFor(float state, vec2 c, float t, float soft) {
     }
   } else if (is(state, E_SPEAKING)) {
     /* the same two-lip mouth as the painted faces; closed, the lips meet in one bar */
-    v = max(faceEyes(c, soft), faceMouth(c, uFaceB.x * 3.4, uFaceD.y, 0.0, soft));
+    v = max(eyes, mouth);
   } else if (is(state, E_SLEEPING)) {
     /* closed eyes and rising z's */
     for (int i = 0; i < 2; i++) {
@@ -110,7 +116,7 @@ float faceFor(float state, vec2 c, float t, float soft) {
     }
   } else if (is(state, E_WORKING)) {
     /* narrowed eyes over a progress bar that fills, empties and fills again */
-    v = faceEyes(c, soft);
+    v = eyes;
     float rim = abs(sdBox2(c - vec2(0.0, -4.6), vec2(4.6, 0.95))) - 0.3;
     float fill = fract(t * 0.3) * 8.4;
     float bar = sdBox2(c - vec2(-4.2 + fill * 0.5, -4.6), vec2(fill * 0.5, 0.35));
@@ -143,7 +149,7 @@ float faceFor(float state, vec2 c, float t, float soft) {
       vec2 e = (c - vec2(i == 0 ? -4.5 : 4.5, 1.6)) / throb;
       v = max(v, lit(fxStarLed(e, 2.2, 0.48) * throb - 0.1, soft));
     }
-    v = max(v, faceMouth(c - vec2(0.0, 0.6), 2.6, 0.0, 0.7, soft));
+    v = max(v, mouth);
   } else if (is(state, E_SAD)) {
     /* eyes cut away at the outer top, a frown, and a tear now and then */
     for (int i = 0; i < 2; i++) {
@@ -168,7 +174,7 @@ float faceFor(float state, vec2 c, float t, float soft) {
     float d = min(min(sdSegment(c, vec2(-3.0, -3.0), vec2(-1.3, -4.6)), sdSegment(c, vec2(-1.3, -4.6), vec2(1.3, -4.6))), sdSegment(c, vec2(1.3, -4.6), vec2(3.0, -3.0))) - 0.45;
     v = max(v, lit(d, soft));
   } else {
-    v = faceEyes(c, soft);
+    v = eyes;
   }
   return v;
 }
@@ -180,8 +186,14 @@ float face(vec2 c, float soft) {
   /* an error keeps glitching now and then */
   float glitch = max(uFaceC.w, is(uFaceC.x, E_ERROR) ? 0.6 * step(0.86, hash12(vec2(floor(uTime * 8.0), 7.7))) : 0.0);
   c.x += (hash12(vec2(row, tick)) - 0.5) * 7.0 * glitch * step(0.6, hash12(vec2(row * 1.7, tick)));
-  float now = faceFor(uFaceC.x, c, uFaceD.x, soft);
-  float before = faceFor(uFaceC.y, c, uFaceD.x, soft);
+  /* now and before go through one loop, not two calls: the compiler inlines every call, and
+     faceFor is big enough that each copy adds seconds to building the shader */
+  float now = 0.0;
+  float before = 0.0;
+  for (int i = ZERO; i < 2; i++) {
+    float v = faceFor(i == 0 ? uFaceC.x : uFaceC.y, c, uFaceD.x, soft);
+    if (i == 0) now = v; else before = v;
+  }
   float v = mix(before, now, uFaceC.z);
   return v * (1.0 - glitch * 0.45 * hash12(vec2(tick, 3.1)));
 }
@@ -195,8 +207,13 @@ vec3 screenLight(vec2 q, vec3 color, float cell, vec2 extent, float corner) {
   float dotMask = 1.0 - smoothstep(0.26, 0.4, length(f));
   float footprint = gPixel / cell;
   dotMask = mix(dotMask, 0.5, smoothstep(0.18, 0.45, footprint));
-  float led = face(cellCentre, 0.25);
-  float glow = face(c, 1.6);
+  /* the crisp dot and the soft bloom share one call of face, for the same reason */
+  float led = 0.0;
+  float glow = 0.0;
+  for (int i = ZERO; i < 2; i++) {
+    float v = face(i == 0 ? cellCentre : c, i == 0 ? 0.25 : 1.6);
+    if (i == 0) led = v; else glow = v;
+  }
   float edge = smoothstep(0.0, 0.05, -sdRoundRect(q, extent, corner));
   /* a faint glare across the glass */
   float glare = 0.025 * smoothstep(0.1, 0.0, abs(q.x * 0.7 + q.y - extent.y * 0.35));

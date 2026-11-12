@@ -70,6 +70,10 @@ export interface Pose {
   events: BeatEvent[];
 }
 
+/* seconds: how far ahead a blink or hop counts as moving, and how long a head glance does */
+const LOOK_AHEAD = 0.3;
+const GLANCE = 0.4;
+
 export class Brain {
   readonly temperament: Temperament;
   state: MascotState = 'idle';
@@ -110,6 +114,7 @@ export class Brain {
   private look = { yaw: 0, pitch: 0, x: 0, y: 0 };
   private saccade = { x: 0, y: 0, next: 0 };
   private nextLook = 0.6;
+  private glanceUntil = 0;
   private nextBlink: number;
   private blinkAge = -1;
   private nextHop: number;
@@ -126,6 +131,22 @@ export class Brain {
   private readonly matrices = { a: mat4(), b: mat4() };
 
   readonly pose: Pose;
+
+  /**
+   * A hop, a blink or a head glance is under way or about to start: quick motion that wants the
+   * full frame rate. It looks ahead, because at a slow rate one frame covers a quarter second and a
+   * 0.17 s blink would fall between two of them.
+   */
+  get moving(): boolean {
+    const t = this.time;
+    return (
+      this.jump !== null ||
+      this.blinkAge >= 0 ||
+      t > this.nextBlink - LOOK_AHEAD ||
+      t > this.nextHop - LOOK_AHEAD ||
+      t < this.glanceUntil
+    );
+  }
 
   constructor(temperament: Partial<Temperament> = {}, seed = 0.5) {
     this.temperament = { ...DEFAULT_TEMPERAMENT, ...temperament };
@@ -245,6 +266,7 @@ export class Brain {
       this.look.x = clamp(this.look.yaw * 2.2, -1, 1);
       this.look.y = rand() < 0.3 ? 0.6 : rand() < 0.2 ? -0.6 : 0;
       this.nextLook = t + mix(1.4 + rand() * 2.6, 0.45 + rand() * 1.1, tm.snapLook);
+      this.glanceUntil = t + GLANCE;
     }
     /* the eyes never quite sit still */
     if (t > this.saccade.next) {
