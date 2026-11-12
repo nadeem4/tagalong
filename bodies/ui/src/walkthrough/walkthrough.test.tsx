@@ -2,16 +2,17 @@
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { HostBridgeProvider } from '../host-bridge';
+import { createFakeHostBridge } from '../test-support/fake-host-bridge';
 import { HAS_KEY, makeWalkthroughHost } from './test-host';
 import { Walkthrough } from './walkthrough';
 
 function open(host = makeWalkthroughHost(), initialStep?: number) {
   render(
-    <Walkthrough
-      host={host}
-
-      {...(initialStep === undefined ? {} : { initialStep })}
-    />,
+    // Step ten reads the bridge from context, as the real tour window provides it.
+    <HostBridgeProvider bridge={createFakeHostBridge()}>
+      <Walkthrough host={host} {...(initialStep === undefined ? {} : { initialStep })} />
+    </HostBridgeProvider>,
   );
   return host;
 }
@@ -19,10 +20,10 @@ function open(host = makeWalkthroughHost(), initialStep?: number) {
 const sideButton = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}`) });
 
 describe('Walkthrough', () => {
-  it('renders ten step names and the footnote', () => {
+  it('renders eleven step names and the footnote', () => {
     open();
     const list = screen.getByRole('list', { name: 'Steps' });
-    expect(list.querySelectorAll('li')).toHaveLength(10);
+    expect(list.querySelectorAll('li')).toHaveLength(11);
     expect(
       screen.getByText('You can change all of this later in Home, under Settings.'),
     ).toBeInTheDocument();
@@ -166,12 +167,29 @@ describe('Walkthrough, the end', () => {
     expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
   });
 
-  it('saving the key goes to step ten', async () => {
+  it('saving the key goes to Get to know you', async () => {
     open(makeWalkthroughHost({ key: HAS_KEY }), 9);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await screen.findByRole('heading', { name: 'Let Scout get to know you' });
+    expect(screen.queryByRole('button', { name: 'Finish' })).not.toBeInTheDocument();
+  });
+
+  it('step ten is get to know you, and eleven keeps Connect your tools and the Finish card', async () => {
+    open(makeWalkthroughHost({ key: HAS_KEY }), 10);
+    await screen.findByRole('heading', { name: 'Let Scout get to know you' });
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     await screen.findByRole('heading', { name: 'Connect your tools' });
-    expect(screen.getByRole('button', { name: 'Finish' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
+    await screen.findByRole('heading', { name: 'Scout is on your screen' });
+  });
+
+  it('numbers the side list: get to know you is 10 of 11, connect your tools last', () => {
+    open(makeWalkthroughHost({ key: HAS_KEY }), 10);
+    const items = screen.getByRole('list', { name: 'Steps' }).querySelectorAll('li');
+    expect(items[9]).toHaveTextContent('Get to know you');
+    expect(items[9].querySelector('button')).toHaveAttribute('aria-current', 'step');
+    expect(items[10]).toHaveTextContent('Connect your tools');
   });
 
   it('the finish card lists what the connect step set up', async () => {
@@ -193,7 +211,7 @@ describe('Walkthrough, the end', () => {
         failed: null,
       } as never),
     );
-    open(host, 10);
+    open(host, 11);
     fireEvent.click(await screen.findByRole('button', { name: 'Finish' }));
     await screen.findByRole('heading', { name: 'Scout is on your screen' });
     const list = await screen.findByRole('list', { name: 'Ready to use' });
@@ -202,7 +220,7 @@ describe('Walkthrough, the end', () => {
   });
 
   it('on the finish card every step in the side list is ticked and none is current', async () => {
-    open(makeWalkthroughHost({ key: HAS_KEY }), 10);
+    open(makeWalkthroughHost({ key: HAS_KEY }), 11);
     fireEvent.click(await screen.findByRole('button', { name: 'Finish' }));
     await screen.findByRole('heading', { name: 'Scout is on your screen' });
     expect(sideButton('Connect your tools')).not.toHaveAttribute('aria-current');
@@ -210,14 +228,14 @@ describe('Walkthrough, the end', () => {
   });
 
   it('"I’ll do this later" finishes the tour like Finish does', async () => {
-    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 10);
+    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 11);
     fireEvent.click(await screen.findByRole('button', { name: 'I’ll do this later' }));
     await screen.findByRole('heading', { name: 'Scout is on your screen' });
     expect(host.finishWalkthrough).toHaveBeenCalledWith({ close: false });
   });
 
   it('Finish with a key opens the finish card; Done finishes once, Open Home opens Home first', async () => {
-    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 10);
+    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 11);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Finish' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
     await screen.findByRole('heading', { name: 'Scout is on your screen' });
@@ -235,7 +253,7 @@ describe('Walkthrough, the end', () => {
   });
 
   it('a failure while closing shows an alert instead of an unhandled rejection', async () => {
-    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 10);
+    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 11);
     host.finishWalkthrough.mockImplementation((options?: { close?: boolean }) =>
       options?.close === false ? Promise.resolve() : Promise.reject(new Error('Could not close.')),
     );
@@ -247,7 +265,7 @@ describe('Walkthrough, the end', () => {
   });
 
   it('Open Home on the card opens Home and finishes the tour', async () => {
-    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 10);
+    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 11);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Finish' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
     await screen.findByRole('heading', { name: 'Scout is on your screen' });

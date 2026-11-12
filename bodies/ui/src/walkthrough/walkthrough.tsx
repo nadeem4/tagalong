@@ -17,6 +17,7 @@ import { StepOne } from './step-one';
 import { StepSeven } from './step-seven';
 import { StepSix } from './step-six';
 import { StepThree } from './step-three';
+import { StepKnowMe } from './step-know-me';
 import { StepTen, readyOf } from './step-ten';
 import type { ReadyItem } from './step-ten';
 
@@ -56,6 +57,8 @@ function body(step: number, host: WalkthroughHost, onValid: (valid: boolean) => 
       return <StepEight host={host} />;
     case 9:
       return <StepNine host={host} onValid={onValid} />;
+    case 10:
+      return <StepKnowMe />;
     default:
       return <StepTen host={host} />;
   }

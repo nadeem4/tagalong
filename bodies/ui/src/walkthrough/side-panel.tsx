@@ -1,5 +1,5 @@
 /**
- * The walkthrough's navy side: Scout's still mark, the "Scout" wordmark, the ten steps (only
+ * The walkthrough's navy side: Scout's still mark, the "Scout" wordmark, the eleven steps (only
  * those already reached can be jumped to) and the footnote. Contains SidePanel.
  */
 

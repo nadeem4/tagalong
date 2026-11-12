@@ -54,17 +54,17 @@ describe('Footer', () => {
   });
 
   it('Finish carries the shared final-button class', () => {
-    mount(10);
+    mount(11);
     expect(screen.getByRole('button', { name: 'Finish' })).toHaveClass('wt-final');
   });
 
-  it('Finish on step ten is never disabled', () => {
-    mount(10);
+  it('Finish on the last step is never disabled', () => {
+    mount(11);
     expect(screen.getByRole('button', { name: 'Finish' })).toBeEnabled();
   });
 
-  it('step ten has Back, a quiet "I’ll do this later" and Finish, and no Skip', () => {
-    mount(10);
+  it('the last step has Back, a quiet "I’ll do this later" and Finish, and no Skip', () => {
+    mount(11);
     expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
       'Back',
       'I’ll do this later',
@@ -76,7 +76,7 @@ describe('Footer', () => {
   });
 
   it('Finish and "I’ll do this later" both call onFinish', () => {
-    const props = mount(10);
+    const props = mount(11);
     fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
     fireEvent.click(screen.getByRole('button', { name: 'I’ll do this later' }));
     expect(props.onFinish).toHaveBeenCalledTimes(2);
