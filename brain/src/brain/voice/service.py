@@ -138,6 +138,18 @@ class VoiceService:
     def sentences(self, turn: str) -> list[str]:
         return self._mouth.sentences(turn)
 
+    def queued(self, body_id: str) -> tuple[str | None, list[str]]:
+        return self._mouth.queued(body_id)
+
+    def pause(self) -> None:
+        self._mouth.pause()
+
+    def resume(self) -> None:
+        self._mouth.resume()
+
+    def replace(self, turn: str, body_id: str, text: str) -> None:
+        self._mouth.replace(turn, body_id, text)
+
     async def sample(self, text: str, voice: str | None, speed: float | None) -> bytes:
         return await self._mouth.sample(text, voice, speed)
 

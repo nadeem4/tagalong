@@ -83,6 +83,7 @@ from brain.reading_tools import reading_home_tools
 from brain.retry import classify, safe_to_retry
 from brain.setup.store import InstalledExpert
 from brain.side_check import SideCheck
+from brain.speech_tools import interject
 from brain.store import rules
 from brain.store.conversation import compaction_text
 from brain.store.work import TransitionRefused, WorkRow, WorkStore
@@ -118,6 +119,7 @@ _NOT_STEPS = JOB_TOOLS | {"resolve_step"}
 _SUMMARY_CAP = 300  # characters of a tool result kept on its work row
 _LATE_RESULT_CAP = 2000  # characters of a late tool result put in the news about it
 _STEP_STATUS = {"ok": "done", "failed": "failed", "refused": "refused"}
+INTERJECTION_TIMEOUT_S = 15.0  # the queue is held meanwhile, so a slow call must not keep it
 
 
 @dataclass(frozen=True)
@@ -218,6 +220,7 @@ class Session:
             gave_up=self._say_gave_up,
             quiet=quiet,
             kinds=self._kinds,
+            interject=self._interject,
         )
         self._says_waiting: set[str] = set()  # says posted, not yet delivered: wakes wait for them
         # Says from another body that arrived mid-turn: each starts a turn when that one ends.
@@ -535,6 +538,29 @@ class Session:
             log.exception("could not deliver a say")
         finally:
             self._says_waiting.discard(item.payload["token"])  # the dispatcher pumps wakes next
+
+    async def _interject(self, body_id: str, content: list) -> bool:
+        """News due at a sentence break while Scout speaks: the queue holds, one short call sees
+        the news and the sentences not yet said, and Scout continues or says new words instead
+        (no choice resumes). The running turn keeps owning the queue; this only borrows it.
+        False when there is no voice, no ready model or nothing queued: a plain wake follows."""
+        voice = self.voice
+        if voice is None or not self._ready():
+            return False
+        turn, unsaid = voice.queued(body_id)
+        if turn is None:
+            return False
+        voice.pause()
+        try:
+            ran, words = await asyncio.wait_for(
+                interject(self._model, self._budget, self.guards, content, unsaid),
+                INTERJECTION_TIMEOUT_S,
+            )
+            if words is not None:
+                voice.replace(turn, body_id, words)
+        finally:
+            voice.resume()  # whatever happened, the queue never stays held
+        return ran
 
     def _turn_origin(self, turn_id: str | None = None) -> str:
         """The body showing the running turn (or the given one), "brain" when none."""
