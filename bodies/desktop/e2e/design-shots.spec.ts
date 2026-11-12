@@ -808,7 +808,7 @@ test('E5 model states', async () => {
   }
 });
 
-// E2: Home > Places in three states, tour step 10 before and after adding one, and the finish card.
+// E2: Home > Places in three states, tour step 11 before and after adding one, and the finish card.
 async function launchShot(options: Parameters<typeof startFakeBrain>[0], settings = true) {
   const brain = await startFakeBrain(options);
   const dataDir = mkdtempSync(join(tmpdir(), 'tagalong-shot-'));
@@ -901,13 +901,13 @@ test('E2 places states', async () => {
   );
 });
 
-test('E2 tour step ten and finish card', async () => {
+test('E2 tour connect step and finish card', async () => {
   const dir = shotDir('E2');
   mkdirSync(dir, { recursive: true });
   const { find, done } = await launchShot({ hasKey: true, expertInstallingPercent: 40 }, false);
   try {
     const tour = await find('walkthrough');
-    for (let at = 1; at < 10; at += 1) {
+    for (let at = 1; at < 11; at += 1) {
       await tour.getByRole('button', { name: /^(Get started|Next)$/ }).click();
     }
     await expect(tour.getByRole('heading', { name: 'Connect your tools' })).toBeVisible();
