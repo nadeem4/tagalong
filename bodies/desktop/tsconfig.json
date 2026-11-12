@@ -10,8 +10,7 @@
     "jsx": "react-jsx",
     "types": ["node"]
   },
-  // Bean's manifest is imported by the avatar window; JSON is only included when listed.
-  "include": ["src/**/*", "src/renderer/src/bean/manifest.json"],
+  "include": ["src/**/*"],
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
   "references": [{ "path": "../../protocol/ts" }, { "path": "../ui" }]
 }

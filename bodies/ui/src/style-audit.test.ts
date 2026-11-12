@@ -55,7 +55,10 @@ const sourceFiles = roots.flatMap((root) =>
     .filter((f) => /\.(ts|tsx|css|html)$/.test(f) && !/\.test\.|\.d\.ts$/.test(f))
     .map((f): [string, string] => [join(root, f), read(root, f)]),
 );
-const sources = sourceFiles.filter(([f]) => !f.endsWith(join('theme', 'tokens.ts')));
+// Scout's character spec is art data (its own materials), not UI chrome, so it keeps its own hex.
+const sources = sourceFiles.filter(
+  ([f]) => !f.endsWith(join('theme', 'tokens.ts')) && !f.endsWith(join('mascot', 'scout.ts')),
+);
 const sourceOffenders = (test: (text: string) => string[]): string[] =>
   sources.flatMap(([name, text]) =>
     test(text).map((hit) => `${name.slice(bodies.length)}: ${hit}`),

@@ -7,9 +7,6 @@ import { HostBridgeProvider } from '../host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
 import { HomeView, type HomeHost, type HomePage } from './home-view';
 
-/** A fake idle strip: the host passes Bean's real one. */
-const IDLE = { src: 'idle.webp', frames: 36, fps: 12, loop: true };
-
 const SCOUT: Pet = {
   id: 'scout',
   name: 'Scout',
@@ -28,7 +25,7 @@ function renderHome(
     <HostBridgeProvider bridge={bridge}>
       <HomeView
         host={props.homeHost ?? host()}
-        scout={IDLE}
+
         settings={<p>The settings form</p>}
         {...(props.page === undefined ? {} : { page: props.page })}
         {...(props.onPage === undefined ? {} : { onPage: props.onPage })}
@@ -141,24 +138,17 @@ describe('HomeView', () => {
     expect(await screen.findByRole('heading', { name: 'Approvals' })).toBeVisible();
   });
 
-  it('draws Scout in the nav tile as Bean, a still idle frame cropped to fill it', async () => {
+  it("draws Scout's head in the nav tile once the companion loads", async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     const nav = await screen.findByRole('navigation', { name: 'Tagalong' });
     const tile = nav.querySelector('.home-nav__tile') as HTMLElement;
-    await waitFor(() => expect(within(tile).getByTestId('bean-clip')).toBeInTheDocument());
-    const clip = within(tile).getAllByTestId('bean-clip');
-    expect(clip).toHaveLength(1);
-    expect(clip[0]).toHaveAttribute('data-clip', 'idle');
-    expect(clip[0]!.style.backgroundImage).toBe('url("idle.webp")');
-    // Drawn larger than the 56 px tile, which crops it: Bean fills about two thirds of a frame.
-    expect(clip[0]!.style.width).toBe('76px');
-    expect(clip[0]!.style.animation).toBe('');
+    await waitFor(() => expect(tile.querySelector('svg')).not.toBeNull());
   });
 
   it('leaves the nav tile empty until the companion loads', () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     const tile = document.querySelector('.home-nav__tile') as HTMLElement;
-    expect(within(tile).queryByTestId('bean-clip')).toBeNull();
+    expect(tile.querySelector('svg')).toBeNull();
   });
 
   it('shows What Scout remembers, each memory deletable', async () => {
@@ -258,7 +248,7 @@ describe('HomeView', () => {
     const bridge = createFakeHostBridge({ pets: [SCOUT] });
     const tree = (homeHost: HomeHost) => (
       <HostBridgeProvider bridge={bridge}>
-        <HomeView host={homeHost} scout={IDLE} settings={<p>The settings form</p>} />
+        <HomeView host={homeHost} settings={<p>The settings form</p>} />
       </HostBridgeProvider>
     );
     const { rerender } = render(tree(first));

@@ -24,8 +24,6 @@ export const HOME_CSS = `
   width: 56px; height: 56px; flex: none; display: flex; align-items: center; justify-content: center;
   border-radius: ${t.radius.sm}px; background: ${t.color.tileNavy}; overflow: hidden;
 }
-/* Bean sits a little left of and below a frame's centre: nudge it into the middle of the tile. */
-.home-nav__tile > span { flex: none; transform: translate(2px, -6px); }
 .home-nav__item {
   height: ${t.size.fieldHeight}px; padding: 0 ${t.space.lg}px; border: 0; border-radius: ${t.radius.sm}px;
   background: transparent; color: ${t.color.textMuted}; text-align: left; cursor: pointer;

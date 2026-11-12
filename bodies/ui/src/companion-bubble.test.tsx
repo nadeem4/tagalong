@@ -494,11 +494,9 @@ describe('Scout’s remark survives', () => {
 });
 
 describe('GreetingLine, Scout’s own line', () => {
-  const IDLE = { src: 'fake://idle.webp', frames: 36, fps: 12, loop: true };
-
   it('shows the Scout label and mark', () => {
     const { container } = render(
-      <GreetingLine petName="Scout" text="Hello." scout={IDLE} onDone={() => undefined} />,
+      <GreetingLine petName="Scout" text="Hello." onDone={() => undefined} />,
     );
     expect(container.querySelector('.scout-mark')).not.toBeNull();
     expect(container.querySelector('.bubble-who')).toHaveTextContent('Scout');
@@ -528,7 +526,7 @@ describe('GreetingLine, Scout’s own line', () => {
       <GreetingLine
         petName="Scout"
         status={{ id: 'no-key' }}
-        scout={IDLE}
+
         onDone={() => undefined}
       />,
     );
@@ -539,7 +537,6 @@ describe('GreetingLine, Scout’s own line', () => {
 
 describe('CompanionBubble, the chat window', () => {
   const REMARK = 'Your 3pm with Dana moved to 3:30.';
-  const IDLE = { src: 'fake://idle.webp', frames: 36, fps: 12, loop: true };
 
   it('collapse and close are icon buttons with their names', () => {
     renderBubble(createFakeHostBridge(), {
@@ -561,7 +558,7 @@ describe('CompanionBubble, the chat window', () => {
   it('the remark in the bubble shows the Scout mark and label', () => {
     const { container } = render(
       <HostBridgeProvider bridge={createFakeHostBridge()}>
-        <CompanionBubble petId="scout" petName="Scout" remark={REMARK} scout={IDLE} />
+        <CompanionBubble petId="scout" petName="Scout" remark={REMARK} />
       </HostBridgeProvider>,
     );
     const who = container.querySelector('.bubble-who');
@@ -753,7 +750,6 @@ describe('CompanionBubble, a turn in the chat window', () => {
 });
 
 describe('CompanionBubble, the chat footer and empty state', () => {
-  const IDLE = { src: 'fake://idle.webp', frames: 36, fps: 12, loop: true };
   const talk = (keyLabel: string) => ({
     state: 'idle' as const,
     onHeard: () => () => undefined,
@@ -790,8 +786,8 @@ describe('CompanionBubble, the chat footer and empty state', () => {
     expect(screen.getByLabelText('Message Scout')).toHaveAttribute('placeholder', 'Ask Scout…');
   });
 
-  it('shows the Bean and the same sentence in the empty chat', () => {
-    const { container } = chat({ scout: IDLE });
+  it('shows Scout and the same sentence in the empty chat', () => {
+    const { container } = chat();
     expect(screen.getByText('Ask Scout anything about what is on your screen.')).toBeVisible();
     expect(container.querySelector('.bubble-empty .scout-mark')).toHaveStyle({ width: '48px' });
   });

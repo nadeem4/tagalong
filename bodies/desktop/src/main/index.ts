@@ -479,6 +479,10 @@ async function start(): Promise<void> {
     isStreaming: () => (desktop?.activeTurns.size ?? 0) > 0,
     pet: () => desktop?.avatar ?? null,
   });
+  // A reloaded or crashed panel takes its speech player with it: speech is over.
+  const panelGone = (): void => desktop?.voiceBridge.panelGone();
+  desktop.panel.webContents.on('render-process-gone', panelGone);
+  desktop.panel.webContents.on('did-start-loading', panelGone);
   desktop.avatar = createAvatarWindow({
     position: settings.avatar,
     onMoved: (position) => rememberAvatarSpot(position),

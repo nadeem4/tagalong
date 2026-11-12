@@ -139,6 +139,9 @@ importers:
 
   bodies/ui:
     dependencies:
+      '@tagalong/mascot':
+        specifier: workspace:*
+        version: link:../mascot
       react:
         specifier: 19.3.0
         version: 19.3.0

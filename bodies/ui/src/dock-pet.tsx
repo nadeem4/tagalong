@@ -1,34 +1,42 @@
 /**
- * Scout on the dock: Bean, the 3D figure, drawn from a pre-rendered clip per mood, with a small
- * tag (Seeing, Working), blinking, the sight-paused and listening marks, and
- * the status tag. Contains DockPet, DockMood and BeanFigure. Used by the desktop avatar window.
+ * Scout on the dock: a live 3D mascot (@tagalong/mascot) in a mood, with a small tag for what it
+ * is doing (Seeing, Working), the sight-paused and listening marks, and the status tag.
+ * Contains DockPet, DockMood and DOCK_MOODS. Used by the desktop avatar window.
  */
 
-import { useEffect, useRef, useState } from 'react';
 import { STATUS_WORDS } from './shapes';
 import type { Pet, StatusMark as StatusMarkValue } from './shapes';
 import { StatusMark } from './status-mark';
-import { BeanClip, type BeanClipData } from './theme/bean-clip';
+import { ScoutFace } from './scout-face';
+import { scout } from './mascot/scout';
 import { themeTokens as t } from './theme/tokens';
 
 /**
  * What the pet on the dock is doing, as its pose and tag show it. `listening` is "Seeing"
- * (a capture); `reading` is a screen tool in flight, `thinking` Scout's own turn and `working`
- * one of Scout's own background jobs. Dozing is a mood with a pose and no tag.
+ * (a capture); `reading` a screen tool in flight, `thinking` Scout's own turn, `speaking` its
+ * voice playing and `working` one of its own background jobs. `dozing` is a pose with no tag.
+ * The last four are short reactions: a job done (`celebrating`), a failure (`error`), Scout
+ * speaking up on its own (`surprised`), something stopped (`sad`) and a click (`happy`).
  */
-export type DockMood = 'idle' | 'listening' | 'reading' | 'thinking' | 'working' | 'dozing';
-
-/** The moods Bean blinks in; each has a blink clip rendered from frame 0 of its loop. */
-type BlinkMood = 'idle' | 'listening';
-
-/** Every clip of Bean the dock draws: one per mood, plus a blink for each mood that blinks. */
-export type BeanFigure = Readonly<Record<DockMood | `${BlinkMood}-blink`, BeanClipData>>;
+export const DOCK_MOODS = [
+  'idle',
+  'listening',
+  'reading',
+  'thinking',
+  'speaking',
+  'working',
+  'dozing',
+  'celebrating',
+  'error',
+  'surprised',
+  'sad',
+  'happy',
+] as const;
+export type DockMood = (typeof DOCK_MOODS)[number];
 
 export interface DockPetProps {
   pet: Pet;
   mood: DockMood;
-  /** Bean's clips: the host bundles the strips and hands in their URLs and timings. */
-  figure: BeanFigure;
   /** The person turned sight off: a mark that stays until they turn it back on. */
   sightPaused?: boolean;
   /**
@@ -37,8 +45,6 @@ export interface DockPetProps {
    * reply needs no name) brighten the same dot.
    */
   listening?: ListeningDot | undefined;
-  /** How often it blinks. Left out, every three to six seconds, never in step. */
-  blinkEveryMs?: number;
   /** The top status mark (a problem, progress or a hint), as a tag at the bottom centre. */
   status?: StatusMarkValue | null;
 }
@@ -56,7 +62,7 @@ const LISTENING: Readonly<Record<ListeningDot, { title: string; words: string }>
   paused: { title: STATUS_WORDS['listening-paused'].detail, words: 'listening paused' },
 };
 
-/** The avatar window is 96 px square, and so is one frame of Bean. */
+/** The avatar window is 96 px square, and so is the mascot's frame. */
 const SIZE = 96;
 
 /**
@@ -76,77 +82,28 @@ const WORDS: Readonly<Record<DockMood, string>> = {
   listening: 'is looking at your screen',
   reading: 'is reading your screen',
   thinking: 'is thinking',
+  speaking: 'is speaking',
   working: 'is working on a job of its own',
   dozing: 'is dozing',
+  celebrating: 'finished a job',
+  error: 'hit a problem',
+  surprised: 'has something to say',
+  sad: 'stopped',
+  happy: 'is happy to see you',
 };
 
 function isTagged(mood: DockMood): mood is TaggedMood {
   return mood in TAGS;
 }
 
-function canBlinkIn(mood: DockMood): mood is BlinkMood {
-  return mood === 'idle' || mood === 'listening';
-}
-
 /**
- * The companion on the dock: Bean in a pose and a small tag for what it is doing (seeing,
- * working), a pose alone for thinking, reading and dozing, plus the sight-paused and
- * listening marks, which show in every mood.
+ * The companion on the dock: the live mascot in a mood and a small tag for what it is doing
+ * (seeing, working), plus the sight-paused and listening marks, which show in every mood.
+ * The mascot's props (a laptop, a lightbulb) say the rest; it blinks and breathes on its own.
  */
-export function DockPet({
-  pet,
-  mood,
-  figure,
-  sightPaused = false,
-  listening,
-  blinkEveryMs,
-  status,
-}: DockPetProps) {
-  const [blinking, setBlinking] = useState(false);
-  // Blinks in idle and listening, the poses with open eyes and a blink clip of their own. A
-  // blink is motion too, so it stops with the rest when the system asks for less.
-  const [still] = useState(reducedMotion);
-  const blinkMood = !still && canBlinkIn(mood) ? mood : undefined;
-  // Time to blink. The blink then waits for the loop to come round to frame 0, the pose its
-  // frames were rendered from, so nothing jumps.
-  const due = useRef(false);
-  const shut = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  // Bumped after each blink, to start the next wait.
-  const [blinks, setBlinks] = useState(0);
-
-  useEffect(() => {
-    if (blinkMood === undefined) return;
-    const wait = setTimeout(
-      () => {
-        due.current = true;
-      },
-      blinkEveryMs ?? 3000 + Math.random() * 3000,
-    );
-    return () => {
-      clearTimeout(wait);
-      clearTimeout(shut.current);
-      due.current = false;
-      setBlinking(false);
-    };
-  }, [blinkMood, blinkEveryMs, blinks]);
-
-  const loopCameRound = (): void => {
-    if (!due.current || blinkMood === undefined) return;
-    due.current = false;
-    setBlinking(true);
-    const clip = figure[`${blinkMood}-blink`];
-    shut.current = setTimeout(
-      () => {
-        setBlinking(false);
-        setBlinks((n) => n + 1);
-      },
-      (clip.frames / clip.fps) * 1000,
-    );
-  };
-
-  const showBlink = blinking && blinkMood !== undefined;
+export function DockPet({ pet, mood, sightPaused = false, listening, status }: DockPetProps) {
   // The Paused mark takes the top while sight is off: the two would overlap in 96 px, and the
-  // pose (the gear) and the label still say what Bean is doing.
+  // pose and the label still say what Scout is doing.
   const tag = isTagged(mood) && !sightPaused ? TAGS[mood] : undefined;
   const label = `${pet.name} ${WORDS[mood]}${sightPaused ? ', sight paused' : ''}${
     listening === undefined ? '' : `, ${LISTENING[listening].words}`
@@ -156,27 +113,11 @@ export function DockPet({
       role="img"
       aria-label={label}
       data-mood={mood}
-      data-blink={String(showBlink)}
       style={{ position: 'relative', display: 'block', width: SIZE, height: SIZE, padding: 0 }}
     >
       <style>{DOCK_CSS}</style>
-      {/* Keyed by mood, so each mood's clip always plays from its first frame. */}
-      <BeanClip
-        key={mood}
-        name={mood}
-        clip={figure[mood]}
-        still={still}
-        // Hidden, not stopped, under a blink: the loop keeps time and carries on after it.
-        {...(showBlink ? { style: { visibility: 'hidden' } } : {})}
-        onAnimationIteration={loopCameRound}
-      />
-      {showBlink && (
-        <BeanClip
-          name={`${blinkMood}-blink`}
-          clip={figure[`${blinkMood}-blink`]}
-          style={{ position: 'absolute', top: 0, left: 0 }}
-        />
-      )}
+      <ScoutFace spec={scout} mood={mood} />
+
       {tag !== undefined && (
         <span
           data-testid="dock-tag"
@@ -184,8 +125,7 @@ export function DockPet({
             position: 'absolute',
             top: 4,
             right: 0,
-            // Small and tucked into the corner, so it stays clear of Bean's floating sign (the
-            // gear) beside it.
+            // Small and tucked into the corner, so it stays clear of the mascot's props.
             padding: `${t.space.xxs}px ${t.space.hair}px`,
             borderRadius: 999,
             background: tag.color,
@@ -234,15 +174,6 @@ export function DockPet({
   );
 }
 
-/** Whether the person asked the system for less motion. */
-function reducedMotion(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  );
-}
-
 const DOCK_CSS = `
 /* Always listening: a solid dot while on, an outline while paused. Never hidden. */
 .dock-pet__listening { position: absolute; bottom: 8px; right: 16px; width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; border: 2px solid ${t.color.listening}; background: ${t.color.listening}; box-shadow: 0 0 0 1px ${t.color.card}; }
@@ -252,6 +183,5 @@ const DOCK_CSS = `
 .dock-pet__listening[data-state='follow-up'] { box-shadow: 0 0 0 1px ${t.color.card}, 0 0 0 3px ${t.color.listening}; }
 @keyframes dock-hearing { 0% { transform: scale(1); } 50% { transform: scale(1.35); } 100% { transform: scale(1); } }
 @keyframes dock-listening { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
-/* A backstop: the clips are already drawn still when the system asks for less motion. */
-@media (prefers-reduced-motion: reduce) { [data-testid='bean-clip'], .dock-pet__listening { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .dock-pet__listening { animation: none !important; } }
 `;

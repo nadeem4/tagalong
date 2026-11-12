@@ -6,6 +6,16 @@ import { IDLE_DOCK, dockMood, moveDrag, nextDock, startDrag } from './dock';
 const T = '10000000-0000-4000-8000-000000000001';
 const J = '10000000-0000-4000-8000-0000000000b1';
 
+describe('listening to the mic', () => {
+  it('listens while speech is heard, below short reactions but above thinking', () => {
+    expect(dockMood(IDLE_DOCK, true)).toBe('listening');
+    const thinking = nextDock(IDLE_DOCK, { type: 'turn.started', turnId: T });
+    expect(dockMood(thinking, true)).toBe('listening');
+    expect(dockMood(nextDock(IDLE_DOCK, { type: 'poke' }), true)).toBe('happy');
+    expect(dockMood(IDLE_DOCK, false)).toBe('idle');
+  });
+});
+
 describe('the dock', () => {
   it('is idle to begin with', () => {
     expect(dockMood(IDLE_DOCK)).toBe('idle');
@@ -30,7 +40,12 @@ describe('the dock', () => {
     const job = nextDock(IDLE_DOCK, { type: 'turn.started', turnId: T, background: true });
     expect(dockMood(job)).toBe('working');
     expect(dockMood(nextDock(job, { type: 'turn.completed', turnId: T }))).toBe('idle');
-    expect(dockMood(nextDock(job, { type: 'turn.error', turnId: T }))).toBe('idle');
+    const failed = nextDock(job, { type: 'turn.error', turnId: T });
+    // The failure plays as a short error reaction, then the dock is idle again.
+    expect(dockMood(failed)).toBe('error');
+    expect(dockMood(nextDock(failed, { type: 'flashEnd', id: failed.flash?.id ?? 0 }))).toBe(
+      'idle',
+    );
   });
 
   it('returns the same state for a turn without an id, or the end of a turn it never saw', () => {
@@ -99,7 +114,10 @@ describe('reading the screen', () => {
 
   it('clears on the turn ending too, as an aborted turn sends no result', () => {
     expect(dockMood(nextDock(look(), { type: 'turn.completed', turnId: T }))).toBe('idle');
-    expect(dockMood(nextDock(look(), { type: 'turn.error', turnId: T }))).toBe('idle');
+    const failed = nextDock(look(), { type: 'turn.error', turnId: T });
+    expect(dockMood(nextDock(failed, { type: 'flashEnd', id: failed.flash?.id ?? 0 }))).toBe(
+      'idle',
+    );
   });
 
   const READS = ['list_windows', 'read_window_text', 'look_at_window'];
@@ -146,6 +164,93 @@ describe('the activity order', () => {
     dock = nextDock(dock, { type: 'turn.toolRequest', turnId: T, tool: 'look_at_window' });
     expect(dockMood(dock)).toBe('reading');
     expect(dockMood(nextDock(dock, { type: 'seeing' }))).toBe('listening');
+  });
+});
+
+describe('speaking', () => {
+  it('speaks while the voice plays, over thinking and a job, under reading and seeing', () => {
+    let dock = nextDock(IDLE_DOCK, { type: 'turn.started', turnId: J, background: true });
+    dock = nextDock(dock, { type: 'turn.started', turnId: T, petId: 'scout' });
+    dock = nextDock(dock, { type: 'speech.started' });
+    expect(dockMood(dock)).toBe('speaking');
+    expect(
+      dockMood(nextDock(dock, { type: 'turn.toolRequest', turnId: T, tool: 'look_at_window' })),
+    ).toBe('reading');
+    expect(dockMood(nextDock(dock, { type: 'seeing' }))).toBe('listening');
+    expect(dockMood(nextDock(dock, { type: 'speech.ended' }))).toBe('thinking');
+  });
+
+  it('returns the same state for a repeated start or an end with nothing playing', () => {
+    const on = nextDock(IDLE_DOCK, { type: 'speech.started' });
+    expect(nextDock(on, { type: 'speech.started' })).toBe(on);
+    expect(nextDock(IDLE_DOCK, { type: 'speech.ended' })).toBe(IDLE_DOCK);
+  });
+});
+
+describe('jobs from the list', () => {
+  const rows = (...states: string[]) => ({
+    type: 'jobs',
+    jobs: states.map((state, i) => ({ id: `j${i}`, state })),
+  });
+
+  it('works while any job runs, and stops when none does', () => {
+    const running = nextDock(IDLE_DOCK, rows('running', 'done'));
+    expect(dockMood(running)).toBe('working');
+    expect(dockMood(nextDock(running, rows('done', 'done')))).toBe('celebrating');
+  });
+
+  it('celebrates a job that finished, grieves a stopped one, and flags a failed one', () => {
+    const running = nextDock(IDLE_DOCK, rows('running'));
+    expect(dockMood(nextDock(running, rows('done')))).toBe('celebrating');
+    expect(dockMood(nextDock(running, rows('error')))).toBe('error');
+    expect(dockMood(nextDock(running, rows('stopped')))).toBe('sad');
+  });
+
+  it('shows nothing for jobs that were already finished when first listed', () => {
+    expect(dockMood(nextDock(IDLE_DOCK, rows('done', 'error', 'stopped')))).toBe('idle');
+  });
+
+  it('shows a job finishing only once', () => {
+    const done = nextDock(nextDock(IDLE_DOCK, rows('running')), rows('done'));
+    expect(dockMood(nextDock({ ...done, flash: null }, rows('done')))).toBe('idle');
+  });
+});
+
+describe('short reactions', () => {
+  it('flags a turn that failed, and a brain that was lost', () => {
+    const turn = nextDock(IDLE_DOCK, { type: 'turn.started', turnId: T, petId: 'scout' });
+    expect(dockMood(nextDock(turn, { type: 'turn.error', turnId: T }))).toBe('error');
+  });
+
+  it('is sad when the person stopped a turn, and idle when it just completed', () => {
+    const turn = nextDock(IDLE_DOCK, { type: 'turn.started', turnId: T, petId: 'scout' });
+    expect(
+      dockMood(nextDock(turn, { type: 'turn.completed', turnId: T, stopReason: 'aborted' })),
+    ).toBe('sad');
+    expect(dockMood(nextDock(turn, { type: 'turn.completed', turnId: T, stopReason: 'end' }))).toBe(
+      'idle',
+    );
+  });
+
+  it('is surprised when Scout speaks up on its own', () => {
+    expect(dockMood(nextDock(IDLE_DOCK, { type: 'pet.remark' }))).toBe('surprised');
+  });
+
+  it('is happy when the person clicks it', () => {
+    expect(dockMood(nextDock(IDLE_DOCK, { type: 'poke' }))).toBe('happy');
+  });
+
+  it('wins over everything, and ends only for its own flash', () => {
+    const seeing = nextDock(IDLE_DOCK, { type: 'seeing' });
+    const happy = nextDock(seeing, { type: 'poke' });
+    expect(dockMood(happy)).toBe('happy');
+    expect(dockMood(nextDock(happy, { type: 'flashEnd', id: happy.flash!.id + 1 }))).toBe('happy');
+    expect(dockMood(nextDock(happy, { type: 'flashEnd', id: happy.flash!.id }))).toBe('listening');
+  });
+
+  it('gives each flash its own id, so a second one restarts the timer', () => {
+    const one = nextDock(IDLE_DOCK, { type: 'poke' });
+    expect(nextDock(one, { type: 'poke' }).flash!.id).not.toBe(one.flash!.id);
   });
 });
 

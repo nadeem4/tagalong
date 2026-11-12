@@ -1,5 +1,5 @@
 /**
- * The avatar window's page: Scout on the desktop as Bean, the 3D figure, with its mood, the
+ * The avatar window's page: Scout on the desktop as a live 3D mascot, with its mood, the
  * sight-paused and listening marks, and the top status mark. Mood rules live in dock.ts and
  * pointer and drop handling in pet-input.ts; this file only wires them to the host.
  */
@@ -13,15 +13,16 @@ import type { ListeningState } from '../../shared/ipc';
 import '@fontsource/onest/latin-600.css';
 import './app.css';
 import '../../shared/ipc';
-import { FIGURE } from './bean-assets';
 import { IDLE_DOCK, dockMood, nextDock } from './dock';
 import { petInput } from './pet-input';
 
 /** How long "Seeing" shows after a capture. */
 const SEEING_MS = 2500;
+/** How long a short reaction (celebrating, error, ...) plays before the dock goes back to work. */
+const FLASH_MS = 2200;
 
 /**
- * The companion on the desktop: Bean in a small transparent window. The pet
+ * The companion on the desktop: the mascot in a small transparent window. The pet
  * is a button that is dragged by hand rather than through a drag region, which would swallow
  * its clicks: a press that moves past a few pixels drags the pet (and its bubble), a press
  * that does not is a click, which opens the bubble and clears "Done". A file, link or text
@@ -95,6 +96,40 @@ function Avatar() {
   // Brain turn events, and main's presence.away and presence.back on the same channel.
   useEffect(() => window.tagalong.onTurnEvent((event) => send(event)), []);
 
+  // Scout's voice: the panel's player tells the brain, and main tells every window. A sentence
+  // starting is speaking; the player going idle or paused is not. Between sentences it holds.
+  useEffect(
+    () =>
+      window.tagalongHost.onSpeaking((event) => {
+        if (event.state === 'started') send({ type: 'speech.started' });
+        else if (event.state === 'idle' || event.state === 'paused') send({ type: 'speech.ended' });
+      }),
+    [],
+  );
+
+  // The jobs list, read on mount and whenever the brain says a job moved: a running one is
+  // Scout working, and one that ends is a short reaction (done, failed, stopped).
+  useEffect(() => {
+    const read = (): void => {
+      window.tagalong
+        .listJobs()
+        .then((jobs) => send({ type: 'jobs', jobs }))
+        .catch(() => undefined);
+    };
+    read();
+    return window.tagalong.onBrainChanged((what) => {
+      if (what === 'jobs') read();
+    });
+  }, []);
+
+  // A short reaction plays for a moment; ending it by id keeps a newer one from being cut short.
+  const flashId = dock.flash?.id;
+  useEffect(() => {
+    if (flashId === undefined) return;
+    const timer = setTimeout(() => send({ type: 'flashEnd', id: flashId }), FLASH_MS);
+    return () => clearTimeout(timer);
+  }, [flashId]);
+
   // Every capture is announced: the pet looks up and says "Seeing" for a moment.
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -144,13 +179,13 @@ function Avatar() {
         onClick={() => {
           // The click that ends a drag is not a click on the pet.
           if (!input.takeClick()) return;
+          send({ type: 'poke' });
           void window.tagalongHost.openBubble();
         }}
       >
         <DockPet
           pet={pet}
-          mood={dockMood(dock)}
-          figure={FIGURE}
+          mood={dockMood(dock, hearing)}
           sightPaused={sightPaused}
           listening={listeningDot(listening, hearing)}
           status={status}

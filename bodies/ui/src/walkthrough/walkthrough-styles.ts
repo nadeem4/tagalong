@@ -25,7 +25,7 @@ export const WALKTHROUGH_CSS = `
 .wt-scout { padding: ${t.space.xs}px ${t.space.md}px ${t.space.xl}px; }
 .wt-tile {
   height: 140px; border-radius: ${t.radius.card}px; background: ${t.color.tileNavy}; overflow: hidden;
-  display: grid; place-items: end center;
+  display: grid; place-items: center;
 }
 .wt-name { margin: ${t.space.md}px 0 0; font-family: ${t.font.wordmark}; ${typeCss('title')}; }
 .wt-role { margin: 2px 0 0; ${typeCss('small')}; color: ${t.color.sky}; }

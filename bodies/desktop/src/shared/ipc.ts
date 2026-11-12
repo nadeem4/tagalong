@@ -96,6 +96,7 @@ export const IPC = {
   speechChunk: 'tagalong:voice:speech-chunk',
   speechDone: 'tagalong:voice:speech-done',
   speechState: 'tagalong:voice:speech-state',
+  speakingEvent: 'tagalong:voice:speaking',
   speechControl: 'tagalong:voice:speech-control',
   stopVoiceEvent: 'tagalong:voice:stop',
   talkEvent: 'tagalong:voice:talk',
@@ -344,6 +345,8 @@ export interface TagalongHostApi {
   hush(): Promise<void>;
   /** The player started or ended a sentence, paused, or went idle: told to the brain. */
   speechState(event: SpeechEvent): void;
+  /** What the speaker is doing, from the panel's player: the dock shows Scout speaking. */
+  onSpeaking(handler: (event: SpeechEvent) => void): () => void;
   /** The brain holds, resumes or clears Scout's speech. */
   onSpeechControl(handler: (control: SpeechControl) => void): () => void;
   /** One sentence of a spoken reply, from the brain. */

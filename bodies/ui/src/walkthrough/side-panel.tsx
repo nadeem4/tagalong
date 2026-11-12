@@ -1,14 +1,12 @@
 /**
- * The walkthrough's navy side: Bean standing still, the "Scout" wordmark, the ten steps (only
+ * The walkthrough's navy side: Scout's still mark, the "Scout" wordmark, the ten steps (only
  * those already reached can be jumped to) and the footnote. Contains SidePanel.
  */
 
-import { BeanClip } from '../theme/bean-clip';
-import type { BeanClipData } from '../theme/bean-clip';
+import { ScoutGlyph } from '../scout-mark';
 import { STEPS } from './steps';
 
 interface SidePanelProps {
-  scout: BeanClipData;
   current: number;
   /** The furthest step visited; the list jumps to any step up to it. */
   reached: number;
@@ -17,12 +15,12 @@ interface SidePanelProps {
   keySet: boolean;
 }
 
-export function SidePanel({ scout, current, reached, onJump, keySet }: SidePanelProps) {
+export function SidePanel({ current, reached, onJump, keySet }: SidePanelProps) {
   return (
     <aside className="wt-side on-navy">
       <div className="wt-scout">
         <div className="wt-tile">
-          <BeanClip clip={scout} still size={132} name="idle" />
+          <ScoutGlyph size={96} />
         </div>
         <p className="wt-name tg-wordmark">Scout</p>
         <p className="wt-role">Your companion</p>

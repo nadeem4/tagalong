@@ -47,6 +47,8 @@ export interface VoiceBridge {
   onNotification(method: string, params: unknown): void;
   /** What the panel's player is doing, on its way to the brain. A bad shape is dropped. */
   speechState(params: unknown): void;
+  /** The panel page reloaded, crashed or closed: its player is gone, so speech is over. */
+  panelGone(): void;
   /** The health check: the brain's last word on its voice. */
   models(): VoiceModels;
 }
@@ -66,6 +68,8 @@ export function createVoiceBridge(deps: BridgeDeps): VoiceBridge {
   /** The open listening session, if any, so a reconnect can ask again. */
   let mode: 'held' | 'always' | null = null;
   let voiceFailed = false;
+  /** The turn whose speech the player last reported as not idle, if any. */
+  let speakingTurn: string | null = null;
 
   const failed = (message: string): void => {
     send(IPC.earsStatusEvent, { status: 'failed', message });
@@ -165,7 +169,18 @@ export function createVoiceBridge(deps: BridgeDeps): VoiceBridge {
     },
     speechState: (params) => {
       const parsed = SpeechStateParams.safeParse(params);
-      if (parsed.success) brain.speechState(parsed.data);
+      if (!parsed.success) return;
+      brain.speechState(parsed.data);
+      // The dock shows Scout speaking from the same word.
+      send(IPC.speakingEvent, parsed.data);
+      speakingTurn = parsed.data.state === 'idle' ? null : parsed.data.turn;
+    },
+    panelGone: () => {
+      if (speakingTurn === null) return;
+      const idle = { turn: speakingTurn, state: 'idle' as const };
+      speakingTurn = null;
+      brain.speechState(idle);
+      send(IPC.speakingEvent, idle);
     },
     // The brain's `voice` frames come from the ears alone; the mouth has no status to show.
     models: () => ({ ears: !voiceFailed }),

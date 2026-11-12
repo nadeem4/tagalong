@@ -1,7 +1,7 @@
 # Mascot engine
 
 `bodies/mascot` (`@tagalong/mascot`, private, never published) is the WebGL engine that draws Scout as a
-live 3D character. It is not wired into the UI yet; the dock pet moves onto it in the next slice.
+live 3D character. The desktop dock draws Scout with it (see [Scout on the dock](#scout-on-the-dock)).
 
 ## Where it comes from
 
@@ -92,3 +92,48 @@ From `@tagalong/mascot`: `mount(element, spec, options)` or `new Mascot(canvas, 
 
 `pnpm --filter @tagalong/mascot build` (plain `tsc -b`, run by `pnpm build` too) and
 `pnpm --filter @tagalong/mascot test` (vitest in node; the tests cover the pure logic, no WebGL).
+
+## Scout on the dock
+
+Scout is wobnimo's Volt recoloured gold, navy and sky, with a sky chest lamp. The character spec is
+`bodies/ui/src/mascot/scout.ts`. `DockPet` renders `ScoutFace` (`bodies/ui/src/scout-face.tsx`), the
+engine's `<Mascot>` in a 96 px box: not interactive, pixel ratio capped at 1, drawn at most 30 fps (`maxFps`, see below), fading in when ready.
+Without WebGL2 (a VM, RDP, a blocklisted GPU) `ScoutFace` checks `isSupported()` and draws the still
+`ScoutGlyph` instead, so the avatar window never crashes; the shader is warmed in an effect, not during render.
+`MOOD_STATE` (`bodies/ui/src/mascot/mood-states.ts`, pure and tested) maps a dock mood to the engine's:
+`dozing` becomes `sleeping`, the rest keep their name. Every other place Scout appears (chat lines, Home's
+nav tile, the tour's side panel) is the still SVG head `ScoutGlyph` / `ScoutMark` (`scout-mark.tsx`), so
+no WebGL canvas is created per chat line.
+
+The renderer reducer (`bodies/desktop/src/renderer/src/dock.ts`, `nextDock` and `dockMood`) picks the
+mood. Priority, highest first: a flash, seeing or speech heard on the mic (Always listening), reading, speaking, thinking, working, a drop hover,
+dozing, idle.
+
+| Mood          | Trigger                                                                                                                                                   | Prop                |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| `idle`        | nothing going on                                                                                                                                          | none                |
+| `listening`   | Seeing, or speech heard on the mic (Always listening)                                                                                                     | headphones          |
+| `reading`     | a screen-reading tool runs (`list_windows`, `read_window_text`, `look_at_window`)                                                                         | tablet              |
+| `thinking`    | a turn started                                                                                                                                            | lightbulb           |
+| `speaking`    | Scout's voice is playing (the panel player's `speech_state`, mirrored by main to every window as `tagalong:voice:speaking`, `onSpeaking` on the host API) | none                |
+| `working`     | an expert job is running (`listJobs`, refetched on `onBrainChanged('jobs')`) or a background turn                                                         | laptop and desk     |
+| `dozing`      | the person is away (the engine's `sleeping`)                                                                                                              | nightcap and pillow |
+| `celebrating` | a job finished (running to done), a flash of about 2.2 s                                                                                                  | party hat, confetti |
+| `error`       | a job failed, or a turn errored (including a brain restart), a short flash                                                                                | wrench              |
+| `surprised`   | Scout speaks up on its own (`pet.remark`: every one flashes surprised, urgent or not), a short flash                                                      | none                |
+| `sad`         | a job stopped, or a turn was cancelled, a short flash                                                                                                     | none                |
+| `happy`       | the person clicks Scout, a short flash                                                                                                                    | none                |
+
+If the panel page reloads or crashes while Scout is speaking, main sends the dock (and the
+brain) an `idle` speech state, so `speaking` never sticks.
+
+Not wired yet: an install-finished celebration (no install-finished signal exists), a distinct signal
+for an urgent interjection (every `pet.remark` flashes `surprised`), `sad` for a declined ask, and
+`error` for a lost brain with no turn in flight (neither signal reaches the dock yet).
+
+The `Mascot` option `maxFps` (default 0, the display's rate) caps drawn frames per second and carries
+the skipped time, so motion keeps its speed (`runtime/pace.ts`, tested). The dock sets 30.
+
+The engine breathes and blinks on its own, so the dock has no frame or blink logic. Under
+`prefers-reduced-motion: reduce` the engine (`respectReducedMotion`, default true) holds the mood's
+pose and stops drawing once settled.

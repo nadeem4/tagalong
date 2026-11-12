@@ -6,7 +6,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { BeanClipData } from '../theme/bean-clip';
 import { FinishCard } from './finish-card';
 import { Footer } from './footer';
 import { SidePanel } from './side-panel';
@@ -33,8 +32,6 @@ import { WALKTHROUGH_CSS } from './walkthrough-styles';
 
 interface WalkthroughProps {
   host: WalkthroughHost;
-  /** Bean's idle strip, drawn still in the side panel. */
-  scout: BeanClipData;
   /** The step to open at (the no-key button opens the key step). */
   initialStep?: number;
 }
@@ -78,7 +75,7 @@ async function finishKeys(host: WalkthroughHost): Promise<{ ask: string; talk: s
   }
 }
 
-export function Walkthrough({ host, scout, initialStep = 1 }: WalkthroughProps) {
+export function Walkthrough({ host, initialStep = 1 }: WalkthroughProps) {
   const first = initialStep >= 1 && initialStep <= STEPS.length ? initialStep : 1;
   const [current, setCurrent] = useState(first);
   // Steps before the one opened at count as reached, so the list can go back over them.
@@ -179,7 +176,6 @@ export function Walkthrough({ host, scout, initialStep = 1 }: WalkthroughProps) 
       <style>{WALKTHROUGH_CSS}</style>
       <style>{CONNECTIONS_CSS}</style>
       <SidePanel
-        scout={scout}
         current={finishKeysShown !== null ? STEPS.length + 1 : current}
         reached={reached}
         onJump={go}

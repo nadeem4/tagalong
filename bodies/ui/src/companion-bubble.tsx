@@ -23,7 +23,6 @@ import { CloseIcon, CollapseIcon, ExpandIcon, EyeIcon, MicIcon, SendIcon } from 
 import { ScoutMark } from './scout-mark';
 import { Keycap } from './controls';
 import { Icon } from './setup/icons';
-import type { BeanClipData } from './theme/bean-clip';
 import { ConnectorConfirmCard, type JobAnswer } from './connector-confirm';
 import { InstallConfirm } from './setup/install-confirm';
 import { DropCard, type DropOffer } from './drop-card';
@@ -86,8 +85,6 @@ export interface CompanionBubbleProps {
   onDropDone?: () => void;
   /** The top status mark from the host: a muted row above the question box, never spoken. */
   status?: StatusMarkValue | null;
-  /** Bean's idle strip, drawn still in Scout's mark beside lines Scout starts. */
-  scout?: BeanClipData;
   /** Subscribes to text Home sends as the person (Ask Scout to fix it); returns an unsubscribe. */
   onAsk?: (handler: (text: string) => void) => () => void;
   /** Scout's own line the person clicked open on the quiet line: it becomes Scout's first message. */
@@ -108,10 +105,10 @@ interface Chip {
 }
 
 /** Scout's reply in the full chat: its mark in a 24px gutter, the words beside it. */
-function ScoutReply({ scout, children }: { scout: BeanClipData | undefined; children: ReactNode }) {
+function ScoutReply({ children }: { children: ReactNode }) {
   return (
     <div className="bubble-scout">
-      <ScoutMark {...(scout !== undefined ? { clip: scout } : {})} size={24} />
+      <ScoutMark size={24} />
       <div className="bubble-scout-body">{children}</div>
     </div>
   );
@@ -181,7 +178,6 @@ export function CompanionBubble({
   onDropDone,
   status,
   remark,
-  scout,
   onAsk,
 }: CompanionBubbleProps) {
   const bridge = useHostBridge();
@@ -759,7 +755,7 @@ export function CompanionBubble({
   const scoutSays = (words: string) => (
     <div className="bubble-scoutmsg">
       <span className="bubble-who">
-        <ScoutMark {...(scout !== undefined ? { clip: scout } : {})} />
+        <ScoutMark />
         <span>{petName}</span>
       </span>
       <Answer text={words} />
@@ -849,7 +845,7 @@ export function CompanionBubble({
       )}
       {installs.length > 0 &&
         !installsInReply &&
-        (expanded ? <ScoutReply scout={scout}>{installCards}</ScoutReply> : installCards)}
+        (expanded ? <ScoutReply>{installCards}</ScoutReply> : installCards)}
       {confirm !== null && (
         <ConnectorConfirmCard
           key={confirm.approvalId}
@@ -909,7 +905,7 @@ export function CompanionBubble({
   // The header of both windows: Scout's mark, name and what it is doing, the toggles and the exits.
   const header = (quick: boolean) => (
     <header className={quick ? 'bubble-head bubble-head--quick' : 'bubble-head'}>
-      <ScoutMark {...(scout !== undefined ? { clip: scout } : {})} size={quick ? 28 : 32} />
+      <ScoutMark size={quick ? 28 : 32} />
       <span className="bubble-headwho">
         <strong>{petName}</strong>
         <span className="bubble-headstatus" data-testid="head-status">
@@ -958,7 +954,7 @@ export function CompanionBubble({
           >
             {past.length === 0 && question === null && scoutLine === null && (
               <div className="bubble-empty">
-                <ScoutMark {...(scout !== undefined ? { clip: scout } : {})} size={48} />
+                <ScoutMark size={48} />
                 <p>Ask {petName} anything about what is on your screen.</p>
                 {talk !== undefined && (
                   <span className="bubble-empty-key">
@@ -978,7 +974,7 @@ export function CompanionBubble({
                     <span>{exchange.answer}</span>
                   </div>
                 ) : (
-                  <ScoutReply scout={scout}>
+                  <ScoutReply>
                     <Answer text={exchange.answer} gist />
                     {installsInReply &&
                       question === null &&
@@ -995,7 +991,7 @@ export function CompanionBubble({
                 {health === null && reply.state === 'failed' ? (
                   failedBox
                 ) : (
-                  <ScoutReply scout={scout}>
+                  <ScoutReply>
                     {answer}
                     {installsInReply && installCards}
                   </ScoutReply>
@@ -1060,8 +1056,6 @@ export interface GreetingLineProps {
   onDone: () => void;
   /** Whether the host is reading the line aloud: three bars show it. */
   speaking?: boolean;
-  /** Bean's idle strip, drawn still in Scout's mark. */
-  scout?: BeanClipData;
   /** The person clicked it: open the bubble to ask, carrying the line so it is not lost. */
   onOpen?: (text: string) => void;
   tail?: 'left' | 'right';
@@ -1087,7 +1081,6 @@ export function GreetingLine({
   status,
   onFix,
   speaking = false,
-  scout,
 }: GreetingLineProps) {
   const [held, setHeld] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -1129,7 +1122,7 @@ export function GreetingLine({
               onClick={() => onOpen?.(text ?? '')}
             >
               <span className="bubble-who">
-                <ScoutMark {...(scout !== undefined ? { clip: scout } : {})} />
+                <ScoutMark />
                 <span>{petName}</span>
                 {speaking && (
                   <span className="bubble-bars" aria-hidden="true">
