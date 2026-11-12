@@ -106,6 +106,7 @@ the total can run a little low.
 | `brain/src/brain/retry.py`             | `classify` (transient or permanent) and `safe_to_retry`: which failures and tools may be tried again                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `brain/src/brain/timers_home.py`       | `timer_home_tools`: Home-only `timers_state` (every timer, soonest first) and `timer_cancel {id}` (an unknown id, or a `watch` row, is `invalid_params`); `Timers.cancel` ends the row and emits `changed { what: "timers" }`, as does any other timer change                                                                                                                                                                                                                                                                                                                                                                |
 | `brain/src/brain/timers.py`            | `Timers`: fires the due `timer` and `watch` work rows as `timer` events, hands due `tool_call` and `expert_call` retries to the session and keeps one wake armed                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `brain/src/brain/speech_tools.py`      | The interjection call: `speech_continue` and `speech_replace` tool definitions, the short one-call `interject`, and the parse of its choice (wording in `mind/interjection.md`)                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `brain/src/brain/mind/events.md`       | One note per event kind on how Scout should weigh it (model wording, not code)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `brain/src/brain/choices.py`           | `Choices`: Scout's non-blocking `choose` question, a `choice` open item; an answer or a timeout emits a `choice` event                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `brain/src/brain/questions.py`         | `ScoutQuestions`: an expert's question goes to Scout first (`ask`, `answer`, `pass_to_user`, `cancel_job`); each is a `question` work row under its job                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -2381,8 +2382,35 @@ break seen while a `next_pause` item waits is latched, so two frames handled bac
 if no such item is left waiting (dropped, held, superseded).
 
 `Mouth.pause` and `Mouth.resume` send `speech_control` to the body playing the turn (a turn
-already fully sent is still reached, through the last body sent to). Nothing calls them yet: F18
-(interjection turns) will.
+already fully sent is still reached, through the last body sent to). The caller is the interjection
+(below).
+
+#### Interjections
+
+A wake kind with urgency `next_pause` that is due while the speaker is at a `sentence_break` is not
+started as a turn: it borrows the speech queue. `Dispatcher._at_break` decides (the kind, the live
+speech state, an `interject` callback, and the group not already `tried`); `Session._interject` does
+it, one at a time, and no wake turn starts alongside it.
+
+1. `voice.queued(body_id)` names the turn that owns the queue and the sentences it has not said. No
+   voice, no ready model or no live turn on that body: the interjection returns `False`, the group is
+   marked `tried` and waits for a plain wake after the turn, as before.
+2. `voice.pause()` holds the queue (the desktop is told with `speech_control`).
+3. One short model call (`speech_tools.interject`): `max_tokens` 300, no thinking, no compaction
+   (`_request(..., max_tokens=)`), no chat history, only the fenced event and the unsaid sentences, and
+   two tools, `speech_continue` and `speech_replace(text)`. It passes the `model_call` guard (kind
+   `interjection`) and is spent on the budget like any call. The wording is `mind/interjection.md`;
+   there is no canned line in code. They are not toolbox tools (only this call sees them), so Home's
+   Permissions has no row for them.
+4. `speech_replace` calls `Mouth.replace(turn, body_id, text)`: the unsaid sentences are dropped, the
+   turn's own later words are muted (the turn still owns the queue and still ends normally) and the
+   new text is said in the same voice. `speech_continue`, no tool, an empty replacement, an error or
+   the 15 s `INTERJECTION_TIMEOUT_S` all leave the queue as it was. Always, `voice.resume()` runs last.
+5. The wake's hooks run as for a turn (`on_start`, then `on_end("done")`) and it counts toward the
+   hourly cap. Stopping the brain mid-interjection cancels it and holds its news.
+
+The old path that took an item between model steps is gone: items now only reach Scout as a wake turn
+or an interjection, and what a turn drains between steps is the owner's own words (`inbox`).
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
