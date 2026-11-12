@@ -214,6 +214,52 @@ async def test_event_frame_reaches_the_session():
         await server.wait_closed()
 
 
+class _Recorder:
+    def __init__(self) -> None:
+        self.calls: list[tuple] = []
+
+    def set_speech_state(self, state):
+        self.calls.append(("state", state))
+
+    def speech_body_gone(self):
+        self.calls.append(("gone",))
+
+
+async def test_speech_state_frames_feed_the_dispatcher():
+    rec = _Recorder()
+    bodies = Bodies()
+    session = Session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
+    session.dispatcher.set_speech_state = rec.set_speech_state
+    session.dispatcher.speech_body_gone = rec.speech_body_gone
+    server = await start_server("127.0.0.1", 0, bodies, "s1", session)
+    url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+    try:
+        async with connect(url) as ws:
+            await call(ws, hello())
+            for params in (
+                {"turn": "t", "n": 1, "state": "started"},
+                {"turn": "t", "n": 1, "state": "ended"},
+                {"turn": "t", "state": "paused"},
+                {"turn": "t", "state": "idle"},
+                {"turn": "t", "state": "bogus"},  # dropped, never answered
+            ):
+                await ws.send(
+                    json.dumps({"jsonrpc": "2.0", "method": "speech_state", "params": params})
+                )
+            await call(ws, request("tools", {"tools": []}))  # in order: all were handled
+        await asyncio.sleep(0.05)
+        assert rec.calls == [
+            ("state", "talking"),
+            ("state", "sentence_break"),
+            ("state", "paused"),
+            ("state", "idle"),
+            ("gone",),  # the body that reported left
+        ]
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
 async def test_event_with_bad_params_is_ignored_and_the_connection_stays_up():
     server, url, seen = await event_env()
     try:

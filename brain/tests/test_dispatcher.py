@@ -33,6 +33,7 @@ KINDS = {
     "focus": EventKind("focus", wakes=False),
     "off": EventKind("off", enabled=False),
     "parked": EventKind("parked", urgency="hold"),
+    "chime": EventKind("chime", urgency="next_pause", wakes=False),
 }
 
 
@@ -212,6 +213,65 @@ async def test_next_pause_goes_at_a_brief_sentence_break(make):
     rig.d.set_speech_state("talking")  # the break is over before anything else could happen
     await settle()
     assert len(rig.starts) == 1
+
+
+async def test_a_seen_break_is_latched_until_the_next_take(make):
+    rig = make()
+    rig.d.set_speech_state("talking")
+    await rig.emit(ev("soon"))
+    # Two frames handled back to back, no await between: the break must not be lost.
+    rig.d.set_speech_state("sentence_break")
+    rig.d.set_speech_state("talking")
+    await settle()
+    assert len(rig.starts) == 1
+    await rig.emit(ev("soon"))  # the latch was spent by that take
+    assert len(rig.starts) == 1
+
+
+async def test_desktop_state_overrides_brain_state(make):
+    rig = make()
+    rig.d.set_speech_state("talking")  # the desktop is playing audio
+    rig.d.set_mouth_state("idle")  # the brain's synth ran ahead of the speaker
+    await rig.emit(ev("soon"))
+    assert rig.starts == []
+    rig.d.set_mouth_state("sentence_break")
+    await settle()
+    assert rig.starts == []  # still the desktop that decides
+    rig.d.set_speech_state("sentence_break")
+    await settle()
+    assert len(rig.starts) == 1
+
+
+async def test_fallback_to_mouth_state_without_audio_body(make):
+    rig = make()
+    rig.d.set_mouth_state("talking")
+    await rig.emit(ev("soon"))
+    assert rig.starts == []
+    rig.d.set_mouth_state("sentence_break")
+    await settle()
+    assert len(rig.starts) == 1
+
+
+async def test_mouth_state_is_the_fallback_again_when_the_desktop_leaves(make):
+    rig = make()
+    rig.d.set_speech_state("talking")
+    await rig.emit(ev("soon"))
+    assert rig.starts == []
+    rig.d.speech_body_gone()  # nobody plays audio now; the mouth says idle
+    await settle()
+    assert len(rig.starts) == 1
+
+
+async def test_typed_only_next_pause_waits_for_reply_end(make):
+    rig = make()
+    rig.busy = True  # a typed reply is running; no speech state exists for it
+    rig.d.post(Item("chime", "desktop", {}, "next_pause"))
+    await settle()
+    assert rig.delivered == []
+    rig.busy = False
+    rig.d.turn_ended("t0")
+    await settle()
+    assert [i.kind for i in rig.delivered] == ["chime"]
 
 
 async def test_idle_waits_for_quiet_and_no_conversation(make):
