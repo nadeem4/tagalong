@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "./protocol/ts" },
+    { "path": "./bodies/mascot" },
     { "path": "./bodies/ui" },
     { "path": "./bodies/desktop" },
     { "path": "./bodies/browser" },

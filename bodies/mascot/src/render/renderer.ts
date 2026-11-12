@@ -1,0 +1,38 @@
+/* What the runtime needs from a GPU backend. WebGL2 is the only one
+   today; a WebGPU backend implements the same interface and can take the
+   same compiled characters once the compiler also emits WGSL. */
+
+import type { Pose } from '../behavior/brain';
+import type { Fx } from '../behavior/fx';
+import type { CompiledCharacter } from '../compiler/compile';
+import type { Vec3 } from '../spec/types';
+
+export interface Frame {
+  pose: Pose;
+  bones: Float32Array;
+  fx: Fx;
+  /** Material colours, laid out like `CompiledCharacter.albedo`. */
+  albedo: Float32Array;
+  time: number;
+  /** Device pixels. */
+  width: number;
+  height: number;
+  shadow: Vec3;
+  /** Strength of the floor shadow, 0–1. */
+  floor: number;
+  exposure: number;
+  /** Room around the character: 1 fits it snugly, 1.2 pulls the camera back a fifth. */
+  framing: number;
+  /** Parts shown, face on (0/1), paints on (0/1), for shaders compiled with `reveal`. Default all. */
+  reveal?: Vec3;
+  /** Scale of each mood-gated part (`CompiledCharacter.gated`), 0 hidden to 1 shown. */
+  partScale?: Float32Array;
+}
+
+export interface Renderer {
+  /** Starts building (or reuses) the character's program; cheap to call again with the same character. */
+  load(character: CompiledCharacter): void;
+  /** Draws a frame. False while the character's program is still being built. */
+  render(frame: Frame): boolean;
+  dispose(): void;
+}

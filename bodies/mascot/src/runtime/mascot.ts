@@ -1,0 +1,394 @@
+/* The public face of the engine: a character, alive on a canvas.
+
+     const mascot = mount(element, volt);
+     mascot.setState('thinking');
+     mascot.on('poke', () => …);
+
+   Wire `setState` to whatever your agent is doing and the character
+   does the rest. */
+
+import { Brain } from '../behavior/brain';
+import { Fx } from '../behavior/fx';
+import type { MascotState } from '../behavior/states';
+import { compile, type CompiledCharacter } from '../compiler/compile';
+import { Gpu } from '../render/gpu';
+import { rng } from '../math/scalar';
+import { Rig } from '../rig/rig';
+import type { Renderer } from '../render/renderer';
+import { WebGL2Renderer } from '../render/webgl2';
+import type { CharacterSpec, Vec3 } from '../spec/types';
+import { gatedTargets, initialScales, stepPartScales } from '../props/visibility';
+import { albedo, type Palette } from './customize';
+import { moodExpression, moodFace } from './moods';
+import { scheduler, type Animated } from './scheduler';
+
+export interface MascotOptions {
+  /** Where it starts. Default `idle`. */
+  state?: MascotMood;
+  /** 0–1. Desyncs blinks, glances and hops between mascots on one page. Random by default. */
+  seed?: number;
+  /** Follow the pointer and hop when clicked. Default true. */
+  interactive?: boolean;
+  /** Effects around the character (z's, sparkles, sound waves…). Default true. */
+  effects?: boolean;
+  /** Multiplies the pace of everything. Default 1. */
+  speed?: number;
+  /** Recolour materials by name, e.g. `{ shell: '#e0457b' }`. */
+  palette?: Palette;
+  /** Cap on device pixels per CSS pixel. Default 2. */
+  maxPixelRatio?: number;
+  /** The floor shadow's colour, linear RGB. */
+  shadow?: Vec3;
+  /** Strength of the floor shadow, 0–1. 0 suits a mascot laid over text or a busy background. Default 1. */
+  floor?: number;
+  /** Overall brightness. Default 1. */
+  exposure?: number;
+  /** Room around the character: 1 fits it snugly, larger values make it smaller in its canvas. Default 1. */
+  framing?: number;
+  /** Respect `prefers-reduced-motion`: hold the state's pose instead of animating. Default true. */
+  respectReducedMotion?: boolean;
+  /** Build the character so `reveal()` can show it a piece at a time, for build-up animations. Default false. */
+  revealable?: boolean;
+}
+
+/** What `reveal()` shows: the first `parts` parts of the spec, and whether the face and the paints are on. */
+export interface Reveal {
+  parts?: number;
+  face?: boolean;
+  paints?: boolean;
+}
+
+const SHOW_ALL: Vec3 = [1e6, 1, 1];
+
+/** A built-in state, or any mood name the spec declares in `moods`. */
+export type MascotMood = MascotState | (string & {});
+
+export interface MascotEvents {
+  /** Clicked or poked. */
+  poke: void;
+  state: string;
+  /** The first frame is on screen: its shader is built. Fade it in from here. */
+  ready: void;
+}
+
+type Listener<T> = (value: T) => void;
+
+/* compiling is pure, so every mascot of one character shares the result */
+const compiled = new WeakMap<CharacterSpec, CompiledCharacter>();
+const compiledRevealable = new WeakMap<CharacterSpec, CompiledCharacter>();
+export function compileCached(
+  spec: CharacterSpec,
+  options: { reveal?: boolean } = {},
+): CompiledCharacter {
+  const cache = options.reveal ? compiledRevealable : compiled;
+  let c = cache.get(spec);
+  if (!c) cache.set(spec, (c = compile(spec, options)));
+  return c;
+}
+
+/**
+ * Whether this browser can draw mascots (WebGL2, which some locked-down or
+ * very old devices turn off). Check it before creating one to show a still
+ * instead; `new Mascot` throws where it's false.
+ */
+export function isSupported(): boolean {
+  try {
+    Gpu.shared();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Starts building the character's shader without drawing it, so a mascot
+ * that shows it later appears at once. Call it ahead of a likely need: when
+ * a picker is hovered, or while the page is idle. Where the browser can't
+ * build shaders in the background this blocks while it builds, so call it
+ * from an idle callback there.
+ */
+export function warm(spec: CharacterSpec, options: { revealable?: boolean } = {}) {
+  Gpu.shared().program(compileCached(spec, { reveal: options.revealable }));
+}
+
+export class Mascot implements Animated {
+  private character!: CompiledCharacter;
+  private brain!: Brain;
+  private rig!: Rig;
+  private fx!: Fx;
+  private readonly renderer: Renderer;
+  private readonly options: Required<Omit<MascotOptions, 'state' | 'seed' | 'palette'>>;
+  private shown: Vec3 = SHOW_ALL;
+  private readonly seed: number;
+  private palette: Palette | undefined;
+  private albedo!: Float32Array;
+  private mood = 'idle';
+  private partScale = new Float32Array(0);
+  private partVel = new Float32Array(0);
+  private visible = true;
+  private paused = false;
+  private time = 0;
+  private readonly reducedMotion: MediaQueryList | null;
+  private stillFrames = 0;
+  private drawn = false;
+  private readonly listeners: { [K in keyof MascotEvents]: Set<Listener<MascotEvents[K]>> } = {
+    poke: new Set(),
+    state: new Set(),
+    ready: new Set(),
+  };
+  private readonly cleanup: Array<() => void> = [];
+  private source!: CharacterSpec;
+
+  constructor(
+    readonly canvas: HTMLCanvasElement,
+    spec: CharacterSpec,
+    options: MascotOptions = {},
+  ) {
+    this.seed = options.seed ?? Math.random();
+    this.palette = options.palette;
+    this.options = {
+      interactive: options.interactive ?? true,
+      effects: options.effects ?? true,
+      speed: options.speed ?? 1,
+      maxPixelRatio: options.maxPixelRatio ?? 2,
+      shadow: options.shadow ?? [0.05, 0.06, 0.12],
+      floor: options.floor ?? 1,
+      exposure: options.exposure ?? 1,
+      framing: options.framing ?? 1,
+      respectReducedMotion: options.respectReducedMotion ?? true,
+      revealable: options.revealable ?? false,
+    };
+    this.renderer = new WebGL2Renderer(canvas);
+    this.load(spec, options.state ?? 'idle');
+
+    canvas.setAttribute('role', 'img');
+    this.reducedMotion =
+      typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+
+    if (typeof IntersectionObserver !== 'undefined') {
+      const io = new IntersectionObserver(([e]) => (this.visible = e.isIntersecting));
+      io.observe(canvas);
+      this.cleanup.push(() => io.disconnect());
+    }
+    if (this.options.interactive) this.listen();
+    scheduler.add(this);
+  }
+
+  /** The mood, which may be one of the spec's own names; the face plays its base expression. */
+  get state(): string {
+    return this.mood;
+  }
+
+  /** The spec as given; a palette doesn't change it. */
+  get spec(): CharacterSpec {
+    return this.source;
+  }
+
+  get stats() {
+    return this.character.stats;
+  }
+
+  /** A built-in state, or a mood the spec names in `moods` (which plays its `base` and shows its props). */
+  setState(mood: MascotMood) {
+    const base = moodExpression(this.source, mood);
+    if (mood === this.mood) return;
+    this.mood = mood;
+    this.brain.setState(base, moodFace(this.source, mood));
+    this.stillFrames = 0;
+    this.label();
+    this.emit('state', mood);
+  }
+
+  /** Swaps the character, keeping the mood. Material names differ between characters, so the palette resets unless you pass one. */
+  setSpec(spec: CharacterSpec, palette?: Palette) {
+    this.palette = palette;
+    this.load(spec, this.mood);
+  }
+
+  /** Recolours materials by name; `undefined` goes back to the spec's own colours. Cheap enough for a colour picker. */
+  setPalette(palette: Palette | undefined) {
+    this.albedo = albedo(this.character, palette);
+    this.palette = palette;
+    this.stillFrames = 0;
+  }
+
+  setSpeed(speed: number) {
+    this.options.speed = Math.max(0, speed);
+  }
+
+  setEffects(on: boolean) {
+    this.options.effects = on;
+  }
+
+  /**
+   * Shows only part of the character: the first `parts` parts, with or
+   * without the face and the paints. `null` shows all of it. Needs the
+   * `revealable` option; costs nothing to change, so it can step every frame.
+   */
+  reveal(show: Reveal | null) {
+    if (!this.options.revealable)
+      throw new Error('reveal() needs a mascot created with { revealable: true }');
+    this.shown = show
+      ? [show.parts ?? SHOW_ALL[0], show.face === false ? 0 : 1, show.paints === false ? 0 : 1]
+      : SHOW_ALL;
+    this.stillFrames = 0;
+  }
+
+  /** The happy reaction: a hop with a spin. */
+  poke() {
+    this.brain.poke();
+    this.stillFrames = 0;
+    this.emit('poke', undefined);
+  }
+
+  pause() {
+    this.paused = true;
+  }
+
+  play() {
+    this.paused = false;
+  }
+
+  /** Subscribes to an event; returns the unsubscribe function. */
+  on<K extends keyof MascotEvents>(event: K, listener: Listener<MascotEvents[K]>): () => void {
+    this.listeners[event].add(listener);
+    return () => this.listeners[event].delete(listener);
+  }
+
+  get active() {
+    if (!this.visible || this.paused) return false;
+    /* with reduced motion, settle into the state's pose, then stop drawing */
+    return !this.still || this.stillFrames < 2;
+  }
+
+  tick(dt: number, _time: number, quality: number) {
+    const still = this.still;
+    const step = dt * this.options.speed;
+    if (still) {
+      /* jump straight to where the springs would settle, with no waves */
+      for (let i = 0; i < 90; i++) this.brain.update(1 / 60);
+    } else {
+      this.brain.update(step);
+      this.time += step;
+    }
+    this.springParts(still ? 0 : step);
+    const time = still ? 0 : this.time;
+    const pose = this.brain.pose;
+    this.rig.update(pose.root, pose.channels, pose.weights, time, still ? 0 : step);
+    if (!still && this.options.effects) this.fx.update(step, pose, this.rig);
+    else this.fx.count = 0;
+    pose.events.length = 0;
+
+    const ratio = Math.min(devicePixelRatio || 1, this.options.maxPixelRatio) * quality;
+    const drew = this.renderer.render({
+      pose,
+      bones: this.rig.inverse,
+      fx: this.fx,
+      albedo: this.albedo,
+      time,
+      width: Math.max(1, Math.round(this.canvas.clientWidth * ratio)),
+      height: Math.max(1, Math.round(this.canvas.clientHeight * ratio)),
+      shadow: this.options.shadow,
+      floor: this.options.floor,
+      exposure: this.options.exposure,
+      framing: this.options.framing,
+      reveal: this.shown,
+      partScale: this.partScale,
+    });
+    /* with reduced motion, count only frames that reached the screen */
+    if (drew && still) this.stillFrames++;
+    if (drew && !this.drawn) {
+      this.drawn = true;
+      this.emit('ready', undefined);
+    }
+  }
+
+  /** Whether the first frame has been drawn. */
+  get ready() {
+    return this.drawn;
+  }
+
+  dispose() {
+    scheduler.delete(this);
+    this.cleanup.forEach((fn) => fn());
+    this.listeners.poke.clear();
+    this.listeners.state.clear();
+    this.listeners.ready.clear();
+    this.renderer.dispose();
+  }
+
+  private springParts(dt: number) {
+    stepPartScales(this.partScale, this.partVel, gatedTargets(this.character.gated, this.mood), dt);
+  }
+
+  private load(spec: CharacterSpec, mood: string) {
+    this.source = spec;
+    this.character = compileCached(spec, { reveal: this.options.revealable });
+    this.albedo = albedo(this.character, this.palette);
+    this.renderer.load(this.character);
+    this.mood = mood;
+    this.brain = new Brain(spec.motion, this.seed);
+    this.brain.setState(moodExpression(spec, mood), moodFace(spec, mood));
+    /* props start in their mood's state, so a fresh mascot doesn't grow them in */
+    this.partScale = initialScales(this.character.gated, mood);
+    this.partVel = new Float32Array(this.character.gated.length);
+    this.rig = new Rig(this.character.bones, this.character.acting);
+    this.fx = new Fx(this.character, rng(this.seed + 0.37));
+    this.stillFrames = 0;
+    this.label();
+  }
+
+  private get still() {
+    return this.options.respectReducedMotion && (this.reducedMotion?.matches ?? false);
+  }
+
+  private emit<K extends keyof MascotEvents>(event: K, value: MascotEvents[K]) {
+    for (const l of this.listeners[event]) l(value);
+  }
+
+  private label() {
+    if (!this.canvas.hasAttribute('data-own-label'))
+      this.canvas.setAttribute('aria-label', `${this.source.name}, ${this.brain.state}`);
+  }
+
+  private listen() {
+    const move = (e: PointerEvent) => {
+      const r = this.canvas.getBoundingClientRect();
+      const size = Math.max(r.width, 1);
+      const x = (e.clientX - (r.left + r.width / 2)) / (size * 1.1);
+      const y = (e.clientY - (r.top + r.height * 0.45)) / (size * 1.1);
+      this.brain.pointer = Math.hypot(x, y) < 3 ? { x, y } : null;
+    };
+    const leave = () => (this.brain.pointer = null);
+    const click = () => this.poke();
+    window.addEventListener('pointermove', move, { passive: true });
+    document.addEventListener('pointerleave', leave);
+    this.canvas.addEventListener('click', click);
+    this.cleanup.push(() => {
+      window.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerleave', leave);
+      this.canvas.removeEventListener('click', click);
+    });
+  }
+}
+
+/**
+ * The shortest way in: creates a canvas that fills `container` and puts a
+ * mascot on it. `dispose()` removes the canvas again.
+ */
+export function mount(
+  container: HTMLElement,
+  spec: CharacterSpec,
+  options: MascotOptions = {},
+): Mascot {
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText = 'display:block;width:100%;height:100%;touch-action:manipulation';
+  container.append(canvas);
+  const mascot = new Mascot(canvas, spec, options);
+  const dispose = mascot.dispose.bind(mascot);
+  mascot.dispose = () => {
+    dispose();
+    canvas.remove();
+  };
+  return mascot;
+}
