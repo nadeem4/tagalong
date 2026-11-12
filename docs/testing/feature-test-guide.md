@@ -2447,21 +2447,24 @@ Brain tests only; nothing here installs anything.
 
 ### Log in an expert
 
-1. `cd brain && uv run pytest tests/test_setup_login.py -q` passes (the fake agent and a fake
-   terminal: no real window, browser or login).
+1. `cd brain && uv run pytest tests/test_setup_login.py tests/test_setup_install.py tests/test_setup_apps.py -q`
+   passes (the fake agent and a fake terminal: no real window, browser or login).
 2. By hand on Windows with a real brain, Claude Code installed from a clean home (no
-   `~/.claude`): ask Scout to log it in. The Allow card shows `claude-acp`, the method
-   `claude-ai-login` and `opens: terminal window`, with no **Always allow**. Not now: no window opens.
+   `~/.claude`): ask Scout to log it in. The Allow card shows `claude-acp` at once
+   (no wait for a check) and no **Always allow**. Not now: no window opens.
    Allow: a console window opens running the adapter's login; finish it in the browser it opens.
    Scout says it worked (a `setup_login` event), `experts.json` shows `logged_in: true`, and
    no code or link appeared in the chat.
 3. Close the window with X before finishing: within a moment Scout says the login did not finish
    (the window was closed) and `logged_in` is false; it does not wait 10 minutes.
    Ask again: a fresh window opens and the first never reports.
-4. With Claude Code already logged in, ask again: the tool refuses as already logged in and no
-   window opens.
-5. Leave the window open for ten minutes: Scout reports a timeout once.
-6. On a brain without a display (or not Windows): Scout tells you the command to run yourself.
+4. With Claude Code already logged in, ask again: no window opens and Scout says it is already
+   logged in (one `setup_login` event).
+5. Ask Scout to log the same expert in twice, quickly (or press **Log in** twice): one window
+   opens, the second request joins the first, and only one result is reported. The same holds
+   for installing the same expert or app twice.
+6. Leave the window open for ten minutes: Scout reports a timeout once.
+7. On a brain without a display (or not Windows): Scout tells you the command to run yourself.
 
 ### Scout knows what it can do and routes by it
 

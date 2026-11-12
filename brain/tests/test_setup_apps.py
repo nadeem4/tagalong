@@ -664,3 +664,12 @@ async def test_install_saves_the_package_version_and_a_remote_app_has_none(rig):
         "notes": "1.2.3",
         "cloud": "",
     }
+
+
+async def test_two_overlapping_installs_of_one_app_join_one_flight(rig):
+    r = rig()
+    first, second = await asyncio.gather(r.run(), r.run())
+    assert first == second and "error" not in first  # not "already_added" for the second
+    assert len(r.memory.list_apps()) == 1
+    again = await r.run()  # once the flight ended, a repeat is the normal already_added
+    assert again["error"] == "already_added"

@@ -6,7 +6,8 @@ same path as one added by hand. A package runs through a Node's own `npm exec` b
 references, so no secret value is ever stored. Failures are facts (`InstallError`), not prose.
 An app that connects inside the call is reported in its result (with its tool names); one that
 finishes later (a browser sign-in, a slow start) ends in a `setup_done` event, so Scout can pick
-the person's earlier request back up in the same conversation.
+the person's earlier request back up in the same conversation. One add per app runs at a time:
+a second request for the same app joins the first and gets its result.
 """
 
 import asyncio
@@ -265,6 +266,8 @@ def app_setup_tools(
         watching.add(task)
         task.add_done_callback(watching.discard)
 
+    inflight: dict[str, asyncio.Task[str]] = {}  # one add per app; a repeat joins it
+
     async def install(args: dict) -> str:
         try:
             entry = await entry_for(args)
@@ -272,6 +275,14 @@ def app_setup_tools(
             return fail("registry_unavailable", str(err))
         if entry is None:
             return fail("unknown_app", str(args.get("id")))
+        if (running := inflight.get(entry.id)) is not None:
+            return await asyncio.shield(running)  # the joiner leaving never cancels the add
+        task = asyncio.ensure_future(add(entry))
+        inflight[entry.id] = task
+        task.add_done_callback(lambda _: inflight.pop(entry.id, None))
+        return await task
+
+    async def add(entry: RegistryEntry) -> str:
         try:
             row = await add_registry_app(
                 entry, home, inspect_fn, fetch, get_json, apps, memory, tokens, notify
