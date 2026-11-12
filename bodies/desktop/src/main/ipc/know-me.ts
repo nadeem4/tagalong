@@ -4,7 +4,7 @@
  * rejection would wrap it in Electron's own text. Contains registerKnowMeIpc.
  */
 
-import { BrainOffline, RpcError } from '@tagalong/contract';
+import { BrainOffline, KnowMeGithub, RpcError } from '@tagalong/contract';
 import type { BrainClient } from '@tagalong/contract';
 import { KnowMeInput, KnowMeStatus, KnowSourceInfo } from '@tagalong/ui/shapes';
 import { z } from 'zod';
@@ -15,9 +15,6 @@ import type { IpcHandle } from './handle';
 
 /** The brain's own limit; checked here too so a huge file never crosses the socket. */
 const PDF_MAX_BYTES = 10 * 1024 * 1024;
-// Same rule as the contract's know_me_start username; checked here so the brain's raw
-// invalid_params text never reaches the form.
-const GITHUB_NAME = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
 const OVER_LIMIT = -32008;
 
 type KnowBrain = BrainCall & Pick<BrainClient, 'knowMeStart' | 'onKnowMeStatus'>;
@@ -47,7 +44,8 @@ export function registerKnowMeIpc(
     if (!input.success || (!github && !pdf)) {
       return { error: 'Give a GitHub username or a LinkedIn PDF.' };
     }
-    if (github && !GITHUB_NAME.test(github)) {
+    // The contract username rule, so the brain raw invalid_params text never reaches the form.
+    if (github && !KnowMeGithub.safeParse(github).success) {
       return { error: 'That is not a GitHub username.' };
     }
     if (pdf && decodedBytes(pdf.data) > PDF_MAX_BYTES) {
