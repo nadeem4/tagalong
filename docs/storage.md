@@ -624,7 +624,7 @@ choice, offer and setup-event waits that lived only in memory are gone.
 | Column            | Type             | Meaning                                                                                        |
 | ----------------- | ---------------- | ---------------------------------------------------------------------------------------------- |
 | `id`              | TEXT PRIMARY KEY | A random hex id                                                                                |
-| `kind`            | TEXT             | `ask`, `choice`, `install`, `signin`, `expert_ask`, `offer`, `setup` or `held` (CHECK)                 |
+| `kind`            | TEXT             | `ask`, `choice`, `install`, `signin`, `expert_ask`, `offer`, `setup` or `held` (CHECK)         |
 | `origin_body`     | TEXT             | The body the item came from, so a reply goes back to it                                        |
 | `state`           | TEXT             | `open`, `answered`, `done` or `expired` (CHECK); default `open`                                |
 | `saved_call_json` | TEXT             | The call to run on a later yes, as JSON, or null. Callers mask it before saving                |
@@ -738,7 +738,7 @@ These are lost when the brain restarts.
 | -------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Open asks            | `asks.py` `Asks`                | The waiting is gone. A job's ask or card row is expired ("brain restarted"); a Scout ask is an `ask` open item that stays open and its card returns when a displaying body joins |
 | Expert questions     | `questions.py` `ScoutQuestions` | The waiting is gone; its `question` row is expired ("brain restarted")                                                                                                           |
-| Dispatcher wakes | `dispatcher.py` `Dispatcher` | Wake batches still waiting for a body or a turn, and the rolling hour's wake count, start empty. News the dispatcher held is an `open_items` row of kind `held` and survives |
+| Dispatcher wakes     | `dispatcher.py` `Dispatcher`    | Wake batches still waiting for a body or a turn, and the rolling hour's wake count, start empty. News the dispatcher held is an `open_items` row of kind `held` and survives     |
 | Outboxes             | `bodies.py` `Outbox`            | The replay buffer (500 frames, 24 hours per body) is empty, so a reconnecting body gets a fresh start                                                                            |
 | Running jobs         | `jobs.py`, `experts.py`         | The expert processes end; their rows become `cancelled`                                                                                                                          |
 | Live history         | `sessions.py` `history`         | Rebuilt from `messages`                                                                                                                                                          |

@@ -7,7 +7,7 @@ The rules the Python brain and its bodies follow: who does what, and what code d
 | Part  | What it is                                                                         | Examples                                                                                                      |
 | ----- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | Body  | Where you talk to Scout. Brings its own senses and tools.                          | Windows desktop (screen, pointer, mic, speaker, bubble), Chrome extension (tabs), later phone and a desk body |
-| Brain | Decides, remembers, routes. Python. Runs anywhere: laptop, Raspberry Pi, Mac mini. | Thinking loop, sessions, memory, dispatcher, guardrails, experts                                               |
+| Brain | Decides, remembers, routes. Python. Runs anywhere: laptop, Raspberry Pi, Mac mini. | Thinking loop, sessions, memory, dispatcher, guardrails, experts                                              |
 | Tools | Do things. Live in the brain, on bodies, or outside.                               | Brain: memory, schedule, settings. Bodies: see screen, point, notify. Outside: MCP apps, Claude Code          |
 
 ## Rules

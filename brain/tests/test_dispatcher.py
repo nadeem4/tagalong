@@ -827,6 +827,19 @@ async def test_posting_the_same_event_and_key_closes_its_held_row(make):
     assert rig.held() == [] and len(rig.starts) == 1
 
 
+async def test_a_failing_close_of_a_held_row_does_not_raise_out_of_post_or_drop(make, caplog):
+    rig = make(kinds=CAPPED)
+
+    def boom(*a, **k):
+        raise RuntimeError("db locked")
+
+    rig.items.find_open = boom
+    with caplog.at_level(logging.ERROR, logger="brain.dispatcher"):
+        await rig.emit(ev("a", key="job:1"))
+        rig.d.drop("a", "job:1")
+    assert len(rig.starts) == 1 and "db locked" in caplog.text
+
+
 async def test_a_held_row_for_a_different_key_stays(make):
     quiet = [True]
     rig = make(kinds=CAPPED, quiet=lambda now: quiet[0])

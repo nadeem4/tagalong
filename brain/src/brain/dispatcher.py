@@ -241,8 +241,13 @@ class Dispatcher:
 
     def _close_held(self, kind: str, key: str) -> None:
         """News with this event and key is being told or forgotten: its held row is stale."""
-        while (row := self._open_items.find_open("held", {"event": kind, "key": key})) is not None:
-            self._open_items.finish(row.id, "superseded")
+        try:  # a store error must never stop the news itself from going on
+            while (
+                row := self._open_items.find_open("held", {"event": kind, "key": key})
+            ) is not None:
+                self._open_items.finish(row.id, "superseded")
+        except Exception:
+            _log.exception("dispatcher.close_held_failed kind=%s key=%s", kind, key)
 
     def _hold_group(self, group: _Group, why: str) -> None:
         for item in group.items:
