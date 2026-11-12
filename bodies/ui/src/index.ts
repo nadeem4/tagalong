@@ -51,6 +51,12 @@ export { SETTINGS_CSS } from './settings/settings-styles';
 export { KeyField, LimitField } from './key/key-field';
 export { useKeyStatus } from './key/use-key-status';
 
+/** Get to know me: the form, the two-step result and the hook that runs it. */
+export { RunForm } from './know-me/run-form';
+export { ResultView, gapsFrom } from './know-me/result-view';
+export { useKnowMe } from './know-me/use-know-me';
+export type { KnowMe } from './know-me/use-know-me';
+
 /** Settings' Scout's model: the provider and model selects. */
 export { ModelField } from './model/model-field';
 export type { KeyHost } from './key/use-key-status';
