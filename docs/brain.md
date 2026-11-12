@@ -87,6 +87,7 @@ the total can run a little low.
 | `brain/src/brain/sessions.py`          | The one conversation: history, the running turn, `say` joins, `interrupt` (pause, nothing cancelled), `cancel`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `brain/src/brain/mind/resume.py`       | Rebuilds a valid history from the saved chat at start                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `brain/src/brain/memory.py`            | Scout's memory: `Memory`, the one object over `tagalong.db`; chat, memory, apps and outputs delegate to `store/`; it masks memory text on the way in (`Memory.mask`, set by the session to the `save` guard)                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `brain/src/brain/know/`                | Get to know me: `facts.py` tag visibility, `status.py` per-source status, `runner.py` the one run at a time behind `know_me_start` (see [Get to know me](#get-to-know-me-know))                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `brain/src/brain/store/`               | The database layer: `db.py` opens `tagalong.db` and runs the numbered migrations in `migrations/`; `search.py` the FTS5 helpers and `search`; `conversation.py`, `memory.py`, `connections.py` and `outputs.py` own the SQL of chat, memory items, apps and tool outputs; `work.py` is `WorkStore`, the work table's state machine (jobs use it today, through `job_records.py`); `rules.py` the `rules` table: tool modes, preferences and offers                                                                                                                                                                           |
 | `brain/src/brain/dispatcher.py`        | `Dispatcher`: the front-door queue; `post(Item)` takes urgency from the event kind, `set_speech_state` (the desktop's), `set_mouth_state` (the fallback) and `set_conversation_active` say when delivery may happen, one loop hands batches to the `deliver` callback; `hold` items become open items. See [Front door](#front-door-and-urgency)                                                                                                                                                                                                                                                                             |
 | `brain/src/brain/open_items.py`        | `OpenItems`: the one record for what waits on the person (`open`, `answer`, `finish`, `expire_due`, `expire_live_only`, `list_open`, `list_answered`, `find_open`; `expire_live_only(job_id=None)` takes one job's items only), one lifecycle (open to answered, done or expired), one deadline (`DEADLINE_S`, a day) and a log line per move, `open_item.<event> t=<epoch> id=<id> kind=<kind> by=<who> why=<why>`, on logger `brain.open_items`. Scout's asks use it through `open_item_runner.py`, choices, offers and setup events directly (kinds `choice`, `offer`, `setup`); the table is in [storage.md](storage.md) |
@@ -2511,6 +2512,27 @@ There is one deadline rule: `DEADLINE_S` in `open_items.py` for what waits on a 
 is a live card tied to one turn, not a stored wait.
 
 Tests: `tests/test_dispatcher.py` (fake clock) and `tests/test_events.py`.
+
+## Get to know me (`know/`)
+
+Scout reads the person's public presence on their say-so. So far the frames and a runner shell
+exist; the sources, extraction and portrait come in later slices.
+
+- **`know_me_start`** (body to brain, a request, in `server.py`): `{ github?, pdf?: { name, data } }`.
+  At least one input, else `invalid_params`; `pdf.data` is base64 (bad base64 is `invalid_params`)
+  and may decode to at most 10 MB (`over_limit`). The reply is `{ joined }`.
+- **`know_me_status`** (brain to body, live, no `seq`, never replayed): `{ sources, done, portrait? }`,
+  sent through `Bodies.send_live` to the bodies that started or joined the run. A run does not
+  survive a restart.
+- **`know/runner.py`**: `KnowMeRunner` runs one task at a time. A start while it is going joins
+  it (`joined: true`) and the joiner gets the current status at once; once the run is done a new
+  start begins a fresh one. `Session.know_me` owns it and `body_gone` drops a body from the
+  watchers. `_run` is a shell for now: every source is marked done and a final `done: true`
+  status goes out (the source list is empty).
+- **`know/status.py`**: `SourceProgress` and `KnowMeStatus`; `params()` is the frame's shape with
+  unset values left out.
+
+Tests: `tests/test_know_start.py` (runner and websocket path) and `tests/test_protocol.py`.
 
 ## Not built yet
 

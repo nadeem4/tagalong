@@ -2810,3 +2810,11 @@ No screen yet; the tests in `brain/tests/test_know_store.py` and `test_migrate_m
 - Forgetting a profile fact stops a re-run bringing it back, even if its whitespace or case differs.
 - Personal (`asked`) facts are left out of `recall` unless `include_personal` is set; the portrait is never recalled, never forgotten, and leads the prompt.
 - `remember` cannot write `profile` or `portrait`; secrets in saved facts and the portrait are masked.
+
+## Get to know me (K2 frames, automated only)
+
+Still no screen; `brain/tests/test_know_start.py`, `test_protocol.py` and the contract's `messages.test.ts` and `brain-client.test.ts` cover it:
+
+- `know_me_start` with neither a GitHub username nor a PDF, a username over 39 characters or with a space, or bad base64 is refused with `invalid_params`; a PDF over 10 MB decoded is `over_limit`.
+- A second start while a run is going joins it (`joined: true`); once the run is done a new start begins again.
+- `know_me_status` goes live (no `seq`) to the body that started or joined the run, not to other bodies, and not to a body that has gone.
