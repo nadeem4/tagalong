@@ -1078,7 +1078,7 @@ Scout's only faces are the dock moods (idle, listening, reading, thinking, worki
    GPU can take a little longer, and the dock is never empty). Then watch Scout idle for half a minute
    and trigger each mood below. Do it on a light wallpaper and on a dark one.
 2. **Expected:** Scout is a live 3D figure that breathes and blinks by itself and never jumps between
-   moods. Idle and dozing draw slowly (about 4 frames a second) and look the same; a hop, a blink or
+   moods. Idle and dozing draw slowly (about 4 frames a second) and look the same; a hop, a blink, a head glance or
    a mood change is smooth. The small tag at the top right reads clearly on both wallpapers.
    - idle: nothing going on, no prop.
    - listening: open the mic (hold the talk key) or capture the screen (Seeing); headphones. Seeing

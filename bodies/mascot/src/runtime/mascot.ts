@@ -51,9 +51,9 @@ export interface MascotOptions {
   /** Cap on drawn frames per second, for a small always-on mascot. Default 0: the display's rate. */
   maxFps?: number;
   /**
-   * Frames per second while the mood is idle or sleeping and nothing is hopping or blinking: it
-   * only breathes, so a slow rate looks the same and costs a fraction. Changes and quick motion
-   * go back to `maxFps`. Default 0: no slow rate.
+   * Frames per second while the mood is idle or sleeping and nothing is hopping, blinking or
+   * glancing: it only breathes and drifts, so a slow rate looks the same and costs a fraction.
+   * Changes and quick motion go back to `maxFps`. Default 0: no slow rate.
    */
   calmFps?: number;
   /** Build the character so `reveal()` can show it a piece at a time, for build-up animations. Default false. */
@@ -86,13 +86,15 @@ type Listener<T> = (value: T) => void;
 const compiled = new Map<string, WeakMap<CharacterSpec, CompiledCharacter>>();
 export function compileCached(
   spec: CharacterSpec,
-  options: { reveal?: boolean; floor?: boolean } = {},
+  /* `floor` is the mascot's floor strength; 0 leaves the floor shadow out of the shader */
+  options: { reveal?: boolean; floor?: number } = {},
 ): CompiledCharacter {
-  const key = `${options.reveal ? 'r' : ''}${options.floor === false ? 'n' : ''}`;
+  const hasFloor = options.floor !== 0;
+  const key = `${options.reveal ? 'r' : ''}${hasFloor ? '' : 'n'}`;
   let cache = compiled.get(key);
   if (!cache) compiled.set(key, (cache = new WeakMap()));
   let c = cache.get(spec);
-  if (!c) cache.set(spec, (c = compile(spec, options)));
+  if (!c) cache.set(spec, (c = compile(spec, { reveal: options.reveal, floor: hasFloor })));
   return c;
 }
 
@@ -118,9 +120,7 @@ export function isSupported(): boolean {
  * from an idle callback there.
  */
 export function warm(spec: CharacterSpec, options: { revealable?: boolean; floor?: number } = {}) {
-  Gpu.shared().program(
-    compileCached(spec, { reveal: options.revealable, floor: options.floor !== 0 }),
-  );
+  Gpu.shared().program(compileCached(spec, { reveal: options.revealable, floor: options.floor }));
 }
 
 export class Mascot implements Animated {
@@ -352,7 +352,7 @@ export class Mascot implements Animated {
     this.source = spec;
     this.character = compileCached(spec, {
       reveal: this.options.revealable,
-      floor: this.options.floor !== 0,
+      floor: this.options.floor,
     });
     this.albedo = albedo(this.character, this.palette);
     this.renderer.load(this.character);
@@ -369,7 +369,7 @@ export class Mascot implements Animated {
     this.label();
   }
 
-  /* idle and sleeping only breathe and blink; every other mood has props or effects in motion */
+  /* idle and sleeping only breathe, blink, hop and glance (the brain says when); every other mood has props or effects in motion */
   private get calm() {
     const base = moodExpression(this.source, this.mood);
     return base === 'idle' || base === 'sleeping';

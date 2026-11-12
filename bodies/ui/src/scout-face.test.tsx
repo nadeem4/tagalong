@@ -59,7 +59,33 @@ describe('ScoutFace', () => {
     expect(getByTestId('scout-face')).not.toHaveAttribute('data-live');
     act(() => live.ready());
     expect(getByTestId('scout-face')).toHaveAttribute('data-live', 'ready');
-    expect(container.querySelector('svg')).toBeNull();
     expect(queryByTestId('live-mascot')).not.toBeNull();
+  });
+
+  it('keeps the still head under the canvas until its fade-in ends, then removes it', () => {
+    vi.useFakeTimers();
+    supported.value = true;
+    const { container } = render(<ScoutFace spec={scout} mood="idle" />);
+    act(() => live.ready());
+    expect(container.querySelector('svg')).not.toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    expect(container.querySelector('svg')).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it('starts over when the spec changes: the still head is back until the new one draws', () => {
+    vi.useFakeTimers();
+    supported.value = true;
+    const { container, rerender, getByTestId } = render(<ScoutFace spec={scout} mood="idle" />);
+    act(() => live.ready());
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    rerender(<ScoutFace spec={{ ...scout }} mood="idle" />);
+    expect(container.querySelector('svg')).not.toBeNull();
+    expect(getByTestId('scout-face')).not.toHaveAttribute('data-live');
+    vi.useRealTimers();
   });
 });
