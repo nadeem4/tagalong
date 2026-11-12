@@ -226,6 +226,30 @@ def test_every_kind_has_an_urgency_set_by_code():
         assert kind.urgency in ("now", "next_pause", "idle", "hold")
 
 
+def test_event_kinds_have_urgency():
+    for name in ("ask_closed", "many_pending"):
+        kind = EVENT_KINDS[name]
+        assert kind.urgency == "next_pause"
+        assert kind.wakes and kind.batch_seconds == 0
+        assert load_notes()[name].strip()
+    assert "urgency" not in load_notes()["ask_closed"].lower()
+
+
+def test_from_body_whatsapp_ask_closed():
+    event = from_body("wa", "ask_closed", {"via": "tap"})
+    assert event == Event("ask_closed", {"body": "wa", "via": "tap"}, key="ask_closed:wa")
+    assert from_body("wa", "ask_closed", {"via": "x"}) is None
+    assert from_body("wa", "ask_closed", None) is None
+
+
+def test_from_body_whatsapp_many_pending():
+    event = from_body("wa", "many_pending", {"asks": 3})
+    assert event == Event("many_pending", {"body": "wa", "asks": 3}, key="many_pending:wa")
+    assert from_body("wa", "many_pending", {"asks": 0}) is None
+    assert from_body("wa", "many_pending", {"asks": "3"}) is None
+    assert from_body("wa", "many_pending", {"asks": True}) is None
+
+
 def test_urgency_examples():
     assert EVENT_KINDS["timer"].urgency == "next_pause"
     assert EVENT_KINDS["job_question"].urgency == "next_pause"
