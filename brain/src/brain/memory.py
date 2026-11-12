@@ -106,6 +106,9 @@ class Memory:
     def profile_facts(self, include_asked: bool = True) -> list[Item]:
         return memory_store.profile_facts(self._db, include_asked)
 
+    def chat_facts(self) -> list[Item]:
+        return memory_store.chat_facts(self._db)
+
     def set_portrait(self, text: str) -> Item:
         masked = self.mask(text)
         if masked == WITHHELD:

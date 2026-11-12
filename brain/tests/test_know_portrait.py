@@ -88,3 +88,29 @@ async def test_portrait_budget_stop_keeps_old(mem, tmp_path):
     with pytest.raises(BudgetStop):
         await write_portrait(FakeModel(), budget(tmp_path, limit=0.0), mem)
     assert mem.portrait().text == "Old text."
+
+
+async def test_portrait_input_has_free_chat_facts_but_not_asked_ones(mem, tmp_path):
+    seed(mem)
+    mem.remember("about_you", "Works at Initech, not Acme")
+    mem.remember("project", "Building a garden planner")  # a work note, not about the person
+    mem.remember("about_you", "Has a sister named Zed", tag="personal")
+    mem.remember("instruction", "Answer in short sentences")
+    model = FakeModel(final("Alice works at Initech."))
+    await write_portrait(model, budget(tmp_path), mem)
+    sent = str(model.calls[0][1])
+    assert "Works at Initech, not Acme" in sent and "garden planner" not in sent
+    assert "Zed" not in sent and "daughters" not in sent and "short sentences" not in sent
+
+
+async def test_portrait_writes_from_chat_facts_alone(mem, tmp_path):
+    mem.remember("about_you", "Works at Initech")
+    text = await write_portrait(FakeModel(final("Works at Initech.")), budget(tmp_path), mem)
+    assert text == "Works at Initech."
+
+
+def test_portrait_prompt_says_chat_wins_over_source_facts():
+    from brain.know.extract import prompt
+
+    p = prompt("know_portrait.md").lower()
+    assert "told scout" in p and "wins" in p

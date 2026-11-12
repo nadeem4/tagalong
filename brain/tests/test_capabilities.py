@@ -141,3 +141,10 @@ def test_capabilities_names_the_wait_argument():
     assert "ask_wait_hours" not in picture()
     line = next(ln for ln in picture(asks=True).splitlines() if "ask_wait_hours" in ln)
     assert "1 to 168" in line and "default 72" in line
+
+
+def test_offer_line_says_when_an_offer_fits_and_stays_rare():
+    line = next(ln for ln in picture(know_me_offer=True).splitlines() if "get_to_know_me" in ln)
+    assert "Early on" in line and "what you can do" in line
+    assert "never pushy" in line
+    assert "declined" in line

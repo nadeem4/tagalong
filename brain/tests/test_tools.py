@@ -1826,3 +1826,8 @@ async def test_list_memories_portrait_null_when_unset(run):
 def test_brain_status_is_home_only():
     [(spec, _)] = brain_status_tools(lambda: {})
     assert spec.audience == frozenset({"home"})
+
+
+def test_recall_description_says_to_search_personal_when_asked_about_themselves(mem):
+    spec = next(s for s, _ in brain_tools(mem) if s.name == "recall")
+    assert "about themselves" in spec.description and "include_personal" in spec.description

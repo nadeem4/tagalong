@@ -86,8 +86,10 @@ def capability_picture(
         )
     if know_me_offer:  # fixed text; code decides when it is due, Scout the wording
         lines.append(
-            "You do not know the owner yet. You may offer once, in your own words, to read their "
-            "public profiles (get_to_know_me, action offered), and only if it fits the moment."
+            "You do not know the owner yet. Early on, or when they ask what you can do, offer "
+            "once, in your own words, to read their public profiles (call get_to_know_me with "
+            "action offered first); rare and never pushy. If they say no, call get_to_know_me "
+            "with action declined."
         )
     if experts:
         lines.append(

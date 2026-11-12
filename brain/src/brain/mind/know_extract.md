@@ -8,6 +8,7 @@ Rules:
 - One plain sentence per fact in `text`, at most 200 characters, third person about the owner.
 - `tag` is a short lowercase word: work, skills, projects, interests, or personal (family, health, home, anything private). Use personal for anything private.
 - `ref` says where the fact came from: a URL, `github:<name>`, or `linkedin.pdf#p2` for a PDF page.
+- Never extract contact details: no phone number, no email address, in `text` or in `evidence`. Skip a fact that needs one.
 - Skip filler. If nothing in the material is a fact about the person, return no facts.
 - `name` is the person's full name and `employer` their current employer, only if the material states them, quoted exactly as written; otherwise null.
 

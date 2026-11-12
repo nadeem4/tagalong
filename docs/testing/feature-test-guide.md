@@ -2867,3 +2867,15 @@ Automated: `brain/tests/test_know_runner.py`, `test_know_portrait.py`, `test_kno
 3. **Expected:** Scout starts the run; Home shows the portrait and facts in Memory when it finishes; every fact has a quote that is really on your GitHub profile; a page of someone with the same name is not used; any source that gave nothing says why.
 4. **Action:** forget one fact in Home, then run get to know me again.
 5. **Expected:** the forgotten fact is not back; the other GitHub facts are replaced by the new run's. Ask Scout to rewrite the portrait: it no longer mentions the forgotten fact.
+
+## Get to know me live-test fixes (KF1)
+
+Automated: `brain/tests/test_know_extract.py`, `test_know_portrait.py`, `test_know_tools.py`, `test_know_start.py`, `test_capabilities.py` and `test_tools.py`.
+
+- A fact whose text or quote holds a phone number or an email address is dropped; the extractor prompt says not to extract them.
+- The portrait input holds free profile facts and free `about_you` chat memories, never asked ones; the prompt says a chat statement wins over a conflicting source fact.
+- `recall` says to set `include_personal` when the person asks about themselves.
+- The capability offer line says to offer early or when asked what Scout can do, rarely, and to call `get_to_know_me` with `declined` on a no; the line still appears only while an offer is allowed.
+- `know_me_start` with a bad username or nothing to read returns `invalid_params` with a short plain message, no pydantic text or URL.
+
+**Manual, real brain.** On a fresh home, ask "what can you do": Scout may offer to get to know you once; say no and it records the decline instead of a memory. After a run, tell Scout "I work at Initech, not Acme" and ask it to rewrite the portrait: the portrait names Initech. Ask "where am I based?": Scout searches personal notes and answers.

@@ -81,7 +81,8 @@ def know_me_tools(
                 "Read the owner's public profiles so you know who they are. action start (with "
                 "their GitHub username) runs it once they said yes; the LinkedIn PDF goes in "
                 "through Home. action offered: call before you offer, it refuses when an offer "
-                "is not due. action declined: they said no.",
+                "is not due. action declined: they said no to your offer; call this, never "
+                "`remember`, so you do not offer again.",
                 {
                     "type": "object",
                     "properties": {

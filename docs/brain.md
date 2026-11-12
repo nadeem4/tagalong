@@ -2520,7 +2520,7 @@ saves each source as it finishes, the portrait, and the tools. The result view a
 come in a later slice.
 
 - **`know_me_start`** (body to brain, a request, in `server.py`): `{ github?, pdf?: { name, data } }`.
-  At least one input, else `invalid_params`; `pdf.data` is base64 (bad base64 is `invalid_params`)
+  At least one input, else `invalid_params` ("Give a GitHub username or a LinkedIn PDF."; a bad username says "That is not a GitHub username."; never pydantic's own text); `pdf.data` is base64 (bad base64 is `invalid_params`)
   and may decode to at most 10 MB (`over_limit`). The reply is `{ joined }`.
 - **`know_me_status`** (brain to body, live, no `seq`, never replayed): `{ sources, done, portrait? }`,
   sent through `Bodies.send_live` to the bodies that started or joined the run. A run does not
@@ -2535,7 +2535,7 @@ come in a later slice.
   makes that and every later source `failed` with its reason ("Stopped: daily limit reached", or "Add your Anthropic key first." when there is no key); any other error
   is logged and shown as "Something went wrong reading <label>.". The web source gets a `Known`
   built from every material's `keys` plus the `name` and `employer` the extractor found (the
-  earliest non-empty wins). After the sources the portrait is written (`portrait.py`) and shown as
+  earliest non-empty wins). `extract.check` also drops any fact whose text or evidence holds a phone number or an email address. After the sources the portrait is written (`portrait.py`, from free profile facts plus free `about_you` chat memories, which win a conflict; never asked facts) and shown as
   a last status row named `portrait` (its gap: "Not enough found to write a portrait." or the
   daily limit); `status.portrait` carries the saved text, the old one if a new one could not be
   written. `done: true` is always sent, even when the task hits a bug (it is logged), and the run

@@ -141,3 +141,51 @@ async def test_complete_stops_when_budget_spent(tmp_path):
 async def test_complete_stops_when_model_not_ready(tmp_path):
     with pytest.raises(BudgetStop):
         await complete(FakeModel(ready=False), budget(tmp_path), "sys", [])
+
+
+CONTACT = Material(
+    "Reach me on +1 331 814 9771 or at amy@example.com. I built Foo, a CLI tool.", "github:amy"
+)
+
+
+@pytest.mark.parametrize(
+    "evidence,text",
+    [
+        ("+1 331 814 9771", "Has a home phone"),
+        ("amy@example.com", "Has an email"),
+        ("I built Foo, a CLI tool", "Phone is 331-814-9771"),
+        ("I built Foo, a CLI tool", "Mail amy@example.com about Foo"),
+    ],
+)
+def test_check_drops_contact_details(evidence, text):
+    c = Candidate("personal", text, evidence, "github:amy")
+    assert check([c], CONTACT) == []
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Computer Science (2015 - 2019)",
+        "Acme 2019-2023",
+        "(2019) (2020)",
+        "released 2023.01.15",
+        "version 10.0.26200",
+        "+13318149771 (Home)",
+        "(331) 814-9771",
+    ],
+)
+def test_phone_shape_needs_nine_digits(line):
+    from brain.know.extract import has_contact_details
+
+    assert has_contact_details(line) == line.startswith(("+", "(331"))
+
+
+def test_check_keeps_a_fact_with_no_contact_details():
+    c = Candidate("projects", "Built Foo", "I built Foo, a CLI tool", "github:amy")
+    assert check([c], CONTACT) == [c]
+
+
+def test_extractor_prompt_forbids_contact_details():
+    from brain.know.extract import prompt
+
+    assert "phone" in prompt("know_extract.md") and "email" in prompt("know_extract.md")

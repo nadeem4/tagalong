@@ -1,7 +1,8 @@
 """Writes the portrait: a few plain paragraphs about the owner, from saved free facts only.
 
-Facts the person keeps for being asked (`asked`) never reach the model here. The facts came
-from strangers' text, so they are fenced as data. The old portrait is kept whenever a new one
+Free profile facts and free chat memories (what the person told Scout; those win a conflict)
+go in. Facts the person keeps for being asked (`asked`) never reach the model here. The
+facts are fenced as data. The old portrait is kept whenever a new one
 cannot be written (nothing to write from, an empty reply, the daily limit).
 """
 
@@ -29,9 +30,11 @@ def trim(text: str) -> str:
 async def write_portrait(model: Model, budget: Budget, memory: Memory) -> str | None:
     """Returns the saved portrait, or None when there was nothing to write. BudgetStop passes."""
     facts = memory.profile_facts(include_asked=False)
-    if not facts:
+    told = memory.chat_facts()
+    if not facts and not told:
         return None
-    lines = "\n".join(f"- [{f.tag}] {f.text}".replace("<", "&lt;") for f in facts)
+    rows = [f"- [{f.tag}] {f.text}" for f in facts] + [f"- [chat] {f.text}" for f in told]
+    lines = "\n".join(r.replace("<", "&lt;") for r in rows)
     content = [{"type": "text", "text": f'<facts untrusted="true">\n{lines}\n</facts>'}]
     reply = await complete(model, budget, prompt("know_portrait.md"), content, 1200)
     text = trim(reply)
