@@ -127,6 +127,11 @@ export class Brain {
 
   readonly pose: Pose;
 
+  /** A hop or a blink is under way: quick motion that wants the full frame rate. */
+  get moving(): boolean {
+    return this.jump !== null || this.blinkAge >= 0;
+  }
+
   constructor(temperament: Partial<Temperament> = {}, seed = 0.5) {
     this.temperament = { ...DEFAULT_TEMPERAMENT, ...temperament };
     this.random = rng(seed);

@@ -107,6 +107,18 @@ describe('DockPet', () => {
     expect(screen.getByRole('img')).toHaveAccessibleName('Scout is idle, listening for your reply');
   });
 
+  it('reads speech heard on the mic as listening, not as Seeing', () => {
+    const { rerender } = render(<DockPet pet={SCOUT} mood="listening" listening="hearing" />);
+    expect(screen.queryByTestId('dock-tag')).toBeNull();
+    expect(screen.getByRole('img')).toHaveAccessibleName('Scout is listening');
+    // A real capture keeps its words, with or without the dot on.
+    rerender(<DockPet pet={SCOUT} mood="listening" listening="on" />);
+    expect(screen.getByTestId('dock-tag')).toHaveTextContent('Seeing');
+    expect(screen.getByRole('img')).toHaveAccessibleName(
+      'Scout is looking at your screen, listening',
+    );
+  });
+
   it('names what the listening dot means in its tooltip', () => {
     const { rerender } = render(<DockPet pet={SCOUT} mood="idle" listening="on" />);
     expect(screen.getByTestId('listening-mark')).toHaveAttribute(

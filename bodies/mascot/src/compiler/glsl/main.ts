@@ -6,7 +6,9 @@
    there. Effect particles go in front of or behind the body, whichever
    is true. The output is premultiplied alpha over the page. */
 
-export const MAIN = /* glsl */ `
+/* The floor shadow marches the whole distance field a second time, which is most of the cost of
+   building the shader on Windows, so a mascot with no floor (the dock) leaves it out. */
+export const main = (floor: boolean) => /* glsl */ `
 vec3 calcNormal(vec3 p) {
   vec3 n = vec3(0.0);
   for (int i = ZERO; i < 4; i++) {
@@ -40,12 +42,15 @@ void main() {
     float tEnd = -b + s;
     float nearest = 1e9;
     float nearestT = 0.0;
+    float hitId = 0.0;
+    float nearestId = 0.0;
     for (int i = ZERO; i < 140; i++) {
-      float d = map(ro + rd * t).x;
+      vec2 h = map(ro + rd * t);
+      float d = h.x;
       float px = t * pixelAngle;
-      if (d < 0.2 * px) { hitT = t; break; }
+      if (d < 0.2 * px) { hitT = t; hitId = h.y; break; }
       float ratio = d / px;
-      if (ratio < nearest) { nearest = ratio; nearestT = t; }
+      if (ratio < nearest) { nearest = ratio; nearestT = t; nearestId = h.y; }
       t += d * 0.85;
       if (t > tEnd) break;
     }
@@ -55,7 +60,8 @@ void main() {
       vec3 p = ro + rd * tt;
       gPixel = tt * pixelAngle;
       vec3 n = calcNormal(p);
-      float id = map(p).y;
+      /* the material found by the march itself: another distance query here costs seconds of shader build */
+      float id = hitT > 0.0 ? hitId : nearestId;
       Material m = getMaterial(id, p, n);
       surface(id, p, n, m);
       vec3 col = pow(aces(shade(m, p, n, -rd) * uExposure), vec3(1.0 / 2.2));
@@ -64,7 +70,9 @@ void main() {
     }
   }
 
-  vec4 floorLayer = vec4(0.0);
+${
+  floor
+    ? `  vec4 floorLayer = vec4(0.0);
   if (uFloor > 0.0 && body.a < 1.0 && rd.y < 0.0) {
     vec3 fp = ro + rd * (-ro.y / rd.y);
     float r = length(fp.xz - uBound.xz);
@@ -82,6 +90,9 @@ void main() {
     }
   }
 
+`
+    : 'vec4 floorLayer = vec4(0.0);'
+}
   vec4 front = vec4(0.0);
   vec4 back = vec4(0.0);
   float pixel = 2.0 / uResolution.y;

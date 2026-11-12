@@ -9,6 +9,25 @@ const settle = (b: Brain) => {
   return b.pose.glow;
 };
 
+describe('Brain moving', () => {
+  it('is moving during a hop, so the mascot draws at its full rate', () => {
+    const b = new Brain({}, 0.5);
+    b.poke();
+    b.update(1 / 60);
+    expect(b.moving).toBe(true);
+  });
+
+  it('is still between hops and blinks', () => {
+    const b = new Brain({}, 0.5);
+    const states = new Set<boolean>();
+    for (let i = 0; i < 1200; i++) {
+      b.update(1 / 60);
+      states.add(b.moving);
+    }
+    expect(states.has(false)).toBe(true);
+  });
+});
+
 describe('Brain face override', () => {
   it('uses the base expression when there is no override', () => {
     const b = new Brain({}, 0.5);

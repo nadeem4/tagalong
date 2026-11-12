@@ -104,9 +104,12 @@ function isTagged(mood: DockMood): mood is TaggedMood {
 export function DockPet({ pet, mood, sightPaused = false, listening, status }: DockPetProps) {
   // The Paused mark takes the top while sight is off: the two would overlap in 96 px, and the
   // pose and the label still say what Scout is doing.
-  const tag = isTagged(mood) && !sightPaused ? TAGS[mood] : undefined;
-  const label = `${pet.name} ${WORDS[mood]}${sightPaused ? ', sight paused' : ''}${
-    listening === undefined ? '' : `, ${LISTENING[listening].words}`
+  // `listening` is also the mood while speech is heard on the mic (Always listening): that is
+  // hearing, not Seeing, so it takes no Seeing tag and says it only once.
+  const hearing = mood === 'listening' && listening === 'hearing';
+  const tag = isTagged(mood) && !sightPaused && !hearing ? TAGS[mood] : undefined;
+  const label = `${pet.name} ${hearing ? 'is listening' : WORDS[mood]}${sightPaused ? ', sight paused' : ''}${
+    listening === undefined || hearing ? '' : `, ${LISTENING[listening].words}`
   }${status == null ? '' : `, ${STATUS_WORDS[status.id].detail}`}`;
   return (
     <span

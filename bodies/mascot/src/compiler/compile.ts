@@ -9,7 +9,7 @@ import type { CharacterSpec } from '../spec/types';
 import { emitMap } from './emit-map';
 import { emitMaterials, emitSurfaces } from './emit-materials';
 import { LIGHTING } from './glsl/lighting';
-import { MAIN } from './glsl/main';
+import { main } from './glsl/main';
 import { MOUTH } from './glsl/mouth';
 import { PARTICLES } from './glsl/particles';
 import { PRELUDE } from './glsl/prelude';
@@ -44,6 +44,12 @@ export interface CompileOptions {
    * one such shader replaces a shader per step.
    */
   reveal?: boolean;
+  /**
+   * Draw a floor shadow under the character. Default true. A mascot that never shows one can
+   * pass false: the shader is left without it and builds markedly faster. Its `floor` option
+   * must then stay 0.
+   */
+  floor?: boolean;
 }
 
 export const VERTEX_SHADER = /* glsl */ `#version 300 es
@@ -59,6 +65,7 @@ const expressionDefines = () =>
 export function compile(spec: CharacterSpec, options: CompileOptions = {}): CompiledCharacter {
   const r = resolve(spec);
   const reveal = options.reveal ?? false;
+  const floor = options.floor ?? true;
   const gated = spec.parts.filter((p) => p.moods).map((p) => p.moods!);
   const fragment = [
     '#version 300 es',
@@ -78,7 +85,7 @@ export function compile(spec: CharacterSpec, options: CompileOptions = {}): Comp
     emitMaterials(r, reveal),
     emitSurfaces(r),
     PARTICLES,
-    MAIN,
+    main(floor),
   ].join('\n');
 
   return {
