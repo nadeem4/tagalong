@@ -24,8 +24,9 @@ connection from `store.db.open_db`; nothing else opens the file.
   `search(db, query, kind, limit)` over `memories_fts` and `messages_fts` and its `Hit`.
 - `store/conversation.py`: owns `messages` (`save_messages`, `replace_last_message`,
   `load_messages`).
-- `store/memory.py`: owns `memories` (`remember`, `forget`, `list_items`, `always_loaded`,
-  `add_summary`), with the kinds table, `Item` and `MemoryRefused`.
+- `store/memory.py`: owns `memories` and `memory_dismissed` (`remember`, `forget`, `list_items`,
+  `always_loaded`, `add_summary`, `save_source_facts`, `profile_facts`, `set_portrait`,
+  `get_portrait`), with the kinds table, `Item` and `MemoryRefused`.
 - `store/connections.py`: owns `apps` (`list_apps`, `add_app`, `set_app_enabled`, `remove_app`,
   the mail switch `set_reads_mail` and `reads_mail_apps`) and `app_cursors` (`cursor`, `set_cursor`,
   `clear_mail`).
@@ -43,7 +44,7 @@ Nothing outside this package runs SQL: `tests/test_store_boundary.py` fails if a
 under `brain/src/brain` calls `.execute`, `.executescript` or `.executemany`.
 
 - `store/migrations/`: `NNNN_name.sql` (or `NNNN_name.py` with a `migrate(db)` function) files,
-  `0001_memories` to `0032_open_items_held`. The numbers have no gaps (the loader refuses a gap or a
+  `0001_memories` to `0033_memory_profile`. The numbers have no gaps (the loader refuses a gap or a
   duplicate). Each file runs in one transaction together with its `user_version` bump, so a
   failure leaves the file at the last good version. A file is never edited after it has merged;
   a schema change is a new file.
@@ -176,32 +177,43 @@ it with bm25; free text is turned into quoted words joined by OR (`fts_query`).
 
 What Scout remembers across restarts, by kind.
 
-| Column            | Type                | Meaning                                                           |
-| ----------------- | ------------------- | ----------------------------------------------------------------- |
-| `id`              | INTEGER PRIMARY KEY | The id Scout uses to `forget` or replace an item                  |
-| `kind`            | TEXT                | `instruction`, `about_you`, `project` or `summary`                |
-| `text`            | TEXT                | The item, masked                                                  |
-| `created_at`      | TEXT                | When it was saved                                                 |
-| `updated_at`      | TEXT                | When it last changed                                              |
-| `layer`           | TEXT                | `core` (default) or `episodic`; see [memory.md](memory.md#layers) |
-| `period`          | TEXT                | `day` for an episodic entry; null for core                        |
-| `span_start`      | TEXT                | Start of the time an episodic entry covers; null for core         |
-| `span_end`        | TEXT                | End of that time                                                  |
-| `source_msg_from` | INTEGER             | First chat message the entry was made from; not set yet           |
-| `source_msg_to`   | INTEGER             | Last chat message it was made from; not set yet                   |
-| `source_work_id`  | TEXT                | The work row it describes; not set yet                            |
+| Column            | Type                | Meaning                                                                                                      |
+| ----------------- | ------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `id`              | INTEGER PRIMARY KEY | The id Scout uses to `forget` or replace an item                                                             |
+| `kind`            | TEXT                | `instruction`, `about_you`, `project`, `summary`, `profile` or `portrait`                                    |
+| `text`            | TEXT                | The item, masked                                                                                             |
+| `created_at`      | TEXT                | When it was saved                                                                                            |
+| `updated_at`      | TEXT                | When it last changed                                                                                         |
+| `layer`           | TEXT                | `core` (default) or `episodic`; see [memory.md](memory.md#layers)                                            |
+| `period`          | TEXT                | `day` for an episodic entry; null for core                                                                   |
+| `span_start`      | TEXT                | Start of the time an episodic entry covers; null for core                                                    |
+| `span_end`        | TEXT                | End of that time                                                                                             |
+| `source_msg_from` | INTEGER             | First chat message the entry was made from; not set yet                                                      |
+| `source_msg_to`   | INTEGER             | Last chat message it was made from; not set yet                                                              |
+| `source_work_id`  | TEXT                | The work row it describes; not set yet                                                                       |
+| `tag`             | TEXT                | Topic of a fact (`work`, `skills`, `personal`, ...); empty for old rows                                      |
+| `source`          | TEXT                | `chat` (default), or where a `profile` fact came from (`github`, `linkedin`, `web`); `know` for the portrait |
+| `source_ref`      | TEXT                | The page or repo a profile fact came from; null otherwise                                                    |
+| `evidence`        | TEXT                | The verbatim words behind a fact, masked; null for old rows                                                  |
+| `visibility`      | TEXT                | `free` (default) or `asked`; see [memory.md](memory.md#provenance-and-visibility)                            |
 
-- Written by: `store/memory.py` `remember`, `add_summary`, `forget` (called from `tools.py` and the
-  compaction in `sessions.py`).
+`memory_dismissed(source, evidence)` (primary key both columns) holds the profile facts the person forgot, evidence normalised (whitespace collapsed, case folded), so a re-run skips them.
+
+- Written by: `store/memory.py` `remember`, `add_summary`, `forget`, `save_source_facts`,
+  `set_portrait` (called from `tools.py`, the compaction in `sessions.py` and get to know me).
 - Read by: `store/memory.py` `always_loaded` (the prompt), `list_items`; `store/search.py` `search`.
 - Retention: kept until forgotten or replaced. Caps per kind: `instruction` 50 items of 300
   characters, `about_you` 50 of 300, `project` 200 of 500; `summary` is
-  uncapped and written by code.
-- Masked: yes. `Memory` masks the text on its way in (`remember`, `add_summary`) with the
-  session's `save` guard, so a pasted key is stored as `[secret]`.
+  uncapped and written by code; `profile` 500 of 500 and one `portrait` of 1,500, both written by
+  code.
+- Masked: yes. `Memory` masks the text on its way in (`remember`, `add_summary`, `save_source_facts`,
+  `set_portrait`; evidence too) with the session's `save` guard, so a pasted key is stored as
+  `[secret]`. Always-loaded kinds skip `asked` rows.
 - Upgrade: migration `0025_memory_layers` adds the layer columns. Every old row is `core`
   except `summary` rows, which become `episodic`, period `day`, spanning their `created_at`.
   `kind` is untouched, so Home's list is the same.
+- Upgrade: migration `0033_memory_profile` adds `tag`, `source`, `source_ref`, `evidence` and
+  `visibility` (old rows: `chat`, no tag, `free`) and creates `memory_dismissed`.
 
 `memories_fts` is an FTS5 index over `memories.text`, built and searched the same way as
 `messages_fts`; it backs the `recall` tool.

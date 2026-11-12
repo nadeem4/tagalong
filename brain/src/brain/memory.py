@@ -16,7 +16,7 @@ from brain.store import connections, conversation, outputs
 from brain.store import memory as memory_store
 from brain.store import search as search_store
 from brain.store.db import open_db
-from brain.store.memory import Item, MemoryRefused
+from brain.store.memory import Item, MemoryRefused, NewFact
 from brain.store.search import Hit
 
 
@@ -67,13 +67,23 @@ class Memory:
     def remove_app(self, app_id: str) -> None:
         connections.remove_app(self._db, app_id)
 
-    def remember(self, kind: str, text: str, replaces: int | None = None) -> Item:
+    def remember(
+        self,
+        kind: str,
+        text: str,
+        replaces: int | None = None,
+        tag: str = "",
+        evidence: str | None = None,
+    ) -> Item:
         at = self._now().isoformat()
         masked = self.mask(text)
         if masked == WITHHELD:
             # A blocking save guard: saving "[withheld]" would store noise.
             raise MemoryRefused("A save guard withheld this text, so it was not remembered.")
-        return memory_store.remember(self._db, kind, masked, replaces, at)
+        masked_evidence = self.mask(evidence) if evidence else None
+        if masked_evidence == WITHHELD:
+            masked_evidence = None
+        return memory_store.remember(self._db, kind, masked, replaces, at, tag, masked_evidence)
 
     def forget(self, item_id: int) -> Item:
         return memory_store.forget(self._db, item_id)
@@ -83,6 +93,27 @@ class Memory:
 
     def always_loaded(self) -> dict[str, list[Item]]:
         return memory_store.always_loaded(self._db)
+
+    def save_source_facts(self, source: str, facts: list[NewFact]) -> list[Item]:
+        masked = []
+        for f in facts:
+            text, evidence = self.mask(f.text), self.mask(f.evidence)
+            if WITHHELD in (text, evidence):
+                continue  # a blocking save guard: skip the fact rather than store noise
+            masked.append(NewFact(f.tag, text, evidence, f.source_ref))
+        return memory_store.save_source_facts(self._db, source, masked, self._now().isoformat())
+
+    def profile_facts(self, include_asked: bool = True) -> list[Item]:
+        return memory_store.profile_facts(self._db, include_asked)
+
+    def set_portrait(self, text: str) -> Item:
+        masked = self.mask(text)
+        if masked == WITHHELD:
+            raise MemoryRefused("A save guard withheld this text, so it was not saved.")
+        return memory_store.set_portrait(self._db, masked, self._now().isoformat())
+
+    def portrait(self) -> Item | None:
+        return memory_store.get_portrait(self._db)
 
     def add_summary(self, text: str) -> Item:
         return memory_store.add_summary(self._db, self.mask(text), self._now().isoformat())
@@ -99,5 +130,11 @@ class Memory:
     def load_messages(self, include_cut: bool = False) -> list[dict]:
         return conversation.load_messages(self._db, include_cut)
 
-    def search(self, query: str, kind: str | None = None, limit: int = 10) -> list[Hit]:
-        return search_store.search(self._db, query, kind, limit)
+    def search(
+        self,
+        query: str,
+        kind: str | None = None,
+        limit: int = 10,
+        include_personal: bool = False,
+    ) -> list[Hit]:
+        return search_store.search(self._db, query, kind, limit, include_personal)

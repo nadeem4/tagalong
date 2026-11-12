@@ -122,6 +122,7 @@ def test_cadence_column_and_timers_table_gone(db):
 
 
 def test_memory_search_still_works_after_the_column_drop(db):
+    migrate(db)  # search reads columns added by later migrations
     assert [h.text for h in search(db, "brief", None, 5)] == ["be brief"]
 
 

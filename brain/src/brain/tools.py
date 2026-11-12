@@ -119,14 +119,22 @@ def brain_tools(
         _need("remember", args, "kind", "text")
         if args["kind"] == "tracking":
             raise MemoryRefused("Keeping an eye on something is the watch tool, not remember.")
-        item = memory.remember(args["kind"], args["text"], args.get("replaces"))
+        item = memory.remember(
+            args["kind"],
+            args["text"],
+            args.get("replaces"),
+            args.get("tag") or "",
+            args.get("evidence"),
+        )
         notify("changed", {"what": "memory"})  # Scout's saves show up in Home
         verb = "replaced" if args.get("replaces") is not None else "saved"
         return f"{verb} {item.kind} #{item.id}"
 
     async def recall(args: dict) -> str:
         _need("recall", args, "query")
-        hits = memory.search(args["query"], args.get("kind"))
+        hits = memory.search(
+            args["query"], args.get("kind"), include_personal=bool(args.get("include_personal"))
+        )
         return format_hits(hits) if hits else "No matching memories."
 
     async def forget(args: dict) -> str:
@@ -137,6 +145,7 @@ def brain_tools(
 
     async def list_memories(args: dict) -> str:
         items = memory.list_items(LIST_MEMORIES_MAX)
+        portrait = memory.portrait()
         return json.dumps(
             {
                 "memories": [
@@ -145,9 +154,15 @@ def brain_tools(
                         "kind": i.kind,
                         "text": i.text,
                         "at": i.updated_at,
+                        "tag": i.tag,
+                        "source": i.source,
+                        "source_ref": i.source_ref,
+                        "evidence": i.evidence,
+                        "visibility": i.visibility,
                     }
                     for i in items
-                ]
+                ],
+                "portrait": portrait.text if portrait else None,
             }
         )
 
@@ -165,6 +180,16 @@ def brain_tools(
                         "kind": {"type": "string", "enum": _MODEL_KINDS},
                         "text": {"type": "string"},
                         "replaces": {"type": "integer", "description": "Id of the item to update."},
+                        "tag": {
+                            "type": "string",
+                            "description": "Topic of a fact about the person: work, skills, "
+                            "projects, interests or personal. Personal facts are only raised "
+                            "when asked.",
+                        },
+                        "evidence": {
+                            "type": "string",
+                            "description": "The person's own words that this fact comes from.",
+                        },
                     },
                     "required": ["kind", "text"],
                 },
@@ -178,12 +203,14 @@ def brain_tools(
             ToolSpec(
                 "recall",
                 "Search your long-term memory, the saved chat and past jobs by words. Use it when "
-                "something not in your prompt may have been saved, said or done earlier.",
+                "something not in your prompt may have been saved, said or done earlier. "
+                "Set include_personal only when the person brought that topic up themselves.",
                 {
                     "type": "object",
                     "properties": {
                         "query": {"type": "string"},
                         "kind": {"type": "string", "enum": [*KINDS, "chat", "work"]},
+                        "include_personal": {"type": "boolean"},
                     },
                     "required": ["query"],
                 },

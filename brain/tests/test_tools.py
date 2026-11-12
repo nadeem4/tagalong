@@ -21,7 +21,7 @@ from brain.outputs import OutputStore
 from brain.permission import Tier
 from brain.protocol import Body, ErrorCode, RpcError, Tool
 from brain.store import rules
-from brain.store.memory import MemoryRefused
+from brain.store.memory import MemoryRefused, NewFact
 from brain.store.search import Hit
 from brain.store.work import TransitionRefused
 from brain.toolbox import BodySource, BrainSource, Toolbox, ToolSpec
@@ -723,7 +723,18 @@ async def test_list_memories_has_no_cadence_and_is_newest_first(mem, home):
     out = json.loads(await home.run("list_memories"))
     assert [m["id"] for m in out["memories"]] == [2, 1]
     first = out["memories"][0]
-    assert set(first) == {"id", "kind", "text", "at"}  # no cadence: watches replaced tracking
+    # No cadence (watches replaced tracking); provenance fields added by get to know me.
+    assert set(first) == {
+        "id",
+        "kind",
+        "text",
+        "at",
+        "tag",
+        "source",
+        "source_ref",
+        "evidence",
+        "visibility",
+    }
     assert first["kind"] == "instruction"
     assert first["text"] == "Water plants"
     assert re.match(r"\d{4}-\d{2}-\d{2}T", first["at"])
@@ -1779,6 +1790,37 @@ async def test_brain_status_reports_the_facts():
     [(spec, handler)] = brain_status_tools(lambda: facts)
     assert spec.name == "brain_status" and spec.effect == "read"
     assert json.loads(await handler({})) == facts
+
+
+async def test_recall_include_personal_flag(mem, run):
+    mem.save_source_facts("github", [NewFact("family", "Widgets at home", "ev", "r")])
+    assert await run("recall", {"query": "widgets"}) == "No matching memories."
+    out = await run("recall", {"query": "widgets", "include_personal": True})
+    assert "Widgets at home" in out
+
+
+async def test_remember_tool_passes_tag_and_evidence(mem, run):
+    await run(
+        "remember",
+        {"kind": "about_you", "text": "Has a dog", "tag": "personal", "evidence": "my dog"},
+    )
+    item = mem.list_items(5)[0]
+    assert (item.visibility, item.evidence) == ("asked", "my dog")
+
+
+async def test_list_memories_includes_provenance_and_portrait(mem, run):
+    mem.save_source_facts("github", [NewFact("work", "Ships widgets", "built widgets", "repo")])
+    mem.set_portrait("Makes widgets")
+    data = json.loads(await run("list_memories", {}))
+    assert data["portrait"] == "Makes widgets"
+    assert [m["kind"] for m in data["memories"]] == ["profile"]
+    entry = data["memories"][0]
+    assert (entry["tag"], entry["source"], entry["source_ref"]) == ("work", "github", "repo")
+    assert (entry["evidence"], entry["visibility"]) == ("built widgets", "free")
+
+
+async def test_list_memories_portrait_null_when_unset(run):
+    assert json.loads(await run("list_memories", {}))["portrait"] is None
 
 
 def test_brain_status_is_home_only():

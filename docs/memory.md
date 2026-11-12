@@ -18,12 +18,27 @@ The kinds table in `store/memory.py` is the only place caps and rules live.
 | `about_you`   | model      | yes             | 50         | 300             |
 | `project`     | model      | no, `recall`    | 200        | 500             |
 | `summary`     | code       | no, `recall`    | none       | none            |
+| `profile`     | code       | no, `recall`    | 500        | 500             |
+| `portrait`    | code       | yes, first      | 1          | 1,500           |
 
-Keeping an eye on something is no longer a memory: it is a `watch` (see below). Code writes `summary` items: one for each compaction block (see Saved chat).
+`profile` and `portrait` are written only by "get to know me" code; `remember` refuses both with "written by code". Keeping an eye on something is no longer a memory: it is a `watch` (see below). Code writes `summary` items: one for each compaction block (see Saved chat).
 
 ### Layers
 
 Every memory also sits in a layer (migration 25). `instruction`, `about_you` and `project` rows are `core`: what Scout knows about the person. `summary` rows are `episodic`: a dated entry with a `period` (`day`) and the time it covers (`span_start`, `span_end`). `kind` is unchanged, so the tools and Home's list work as before. The columns `source_msg_from`, `source_msg_to` and `source_work_id` are there for linking an entry back to the chat or the work it came from; nothing sets them yet, and nothing rolls entries up or rewrites core yet.
+
+### Provenance and visibility
+
+Migration 33 gives every memory row `tag`, `source`, `source_ref`, `evidence` and `visibility`. Old rows read as `source='chat'`, no tag, no evidence, `free`. A `profile` fact is one claim Scout can quote evidence for: `source` is where it came from (`github`, `linkedin`, `web`), `source_ref` the page or repo, `evidence` the verbatim words. Code in `know/facts.py` decides the visibility from the tag: `work`, `skills`, `projects` and `interests` are `free`; `personal` and any unknown tag are `asked`. Tags are stored lowercase, trimmed, at most 20 characters, spaces as `_`; empty is `other`.
+
+- `asked` facts are never in the prompt or the portrait, and `recall` leaves them out unless called with `include_personal=true` (only when the person raised the topic).
+- `remember` takes an optional `tag` and `evidence` for a fact the person told Scout (`source='chat'`); no tag stays `free`.
+- `Memory.save_source_facts(source, facts)` replaces that source's `profile` rows in one transaction, skipping a fact whose evidence was dismissed, whose text another source already holds, or any past the 500 cap. Text and evidence are masked first.
+- Forgetting a `profile` fact (chat or Home) also records `(source, evidence)` in `memory_dismissed`, compared after collapsing whitespace and case, so a re-run does not bring it back.
+
+### Portrait
+
+One `portrait` row (up to 1,500 characters, written by code) is a short description of the owner. It is always loaded and leads the "What you know" block as `Who the owner is:` with no id. `recall` never returns it, and `forget` refuses it: it is rewritten, not deleted. Home's `list_memories` leaves it out of the rows and returns it as a separate `portrait` text (null when unset); each row also carries `tag`, `source`, `source_ref`, `evidence` and `visibility`.
 
 ### Masking on save
 
@@ -31,11 +46,11 @@ Every memory also sits in a layer (migration 25). `instruction`, `about_you` and
 
 ### Tools
 
-| Tool       | Does                                                                                 |
-| ---------- | ------------------------------------------------------------------------------------ |
-| `remember` | Saves an item of a model-written kind. `replaces=<id>` updates one instead of adding |
-| `recall`   | Searches all kinds by words (SQLite FTS5, ranked), optionally one kind               |
-| `forget`   | Deletes one item by id                                                               |
+| Tool       | Does                                                                                                                |
+| ---------- | ------------------------------------------------------------------------------------------------------------------- |
+| `remember` | Saves an item of a model-written kind. `replaces=<id>` updates one instead of adding; optional `tag` and `evidence` |
+| `recall`   | Searches all kinds by words (SQLite FTS5, ranked), optionally one kind; `include_personal` adds `asked` facts       |
+| `forget`   | Deletes one item by id                                                                                              |
 
 `read_output` (Scout's own) pages the stored copy of a long tool result by id; see
 [Long tool output](brain.md#long-tool-output).

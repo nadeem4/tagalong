@@ -212,6 +212,9 @@ flowchart TD
   together. The model is offered the memory tools (`remember`, `recall`,
   `forget`), the timer tools (`set_timer`, `list_timers`, `cancel_timer`, `watch`) and every online body's
   tools (see Toolbox); a refused or failed call ends as an error result the model reads.
+  Memory rows carry a tag, source, evidence and visibility, and one code-written portrait leads
+  "What you know"; `recall` leaves personal facts out unless asked (see
+  [memory.md](memory.md#provenance-and-visibility)).
 - A turn ends with one of `done`, `cancelled`, `error`, `over_budget` or `step_cap`. A refusal or
   a failed model call is `error`.
 - **No key.** `Session.say` checks `model.ready` first. Without a key it returns a turn id, sends
