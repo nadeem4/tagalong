@@ -87,7 +87,7 @@ the total can run a little low.
 | `brain/src/brain/sessions.py`          | The one conversation: history, the running turn, `say` joins, `interrupt` (pause, nothing cancelled), `cancel`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `brain/src/brain/mind/resume.py`       | Rebuilds a valid history from the saved chat at start                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `brain/src/brain/memory.py`            | Scout's memory: `Memory`, the one object over `tagalong.db`; chat, memory, apps and outputs delegate to `store/`; it masks memory text on the way in (`Memory.mask`, set by the session to the `save` guard)                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `brain/src/brain/know/`                | Get to know me: `facts.py` tag visibility, `status.py` per-source status, `runner.py` the one run at a time behind `know_me_start` (see [Get to know me](#get-to-know-me-know))                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `brain/src/brain/know/`                | Get to know me: `facts.py` tag visibility, `status.py` per-source status, `runner.py` the one run at a time behind `know_me_start`, `source.py` the source protocol, `github.py`, `linkedin.py` and `web.py` the sources, `extract.py` facts with the evidence check (see [Get to know me](#get-to-know-me-know))                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `brain/src/brain/store/`               | The database layer: `db.py` opens `tagalong.db` and runs the numbered migrations in `migrations/`; `search.py` the FTS5 helpers and `search`; `conversation.py`, `memory.py`, `connections.py` and `outputs.py` own the SQL of chat, memory items, apps and tool outputs; `work.py` is `WorkStore`, the work table's state machine (jobs use it today, through `job_records.py`); `rules.py` the `rules` table: tool modes, preferences and offers                                                                                                                                                                           |
 | `brain/src/brain/dispatcher.py`        | `Dispatcher`: the front-door queue; `post(Item)` takes urgency from the event kind, `set_speech_state` (the desktop's), `set_mouth_state` (the fallback) and `set_conversation_active` say when delivery may happen, one loop hands batches to the `deliver` callback; `hold` items become open items. See [Front door](#front-door-and-urgency)                                                                                                                                                                                                                                                                             |
 | `brain/src/brain/open_items.py`        | `OpenItems`: the one record for what waits on the person (`open`, `answer`, `finish`, `expire_due`, `expire_live_only`, `list_open`, `list_answered`, `find_open`; `expire_live_only(job_id=None)` takes one job's items only), one lifecycle (open to answered, done or expired), one deadline (`DEADLINE_S`, a day) and a log line per move, `open_item.<event> t=<epoch> id=<id> kind=<kind> by=<who> why=<why>`, on logger `brain.open_items`. Scout's asks use it through `open_item_runner.py`, choices, offers and setup events directly (kinds `choice`, `offer`, `setup`); the table is in [storage.md](storage.md) |
@@ -2516,7 +2516,8 @@ Tests: `tests/test_dispatcher.py` (fake clock) and `tests/test_events.py`.
 ## Get to know me (`know/`)
 
 Scout reads the person's public presence on their say-so. So far the frames and a runner shell
-exist; the sources, extraction and portrait come in later slices.
+exist, plus the pieces a run will use (sources and extraction); the runner that wires them and
+the portrait come in a later slice.
 
 - **`know_me_start`** (body to brain, a request, in `server.py`): `{ github?, pdf?: { name, data } }`.
   At least one input, else `invalid_params`; `pdf.data` is base64 (bad base64 is `invalid_params`)
@@ -2532,7 +2533,32 @@ exist; the sources, extraction and portrait come in later slices.
 - **`know/status.py`**: `SourceProgress` and `KnowMeStatus`; `params()` is the frame's shape with
   unset values left out.
 
-Tests: `tests/test_know_start.py` (runner and websocket path) and `tests/test_protocol.py`.
+- **Sources** (`know/source.py`): a `KnowSource` has `name`, `needs` (`username`, `file` or
+  `none`), `label` and `async read(given, known) -> list[Material]`. It only reads, and raises
+  `SourceGap` with the plain line the person sees when it cannot. `Material` is one page or file
+  (`text`, `ref`, an optional Claude `document` block, and `keys: Known`, what the source learned
+  for the web match: handle, links, name, employer). A new source is one module and one line in
+  the default list.
+- **`know/github.py`**: unauthenticated `api.github.com` (profile, the first 30 non-fork repos by
+  last push, the profile README). Unknown user, a username that is not a valid GitHub login, a
+  rate limit (403 or 429) and network errors are gaps; a missing README is not.
+- **`know/linkedin.py`**: only the PDF the person saves from LinkedIn. Text is pulled out with
+  `pypdf` (so evidence can be checked) and the PDF also goes to the model as a document block.
+  Not a PDF, or a PDF with no text (an image), is a gap.
+- **`know/web.py`**: one model request with the capped web search and fetch tools
+  (`web_tools.MAX_USES`, 5). A fetched page is kept only if it holds the handle (whole word), a
+  link the person listed, or both their name and employer; a name alone is a namesake and is
+  dropped. No keys, or no page kept, is a gap. The budget counts the call and its searches.
+- **`know/extract.py`**: `extract` sends the material (fenced as `<material untrusted="true">`,
+  `<` escaped, with the system prompt `mind/know_extract.md` saying to ignore instructions inside
+  it) and gets facts back as JSON. `check` keeps a fact only when its quoted evidence, compared
+  without regard to whitespace or case, is in the material, so the model proposes and code
+  decides. `complete` is the one model call and raises `BudgetStop` when the day's limit is spent
+  or there is no key. `name` and `employer` the model reports count only if quoted from the text.
+
+Tests: `tests/test_know_start.py` (runner and websocket path), `tests/test_protocol.py`,
+`test_know_source.py`, `test_know_extract.py`, `test_know_web.py`, `test_know_github.py` and
+`test_know_linkedin.py` (fakes in `tests/know_fakes.py`; GitHub on a mock transport).
 
 ## Not built yet
 

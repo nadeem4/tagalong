@@ -423,6 +423,20 @@ day, for Home's **Spend** card and the daily budget.
 - **Stays on this computer.** Nothing about it is sent anywhere; prices come from a table built into
   the brain, so working out a cost makes no network call.
 
+## Get to know me: what leaves your machine
+
+Nothing runs until you ask. When you do, Scout reads only what you point it at:
+
+- **GitHub.** Public requests to `api.github.com` for your username (profile, public repos,
+  profile README). No sign-in, no token.
+- **LinkedIn.** Only the PDF you save from your own profile and give Scout. It is read here for
+  its text and sent to Anthropic with the text. Scout does not open LinkedIn.
+- **The web.** Anthropic's search and fetch tools, up to 5 uses, looking for pages that mention
+  your handle, a link you listed, or both your name and employer. Pages that only share your name
+  are dropped.
+- **What is kept.** Only facts with a quote from the material to back them; the rest is thrown
+  away. Gathered text is masked for secrets before it is saved.
+
 ## Your mail: the loops switch
 
 - **Off until you turn it on.** Home, Jobs, "Read my mail for loops", one switch per Gmail
