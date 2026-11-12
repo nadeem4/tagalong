@@ -52,8 +52,8 @@ def _scout_tool_names() -> set[str]:
     fake = MagicMock()
     extra = (
         setup_tools(MagicMock(), fake, fake)
-        + expert_setup_tools(MagicMock(), *[fake] * 8)[0]
-        + app_setup_tools(MagicMock(), *[fake] * 10, {}, fake)[0]
+        + expert_setup_tools(MagicMock(), *[fake] * 9)[0]
+        + app_setup_tools(MagicMock(), *[fake] * 10, {}, fake, fake)[0]
         + login_tools(MagicMock(), fake)
         + loop_tools(fake)
     )

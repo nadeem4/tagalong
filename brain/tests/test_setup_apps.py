@@ -9,6 +9,7 @@ import json
 import logging
 import os
 from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -20,6 +21,7 @@ from brain.bodies import Bodies
 from brain.events import Event
 from brain.memory import Memory
 from brain.mind.turn import Call
+from brain.open_items import OpenItems
 from brain.permission import (
     Engine,
     Person,
@@ -37,6 +39,7 @@ from brain.setup.home_tools import home_app_rows
 from brain.setup.install import InstallError, NoBuild
 from brain.setup.paths import node_dir
 from brain.setup.registry import Distribution, Registry, RegistryEntry
+from brain.store.db import open_db
 from brain.toolbox import BrainSource
 from brain.toolbox import Toolbox as RealToolbox
 
@@ -262,6 +265,7 @@ class Rig:
         self.bodies = Bodies()
         self.machine = mach
         self.events: list[Event] = []
+        self.items = OpenItems(open_db(tmp_path / "items.db"), lambda: datetime.now(UTC))
 
         async def get(url: str) -> bytes:
             return NODE_INDEX if url.endswith("index.json") else MCP
@@ -285,6 +289,7 @@ class Rig:
             get,
             env if env is not None else {},
             self.events.append,
+            self.items,
             wait_s=0.0,
             opener=lambda app_id: opens if browser else None,
         )
@@ -664,3 +669,38 @@ async def test_install_saves_the_package_version_and_a_remote_app_has_none(rig):
         "notes": "1.2.3",
         "cloud": "",
     }
+
+
+async def test_two_overlapping_installs_of_one_app_join_one_flight(rig):
+    r = rig()
+    first, second = await asyncio.gather(r.run(), r.run())
+    assert first == second and "error" not in first  # not "already_added" for the second
+    assert len(r.memory.list_apps()) == 1
+    again = await r.run()  # once the flight ended, a repeat is the normal already_added
+    assert again["error"] == "already_added"
+
+
+async def test_an_app_add_opens_one_install_item_that_closes_when_it_ends(rig):
+    r = rig()
+    await r.run()
+    await asyncio.sleep(0)  # the done callback closes the item
+    assert r.items.list_open() == []
+
+
+async def test_a_cancelled_first_caller_does_not_cancel_the_shared_add(rig):
+    r = rig()
+    gate = asyncio.Event()
+
+    async def slow_restart(app_id):
+        await gate.wait()
+
+    r.apps.restart = slow_restart
+    first = asyncio.ensure_future(r.run())
+    await asyncio.sleep(0.05)
+    second = asyncio.ensure_future(r.run())
+    await asyncio.sleep(0.05)
+    first.cancel()  # a cancelled turn
+    await asyncio.sleep(0)
+    gate.set()
+    out = await asyncio.wait_for(second, 5)
+    assert "error" not in out
