@@ -9,12 +9,13 @@ import asyncio
 import hashlib
 import json
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 from brain.setup.archive import safe_extract
 from brain.setup.facts import NodePaths, node_paths
-from brain.setup.net import GetJson
+from brain.setup.net import GetJson, percent_steps
 from brain.setup.paths import node_dir
 from brain.voice.models import Fetch, Progress
 
@@ -91,16 +92,25 @@ def _wanted_sum(sums: str, filename: str) -> str | None:
     return None
 
 
-async def _download(part: Path, build: NodeBuild, want: str, fetch: Fetch) -> Path:
+async def _download(
+    part: Path, build: NodeBuild, want: str, fetch: Fetch, on_percent: Callable[[int], None]
+) -> Path:
     """Stream the archive into `part`, hashing as it goes; one retry, then NodeIntegrityError."""
     part.mkdir(parents=True)
     target = part / build.filename
     for attempt in range(2):
         digest = hashlib.sha256()
+        received = 0
+        report = None
         with target.open("wb") as out:
-            async for chunk in fetch(build.url):
+            stream = fetch(build.url)
+            async for chunk in stream:
+                if report is None:  # the size is known once the first chunk has arrived
+                    report = percent_steps(getattr(stream, "size", None), on_percent)
                 digest.update(chunk)
                 await asyncio.to_thread(out.write, chunk)
+                received += len(chunk)
+                report(received)
         if digest.hexdigest() == want:
             return target
         if attempt == 1:
@@ -170,12 +180,14 @@ async def ensure_node(
         want = _wanted_sum(sums, build.filename)
         if want is None:
             raise NodeIntegrityError(f"no checksum listed for {build.filename}")
-        on_progress(0.05)
+        on_progress(0.05)  # the download fills 0.05 to 0.8, the unpacking the rest
         runtime = node.parent
         part, new = runtime / "node.part", runtime / "node.new"
         await _clean(part, new)
         try:
-            archive = await _download(part, build, want, fetch)
+            archive = await _download(
+                part, build, want, fetch, lambda p: on_progress(0.05 + 0.75 * p / 100)
+            )
             on_progress(0.8)
             await asyncio.to_thread(_install, archive, new, node, build.version)
         finally:

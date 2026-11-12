@@ -888,9 +888,9 @@ the install's `setup_progress` and `setup_done` events), `setup_expert` and `set
 (`{id, approved?}`, tier `auto`: they ask for themselves). With `approved` false they open the same Allow card Scout's
 `install_expert`, `login_expert` and `install_app` open (empty card text, so the body renders it
 from the tool and its input; it waits as long as the gate's ask) and run that tool's own handler
-on Allow. A card that refuses with an `{error: token}` (such as `already_logged_in`, when the
-check finds the login done; it saves that and sends `changed setup` first) is answered as that
-token, so Home words it; any other card failure stays a tool error. `setup_expert` with `approved` true (the tour's button is the OK) skips the card;
+on Allow. A card that refuses with an `{error: token}` (such as `unknown_expert`) is answered as that
+token, so Home words it; any other card failure stays a tool error. A login card runs no check, so
+it shows at once. `setup_expert` with `approved` true (the tour's button is the OK) skips the card;
 `setup_app` with `approved` true connects an Official app at once, while a community app still
 opens the check card (the Allow card with the trust facts) until `community_ok` (the Connect
 anyway press) is also true; a bare `approved` never installs community code. The desktop only
@@ -1079,9 +1079,13 @@ words what the person reads (guidance in `mind/soul.md`).
   the card. The card's input is built by code (`ToolSpec.card`): the expert, its version, the
   folder, `recommended` (true for the recommended expert, so the chat's card shows its
   "Recommended" chip), and `node_download` (the Node version and folder, or `null` when a system Node is new
-  enough). After Allow the tool returns `{"started": id}` at once and the install runs in the
-  background, outside the turn, one per expert id at a time (a second ask for the same id is
-  refused with `already_installing` before the Allow card is shown). `tagalong stop` ends the
+  enough). After Allow the tool returns `{"started": id, "item": <install open item id>}` at once and the
+  install runs in the background, outside the turn, one flight per expert id (`setup/flights.py`):
+  a second ask for the same id while it runs joins it and gets the same item back with
+  `"joined": true`; the item closes when the install ends (done) or is cancelled at shutdown
+  (expired). `update` (the updates check) runs as the same flight, with the same `setup_progress` and
+  `setup_done` events, so an install that joins a running update gets its result; it still refuses
+  with `already_installing` rather than join a running install. `tagalong stop` ends the
   brain by killing it on Windows, so a start removes any `tools/*.part` and `tools/*.dl` staging
   folder a killed brain left (`sweep_staging`). If the registry moved on after the card named a version, it returns
   `version_changed` (`"<shown> -> <now>"`) and installs nothing. It emits non-waking `setup_progress` events (`expert`, `stage`,
@@ -1095,7 +1099,17 @@ words what the person reads (guidance in `mind/soul.md`).
   Node that is new enough (and has its own npm), else Tagalong's own Node; the Node floor is 22 for
   every npx expert. npm gets a minimal environment of its own (PATH with the chosen Node first,
   the OS essentials and proxy settings), never an API key or any `npm_config_*` of the person's;
-  the system environment is never changed and nothing is global. A command that is cancelled or
+  the system environment is never changed and nothing is global. Progress is real, not one long
+  "installing": npm runs at `loglevel=http` and its output is read line by line (`on_line`, an
+  optional fourth argument of a `RunCmd`), so the stages are `resolving` (until npm logs its first request, the package's
+  metadata, which it does once that answer is in), `fetching` (from then on: it is downloading the
+  package and what it depends on) and `finishing` (npm exited, the program is being checked), each
+  said once with no percent (npm gives no total). A binary entry says `downloading` and then a
+  `percent` from the response's Content-Length (`ByteStream.size` in `setup/net.py`, set by
+  `http_fetch`, read after the first chunk), at most one update per 5 percent (`percent_steps`);
+  with no length there is only the stage. Tagalong's own Node download uses the same percent,
+  filling 5 to 80 percent of the `node` stage. `extracting` and `done` follow. The 900 s `NPM_TIMEOUT_S` is the whole install's
+  ceiling, not a stage. A command that is cancelled or
   times out is killed with its whole process tree. The stored command is
   `[node, <the package's bin js>, <registry args>]`, resolved against the final folder. A `binary`
   entry is streamed to `tools/<id>.dl`, checked against its listed sha256 and extracted with `safe_extract` into `tools/<id>.part`. The staged tree is swapped
@@ -1113,11 +1127,11 @@ words what the person reads (guidance in `mind/soul.md`).
   `unsafe_archive`, `download_failed`, `swap_failed`) carried in `setup_done`.
 - `login.py`, `terminal.py`, `env.py`: the `login_expert(id)` tool logs an installed expert in on
   the person's own subscription. Like install it is `person_only`; the card (built by
-  code) shows `expert`, the chosen `method` and `opens` (`terminal window` or `browser`), so
-  nothing opens before the OK. `LoginDriver.check` spawns the adapter with
+  code) shows just `expert` and appears at once, because it runs no check: nothing opens before
+  the OK, and the checks run after it, in the background. `LoginDriver.check` spawns the adapter with
   `clientCapabilities.auth.terminal = true` (without it Claude lists no methods), calls
   `new_session` in a scratch folder and sends no prompt (a scratch folder the adapter still holds, as on Windows, never changes the answer: cleanup errors are ignored): success is logged in, an auth-required
-  error is not logged in (with the advertised methods), anything else is unknown. `start` picks a
+  error is not logged in (with the advertised methods), anything else is unknown. The flight picks a
   subscription method: the terminal `claude-ai-login`, else the one terminal method, else a
   browser one (`chat-gpt`); never an API-key method. A terminal method opens a
   visible window (the `OpenTerminal` seam; `real_open_terminal` is Windows only: `cmd` with
@@ -1125,14 +1139,20 @@ words what the person reads (guidance in `mind/soul.md`).
   expert's env, wrapped so the exit code lands in a done file, `cache/login-<id>-<random>.done`, new for every
   start (a watcher writes `closed` there if the window is closed with X, so the login ends as
   failed at once). Arguments or paths with `" % ! & | < > ^` are refused with `NoTerminal` too, as
-  cmd would act on them; elsewhere it raises `NoTerminal` and the tool answers `{error: "no_terminal", command}` so Scout can tell the person
-  what to run. A browser method calls ACP `authenticate(method_id)` and the adapter opens the
-  browser. The tool returns `{state: "waiting", kind}` at once (or `{state: "logged_in"}` with nothing opened when the check says it is already done; the store is updated and the brain sends `changed setup`); a background task waits (10
-  minutes at most for the done file or the call), re-checks login, records it in `experts.json`
-  and emits one waking `setup_login` event (`expert`, `state` = `logged_in`, `failed` or
-  `unknown`, and `detail`) and sends `changed setup` so Home and the tour reload. A second login for the same expert cancels the first once its window has opened (a refused
-  window leaves the first running); the card says `unknown` when the check could not tell; shutdown cancels
-  them all; every adapter process tree is killed on the way out. No link or code passes through
+  cmd would act on them; elsewhere it raises `NoTerminal` and the flight ends in a `setup_login` event with `state` `failed`,
+  `detail` `no_terminal` and the `command`, so Scout can tell the person what to run. A browser method calls ACP `authenticate(method_id)` and the adapter opens the
+  browser. The tool returns `{state: "waiting", item: <signin open item id>}` at once. One background flight
+  per expert (`setup/flights.py`) runs the first check, opens the window or browser if needed,
+  waits (10 minutes at most for the done file or the call), re-checks login, records it in
+  `experts.json` and emits one waking `setup_login` event through the front door (`expert`,
+  `state` = `logged_in`, `failed` or `unknown`, and `detail`, plus `command` for `no_terminal`)
+  and sends `changed setup` so Home and the tour reload. A login already done ends the same way
+  with `logged_in` and nothing opened. A second request for the same expert while the flight
+  runs joins it: the same item comes back with `"joined": true`, no second window opens, the
+  running waiter is never cancelled, and there is one event for all the requests (earlier, requests
+  that overlapped each cancelled the previous waiter, and one failing expert gave three
+  `setup_login` events in 33 s; a retry after a flight has ended is a new request, by design). The item closes when the flight ends;
+  shutdown cancels the flights; every adapter process tree is killed on the way out. No link or code passes through
   Scout or the brain, so nothing is masked. `env.py` holds the per-expert table of keys that would
   switch an expert to an API key (Claude, Codex; an unknown expert loses all of them; every expert also loses
   `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN`), used
@@ -1535,7 +1555,7 @@ Event kinds (`EVENT_KINDS` in `events.py`):
 | `download`        | none         | none         | The latest finished or failed browser download (context, no wake)                                                                                                                                                 |
 | `setup_progress`  | none         | none         | How far an expert install is (expert, stage, percent; context, no wake)                                                                                                                                           |
 | `setup_done`      | none         | none         | An install ended: an expert (expert, ok, installed or error, detail) or an app that connected later (app, name, ok, state, tools and tools_total, or detail); wakes Scout                                         |
-| `setup_login`     | none         | none         | An expert login ended (expert, state, detail); wakes Scout to say so                                                                                                                                              |
+| `setup_login`     | none         | none         | An expert login ended (expert, state, detail, command); wakes Scout to say so                                                                                                                                     |
 
 A kind can also set `wakes` (false: keep only the latest fact, no turn) and `enabled`. An event with
 a `key` replaces an older held event of the same kind and key (also for kinds with no batch window). Held events live in memory only: a

@@ -15,6 +15,7 @@ import re
 import sys
 import time
 from collections.abc import Awaitable, Callable, MutableMapping
+from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 from typing import NoReturn, TextIO
@@ -24,6 +25,7 @@ from brain.config import load_config, load_env_file, upsert_env_value
 from brain.events import Event
 from brain.lifecycle import pid_path, stop_real_brain
 from brain.memory import Memory
+from brain.open_items import OpenItems
 from brain.setup.apps import add_registry_app, app_card
 from brain.setup.facts import Machine, RunCmd, inspect, real_run_cmd
 from brain.setup.install import (
@@ -32,11 +34,12 @@ from brain.setup.install import (
     install_card,
     install_expert,
 )
-from brain.setup.login import LOGIN_TIMEOUT_S, Failed, LoggedIn, LoginDriver, Unknown
+from brain.setup.login import LOGIN_TIMEOUT_S, LoginDriver
 from brain.setup.net import GetJson, http_fetch, real_get_json
 from brain.setup.registry import Registry, RegistryEntry, RegistryUnavailable
 from brain.setup.store import ExpertStore, all_experts
-from brain.setup.terminal import NoTerminal, OpenTerminal, real_open_terminal
+from brain.setup.terminal import OpenTerminal, real_open_terminal
+from brain.store.db import open_db
 from brain.tools import KEY_NAME, clean_key
 from brain.voice.models import Fetch
 
@@ -343,28 +346,23 @@ async def _login(expert_id: str, home: Path, open_terminal: OpenTerminal, out) -
         result.append(event)
         ended.set()
 
-    driver = LoginDriver(home, store, open_terminal, emit)
-    try:
-        state = await driver.start(expert)
-    except NoTerminal as err:
-        raise _Fail(
-            f"no window can open here; run this yourself, then `tagalong doctor`:\n  {err.command}"
-        ) from err
-    if isinstance(state, LoggedIn):
-        out(f"{expert_id} is already logged in")
-        return
-    if isinstance(state, Failed):
-        raise _Fail(f"failed: {state.detail}")
-    if isinstance(state, Unknown):
-        raise _Fail("failed: could not tell whether the expert is logged in")
-    out(f"finish signing in to {expert_id} in the {state.kind} that opened; waiting")
+    # The command has no brain to keep items for it: a throwaway in-memory set holds the flight.
+    items = OpenItems(open_db(":memory:"), lambda: datetime.now(UTC))
+    driver = LoginDriver(home, store, open_terminal, emit, items)
+    driver.start(expert)
+    out(f"checking {expert_id}; if it needs a login, finish it in the window or browser that opens")
     try:
         await asyncio.wait_for(ended.wait(), LOGIN_TIMEOUT_S + LOGIN_GRACE_S)
     except TimeoutError as err:
         raise _Fail("failed: login timeout") from err
     finally:
         await driver.stop()
-    facts = result[0].facts if result else {}
-    if facts.get("state") != "logged_in":
-        raise _Fail(f"failed: login {facts.get('state', 'timeout')}: {facts.get('detail', '')}")
+    facts = result[0].facts
+    if facts.get("detail") == "no_terminal":
+        raise _Fail(
+            f"no window can open here; run this yourself, then `tagalong doctor`:\n  "
+            f"{facts['command']}"
+        )
+    if facts["state"] != "logged_in":
+        raise _Fail(f"failed: login {facts['state']}: {facts.get('detail', '')}")
     out(f"{expert_id} is logged in")

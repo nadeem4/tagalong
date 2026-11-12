@@ -211,7 +211,7 @@ def test_key_set_refuses_a_key_with_spaces(tmp_path):
 
 
 class Npm:
-    async def __call__(self, argv, env, cwd):
+    async def __call__(self, argv, env, cwd, on_line=None):
         prefix = Path(argv[argv.index("--prefix") + 1])
         pkg = prefix / "node_modules" / "@agentclientprotocol" / "claude-agent-acp"
         (pkg / "dist").mkdir(parents=True)
@@ -262,7 +262,7 @@ def test_a_typed_y_is_the_ok(tmp_path, no_node_download):
 
 
 def test_a_failure_prints_facts_and_exits_1(tmp_path, no_node_download):
-    async def bad(argv, env, cwd):
+    async def bad(argv, env, cwd, on_line=None):
         return CmdResult(1, "", "npm ERR! network")
 
     rig = Rig(tmp_path)

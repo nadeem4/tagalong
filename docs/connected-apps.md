@@ -261,7 +261,7 @@ searching.
 `install_app(id, query?)` (Scout) adds a registry app without typing its settings. It is `person_only`: the Allow card names the transport, the package and version (or the host), the
 environment variable names it needs and any Node download, and for a community app the check
 card facts (who made it, where it runs, sign-in, licence, "not yet audited by anyone"), and neither a saved preference nor a
-stored Auto skips it. After Allow it saves the app through the same code as `add_app`. A connected
+stored Auto skips it. After Allow it saves the app through the same code as `add_app`. Two overlapping calls for the same app join one add (one `install` open item, `setup/flights.py`) and share its result (the second never gets `already_added`); a cancelled turn never cancels that add. A connected
 app is reported with its tool names in the result; a sign-in or slow start that ends later sends
 a `setup_done` event (app, name, ok, state, tools, tools_total; `tools` lists at most 30 names, `tools_total` is the full count), so Scout can carry on with the request that led
 to the Connect offer (see [docs/brain.md](brain.md#missing-tool-connect-then-carry-on)).

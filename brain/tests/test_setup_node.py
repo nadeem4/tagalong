@@ -17,7 +17,7 @@ import pytest
 
 from brain.setup.archive import UnsafeArchive, safe_extract
 from brain.setup.facts import node_paths
-from brain.setup.net import http_fetch
+from brain.setup.net import ByteStream, http_fetch
 from brain.setup.node_runtime import (
     NodeBuildMissing,
     NodeIntegrityError,
@@ -111,10 +111,33 @@ class Net:
         yield self.archive[half:]
 
 
+class SizedNet(Net):
+    """Serves the archive in many small chunks with its size known, as a real response does."""
+
+    def fetch(self, url: str):
+        self.fetched.append(url)
+        step = len(self.archive) // 50 + 1
+
+        async def chunks(stream):
+            for i in range(0, len(self.archive), step):
+                yield self.archive[i : i + step]
+
+        return ByteStream(chunks, len(self.archive))
+
+
 async def run(home: Path, net: Net, os_name="windows", arch="x64", progress=None):
     return await ensure_node(
         home, 22, net.fetch, net.get_json, os_name, arch, progress or (lambda f: None)
     )
+
+
+async def test_node_download_reports_percent_within_its_share(tmp_path):
+    seen: list[float] = []
+    await run(tmp_path, SizedNet(make_zip({"pad.bin": b"x" * 20000})), progress=seen.append)
+    middle = [f for f in seen if 0.05 < f < 0.8]
+    assert middle == sorted(middle) and 3 <= len(middle) <= 20  # throttled, not one per chunk
+    assert seen[0] == 0.0 and seen[-1] == 1.0
+    assert 0.8 in seen
 
 
 async def test_downloads_verifies_and_extracts_into_node_dir(tmp_path):
@@ -371,6 +394,7 @@ async def test_two_concurrent_calls_download_once(tmp_path):
 class FakeResponse:
     def __init__(self, url="https://nodejs.org/x", status=200, size=3 * 1024 * 1024):
         self.url, self.status, self.left = url, status, size
+        self.headers = {"Content-Length": str(size)}
 
     def read(self, n):
         got = min(n, self.left)
@@ -387,8 +411,10 @@ def serve(monkeypatch, response):
 
 async def test_http_fetch_streams_chunks(monkeypatch):
     serve(monkeypatch, FakeResponse())
-    chunks = [c async for c in http_fetch("https://nodejs.org/x")]
+    stream = http_fetch("https://nodejs.org/x")
+    chunks = [c async for c in stream]
     assert len(chunks) > 1
+    assert stream.size == 3 * 1024 * 1024  # the Content-Length, for a download percent
     assert sum(len(c) for c in chunks) == 3 * 1024 * 1024
 
 

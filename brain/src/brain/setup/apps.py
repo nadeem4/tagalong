@@ -6,7 +6,8 @@ same path as one added by hand. A package runs through a Node's own `npm exec` b
 references, so no secret value is ever stored. Failures are facts (`InstallError`), not prose.
 An app that connects inside the call is reported in its result (with its tool names); one that
 finishes later (a browser sign-in, a slow start) ends in a `setup_done` event, so Scout can pick
-the person's earlier request back up in the same conversation.
+the person's earlier request back up in the same conversation. One add per app runs at a time:
+a second request for the same app joins the first and gets its result.
 """
 
 import asyncio
@@ -24,9 +25,11 @@ from brain.apps import AppError, Apps, OpenUrl, TokenFile
 from brain.bodies import Bodies
 from brain.events import Event
 from brain.memory import Memory
+from brain.open_items import OpenItems
 from brain.permission import Tier
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.facts import Machine
+from brain.setup.flights import Flights
 from brain.setup.install import (
     InstallError,
     NoBuild,
@@ -198,6 +201,7 @@ def app_setup_tools(
     get_json: GetJson,
     env: Mapping[str, str],
     emit: Callable[[Event], None],
+    items: OpenItems,
     wait_s: float = CONNECT_WAIT_S,
     sign_in_wait_s: float = SIGN_IN_WAIT_S,
     opener: Callable[[str], OpenUrl | None] | None = None,
@@ -265,6 +269,8 @@ def app_setup_tools(
         watching.add(task)
         task.add_done_callback(watching.discard)
 
+    flights = Flights(items, "install")  # one add per app; a repeat joins it
+
     async def install(args: dict) -> str:
         try:
             entry = await entry_for(args)
@@ -272,6 +278,10 @@ def app_setup_tools(
             return fail("registry_unavailable", str(err))
         if entry is None:
             return fail("unknown_app", str(args.get("id")))
+        # Both callers wait on the shared add through a shield: a cancelled turn leaves it running.
+        return await asyncio.shield(flights.start(entry.id, lambda: add(entry)).task)
+
+    async def add(entry: RegistryEntry) -> str:
         try:
             row = await add_registry_app(
                 entry, home, inspect_fn, fetch, get_json, apps, memory, tokens, notify
@@ -330,5 +340,6 @@ def app_setup_tools(
         for task in pending:
             task.cancel()
         await asyncio.gather(*pending, return_exceptions=True)
+        await flights.stop()
 
     return [(spec, install)], stop_watches
