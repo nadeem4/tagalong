@@ -179,7 +179,7 @@ stateDiagram-v2
 - **Talking over a spoken answer** (Always listening or the key): the panel
   pauses Scout, and words that are not noise or Scout's echo arrive as an ordinary heard question
   whose `say` carries `interrupted` (see [Voice](voice.md#talking-over-scout)).
-- **No barge-in on listening.** Starting to listen no longer interrupts the turn: the talk key
+- **Listening does not interrupt.** Starting to listen leaves the turn running: the talk key
   only pauses Scout's voice (see [Voice](voice.md#talking-over-scout)). Real words are asked like
   any question; the brain pauses the old turn, and `submit` shows the new one. Only the Stop button
   and the close interrupt a turn on their own.

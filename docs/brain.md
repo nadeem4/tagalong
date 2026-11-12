@@ -2371,8 +2371,8 @@ this]` (`Memory.replace_last_message` rewrites the cut turn's message), never th
 
 `dispatcher.py` is the one queue everything that wants Scout's attention enters: say, timers, loops, job
 questions and results, install results and card answers all `post` here. It also batches and caps
-the wakes it hands on and starts them (it took over what `scheduler.py` did, with one set of
-rules). `drop(kind, key)` forgets a waiting item whose news is superseded.
+the wakes it hands on and starts them, under one set of rules for quiet hours, away, budget and
+stale news. `drop(kind, key)` forgets a waiting item whose news is superseded.
 An `Item` has a kind, an origin body, a payload, an urgency and an optional key. The urgency is a
 field of the event kind in `events.py`: code sets it, and neither the payload nor the model can raise
 it. `post` looks the kind up and overrides the item's own urgency; only a kind not yet registered

@@ -157,7 +157,7 @@ export class BrainClient {
     this.notify('unlisten');
   }
 
-  /** Barge-in: stop speaking the current reply. Dropped unless online. */
+  /** Stop: the person cut Scout off. Dropped unless online. */
   hush(): void {
     this.notify('hush');
   }
