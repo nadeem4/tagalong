@@ -35,8 +35,9 @@ describe('useKnowMe', () => {
     await waitFor(() => expect(result.current.error).toBe('Scout is not connected right now.'));
     bridge.knowMeSources = real;
     act(() => bridge.emitChanged('link'));
-    await waitFor(() => expect(result.current.sources).toHaveLength(3));
-    expect(result.current.error).toBeNull();
+    // The mount load already filled the sources, so wait on the error clearing instead.
+    await waitFor(() => expect(result.current.error).toBeNull());
+    expect(result.current.sources).toHaveLength(3);
   });
 
   it('subscribes on mount, before any start, and unsubscribes on unmount', () => {

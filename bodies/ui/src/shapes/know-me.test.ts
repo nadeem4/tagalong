@@ -6,8 +6,8 @@ import { KnowMeInput, KnowMeStatus, KnowSourceInfo } from './know-me';
 
 const frame = (name: string): { params: unknown } =>
   JSON.parse(
-    // vitest runs from bodies/ui, so the shared examples sit two folders up.
-    readFileSync(resolve(process.cwd(), '../../protocol/examples/valid', name), 'utf8'),
+    // From this file, not the working directory: CI runs from a different folder.
+    readFileSync(resolve(__dirname, '../../../../protocol/examples/valid', name), 'utf8'),
   ) as { params: unknown };
 
 describe('KnowMeStatus', () => {
