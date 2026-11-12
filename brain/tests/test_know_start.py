@@ -103,6 +103,14 @@ async def test_pdf_over_limit_is_over_limit(know_env):
     assert reply["error"]["code"] == ErrorCode.over_limit
 
 
+async def test_pdf_far_over_limit_is_over_limit(know_env):
+    _, url = know_env
+    async with connect(url) as ws:
+        await call(ws, hello())
+        reply = await call(ws, request("know_me_start", {"pdf": pdf(20 * 1024 * 1024)}))
+    assert reply["error"]["code"] == ErrorCode.over_limit
+
+
 async def test_bad_base64_is_invalid_params(know_env):
     _, url = know_env
     async with connect(url) as ws:
@@ -133,7 +141,21 @@ async def test_status_sent_live_to_starter_only(know_env):
         result = next(f for f in frames if f.get("id") == 2)
         status = next(f for f in frames if f.get("method") == "know_me_status")
         assert result["result"] == {"joined": False}
-        assert status["params"]["done"] in (True, False)
+        assert status["params"] == {"sources": [], "done": False}
         assert "seq" not in status
         reply = await call(ws2, request("tools", {"tools": []}))
         assert reply.get("id") == 2  # no status frame came first
+
+
+async def test_second_start_over_the_wire_joins(know_env):
+    session, url = know_env
+    async with connect(url) as ws:
+        await call(ws, hello())
+        session.know_me._task = asyncio.get_running_loop().create_future()  # a run is going
+        reply = None
+        await ws.send(json.dumps(request("know_me_start", {"github": "octocat"})))
+        while reply is None:
+            frame = json.loads(await ws.recv())
+            if frame.get("id") == 2:
+                reply = frame
+    assert reply["result"] == {"joined": True}

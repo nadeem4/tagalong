@@ -298,7 +298,12 @@ async def _know_me_start(
         joined = session.know_me.start(body_id, params.github, pdf)
         reply = _result(req_id, KnowMeStartResult(joined=joined))
     except ValidationError as exc:
-        reply = _error(req_id, ErrorCode.invalid_params, str(exc))
+        # A PDF past the schema's base64 bound is still "too big", not "malformed".
+        too_big = any(
+            e["loc"] == ("pdf", "data") and e["type"] == "string_too_long" for e in exc.errors()
+        )
+        code = ErrorCode.over_limit if too_big else ErrorCode.invalid_params
+        reply = _error(req_id, code, "The PDF is over 10 MB." if too_big else str(exc))
     except RpcError as exc:  # invalid_params, over_limit
         reply = _error(req_id, exc.code, str(exc))
     except asyncio.CancelledError:
