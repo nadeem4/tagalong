@@ -188,7 +188,7 @@ describe('Walkthrough, the end', () => {
     open(makeWalkthroughHost({ key: HAS_KEY }), 10);
     const items = screen.getByRole('list', { name: 'Steps' }).querySelectorAll('li');
     expect(items[9]).toHaveTextContent('Get to know you');
-    expect(items[9].querySelector('button')).toHaveAttribute('aria-current', 'step');
+    expect(items[9]?.querySelector('button')).toHaveAttribute('aria-current', 'step');
     expect(items[10]).toHaveTextContent('Connect your tools');
   });
 
