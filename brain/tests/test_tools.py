@@ -63,7 +63,8 @@ def test_tool_list_names_and_schemas(mem):
     assert [t["name"] for t in TOOLS] == ["remember", "recall", "forget"]
     for t in TOOLS:
         assert t["input_schema"]["type"] == "object"
-        assert t["input_schema"]["required"]
+        if t["name"] != "recall":  # recall needs words or a filter, checked in its handler
+            assert t["input_schema"]["required"]
     remember = TOOLS[0]["input_schema"]["properties"]
     assert "summary" not in remember["kind"]["enum"]
     assert "project" in remember["kind"]["enum"]
@@ -108,6 +109,45 @@ async def test_recall_formats_hits(run):
     out = await run("recall", {"query": "pnpm"})
     assert re.search(r"1.*project.*\d{4}-\d{2}-\d{2}.*Tagalong uses pnpm", out)
     assert "<data" not in out
+
+
+async def test_recall_line_shows_years_and_category(mem, run):
+    mem.save_source_facts(
+        "github", [NewFact("work", "Writes Rust", "rust", "r", "Languages", "2019")]
+    )
+    out = await run("recall", {"year": 2020})
+    assert re.search(r"\d+ profile \d{4}-\d{2}-\d{2} \[Languages, since 2019\] Writes Rust", out)
+
+
+async def test_recall_by_category_without_words(mem, run):
+    mem.save_source_facts(
+        "github", [NewFact("work", "Writes Rust", "rust", "r", "Languages", "2019")]
+    )
+    assert "Writes Rust" in await run("recall", {"category": "languages"})
+    assert "no matching" in (await run("recall", {"category": "Awards"})).lower()
+
+
+async def test_recall_year_args_are_coerced_or_refused(mem, run):
+    mem.save_source_facts(
+        "github", [NewFact("work", "Writes Rust", "rust", "r", "Languages", "2019")]
+    )
+    assert "Writes Rust" in await run("recall", {"from_year": "2018", "to_year": 2020})
+    with pytest.raises(MemoryRefused, match="year"):
+        await run("recall", {"year": "soon"})
+
+
+async def test_recall_requires_query_or_a_filter(run):
+    with pytest.raises(MemoryRefused, match="recall needs query, or year"):
+        await run("recall", {})
+    with pytest.raises(MemoryRefused, match="recall needs query, or year"):
+        await run("recall", {"query": "  "})
+
+
+def test_recall_schema_has_year_from_to_category(mem):
+    spec = next(s for s, _ in brain_tools(mem) if s.name == "recall")
+    props = spec.input_schema["properties"]
+    assert {"year", "from_year", "to_year", "category"} <= set(props)
+    assert spec.input_schema["required"] == []
 
 
 def test_format_hits_fences_summaries():

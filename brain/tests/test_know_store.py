@@ -250,6 +250,79 @@ def test_shape_updates_after_forget(mem):
     assert shape.years == ("2020", "2021") and shape.categories == [("Skills", 1)]
 
 
+def seed_years(mem):
+    mem.save_source_facts(
+        "github",
+        [
+            dated("closed span fact", "2019", "2021", "Work"),
+            dated("open span fact", "2019", None, "Languages"),
+            dated("old fact", "2012", "2013", "Work"),
+            fact("undated fact"),
+        ],
+    )
+
+
+def recalled(mem, query="", **kw):
+    return sorted(h.text for h in mem.search(query, **kw))
+
+
+def test_recall_year_matches_open_and_closed_spans(mem):
+    seed_years(mem)
+    assert recalled(mem, year=2020) == ["closed span fact", "open span fact"]
+    assert recalled(mem, year=2024) == ["open span fact"]
+    assert recalled(mem, year=2018) == []
+
+
+def test_recall_range_overlap(mem):
+    seed_years(mem)
+    assert recalled(mem, from_year=2013, to_year=2019) == [
+        "closed span fact",
+        "old fact",
+        "open span fact",
+    ]
+    assert recalled(mem, from_year=2022) == ["open span fact"]
+    assert recalled(mem, to_year=2011) == []
+
+
+def test_recall_category_filter_is_case_insensitive(mem):
+    seed_years(mem)
+    assert recalled(mem, category="work") == ["closed span fact", "old fact"]
+
+
+def test_recall_filter_without_words_lists_matches(mem):
+    seed_years(mem)
+    hits = mem.search("", year=2019)
+    assert [h.text for h in hits] == ["closed span fact", "open span fact"]
+    assert [(h.category, h.span) for h in hits] == [
+        ("Work", "2019–2021"),
+        ("Languages", "since 2019"),
+    ]
+
+
+def test_recall_words_and_year_filter_after_match(mem):
+    seed_years(mem)
+    assert recalled(mem, "span fact", year=2024) == ["open span fact"]
+    assert recalled(mem, "old", year=2024) == []
+
+
+def test_recall_year_excludes_summaries_and_chat(mem):
+    seed_years(mem)
+    mem.add_summary("summary of span fact talk")
+    mem.save_messages([{"role": "user", "content": "span fact chat"}])
+    assert recalled(mem, "span fact", year=2020) == ["closed span fact", "open span fact"]
+
+
+def test_recall_year_still_hides_asked_facts_without_include_personal(mem):
+    mem.save_source_facts("github", [dated("kept back", "2020", None, "Life", tag="family")])
+    assert recalled(mem, year=2020) == []
+    assert recalled(mem, year=2020, include_personal=True) == ["kept back"]
+
+
+def test_recall_single_year_span(mem):
+    mem.save_source_facts("github", [dated("one year", "2019", "2019", "Work")])
+    assert mem.search("", year=2019)[0].span == "2019"
+
+
 def test_shape_open_ended_fact_counts_its_start_year(mem):
     mem.save_source_facts("github", [dated("a", "2019", None, "Work")])
     assert mem.shape().years == ("2019", "2019")

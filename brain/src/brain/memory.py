@@ -170,5 +170,11 @@ class Memory:
         kind: str | None = None,
         limit: int = 10,
         include_personal: bool = False,
+        year: int | None = None,
+        from_year: int | None = None,
+        to_year: int | None = None,
+        category: str | None = None,
     ) -> list[Hit]:
-        return search_store.search(self._db, query, kind, limit, include_personal)
+        return search_store.search(
+            self._db, query, kind, limit, include_personal, year, from_year, to_year, category
+        )
