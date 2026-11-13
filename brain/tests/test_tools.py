@@ -792,18 +792,31 @@ async def test_list_memories_has_no_cadence_and_is_newest_first(mem, home):
         "source_ref",
         "evidence",
         "visibility",
+        "category",
+        "span_start",
+        "span_end",
     }
     assert first["kind"] == "instruction"
     assert first["text"] == "Water plants"
     assert re.match(r"\d{4}-\d{2}-\d{2}T", first["at"])
 
 
-async def test_list_memories_is_capped_at_200(mem, home):
-    for i in range(205):
+async def test_list_memories_rows_carry_category_and_span(mem, home):
+    mem.remember("about_you", "Senior engineer at Acme", category="Work", start="2019", end="2021")
+    mem.remember("about_you", "Likes tea")
+    rows = {m["text"]: m for m in json.loads(await home.run("list_memories"))["memories"]}
+    acme = rows["Senior engineer at Acme"]
+    assert (acme["category"], acme["span_start"], acme["span_end"]) == ("Work", "2019", "2021")
+    tea = rows["Likes tea"]
+    assert (tea["category"], tea["span_start"], tea["span_end"]) == (None, None, None)
+
+
+async def test_list_memories_returns_up_to_700(mem, home):
+    for i in range(705):
         mem.add_summary(f"s{i}")
     out = json.loads(await home.run("list_memories"))
-    assert len(out["memories"]) == 200
-    assert out["memories"][0]["id"] == 205
+    assert len(out["memories"]) == 700
+    assert out["memories"][0]["id"] == 705
 
 
 async def test_remember_and_forget_send_changed_memory(home):

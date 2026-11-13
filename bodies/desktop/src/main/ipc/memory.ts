@@ -20,6 +20,9 @@ interface BrainMemory {
   source_ref?: string | null;
   evidence?: string | null;
   visibility?: string | null;
+  category?: string | null;
+  span_start?: string | null;
+  span_end?: string | null;
 }
 
 /** Home labels three kinds; the brain keeps more, so each lands on the nearest one. */
@@ -43,13 +46,16 @@ function parseMemories(value: unknown): { entries: MemoryEntry[]; portrait: stri
     ...(m.source_ref ? { sourceRef: m.source_ref } : {}),
     ...(m.evidence ? { evidence: m.evidence } : {}),
     ...(m.visibility === 'free' || m.visibility === 'asked' ? { visibility: m.visibility } : {}),
+    ...(m.category ? { category: m.category } : {}),
+    ...(m.span_start ? { spanStart: m.span_start } : {}),
+    ...(m.span_end ? { spanEnd: m.span_end } : {}),
   }));
   return { entries, portrait: typeof portrait === 'string' && portrait !== '' ? portrait : null };
 }
 
 export function registerMemoryIpc(handle: IpcHandle, deps: { brain: BrainCall }): void {
   const { brain } = deps;
-  // The brain returns the newest 200: what Home shows in one page.
+  // The brain returns the newest 700, enough for a whole timeline.
   handle(IPC.listMemories, async () => {
     return parseMemories(await callJson(brain, 'list_memories')).entries;
   });

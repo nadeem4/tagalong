@@ -53,7 +53,7 @@ from brain.voice import VoiceHooks
 log = logging.getLogger("brain")
 
 Notify = Callable[[str, dict], None]
-LIST_MEMORIES_MAX = 200
+LIST_MEMORIES_MAX = 700
 TIMER_NOTE_MAX = 500
 SAMPLE_MAX_CHARS = 500  # a Preview line, not a reading
 # One year; keeps now + timedelta far from datetime overflow.
@@ -195,6 +195,9 @@ def brain_tools(
                         "source_ref": i.source_ref,
                         "evidence": i.evidence,
                         "visibility": i.visibility,
+                        "category": i.category,
+                        "span_start": i.span_start,
+                        "span_end": i.span_end,
                     }
                     for i in items
                 ],

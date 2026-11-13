@@ -45,4 +45,12 @@ describe('MemoryEntry', () => {
       }).success,
     ).toBe(false);
   });
+
+  it('accepts category and span, rejects a non-string span', () => {
+    const base = { id: 'm', kind: 'fact', text: 'x', createdAt: AT };
+    expect(
+      MemoryEntry.parse({ ...base, category: 'Work', spanStart: '2019', spanEnd: '2021' }),
+    ).toMatchObject({ category: 'Work', spanStart: '2019', spanEnd: '2021' });
+    expect(MemoryEntry.safeParse({ ...base, spanStart: 2019 }).success).toBe(false);
+  });
 });

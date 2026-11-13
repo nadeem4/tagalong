@@ -1,14 +1,16 @@
 /**
- * Home's "What Scout remembers" page: Scout's facts, preferences and conversation summaries,
- * newest first, each with Delete. Above the list sit Scout's portrait of the person and the
- * Get to know me button that writes it. Contains MemoryView.
+ * Home's "What Scout remembers" page: a summary card (the portrait, the years it covers and
+ * where it was read), the facts as a year-by-year timeline, and the preferences and
+ * conversation summaries as a flat list, each with Delete. Contains MemoryView.
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { buildTimeline } from '../shapes';
 import type { MemoryEntry } from '../shapes';
 import { useHostBridge } from '../host-bridge';
 import { Button } from '../controls/button';
 import { KnowMeFlow } from '../know-me/know-me-flow';
+import { MemoryTimeline, deleteLabel, sourceLabel } from './memory-timeline';
 import { themeTokens as t, typeCss } from '../theme/tokens';
 
 const KIND_LABELS: Record<MemoryEntry['kind'], string> = {
@@ -16,35 +18,6 @@ const KIND_LABELS: Record<MemoryEntry['kind'], string> = {
   preference: 'Preference',
   summary: 'Conversation summary',
 };
-
-/** A delete button's name: the memory's start, so a long summary stays a short name. */
-function deleteLabel(text: string): string {
-  return `Delete: ${text.length > 80 ? `${text.slice(0, 79)}…` : text}`;
-}
-
-const SOURCE_LABELS: Record<string, string> = {
-  github: 'GitHub',
-  linkedin: 'LinkedIn',
-  web: 'The web',
-};
-const cap = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
-
-/** The chip: a tagged fact says what it is about (Work, Skills), anything else its kind. */
-function chipLabel(memory: MemoryEntry): string {
-  return memory.kind === 'fact' && memory.tag
-    ? cap(memory.tag.replace(/_/g, ' '))
-    : KIND_LABELS[memory.kind];
-}
-
-/** A fact's small line: where it was read, and whether it is only used when asked. */
-function provenance(memory: MemoryEntry): string[] {
-  const parts: string[] = [];
-  if (memory.source && memory.source !== 'chat') {
-    parts.push(SOURCE_LABELS[memory.source] ?? cap(memory.source));
-  }
-  if (memory.visibility === 'asked') parts.push('only if asked');
-  return parts;
-}
 
 function day(iso: string): string {
   return new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short' });
@@ -63,16 +36,25 @@ const CSS = `
 }
 .memory-row__text { ${typeCss('bodyLead')}; overflow-wrap: anywhere; min-width: 0; }
 .memory-row__date { padding-top: 3px; ${typeCss('small')}; color: ${t.color.panelMuted}; }
-.memory-row__meta { display: block; margin-top: ${t.space.xxs}px; ${typeCss('small')}; color: ${t.color.panelMuted}; }
 .memory-portrait p { margin: 0; max-width: 62ch; ${typeCss('bodyLead')}; overflow-wrap: anywhere; }
 .memory-portrait p + p { margin-top: ${t.space.lg}px; }
 .memory-head-actions { margin-top: ${t.space.md}px; }
 .memory-row .tg-chip { justify-self: start; white-space: nowrap; }
+.memory-covered { margin-top: ${t.space.lg}px; ${typeCss('small')}; color: ${t.color.panelMuted}; }
+.memory-covered p { margin: 0; }
 `;
 
+/** The sources a run of facts was read from, in the order first seen; chat is not a source. */
+function sourcesOf(facts: MemoryEntry[]): string[] {
+  const seen = new Set<string>();
+  for (const f of facts) if (f.source && f.source !== 'chat') seen.add(sourceLabel(f.source));
+  return [...seen];
+}
+
 /**
- * Home's "What Scout remembers": every memory Scout keeps about the person, newest first,
- * with its kind and the day it was saved. Each one can be deleted, for good.
+ * Home's "What Scout remembers": every memory Scout keeps about the person. Facts sit in the
+ * timeline; preferences and conversation summaries stay a flat list, newest first, with the
+ * day they were saved. Each one can be deleted, for good.
  */
 export function MemoryView({ name }: { name: string }) {
   const bridge = useHostBridge();
@@ -111,6 +93,17 @@ export function MemoryView({ name }: { name: string }) {
       .catch((error: unknown) => console.error('could not delete a memory', error));
   };
 
+  const facts = (memories ?? []).filter((memory) => memory.kind === 'fact');
+  const others = (memories ?? []).filter((memory) => memory.kind !== 'fact');
+  const { covered } = buildTimeline(facts);
+  const sources = sourcesOf(facts);
+  const coveredLines =
+    covered !== null || sources.length > 0 ? (
+      <div className="memory-covered">
+        {covered !== null && <p>Years covered: {covered}</p>}
+        {sources.length > 0 && <p>From {sources.join(', ')}</p>}
+      </div>
+    ) : null;
   const title = `What ${name} remembers`;
   return (
     <>
@@ -146,38 +139,45 @@ export function MemoryView({ name }: { name: string }) {
             .map((paragraph, i) => (
               <p key={i}>{paragraph.trim()}</p>
             ))}
+          {coveredLines}
         </section>
       )}
-      <section className="tg-card" aria-label="Memories">
-        <h2 className="tg-card__label">Memories</h2>
-        {failed && memories === null && (
-          <p role="alert">Tagalong could not read these memories. Reopen Home to try again.</p>
-        )}
-        {memories !== null && memories.length === 0 && <p>{name} doesn’t remember anything yet.</p>}
-        {memories !== null && memories.length > 0 && (
-          <ul aria-label={title} className="memory-list">
-            {memories.map((memory) => (
-              <li key={memory.id} className="memory-row">
-                <span className="tg-chip">{chipLabel(memory)}</span>
-                <span className="memory-row__text">
-                  {memory.text}
-                  {provenance(memory).length > 0 && (
-                    <span className="memory-row__meta">{provenance(memory).join(' · ')}</span>
-                  )}
-                </span>
-                <span className="memory-row__date home-time">{day(memory.createdAt)}</span>
-                <Button
-                  variant="quiet"
-                  aria-label={deleteLabel(memory.text)}
-                  onClick={() => remove(memory.id)}
-                >
-                  Delete
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {facts.length > 0 && (
+        <section className="tg-card" aria-label="Timeline">
+          <h2 className="tg-card__label">Timeline</h2>
+          {portrait === null && coveredLines}
+          <MemoryTimeline entries={facts} onDelete={remove} />
+        </section>
+      )}
+      {(memories === null || memories.length === 0 || others.length > 0) && (
+        <section className="tg-card" aria-label="Memories">
+          <h2 className="tg-card__label">Memories</h2>
+          {failed && memories === null && (
+            <p role="alert">Tagalong could not read these memories. Reopen Home to try again.</p>
+          )}
+          {memories !== null && memories.length === 0 && (
+            <p>{name} doesn’t remember anything yet.</p>
+          )}
+          {others.length > 0 && (
+            <ul aria-label={title} className="memory-list">
+              {others.map((memory) => (
+                <li key={memory.id} className="memory-row">
+                  <span className="tg-chip">{KIND_LABELS[memory.kind]}</span>
+                  <span className="memory-row__text">{memory.text}</span>
+                  <span className="memory-row__date home-time">{day(memory.createdAt)}</span>
+                  <Button
+                    variant="quiet"
+                    aria-label={deleteLabel(memory.text)}
+                    onClick={() => remove(memory.id)}
+                  >
+                    Delete
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
     </>
   );
 }

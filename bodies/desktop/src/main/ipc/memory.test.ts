@@ -77,6 +77,36 @@ describe('registerMemoryIpc', () => {
     ]);
   });
 
+  it('maps category and span, omitting nulls', async () => {
+    const { invoke } = setup(() =>
+      text({
+        memories: [
+          {
+            id: 6,
+            kind: 'about_you',
+            text: 'Senior engineer',
+            at: AT,
+            category: 'Work',
+            span_start: '2019',
+            span_end: null,
+          },
+          { id: 7, kind: 'about_you', text: 'Old row', at: AT, category: null, span_start: null },
+        ],
+      }),
+    );
+    expect(await invoke(IPC.listMemories)).toEqual([
+      {
+        id: '6',
+        kind: 'fact',
+        text: 'Senior engineer',
+        createdAt: AT,
+        category: 'Work',
+        spanStart: '2019',
+      },
+      { id: '7', kind: 'fact', text: 'Old row', createdAt: AT },
+    ]);
+  });
+
   it('reads the portrait from the same brain call, or null when there is none', async () => {
     const withPortrait = setup(() => text({ memories: [], portrait: 'You build things.' }));
     expect(await withPortrait.invoke(IPC.getPortrait)).toBe('You build things.');
