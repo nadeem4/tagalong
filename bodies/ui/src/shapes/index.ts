@@ -17,6 +17,7 @@ export * from './pet';
 export * from './reading';
 export * from './setup';
 export * from './status';
+export * from './timeline';
 export * from './timers';
 export * from './turn-events';
 export * from './updates';

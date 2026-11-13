@@ -19,5 +19,10 @@ export const MemoryEntry = z.object({
   evidence: z.string().optional(),
   /** `asked` facts are used only when the person asks for them. */
   visibility: z.enum(['free', 'asked']).optional(),
+  /** The model's own heading for the fact (Work, Open source); old rows have none. */
+  category: z.string().optional(),
+  /** Four-digit years the fact was true: start, and end (absent: still true). */
+  spanStart: z.string().optional(),
+  spanEnd: z.string().optional(),
 });
 export type MemoryEntry = z.infer<typeof MemoryEntry>;
