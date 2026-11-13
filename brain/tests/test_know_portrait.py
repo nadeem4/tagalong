@@ -156,3 +156,7 @@ def test_portrait_prompt_says_chat_wins_over_source_facts():
 
     p = prompt("know_portrait.md").lower()
     assert "told scout" in p and "wins" in p
+
+
+def test_portrait_prompt_writes_ranges_with_to():
+    assert 'with "to"' in prompt("know_portrait.md")

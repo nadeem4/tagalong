@@ -1950,3 +1950,10 @@ async def test_remember_without_said_saves_undated(mem, run):
 def test_remember_schema_lists_category_start_end(mem):
     props = next(s for s, _ in brain_tools(mem) if s.name == "remember").input_schema["properties"]
     assert all(props[k]["type"] == "string" for k in ("category", "start", "end"))
+
+
+def test_remember_description_keeps_time_words_and_writes_ranges_with_to(home):
+    described = {t["name"]: t["description"] for t in home.box.model_tools()}
+    text = described["remember"]
+    assert "about two years ago" in text and "never write a year you worked out" in text
+    assert 'with "to"' in text
