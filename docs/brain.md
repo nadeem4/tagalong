@@ -216,6 +216,9 @@ flowchart TD
   Memory rows carry a tag, source, evidence and visibility, and one code-written portrait leads
   "What you know"; `recall` leaves personal facts out unless asked (see
   [memory.md](memory.md#provenance-and-visibility)).
+  `remember` also takes optional `category`, `start` and `end`; a year counts only when the
+  person said it in this turn (`Session` passes the owner's text to `brain_tools` as `said`), and a
+  wake turn has none (see [memory.md](memory.md#dates-and-categories)).
 - A turn ends with one of `done`, `cancelled`, `error`, `over_budget` or `step_cap`. A refusal or
   a failed model call is `error`.
 - **No key.** `Session.say` checks `model.ready` first. Without a key it returns a turn id, sends
@@ -2567,6 +2570,10 @@ come in a later slice.
   without regard to whitespace or case, is in the material, so the model proposes and code
   decides. `complete` is the one model call and raises `BudgetStop` when the day's limit is spent
   or there is no key. `name` and `employer` the model reports count only if quoted from the text.
+  Each fact also carries `category`, `start` and `end`; `check` keeps a year only when it is in
+  the fact's own evidence and drops a category that holds contact details or a personal topic
+  (`evidenced_span`, `normalise_category` in `facts.py`). `extract` is also given the categories in
+  use and the facts other sources saved, and the runner passes both.
 
 - **`know/portrait.py`**: `write_portrait(model, budget, memory)` reads
   `profile_facts(include_asked=False)` (none: returns None without a call), sends them fenced as

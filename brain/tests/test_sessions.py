@@ -3179,3 +3179,22 @@ async def test_a_waiting_say_or_later_entry_keeps_next_pause_closed():
     session._says_waiting.clear()
     session._later.append((None, "t", [], say("x")))
     assert not session.dispatcher._can_deliver("next_pause")
+
+
+async def test_session_passes_the_turn_text_to_remember():
+    memory = Memory(":memory:")
+    steps = [tool_use("remember", kind="about_you", text="Uses Python", start="2019")]
+    session, _ = make(Gate([*steps, "ok"]), memory)
+    join(session, "desktop")
+    await session.say("desktop", say("since 2019 I use Python"))
+    await idle(session)
+    [item] = [i for i in memory.list_items(10) if i.kind == "about_you"]
+    assert item.span_start == "2019"
+
+
+async def test_wake_turn_remember_saves_undated():
+    session, memory = await wake_with(
+        [tool_use("remember", kind="about_you", text="Uses Python", start="2019")]
+    )
+    [item] = [i for i in memory.list_items(10) if i.kind == "about_you"]
+    assert item.span_start is None

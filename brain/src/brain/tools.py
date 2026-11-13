@@ -31,6 +31,7 @@ from brain.config import upsert_env_value
 from brain.guardrails import Budget
 from brain.job_records import JobPart, JobRecords, home_state
 from brain.jobs import JobError, Jobs, job_title
+from brain.know.facts import evidenced_span, normalise_category
 from brain.memory import Memory
 from brain.models import DEFAULT_MODEL_ID, MODELS, PROVIDER
 from brain.models import chosen as chosen_model
@@ -113,18 +114,27 @@ def _need_text(tool: str, args: dict, *names: str) -> None:
 
 
 def brain_tools(
-    memory: Memory, notify: Notify = lambda method, params: None
+    memory: Memory,
+    notify: Notify = lambda method, params: None,
+    said: Callable[[], str] = lambda: "",
 ) -> list[tuple[ToolSpec, Handler]]:
+    """`said` is the owner's words this turn: the only evidence a year in chat can have."""
+
     async def remember(args: dict) -> str:
         _need("remember", args, "kind", "text")
         if args["kind"] == "tracking":
             raise MemoryRefused("Keeping an eye on something is the watch tool, not remember.")
+        # The model's own `evidence` string is not proof of a date; only what was said is.
+        start, end = evidenced_span(args.get("start"), args.get("end"), said())
         item = memory.remember(
             args["kind"],
             args["text"],
             args.get("replaces"),
             args.get("tag") or "",
             args.get("evidence"),
+            normalise_category(args.get("category")),
+            start,
+            end,
         )
         notify("changed", {"what": "memory"})  # Scout's saves show up in Home
         verb = "replaced" if args.get("replaces") is not None else "saved"
@@ -189,6 +199,27 @@ def brain_tools(
                         "evidence": {
                             "type": "string",
                             "description": "The person's own words that this fact comes from.",
+                        },
+                        "category": {
+                            "type": "string",
+                            "description": (
+                                "A short name for the theme of the fact (at most 30 characters); "
+                                "reuse one already in use when it fits."
+                            ),
+                        },
+                        "start": {
+                            "type": "string",
+                            "description": (
+                                "Four-digit year the fact became true, only if the person said "
+                                "that year in this turn."
+                            ),
+                        },
+                        "end": {
+                            "type": "string",
+                            "description": (
+                                "Four-digit year it stopped, or 'now' if it is still true; "
+                                "only if the person said it."
+                            ),
                         },
                     },
                     "required": ["kind", "text"],

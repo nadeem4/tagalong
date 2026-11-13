@@ -309,7 +309,7 @@ class Session:
             lambda: notify("changed", {"what": "memory"}),
         )
         tools = (
-            brain_tools(memory, notify)
+            brain_tools(memory, notify, lambda: self._said)
             + know_me_tools(self.know_me, memory, now, notify)
             + home_tools(budget, lambda: self.toolbox, keys)
             + model_tools(memory.db, model_default, notify)
@@ -380,6 +380,7 @@ class Session:
         # True while the running turn is the owner's: they started it, or they typed into it.
         # A wake turn stays Scout's own until then, so its follow-ups still ask.
         self._owner_turn = False
+        self._said = ""  # the owner's words in the running turn: evidence for dates in remember
         self._task: asyncio.Task | None = None
         # Set when the owner talks over the running turn: it stops at once and winds down by itself.
         self._stop: asyncio.Event | None = None
@@ -1034,6 +1035,11 @@ class Session:
         self._wake_jobs = set()
         self._stop = stop = asyncio.Event()
         self._owner_turn = started_by == "user"
+        self._said = (
+            " ".join(b.get("text", "") for b in content if b.get("type") == "text")
+            if started_by == "user"
+            else ""
+        )
         self._turn_body = body_id
         lead = [interruption_block(cut.spoken, cut.unsaid)] if cut is not None else []
         lead = [*self._carried, *lead]  # what an interjection changed, once

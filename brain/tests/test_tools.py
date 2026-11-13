@@ -1831,3 +1831,51 @@ def test_brain_status_is_home_only():
 def test_recall_description_says_to_search_personal_when_asked_about_themselves(mem):
     spec = next(s for s, _ in brain_tools(mem) if s.name == "recall")
     assert "about themselves" in spec.description and "include_personal" in spec.description
+
+
+@pytest.fixture
+def said_run(mem):
+    handlers = {
+        spec.name: handler
+        for spec, handler in brain_tools(mem, said=lambda: "I moved to Chicago in 2021")
+    }
+
+    async def run(name, args):
+        return await handlers[name](args)
+
+    return run
+
+
+def _saved(mem):
+    return next(i for i in mem.list_items(10) if i.kind == "about_you")
+
+
+async def test_remember_saves_dates_said_by_the_person(mem, said_run):
+    await said_run(
+        "remember",
+        {"kind": "about_you", "text": "Moved to Chicago", "start": "2021", "category": "places"},
+    )
+    item = _saved(mem)
+    assert (item.span_start, item.span_end, item.category) == ("2021", None, "Places")
+
+
+async def test_remember_drops_year_the_person_did_not_say(mem, said_run):
+    await said_run("remember", {"kind": "about_you", "text": "Moved", "start": "2018"})
+    item = _saved(mem)
+    assert item.span_start is None and item.text == "Moved"
+
+
+async def test_remember_ignores_model_evidence_for_dates(mem, said_run):
+    args = {"kind": "about_you", "text": "Moved", "start": "2018", "evidence": "moved in 2018"}
+    await said_run("remember", args)
+    assert _saved(mem).span_start is None
+
+
+async def test_remember_without_said_saves_undated(mem, run):
+    await run("remember", {"kind": "about_you", "text": "Moved", "start": "2021"})
+    assert _saved(mem).span_start is None
+
+
+def test_remember_schema_lists_category_start_end(mem):
+    props = next(s for s, _ in brain_tools(mem) if s.name == "remember").input_schema["properties"]
+    assert all(props[k]["type"] == "string" for k in ("category", "start", "end"))
