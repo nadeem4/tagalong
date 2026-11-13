@@ -5,7 +5,7 @@ import json
 import pytest
 from know_fakes import FakeModel, budget, final
 
-from brain.know.extract import BudgetStop, check, complete, extract
+from brain.know.extract import BudgetStop, check, complete, extract, prompt
 from brain.know.facts import Candidate, Material
 
 MATERIAL = Material("I built  Foo, a CLI.\nWorked at Acme Corp since 2021.", "github:amy")
@@ -237,3 +237,9 @@ async def test_extract_prompt_lists_known_categories_and_saved_facts(tmp_path):
     assert "Languages" in text and "Work" in text
     assert "Builds &lt;b>compilers" in text and "<b>" not in text
     assert all(w in system for w in ("category", "start", "end"))
+
+
+def test_extract_prompt_keeps_time_words_and_writes_ranges_with_to():
+    text = prompt("know_extract.md")
+    assert "about two years ago" in text and "never write a year you worked out" in text
+    assert 'with "to"' in text

@@ -212,7 +212,10 @@ def brain_tools(
                 "remember",
                 "Save something worth keeping across conversations: a standing instruction, a "
                 "fact about the user, or project notes. To keep an eye on something, use watch. "
-                "Pass replaces=<id> to update an existing item instead of adding a duplicate.",
+                "Pass replaces=<id> to update an existing item instead of adding a duplicate. "
+                'Keep the person\'s own words for time ("about two years ago") in text and '
+                'never write a year you worked out into it. Write a date range with "to", '
+                "not a dash.",
                 {
                     "type": "object",
                     "properties": {
