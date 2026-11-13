@@ -202,6 +202,27 @@ describe('MemoryView, get to know me', () => {
     expect(rows[1]).toHaveTextContent('only if asked');
   });
 
+  it('a profile fact wears its tag as the chip, not Fact, and the tag is not repeated', async () => {
+    renderView(createFakeHostBridge({ memories: [FROM_GITHUB] }));
+    const row = (await screen.findAllByRole('listitem'))[0]!;
+    expect(row.querySelector('.tg-chip')).toHaveTextContent(/^Skills$/);
+    expect(row).not.toHaveTextContent('Fact');
+    expect(row.querySelector('.memory-row__meta')).not.toHaveTextContent('Skills');
+  });
+
+  it('shows one way out while a run is not finished, and none beside the result', async () => {
+    const bridge = createFakeHostBridge({ memories: [FROM_GITHUB], portrait: 'You build things.' });
+    renderView(bridge);
+    fireEvent.click(await screen.findByRole('button', { name: 'Get to know me again' }));
+    expect(await screen.findByRole('button', { name: 'Close' })).toBeInTheDocument();
+    fireEvent.change(await screen.findByLabelText('GitHub'), { target: { value: 'octocat' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Get to know me' }));
+    await waitFor(() => expect(bridge.knowStarts).toHaveLength(1));
+    act(() => bridge.emitKnowStatus(DONE));
+    await screen.findByRole('button', { name: 'Looks right' });
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+  });
+
   it('a chat fact shows no source line', async () => {
     renderView(createFakeHostBridge({ memories: [{ ...REPO, source: 'chat' }] }));
     const row = (await screen.findAllByRole('listitem'))[0];

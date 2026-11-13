@@ -106,6 +106,9 @@ class Memory:
     def profile_facts(self, include_asked: bool = True) -> list[Item]:
         return memory_store.profile_facts(self._db, include_asked)
 
+    def asked_topics(self) -> list[str]:
+        return memory_store.asked_topics(self._db)
+
     def chat_facts(self) -> list[Item]:
         return memory_store.chat_facts(self._db)
 

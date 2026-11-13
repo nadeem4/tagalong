@@ -8,7 +8,7 @@ import sqlite3
 from dataclasses import dataclass
 from typing import Literal
 
-from brain.know.facts import normalise_tag, visibility_for
+from brain.know.facts import TAG_VISIBILITY, normalise_tag, visibility_for
 
 
 @dataclass(frozen=True)
@@ -238,6 +238,17 @@ def profile_facts(db: sqlite3.Connection, include_asked: bool = True) -> list[It
     if not include_asked:
         sql += " AND visibility='free'"
     return [Item(*r) for r in db.execute(sql + " ORDER BY id")]
+
+
+def asked_topics(db: sqlite3.Connection) -> list[str]:
+    """Topics of the asked facts, never their text: the prompt may name what is held, not say it.
+    A tag the model made up could itself carry the fact, so only known tags are named; any
+    other shows as personal."""
+    rows = db.execute(
+        "SELECT DISTINCT tag FROM memories WHERE kind IN ('profile','about_you')"
+        " AND visibility='asked'"
+    )
+    return sorted({r[0] if r[0] in TAG_VISIBILITY else "personal" for r in rows})
 
 
 def chat_facts(db: sqlite3.Connection) -> list[Item]:
