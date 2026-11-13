@@ -313,8 +313,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
     **Cancel**.
 - **Places**: where you can talk to Scout. **This PC**, the **Chrome add-on** (Connected or Not set up, with **Get the add-on**, which opens the tour at its Browser step) and **WhatsApp** (Connected, Not set up or Offline), and WhatsApp's setup under its row ([docs/whatsapp.md](docs/whatsapp.md)).
 - **Approvals**: the preferences Scout follows (the sentence, when you agreed to it, how often it was used, with **Edit** and **Remove**; "Always ask me before risky actions" is listed like any other), a summary of how many asks there were, how many Scout answered and how many you refused, and the history of every permission ask by day, filtered by **All**, **Decided by Scout** or **Refused**. A row Scout approved says so and quotes the preference it relied on. When Scout approves an ask, a small quiet card in the bubble says "Approved for you" and which preference it used.
-- **What Scout remembers**: its facts, preferences and conversation summaries, newest first. Facts read from your profiles say where they came from.
-  Delete any one.
+- **What Scout remembers**: a summary of you (with the years it covers), your facts as a timeline (newest year first, grouped by category, quiet years folded, undated facts last; open one for its quote and where it was read), then your preferences and conversation summaries. Delete any one.
 - **Settings**, in six sections. Press ⓘ beside a setting for the longer story. Below the form,
   **Permissions** lists every tool Scout can use in plain words, in groups (Memory, This computer, your browser, each
   connected app and so on), each collapsed until you open it, with a one-line summary such as "13 · 2 Ask, 11 Auto" and a flag when a risky

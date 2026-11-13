@@ -535,8 +535,8 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   and `forget` (`ipc/memory.ts`: brain kinds `instruction` map to Preference, `summary` to Summary,
   the rest to Fact; a refused `forget` or an id that is not a number gives `false`; an offline brain
   rejects, so the page says it could not read). The list rows also carry the profile provenance
-  (`tag`, `source`, `sourceRef`, `evidence`, `visibility`, null left out), brain kind `profile` maps
-  to Fact, and the portrait comes from the same call through `getPortrait`.
+  (`tag`, `source`, `sourceRef`, `evidence`, `visibility`), the category and the years (`category`, `spanStart`, `spanEnd`, from `span_start` and `span_end`), null left out; brain kind `profile` maps
+  to Fact, and the portrait comes from the same call through `getPortrait`. The brain returns the newest 700 rows, enough for a whole timeline. Home's memory page shows a summary card (portrait, years covered, sources), the facts as a year-by-year timeline (`shapes/timeline.ts`, `home/memory-timeline.tsx`) and the preferences and conversation summaries as a flat list.
   Get to know me (`ipc/know-me.ts`): `know-me:start` checks the input before the brain does (a
   username, which must look like a GitHub name, or a PDF; a PDF over 10 MB decoded is refused) and
   answers `{ joined }` or `{ error }` with a plain sentence. The preload turns `{ error }` into a

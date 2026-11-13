@@ -2157,7 +2157,10 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
    match, Scout asks which one, in its own words.
 4. **Live update.** With Home open on **What Scout remembers**, ask Scout to remember something.
    **Expected:** the row appears without reopening Home.
-5. **Usage.** Open Home → **Overview**. **Expected:** **Spend** shows today's spend and the limit. Stop the brain: the **Scout** card says **Brain: Offline**, not Ready. Start it again: the card says Ready and **Spend** shows the numbers again without leaving the page.
+5. **Timeline.** After a get-to-know-me run (or after telling Scout a dated fact such as "I joined Acme in 2019"), open Home → **What Scout remembers**.
+   **Expected:** a summary card with "Years covered"; a **Timeline** card with the newest year first, categories inside each year; a long-running fact appears once, at its start year ("since 2019" when still true); years with nothing new fold into one range; facts with no year sit under **Undated** at the bottom; preferences and conversation summaries stay in the list below.
+6. **Open and delete.** Open an entry. **Expected:** its quote and where it was read (and "only if asked" for a personal fact). Press **Delete** on the only fact of a year. **Expected:** the year block disappears at once.
+7. **Usage.** Open Home → **Overview**. **Expected:** **Spend** shows today's spend and the limit. Stop the brain: the **Scout** card says **Brain: Offline**, not Ready. Start it again: the card says Ready and **Spend** shows the numbers again without leaving the page.
 
 ## Get to know me (K5 result view and bridge, automated only)
 
@@ -2178,7 +2181,7 @@ Automated: `bodies/ui/src/walkthrough/step-know-me.test.tsx`, `src/home/memory-v
 4. **Action:** delete one GitHub fact on Home, then run **Get to know me** again. **Expected:** that fact does not come back.
 5. **Action:** press **Get to know me again**, enter a username and start; at the end press **Looks right** or **What's this based on?**. **Expected:** the progress rows, then the portrait and its facts; **Looks right** closes the panel and the list and portrait are refreshed.
 6. **Action:** tell Scout in chat that one fact is wrong, then run it again. **Expected:** the correction is kept as a chat fact and the rewritten portrait follows it.
-7. **Dated facts (T1).** Run **Get to know me** again with a GitHub username. **Expected:** the run finishes as before; facts read from repos can carry a year and a category in the saved memory (in the database now, in Home once the timeline ships), and a fact whose source names no year stays undated.
+7. **Dated facts (T1).** Run **Get to know me** again with a GitHub username. **Expected:** the run finishes as before; facts read from repos can carry a year and a category in the saved memory (shown in Home's timeline), and a fact whose source names no year stays undated.
 8. **Dates from chat (T1).** Say "I moved to Chicago in 2021." **Expected:** Scout saves a fact with start year 2021. Then say "I changed jobs" and ask Scout to save it as 2022. **Expected:** the fact is saved undated, because you never said 2022.
 
 ## Web search and fetch _(real brain, real key: this spends a few cents)_
