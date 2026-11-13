@@ -87,8 +87,24 @@ class Memory:
         if masked_evidence == WITHHELD:
             masked_evidence = None
         return memory_store.remember(
-            self._db, kind, masked, replaces, at, tag, masked_evidence, category, start, end
+            self._db,
+            kind,
+            masked,
+            replaces,
+            at,
+            tag,
+            masked_evidence,
+            self._masked_category(category),
+            start,
+            end,
         )
+
+    def _masked_category(self, category: str | None) -> str | None:
+        """A category masking would change or withhold holds a secret: drop it, keep the fact."""
+        if not category:
+            return None
+        masked = self.mask(category)
+        return category if masked == category else None
 
     def forget(self, item_id: int) -> Item:
         return memory_store.forget(self._db, item_id)
@@ -105,7 +121,8 @@ class Memory:
             text, evidence = self.mask(f.text), self.mask(f.evidence)
             if WITHHELD in (text, evidence):
                 continue  # a blocking save guard: skip the fact rather than store noise
-            masked.append(NewFact(f.tag, text, evidence, f.source_ref, f.category, f.start, f.end))
+            category = self._masked_category(f.category)
+            masked.append(NewFact(f.tag, text, evidence, f.source_ref, category, f.start, f.end))
         return memory_store.save_source_facts(self._db, source, masked, self._now().isoformat())
 
     def profile_facts(self, include_asked: bool = True) -> list[Item]:

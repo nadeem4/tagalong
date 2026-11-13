@@ -47,7 +47,6 @@ def test_end_without_start_is_dropped():
 
 def test_non_year_values_ignored():
     assert evidenced_span("last spring", "x", "last spring") == (None, None)
-    assert evidenced_span(2019, None, "in 2019") == (None, None)
 
 
 def test_category_normalised():
@@ -58,3 +57,26 @@ def test_category_normalised():
 @pytest.mark.parametrize("name", ["a@b.com", "Family", "Home town", "Health", "", "  ", 7, None])
 def test_category_dropped_for_contact_or_personal(name):
     assert normalise_category(name) is None
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["Hometown", "Kids", "Children", "Medical", "Address", "Religion", "Partner", "Salary"],
+)
+def test_wider_personal_words_are_dropped(name):
+    assert normalise_category(name) is None
+
+
+def test_work_words_still_pass():
+    assert normalise_category("Languages") == "Languages"
+    assert normalise_category("Employment") == "Employment"
+
+
+def test_title_case_leaves_mixed_case_words_alone():
+    assert normalise_category("iOS apps") == "iOS Apps"
+    assert normalise_category("AI/ML research") == "AI/ML Research"
+
+
+def test_whole_number_years_become_strings():
+    assert evidenced_span(2019, "now", "since 2019") == ("2019", None)
+    assert evidenced_span(2019, 2021, "2019 to 2021") == ("2019", "2021")

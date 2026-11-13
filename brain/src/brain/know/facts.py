@@ -38,18 +38,35 @@ _YEAR_IN_TEXT = re.compile(r"\b(?:19|20)\d{2}\b")
 
 # Category names that point at a personal topic are dropped whatever the fact's tag, so a
 # model-made category can never carry such a topic into the prompt.
-PERSONAL_WORDS = frozenset(
-    {
-        "personal",
-        "location",
-        "family",
-        "health",
-        "home",
-        "relationship",
-        "relationships",
-        "finance",
-        "finances",
-    }
+PERSONAL_WORDS = (
+    "personal",
+    "locat",
+    "famil",
+    "health",
+    "home",
+    "relationship",
+    "financ",
+    "kid",
+    "child",
+    "medic",
+    "address",
+    "religio",
+    "partner",
+    "spouse",
+    "wife",
+    "husband",
+    "parent",
+    "sibling",
+    "marriage",
+    "married",
+    "divorce",
+    "dating",
+    "money",
+    "salar",
+    "politic",
+    "pregnan",
+    "therap",
+    "disab",
 )
 CATEGORY_MAX = 30
 
@@ -65,6 +82,10 @@ def evidenced_span(start: object, end: object, evidence: str) -> tuple[str | Non
     "now" as the end means still true: stored as no end, and only with an evidenced start.
     Anything else that fails (a year the source never states, an end before the start, an end
     with no start) saves the fact undated rather than with half a span."""
+    if isinstance(start, int) and not isinstance(start, bool):
+        start = str(start)  # a model may write 2019 as a number
+    if isinstance(end, int) and not isinstance(end, bool):
+        end = str(end)
     said = set(_YEAR_IN_TEXT.findall(evidence))
     if not (isinstance(start, str) and _YEAR.fullmatch(start) and start in said):
         return None, None
@@ -79,10 +100,13 @@ def normalise_category(name: object) -> str | None:
     """Trimmed, title case, at most 30 characters; None when empty or not safe to show."""
     if not isinstance(name, str):
         return None
-    cleaned = " ".join(name.split()).title()[:CATEGORY_MAX].strip()
+    # Only all-lowercase words are capitalised, so "iOS" and "AI/ML" stay as written.
+    words = [w.capitalize() if w.islower() else w for w in name.split()]
+    cleaned = " ".join(words)[:CATEGORY_MAX].strip()
     if not cleaned or has_contact_details(cleaned):
         return None
-    if any(w in PERSONAL_WORDS for w in re.findall(r"[a-z]+", cleaned.casefold())):
+    # Prefix match, so "Hometown" and "Kids" are caught as well as "Home" and "Kid".
+    if any(w.startswith(PERSONAL_WORDS) for w in re.findall(r"[a-z]+", cleaned.casefold())):
         return None
     return cleaned
 

@@ -82,6 +82,7 @@ def _material(user: str, p: dict, repos: httpx2.Response, readme: httpx2.Respons
         extra = " ".join(filter(None, [r.get("language") or "", *(r.get("topics") or [])]))
         line = f"- {r['name']}: {r.get('description') or ''} [{extra}]".rstrip()
         # Years let a repo fact be dated from the material's own words.
+        # The last-push year is only when it was last touched, never an end year.
         created, pushed = (str(r.get(k) or "")[:4] for k in ("created_at", "pushed_at"))
         if created and pushed:
             line += f" (created {created}, last pushed {pushed})"

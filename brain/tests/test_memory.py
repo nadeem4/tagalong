@@ -592,3 +592,14 @@ def test_remember_replace_keeps_dates_unless_given(mem):
         "about_you", "Uses Python a lot", replaces=first.id, start="2020", end="2022"
     )
     assert (moved.span_start, moved.span_end) == ("2020", "2022")
+
+
+def test_category_holding_a_secret_is_dropped_fact_kept(tmp_path):
+    m = Memory(tmp_path / "t.db", mask=lambda t: t.replace("sk-secret", "[secret]"))
+    item = m.remember("about_you", "Uses Python", category="sk-secret")
+    assert item.text == "Uses Python" and item.category is None
+    kept = m.remember("about_you", "Likes tea", category="Habits")
+    assert kept.category == "Habits"
+    saved = m.save_source_facts("github", [NewFact("work", "a", "ev a", "r", "sk-secret")])
+    assert saved[0].category is None
+    m.close()
