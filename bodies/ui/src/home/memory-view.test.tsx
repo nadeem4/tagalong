@@ -38,17 +38,62 @@ describe('MemoryView', () => {
     expect(css).toMatch(/\.memory-row \.tg-chip[^{]*\{[^}]*white-space: nowrap/);
   });
 
-  it('lists each memory newest first, with its kind', async () => {
-    renderView(createFakeHostBridge({ memories: [TEA, REPO, THREAD] }));
+  it('lists preferences and summaries newest first, with their kind', async () => {
+    renderView(createFakeHostBridge({ memories: [TEA, THREAD] }));
     const rows = within(
       await screen.findByRole('list', { name: 'What Scout remembers' }),
     ).getAllByRole('listitem');
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveTextContent('Preference');
     expect(rows[0]).toHaveTextContent('Prefers green tea');
-    expect(rows[1]).toHaveTextContent('Fact');
-    expect(rows[2]).toHaveTextContent('Conversation summary');
+    expect(rows[1]).toHaveTextContent('Conversation summary');
     expect(screen.getByRole('heading', { name: 'What Scout remembers' })).toBeInTheDocument();
+  });
+
+  it('the flat list no longer repeats facts', async () => {
+    renderView(createFakeHostBridge({ memories: [TEA, REPO] }));
+    const list = await screen.findByRole('list', { name: 'What Scout remembers' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(list).queryByText('Works on Tagalong')).toBeNull();
+    const timeline = screen.getByRole('region', { name: 'Timeline' });
+    expect(within(timeline).getByText('Works on Tagalong')).toBeInTheDocument();
+  });
+
+  it('shows facts in the timeline, most recent year first', async () => {
+    renderView(
+      createFakeHostBridge({
+        memories: [
+          { ...REPO, id: 'a', text: 'Old job', spanStart: '2015', spanEnd: '2018' },
+          { ...REPO, id: 'b', text: 'New job', spanStart: '2023' },
+        ],
+      }),
+    );
+    const timeline = await screen.findByRole('region', { name: 'Timeline' });
+    const years = within(timeline).getAllByRole('heading', { level: 3 });
+    expect(years.map((h) => h.textContent)).toEqual(['2023', '2015']);
+  });
+
+  it('shows years covered and the summary', async () => {
+    renderView(
+      createFakeHostBridge({
+        memories: [
+          { ...REPO, id: 'a', spanStart: '2012', spanEnd: '2016', source: 'github' },
+          { ...REPO, id: 'b', spanStart: '2020', source: 'linkedin' },
+        ],
+        portrait: 'You build things.',
+      }),
+    );
+    const summary = await screen.findByRole('region', { name: 'Scout’s portrait of you' });
+    expect(summary).toHaveTextContent('You build things.');
+    await waitFor(() => expect(summary).toHaveTextContent('Years covered: 2012–2020'));
+    expect(summary).toHaveTextContent('From GitHub, LinkedIn');
+  });
+
+  it('says nothing about years when nothing is dated', async () => {
+    renderView(createFakeHostBridge({ memories: [REPO], portrait: 'You build things.' }));
+    const summary = await screen.findByRole('region', { name: 'Scout’s portrait of you' });
+    await screen.findByRole('region', { name: 'Timeline' });
+    expect(summary).not.toHaveTextContent('Years covered');
   });
 
   it('deletes one memory, and the row goes', async () => {
@@ -190,24 +235,14 @@ describe('MemoryView, get to know me', () => {
     expect(screen.queryByRole('region', { name: 'Scout’s portrait of you' })).toBeNull();
   });
 
-  it('a row shows its tag and source, and a personal one says only if asked', async () => {
+  it('a timeline entry shows its source and a personal one says only if asked', async () => {
     renderView(createFakeHostBridge({ memories: [FROM_GITHUB, PERSONAL] }));
-    const rows = within(
-      await screen.findByRole('list', { name: 'What Scout remembers' }),
-    ).getAllByRole('listitem');
-    expect(rows[0]).toHaveTextContent('Skills');
-    expect(rows[0]).toHaveTextContent('GitHub');
-    expect(rows[0]).not.toHaveTextContent('only if asked');
-    expect(rows[1]).toHaveTextContent('LinkedIn');
-    expect(rows[1]).toHaveTextContent('only if asked');
-  });
-
-  it('a profile fact wears its tag as the chip, not Fact, and the tag is not repeated', async () => {
-    renderView(createFakeHostBridge({ memories: [FROM_GITHUB] }));
-    const row = (await screen.findAllByRole('listitem'))[0]!;
-    expect(row.querySelector('.tg-chip')).toHaveTextContent(/^Skills$/);
-    expect(row).not.toHaveTextContent('Fact');
-    expect(row.querySelector('.memory-row__meta')).not.toHaveTextContent('Skills');
+    const timeline = await screen.findByRole('region', { name: 'Timeline' });
+    const entries = within(timeline).getAllByRole('listitem');
+    expect(entries[0]).toHaveTextContent('GitHub');
+    expect(entries[0]).not.toHaveTextContent('only if asked');
+    expect(entries[1]).toHaveTextContent('LinkedIn');
+    expect(entries[1]).toHaveTextContent('only if asked');
   });
 
   it('shows one way out while a run is not finished, and none beside the result', async () => {
@@ -244,8 +279,8 @@ describe('MemoryView, get to know me', () => {
     expect(
       await screen.findByRole('heading', { name: "Here's who I think you are" }),
     ).toBeInTheDocument();
-    const list = await screen.findByRole('list', { name: 'What Scout remembers' });
-    expect(list).toHaveTextContent('Writes TypeScript');
+    const timeline = await screen.findByRole('region', { name: 'Timeline' });
+    expect(timeline).toHaveTextContent('Writes TypeScript');
     expect(screen.getByRole('region', { name: 'Scout’s portrait of you' })).toHaveTextContent(
       'You build things.',
     );

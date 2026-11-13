@@ -41,9 +41,9 @@ describe('buildTimeline', () => {
       fact({ spanStart: '2024' }),
       fact({ category: 'Skills', spanStart: '2024' }),
     ]);
-    expect(t.years.filter((b) => b.kind === 'year').map((b) => b.kind === 'year' && b.year)).toEqual(
-      ['2024', '2020'],
-    );
+    expect(
+      t.years.filter((b) => b.kind === 'year').map((b) => b.kind === 'year' && b.year),
+    ).toEqual(['2024', '2020']);
     const first = t.years[0];
     expect(first?.kind === 'year' && first.groups.map((g) => g.category)).toEqual([
       'Skills',
