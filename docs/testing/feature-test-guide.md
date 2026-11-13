@@ -2833,6 +2833,16 @@ No screen yet; the tests in `brain/tests/test_know_store.py` and `test_migrate_m
 - Personal (`asked`) facts are left out of `recall` unless `include_personal` is set; the portrait is never recalled, never forgotten, and leads the prompt.
 - `remember` cannot write `profile` or `portrait`; secrets in saved facts and the portrait are masked.
 
+## Memory shape in the prompt and `recall` by year (T2)
+
+Automated: `brain/tests/test_know_store.py` (shape, recall filters), `test_prompt.py`, `test_tools.py`, `test_know_portrait.py`, `test_sessions.py`.
+
+- The prompt's `Timeline:` line lists the years and category counts of free facts only; held (`asked`) facts, summaries and forgotten facts never count.
+- `recall` with `year`, `from_year`, `to_year` or `category` works without words, matches open-ended facts ("since 2019") in later years, and skips chat, work and summaries.
+- The summary is cut at a sentence end under 600 characters, and is written from facts labelled with their years.
+
+**Manual, real brain.** After a run that dated some facts: ask "what was I doing in 2020?". Scout calls `recall` with `year: 2020` and answers from the saved facts, not a guess. Check that a fact kept back (family, location) never appears in the summary or the `Timeline:` line.
+
 ## Get to know me (K2 frames, automated only)
 
 Still no screen; `brain/tests/test_know_start.py`, `test_protocol.py` and the contract's `messages.test.ts` and `brain-client.test.ts` cover it:

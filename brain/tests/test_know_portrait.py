@@ -4,7 +4,7 @@ portrait kept whenever a new one cannot be written. Fake model, real Memory."""
 import pytest
 from know_fakes import FakeModel, budget, final
 
-from brain.know.extract import BudgetStop
+from brain.know.extract import BudgetStop, prompt
 from brain.know.portrait import PORTRAIT_MAX, trim, write_portrait
 from brain.memory import Memory
 from brain.store.memory import NewFact
@@ -54,6 +54,39 @@ def test_trim_cuts_at_the_last_sentence_end():
     out = trim(text)
     assert len(out) <= PORTRAIT_MAX and out.endswith("One.")
     assert trim("Short.") == "Short."
+
+
+def test_trim_cuts_at_the_last_sentence_under_600():
+    assert PORTRAIT_MAX == 600
+    out = trim("Sentence number one. " * 40)
+    assert len(out) < 600 and out.endswith("one.")
+
+
+async def test_portrait_input_shows_years_not_asked_facts(mem, tmp_path):
+    mem.save_source_facts(
+        "github",
+        [
+            NewFact("work", "Builds compilers at Acme", "compilers", "r", "Work", "2019"),
+            NewFact("work", "Won a prize", "prize", "r", "Awards", "2020", "2020"),
+            NewFact("skills", "Writes Rust", "rust", "r", "Skills"),
+            NewFact("work", "Left a job", "left", "r", None, "2015", "2017"),
+            NewFact("family", "Has two daughters", "daughters", "r", None, "2010"),
+        ],
+    )
+    model = FakeModel(final("Alice builds compilers."))
+    await write_portrait(model, budget(tmp_path), mem)
+    sent = str(model.calls[0][1])
+    assert "[work, 2019–now] Builds compilers at Acme" in sent
+    assert "[work, 2015–2017] Left a job" in sent
+    assert "[work, 2020] Won a prize" in sent
+    assert "[skills] Writes Rust" in sent
+    assert "daughters" not in sent and "2010" not in sent
+
+
+def test_portrait_prompt_asks_for_a_short_summary():
+    text = prompt("know_portrait.md")
+    assert "about 500 characters" in text and "one short paragraph" in text.lower()
+    assert "1,200" not in text
 
 
 def test_trim_without_a_sentence_end_cuts_at_the_cap():

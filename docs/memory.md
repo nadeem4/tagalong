@@ -48,17 +48,23 @@ Migration 34 adds a nullable `category` to every row; the span columns from migr
 - Extraction is told the categories already in use (`Memory.categories_in_use()`) and the facts other sources already saved, so it reuses a category and does not restate a fact. GitHub's material carries each repo's created and last-pushed years so repo facts can be dated from evidence.
 - No backfill: old facts stay undated and uncategorised until their source runs again (a re-run replaces that source's facts) or, for chat facts, until Scout saves them again with `remember`. A wake turn (not the person's own message) has no chat evidence, so a year it passes is dropped.
 
+### What the prompt shows and what `recall` finds
+
+Right after the summary, the prompt carries one `Timeline:` line when any free fact is dated or categorised: the years the saved facts cover (`2012–2026`) and the categories with their counts (`Work (12), Skills (9)`), plus a note to call `recall` rather than guess dates. `Memory.shape()` computes it from `visibility='free'` profile and chat facts on every turn (no cache, so a forgotten fact is gone at once); `asked` facts, summaries and compaction rows never count, and the timeline itself is never pasted into the prompt.
+
+`recall` takes `year` (spans that include it), `from_year` and `to_year` (spans that overlap the range) and `category` (case-insensitive, exact). A fact with a start and no end counts as true from then on. Any of these limits the search to dated or categorised saved facts (no chat, work or summaries) and the words become optional: with none, matches come back ordered by start year. `include_personal` works as before. Each result line shows category and years, e.g. `12 profile 2026-11-12 [Languages, since 2019] text`.
+
 ### Sources of profile facts
 
 "Get to know me" reads GitHub (public API), the PDF the person saves from LinkedIn, and the web, one `KnowSource` each (see [brain.md](brain.md#get-to-know-me-know)). A model proposes facts from each source's material, but a fact is kept only when the words it quotes as evidence are in that material (whitespace and case ignored); anything else is dropped. A web page counts only when it holds the person's handle, a link they listed, or both their name and employer, so a namesake's page is dropped. Material is fenced as untrusted data, so text in a README or page cannot instruct the extractor.
 
 ### Portrait
 
-One `portrait` row (up to 1,500 characters, written by code) is a short description of the owner. It is always loaded and leads the "What you know" block as `Who the owner is:` with no id. `recall` never returns it, and `forget` refuses it: it is rewritten, not deleted. Home's `list_memories` leaves it out of the rows and returns it as a separate `portrait` text (null when unset); each row also carries `tag`, `source`, `source_ref`, `evidence` and `visibility`.
+One `portrait` row, written by code, is a short summary of the owner (about 500 characters, one paragraph; code cuts it at the last sentence end under 600, `PORTRAIT_MAX`; the row's own cap stays 1,500 so an older, longer portrait still loads). It is always loaded and leads the "What you know" block as `Summary of the owner:` with no id. `recall` never returns it, and `forget` refuses it: it is rewritten, not deleted. Home's `list_memories` leaves it out of the rows and returns it as a separate `portrait` text (null when unset); each row also carries `tag`, `source`, `source_ref`, `evidence` and `visibility`.
 
 ### A run, corrections and the offer
 
-A run (`know_me_start` from Home, or `get_to_know_me` with a GitHub username) reads the sources in order: GitHub, the LinkedIn PDF, then the web last, since it searches with what the others found. Each source's facts are saved as soon as that source finishes, replacing that source's earlier facts and leaving chat memories alone. A source the person did not give (no username, no PDF) is skipped without a gap. If the daily limit is reached, finished sources stay saved and the rest report "Stopped: daily limit reached". Then the portrait is written from the saved `free` profile facts and the `free` chat memories (`about_you` rows, marked `chat` in the model's input; a chat statement wins over a source fact that conflicts with it), never from `asked` facts, at most 1,500 characters, cut at a sentence end; with nothing to write from, or when the limit is reached, the old portrait is kept.
+A run (`know_me_start` from Home, or `get_to_know_me` with a GitHub username) reads the sources in order: GitHub, the LinkedIn PDF, then the web last, since it searches with what the others found. Each source's facts are saved as soon as that source finishes, replacing that source's earlier facts and leaving chat memories alone. A source the person did not give (no username, no PDF) is skipped without a gap. If the daily limit is reached, finished sources stay saved and the rest report "Stopped: daily limit reached". Then the portrait is written from the saved `free` profile facts and the `free` chat memories (`about_you` rows, marked `chat` in the model's input; a chat statement wins over a source fact that conflicts with it), never from `asked` facts, at most 600 characters, cut at a sentence end (each fact goes in labelled with its tag and years, like `work, 2019–now`, so the summary can say when); with nothing to write from, or when the limit is reached, the old portrait is kept.
 
 To correct something, use `forget` on the fact: a forgotten fact is remembered per source and does not come back on a re-run. `remember` adds a fact the person told Scout (source `chat`). Then `rewrite_portrait` writes the portrait again from what is left, chat memories included. Nothing rewrites the portrait on its own except a run.
 
@@ -74,11 +80,11 @@ Scout may offer to do all this at most once a week, never after the person said 
 
 ### Tools
 
-| Tool       | Does                                                                                                                                            |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `remember` | Saves an item of a model-written kind. `replaces=<id>` updates one instead of adding; optional `tag`, `evidence`, `category`, `start` and `end` |
-| `recall`   | Searches all kinds by words (SQLite FTS5, ranked), optionally one kind; `include_personal` adds `asked` facts                                   |
-| `forget`   | Deletes one item by id                                                                                                                          |
+| Tool       | Does                                                                                                                                                                                            |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `remember` | Saves an item of a model-written kind. `replaces=<id>` updates one instead of adding; optional `tag`, `evidence`, `category`, `start` and `end`                                                 |
+| `recall`   | Searches all kinds by words (SQLite FTS5, ranked), optionally one kind; `include_personal` adds `asked` facts; `year`, `from_year`, `to_year` and `category` filter saved facts, words optional |
+| `forget`   | Deletes one item by id                                                                                                                                                                          |
 
 `read_output` (Scout's own) pages the stored copy of a long tool result by id; see
 [Long tool output](brain.md#long-tool-output).
@@ -86,7 +92,8 @@ Scout may offer to do all this at most once a week, never after the person said 
 - The same text saved twice in a kind is one item.
 - A full kind, text over the cap, a wrong kind or an unknown id is refused with a plain sentence.
   The tool result is an error the model reads. Nothing is dropped silently.
-- `recall` returns one line per hit (`id kind date text`) and is capped at 4,000 characters; when
+- `recall` returns one line per hit (`id kind date [category, years] text`, the bracket only when the
+  fact has them) and is capped at 4,000 characters; when
   the cap is reached, whole hits are dropped rather than a hit being cut in half. Separately, each
   chat hit's own text is shortened to 500 characters before it is counted. `recall` also searches
   the saved chat (all kinds, or kind `chat`) and the title of every job, step and timer (kind `work`;
