@@ -74,6 +74,9 @@ class Memory:
         replaces: int | None = None,
         tag: str = "",
         evidence: str | None = None,
+        category: str | None = None,
+        start: str | None = None,
+        end: str | None = None,
     ) -> Item:
         at = self._now().isoformat()
         masked = self.mask(text)
@@ -83,7 +86,9 @@ class Memory:
         masked_evidence = self.mask(evidence) if evidence else None
         if masked_evidence == WITHHELD:
             masked_evidence = None
-        return memory_store.remember(self._db, kind, masked, replaces, at, tag, masked_evidence)
+        return memory_store.remember(
+            self._db, kind, masked, replaces, at, tag, masked_evidence, category, start, end
+        )
 
     def forget(self, item_id: int) -> Item:
         return memory_store.forget(self._db, item_id)
@@ -100,7 +105,7 @@ class Memory:
             text, evidence = self.mask(f.text), self.mask(f.evidence)
             if WITHHELD in (text, evidence):
                 continue  # a blocking save guard: skip the fact rather than store noise
-            masked.append(NewFact(f.tag, text, evidence, f.source_ref))
+            masked.append(NewFact(f.tag, text, evidence, f.source_ref, f.category, f.start, f.end))
         return memory_store.save_source_facts(self._db, source, masked, self._now().isoformat())
 
     def profile_facts(self, include_asked: bool = True) -> list[Item]:

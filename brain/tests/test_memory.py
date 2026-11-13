@@ -573,3 +573,22 @@ def test_save_messages_records_the_body(mem):
     mem.save_messages([{"role": "user", "content": "b"}])
     rows = mem._db.execute("SELECT body FROM messages ORDER BY id").fetchall()
     assert rows == [("whatsapp",), ("desktop",)]
+
+
+def test_remember_with_dates_and_category(mem):
+    item = mem.remember(
+        "about_you", "Moved to Chicago", tag="personal", category="Places", start="2021"
+    )
+    assert (item.category, item.span_start, item.span_end) == ("Places", "2021", None)
+    layer = mem.db.execute("SELECT layer, period FROM memories WHERE id=?", (item.id,)).fetchone()
+    assert layer == ("episodic", "year")
+
+
+def test_remember_replace_keeps_dates_unless_given(mem):
+    first = mem.remember("about_you", "Uses Python", category="Skills", start="2019")
+    same = mem.remember("about_you", "Uses Python daily", replaces=first.id)
+    assert (same.category, same.span_start) == ("Skills", "2019")
+    moved = mem.remember(
+        "about_you", "Uses Python a lot", replaces=first.id, start="2020", end="2022"
+    )
+    assert (moved.span_start, moved.span_end) == ("2020", "2022")

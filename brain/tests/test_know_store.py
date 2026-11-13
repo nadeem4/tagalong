@@ -188,3 +188,23 @@ def test_withheld_evidence_stored_as_none_on_remember(tmp_path):
 def test_empty_portrait_refused(mem, text):
     with pytest.raises(MemoryRefused):
         mem.set_portrait(text)
+
+
+def _row(mem, text):
+    return mem.db.execute(
+        "SELECT category, span_start, span_end, layer, period FROM memories WHERE text=?", (text,)
+    ).fetchone()
+
+
+def test_save_source_facts_stores_category_and_span(mem):
+    mem.save_source_facts("github", [NewFact("work", "a", "ev a", "r", "Languages", "2019", None)])
+    item = mem.profile_facts()[0]
+    assert (item.category, item.span_start, item.span_end) == ("Languages", "2019", None)
+    assert _row(mem, "a") == ("Languages", "2019", None, "episodic", "year")
+
+
+def test_undated_fact_stays_core(mem):
+    mem.save_source_facts("github", [fact("b")])
+    item = mem.profile_facts()[0]
+    assert item.span_start is None and item.category is None
+    assert _row(mem, "b") == (None, None, None, "core", None)
