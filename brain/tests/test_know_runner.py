@@ -237,3 +237,34 @@ async def test_crash_before_portrait_leaves_portrait_row_failed(mem, tmp_path):
     runner._work = boom
     await runner._task
     assert sent.frames[-1][1]["sources"][-1]["state"] == "failed"
+
+
+async def test_later_source_is_told_earlier_facts(mem, tmp_path):
+    model = FakeModel(
+        reply(("work", "Builds compilers", "builds compilers")),
+        reply(),
+        final("Portrait."),
+    )
+    sources = [Seeing("one", [material()]), Seeing("two", [material()])]
+    runner, _ = run(sources, mem, model, tmp_path)
+    await runner._task
+    second = model.calls[1][1][0]["content"][-1]["text"]
+    assert "Builds compilers" in second
+
+
+async def test_run_saves_category_and_span(mem, tmp_path):
+    fact = {
+        "tag": "work",
+        "text": "Builds compilers",
+        "evidence": "Alice builds compilers since 2019",
+        "ref": "r",
+        "category": "Craft",
+        "start": "2019",
+        "end": "now",
+    }
+    model = FakeModel(final(json.dumps({"facts": [fact]})), final("Portrait."))
+    src = Seeing("one", [material("Alice builds compilers since 2019")])
+    runner, _ = run([src], mem, model, tmp_path)
+    await runner._task
+    item = mem.profile_facts()[0]
+    assert (item.category, item.span_start, item.span_end) == ("Craft", "2019", None)

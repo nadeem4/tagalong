@@ -277,6 +277,16 @@ def profile_facts(db: sqlite3.Connection, include_asked: bool = True) -> list[It
     return [Item(*r) for r in db.execute(sql + " ORDER BY id")]
 
 
+def categories_in_use(db: sqlite3.Connection) -> list[str]:
+    """Distinct categories over facts, so extraction can reuse one. Asked facts count too: this
+    only guides the extractor and never reaches the prompt."""
+    rows = db.execute(
+        "SELECT DISTINCT category FROM memories WHERE kind IN ('profile','about_you')"
+        " AND category IS NOT NULL AND category != '' ORDER BY category"
+    )
+    return [r[0] for r in rows]
+
+
 def asked_topics(db: sqlite3.Connection) -> list[str]:
     """Topics of the asked facts, never their text: the prompt may name what is held, not say it.
     A tag the model made up could itself carry the fact, so only known tags are named; any

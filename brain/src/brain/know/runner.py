@@ -136,6 +136,10 @@ class KnowMeRunner:
     async def _read(self, source: KnowSource, given, known: Known) -> Known:
         """Read, extract and save one source; returns what the later sources can search with."""
         materials = await source.read(given, known)
+        categories = self._memory.categories_in_use()
+        # What other sources hold (earlier ones in this run included), so this one
+        # does not say it again; this source's own old facts are about to be replaced.
+        saved = [i.text for i in self._memory.profile_facts() if i.source != source.name]
         facts: list[NewFact] = []
         handle, urls = known.handle, list(known.urls)
         name, employer = known.name, known.employer
@@ -143,9 +147,12 @@ class KnowMeRunner:
             handle = handle or m.keys.handle
             urls += [u for u in m.keys.urls if u not in urls]
             name, employer = name or m.keys.name, employer or m.keys.employer
-            got = await extract(self._model, self._budget, m, source.label)
+            got = await extract(self._model, self._budget, m, source.label, categories, saved)
             name, employer = name or got.name, employer or got.employer
-            facts += [NewFact(c.tag, c.text, c.evidence, c.ref) for c in got.facts]
+            facts += [
+                NewFact(c.tag, c.text, c.evidence, c.ref, c.category or None, c.start, c.end)
+                for c in got.facts
+            ]
         self._memory.save_source_facts(source.name, facts)
         return Known(handle, tuple(urls), name, employer)
 

@@ -115,3 +115,11 @@ async def test_github_server_error_is_unreachable_not_unknown_user():
     handler = lambda request: httpx2.Response(500)  # noqa: E731
     with pytest.raises(SourceGap, match="Couldn't reach GitHub"):
         await source(handler).read("amyb", Known())
+
+
+async def test_github_material_has_repo_years():
+    repos = [
+        {**REPOS[0], "created_at": "2019-03-01T10:00:00Z", "pushed_at": "2024-05-02T10:00:00Z"}
+    ]
+    [m] = await source(ok_handler(repos=repos)).read("amyb", Known())
+    assert "- foo: A fast linter [Rust lint] (created 2019, last pushed 2024)" in m.text
