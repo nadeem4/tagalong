@@ -277,6 +277,29 @@ def profile_facts(db: sqlite3.Connection, include_asked: bool = True) -> list[It
     return [Item(*r) for r in db.execute(sql + " ORDER BY id")]
 
 
+@dataclass(frozen=True)
+class Shape:
+    """What the prompt may say about the saved facts: the years they cover and their categories,
+    free facts only. Computed per call, never cached, so a forgotten fact vanishes at once."""
+
+    years: tuple[str, str] | None
+    categories: list[tuple[str, int]]
+
+
+def shape(db: sqlite3.Connection) -> Shape:
+    where = "kind IN ('profile','about_you') AND visibility='free'"
+    low, high = db.execute(
+        "SELECT MIN(substr(span_start,1,4)),"
+        " MAX(substr(COALESCE(span_end, span_start),1,4)) FROM memories"
+        f" WHERE {where} AND span_start IS NOT NULL"
+    ).fetchone()
+    rows = db.execute(
+        f"SELECT category, COUNT(*) AS n FROM memories WHERE {where}"
+        " AND category IS NOT NULL AND category != '' GROUP BY category ORDER BY n DESC, category"
+    )
+    return Shape((low, high) if low else None, [(c, n) for c, n in rows])
+
+
 def categories_in_use(db: sqlite3.Connection) -> list[str]:
     """Distinct categories over facts, so extraction can reuse one. Asked facts count too: this
     only guides the extractor and never reaches the prompt."""
