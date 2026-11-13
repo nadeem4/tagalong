@@ -25,7 +25,7 @@ from brain.protocol import (
     SayParams,
     TextPart,
 )
-from brain.store.memory import Item
+from brain.store.memory import Item, Shape
 from brain.store.rules import Preference
 
 IMAGE_MIMES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
@@ -47,12 +47,38 @@ _KNOW_HEADINGS = {
 _TOPIC_GLOSS = {"personal": "personal (where they live, family, health)"}
 
 
-def render_know(groups: dict[str, list[Item]], asked_topics: list[str] | None = None) -> str:
+def _shape_block(shape: Shape) -> str:
+    parts = []
+    if shape.years:
+        low, high = shape.years
+        parts.append(
+            f"the saved facts cover {low}–{high}"
+            if low != high
+            else f"the saved facts are from {low}"
+        )
+    if shape.categories:
+        names = ", ".join(f"{c.replace('<', '&lt;')} ({n})" for c, n in shape.categories)
+        parts.append(f"categories: {names}")
+    return (
+        f"Timeline: {'. '.join(p[0].upper() + p[1:] for p in parts)}. "
+        "Call recall with year, from_year, to_year or category to look up a period or a theme; "
+        "do not guess dates."
+    )
+
+
+def render_know(
+    groups: dict[str, list[Item]],
+    asked_topics: list[str] | None = None,
+    shape: Shape | None = None,
+) -> str:
     blocks = []
     portrait = groups.get("portrait")
     if portrait:
         # No [id]: the portrait is rewritten by code, never forgotten or replaced by id.
-        blocks.append(f"Who the owner is:\n{portrait[0].text}")
+        blocks.append(f"Summary of the owner:\n{portrait[0].text}")
+    if shape and (shape.years or shape.categories):
+        # Counts and years only; the timeline itself is fetched with recall, never pasted.
+        blocks.append(_shape_block(shape))
     for kind, heading in _KNOW_HEADINGS.items():
         items = groups.get(kind)
         if not items:
@@ -64,7 +90,7 @@ def render_know(groups: dict[str, list[Item]], asked_topics: list[str] | None = 
         glossed = [_TOPIC_GLOSS.get(t, t) for t in asked_topics]
         blocks.append(
             f"Facts the owner keeps back, held on: {', '.join(glossed)}. "
-            "The portrait does not cover them. Call recall with include_personal before "
+            "The summary does not cover them. Call recall with include_personal before "
             "answering anything about these topics."
         )
     return "\n\n".join(blocks)

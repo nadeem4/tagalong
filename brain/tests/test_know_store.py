@@ -208,3 +208,134 @@ def test_undated_fact_stays_core(mem):
     item = mem.profile_facts()[0]
     assert item.span_start is None and item.category is None
     assert _row(mem, "b") == (None, None, None, "core", None)
+
+
+def dated(text, start, end=None, category=None, tag="work"):
+    return NewFact(tag, text, f"ev {text}", "r", category, start, end)
+
+
+def test_shape_counts_free_dated_facts_only(mem):
+    mem.save_source_facts(
+        "github",
+        [
+            dated("a", "2012", "2014", "Work"),
+            dated("b", "2018", None, "Work"),
+            dated("c", "2005", None, "Medical", tag="health"),
+        ],
+    )
+    shape = mem.shape()
+    assert shape.years == ("2012", "2018")
+    assert shape.categories == [("Work", 2)]
+
+
+def test_shape_excludes_summaries(mem):
+    mem.save_source_facts("github", [dated("a", "2015", "2016", "Work")])
+    mem.add_summary("we talked")
+    assert mem.shape().years == ("2015", "2016")
+
+
+def test_shape_empty_is_none(mem):
+    mem.save_source_facts("github", [fact("plain")])
+    shape = mem.shape()
+    assert shape.years is None and shape.categories == []
+
+
+def test_shape_updates_after_forget(mem):
+    saved = mem.save_source_facts(
+        "github", [dated("old", "2012", "2013", "Work"), dated("new", "2020", "2021", "Skills")]
+    )
+    assert mem.shape().years == ("2012", "2021")
+    mem.forget(saved[0].id)
+    shape = mem.shape()
+    assert shape.years == ("2020", "2021") and shape.categories == [("Skills", 1)]
+
+
+def seed_years(mem):
+    mem.save_source_facts(
+        "github",
+        [
+            dated("closed span fact", "2019", "2021", "Work"),
+            dated("open span fact", "2019", None, "Languages"),
+            dated("old fact", "2012", "2013", "Work"),
+            fact("undated fact"),
+        ],
+    )
+
+
+def recalled(mem, query="", **kw):
+    return sorted(h.text for h in mem.search(query, **kw))
+
+
+def test_recall_year_matches_open_and_closed_spans(mem):
+    seed_years(mem)
+    assert recalled(mem, year=2020) == ["closed span fact", "open span fact"]
+    assert recalled(mem, year=2024) == ["open span fact"]
+    assert recalled(mem, year=2018) == []
+
+
+def test_recall_range_overlap(mem):
+    seed_years(mem)
+    assert recalled(mem, from_year=2013, to_year=2019) == [
+        "closed span fact",
+        "old fact",
+        "open span fact",
+    ]
+    assert recalled(mem, from_year=2022) == ["open span fact"]
+    assert recalled(mem, to_year=2011) == []
+
+
+def test_recall_category_filter_is_case_insensitive(mem):
+    seed_years(mem)
+    assert recalled(mem, category="work") == ["closed span fact", "old fact"]
+
+
+def test_recall_filter_without_words_lists_matches(mem):
+    seed_years(mem)
+    hits = mem.search("", year=2019)
+    assert [h.text for h in hits] == ["closed span fact", "open span fact"]
+    assert [(h.category, h.span) for h in hits] == [
+        ("Work", "2019–2021"),
+        ("Languages", "since 2019"),
+    ]
+
+
+def test_recall_words_and_year_filter_after_match(mem):
+    seed_years(mem)
+    assert recalled(mem, "span fact", year=2024) == ["open span fact"]
+    assert recalled(mem, "old", year=2024) == []
+
+
+def test_recall_year_excludes_summaries_and_chat(mem):
+    seed_years(mem)
+    mem.add_summary("summary of span fact talk")
+    mem.save_messages([{"role": "user", "content": "span fact chat"}])
+    assert recalled(mem, "span fact", year=2020) == ["closed span fact", "open span fact"]
+
+
+def test_recall_year_still_hides_asked_facts_without_include_personal(mem):
+    mem.save_source_facts("github", [dated("kept back", "2020", None, "Life", tag="family")])
+    assert recalled(mem, year=2020) == []
+    assert recalled(mem, year=2020, include_personal=True) == ["kept back"]
+
+
+def test_recall_single_year_span(mem):
+    mem.save_source_facts("github", [dated("one year", "2019", "2019", "Work")])
+    assert mem.search("", year=2019)[0].span == "2019"
+
+
+def test_shape_open_ended_fact_counts_its_start_year(mem):
+    mem.save_source_facts("github", [dated("a", "2019", None, "Work")])
+    assert mem.shape().years == ("2019", "2019")
+
+
+def test_shape_orders_categories_by_count_then_name(mem):
+    mem.save_source_facts(
+        "github",
+        [
+            dated("a", "2019", None, "Skills"),
+            dated("b", "2019", None, "Work"),
+            dated("c", "2020", None, "Work"),
+            dated("d", "2020", None, "Awards"),
+        ],
+    )
+    assert mem.shape().categories == [("Work", 2), ("Awards", 1), ("Skills", 1)]

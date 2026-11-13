@@ -204,7 +204,8 @@ flowchart TD
 - A `say` while a turn runs waits at the front door and gets a turn of its own when the running
   one ends (there is no inbox to fold it into). Its reply goes to the body it came from, so a
   WhatsApp message sent during a desktop turn is answered on WhatsApp.
-- At the start of a turn the always-loaded memories are read once. Every step rebuilds the system
+- At the start of a turn the always-loaded memories and the memory shape (years covered and
+  category counts of the free facts, one `Timeline:` line after the summary) are read once. Every step rebuilds the system
   prompt from Scout's soul, that "What you know" block, the capability picture, the bodies online
   and the local time (with its UTC offset), in that order.
 - Text streams as `reply` notifications with `delta`. Tools run at the same time, each with
@@ -216,6 +217,9 @@ flowchart TD
   Memory rows carry a tag, source, evidence and visibility, and one code-written portrait leads
   "What you know"; `recall` leaves personal facts out unless asked (see
   [memory.md](memory.md#provenance-and-visibility)).
+  `recall` also takes `year`, `from_year`, `to_year` and `category` to look up a period or a
+  theme in saved facts, with words optional (see
+  [memory.md](memory.md#what-the-prompt-shows-and-what-recall-finds)).
   `remember` also takes optional `category`, `start` and `end`; a year counts only when the
   person said it in this turn (`Session` passes the owner's text to `brain_tools` as `said`), and a
   wake turn has none (see [memory.md](memory.md#dates-and-categories)).

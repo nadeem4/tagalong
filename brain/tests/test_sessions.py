@@ -401,6 +401,17 @@ async def test_session_passes_current_preferences_each_turn():
     assert "Never touch my Downloads" in model.systems[1]
 
 
+async def test_system_prompt_names_years_and_categories():
+    memory = Memory(":memory:")
+    fact = NewFact("work", "Ran ops", "ops", "r", "Work", "2012", "2014")
+    memory.save_source_facts("github", [fact])
+    model = Gate(["hi"])
+    session, _ = make(model, memory)
+    await session.say("desktop", say("hello"))
+    await finish(session)
+    assert "2012–2014" in model.systems[0] and "Work (1)" in model.systems[0]
+
+
 async def test_know_read_once_per_turn():
     memory = Memory(":memory:")
     model = Gate([remember_call("be brief"), "ok", "again"])

@@ -1,4 +1,4 @@
-"""Writes the portrait: a few plain paragraphs about the owner, from saved free facts only.
+"""Writes the portrait: one short paragraph about the owner, from saved free facts only.
 
 Free profile facts and free chat memories (what the person told Scout; those win a conflict)
 go in. Facts the person keeps for being asked (`asked`) never reach the model here. The
@@ -10,9 +10,19 @@ from brain.guardrails import Budget
 from brain.know.extract import complete, prompt
 from brain.memory import Memory
 from brain.mind.turn import Model
+from brain.store.memory import Item
 
-PORTRAIT_MAX = 1500
+PORTRAIT_MAX = 600
 _ENDS = (". ", "! ", "? ")
+
+
+def _label(f: Item, tag: str | None = None) -> str:
+    """`work, 2019–now`: the tag, then the years when the fact is dated (open-ended means now)."""
+    tag = f.tag if tag is None else tag
+    if not f.span_start:
+        return tag
+    start, end = f.span_start[:4], f.span_end[:4] if f.span_end else "now"
+    return f"{tag}, {start if end == start else f'{start}–{end}'}"
 
 
 def trim(text: str) -> str:
@@ -33,7 +43,9 @@ async def write_portrait(model: Model, budget: Budget, memory: Memory) -> str | 
     told = memory.chat_facts()
     if not facts and not told:
         return None
-    rows = [f"- [{f.tag}] {f.text}" for f in facts] + [f"- [chat] {f.text}" for f in told]
+    rows = [f"- [{_label(f)}] {f.text}" for f in facts] + [
+        f"- [{_label(f, 'chat')}] {f.text}" for f in told
+    ]
     lines = "\n".join(r.replace("<", "&lt;") for r in rows)
     content = [{"type": "text", "text": f'<facts untrusted="true">\n{lines}\n</facts>'}]
     reply = await complete(model, budget, prompt("know_portrait.md"), content, 1200)

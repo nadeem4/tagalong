@@ -17,7 +17,7 @@ from brain.mind.prompt import (
     user_content,
 )
 from brain.protocol import Body, SayParams
-from brain.store.memory import Item
+from brain.store.memory import Item, Shape
 from brain.store.rules import Preference
 
 NOW = datetime(2026, 10, 25, 15, 24, 59)
@@ -151,9 +151,30 @@ def test_render_know_puts_portrait_first():
         }
     )
     assert out == (
-        "Who the owner is:\nA backend engineer.\n\nInstructions from the owner:\n"
+        "Summary of the owner:\nA backend engineer.\n\nInstructions from the owner:\n"
         "- [1] Reply in French"
     )
+
+
+def test_render_know_includes_years_and_categories():
+    out = render_know(
+        {"portrait": [item(9, "portrait", "A backend engineer.")]},
+        shape=Shape(("2012", "2026"), [("Work", 12), ("Skills", 9)]),
+    )
+    assert out.startswith("Summary of the owner:\nA backend engineer.")
+    assert "2012–2026" in out and "Work (12), Skills (9)" in out
+    assert "recall" in out
+
+
+def test_render_know_without_shape_unchanged():
+    groups = {"about_you": [item(2, "about_you", "Works nights")]}
+    assert render_know(groups, shape=Shape(None, [])) == render_know(groups)
+    assert "Timeline" not in render_know(groups)
+
+
+def test_render_know_shape_escapes_category_names():
+    out = render_know({}, shape=Shape(None, [("<b>x", 1)]))
+    assert "<b>" not in out and "&lt;b>x (1)" in out
 
 
 def test_render_know_without_portrait_unchanged():
@@ -175,7 +196,7 @@ def test_prompt_has_no_tracking_heading():
 def test_render_know_names_asked_topics_without_content():
     out = render_know({}, asked_topics=["personal"])
     assert "personal (where they live, family, health)" in out
-    assert "include_personal" in out and "portrait" in out
+    assert "include_personal" in out and "summary" in out
 
 
 def test_render_know_no_asked_topics_has_no_line():

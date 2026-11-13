@@ -16,7 +16,7 @@ from brain.store import connections, conversation, outputs
 from brain.store import memory as memory_store
 from brain.store import search as search_store
 from brain.store.db import open_db
-from brain.store.memory import Item, MemoryRefused, NewFact
+from brain.store.memory import Item, MemoryRefused, NewFact, Shape
 from brain.store.search import Hit
 
 
@@ -131,6 +131,9 @@ class Memory:
     def categories_in_use(self) -> list[str]:
         return memory_store.categories_in_use(self._db)
 
+    def shape(self) -> Shape:
+        return memory_store.shape(self._db)
+
     def asked_topics(self) -> list[str]:
         return memory_store.asked_topics(self._db)
 
@@ -167,5 +170,11 @@ class Memory:
         kind: str | None = None,
         limit: int = 10,
         include_personal: bool = False,
+        year: int | None = None,
+        from_year: int | None = None,
+        to_year: int | None = None,
+        category: str | None = None,
     ) -> list[Hit]:
-        return search_store.search(self._db, query, kind, limit, include_personal)
+        return search_store.search(
+            self._db, query, kind, limit, include_personal, year, from_year, to_year, category
+        )

@@ -82,7 +82,9 @@ def _line(hit: Hit) -> str:
         text = text[: CHAT_HIT_MAX_CHARS - 1] + "…"
     if hit.kind in _FENCED:
         text = f'<data kind="{hit.kind}">{_fence_safe(text)}</data>'
-    return f"{hit.ref} {hit.kind} {hit.at[:10]} {text}"
+    label = ", ".join(p for p in (hit.category, hit.span) if p)
+    tag = f" [{label}]" if label else ""
+    return f"{hit.ref} {hit.kind} {hit.at[:10]}{tag} {text}"
 
 
 def format_hits(hits: list[Hit]) -> str:
@@ -100,6 +102,16 @@ def _render(hits: list[Hit]) -> str:
     if any(h.kind in _FENCED for h in hits):
         lines.insert(0, _PREAMBLE)
     return "\n".join(lines)
+
+
+def _year(value: object) -> int | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value)
+    raise MemoryRefused(f"recall: a year must be a whole number like 2019, not {value!r}.")
 
 
 def _need(tool: str, args: dict, *names: str) -> None:
@@ -141,9 +153,23 @@ def brain_tools(
         return f"{verb} {item.kind} #{item.id}"
 
     async def recall(args: dict) -> str:
-        _need("recall", args, "query")
+        years = {k: _year(args.get(k)) for k in ("year", "from_year", "to_year")}
+        category = str(args.get("category") or "").strip() or None
+        query = str(args.get("query") or "").strip()
+        if not query and category is None and all(v is None for v in years.values()):
+            raise MemoryRefused("recall needs query, or year, from_year, to_year or category.")
+        if args.get("kind") in ("chat", "work") and (
+            category is not None or any(v is not None for v in years.values())
+        ):
+            raise MemoryRefused(
+                "year and category filters apply only to saved facts, not chat or work."
+            )
         hits = memory.search(
-            args["query"], args.get("kind"), include_personal=bool(args.get("include_personal"))
+            query,
+            args.get("kind"),
+            include_personal=bool(args.get("include_personal")),
+            category=category,
+            **years,
         )
         return format_hits(hits) if hits else "No matching memories."
 
@@ -235,6 +261,9 @@ def brain_tools(
                 "recall",
                 "Search your long-term memory, the saved chat and past jobs by words. Use it when "
                 "something not in your prompt may have been saved, said or done earlier. "
+                "Give year, from_year and to_year, or category, to look up a period or a theme "
+                "from the timeline in your prompt (words are then optional); those search saved "
+                "facts only. "
                 "Set include_personal when the person asks about themselves (where they live, "
                 "family, health, anything private) or brought that topic up; a fact kept for "
                 "being asked shows only then. Search before saying you do not know.",
@@ -244,8 +273,12 @@ def brain_tools(
                         "query": {"type": "string"},
                         "kind": {"type": "string", "enum": [*KINDS, "chat", "work"]},
                         "include_personal": {"type": "boolean"},
+                        "year": {"type": "integer"},
+                        "from_year": {"type": "integer"},
+                        "to_year": {"type": "integer"},
+                        "category": {"type": "string"},
                     },
-                    "required": ["query"],
+                    "required": [],
                 },
                 scout,
                 effect="read",
