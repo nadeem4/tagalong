@@ -25,7 +25,7 @@ The kinds table in `store/memory.py` is the only place caps and rules live.
 
 ### Layers
 
-Every memory also sits in a layer (migration 25). `instruction`, `about_you` and `project` rows are `core`: what Scout knows about the person. `summary` rows are `episodic`: a dated entry with a `period` (`day`) and the time it covers (`span_start`, `span_end`). `kind` is unchanged, so the tools and Home's list work as before. The columns `source_msg_from`, `source_msg_to` and `source_work_id` are there for linking an entry back to the chat or the work it came from; nothing sets them yet, and nothing rolls entries up or rewrites core yet.
+Every memory also sits in a layer (migration 25). `instruction`, `about_you` and `project` rows are `core`: what Scout knows about the person. `summary` rows are `episodic`: a dated entry with a `period` (`day`) and the time it covers (`span_start`, `span_end`). `kind` is unchanged, so the tools and Home's list work as before. The columns `source_msg_from`, `source_msg_to` and `source_work_id` are there for linking an entry back to the chat or the work it came from; nothing sets them yet, and nothing rolls entries up or rewrites core yet. Migration 34 adds `category`, and a dated fact is `episodic` too, with `period` `year` (see [Dates and categories](#dates-and-categories)).
 
 ### Provenance and visibility
 
@@ -34,9 +34,19 @@ Migration 33 gives every memory row `tag`, `source`, `source_ref`, `evidence` an
 - When `asked` facts exist, the prompt carries one line naming their topics only; a tag outside the known set (`TAG_VISIBILITY`) shows as `personal`, so a model-made tag never carries content into the prompt; chat `about_you` facts count too (`Memory.asked_topics()`, rendered by `render_know`): "held on: personal (where they live, family, health)", that the portrait does not cover them, and that `recall` with `include_personal` comes first. Never their text, so Scout fetches them instead of guessing from the portrait. No `asked` facts, no line.
 - `asked` facts are never in the prompt or the portrait, and `recall` leaves them out unless called with `include_personal=true`. The tool says to set it whenever the person asks about themselves (where they live, family, health), so Scout searches before saying it does not know.
 - Extraction drops, in code, any fact (any email-shaped text counts, including GitHub noreply and `git@` addresses) whose text or evidence holds a phone number or an email address; the extractor prompt also says not to extract them. Scout has no use for contact details and Home would show them.
-- `remember` takes an optional `tag` and `evidence` for a fact the person told Scout (`source='chat'`); no tag stays `free`.
+- `remember` takes an optional `tag` and `evidence` for a fact the person told Scout (`source='chat'`); no tag stays `free`. It also takes optional `category`, `start` and `end` (see [Dates and categories](#dates-and-categories)).
 - `Memory.save_source_facts(source, facts)` replaces that source's `profile` rows in one transaction, skipping a fact whose evidence was dismissed, whose text another source already holds, or any past the 500 cap. Text and evidence are masked first.
 - Forgetting a `profile` fact (chat or Home) also records `(source, evidence)` in `memory_dismissed`, compared after collapsing whitespace and case, so a re-run does not bring it back.
+
+### Dates and categories
+
+Migration 34 adds a nullable `category` to every row; the span columns from migration 25 carry the dates. A fact is one claim with an optional category (an open name the model picks, at most 30 characters, title case) and the years it was true. `tag` alone sets `visibility`; `category` never does.
+
+- `span_start` and `span_end` are four-digit years (`'2019'`). Only `span_start` set means "since then, still true"; both empty means undated. A dated fact has `layer='episodic'` and `period='year'`; an undated one stays `core`. Compaction summaries keep day timestamps; every year query excludes `kind='summary'` and reads the first four characters.
+- Date guardrail (`know/facts.py` `evidenced_span`): a year is kept only when the same four-digit year appears literally in that fact's evidence (for chat, the person's own message in the current turn; the model's `evidence` string does not count). `'19` and "three years ago" do not count. `end: "now"` is stored as no end and only with an evidenced start. An end before the start, an end that is not evidenced, or an end with no start drops both dates. The fact itself is always kept, undated.
+- Category guardrail (`normalise_category`): trimmed, title case, at most 30 characters; dropped (the fact is kept, uncategorised) when it holds contact details or names a personal topic (location, family, health, home and the like), whatever the tag.
+- Extraction is told the categories already in use (`Memory.categories_in_use()`) and the facts other sources already saved, so it reuses a category and does not restate a fact. GitHub's material carries each repo's created and last-pushed years so repo facts can be dated from evidence.
+- No backfill: old facts stay undated and uncategorised until their source runs again (a re-run replaces that source's facts) or, for chat facts, until Scout saves them again with `remember`. A wake turn (not the person's own message) has no chat evidence, so a year it passes is dropped.
 
 ### Sources of profile facts
 
@@ -64,11 +74,11 @@ Scout may offer to do all this at most once a week, never after the person said 
 
 ### Tools
 
-| Tool       | Does                                                                                                                |
-| ---------- | ------------------------------------------------------------------------------------------------------------------- |
-| `remember` | Saves an item of a model-written kind. `replaces=<id>` updates one instead of adding; optional `tag` and `evidence` |
-| `recall`   | Searches all kinds by words (SQLite FTS5, ranked), optionally one kind; `include_personal` adds `asked` facts       |
-| `forget`   | Deletes one item by id                                                                                              |
+| Tool       | Does                                                                                                                                            |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `remember` | Saves an item of a model-written kind. `replaces=<id>` updates one instead of adding; optional `tag`, `evidence`, `category`, `start` and `end` |
+| `recall`   | Searches all kinds by words (SQLite FTS5, ranked), optionally one kind; `include_personal` adds `asked` facts                                   |
+| `forget`   | Deletes one item by id                                                                                                                          |
 
 `read_output` (Scout's own) pages the stored copy of a long tool result by id; see
 [Long tool output](brain.md#long-tool-output).

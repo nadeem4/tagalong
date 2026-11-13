@@ -573,3 +573,33 @@ def test_save_messages_records_the_body(mem):
     mem.save_messages([{"role": "user", "content": "b"}])
     rows = mem._db.execute("SELECT body FROM messages ORDER BY id").fetchall()
     assert rows == [("whatsapp",), ("desktop",)]
+
+
+def test_remember_with_dates_and_category(mem):
+    item = mem.remember(
+        "about_you", "Moved to Chicago", tag="personal", category="Places", start="2021"
+    )
+    assert (item.category, item.span_start, item.span_end) == ("Places", "2021", None)
+    layer = mem.db.execute("SELECT layer, period FROM memories WHERE id=?", (item.id,)).fetchone()
+    assert layer == ("episodic", "year")
+
+
+def test_remember_replace_keeps_dates_unless_given(mem):
+    first = mem.remember("about_you", "Uses Python", category="Skills", start="2019")
+    same = mem.remember("about_you", "Uses Python daily", replaces=first.id)
+    assert (same.category, same.span_start) == ("Skills", "2019")
+    moved = mem.remember(
+        "about_you", "Uses Python a lot", replaces=first.id, start="2020", end="2022"
+    )
+    assert (moved.span_start, moved.span_end) == ("2020", "2022")
+
+
+def test_category_holding_a_secret_is_dropped_fact_kept(tmp_path):
+    m = Memory(tmp_path / "t.db", mask=lambda t: t.replace("sk-secret", "[secret]"))
+    item = m.remember("about_you", "Uses Python", category="sk-secret")
+    assert item.text == "Uses Python" and item.category is None
+    kept = m.remember("about_you", "Likes tea", category="Habits")
+    assert kept.category == "Habits"
+    saved = m.save_source_facts("github", [NewFact("work", "a", "ev a", "r", "sk-secret")])
+    assert saved[0].category is None
+    m.close()

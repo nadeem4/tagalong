@@ -2178,6 +2178,8 @@ Automated: `bodies/ui/src/walkthrough/step-know-me.test.tsx`, `src/home/memory-v
 4. **Action:** delete one GitHub fact on Home, then run **Get to know me** again. **Expected:** that fact does not come back.
 5. **Action:** press **Get to know me again**, enter a username and start; at the end press **Looks right** or **What's this based on?**. **Expected:** the progress rows, then the portrait and its facts; **Looks right** closes the panel and the list and portrait are refreshed.
 6. **Action:** tell Scout in chat that one fact is wrong, then run it again. **Expected:** the correction is kept as a chat fact and the rewritten portrait follows it.
+7. **Dated facts (T1).** Run **Get to know me** again with a GitHub username. **Expected:** the run finishes as before; facts read from repos can carry a year and a category in the saved memory (in the database now, in Home once the timeline ships), and a fact whose source names no year stays undated.
+8. **Dates from chat (T1).** Say "I moved to Chicago in 2021." **Expected:** Scout saves a fact with start year 2021. Then say "I changed jobs" and ask Scout to save it as 2022. **Expected:** the fact is saved undated, because you never said 2022.
 
 ## Web search and fetch _(real brain, real key: this spends a few cents)_
 

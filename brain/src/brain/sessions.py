@@ -309,7 +309,7 @@ class Session:
             lambda: notify("changed", {"what": "memory"}),
         )
         tools = (
-            brain_tools(memory, notify)
+            brain_tools(memory, notify, lambda: self._said)
             + know_me_tools(self.know_me, memory, now, notify)
             + home_tools(budget, lambda: self.toolbox, keys)
             + model_tools(memory.db, model_default, notify)
@@ -380,6 +380,7 @@ class Session:
         # True while the running turn is the owner's: they started it, or they typed into it.
         # A wake turn stays Scout's own until then, so its follow-ups still ask.
         self._owner_turn = False
+        self._said = ""  # the owner's words in the running turn: evidence for dates in remember
         self._task: asyncio.Task | None = None
         # Set when the owner talks over the running turn: it stops at once and winds down by itself.
         self._stop: asyncio.Event | None = None
@@ -443,7 +444,9 @@ class Session:
             after = self._task if self._busy() else None
             cut = self.interrupt(params.interrupted.turn, params.interrupted.heard)
             if cut is not None:
-                turn = self._start_turn(shown_on, content, after=after, cut=cut)
+                turn = self._start_turn(
+                    shown_on, content, after=after, cut=cut, said=params.text or ""
+                )
                 self._speak(turn, shown_on, params)
                 return SayResult(turn=turn, joined=False)
         if not self._ready():
@@ -547,7 +550,7 @@ class Session:
                 if cut:
                     self._end_cancelled(turn, shown)
                 else:
-                    self._start_turn(shown, content, turn_id=turn)
+                    self._start_turn(shown, content, turn_id=turn, said=params.text or "")
                     self._speak(turn, shown, params)
         except BaseException as err:
             if not result.done():
@@ -1023,6 +1026,7 @@ class Session:
         after: asyncio.Task | None = None,
         cut: Interruption | None = None,
         turn_id: str | None = None,
+        said: str = "",
     ) -> str:
         """`after` is a cancelled turn still winding down: this one waits for it, so the history it
         closes is valid before anything is added. `cut` is what the owner talked over.
@@ -1034,6 +1038,8 @@ class Session:
         self._wake_jobs = set()
         self._stop = stop = asyncio.Event()
         self._owner_turn = started_by == "user"
+        # Only the person's typed words count as date evidence, never body context or parts.
+        self._said = said if started_by == "user" else ""
         self._turn_body = body_id
         lead = [interruption_block(cut.spoken, cut.unsaid)] if cut is not None else []
         lead = [*self._carried, *lead]  # what an interjection changed, once
@@ -1276,10 +1282,13 @@ class Session:
         self.dispatcher.turn_ended(turn_id, reason)
         if pending:
             shown, params = joined if joined is not None else (body_id, None)
-            self._speak(self._start_turn(shown, pending), shown, params)
+            said = (params.text or "") if params is not None else ""
+            self._speak(self._start_turn(shown, pending, said=said), shown, params)
         elif self._later and self._task is None:
             shown, turn, content, params = self._later.pop(0)
-            self._start_turn(shown, content, turn_id=turn)
+            self._start_turn(
+                shown, content, turn_id=turn, said=(params.text or "") if params else ""
+            )
             self._speak(turn, shown, params)
 
     def _masked(self, message: dict[str, Any]) -> dict[str, Any]:

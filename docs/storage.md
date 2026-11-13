@@ -44,7 +44,7 @@ Nothing outside this package runs SQL: `tests/test_store_boundary.py` fails if a
 under `brain/src/brain` calls `.execute`, `.executescript` or `.executemany`.
 
 - `store/migrations/`: `NNNN_name.sql` (or `NNNN_name.py` with a `migrate(db)` function) files,
-  `0001_memories` to `0033_memory_profile`. The numbers have no gaps (the loader refuses a gap or a
+  `0001_memories` to `0034_memory_category`. The numbers have no gaps (the loader refuses a gap or a
   duplicate). Each file runs in one transaction together with its `user_version` bump, so a
   failure leaves the file at the last good version. A file is never edited after it has merged;
   a schema change is a new file.
@@ -126,6 +126,7 @@ erDiagram
         text kind
         text layer
         text source_work_id
+        text category
     }
     messages {
         int id PK
@@ -177,25 +178,26 @@ it with bm25; free text is turned into quoted words joined by OR (`fts_query`).
 
 What Scout remembers across restarts, by kind.
 
-| Column            | Type                | Meaning                                                                                                      |
-| ----------------- | ------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `id`              | INTEGER PRIMARY KEY | The id Scout uses to `forget` or replace an item                                                             |
-| `kind`            | TEXT                | `instruction`, `about_you`, `project`, `summary`, `profile` or `portrait`                                    |
-| `text`            | TEXT                | The item, masked                                                                                             |
-| `created_at`      | TEXT                | When it was saved                                                                                            |
-| `updated_at`      | TEXT                | When it last changed                                                                                         |
-| `layer`           | TEXT                | `core` (default) or `episodic`; see [memory.md](memory.md#layers)                                            |
-| `period`          | TEXT                | `day` for an episodic entry; null for core                                                                   |
-| `span_start`      | TEXT                | Start of the time an episodic entry covers; null for core                                                    |
-| `span_end`        | TEXT                | End of that time                                                                                             |
-| `source_msg_from` | INTEGER             | First chat message the entry was made from; not set yet                                                      |
-| `source_msg_to`   | INTEGER             | Last chat message it was made from; not set yet                                                              |
-| `source_work_id`  | TEXT                | The work row it describes; not set yet                                                                       |
-| `tag`             | TEXT                | Topic of a fact (`work`, `skills`, `personal`, ...); empty for old rows                                      |
-| `source`          | TEXT                | `chat` (default), or where a `profile` fact came from (`github`, `linkedin`, `web`); `know` for the portrait |
-| `source_ref`      | TEXT                | The page or repo a profile fact came from; null otherwise                                                    |
-| `evidence`        | TEXT                | The verbatim words behind a fact, masked; null for old rows                                                  |
-| `visibility`      | TEXT                | `free` (default) or `asked`; see [memory.md](memory.md#provenance-and-visibility)                            |
+| Column            | Type                | Meaning                                                                                                                                |
+| ----------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`              | INTEGER PRIMARY KEY | The id Scout uses to `forget` or replace an item                                                                                       |
+| `kind`            | TEXT                | `instruction`, `about_you`, `project`, `summary`, `profile` or `portrait`                                                              |
+| `text`            | TEXT                | The item, masked                                                                                                                       |
+| `created_at`      | TEXT                | When it was saved                                                                                                                      |
+| `updated_at`      | TEXT                | When it last changed                                                                                                                   |
+| `layer`           | TEXT                | `core` (default) or `episodic`; see [memory.md](memory.md#layers)                                                                      |
+| `period`          | TEXT                | `year` for a dated fact, `day` for a summary; null for core                                                                            |
+| `span_start`      | TEXT                | First year of a dated fact (`'2019'`), or the start of an episodic entry; null for undated core                                        |
+| `span_end`        | TEXT                | End of that time                                                                                                                       |
+| `source_msg_from` | INTEGER             | First chat message the entry was made from; not set yet                                                                                |
+| `source_msg_to`   | INTEGER             | Last chat message it was made from; not set yet                                                                                        |
+| `source_work_id`  | TEXT                | The work row it describes; not set yet                                                                                                 |
+| `tag`             | TEXT                | Topic of a fact (`work`, `skills`, `personal`, ...); empty for old rows                                                                |
+| `source`          | TEXT                | `chat` (default), or where a `profile` fact came from (`github`, `linkedin`, `web`); `know` for the portrait                           |
+| `source_ref`      | TEXT                | The page or repo a profile fact came from; null otherwise                                                                              |
+| `evidence`        | TEXT                | The verbatim words behind a fact, masked; null for old rows                                                                            |
+| `visibility`      | TEXT                | `free` (default) or `asked`; see [memory.md](memory.md#provenance-and-visibility)                                                      |
+| `category`        | TEXT                | The model's open grouping for a fact (at most 30 characters); null when uncategorised; see [memory.md](memory.md#dates-and-categories) |
 
 `memory_dismissed(source, evidence)` (primary key both columns) holds the profile facts the person forgot, evidence normalised (whitespace collapsed, case folded), so a re-run skips them.
 
@@ -216,6 +218,8 @@ The `settings` row `know_me_offer` (JSON text: `offered_at`, `declined`, `last_r
   `kind` is untouched, so Home's list is the same.
 - Upgrade: migration `0033_memory_profile` adds `tag`, `source`, `source_ref`, `evidence` and
   `visibility` (old rows: `chat`, no tag, `free`) and creates `memory_dismissed`.
+- Upgrade: migration `0034_memory_category` adds `category`. No backfill: old rows stay
+  uncategorised and undated, and the span columns from 0025 now also carry a fact's years.
 
 `memories_fts` is an FTS5 index over `memories.text`, built and searched the same way as
 `messages_fts`; it backs the `recall` tool.

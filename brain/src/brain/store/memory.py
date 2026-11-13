@@ -50,9 +50,20 @@ class Item:
     source_ref: str | None = None
     evidence: str | None = None
     visibility: str = "free"
+    category: str | None = None
+    span_start: str | None = None
+    span_end: str | None = None
 
 
-_COLUMNS = "id, kind, text, created_at, updated_at, tag, source, source_ref, evidence, visibility"
+_COLUMNS = (
+    "id, kind, text, created_at, updated_at, tag, source, source_ref, evidence, visibility,"
+    " category, span_start, span_end"
+)
+
+
+def _span_columns(start: str | None) -> tuple[str, str | None]:
+    """Layer and period for a fact: dated facts are episodic by year, the rest stay core."""
+    return ("episodic", "year") if start else ("core", None)
 
 
 def normalise(text: str) -> str:
@@ -93,11 +104,14 @@ def remember(
     at: str,
     tag: str = "",
     evidence: str | None = None,
+    category: str | None = None,
+    start: str | None = None,
+    end: str | None = None,
 ) -> Item:
     spec, text = _validate(kind, text)
     db.execute("BEGIN IMMEDIATE")
     try:
-        item = _write(db, spec, text, replaces, at, tag, evidence)
+        item = _write(db, spec, text, replaces, at, tag, evidence, category, start, end)
     except BaseException:
         db.execute("ROLLBACK")
         raise
@@ -113,6 +127,9 @@ def _write(
     now: str,
     tag: str = "",
     evidence: str | None = None,
+    category: str | None = None,
+    start: str | None = None,
+    end: str | None = None,
 ) -> Item:
     # A chat fact with no tag stays free; a tag decides (personal is asked).
     tag = normalise_tag(tag) if tag.strip() else ""
@@ -130,10 +147,12 @@ def _write(
                 f"{spec.name} is full ({spec.max_items}). "
                 "Use replaces=<id> to update one or forget one first."
             )
+        layer, period = _span_columns(start)
         cur = db.execute(
-            "INSERT INTO memories(kind, text, created_at, updated_at, tag, evidence, visibility)"
-            " VALUES (?,?,?,?,?,?,?)",
-            (spec.name, text, now, now, tag, evidence, visibility),
+            "INSERT INTO memories(kind, text, created_at, updated_at, tag, evidence, visibility,"
+            " category, layer, period, span_start, span_end) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (spec.name, text, now, now, tag, evidence, visibility, category, layer, period)
+            + (start, end if start else None),
         )
         return _item(db, cur.lastrowid)  # type: ignore[arg-type,return-value]
     old = _item(db, replaces)
@@ -143,14 +162,26 @@ def _write(
         # The new text already exists as another item: drop the old one, keep that one.
         db.execute("DELETE FROM memories WHERE id=?", (replaces,))
         return _item(db, twin[0])  # type: ignore[return-value]
+    # Dates and category change only when passed; a new start replaces the old span whole.
+    if start:
+        layer, period = _span_columns(start)
+        span = (start, end)
+    else:
+        layer, period = _span_columns(old.span_start)
+        span = (old.span_start, old.span_end)
     db.execute(
-        "UPDATE memories SET text=?, updated_at=?, tag=?, evidence=?, visibility=? WHERE id=?",
+        "UPDATE memories SET text=?, updated_at=?, tag=?, evidence=?, visibility=?, category=?,"
+        " layer=?, period=?, span_start=?, span_end=? WHERE id=?",
         (
             text,
             now,
             tag or old.tag,
             evidence or old.evidence,
             visibility if tag else old.visibility,
+            category or old.category,
+            layer,
+            period,
+            *span,
             replaces,
         ),
     )
@@ -187,6 +218,9 @@ class NewFact:
     text: str
     evidence: str
     source_ref: str
+    category: str | None = None
+    start: str | None = None
+    end: str | None = None
 
 
 def save_source_facts(
@@ -218,10 +252,13 @@ def save_source_facts(
             if count >= cap:
                 break
             tag = normalise_tag(f.tag)
+            layer, period = _span_columns(f.start)
             cur = db.execute(
                 "INSERT INTO memories(kind, text, created_at, updated_at, tag, source,"
-                " source_ref, evidence, visibility) VALUES ('profile',?,?,?,?,?,?,?,?)",
-                (text, at, at, tag, source, f.source_ref, f.evidence, visibility_for(tag)),
+                " source_ref, evidence, visibility, category, layer, period, span_start,"
+                " span_end) VALUES ('profile',?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (text, at, at, tag, source, f.source_ref, f.evidence, visibility_for(tag))
+                + (f.category, layer, period, f.start, f.end if f.start else None),
             )
             known.add(key)
             count += 1
@@ -238,6 +275,16 @@ def profile_facts(db: sqlite3.Connection, include_asked: bool = True) -> list[It
     if not include_asked:
         sql += " AND visibility='free'"
     return [Item(*r) for r in db.execute(sql + " ORDER BY id")]
+
+
+def categories_in_use(db: sqlite3.Connection) -> list[str]:
+    """Distinct categories over facts, so extraction can reuse one. Asked facts count too: this
+    only guides the extractor and never reaches the prompt."""
+    rows = db.execute(
+        "SELECT DISTINCT category FROM memories WHERE kind IN ('profile','about_you')"
+        " AND category IS NOT NULL AND category != '' ORDER BY category"
+    )
+    return [r[0] for r in rows]
 
 
 def asked_topics(db: sqlite3.Connection) -> list[str]:

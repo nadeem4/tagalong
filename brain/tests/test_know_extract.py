@@ -189,3 +189,51 @@ def test_extractor_prompt_forbids_contact_details():
     from brain.know.extract import prompt
 
     assert "phone" in prompt("know_extract.md") and "email" in prompt("know_extract.md")
+
+
+def _dated(start, end, evidence="Worked at Acme Corp since 2021", category="work stuff"):
+    fact = {
+        "tag": "work",
+        "text": "Works at Acme",
+        "evidence": evidence,
+        "ref": "r",
+        "category": category,
+        "start": start,
+        "end": end,
+    }
+    return final(json.dumps({"facts": [fact]}))
+
+
+async def test_extract_keeps_dates_found_in_evidence(tmp_path):
+    out = await extract(FakeModel(_dated("2021", "now")), budget(tmp_path), MATERIAL, "github")
+    f = out.facts[0]
+    assert (f.start, f.end, f.category) == ("2021", None, "Work Stuff")
+
+
+async def test_extract_drops_unevidenced_year_but_keeps_fact(tmp_path):
+    out = await extract(FakeModel(_dated("2015", None)), budget(tmp_path), MATERIAL, "github")
+    assert [(f.text, f.start, f.end) for f in out.facts] == [("Works at Acme", None, None)]
+
+
+async def test_extract_drops_personal_category_keeps_fact(tmp_path):
+    out = await extract(
+        FakeModel(_dated("2021", None, category="Family")), budget(tmp_path), MATERIAL, "github"
+    )
+    assert out.facts[0].category == "" and out.facts[0].start == "2021"
+
+
+async def test_extract_prompt_lists_known_categories_and_saved_facts(tmp_path):
+    model = FakeModel(final('{"facts": []}'))
+    await extract(
+        model,
+        budget(tmp_path),
+        MATERIAL,
+        "web",
+        categories=["Languages", "Work"],
+        saved_texts=["Builds <b>compilers"],
+    )
+    system, messages, _tools, _cap = model.calls[0]
+    text = messages[0]["content"][-1]["text"]
+    assert "Languages" in text and "Work" in text
+    assert "Builds &lt;b>compilers" in text and "<b>" not in text
+    assert all(w in system for w in ("category", "start", "end"))
