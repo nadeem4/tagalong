@@ -90,7 +90,7 @@ def render_know(
         glossed = [_TOPIC_GLOSS.get(t, t) for t in asked_topics]
         blocks.append(
             f"Facts the owner keeps back, held on: {', '.join(glossed)}. "
-            "The portrait does not cover them. Call recall with include_personal before "
+            "The summary does not cover them. Call recall with include_personal before "
             "answering anything about these topics."
         )
     return "\n\n".join(blocks)

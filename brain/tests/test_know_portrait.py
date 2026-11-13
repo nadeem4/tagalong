@@ -89,6 +89,15 @@ def test_portrait_prompt_asks_for_a_short_summary():
     assert "1,200" not in text
 
 
+async def test_chat_facts_carry_their_years_in_the_portrait_input(mem, tmp_path):
+    mem.remember("about_you", "Moved to Lisbon", category="Life", start="2021", evidence="in 2021")
+    mem.remember("about_you", "Likes tea")
+    model = FakeModel(final("Alice."))
+    await write_portrait(model, budget(tmp_path), mem)
+    sent = str(model.calls[0][1])
+    assert "[chat, 2021–now] Moved to Lisbon" in sent and "[chat] Likes tea" in sent
+
+
 def test_trim_without_a_sentence_end_cuts_at_the_cap():
     assert len(trim("x" * 3000)) == PORTRAIT_MAX
 

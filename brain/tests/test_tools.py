@@ -136,6 +136,24 @@ async def test_recall_year_args_are_coerced_or_refused(mem, run):
         await run("recall", {"year": "soon"})
 
 
+async def test_recall_year_rejects_bool_and_float(run):
+    for bad in (True, 2019.5, "20.5"):
+        with pytest.raises(MemoryRefused, match="year"):
+            await run("recall", {"year": bad})
+
+
+async def test_recall_filters_refuse_chat_and_work_kinds(run):
+    for kind in ("chat", "work"):
+        with pytest.raises(MemoryRefused, match="saved facts"):
+            await run("recall", {"kind": kind, "year": 2020})
+
+
+async def test_recall_summary_hit_has_no_span_label(mem, run):
+    mem.add_summary("we talked about tea")
+    out = await run("recall", {"query": "tea"})
+    assert "[" not in out
+
+
 async def test_recall_requires_query_or_a_filter(run):
     with pytest.raises(MemoryRefused, match="recall needs query, or year"):
         await run("recall", {})

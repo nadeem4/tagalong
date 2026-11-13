@@ -110,7 +110,7 @@ def search(
         sql += " LIMIT ?"
         args.append(limit)
         hits = [
-            Hit(str(i), k, at, t, c or "", span_text(s, e))
+            Hit(str(i), k, at, t, c or "", "" if k == "summary" else span_text(s, e))
             for i, k, at, t, c, s, e in db.execute(sql, args)
         ]
     if filtered:

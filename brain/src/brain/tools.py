@@ -107,10 +107,11 @@ def _render(hits: list[Hit]) -> str:
 def _year(value: object) -> int | None:
     if value is None or value == "":
         return None
-    try:
-        return int(value)  # type: ignore[call-overload]
-    except (TypeError, ValueError):
-        raise MemoryRefused(f"recall: a year must be a number like 2019, not {value!r}.") from None
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value)
+    raise MemoryRefused(f"recall: a year must be a whole number like 2019, not {value!r}.")
 
 
 def _need(tool: str, args: dict, *names: str) -> None:
@@ -157,6 +158,12 @@ def brain_tools(
         query = str(args.get("query") or "").strip()
         if not query and category is None and all(v is None for v in years.values()):
             raise MemoryRefused("recall needs query, or year, from_year, to_year or category.")
+        if args.get("kind") in ("chat", "work") and (
+            category is not None or any(v is not None for v in years.values())
+        ):
+            raise MemoryRefused(
+                "year and category filters apply only to saved facts, not chat or work."
+            )
         hits = memory.search(
             query,
             args.get("kind"),

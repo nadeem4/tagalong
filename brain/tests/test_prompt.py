@@ -196,7 +196,7 @@ def test_prompt_has_no_tracking_heading():
 def test_render_know_names_asked_topics_without_content():
     out = render_know({}, asked_topics=["personal"])
     assert "personal (where they live, family, health)" in out
-    assert "include_personal" in out and "portrait" in out
+    assert "include_personal" in out and "summary" in out
 
 
 def test_render_know_no_asked_topics_has_no_line():
