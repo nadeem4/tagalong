@@ -20,15 +20,19 @@ export type TimelineBlock =
 export interface Timeline {
   years: TimelineBlock[];
   undated: CategoryGroup[];
-  /** "2012–2026": first start to the last end or start; null when nothing is dated. */
+  /** "2012–2026", or "2012–now" when a dated fact is still true; null when nothing is dated. */
   covered: string | null;
 }
 
 const OTHER = 'Other';
 
+/** Years are matched on the first four characters, so "2019-03" counts as 2019. */
+const yearOf = (span: string): string => span.slice(0, 4);
+
 function rangeOf(entry: MemoryEntry, start: string): string | null {
   if (!entry.spanEnd) return `since ${start}`;
-  return entry.spanEnd === start ? null : `${start}–${entry.spanEnd}`;
+  const end = yearOf(entry.spanEnd);
+  return end === start ? null : `${start}–${end}`;
 }
 
 /** Groups in first-seen order, uncategorised facts ("Other") last. */
@@ -49,18 +53,19 @@ export function buildTimeline(entries: MemoryEntry[]): Timeline {
   const dated = new Map<number, TimelineFact[]>();
   const undated: TimelineFact[] = [];
   let last = 0;
+  let openEnded = false;
   for (const entry of entries) {
     if (entry.kind !== 'fact') continue;
     if (!entry.spanStart) {
       undated.push({ entry, range: null });
       continue;
     }
-    const year = Number(entry.spanStart);
-    dated.set(year, [
-      ...(dated.get(year) ?? []),
-      { entry, range: rangeOf(entry, entry.spanStart) },
-    ]);
-    last = Math.max(last, Number(entry.spanEnd ?? entry.spanStart));
+    const start = yearOf(entry.spanStart);
+    const year = Number(start);
+    dated.set(year, [...(dated.get(year) ?? []), { entry, range: rangeOf(entry, start) }]);
+    if (entry.spanEnd) last = Math.max(last, Number(yearOf(entry.spanEnd)));
+    else openEnded = true;
+    last = Math.max(last, year);
   }
 
   const starts = [...dated.keys()].sort((a, b) => b - a);
@@ -77,6 +82,6 @@ export function buildTimeline(entries: MemoryEntry[]): Timeline {
   return {
     years,
     undated: group(undated),
-    covered: first === undefined ? null : `${first}–${last}`,
+    covered: first === undefined ? null : `${first}–${openEnded ? 'now' : last}`,
   };
 }

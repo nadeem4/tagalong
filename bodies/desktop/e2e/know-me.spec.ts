@@ -103,7 +103,7 @@ test('know me: Home, press the button, see Reading GitHub then the portrait and 
   // The page now shows the portrait block and the new fact with where it came from.
   await expect(home.getByRole('region', { name: 'Scout’s portrait of you' })).toBeVisible();
   await expect(home.getByRole('button', { name: 'Get to know me again' })).toBeVisible();
-  await expect(home.getByRole('listitem').filter({ hasText: 'Writes TypeScript' })).toContainText(
-    'GitHub',
-  );
+  const entry = home.getByRole('listitem').filter({ hasText: 'Writes TypeScript' });
+  await entry.getByText('Writes TypeScript').click();
+  await expect(entry.getByText('GitHub', { exact: true })).toBeVisible();
 });

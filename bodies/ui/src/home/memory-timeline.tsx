@@ -1,7 +1,7 @@
 /**
  * Home's memory timeline: what Scout knows about the person, one block per year (newest
  * first), the model's categories inside each year, quiet years folded, undated facts last.
- * Each fact opens to its quote and source. Contains MemoryTimeline and sourceLabel.
+ * Each fact opens to its quote and source. Contains MemoryTimeline, sourceLabel and deleteLabel.
  */
 
 import type { MemoryEntry, TimelineFact, CategoryGroup } from '../shapes';
@@ -21,8 +21,8 @@ export function sourceLabel(source: string): string {
   return SOURCE_LABELS[source] ?? cap(source);
 }
 
-/** A delete button's name: the fact's start, so a long fact stays a short name. */
-function deleteLabel(text: string): string {
+/** A delete button's name: the memory's start, so a long one stays a short name. */
+export function deleteLabel(text: string): string {
   return `Delete: ${text.length > 80 ? `${text.slice(0, 79)}…` : text}`;
 }
 
@@ -42,16 +42,15 @@ const CSS = `
 
 function FactRow({ fact, onDelete }: { fact: TimelineFact; onDelete(id: string): void }) {
   const { entry, range } = fact;
-  const meta = [
-    entry.source && entry.source !== 'chat' ? sourceLabel(entry.source) : null,
-    entry.visibility === 'asked' ? 'only if asked' : null,
-  ].filter((part): part is string => part !== null);
+  const asked = entry.visibility === 'asked';
+  const meta = entry.source && entry.source !== 'chat' ? [sourceLabel(entry.source)] : [];
   return (
     <li>
       <details className="mt-fact">
         <summary>
           <span className="mt-fact__text">{entry.text}</span>
           {range !== null && <span className="mt-fact__range">{range}</span>}
+          {asked && <span className="mt-fact__range">only if asked</span>}
         </summary>
         <div className="mt-fact__more">
           {entry.evidence && <p>“{entry.evidence}”</p>}
@@ -72,11 +71,13 @@ function FactRow({ fact, onDelete }: { fact: TimelineFact; onDelete(id: string):
 }
 
 function Groups({ groups, onDelete }: { groups: CategoryGroup[]; onDelete(id: string): void }) {
+  // A lone "Other" says nothing the year heading does not, so its heading is left out.
+  const lone = groups.length === 1 && groups[0]?.category === 'Other';
   return (
     <>
       {groups.map((g) => (
         <div key={g.category}>
-          <h4 className="mt-cat">{g.category}</h4>
+          {!lone && <h4 className="mt-cat">{g.category}</h4>}
           <ul className="mt-facts">
             {g.facts.map((f) => (
               <FactRow key={f.entry.id} fact={f} onDelete={onDelete} />

@@ -10,7 +10,7 @@ import type { MemoryEntry } from '../shapes';
 import { useHostBridge } from '../host-bridge';
 import { Button } from '../controls/button';
 import { KnowMeFlow } from '../know-me/know-me-flow';
-import { MemoryTimeline, sourceLabel } from './memory-timeline';
+import { MemoryTimeline, deleteLabel, sourceLabel } from './memory-timeline';
 import { themeTokens as t, typeCss } from '../theme/tokens';
 
 const KIND_LABELS: Record<MemoryEntry['kind'], string> = {
@@ -18,11 +18,6 @@ const KIND_LABELS: Record<MemoryEntry['kind'], string> = {
   preference: 'Preference',
   summary: 'Conversation summary',
 };
-
-/** A delete button's name: the memory's start, so a long summary stays a short name. */
-function deleteLabel(text: string): string {
-  return `Delete: ${text.length > 80 ? `${text.slice(0, 79)}…` : text}`;
-}
 
 function day(iso: string): string {
   return new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short' });
@@ -102,6 +97,13 @@ export function MemoryView({ name }: { name: string }) {
   const others = (memories ?? []).filter((memory) => memory.kind !== 'fact');
   const { covered } = buildTimeline(facts);
   const sources = sourcesOf(facts);
+  const coveredLines =
+    covered !== null || sources.length > 0 ? (
+      <div className="memory-covered">
+        {covered !== null && <p>Years covered: {covered}</p>}
+        {sources.length > 0 && <p>From {sources.join(', ')}</p>}
+      </div>
+    ) : null;
   const title = `What ${name} remembers`;
   return (
     <>
@@ -137,17 +139,13 @@ export function MemoryView({ name }: { name: string }) {
             .map((paragraph, i) => (
               <p key={i}>{paragraph.trim()}</p>
             ))}
-          {(covered !== null || sources.length > 0) && (
-            <div className="memory-covered">
-              {covered !== null && <p>Years covered: {covered}</p>}
-              {sources.length > 0 && <p>From {sources.join(', ')}</p>}
-            </div>
-          )}
+          {coveredLines}
         </section>
       )}
       {facts.length > 0 && (
         <section className="tg-card" aria-label="Timeline">
           <h2 className="tg-card__label">Timeline</h2>
+          {portrait === null && coveredLines}
           <MemoryTimeline entries={facts} onDelete={remove} />
         </section>
       )}

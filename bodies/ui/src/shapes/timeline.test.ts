@@ -1,4 +1,6 @@
-/** Tests for the pure memory timeline builder. */
+/**
+ * Tests for the pure memory timeline builder: blocks, ranges, folding, Undated, years covered.
+ */
 import { describe, expect, it } from 'vitest';
 import type { MemoryEntry } from './memory';
 import { buildTimeline } from './timeline';
@@ -85,16 +87,39 @@ describe('buildTimeline', () => {
     expect(t).toEqual({ years: [], undated: [], covered: null });
   });
 
-  it('covers first start to last end', () => {
+  it('covers first start to now when a dated fact is still true', () => {
     const t = buildTimeline([
       fact({ spanStart: '2012', spanEnd: '2016' }),
       fact({ spanStart: '2019', spanEnd: '2026' }),
       fact({ spanStart: '2022' }),
     ]);
-    expect(t.covered).toBe('2012–2026');
+    expect(t.covered).toBe('2012–now');
   });
 
   it('has no coverage when nothing is dated', () => {
     expect(buildTimeline([fact()]).covered).toBeNull();
+  });
+
+  it('covers first start to last end when every dated fact has ended', () => {
+    const t = buildTimeline([
+      fact({ spanStart: '2012', spanEnd: '2016' }),
+      fact({ spanStart: '2019', spanEnd: '2021' }),
+    ]);
+    expect(t.covered).toBe('2012–2021');
+  });
+
+  it('matches years on the first four characters of a span', () => {
+    const t = buildTimeline([
+      fact({ spanStart: '2019-03', spanEnd: '2021-06' }),
+      fact({ spanStart: '2021-11' }),
+    ]);
+    expect(t.years.map((b) => (b.kind === 'year' ? b.year : 'quiet'))).toEqual([
+      '2021',
+      'quiet',
+      '2019',
+    ]);
+    const old = t.years[2];
+    expect(old?.kind === 'year' && old.groups[0]?.facts[0]?.range).toBe('2019–2021');
+    expect(t.covered).toBe('2019–now');
   });
 });

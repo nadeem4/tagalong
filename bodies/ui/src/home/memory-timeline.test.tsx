@@ -1,4 +1,6 @@
-/** Tests for MemoryTimeline: year blocks, folding, the Undated group, opening an entry, delete. */
+/**
+ * Tests for MemoryTimeline: year blocks, folding, the Undated group, opening an entry, delete.
+ */
 
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -72,7 +74,9 @@ describe('MemoryTimeline', () => {
 
   it('marks a personal fact only if asked', () => {
     show([fact({ text: 'Lives in Leeds', visibility: 'asked' })]);
-    expect(screen.getByText('only if asked')).toBeInTheDocument();
+    const entry = screen.getByText('Lives in Leeds').closest('details')!;
+    expect(entry).not.toHaveAttribute('open');
+    expect(within(entry.querySelector('summary')!).getByText('only if asked')).toBeInTheDocument();
   });
 
   it('has a Delete that names the fact and calls back with its id', () => {
@@ -97,5 +101,17 @@ describe('MemoryTimeline', () => {
     expect(container.querySelector('style')?.textContent).toMatch(
       /\.mt-fact__text[^{]*\{[^}]*overflow-wrap: anywhere/,
     );
+  });
+
+  it('hides the Other heading when it is the only group in a year', () => {
+    show([fact({ spanStart: '2020' }), fact({ category: 'Work', spanStart: '2018' })]);
+    const [y2020, y2018] = screen.getAllByRole('region');
+    expect(within(y2020!).queryByRole('heading', { level: 4 })).toBeNull();
+    expect(within(y2018!).getByRole('heading', { level: 4, name: 'Work' })).toBeInTheDocument();
+  });
+
+  it('keeps the Other heading beside real categories', () => {
+    show([fact({ spanStart: '2020' }), fact({ category: 'Work', spanStart: '2020' })]);
+    expect(screen.getByRole('heading', { level: 4, name: 'Other' })).toBeInTheDocument();
   });
 });

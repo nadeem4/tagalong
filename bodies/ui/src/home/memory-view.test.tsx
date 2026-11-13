@@ -85,7 +85,7 @@ describe('MemoryView', () => {
     );
     const summary = await screen.findByRole('region', { name: 'Scout’s portrait of you' });
     expect(summary).toHaveTextContent('You build things.');
-    await waitFor(() => expect(summary).toHaveTextContent('Years covered: 2012–2020'));
+    await waitFor(() => expect(summary).toHaveTextContent('Years covered: 2012–now'));
     expect(summary).toHaveTextContent('From GitHub, LinkedIn');
   });
 
@@ -300,5 +300,17 @@ describe('MemoryView, get to know me', () => {
     await waitFor(() =>
       expect(screen.queryByRole('heading', { name: "Here's who I think you are" })).toBeNull(),
     );
+  });
+
+  it('shows years covered and sources on the Timeline card when there is no portrait', async () => {
+    renderView(
+      createFakeHostBridge({
+        memories: [{ ...REPO, spanStart: '2012', spanEnd: '2016', source: 'github' }],
+      }),
+    );
+    const timeline = await screen.findByRole('region', { name: 'Timeline' });
+    expect(timeline).toHaveTextContent('Years covered: 2012–2016');
+    expect(timeline).toHaveTextContent('From GitHub');
+    expect(screen.queryByRole('region', { name: 'Scout’s portrait of you' })).toBeNull();
   });
 });
