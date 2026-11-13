@@ -12,7 +12,7 @@ from functools import cache
 from importlib.resources import files
 
 from brain.guardrails import Budget
-from brain.know.facts import Candidate, Material, normalise_tag
+from brain.know.facts import Candidate, Material, has_contact_details, normalise_tag
 from brain.mind.turn import Final, Model
 from brain.store.memory import normalise
 
@@ -84,17 +84,6 @@ def _json(text: str) -> dict:
     except ValueError:
         return {}
     return data if isinstance(data, dict) else {}
-
-
-_EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
-# Phone shape: optional +, then 9 or more digits with at most two separators between digits,
-# so year ranges, dotted dates and version numbers (8 digits or fewer) pass.
-_PHONE = re.compile(r"(?<!\w)\+?\d(?:[ ().-]{0,2}\d){8,}(?!\w)")
-
-
-def has_contact_details(text: str) -> bool:
-    """A phone number or an email address: Scout has no use for them and Home would show them."""
-    return bool(_EMAIL.search(text) or _PHONE.search(text))
 
 
 def check(candidates: list[Candidate], material: Material) -> list[Candidate]:
