@@ -1121,6 +1121,15 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
                 : []),
               { id: 'm1', kind: 'summary', text: LONG_FACT, at: '2026-10-27T10:00:00Z' },
               { id: 'm2', kind: 'fact', text: 'Prefers green tea', at: '2026-10-26T10:00:00Z' },
+              {
+                id: 'm3',
+                kind: 'fact',
+                text: 'Senior engineer at Acme',
+                at: '2026-10-25T10:00:00Z',
+                category: 'Work',
+                span_start: '2019',
+                span_end: null,
+              },
             ],
             ...(knowDone ? { portrait: KNOW_PORTRAIT } : {}),
           };
