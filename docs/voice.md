@@ -586,7 +586,7 @@ The words come from a list of models kept as data, not from one hard-wired model
   the other voice models), `size_mb`, `gpu` (`none`, `preferred`, `required`), `languages`, a
   `note` and `options`. Today it holds three Moonshine rows: `moonshine-tiny` (the one used so
   far), `moonshine-small` and `moonshine-medium`. A bad row (unknown role or engine, a live model
-  on an engine that cannot stream, a duplicate id, a file without a hash) stops the loader and the
+  on an engine that cannot stream, a duplicate id, a file without a 64-digit lowercase hex hash) stops the loader and the
   error names the row.
 - **Engines** are code: `voice/engines/<engine>.py`, registered in `voice/engines/__init__.py`
   (`ENGINES`: does it stream, how to load a live model, how to load a final one). The loader
@@ -594,9 +594,24 @@ The words come from a list of models kept as data, not from one hard-wired model
   list and a dependency, with no change to `load.py`.
 - **The choice** is the saved choice, then `TAGALONG_STT_LIVE` / `TAGALONG_STT_FINAL`, then Auto
   (`resolve` in `voice/stt.py`). An id that is not listed, or names a model of the wrong role,
-  reads as Auto. Auto live is `moonshine-tiny`, as before; a final model is not used yet. Only
-  the environment values exist so far; the saved choice comes with the Home picker. A change
-  applies on the next listen, never under a running session.
+  reads as Auto. Auto live is `moonshine-tiny`, as before; Auto has no final model yet (it comes
+  with the measured Auto rule), so the final pass runs only when `TAGALONG_STT_FINAL` names a
+  final model. Only the environment values exist so far; the saved choice comes with the Home
+  picker. A change applies on the next listen, never under a running session.
+- **The final pass.** The live model's words are a preview. While a turn runs, the ears keep its
+  audio in memory (the pre-roll and every stretch, at most the last 60 s). When the turn ends,
+  the final model (`faster-whisper`, rows `whisper-large-v3-turbo` and `whisper-small-en`,
+  `gpu: preferred`) transcribes all of it again, and that text is what `turn_end` carries. The
+  per-stretch `final` events stay live text. It runs only on a turn that had speech (a stretch
+  with live words), because Whisper invents words ("Thank you.") from silence or noise. With a
+  graphics card it tries CUDA in float16 and warms the model up with one second of silence, so a
+  missing CUDA library shows at load; if CUDA fails to load or to run, it logs one warning and
+  uses the processor in int8. No CUDA libraries are bundled: the packaged build runs on the
+  processor unless a CUDA toolkit is on PATH. Its files are downloaded by `ensure_files` (size and
+  SHA-256 checked, each row pinned to a Hugging Face commit, never `main`) into
+  `<TAGALONG_HOME>/voice/stt/<id>`, after the live model, in the same loading progress. The
+  first listen waits for this download, with the loading bar; the library never downloads by
+  itself.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
@@ -607,6 +622,9 @@ flowchart LR
   row --> engines[ENGINES by engine name]
   engines --> live[LiveStt: Moonshine]
   live --> ears[Ears]
+  row --> final[FinalStt: faster-whisper, if chosen]
+  final --> ears
+  ears -->|turn_end carries the final text| body[body]
 ```
 
 ## Interfaces
@@ -679,6 +697,7 @@ thresholds, the sentence rules) is in [brain.md](brain.md#brain-ears).
 | `TALK_CONFIRM_MS`                        | 250 ms                          | `talk-key.ts`                                   |
 | `FRESH_PRESS_MS`                         | 1,100 ms                        | `push-to-talk.ts`                               |
 | `FOLLOW_UP_MS`                           | 20,000 ms                       | `addressing.ts`                                 |
+| `FINAL_MAX_SAMPLES`                      | 60 s of 16 kHz audio            | `ears.py`                                       |
 | Ears retry                               | 30 s, doubling, max 5 min       | `listen-controller.ts`                          |
 | `LISTENING_GUARD_MS`                     | 2,000 ms                        | `always-listening.ts`                           |
 | `LISTENING_MARK_MS` / `SAY_NAME_MARK_MS` | 8,000 ms / 8,000 ms             | `status-marks.ts`                               |
@@ -691,24 +710,27 @@ thresholds, the sentence rules) is in [brain.md](brain.md#brain-ears).
 - **Settings.** `voice.*`, `listening.always` and `hotkeys.talk` are in the settings store. See
   `settings-and-secrets.md`.
 - **Nothing heard.** Audio, transcripts and key events are not stored or logged anywhere by the
-  desktop. Frames live only in memory: in the mic `Pushable`, and in flight to the brain. The text
+  desktop. Frames live only in memory: in the mic `Pushable`, and in flight to the brain. In the
+  brain the ears keep the turn's audio (at most 60 s) in memory for the final pass and drop it
+  when the turn ends; it is never written to disk. The text
   of a heard question is stored only as the ask it becomes, like a typed one (see `memory.md`).
 
 ## Failure handling
 
-| Failure                                                                              | What happens                                                                                                                                                                                                                                           |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Mic busy (`NotReadableError`, `AbortError` from `getUserMedia`)                      | `onMicFailed`. The hold is `end()`ed, the 30 s cap is cleared, and the `mic-busy` mark is set. The note is `STATUS_WORDS['mic-busy'].detail`.                                                                                                          |
-| Mic failed (any other error, including an audio-graph failure rethrown by `openMic`) | The same, with `mic-failed`.                                                                                                                                                                                                                           |
-| Mic failing repeatedly                                                               | `FailureStreak` reports it once per run of failures. Always listening retries after each system-voice line. The mark and the streak clear on the next partial or heard question, or when the person presses the key or the mic button (`micOk`).       |
-| Brain offline when listening starts                                                  | `listen` rejects with `BrainOffline`. Windows get `ears-status: failed` with the brain-offline words. The session is not kept, so the next press tries again.                                                                                          |
-| Brain comes back during a session                                                    | `onOnline` sends `listen` again with the same mode.                                                                                                                                                                                                    |
-| The brain's models cannot load                                                       | `voice { status: 'failed' }` becomes `ears-status: failed` and the `ears-failed` mark; the health row reads "The brain could not load its speech models." `earsFailed()` drops every question and ends the always session, then retries with back-off. |
-| Ears status `failed` in the panel                                                    | `EarsNotes` shows the failure line once. The note is shown only if a question was being asked or always listening was running.                                                                                                                         |
-| The brain cannot speak (no Kokoro)                                                   | It sends `speech` with text only; the panel speaks it with the system voice.                                                                                                                                                                           |
-| A sentence fails to play                                                             | `SpeechPlayer` logs it and plays the next.                                                                                                                                                                                                             |
-| Key hook will not load                                                               | One warning, and a `talk` hotkey problem shown in the panel and Settings. The mic button still works.                                                                                                                                                  |
-| A mic frame cannot reach the brain                                                   | `brain.mic` drops it (the connection is down) and the next frame still goes; an error is logged.                                                                                                                                                       |
+| Failure                                                                                                       | What happens                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mic busy (`NotReadableError`, `AbortError` from `getUserMedia`)                                               | `onMicFailed`. The hold is `end()`ed, the 30 s cap is cleared, and the `mic-busy` mark is set. The note is `STATUS_WORDS['mic-busy'].detail`.                                                                                                                                                                                                                                             |
+| Mic failed (any other error, including an audio-graph failure rethrown by `openMic`)                          | The same, with `mic-failed`.                                                                                                                                                                                                                                                                                                                                                              |
+| Mic failing repeatedly                                                                                        | `FailureStreak` reports it once per run of failures. Always listening retries after each system-voice line. The mark and the streak clear on the next partial or heard question, or when the person presses the key or the mic button (`micOk`).                                                                                                                                          |
+| Brain offline when listening starts                                                                           | `listen` rejects with `BrainOffline`. Windows get `ears-status: failed` with the brain-offline words. The session is not kept, so the next press tries again.                                                                                                                                                                                                                             |
+| Brain comes back during a session                                                                             | `onOnline` sends `listen` again with the same mode.                                                                                                                                                                                                                                                                                                                                       |
+| The brain's models cannot load                                                                                | `voice { status: 'failed' }` becomes `ears-status: failed` and the `ears-failed` mark; the health row reads "The brain could not load its speech models." `earsFailed()` drops every question and ends the always session, then retries with back-off.                                                                                                                                    |
+| Ears status `failed` in the panel                                                                             | `EarsNotes` shows the failure line once. The note is shown only if a question was being asked or always listening was running.                                                                                                                                                                                                                                                            |
+| The brain cannot speak (no Kokoro)                                                                            | It sends `speech` with text only; the panel speaks it with the system voice.                                                                                                                                                                                                                                                                                                              |
+| The final speech model fails to download or load (offline, a hash mismatch), fails to run, or returns nothing | The first listen waits for the download (loading bar), so there is no "still downloading" state. The turn ends with the live words, exactly as without a final model: a failed download or load is logged and the session goes on without it; a failed or empty pass is logged and the live text is sent. CUDA that fails to load or to run falls back to the processor with one warning. |
+| A sentence fails to play                                                                                      | `SpeechPlayer` logs it and plays the next.                                                                                                                                                                                                                                                                                                                                                |
+| Key hook will not load                                                                                        | One warning, and a `talk` hotkey problem shown in the panel and Settings. The mic button still works.                                                                                                                                                                                                                                                                                     |
+| A mic frame cannot reach the brain                                                                            | `brain.mic` drops it (the connection is down) and the next frame still goes; an error is logged.                                                                                                                                                                                                                                                                                          |
 
 **Status marks.** The voice marks are `ears-failed`, `mic-busy`, `mic-failed`, `ears-loading`,
 `listening-paused`, `say-name` and `listening-on` (`bodies/ui/src/shapes/status.ts`). Their order,

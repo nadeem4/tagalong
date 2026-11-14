@@ -1,8 +1,10 @@
 """Ears: one listening session turning 16 kHz mic frames into words.
 
-Silero says speech or not, Moonshine gives the words so far, Smart Turn says whether the
-person has finished. Synchronous on purpose: the service runs it in a worker thread, so a slow
-decode never blocks the websocket. Ported from the desktop's local-ears.
+Silero says speech or not, the live model gives the words so far, Smart Turn says whether the
+person has finished. At the end of a turn the final model (if any) hears the whole turn again and
+its text is what `turn_end` carries; the live text is the fallback. The turn's audio stays in
+memory only until the turn ends. Synchronous on purpose: the service runs it in a worker thread,
+so a slow decode never blocks the websocket. Ported from the desktop's local-ears.
 """
 
 import logging
@@ -11,7 +13,8 @@ from typing import Literal, NamedTuple, Protocol
 
 import numpy as np
 
-from brain.voice.stt import LiveStt
+from brain.telemetry import timed
+from brain.voice.stt import FinalStt, LiveStt
 
 log = logging.getLogger("brain")
 
@@ -30,6 +33,8 @@ MAX_STRETCH_FRAMES = 938
 # 8 frames gave a bad first word in 20 of 25 runs, 3 frames in none (measured on the F13 test WAVs).
 PRE_ROLL_FRAMES = 3
 TURN_SAMPLES = 8 * SAMPLE_RATE  # Smart Turn reads the last 8 s
+# The final model sees at most this much of a turn (the last part): a bound on memory and delay.
+FINAL_MAX_SAMPLES = 60 * SAMPLE_RATE
 
 
 class Vad(Protocol):
@@ -46,6 +51,7 @@ class EarsParts(NamedTuple):
     vad: Vad
     stt: LiveStt
     turn: EndOfTurn
+    final: FinalStt | None = None  # None: the turn ends with the live text
 
 
 Emit = Callable[[str, str | None], None]
@@ -80,13 +86,11 @@ class Ears:
                 self._emit("speech_start", None)
             if not self._in_speech:
                 for before in self._pre_roll:
-                    self._keep(before)
-                    parts.stt.accept(before)
+                    self._feed(before)
                 self._pre_roll = []
             self._in_speech = True
             self._quiet = 0
-            self._keep(samples)
-            parts.stt.accept(samples)
+            self._feed(samples)
             self._stretch += 1
             if self._stretch >= MAX_STRETCH_FRAMES:
                 self._close_stretch(stopping=False)
@@ -101,8 +105,7 @@ class Ears:
             return
         self._quiet += 1
         if self._in_speech:
-            self._keep(samples)
-            parts.stt.accept(samples)
+            self._feed(samples)
             if self._quiet == PAUSE_FRAMES:
                 self._close_stretch(stopping=False)
             return
@@ -147,9 +150,24 @@ class Ears:
 
     def _end_turn(self, *, held: bool) -> None:
         text = " ".join(self._heard).strip()
+        text = self._final_text(text)
         self._reset()
         if text != "" or held:
             self._emit("turn_end", text)
+
+    def _final_text(self, live: str) -> str:
+        # Only a turn that had speech: a model run on silence or noise invents words.
+        final = self._parts.final
+        if final is None or live == "" or not self._turn_audio:
+            return live
+        try:
+            with timed("voice_hop", op="final_pass"):
+                audio = np.concatenate(self._turn_audio)[-FINAL_MAX_SAMPLES:]
+                text = final.transcribe(audio).strip()
+        except Exception:
+            log.warning("the final speech pass failed; using the live words", exc_info=True)
+            return live
+        return text or live
 
     def _reset(self) -> None:
         self._in_turn = False
@@ -160,6 +178,7 @@ class Ears:
         self._last_partial = ""
         self._heard: list[str] = []
         self._audio: list[np.ndarray] = []
+        self._turn_audio: list[np.ndarray] = []
         self._pre_roll: list[np.ndarray] = []
         self._parts.stt.reset()
 
@@ -167,6 +186,14 @@ class Ears:
         self._pre_roll.append(samples)
         if len(self._pre_roll) > PRE_ROLL_FRAMES:
             self._pre_roll.pop(0)
+
+    def _feed(self, samples: np.ndarray) -> None:
+        self._keep(samples)
+        self._parts.stt.accept(samples)
+        self._turn_audio.append(samples)
+        total = sum(len(a) for a in self._turn_audio)
+        while total > FINAL_MAX_SAMPLES and len(self._turn_audio) > 1:
+            total -= len(self._turn_audio.pop(0))
 
     def _keep(self, samples: np.ndarray) -> None:
         self._audio.append(samples)

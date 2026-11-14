@@ -4,6 +4,7 @@ engine is a row; a new engine is one module plus rows. Heavy libraries load only
 """
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Protocol
@@ -47,6 +48,9 @@ class SttModel:
     options: dict[str, Any]
 
 
+SHA256 = re.compile(r"[0-9a-f]{64}")
+
+
 def _row(raw: dict, engines: dict, index: int = 0) -> SttModel:
     try:
         return _build(raw, engines)
@@ -67,8 +71,8 @@ def _build(raw: dict, engines: dict) -> SttModel:
     if raw["role"] in ("live", "both") and not (engine.streams and engine.load_live):
         raise ValueError(f"{where}: a live model needs an engine that can stream and load live")
     files = tuple(ModelFile(**f) for f in raw["files"])
-    if any(not f.sha256 or f.bytes <= 0 for f in files):
-        raise ValueError(f"{where}: every file needs a sha256 and a size")
+    if any(not SHA256.fullmatch(f.sha256) or f.bytes <= 0 for f in files):
+        raise ValueError(f"{where}: every file needs a 64-digit lowercase hex sha256 and a size")
     return SttModel(
         raw["id"],
         raw["label"],

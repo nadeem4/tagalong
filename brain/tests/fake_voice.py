@@ -71,6 +71,21 @@ class WordStt:
         self.words = 0
 
 
+class FakeFinal:
+    """The whole-turn model: returns `text`, or raises when `fail`; records each audio it got."""
+
+    def __init__(self, text: str = "final words", fail: bool = False) -> None:
+        self.text = text
+        self.fail = fail
+        self.calls: list[np.ndarray] = []
+
+    def transcribe(self, audio: np.ndarray) -> str:
+        self.calls.append(audio)
+        if self.fail:
+            raise RuntimeError("final broke")
+        return self.text
+
+
 class FixedTurn:
     """Scores each pause from a list (the last score repeats); `fail` raises instead."""
 
@@ -113,5 +128,10 @@ class FakeTts:
         return np.full(100, 7, dtype=np.int16), 24_000
 
 
-def parts(*scores: float, vad: LevelVad | None = None, fail_turn: bool = False) -> EarsParts:
-    return EarsParts(vad or LevelVad(), WordStt(), FixedTurn(*scores, fail=fail_turn))
+def parts(
+    *scores: float,
+    vad: LevelVad | None = None,
+    fail_turn: bool = False,
+    final: FakeFinal | None = None,
+) -> EarsParts:
+    return EarsParts(vad or LevelVad(), WordStt(), FixedTurn(*scores, fail=fail_turn), final)

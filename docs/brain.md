@@ -2257,7 +2257,12 @@ listen first loads the ears.
   turn only on `finish` (the key was released), with the last words kept and exactly one
   `turn_end`, even if nothing was said. Always mode asks Smart Turn at each pause and ends the
   turn at a score of 0.5 or more, or after about 2 s more of quiet; a failing Smart Turn counts as
-  "over". A stretch of speech with no pause is closed after about 30 s.
+  "over". A stretch of speech with no pause is closed after about 30 s. With a final model
+  (`EarsParts.final`, an `engines/faster_whisper.py` `FinalStt`) the ears also keep the turn's
+  audio in memory (at most the last 60 s, `FINAL_MAX_SAMPLES`) and, when a turn that had speech
+  ends, transcribe all of it again; that text goes in `turn_end`. A failed or empty pass, or no
+  final model, keeps the live words. `load.py` loads the final model after the live one and
+  leaves it out (with a logged warning) if it cannot be downloaded or loaded.
 - **`VoiceService`** implements `VoiceHooks`. `listen` starts a session for that body (replacing
   any earlier one, which goes silent); `mic` converts int16 to float32 and queues it; one worker
   task per session feeds 512-sample frames to `Ears` with `asyncio.to_thread`, so a slow decode

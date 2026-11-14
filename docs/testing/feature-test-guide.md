@@ -1211,6 +1211,20 @@ popup); the answer is text only.
    Moonshine tiny is used, as before. With an id that is not listed (`TAGALONG_STT_LIVE=nope`)
    the brain still listens, with tiny.
 
+### V.5d. The whole turn is transcribed again at the end
+
+1. **Setup:** a fresh brain data folder; stop the brain. A graphics card is not needed.
+2. **Action:** start the brain with `TAGALONG_STT_FINAL=whisper-small-en`, hold the talk key and
+   say "what is the disk space on my C drive?".
+3. **Expected:** the first listen downloads the final model too (the loading progress goes on
+   to the end); the words still appear as you talk. The question Scout answers is the final
+   text, usually cleaner than the live words (check `brain.log` for a `final_pass` timing).
+4. **Action:** hold the key and say nothing, then release.
+5. **Expected:** nothing is asked; no words are invented.
+6. **Action:** repeat step 2 with no internet and a fresh data folder.
+7. **Expected:** the brain logs that the final model could not be loaded and the question still
+   goes through with the live words (the live model needs its own files, so run once online first).
+
 ### V.7. Read aloud: the mind decides what is said
 
 1. **Setup:** a real brain, Scout talks on. Have a research paper
