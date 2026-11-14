@@ -627,6 +627,25 @@ flowchart LR
   ears -->|turn_end carries the final text| body[body]
 ```
 
+### Measuring speech models
+
+`brain/tools/stt_bench/` is a dev-only harness (not shipped, never run in CI, not in the wheel).
+From `brain/`:
+
+```
+uv run python -m tools.stt_bench [--models moonshine-tiny whisper-small-en ...] [--clips DIR ...] [--no-kokoro] [--snr 15] [--idle-seconds 60]
+```
+
+It downloads what it measures: Kokoro (to speak the test lines in three voices), the Silero
+model for the idle measure, and every listed speech model unless `--models` narrows it. Files go
+to `<TAGALONG_HOME>/voice`, checked by size and SHA-256 like the app's own downloads. The test
+set is Kokoro lines ("Scout, what time is it?", file names, numbers) with white noise at `--snr`
+dB, plus optional folders of your own clips (`name.wav` beside `name.txt` with what was said; a
+clip with no WAV is skipped and printed). It prints a table per model: word error rate, how
+often "Scout" survives as the first word (the same sound-alike rule as `addressing.ts`), CPU
+cores and peak GPU while decoding, seconds per clip (the delay after the end of a turn, for final
+models), and Silero's idle CPU. `MODES` in `__main__.py` is where a later wake-word mode plugs in.
+
 ## Interfaces
 
 ### IPC channels
