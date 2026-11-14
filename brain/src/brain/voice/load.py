@@ -1,7 +1,8 @@
 """The real model loaders for voice. Only main.py imports this module; tests use the fakes.
 
 Heavy libraries (onnxruntime, moonshine) are imported inside the adapters' `load`, so starting
-the brain never pays for them until somebody first listens.
+the brain never pays for them until somebody first listens. The live model is the chosen row of
+`stt_models.json`, loaded through its engine; the choice is read on each load, never mid-session.
 """
 
 import asyncio
@@ -10,7 +11,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
 
 from brain.telemetry import timed
-from brain.voice import kokoro, moonshine, silero, smart_turn
+from brain.voice import engines, kokoro, silero, smart_turn, stt
 from brain.voice.ears import EarsParts
 from brain.voice.models import EARS_FILES, KOKORO_FILES, ensure_files
 from brain.voice.mouth import Tts
@@ -18,7 +19,7 @@ from brain.voice.service import LoadEars
 
 CHUNK = 1 << 20
 TIMEOUT = 30  # seconds
-# Share of the loading bar: the two small ONNX files first, then Moonshine's own download.
+# Share of the loading bar: the small ONNX files first, then the speech model's own download.
 ONNX_SHARE = 0.2
 
 
@@ -36,12 +37,19 @@ async def fetch(url: str) -> AsyncIterator[bytes]:
         response.close()
 
 
-def ears_loader(data_dir: Path) -> LoadEars:
+def ears_loader(
+    data_dir: Path, env_live: str | None = None, env_final: str | None = None
+) -> LoadEars:
     folder = data_dir / "voice"
 
     async def load_ears(on_progress: Callable[[float], None]) -> EarsParts:
         loop = asyncio.get_running_loop()
-        await ensure_files(folder, EARS_FILES, fetch, lambda f: on_progress(f * ONNX_SHARE))
+        # No saved choice yet (Home picks it in a later slice): the env default, else Auto.
+        chosen = stt.resolve(None, None, env_live, env_final, stt.detect_hardware()).live
+        engine = engines.ENGINES[chosen.engine]
+        assert engine.load_live is not None  # the list only gives a live role to one that has it
+        files = [*EARS_FILES, *chosen.files]
+        await ensure_files(folder, files, fetch, lambda f: on_progress(f * ONNX_SHARE))
 
         def from_thread(f: float) -> None:
             # Moonshine reports from its worker thread; the sockets and queues are the loop's.
@@ -50,8 +58,8 @@ def ears_loader(data_dir: Path) -> LoadEars:
         with timed("voice_hop", op="load_models"):  # one sample per ears load
             vad = await asyncio.to_thread(silero.load, folder / EARS_FILES[0].path)
             turn = await asyncio.to_thread(smart_turn.load, folder / EARS_FILES[1].path)
-            stt = await asyncio.to_thread(moonshine.load, folder, from_thread)
-        return EarsParts(vad, stt, turn)
+            live = await asyncio.to_thread(engine.load_live, chosen, folder, from_thread)
+        return EarsParts(vad, live, turn)
 
     return load_ears
 

@@ -11,6 +11,8 @@ from typing import Literal, NamedTuple, Protocol
 
 import numpy as np
 
+from brain.voice.stt import LiveStt
+
 log = logging.getLogger("brain")
 
 SAMPLE_RATE = 16_000
@@ -36,23 +38,13 @@ class Vad(Protocol):
     def reset(self) -> None: ...  # forget the recurrent state of the last session
 
 
-class StreamingStt(Protocol):
-    def accept(self, frame: np.ndarray) -> None: ...
-
-    def text(self) -> str: ...  # words so far; can trail the audio by a pass, fine for partials
-
-    def finish(self) -> str: ...  # the final pass over what was fed; restarts the stream
-
-    def reset(self) -> None: ...  # drop the words
-
-
 class EndOfTurn(Protocol):
     def complete(self, samples: np.ndarray) -> float: ...  # last 8 s, 0..1
 
 
 class EarsParts(NamedTuple):
     vad: Vad
-    stt: StreamingStt
+    stt: LiveStt
     turn: EndOfTurn
 
 
