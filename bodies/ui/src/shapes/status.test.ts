@@ -47,6 +47,18 @@ describe('STATUS_WORDS', () => {
   });
 });
 
+describe('brain-starting', () => {
+  it('ranks after brain-offline', () => {
+    const ids = StatusId.options;
+    expect(ids.indexOf('brain-starting')).toBe(ids.indexOf('brain-offline') + 1);
+  });
+
+  it('has neutral Starting words and no fix', () => {
+    expect(STATUS_WORDS['brain-starting'].tag).toBe('Starting');
+    expect(STATUS_WORDS['brain-starting'].fix).toBeUndefined();
+  });
+});
+
 describe('statusTag', () => {
   it('adds a download percent to the tag, rounded', () => {
     expect(statusTag({ id: 'ears-loading', percent: 39.6 })).toBe('Ears 40%');
@@ -69,6 +81,7 @@ describe('topStatus', () => {
   it('puts problems before progress, a pause before the hints, and Listening last', () => {
     expect(StatusId.options).toEqual([
       'brain-offline',
+      'brain-starting',
       'brain-outdated',
       'no-key',
       'ears-failed',

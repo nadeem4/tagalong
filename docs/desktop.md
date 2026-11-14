@@ -198,7 +198,13 @@ The same call backs **Start brain** on the offline card, so it also runs when th
 - **Status marks.** `markBrainLink` (`status-marks.ts`) sets `brain-offline` ("Scout's brain is not
   running.") while the client is offline and `brain-outdated` ("Update Tagalong to talk to this
   brain.") when the contract versions differ. Coming online clears either; "connecting" changes
-  nothing.
+  nothing. While the desktop is starting the brain itself, `markBrainStarting` shows
+  `brain-starting` ("Starting") instead: `launchBrain` reports it through `onStarting` (true
+  before the first-run sync or the spawn, false when the sync fails or the child errors or exits).
+  Offline is held back while Starting shows; coming online clears Starting. Starting ends as
+  Offline when the launch ends, or after a 3 minute grace (`BRAIN_START_GRACE_MS`), and the link is
+  still offline. A brain already running, a non-local address and `TAGALONG_START_BRAIN=0` never
+  show Starting.
 - **Asking.** The `ask` IPC (`ipc/turns.ts`) sends `say` with the text, the pending screenshot as an
   image part, dropped items as parts and the active window title as `context.window`, and returns
   `{ turnId }`. While the brain is offline it throws "Scout's brain is not running." Interrupt sends
@@ -949,8 +955,9 @@ the clean close and stops the brain client.
 
 ## Failure handling
 
-- **The brain is not running.** The app opens anyway and the client retries every 2 s. The
-  `brain-offline` status mark shows "Scout's brain is not running." and an ask throws the same
+- **The brain is not running.** The app opens anyway and the client retries every 2 s. If
+  the desktop is starting the brain, the mark says Starting until it connects (see Status marks);
+  otherwise the `brain-offline` status mark shows "Scout's brain is not running." and an ask throws the same
   sentence. When the brain comes up the mark clears and the next ask works, without restarting the
   app.
 - **The brain restarts mid-turn.** The socket drops, the offline mark shows, and on reconnect the

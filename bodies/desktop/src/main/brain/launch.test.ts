@@ -24,6 +24,7 @@ function setup(over: Partial<LaunchOptions> = {}) {
   const opened: string[] = [];
   const closed: number[] = [];
   const setups: string[] = [];
+  const starts: boolean[] = [];
   const options: LaunchOptions = {
     env: {},
     brainDir: 'C:/repo/brain',
@@ -43,9 +44,10 @@ function setup(over: Partial<LaunchOptions> = {}) {
     sync: false,
     platform: 'linux',
     onSetup: (state) => void setups.push(state),
+    onStarting: (on) => void starts.push(on),
     ...over,
   };
-  return { options, spawned, children, err, opened, closed, setups };
+  return { options, spawned, children, err, opened, closed, setups, starts };
 }
 
 describe('isLocal', () => {
@@ -54,6 +56,46 @@ describe('isLocal', () => {
     expect(isLocal('localhost:1')).toBe(true);
     expect(isLocal('[::1]:1')).toBe(true);
     expect(isLocal('10.0.0.5:9000')).toBe(false);
+  });
+});
+
+describe('launchBrain onStarting', () => {
+  it('onStarting true then false on child exit', async () => {
+    const { options, children, starts } = setup();
+    await launchBrain(options);
+    expect(starts).toEqual([true]);
+    children[0]!.emit('exit', 1);
+    expect(starts).toEqual([true, false]);
+  });
+
+  it('onStarting false on child error', async () => {
+    const { options, children, starts } = setup();
+    await launchBrain(options);
+    children[0]!.emit('error', new Error('nope'));
+    expect(starts).toEqual([true, false]);
+  });
+
+  it('onStarting false when sync fails', async () => {
+    const { options, children, starts } = setup({ sync: true });
+    const done = launchBrain(options);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(starts).toEqual([true]);
+    children[0]!.emit('exit', 1);
+    await done;
+    expect(starts).toEqual([true, false]);
+  });
+
+  it('no onStarting when a brain already runs', async () => {
+    const { options, starts } = setup({ probe: async () => true });
+    await launchBrain(options);
+    expect(starts).toEqual([]);
+  });
+
+  it('no onStarting when TAGALONG_START_BRAIN=0', async () => {
+    const { options, starts } = setup({ env: { TAGALONG_START_BRAIN: '0' } });
+    await launchBrain(options);
+    expect(starts).toEqual([]);
   });
 });
 

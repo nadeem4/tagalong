@@ -274,7 +274,9 @@ run it on its own for those.
 3. **Action:** start `cd brain && uv run brain` yourself, then `pnpm dev:desktop`. Quit the app.
    **Expected:** the app starts no second brain, and your brain is still running after quit.
 4. **Action:** set `TAGALONG_BRAIN_ADDR=10.0.0.5:9000` (or `TAGALONG_START_BRAIN=0`) and start the app.
-   **Expected:** no `uv` process starts; the app shows the offline mark and keeps retrying.
+   **Expected:** no `uv` process starts; the app shows the offline mark (not Starting) and keeps retrying.
+5. **Action:** with no brain running, start the app normally.
+   **Expected:** Scout shows **Starting** while the brain launches, then no mark once it connects. If the brain exits or does not connect within 3 minutes, the mark becomes **Offline**.
 
 ## Hand off to Claude Code (real brain, real Claude Code)
 

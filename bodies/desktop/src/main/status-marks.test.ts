@@ -4,10 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StatusMark } from '@tagalong/ui/shapes';
 import { AlwaysListening } from './always-listening';
 import {
+  BRAIN_START_GRACE_MS,
   LISTENING_MARK_MS,
   SAY_NAME_MARK_MS,
   StatusMarks,
   markBrainLink,
+  markBrainStarting,
   markKey,
   markListening,
   setPanelMark,
@@ -175,5 +177,66 @@ describe('markBrainLink', () => {
     expect(marks.top()).toEqual({ id: 'brain-outdated' });
     markBrainLink(marks, 'online');
     expect(marks.top()).toBeNull();
+  });
+});
+
+describe('markBrainStarting', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('starting hides a later offline', () => {
+    const marks = new StatusMarks();
+    markBrainStarting(marks, true, () => 'offline');
+    markBrainLink(marks, 'offline');
+    expect(marks.top()).toEqual({ id: 'brain-starting' });
+  });
+
+  it('starting clears an offline already shown', () => {
+    const marks = new StatusMarks();
+    markBrainLink(marks, 'offline');
+    markBrainStarting(marks, true, () => 'offline');
+    expect(marks.top()).toEqual({ id: 'brain-starting' });
+  });
+
+  it('online clears starting', () => {
+    const marks = new StatusMarks();
+    markBrainStarting(marks, true, () => 'offline');
+    markBrainLink(marks, 'online');
+    expect(marks.top()).toBeNull();
+  });
+
+  it('starting ends as offline when the link is offline', () => {
+    const marks = new StatusMarks();
+    markBrainStarting(marks, true, () => 'offline');
+    markBrainStarting(marks, false, () => 'offline');
+    expect(marks.top()).toEqual({ id: 'brain-offline' });
+  });
+
+  it('starting ends as nothing when the link is online', () => {
+    const marks = new StatusMarks();
+    markBrainStarting(marks, true, () => 'online');
+    markBrainStarting(marks, false, () => 'online');
+    expect(marks.top()).toBeNull();
+  });
+
+  it('grace expiry ends as offline', () => {
+    const marks = new StatusMarks();
+    markBrainStarting(marks, true, () => 'offline');
+    vi.advanceTimersByTime(BRAIN_START_GRACE_MS - 1);
+    expect(marks.top()).toEqual({ id: 'brain-starting' });
+    vi.advanceTimersByTime(1);
+    expect(marks.top()).toEqual({ id: 'brain-offline' });
+  });
+
+  it('link dropping after online shows offline', () => {
+    const marks = new StatusMarks();
+    markBrainStarting(marks, true, () => 'offline');
+    markBrainLink(marks, 'online');
+    markBrainLink(marks, 'offline');
+    expect(marks.top()).toEqual({ id: 'brain-offline' });
   });
 });
