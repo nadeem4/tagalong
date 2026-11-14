@@ -361,3 +361,39 @@ async def test_follow_speech_reports_the_mouths_state():
     await settle()
     await svc.close()
     assert "talking" in seen and seen[-1] == "idle"
+
+
+async def test_changing_choice_reloads_ears_on_next_listen():
+    sent = Sent()
+    svc, _, calls = service(sent)
+    svc.listen("d", "held")
+    await settle()
+    svc.unlisten("d")
+    await settle()
+    svc.listen("d", "held")
+    await settle()
+    assert calls["n"] == 1  # the loaded models are kept between listens
+    svc.unlisten("d")
+    await settle()
+    svc.reload()
+    svc.listen("d", "held")
+    await settle()
+    assert calls["n"] == 2
+
+
+async def test_running_session_keeps_its_models():
+    sent = Sent()
+    first, second = parts(), parts()
+
+    async def load(on_progress, n):
+        return first if n == 1 else second
+
+    svc, _, calls = service(sent, load=load)
+    svc.listen("d", "held")
+    await settle()
+    svc.reload()  # the choice changes while the session runs
+    svc.mic("d", pcm(LOUD, 12))
+    await settle()
+    svc.unlisten("d")
+    await settle()
+    assert calls["n"] == 1 and first.stt.fed and not second.stt.fed

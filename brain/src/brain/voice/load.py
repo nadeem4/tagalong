@@ -62,13 +62,18 @@ async def _load_final(
 
 
 def ears_loader(
-    data_dir: Path, env_live: str | None = None, env_final: str | None = None
+    data_dir: Path,
+    env_live: str | None = None,
+    env_final: str | None = None,
+    saved: Callable[[], tuple[str | None, str | None]] = lambda: (None, None),
 ) -> LoadEars:
     folder = data_dir / "voice"
 
     async def load_ears(on_progress: Callable[[float], None]) -> EarsParts:
         loop = asyncio.get_running_loop()
-        # No saved choice yet (Home picks it in a later slice): the env default, else Auto.
+        # Read now, not at start: the choice Home saved applies from this load. The saved choice
+        # comes first, then the env default, then Auto.
+        saved_live, saved_final = saved()
         cuda_dir = folder / "cuda"
         await asyncio.to_thread(cuda.add_dll_directory, cuda_dir)  # before the library loads
         hardware = await asyncio.to_thread(stt.detect_hardware, cuda_dir)  # imports ctranslate2
@@ -89,7 +94,7 @@ def ears_loader(
         def report(f: float) -> None:
             on_progress(base + (1 - base) * f)
 
-        picked = stt.resolve(None, None, env_live, env_final, hardware)
+        picked = stt.resolve(saved_live, saved_final, env_live, env_final, hardware)
         chosen, final_row = picked.live, picked.final
         engine = engines.ENGINES[chosen.engine]
         assert engine.load_live is not None  # the list only gives a live role to one that has it
@@ -109,7 +114,7 @@ def ears_loader(
         final = None
         if final_row is not None:
             # Auto's card-only row never lands on the processor; a model the person chose may.
-            cpu_ok = env_final == final_row.id or "cpu" in final_row.auto
+            cpu_ok = final_row.id in (saved_final, env_final) or "cpu" in final_row.auto
             final = await _load_final(final_row, folder, lambda f: report(0.3 + 0.7 * f), cpu_ok)
         return EarsParts(vad, live, turn, final)
 

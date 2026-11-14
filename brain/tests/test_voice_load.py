@@ -172,3 +172,20 @@ async def test_a_final_download_that_fails_leaves_the_live_text(monkeypatch, tmp
     monkeypatch.setattr(load, "ensure_files", offline)
     got = await load.ears_loader(tmp_path, env_final="whisper-small-en")(lambda f: None)
     assert got.stt is made.stt and got.final is None
+
+
+async def test_a_saved_choice_beats_the_env_default(monkeypatch, tmp_path):
+    made = parts()
+    names: list[str] = []
+    _stubs(monkeypatch, made, [])
+
+    def fake_load(model, folder, on_progress):
+        names.append(model.id)
+        return made.stt
+
+    monkeypatch.setitem(engines.ENGINES, "moonshine", Engine(True, fake_load, None))
+    loader = load.ears_loader(
+        tmp_path, "moonshine-small", "whisper-small-en", saved=lambda: ("moonshine-tiny", "off")
+    )
+    got = await loader(lambda f: None)
+    assert names == ["moonshine-tiny"] and got.final is None

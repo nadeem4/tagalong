@@ -62,6 +62,7 @@ from brain.setup.why import WhyPick
 from brain.store.work import WorkStore
 from brain.telemetry import LoopLagMonitor, dump_timings
 from brain.tools import KeySettings, anthropic_check, brain_status_tools
+from brain.voice import stt_choice
 from brain.voice.load import ears_loader, tts_loader
 from brain.voice.service import VoiceService
 
@@ -269,6 +270,7 @@ async def _run() -> None:
         masker=masker,
         keys=keys,
         model_default=config.model,
+        stt_default=(config.stt_live, config.stt_final),
         setup_facts=partial(setup_facts, registry, inspect_machine),
         extra_tools=setup_tools(config.data_dir, registry, inspect_machine)
         + expert_tools
@@ -306,7 +308,12 @@ async def _run() -> None:
     perf_dump: asyncio.Task | None = None
     voice = VoiceService(  # models load on first listen and first spoken turn
         bodies,
-        ears_loader(config.data_dir, config.stt_live, config.stt_final),
+        ears_loader(
+            config.data_dir,
+            config.stt_live,
+            config.stt_final,
+            lambda: (stt_choice.saved_live(memory.db), stt_choice.saved_final(memory.db)),
+        ),
         tts_loader(config.data_dir),
     )
     session.voice = voice
