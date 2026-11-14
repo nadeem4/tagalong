@@ -607,6 +607,14 @@ The words come from a list of models kept as data, not from one hard-wired model
   `gpu` need, the effective choice, and the card name) and `set_stt {live?, final?}`, which saves and
   calls `VoiceService.reload()`. A change applies on the next listen, never under a running session; a load
   that was already running when the choice changed is not kept.
+- **The picker.** Settings has a **Speech to text** card after Voice (`stt-section.tsx` over the shared
+  `VoiceModelsField`): a chip with the graphics card or "No graphics card", **While you talk** (Auto
+  and the live models with their sizes) and **When you finish** (Auto, "Don't double-check" and the
+  final models; a model that needs a graphics card (`gpu: required`, today `whisper-large-v3-turbo`)
+  is disabled with "Needs a graphics card" when there is none). A pick saves at
+  once. The same card has **Show words while I talk**, the desktop setting
+  `voice.showWordsWhileTalking` (default on): off, push-to-talk hides the words until the talk key is
+  let go and the final text appears. Always listening ignores it.
 - **The final pass.** The live model's words are a preview. While a turn runs, the ears keep its
   audio in memory (the pre-roll and every stretch, at most the last 60 s). When the turn ends,
   the final model (`faster-whisper`, rows `whisper-large-v3-turbo` (`gpu: required`) and
@@ -619,7 +627,7 @@ The words come from a list of models kept as data, not from one hard-wired model
   a failure logs the last lines of the child's stderr), then loads the model on CUDA in float16 and warms
   it up with one second of silence. If CUDA cannot run it, a row Auto picked only for the card
   (`whisper-large-v3-turbo`) gets no final pass, never int8 turbo on the processor; a model the
-  person chose still falls back to the processor in int8, with one warning, except a `gpu: required` row (it never does). A `gpu: required` row
+  person chose still falls back to the processor in int8, with one warning; a `gpu: required` row never does. A `gpu: required` row
   (turbo) with no usable card is dropped before anything is downloaded or loaded: no final pass. The CUDA libraries
   are not bundled. On Windows, when a card is seen but cuBLAS or cuDNN is missing, the first
   listen fetches them (`voice/cuda.py`): two pinned PyPI wheels (`cuda_wheels.json`: cuBLAS

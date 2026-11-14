@@ -108,6 +108,7 @@ import { registerBodiesIpc } from './ipc/bodies';
 import { registerLoopsIpc } from './ipc/loops';
 import { registerTimersIpc } from './ipc/timers';
 import { registerModelIpc } from './ipc/model';
+import { registerVoiceModelsIpc } from './ipc/voice-models';
 import { registerPermissionsIpc } from './ipc/permissions';
 import { registerSettingsIpc } from './ipc/settings';
 import { registerSetupIpc } from './ipc/setup';
@@ -1011,6 +1012,7 @@ function registerIpc(): void {
   registerLoopsIpc(handle, { brain: required().brain });
   registerTimersIpc(handle, { brain: required().brain });
   registerModelIpc(handle, { brain: required().brain });
+  registerVoiceModelsIpc(handle, { brain: required().brain });
   registerBodiesIpc(handle, { brain: required().brain });
   registerJobsIpc(handle, { brain: required().brain });
   registerApprovalsIpc(handle, { brain: required().brain });

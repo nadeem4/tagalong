@@ -231,6 +231,9 @@ small models (Silero VAD, Moonshine and Smart Turn) downloaded the first time (a
 A larger Moonshine can be chosen with `TAGALONG_STT_LIVE`, and `TAGALONG_STT_FINAL` adds a second
 pass: when you finish, Whisper (small, or large on a graphics card) hears the whole turn again and its words
 are what Scout is asked (see `.env.example`). If it is missing or fails, the live words are used.
+Both can also be picked in Settings, under **Speech to text** (Auto by default); the pick wins over
+the variables. The same card has **Show words while I talk**: off, push-to-talk shows your words only
+when you let go of the key.
 Audio goes only to your own brain and is never stored; with the brain on this computer it never leaves it.
 
 **Read it to me.** Type or say "read this to me" and Scout reads your selection, or the window in

@@ -216,7 +216,11 @@ The same call backs **Start brain** on the offline card, so it also runs when th
   events to every window on `IPC.turnEvent`. After a reconnect the client reports `resync`, and
   main ends any turn that was open when the socket dropped (the bubble shows it as failed).
 - **Settings.** The desktop's local `SettingsStore` holds its own settings (hotkeys, listening,
-  exclusions). The brain's model, key and budget belong to the brain; the app only asks it (`key:status`, `key:set`, `limit:set`).
+  exclusions, `voice.showWordsWhileTalking`). The brain's model, speech models, key and budget belong to the brain; the app only asks it (`key:status`, `key:set`, `limit:set`, `IPC.sttState` and `IPC.sttSet` in `ipc/voice-models.ts`, which call the Home tools `stt_state` and `set_stt`).
+  Settings' **Speech to text** card (`renderer/src/settings/stt-section.tsx`) picks the models and
+  holds **Show words while I talk**: `panelSettings` carries it to `useTalk`, and `shownPartial`
+  (`talk-rules.ts`) hides a held (push-to-talk) question's live words when it is off, so the text
+  appears at release. Always listening ignores it.
 - **Not wired yet.** Pets are a fixed local Scout; they come back when the brain plans them.
 
 `shutdown()` stops the client.

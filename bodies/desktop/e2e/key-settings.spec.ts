@@ -104,6 +104,16 @@ test("Scout's model: picking Sonnet saves at once and the brain records set_mode
   expect(brain.models).toEqual(['claude-sonnet-5-5']);
 });
 
+test('Speech to text: picking a live model saves at once and the brain records set_stt', async () => {
+  const home = await windowFor('home');
+  const live = home.getByRole('combobox', { name: 'While you talk', exact: true });
+  await expect(live).toHaveValue('auto', { timeout: 30_000 });
+  await expect(home.getByText('NVIDIA GeForce RTX 4060')).toBeVisible();
+  await live.selectOption('moonshine-tiny');
+  await expect(home.locator('.tg-stt__ok')).toHaveText('Saved.');
+  expect(brain.sttSets).toEqual([{ live: 'moonshine-tiny' }]);
+});
+
 test('a refused limit and a saved limit both answer next to the field', async () => {
   const home = await windowFor('home');
   const field = home.getByLabel('Daily limit (USD)');

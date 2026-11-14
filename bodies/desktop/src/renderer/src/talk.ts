@@ -29,6 +29,8 @@ interface TalkOptions {
   keyLabel: string;
   /** The microphone picked in Settings; empty or absent for the system default. */
   microphoneId: string | undefined;
+  /** Show words while the talk key is held (Settings). Off: they appear when the key is let go. */
+  showWords: boolean;
   /** Listening starts: Scout stops talking at once and the bubble comes up. */
   onBegin: () => void;
   /** Scout is speaking: as its spoken answer to a spoken question ends, the follow-up window opens. */
@@ -134,7 +136,7 @@ export function useTalk(options: TalkOptions): {
       },
       onPartial: (text, mode) => {
         micOk();
-        setPartial(shownPartial(text, mode));
+        setPartial(shownPartial(text, mode, latest.current.showWords));
       },
       onHeard: (text) => {
         micOk();

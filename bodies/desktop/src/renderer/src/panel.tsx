@@ -68,6 +68,7 @@ function Panel() {
   // Talk to Scout: the talk key held, or the mic button. Talking cuts Scout off at once.
   const [talkKey, setTalkKey] = useState(DEFAULT_TALK_KEY);
   const [microphoneId, setMicrophoneId] = useState<string | undefined>(undefined);
+  const [showWords, setShowWords] = useState(true);
   // Seeing: off is sight paused, the same switch as the pause key and the tray.
   const [seeing, setSeeing] = useState(true);
   const [bridge] = useState(fullBridge);
@@ -81,6 +82,7 @@ function Panel() {
   function apply(next: PanelSettings): void {
     setTalkKey(next.talkKey);
     setMicrophoneId(next.microphoneId);
+    setShowWords(next.showWords);
     mouthRef.current = next.mouth;
     speedRef.current = next.speed;
   }
@@ -91,6 +93,7 @@ function Panel() {
   } = useTalk({
     keyLabel: talkKey,
     microphoneId,
+    showWords,
     speaking,
     answering,
     player,
