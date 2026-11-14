@@ -204,7 +204,8 @@ The same call backs **Start brain** on the offline card, so it also runs when th
   Offline is held back while Starting shows; coming online clears Starting. Starting ends as
   Offline when the launch ends, or after a 3 minute grace (`BRAIN_START_GRACE_MS`), and the link is
   still offline. A brain already running, a non-local address and `TAGALONG_START_BRAIN=0` never
-  show Starting.
+  show Starting. A first-run sync that runs past the grace shows Offline while Home still says
+  installing. A stale launch's end is ignored (`startingGate`), so an update restart keeps Starting.
 - **Asking.** The `ask` IPC (`ipc/turns.ts`) sends `say` with the text, the pending screenshot as an
   image part, dropped items as parts and the active window title as `context.window`, and returns
   `{ turnId }`. While the brain is offline it throws "Scout's brain is not running." Interrupt sends

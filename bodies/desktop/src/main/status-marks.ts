@@ -1,7 +1,8 @@
 /**
  * The status marks main holds for every window: a plain map of marks, the top one by the shared
  * order, and an optional time limit per mark. No I/O; main broadcasts each change. Contains
- * StatusMarks, markListening, setPanelMark, markBrainLink and markKey.
+ * StatusMarks, markListening, setPanelMark, markBrainLink, markBrainStarting,
+ * BRAIN_START_GRACE_MS and markKey.
  */
 
 import { topStatus } from '@tagalong/ui/shapes';

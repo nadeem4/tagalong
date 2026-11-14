@@ -45,6 +45,7 @@ import { captureActiveWindow, captureAskSnapshot } from './context';
 import type { TurnEvent } from '@tagalong/ui/shapes';
 import { createTurnEvents } from './brain/turn-events';
 import { startBrain } from './brain/start';
+import { startingGate } from './brain/starting-gate';
 import { homedir } from 'node:os';
 import { ownBuild } from './brain/build-id';
 import { brainLogPath, dataDir as brainDataDir, realLaunch, realStop } from './brain/launch';
@@ -170,16 +171,17 @@ const brainRun = (): RealLaunch => ({
   packaged: app.isPackaged ? { uv: join(process.resourcesPath, 'uv', 'uv.exe') } : undefined,
   appVersion: app.getVersion(),
 });
-/** The status marks, once start() has made them; the launch can report before that. */
+/** The status marks, set before the first launch; the launch can report before that. */
 let startingMarks: StatusMarks | null = null;
+const startingGates = startingGate((on) => {
+  if (startingMarks !== null) markBrainStarting(startingMarks, on, () => brainStatus);
+});
 const brainSetup = createBrainSetup(
   (onSetup) =>
     realLaunch({
       ...brainRun(),
       onSetup,
-      onStarting: (on) => {
-        if (startingMarks !== null) markBrainStarting(startingMarks, on, () => brainStatus);
-      },
+      onStarting: startingGates.next(),
     }),
   () => {
     for (const window of BrowserWindow.getAllWindows()) {
@@ -274,8 +276,8 @@ async function start(): Promise<void> {
       if (!window.isDestroyed()) window.webContents.send(IPC.statusMarkEvent, top);
     }
   });
-  // "Listening" on Scout for a few seconds: the mark, not a spoken line, says it is on.
   startingMarks = statusMarks;
+  // "Listening" on Scout for a few seconds: the mark, not a spoken line, says it is on.
   markListening(statusMarks, listening);
 
   // Start the brain if none is running; the client below dials it and retries. Packaged, the
