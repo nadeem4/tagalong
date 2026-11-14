@@ -12,7 +12,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
 
 from brain.telemetry import timed
-from brain.voice import engines, kokoro, silero, smart_turn, stt
+from brain.voice import cuda, engines, kokoro, silero, smart_turn, stt
 from brain.voice.ears import EarsParts
 from brain.voice.models import EARS_FILES, KOKORO_FILES, ensure_files
 from brain.voice.mouth import Tts
@@ -65,9 +65,15 @@ def ears_loader(
     async def load_ears(on_progress: Callable[[float], None]) -> EarsParts:
         loop = asyncio.get_running_loop()
         # No saved choice yet (Home picks it in a later slice): the env default, else Auto.
-        hardware = await asyncio.to_thread(
-            stt.detect_hardware
-        )  # imports ctranslate2 and probes the CUDA libraries
+        cuda_dir = folder / "cuda"
+        await asyncio.to_thread(cuda.add_dll_directory, cuda_dir)  # before the library loads
+        hardware = await asyncio.to_thread(stt.detect_hardware, cuda_dir)  # may spawn a process
+        if hardware.card and not hardware.gpu:
+            # A card without the NVIDIA libraries: fetch them once (Windows only; any failure
+            # is one warning and the processor), then look again.
+            if await cuda.ensure_cuda(folder, fetch, lambda f: on_progress(f * 0.05)):
+                await asyncio.to_thread(cuda.add_dll_directory, cuda_dir)
+                hardware = await asyncio.to_thread(stt.detect_hardware, cuda_dir)
         picked = stt.resolve(None, None, env_live, env_final, hardware)
         chosen, final_row = picked.live, picked.final
         engine = engines.ENGINES[chosen.engine]

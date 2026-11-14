@@ -68,12 +68,12 @@ disagree with parts of that:
   final pass.** On the CPU turbo takes about 10 s after the end of a turn, which is too slow for
   a conversation, and `whisper-small-en` takes 1.1 s but hears worse than Moonshine small
   (0.225 against 0.193), so it would make the transcript worse. The turbo-on-GPU choice is
-  **not measured**: this PC could not run the GPU. Turbo as the GPU final rests on the plan's
-  assumption, not on these numbers; V3b measures it on a GPU. It stays the plan's pick for a PC
-  with a card and CUDA libraries, and the harness is how to check it there.
+  **not measured yet**: this PC could not run the GPU. V3b now fetches the NVIDIA libraries on
+  demand; the GPU row comes after the live run of the harness on this PC. It stays the plan's pick for a PC with a card
+  and CUDA libraries, and the harness is how to check it there.
 - **The GPU probe needs the libraries, not only the card.** `detect_hardware` counts CUDA devices
   through CTranslate2 (so a PC with a driver but no toolkit is seen, and `CUDA_VISIBLE_DEVICES=-1`
-  hides the card) and also requires cuBLAS to be found. Without it, this PC would have been told
+  hides the card) and also requires cuBLAS and cuDNN to be found (on the system, or in `<TAGALONG_HOME>/voice/cuda`, where V3b fetches them). Without it, this PC would have been told
   "GPU", loaded turbo, fallen back to a 10 s CPU decode on every turn. The old probe looked for
   `cudart64_12` and missed this card entirely.
 - The final model is chosen by the `auto` hints in `stt_models.json`; changing the rule is a data

@@ -1214,6 +1214,18 @@ popup); the answer is text only.
    **Automated (V3):** from `brain/`, run `uv run pytest tests/test_voice_stt.py` (the Auto rule
    and the hardware probe, on fakes).
 
+### V.5c2. The NVIDIA libraries are fetched on demand (Windows, graphics card)
+
+1. **Setup:** a PC with an NVIDIA card and driver but no CUDA toolkit; `<TAGALONG_HOME>/voice/cuda`
+   absent; online.
+2. **Action:** start the brain with `TAGALONG_STT_FINAL=auto`, hold the talk key and speak.
+3. **Expected:** the first listen's loading progress runs through a download of about 1.1 GB;
+   `voice/cuda` then holds `cublas64_12.dll` and `cudnn64_9.dll` and no `.whl`. The final text
+   comes back in about a second or two (check `final_pass` in `brain.log`).
+4. **Action:** repeat offline, or with the folder deleted and the network cut.
+5. **Expected:** one warning in `brain.log`, no final pass, the live words are used.
+   **Automated (V3b):** `uv run pytest tests/test_voice_cuda.py` (fake wheels, no network).
+
 ### V.5d. The whole turn is transcribed again at the end
 
 1. **Setup:** a fresh brain data folder; stop the brain. A graphics card is not needed.

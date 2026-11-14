@@ -48,7 +48,7 @@ def load_final(
     if gpu is None:
         from brain.voice.stt import detect_hardware
 
-        gpu = detect_hardware().gpu
+        gpu = detect_hardware(folder / "cuda").gpu
     path = str(folder / Path(model.files[0].path).parent)
     loaded = None
     if gpu:
