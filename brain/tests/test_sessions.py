@@ -2216,7 +2216,7 @@ async def test_a_hushed_read_aloud_turn_says_nothing_more():
 
     out = Sent()
 
-    async def load_tts():
+    async def load_tts(_on_progress):
         return FakeTts()
 
     mouth = Mouth(out, load_tts)

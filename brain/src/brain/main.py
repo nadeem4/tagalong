@@ -318,6 +318,7 @@ async def _run() -> None:
     )
     session.voice = voice
     voice.follow_speech(session.dispatcher.set_mouth_state)
+    voice.follow_download(lambda: bodies.notify("changed", {"what": "voice_download"}))
     session.loops = loops  # focus and tab events also surface loops
     setup_events.resume()  # news of an install or login the last run never told
     loops.start()  # wakes Scout for a loop already due, and arms the next one

@@ -773,6 +773,7 @@ async def test_hello_lists_home_tools_as_contract_records(env):
     names = sorted(t["name"] for t in tools)
     assert names == [
         "edit_preference",
+        "fetch_voice",
         "forget",
         "job_activity",
         "job_report",
@@ -799,6 +800,7 @@ async def test_hello_lists_home_tools_as_contract_records(env):
         "stt_state",
         "timer_cancel",
         "timers_state",
+        "voice_download",
         "watch",
     ]
     for t in tools:

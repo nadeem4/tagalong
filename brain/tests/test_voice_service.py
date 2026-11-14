@@ -46,7 +46,8 @@ def service(sent, *, load=None, p=None):
             return await load(on_progress, calls["n"])
         return made
 
-    async def load_tts():
+    async def load_tts(on_progress):
+        on_progress(0.5)
         return FakeTts()
 
     svc = VoiceService(sent, load_ears, load_tts)
@@ -418,3 +419,33 @@ async def test_running_session_keeps_its_models():
     svc.unlisten("d")
     await settle()
     assert calls["n"] == 1 and first.stt.fed and not second.stt.fed
+
+
+async def test_prefetch_fetches_the_voice_and_the_ears_with_no_one_listening():
+    sent = Sent()
+    svc, made, calls = service(sent)
+    told: list[dict] = []
+    svc.follow_download(lambda: told.append(svc.voice_download()))
+    svc.prefetch()
+    await settle()
+    assert calls["n"] == 1  # the listening models were loaded early
+    assert svc.voice_download() == {"status": "ready", "progress": 1.0}
+    assert told[-1]["status"] == "ready"
+    await svc.close()
+
+
+async def test_prefetch_that_fails_on_the_ears_leaves_the_next_listen_to_try_again():
+    sent = Sent()
+
+    async def broken(on_progress, n):
+        if n == 1:
+            raise OSError("offline")
+        return parts()
+
+    svc, _, calls = service(sent, load=broken)
+    svc.prefetch()
+    await settle()
+    svc.listen("d", "held")
+    await settle()
+    assert calls["n"] == 2
+    await svc.close()

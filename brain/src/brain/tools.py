@@ -1733,7 +1733,44 @@ def voice_tools(voice: Callable[[], VoiceHooks | None]) -> list[tuple[ToolSpec, 
         # Home calls answer in text, so the WAV travels as base64 inside it.
         return json.dumps({"mime": "audio/wav", "data": base64.b64encode(wav).decode("ascii")})
 
+    async def voice_download(args: dict) -> str:
+        hooks = voice()
+        return json.dumps(
+            {"status": "idle", "progress": 0} if hooks is None else hooks.voice_download()
+        )
+
+    async def fetch_voice(args: dict) -> str:
+        hooks = voice()
+        if hooks is None:
+            raise RpcError(ErrorCode.tool_failed, "Voice is not running on this brain.")
+        if args.get("retry"):
+            hooks.retry_download()
+        else:
+            hooks.prefetch()
+        return json.dumps(hooks.voice_download())
+
     return [
+        (
+            ToolSpec(
+                "voice_download",
+                "How far the download of Scout's speaking voice has got, for Settings.",
+                {"type": "object", "properties": {}},
+                frozenset({"home"}),
+                effect="read",
+            ),
+            voice_download,
+        ),
+        (
+            ToolSpec(
+                "fetch_voice",
+                "Start fetching Scout's speaking voice and the listening models in the "
+                "background (the first-run tour); retry: true tries again after a failure.",
+                {"type": "object", "properties": {"retry": {"type": "boolean"}}},
+                frozenset({"home"}),
+                effect="change",
+            ),
+            fetch_voice,
+        ),
         (
             ToolSpec(
                 "speak_sample",
@@ -1751,5 +1788,5 @@ def voice_tools(voice: Callable[[], VoiceHooks | None]) -> list[tuple[ToolSpec, 
                 effect="read",
             ),
             speak_sample,
-        )
+        ),
     ]

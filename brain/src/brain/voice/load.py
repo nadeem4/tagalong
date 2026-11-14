@@ -126,11 +126,11 @@ def ears_loader(
     return load_ears
 
 
-def tts_loader(data_dir: Path) -> Callable[[], Awaitable[Tts]]:
+def tts_loader(data_dir: Path) -> Callable[[Callable[[float], None]], Awaitable[Tts]]:
     folder = data_dir / "voice"
 
-    async def load_tts() -> Tts:
-        await ensure_files(folder, KOKORO_FILES, fetch, lambda _f: None)
+    async def load_tts(on_progress: Callable[[float], None]) -> Tts:
+        await ensure_files(folder, KOKORO_FILES, fetch, on_progress)
         with timed("voice_hop", op="load_models"):
             return await asyncio.to_thread(kokoro.load, folder)
 

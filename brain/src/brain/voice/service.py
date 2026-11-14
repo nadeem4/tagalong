@@ -17,7 +17,7 @@ import numpy as np
 from brain.telemetry import timed
 from brain.voice.ears import FRAME, Ears, EarsParts
 from brain.voice.models import ModelIntegrityError
-from brain.voice.mouth import Mouth, Tts
+from brain.voice.mouth import LoadTts, Mouth
 
 log = logging.getLogger("brain")
 
@@ -25,7 +25,6 @@ MAX_BUFFER_SECONDS = 30  # frames kept while the models load; the oldest go firs
 _FINISH = None  # queue marker: no more audio
 
 LoadEars = Callable[[Callable[[float], None]], Awaitable[EarsParts]]
-LoadTts = Callable[[], Awaitable[Tts]]
 
 
 class _Sender(Protocol):
@@ -101,6 +100,28 @@ class VoiceService:
         self._parts = None
         self._loading = None
 
+    def prefetch(self) -> None:
+        """Fetch the voice and the listening models now (the first-run tour), off the loop and
+        with no one waiting. Sentences meanwhile go out as text, in the system voice."""
+        self._mouth.prefetch()
+
+        async def ears() -> None:
+            try:
+                await self._models()
+            except Exception:  # the next listen tries again and tells the person why
+                log.warning("the listening models could not be fetched early", exc_info=True)
+
+        asyncio.ensure_future(ears())
+
+    def retry_download(self) -> None:
+        self._mouth.retry()
+
+    def voice_download(self) -> dict:
+        return dict(self._mouth.download)
+
+    def follow_download(self, on_change: Callable[[], None]) -> None:
+        self._mouth.on_download = on_change
+
     def mic(self, body_id: str, pcm: bytes) -> None:
         session = self._sessions.get(body_id)
         if session is None or len(pcm) % 2:
@@ -174,7 +195,7 @@ class VoiceService:
                 {"event": event} if text is None else {"event": event, "text": text},
             )
 
-    async def _models(self, session: _Session) -> EarsParts:
+    async def _models(self) -> EarsParts:
         if self._parts is not None:
             return self._parts
         gen = self._gen
@@ -204,7 +225,7 @@ class VoiceService:
     async def _work(self, session: _Session) -> None:
         try:
             try:
-                parts = await self._models(session)
+                parts = await self._models()
             except Exception as error:
                 log.warning("voice models failed to load", exc_info=True)
                 self._send(session, "voice", {"status": "failed", "message": _why(error)})

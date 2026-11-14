@@ -1275,6 +1275,43 @@ def voice_handler(voice):
     return {spec.name: handler for spec, handler in voice_tools(lambda: voice)}["speak_sample"]
 
 
+class DownloadVoice:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def voice_download(self):
+        return {"status": "downloading", "progress": 0.4}
+
+    def prefetch(self):
+        self.calls.append("prefetch")
+
+    def retry_download(self):
+        self.calls.append("retry")
+
+
+def download_handlers(voice):
+    return {spec.name: handler for spec, handler in voice_tools(lambda: voice)}
+
+
+async def test_voice_download_reports_the_state_and_fetch_voice_starts_or_retries_it():
+    voice = DownloadVoice()
+    tools = download_handlers(voice)
+    assert json.loads(await tools["voice_download"]({})) == {
+        "status": "downloading",
+        "progress": 0.4,
+    }
+    await tools["fetch_voice"]({})
+    await tools["fetch_voice"]({"retry": True})
+    assert voice.calls == ["prefetch", "retry"]
+
+
+async def test_voice_download_without_voice_is_idle_and_fetch_is_an_error():
+    tools = download_handlers(None)
+    assert json.loads(await tools["voice_download"]({})) == {"status": "idle", "progress": 0}
+    with pytest.raises(RpcError, match="Voice is not running"):
+        await tools["fetch_voice"]({})
+
+
 async def test_speak_sample_returns_a_wav_for_settings_preview():
     out = json.loads(
         await voice_handler(SampleVoice())({"text": "Hello", "voice": "af_bella", "speed": 1.1})
@@ -1305,9 +1342,10 @@ async def test_speak_sample_refuses_a_long_text():
     assert err.value.code == ErrorCode.invalid_params
 
 
-def test_speak_sample_is_a_home_only_tool():
-    ((spec, _),) = voice_tools(lambda: None)
-    assert spec.name == "speak_sample" and set(spec.audience) == {"home"}
+def test_the_voice_tools_are_home_only():
+    specs = {spec.name: spec for spec, _ in voice_tools(lambda: None)}
+    assert set(specs) == {"speak_sample", "voice_download", "fetch_voice"}
+    assert all(set(spec.audience) == {"home"} for spec in specs.values())
 
 
 # --- save_preference ----------------------------------------------------------
