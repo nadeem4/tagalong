@@ -110,6 +110,7 @@ from brain.tools import (
     work_tools,
 )
 from brain.voice import VoiceHooks
+from brain.voice.stt_tools import stt_tools
 from brain.web_tools import WebSource, without_server_blocks, without_thinking
 
 log = logging.getLogger("brain")
@@ -162,6 +163,7 @@ class Session:
         masker: Masker | None = None,
         keys: KeySettings | None = None,
         model_default: str = DEFAULT_MODEL_ID,  # TAGALONG_MODEL; a saved choice overrides it
+        stt_default: tuple[str | None, str | None] = (None, None),  # TAGALONG_STT_LIVE, _FINAL
         extra_tools: list[tuple[ToolSpec, Handler]] | None = None,
         setup_facts: Callable[[], Awaitable[dict]] | None = None,
         preview_chars: int = DEFAULT_TOOL_PREVIEW_CHARS,
@@ -314,6 +316,7 @@ class Session:
             + home_tools(budget, lambda: self.toolbox, keys)
             + model_tools(memory.db, model_default, notify)
             + voice_tools(lambda: self.voice)
+            + stt_tools(memory.db, stt_default, notify, lambda: self.voice and self.voice.reload())
             + expert_tools(self.jobs, self.owner_turn)
             + work_tools(self.records.work, self.jobs, timers.changed)
             + timer_tools(self.records, timers, now)

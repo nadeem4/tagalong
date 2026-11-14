@@ -93,6 +93,11 @@ class VoiceService:
         self._sessions[body_id] = session
         session.task = asyncio.get_running_loop().create_task(self._work(session))
 
+    def reload(self) -> None:
+        """The speech-model choice changed: the next listen loads the new models. A session
+        already running keeps the ones it holds."""
+        self._parts = None
+
     def mic(self, body_id: str, pcm: bytes) -> None:
         session = self._sessions.get(body_id)
         if session is None or len(pcm) % 2:
