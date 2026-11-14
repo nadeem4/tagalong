@@ -46,7 +46,8 @@ def service(sent, *, load=None, p=None):
             return await load(on_progress, calls["n"])
         return made
 
-    async def load_tts():
+    async def load_tts(on_progress):
+        on_progress(0.5)
         return FakeTts()
 
     svc = VoiceService(sent, load_ears, load_tts)
@@ -418,3 +419,66 @@ async def test_running_session_keeps_its_models():
     svc.unlisten("d")
     await settle()
     assert calls["n"] == 1 and first.stt.fed and not second.stt.fed
+
+
+async def test_prefetch_fetches_the_voice_with_no_one_listening():
+    sent = Sent()
+    svc, _, calls = service(sent)
+    told: list[dict] = []
+    svc.follow_download(lambda: told.append(svc.voice_download()))
+    svc.prefetch()
+    await settle()
+    assert calls["n"] == 0  # no listening model was loaded
+    assert svc.voice_download() == {"status": "ready", "progress": 1.0}
+    assert told[-1]["status"] == "ready"
+    await svc.close()
+
+
+async def test_a_failed_early_fetch_of_the_ears_is_only_logged():
+    sent = Sent()
+    svc, _, _ = service(sent)
+
+    async def broken():
+        raise OSError("offline")
+
+    svc._fetch_ears = broken
+    svc.prefetch()
+    await settle()
+    assert svc.voice_download()["status"] == "ready"
+    await svc.close()
+
+
+async def test_prefetch_only_fetches_files_and_never_loads_the_ears():
+    sent = Sent()
+    svc, _, calls = service(sent)
+    fetched = {"n": 0}
+
+    async def fetch_ears():
+        fetched["n"] += 1
+
+    svc._fetch_ears = fetch_ears
+    svc.prefetch()
+    await settle()
+    assert fetched["n"] == 1 and calls["n"] == 0
+    await svc.close()
+
+
+async def test_close_cancels_a_prefetch_still_running():
+    sent = Sent()
+    svc, _, _ = service(sent)
+    started = asyncio.Event()
+    cancelled = {"v": False}
+
+    async def fetch_ears():
+        started.set()
+        try:
+            await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            cancelled["v"] = True
+            raise
+
+    svc._fetch_ears = fetch_ears
+    svc.prefetch()
+    await started.wait()
+    await svc.close()
+    assert cancelled["v"]

@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { IPC } from '../../shared/ipc';
 import { fakeIpc } from './fake-ipc';
-import { registerVoiceModelsIpc } from './voice-models';
+import { registerVoiceModelsIpc, startVoiceFetch } from './voice-models';
 
 const text = (value: unknown) => [{ type: 'text' as const, text: JSON.stringify(value) }];
 
@@ -24,13 +24,16 @@ const STATE = {
   gpu_name: null,
 };
 
+const DOWNLOAD = { status: 'downloading', progress: 0.5 };
+
 function setup() {
   const ipc = fakeIpc();
   const calls: [string, object | undefined][] = [];
   const brain = {
     call: (tool: string, input?: object) => {
       calls.push([tool, input]);
-      return Promise.resolve(text(tool === 'stt_state' ? STATE : {})) as Promise<never>;
+      const answer = tool === 'stt_state' ? STATE : tool === 'voice_download' ? DOWNLOAD : {};
+      return Promise.resolve(text(answer)) as Promise<never>;
     },
   };
   registerVoiceModelsIpc(ipc.handle, { brain });
@@ -42,6 +45,22 @@ describe('registerVoiceModelsIpc', () => {
     const { invoke, calls } = setup();
     expect(await invoke(IPC.sttState)).toEqual(STATE);
     expect(calls).toEqual([['stt_state', {}]]);
+  });
+
+  it('reads how far the voice download has got', async () => {
+    const { invoke, calls } = setup();
+    expect(await invoke(IPC.voiceDownload)).toEqual(DOWNLOAD);
+    expect(calls).toEqual([['voice_download', {}]]);
+  });
+
+  it('starts the voice fetch, or retries it', async () => {
+    const { invoke, calls } = setup();
+    await invoke(IPC.voiceFetch, false);
+    await invoke(IPC.voiceFetch, true);
+    expect(calls).toEqual([
+      ['fetch_voice', {}],
+      ['fetch_voice', { retry: true }],
+    ]);
   });
 
   it('passes the picked models to set_stt', async () => {
@@ -60,5 +79,18 @@ describe('registerVoiceModelsIpc', () => {
       await expect(invoke(IPC.sttSet, bad)).rejects.toThrow();
     }
     expect(calls).toEqual([]);
+  });
+});
+
+describe('startVoiceFetch', () => {
+  it('asks the brain to fetch the voice, and never throws when it cannot', async () => {
+    const calls: string[] = [];
+    await startVoiceFetch({
+      call: (tool: string) => (calls.push(tool), Promise.resolve(text({}))) as Promise<never>,
+    });
+    await expect(
+      startVoiceFetch({ call: () => Promise.reject(new Error('offline')) }),
+    ).resolves.toBeUndefined();
+    expect(calls).toEqual(['fetch_voice']);
   });
 });

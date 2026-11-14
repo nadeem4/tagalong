@@ -3,7 +3,8 @@
 One worker pulls sentences from one queue and synthesises each in a thread, so a slow voice
 never stalls the websocket or the ears and two syntheses never overlap. While the voice is
 loading or has failed the sentences go out as text only, and the body says them in its own system
-voice. Audio is live-only and never stored.
+voice. `download` is the voice's fetch for Home's status line (idle, downloading, ready or
+failed, with a 0..1 progress); `prefetch` starts it early. Audio is live-only and never stored.
 """
 
 import asyncio
@@ -26,6 +27,7 @@ log = logging.getLogger("brain")
 DEFAULT_VOICE = "bm_george"
 DEFAULT_SPEED = 1.0
 State = Literal["talking", "sentence_break", "paused", "idle"]
+Download = dict[str, float | str]  # {"status": idle|downloading|ready|failed, "progress": 0..1}
 KEPT_TURNS = 3  # sentence logs kept, so a late interruption can still be answered
 
 
@@ -33,6 +35,9 @@ class Tts(Protocol):
     def synth(self, text: str, voice: str, speed: float) -> tuple[np.ndarray, int]:
         """int16 samples and their sample rate."""
         ...
+
+
+LoadTts = Callable[[Callable[[float], None]], Awaitable[Tts]]  # takes a progress callback
 
 
 class _Sender(Protocol):
@@ -59,12 +64,16 @@ class Mouth:
     syntheses never overlap (the phonemizer is not thread-safe) and a pause or clear never has
     to cancel a synth thread it cannot stop."""
 
-    def __init__(self, bodies: _Sender, load_tts: Callable[[], Awaitable[Tts]]) -> None:
+    def __init__(
+        self, bodies: _Sender, load_tts: Callable[[Callable[[float], None]], Awaitable[Tts]]
+    ) -> None:
         self._bodies = bodies
         self._load_tts = load_tts
         self._tts: Tts | None = None
         self._loading: asyncio.Task | None = None
         self._failed = False  # until the next spoken turn, which tries again
+        self.download: Download = {"status": "idle", "progress": 0.0}
+        self.on_download: Callable[[], None] | None = None
         self._synth = asyncio.Lock()  # Preview's sample shares the one synth with the worker
         self._turns: dict[str, _Turn] = {}
         self._queue: deque[tuple[str, str | None]] = deque()  # (turn, sentence); None: turn done
@@ -315,12 +324,41 @@ class Mouth:
             self._loading.add_done_callback(lambda _t: setattr(self, "_loading", None))
         return self._loading
 
+    def prefetch(self) -> None:
+        """Start fetching the voice now (the first-run tour), without a sentence to say."""
+        if self._tts is None:
+            self._start_load()
+
+    def retry(self) -> None:
+        """Home's retry after a failed download."""
+        if self._tts is None:
+            self._failed = False
+            self._start_load()
+
+    def _set_download(self, status: str, progress: float) -> None:
+        if self.download == {"status": status, "progress": progress}:
+            return
+        self.download = {"status": status, "progress": progress}
+        if self.on_download is not None:
+            self.on_download()
+
     async def _load(self) -> None:
+        last = -1.0
+
+        def progress(fraction: float) -> None:
+            nonlocal last
+            # Only while there is something left to fetch: a cached voice goes idle to ready.
+            if fraction < 1 and fraction - last >= 0.02:  # a few dozen updates, not thousands
+                last = fraction
+                self._set_download("downloading", max(fraction, 0.0))
+
         try:
-            self._tts = await self._load_tts()
+            self._tts = await self._load_tts(progress)
+            self._set_download("ready", 1.0)
         except Exception:
             log.warning("the speaking voice failed to load", exc_info=True)
             self._failed = True
+            self._set_download("failed", 0.0)
 
     def _send(self, st: _Turn, params: dict) -> None:
         self._last_body = st.body_id

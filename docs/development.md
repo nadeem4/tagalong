@@ -63,7 +63,7 @@ tagalong/
                                     # (Home's Jobs panel and a job's asks)
       e2e/fixtures/fake-brain.ts    # a ws server speaking contract v1, for smoke, listening, asks, permissions, jobs
       src/main/ipc/model.ts         # Settings' model_state / set_model calls to the brain
-      src/main/ipc/voice-models.ts  # Settings' stt_state / set_stt calls to the brain
+      src/main/ipc/voice-models.ts  # Settings' stt_state / set_stt and voice_download / fetch_voice calls to the brain
       src/main/                     # index.ts, brain/ (turn-events.ts,
                                     # start.ts), context.ts,
                                     # hotkeys.ts, talk-key.ts, always-listening.ts,

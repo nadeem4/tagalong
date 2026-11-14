@@ -17,7 +17,7 @@ import numpy as np
 from brain.telemetry import timed
 from brain.voice.ears import FRAME, Ears, EarsParts
 from brain.voice.models import ModelIntegrityError
-from brain.voice.mouth import Mouth, Tts
+from brain.voice.mouth import LoadTts, Mouth
 
 log = logging.getLogger("brain")
 
@@ -25,7 +25,6 @@ MAX_BUFFER_SECONDS = 30  # frames kept while the models load; the oldest go firs
 _FINISH = None  # queue marker: no more audio
 
 LoadEars = Callable[[Callable[[float], None]], Awaitable[EarsParts]]
-LoadTts = Callable[[], Awaitable[Tts]]
 
 
 class _Sender(Protocol):
@@ -75,9 +74,17 @@ class _Session:
 class VoiceService:
     """Implements VoiceHooks: the ears are here, the speaking is delegated to the Mouth."""
 
-    def __init__(self, bodies: _Sender, load_ears: LoadEars, load_tts: LoadTts) -> None:
+    def __init__(
+        self,
+        bodies: _Sender,
+        load_ears: LoadEars,
+        load_tts: LoadTts,
+        fetch_ears: Callable[[], Awaitable[None]] | None = None,
+    ) -> None:
         self._bodies = bodies
         self._load_ears = load_ears
+        self._fetch_ears = fetch_ears
+        self._prefetching: asyncio.Task | None = None
         self._mouth = Mouth(bodies, load_tts)
         self._sessions: dict[str, _Session] = {}
         self._parts: EarsParts | None = None
@@ -100,6 +107,32 @@ class VoiceService:
         self._gen += 1
         self._parts = None
         self._loading = None
+
+    def prefetch(self) -> None:
+        """Download the voice and the listening models' files now (the first-run tour), off the
+        loop and with no one waiting; nothing is loaded into memory until somebody listens.
+        Sentences meanwhile go out as text, in the system voice."""
+        self._mouth.prefetch()
+        if self._fetch_ears is None or (self._prefetching and not self._prefetching.done()):
+            return
+        fetch = self._fetch_ears
+
+        async def ears() -> None:
+            try:
+                await fetch()
+            except Exception:  # the next listen downloads again and tells the person why
+                log.warning("the listening models could not be fetched early", exc_info=True)
+
+        self._prefetching = asyncio.ensure_future(ears())
+
+    def retry_download(self) -> None:
+        self._mouth.retry()
+
+    def voice_download(self) -> dict:
+        return dict(self._mouth.download)
+
+    def follow_download(self, on_change: Callable[[], None]) -> None:
+        self._mouth.on_download = on_change
 
     def mic(self, body_id: str, pcm: bytes) -> None:
         session = self._sessions.get(body_id)
@@ -125,6 +158,9 @@ class VoiceService:
             self._mouth.clear(turn)
 
     async def close(self) -> None:
+        if self._prefetching is not None:
+            self._prefetching.cancel()
+            await asyncio.gather(self._prefetching, return_exceptions=True)
         await self._mouth.close()
 
     def spoken(
@@ -174,7 +210,7 @@ class VoiceService:
                 {"event": event} if text is None else {"event": event, "text": text},
             )
 
-    async def _models(self, session: _Session) -> EarsParts:
+    async def _models(self) -> EarsParts:
         if self._parts is not None:
             return self._parts
         gen = self._gen
@@ -204,7 +240,7 @@ class VoiceService:
     async def _work(self, session: _Session) -> None:
         try:
             try:
-                parts = await self._models(session)
+                parts = await self._models()
             except Exception as error:
                 log.warning("voice models failed to load", exc_info=True)
                 self._send(session, "voice", {"status": "failed", "message": _why(error)})

@@ -23,3 +23,4 @@ export * from './turn-events';
 export * from './updates';
 export * from './voice';
 export * from './voice-models';
+export * from './voice-download';

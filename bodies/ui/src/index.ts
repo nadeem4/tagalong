@@ -60,6 +60,7 @@ export type { KnowMe } from './know-me/use-know-me';
 /** Settings' Scout's model: the provider and model selects. */
 export { ModelField } from './model/model-field';
 export { VoiceModelsField } from './voice/voice-models-field';
+export { VoiceDownloadLine } from './voice/voice-download-line';
 export type { KeyHost } from './key/use-key-status';
 
 /** Shared controls: toggle, select, slider, money field, keycap, buttons, and their sheet. */

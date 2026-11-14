@@ -18,6 +18,7 @@ import type {
   MemoryEntry,
   ModelState,
   SttState,
+  VoiceDownload,
   SetupOverview,
   SetupResult,
   TurnEvent,
@@ -76,6 +77,9 @@ export interface FakeHostBridge extends HostBridge {
   stt: SttState;
   readonly sttSets: readonly { live?: string; final?: string }[];
   sttError: string | null;
+  /** What voiceDownload answers; null makes it fail. Each fetchVoice call's `retry` is kept. */
+  voiceDownloadState: VoiceDownload | null;
+  readonly voiceFetches: boolean[];
   readonly walkthroughOpens: readonly (number | undefined)[];
   /** Every setPermission call, in order. */
   readonly permissionSets: readonly { tool: string; mode: 'off' | 'ask' | 'auto' }[];
@@ -288,6 +292,7 @@ export function createFakeHostBridge(
   const limitsSet: number[] = [];
   const modelsSet: string[] = [];
   const sttSets: { live?: string; final?: string }[] = [];
+  const voiceFetches: boolean[] = [];
   const walkthroughOpens: (number | undefined)[] = [];
 
   const fake: FakeHostBridge = {
@@ -640,6 +645,17 @@ export function createFakeHostBridge(
     },
     sttSets,
     sttError: null,
+    voiceDownloadState: { status: 'ready', progress: 1 },
+    voiceFetches,
+    voiceDownload() {
+      return fake.voiceDownloadState === null
+        ? Promise.reject(new Error('brain offline'))
+        : Promise.resolve({ ...fake.voiceDownloadState });
+    },
+    fetchVoice(retry = false) {
+      voiceFetches.push(retry);
+      return Promise.resolve();
+    },
     sttState() {
       return Promise.resolve({ ...fake.stt });
     },

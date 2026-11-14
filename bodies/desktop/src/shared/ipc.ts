@@ -162,6 +162,8 @@ export const IPC = {
   // The speech models in Settings: read the choice and the card, save a choice.
   sttState: 'tagalong:stt:state',
   sttSet: 'tagalong:stt:set',
+  voiceDownload: 'tagalong:voice:download',
+  voiceFetch: 'tagalong:voice:fetch',
   // The first-run walkthrough: open it (at a step) or finish it.
   walkthroughOpen: 'tagalong:walkthrough:open',
   walkthroughFinish: 'tagalong:walkthrough:finish',

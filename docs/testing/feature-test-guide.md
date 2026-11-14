@@ -1233,6 +1233,24 @@ popup); the answer is text only.
    `pnpm --filter @tagalong/ui exec vitest run src/voice/voice-models-field.test.tsx`; the e2e
    `key-settings.spec.ts` (Speech to text).
 
+### V.5d. The voice is fetched early and its download shows (V4b)
+
+1. **Setup:** a fresh `TAGALONG_HOME` (no `voice/tts` folder), the app running on a real brain,
+   first run so the tour opens.
+2. **Action:** open Settings → Voice while the tour is open or just after it.
+3. **Expected:** under the Voice select one line reads "Downloading Scout's voice… N%. Using the
+   computer's voice until then." with a thin bar that fills. Scout's replies meanwhile are spoken
+   by the computer's voice.
+4. **Expected:** when it reaches 100% the line disappears; the next sentence Scout speaks is in
+   Kokoro, not the sentence that was already being said.
+5. **Action:** go offline, delete `voice/tts`, restart the brain and open the tour.
+6. **Expected:** the line says Scout couldn't download its voice, the computer's voice still speaks,
+   and **Try again** (back online) starts the download again.
+   **Automated (V4b):** `uv run pytest tests/test_voice_mouth.py tests/test_voice_service.py
+tests/test_voice_load.py tests/test_tools.py` from `brain/`;
+   `pnpm --filter @tagalong/ui exec vitest run src/voice/voice-download-line.test.tsx`;
+   `pnpm --filter @tagalong/desktop exec vitest run src/main/ipc/voice-models.test.ts`.
+
 ### V.5c3. Show words while I talk
 
 1. **Setup:** Settings → Speech to text → **Show words while I talk** is on (the default).
