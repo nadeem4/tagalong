@@ -128,13 +128,14 @@ def model_by_id(model_id: str) -> SttModel | None:
 
 @dataclass(frozen=True)
 class Hardware:
-    gpu: bool
+    gpu: bool  # a card and the libraries to use it
+    card: bool = False  # a card, whether or not the libraries are there
 
 
-def detect_hardware() -> Hardware:
+def detect_hardware(cuda_dir: Path | None = None) -> Hardware:
     # CTranslate2 (faster-whisper's engine) asks the NVIDIA driver itself, so a PC with a driver
     # but no CUDA toolkit still counts, and CUDA_VISIBLE_DEVICES=-1 hides the card. A card alone
-    # is not enough: without cuBLAS or cuDNN the final model cannot use it (measured on the dev PC).
+    # is not enough: without cuBLAS and cuDNN the final model cannot use it (measured).
     # Callers on the event loop run this in a thread (the first import is slow).
     import ctypes.util
 
@@ -144,10 +145,17 @@ def detect_hardware() -> Hardware:
         cards = ctranslate2.get_cuda_device_count() > 0
     except Exception:
         return Hardware(gpu=False)
-    find = ctypes.util.find_library
-    cublas = find("cublas64_12") or find("cublas")
-    cudnn = find("cudnn64_9") or find("cudnn")  # faster-whisper's GPU path needs both
-    return Hardware(gpu=cards and cublas is not None and cudnn is not None)
+
+    def found(dll: str, *names: str) -> bool:
+        # On the system path, or in the folder the brain fetched them into (voice/cuda).
+        return any(ctypes.util.find_library(n) for n in names) or bool(
+            cuda_dir and (cuda_dir / dll).is_file()
+        )
+
+    libs = found("cublas64_12.dll", "cublas64_12", "cublas") and found(
+        "cudnn64_9.dll", "cudnn64_9", "cudnn"
+    )
+    return Hardware(gpu=cards and libs, card=cards)
 
 
 @dataclass(frozen=True)

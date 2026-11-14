@@ -748,6 +748,13 @@ stale when offline); a search or a later page is `mcp-<hash>-registry.json`, the
 query and cursor together, so each page has its own file. `why-registry.json` maps
 `<id>@<version>` to the one-line "why pick it" the model wrote for a community app.
 
+## Voice models
+
+Not in `tagalong.db`: model files under `<TAGALONG_HOME>/voice/`, each checked against a pinned
+SHA-256 (`ears/`, `tts/`, and the speech models' own folders). `voice/cuda/` holds the NVIDIA
+DLLs (cuBLAS, cuDNN) the brain fetched for the final speech model on a Windows PC with a
+graphics card; safe to delete, fetched again on the next listen.
+
 ## In memory only
 
 These are lost when the brain restarts.

@@ -165,7 +165,7 @@ def _fake_cublas(monkeypatch, found, cudnn=True):
 def test_detect_hardware_counts_cuda_devices_through_ctranslate2(monkeypatch):
     _fake_cublas(monkeypatch, True)
     _fake_ct2(monkeypatch, lambda: 1)
-    assert stt.detect_hardware() == Hardware(gpu=True)
+    assert stt.detect_hardware() == Hardware(gpu=True, card=True)
     _fake_ct2(monkeypatch, lambda: 0)
     assert stt.detect_hardware() == Hardware(gpu=False)
 
@@ -175,13 +175,13 @@ def test_detect_hardware_needs_the_cuda_libraries_not_only_the_card(monkeypatch)
     # use the card and Auto must not plan on it.
     _fake_cublas(monkeypatch, False)
     _fake_ct2(monkeypatch, lambda: 1)
-    assert stt.detect_hardware() == Hardware(gpu=False)
+    assert stt.detect_hardware() == Hardware(gpu=False, card=True)
 
 
 def test_detect_hardware_needs_cudnn_too(monkeypatch):
     _fake_cublas(monkeypatch, True, cudnn=False)
     _fake_ct2(monkeypatch, lambda: 1)
-    assert stt.detect_hardware() == Hardware(gpu=False)
+    assert stt.detect_hardware() == Hardware(gpu=False, card=True)
 
 
 def _auto_rows(**over):
