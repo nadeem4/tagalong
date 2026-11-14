@@ -59,10 +59,11 @@ def test_the_final_engine_is_registered_and_does_not_stream():
     assert not engine.streams and engine.load_final is not None and engine.load_live is None
 
 
-def test_the_list_has_two_final_rows():
-    for model_id in ("whisper-large-v3-turbo", "whisper-small-en"):
+def test_the_list_has_two_final_rows_and_turbo_needs_a_card():
+    gpu = {"whisper-large-v3-turbo": "required", "whisper-small-en": "preferred"}
+    for model_id, need in gpu.items():
         found = stt.model_by_id(model_id)
-        assert found is not None and found.role == "final" and found.gpu == "preferred"
+        assert found is not None and found.role == "final" and found.gpu == need
 
 
 def test_joins_segments_and_strips():
