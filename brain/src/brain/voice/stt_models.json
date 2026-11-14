@@ -7,9 +7,7 @@
     "files": [],
     "size_mb": 45,
     "gpu": "none",
-    "languages": [
-      "en"
-    ],
+    "languages": ["en"],
     "note": "Small and quick; the words can come out rough.",
     "options": {
       "arch": "TINY_STREAMING"
@@ -23,9 +21,7 @@
     "files": [],
     "size_mb": 120,
     "gpu": "none",
-    "languages": [
-      "en"
-    ],
+    "languages": ["en"],
     "note": "Better words than tiny, still light on the processor.",
     "options": {
       "arch": "SMALL_STREAMING"
@@ -39,9 +35,7 @@
     "files": [],
     "size_mb": 250,
     "gpu": "none",
-    "languages": [
-      "en"
-    ],
+    "languages": ["en"],
     "note": "The best live words of the three; the biggest download.",
     "options": {
       "arch": "MEDIUM_STREAMING"
@@ -86,9 +80,7 @@
     ],
     "size_mb": 1543,
     "gpu": "preferred",
-    "languages": [
-      "multilingual"
-    ],
+    "languages": ["multilingual"],
     "note": "The most accurate words, heard again when you finish; large, and quicker on a graphics card.",
     "options": {}
   },
@@ -125,9 +117,7 @@
     ],
     "size_mb": 462,
     "gpu": "preferred",
-    "languages": [
-      "en"
-    ],
+    "languages": ["en"],
     "note": "Better words than the live model, light enough for a processor.",
     "options": {
       "language": "en"
