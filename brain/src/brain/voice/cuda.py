@@ -80,6 +80,8 @@ def extract_dlls(archive: Path, target: Path) -> None:
             check_name(name)
         dlls = [n for n in names if n.endswith(".dll") and PurePosixPath(n).parent.name == "bin"]
         target.mkdir(parents=True, exist_ok=True)
+        # The anchor DLLs go last: `ensure_cuda` takes one on disk to mean its wheel finished.
+        dlls.sort(key=lambda n: PurePosixPath(n).name in DLLS)
         for name in dlls:
             final = target / PurePosixPath(name).name
             part = final.with_name(final.name + ".part")
@@ -119,6 +121,7 @@ async def ensure_cuda(voice: Path, fetch: Fetch, on_progress: Progress) -> bool:
             zip(wheels, DLLS, strict=True)
         ):  # wheels are listed in DLLS order
             if (target / dll).is_file():
+                (voice / w.path).unlink(missing_ok=True)  # a leftover from an earlier run
                 on_progress((i + 1) / len(wheels))
                 continue
             # A verified wheel stays until it is extracted (a bad hash is deleted by the fetch);
@@ -175,7 +178,10 @@ def probe_cuda(
         return False
     ok = done.returncode == 0
     if not ok:
-        tail = (getattr(done, "stderr", b"") or b"").decode("utf-8", "replace").splitlines()[-5:]
+        err = getattr(done, "stderr", b"") or b""
+        if isinstance(err, bytes):
+            err = err.decode("utf-8", "replace")
+        tail = err.splitlines()[-5:]
         log.warning("the CUDA probe failed (exit %s): %s", done.returncode, " | ".join(tail))
     cache.parent.mkdir(parents=True, exist_ok=True)
     cache.write_text(json.dumps({"key": key, "ok": ok, "at": time.time()}), encoding="utf-8")

@@ -6,6 +6,7 @@ import io
 import json
 import logging
 import os
+import shutil
 import subprocess
 import sys
 import types
@@ -486,3 +487,49 @@ async def test_auto_turbo_is_for_the_card_only_but_a_chosen_model_may_use_the_pr
     assert await _final_cpu_ok(monkeypatch, tmp_path, None) == [False]  # Auto picked turbo
     assert await _final_cpu_ok(monkeypatch, tmp_path, "whisper-large-v3-turbo") == [True]
     assert await _final_cpu_ok(monkeypatch, tmp_path, "whisper-small-en") == [True]
+
+
+def test_extraction_that_stops_part_way_leaves_no_anchor_dll(monkeypatch, tmp_path):
+    # The anchor DLL is written last, so its presence means the wheel finished.
+    archive = tmp_path / "w.whl"
+    archive.write_bytes(wheel({"n/bin/cublas64_12.dll": b"blas", "n/bin/cublasLt64_12.dll": b"lt"}))
+    real, calls = shutil.copyfileobj, []
+
+    def flaky(src, out):
+        calls.append(1)
+        if len(calls) == 2:
+            raise OSError("disk full")
+        real(src, out)
+
+    monkeypatch.setattr(cuda.shutil, "copyfileobj", flaky)
+    with pytest.raises(OSError):
+        cuda.extract_dlls(archive, tmp_path / "cuda")
+    assert not (tmp_path / "cuda" / "cublas64_12.dll").exists()
+
+
+async def test_a_leftover_wheel_is_removed_when_its_dll_is_already_there(
+    monkeypatch, tmp_path, windows
+):
+    listed = rows(("cuda/wheels/a.whl", GOOD), ("cuda/wheels/b.whl", DNN))
+    monkeypatch.setattr(cuda, "load_wheels", lambda: listed)
+    (tmp_path / "cuda" / "wheels").mkdir(parents=True)
+    (tmp_path / "cuda" / "cublas64_12.dll").write_bytes(b"blas")
+    (tmp_path / "cuda" / "wheels" / "a.whl").write_bytes(GOOD)
+    assert await cuda.ensure_cuda(tmp_path, fetcher({listed[1].url: DNN}), lambda f: None) is True
+    assert not (tmp_path / "cuda" / "wheels" / "a.whl").exists()
+
+
+def test_the_pinned_wheels_are_listed_in_dll_order():
+    for w, dll in zip(cuda.load_wheels(), cuda.DLLS, strict=True):
+        assert dll.split("64_")[0] in w.url and dll.split("64_")[0] in w.path
+
+
+def test_a_probe_failure_with_text_stderr_is_logged(tmp_path, caplog, monkeypatch):
+    monkeypatch.setattr(cuda, "load_wheels", lambda: rows(("cuda/wheels/a.whl", GOOD)))
+
+    def run(cmd, **kw):
+        return types.SimpleNamespace(returncode=1, stderr="a\nboom\n")
+
+    with caplog.at_level(logging.WARNING, logger="brain"):
+        assert cuda.probe_cuda(tmp_path, "m", run) is False
+    assert any("boom" in r.getMessage() for r in caplog.records)
