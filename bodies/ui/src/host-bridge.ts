@@ -20,6 +20,7 @@ import type {
   ModelState,
   Pet,
   SttState,
+  VoiceDownload,
   SetupOverview,
   SetupResult,
   TimerRow,
@@ -365,6 +366,10 @@ export interface HostBridge {
   sttState(): Promise<SttState>;
   /** Saves the live and/or final speech model (`auto`; final also `off`); rejects with the brain's refusal. */
   setStt(choice: { live?: string; final?: string }): Promise<void>;
+  /** Settings' Voice page: how far Scout's speaking voice has downloaded (the brain's state). */
+  voiceDownload(): Promise<VoiceDownload>;
+  /** Starts the voice download in the brain, or `retry` after a failure. */
+  fetchVoice(retry?: boolean): Promise<void>;
   /** Opens the first-run walkthrough, at a step when one is named (9 is the key). */
   openWalkthrough(step?: number): Promise<void>;
   /** Home's Spend card: what was spent today and the daily limit, as the brain knows them. */

@@ -564,6 +564,17 @@ body across reconnects (the desktop resends it on every connect) and speaks any 
 `on` is true. With `system_voice` the brain sends text-only `speech` frames and never loads or
 downloads Kokoro.
 
+**The voice is fetched early.** While the first-run tour is open the brain downloads Kokoro and the
+listening models in the background (the desktop calls `fetch_voice` when the brain comes online and
+the tour is not finished; see [brain.md](brain.md)). Until Kokoro is ready the computer's own voice
+speaks (the brain sends text-only `speech` frames); once it is ready Scout switches to Kokoro from
+the next sentence, not the current one. Settings' Voice page shows one status line under the Voice
+select while it downloads ("Downloading Scout's voice… N%. Using the computer's voice until
+then." with a thin bar; all voices share one Kokoro model, so one line), hides it when done, and on
+a failure says so with a **Try again** button. The brain reports progress through
+`changed {what: "voice_download"}` and the Home tool `voice_download`; the line is
+`VoiceDownloadLine` in `bodies/ui/src/voice/`.
+
 ### The browser body
 
 The browser extension is a second body that can hear. It listens only: it says `display: false`, so

@@ -5,6 +5,8 @@
  */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { HostBridgeProvider } from '@tagalong/ui';
+import type { HostBridge } from '@tagalong/ui';
 import { SETTINGS_DEFAULTS } from '../../../shared/settings';
 import type { Settings } from '../../../shared/settings';
 
@@ -12,9 +14,11 @@ import { VoiceSection } from './voice-section';
 
 function slider(voice: Partial<Settings['voice']>): { max: string; value: string; saved: string } {
   const html = renderToStaticMarkup(
-    <VoiceSection
-      settings={{ ...SETTINGS_DEFAULTS, voice: { ...SETTINGS_DEFAULTS.voice, ...voice } }}
-    />,
+    <HostBridgeProvider bridge={{} as HostBridge}>
+      <VoiceSection
+        settings={{ ...SETTINGS_DEFAULTS, voice: { ...SETTINGS_DEFAULTS.voice, ...voice } }}
+      />
+    </HostBridgeProvider>,
   );
   const tag = /<input[^>]*type="range"[^>]*>/.exec(html)![0];
   const hidden = /<input[^>]*name="voiceSpeed"[^>]*>/.exec(html)![0];
@@ -35,7 +39,11 @@ describe('VoiceSection speed slider', () => {
 
 describe('VoiceSection microphone test', () => {
   it('offers Test your microphone with the meter off', () => {
-    const html = renderToStaticMarkup(<VoiceSection settings={SETTINGS_DEFAULTS} />);
+    const html = renderToStaticMarkup(
+      <HostBridgeProvider bridge={{} as HostBridge}>
+        <VoiceSection settings={SETTINGS_DEFAULTS} />
+      </HostBridgeProvider>,
+    );
     expect(html).toContain('Test your microphone');
     expect(html).toContain('Nothing is recorded or sent');
     expect(html).not.toContain('role="meter"');

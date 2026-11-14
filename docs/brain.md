@@ -858,6 +858,8 @@ so there is one gate and no second path.
 | `spend_today`      | `{}`                                           | `{"spent_usd": float, "limit_usd": float}`                                                                                                                                                                                                                                                  |
 | `list_permissions` | `{}`                                           | `{"tools": [{"name", "description", "title", "line", "info", "group", "effect", "mode", "locked", "self_asks", "person_only", "server_tool", "online", "source", "source_name"}], "groups": [{"id", "title", "note"}]}`, sorted by name, Scout tools only; `mode` is `off`, `ask` or `auto` |
 | `set_permission`   | `{"tool": str, "mode": str}`                   | `{"tool", "mode"}`; `mode` is `off`, `ask` or `auto` (`off` works while the body is offline)                                                                                                                                                                                                |
+| `voice_download`   | `{}`                                           | `{"status": "idle"\|"downloading"\|"ready"\|"failed", "progress": 0..1}`, how far Scout's speaking voice has got (see [Brain mouth](#brain-mouth))                                                                                                                                          |
+| `fetch_voice`      | `{"retry?": bool}`                             | the same state; starts the voice and listening-model fetch in the background (`retry: true` after a failure)                                                                                                                                                                                |
 | `speak_sample`     | `{"text", "voice?", "speed?"}`                 | `{"mime": "audio/wav", "data": base64}`, for Settings' Preview (see [Brain mouth](#brain-mouth))                                                                                                                                                                                            |
 | `list_jobs`        | `{}`                                           | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Home only, Scout reads `work_status`                                                                                                                                                                               |
 | `stop_job`         | `{"job": str, "part?": str}`                   | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                                                                                                                                                                                          |
@@ -2378,6 +2380,17 @@ this]` (`Memory.replace_last_message` rewrites the cut turn's message), never th
   words first." That sentence is the spoken ack; code never says it, there is no canned line and no
   earcon. It sits in the user content rather than the system prompt so the cached system prompt is
   the same for typed and spoken turns. It is an instruction to the model and not guaranteed.
+- **Early fetch and the status line.** The voice is not fetched only at the first spoken turn:
+  while the first-run tour is open the desktop calls the Home tool `fetch_voice` (each time the brain
+  comes online, until the tour is finished), and `VoiceService.prefetch()` starts `Mouth.prefetch()`
+  (Kokoro, as a task off the event loop) and loads the listening models the same way (a failure there
+  is one warning; the next listen tries again). Nothing waits on it. `Mouth.download` is
+  `{status: idle | downloading | ready | failed, progress}`; each change, at most one per 2%, calls
+  `on_download`, which `main.py` turns into `changed {what: "voice_download"}` (no new contract frame),
+  and Home reads it with `voice_download`. Until `ready`, `_say` sends text-only `speech` frames (the
+  body's system voice); the voice is looked at again for every sentence, so Kokoro takes over from the
+  next sentence, never mid-sentence. A failure keeps the system voice working and shows `failed`;
+  `fetch_voice {retry: true}` (Settings' Try again) clears it and loads again.
 - **Settings Preview.** The Home tool `speak_sample {text, voice?, speed?}` returns a text part
   holding the JSON `{"mime": "audio/wav", "data": <base64>}` (Home calls answer in text). It
   fails with `RpcError` `tool_failed` when voice is off or cannot start, and `invalid_params`

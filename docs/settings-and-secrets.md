@@ -162,7 +162,9 @@ not list, and applies it from the next reply. The picker is the shared `ModelFie
 **Speech to text** (Settings, after Voice) works the same way: the brain owns the two choices
 (`stt_live`, `stt_final` in its `settings` table); the card reads `stt_state` and a pick calls
 `set_stt` (`IPC.sttState`, `IPC.sttSet`, `src/main/ipc/voice-models.ts`), saved at once.
-`TAGALONG_STT_LIVE` and `TAGALONG_STT_FINAL` are only the defaults until a model is picked. The one
+`TAGALONG_STT_LIVE` and `TAGALONG_STT_FINAL` are only the defaults until a model is picked.
+The Voice page's download line reads the brain's `voice_download` and Try again calls `fetch_voice`
+(`IPC.voiceDownload`, `IPC.voiceFetch`); nothing about it is saved. The one
 desktop setting on the card is `voice.showWordsWhileTalking` in `settings.json` (default true,
 saved with the form's Save): off, push-to-talk shows no words until the talk key is let go.
 

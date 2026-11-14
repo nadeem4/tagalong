@@ -108,7 +108,7 @@ import { registerBodiesIpc } from './ipc/bodies';
 import { registerLoopsIpc } from './ipc/loops';
 import { registerTimersIpc } from './ipc/timers';
 import { registerModelIpc } from './ipc/model';
-import { registerVoiceModelsIpc } from './ipc/voice-models';
+import { registerVoiceModelsIpc, startVoiceFetch } from './ipc/voice-models';
 import { registerPermissionsIpc } from './ipc/permissions';
 import { registerSettingsIpc } from './ipc/settings';
 import { registerSetupIpc } from './ipc/setup';
@@ -360,6 +360,9 @@ async function start(): Promise<void> {
       // A listening session open when the link dropped asks the new connection to listen.
       if (status === 'online') {
         desktop?.voiceBridge.onOnline();
+        // Until the tour is finished the brain fetches Scout's voice in the background.
+        if (desktop !== null && shouldOpenWalkthrough(desktop.settings))
+          void startVoiceFetch(desktop.brain);
         void refreshKeyMark();
         // The brain forgets nothing across a reconnect, but a restarted brain knows no setting.
         if (desktop !== null) sendReadAloud(desktop.settings);

@@ -6,7 +6,15 @@
  * that buildSettingsPatch reads.
  */
 import { useEffect, useState } from 'react';
-import { Button, MicTest, Select, Slider, Toggle } from '@tagalong/ui';
+import {
+  Button,
+  MicTest,
+  Select,
+  Slider,
+  Toggle,
+  VoiceDownloadLine,
+  useHostBridge,
+} from '@tagalong/ui';
 import type { MicWatcher } from '@tagalong/ui';
 import {
   MAX_VOICE_SPEED,
@@ -49,6 +57,7 @@ export function VoiceSection({
   settings: Settings;
   hotkeyError?: string | undefined;
 }) {
+  const bridge = useHostBridge();
   const [talks, setTalks] = useState(settings.voice.enabled);
   const talkKey = settings.hotkeys.talk ?? SETTINGS_DEFAULTS.hotkeys.talk;
   const [microphones, setMicrophones] = useState<{ id: string; label: string }[]>([]);
@@ -139,6 +148,7 @@ export function VoiceSection({
             </Button>
           </div>
           <input type="hidden" name="voice" value={voice} />
+          <VoiceDownloadLine host={bridge} />
         </div>
         <div>
           <Slider

@@ -46,6 +46,7 @@ import type {
   LoopsState,
   ModelState,
   SttState,
+  VoiceDownload,
   TimerRow,
   UpdateKind,
   UpdateResult,
@@ -191,6 +192,8 @@ const bridge: PreloadBridge = {
   sttState: () => ipcRenderer.invoke(IPC.sttState) as Promise<SttState>,
   setStt: (choice: { live?: string; final?: string }) =>
     ipcRenderer.invoke(IPC.sttSet, choice) as Promise<void>,
+  voiceDownload: () => ipcRenderer.invoke(IPC.voiceDownload) as Promise<VoiceDownload>,
+  fetchVoice: (retry = false) => ipcRenderer.invoke(IPC.voiceFetch, retry) as Promise<void>,
   openWalkthrough: (step?: number) =>
     ipcRenderer.invoke(IPC.walkthroughOpen, { step }) as Promise<void>,
   onBrainChanged: (handler: (what: string) => void) => {
