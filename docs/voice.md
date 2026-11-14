@@ -598,8 +598,8 @@ The words come from a list of models kept as data, not from one hard-wired model
   reads as Auto. **Auto** is data: a row's `auto` hint (`{"cpu"|"gpu": "live"|"final"}`) says where
   it is the pick, and `auto_pick` in `stt.py` reads the hints with no branches on ids. Today Auto
   live is `moonshine-small` on any PC; Auto final is `whisper-large-v3-turbo` when a usable
-  graphics card is found (`detect_hardware`: CTranslate2 sees an NVIDIA device and cuBLAS can be
-  found) and no final pass otherwise. `same` and `off` mean no final pass. The numbers behind
+  graphics card is found (`detect_hardware`: CTranslate2 sees an NVIDIA device and the NVIDIA libraries
+  are found: a device plus cuBLAS and cuDNN, on the system or in `<TAGALONG_HOME>/voice/cuda`) and no final pass otherwise. `same` and `off` mean no final pass. The numbers behind
   this are in [voice-stt-results.md](voice-stt-results.md). Only the environment values exist so
   far; the saved choice comes with the Home picker. A change applies on the next listen, never under a running session.
 - **The final pass.** The live model's words are a preview. While a turn runs, the ears keep its
@@ -610,8 +610,13 @@ The words come from a list of models kept as data, not from one hard-wired model
   with live words), because Whisper invents words ("Thank you.") from silence or noise. With a
   graphics card it tries CUDA in float16 and warms the model up with one second of silence, so a
   missing CUDA library shows at load; if CUDA fails to load or to run, it logs one warning and
-  uses the processor in int8. No CUDA libraries are bundled: the packaged build runs on the
-  processor unless a CUDA toolkit is on PATH. Its files are downloaded by `ensure_files` (size and
+  uses the processor in int8. The CUDA libraries are not bundled. On Windows, when a card is
+  seen but cuBLAS or cuDNN is missing, the first listen fetches them once (`voice/cuda.py`): two
+  pinned PyPI wheels (`cuda_wheels.json`: url, size, SHA-256, about 1.1 GB together) are
+  downloaded during the loading progress, only each wheel's `bin/*.dll` is kept in
+  `<TAGALONG_HOME>/voice/cuda` (safe extract; the wheels are deleted) and `os.add_dll_directory`
+  points at it before CTranslate2 loads. A failed or mismatched download is one warning and the
+  processor, with no final pass. Linux uses its system CUDA; nothing is fetched there. Its files are downloaded by `ensure_files` (size and
   SHA-256 checked, each row pinned to a Hugging Face commit, never `main`) into
   `<TAGALONG_HOME>/voice/stt/<id>`, after the live model, in the same loading progress. The
   first listen waits for this download, with the loading bar; the library never downloads by
