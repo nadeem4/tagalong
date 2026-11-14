@@ -4,7 +4,7 @@ Ported from the desktop's local-ears tests; each frame is 32 ms and loud means s
 """
 
 import pytest
-from fake_voice import LOUD, QUIET, LevelVad, WordStt, parts, soft
+from fake_voice import FRAME, LOUD, QUIET, FakeFinal, LevelVad, WordStt, parts, soft
 
 from brain.voice.ears import GIVE_UP_FRAMES, MAX_STRETCH_FRAMES, PAUSE_FRAMES, PRE_ROLL_FRAMES, Ears
 
@@ -228,3 +228,79 @@ def test_held_finish_takes_the_final_pass_too():
     feed(ears, LOUD, 2)
     ears.finish()
     assert events[-2:] == [f"final:{words(2)}", f"turn_end:{words(2)}"]
+
+
+# The final pass: the whole turn is transcribed again at its end.
+
+
+def test_turn_end_carries_final_text_not_live_text():
+    p = parts(final=FakeFinal("Scout, what time is it?"))
+    ears, events = hear("held", p)
+    feed(ears, LOUD, 3)
+    ears.finish()
+    assert events[-1] == "turn_end:Scout, what time is it?"
+    assert f"final:{words(3)}" in events  # the per-stretch event stays live text
+
+
+def test_final_failure_falls_back_to_live_text():
+    ears, events = hear("held", parts(final=FakeFinal(fail=True)))
+    feed(ears, LOUD, 3)
+    ears.finish()
+    assert events[-1] == f"turn_end:{words(3)}"
+
+
+@pytest.mark.parametrize("empty", ["", "   "])
+def test_empty_final_falls_back_to_live_text(empty):
+    ears, events = hear("held", parts(final=FakeFinal(empty)))
+    feed(ears, LOUD, 3)
+    ears.finish()
+    assert events[-1] == f"turn_end:{words(3)}"
+
+
+def test_no_final_pass_when_no_speech():
+    final = FakeFinal()
+    ears, events = hear("held", parts(final=final))
+    feed(ears, QUIET, 10)
+    ears.finish()
+    assert events == ["turn_end:"] and final.calls == []
+
+
+def test_audio_over_the_cap_is_trimmed_to_the_last_60_seconds():
+    final = FakeFinal()
+    ears, _ = hear("held", parts(final=final))
+    feed(ears, LOUD, 2000)  # 64 s
+    ears.finish()
+    assert [len(a) for a in final.calls] == [60 * 16_000]
+
+
+def test_turn_audio_cleared_after_turn():
+    final = FakeFinal()
+    ears, events = hear("always", parts(final=final))
+    feed(ears, LOUD, 2)
+    feed(ears, QUIET, PAUSE_FRAMES)
+    feed(ears, LOUD, 3)
+    feed(ears, QUIET, PAUSE_FRAMES)
+    assert sum(e.startswith("turn_end") for e in events) == 2
+    # each turn: its speech frames plus the quiet frames that closed it; nothing of the other
+    assert [len(a) for a in final.calls] == [(2 + PAUSE_FRAMES) * FRAME, (3 + PAUSE_FRAMES) * FRAME]
+
+
+def test_final_gets_preroll_and_all_stretches():
+    p = parts(0.1, 0.9, final=(final := FakeFinal()))
+    ears, events = hear("always", p)
+    feed(ears, soft(0.05), 3)  # pre-roll
+    feed(ears, LOUD, 2)
+    feed(ears, QUIET, PAUSE_FRAMES + 4)  # closes stretch one; score too low, turn goes on
+    feed(ears, LOUD, 2)
+    feed(ears, QUIET, PAUSE_FRAMES)  # closes stretch two; turn over
+    assert sum(e.startswith("turn_end") for e in events) == 1
+    fed = len(p.stt.fed)
+    assert p.stt.fed[:3] == pytest.approx([0.05] * 3)
+    assert [len(a) for a in final.calls] == [fed * FRAME]
+
+
+def test_no_final_model_keeps_live_text():
+    ears, events = hear("held", parts())
+    feed(ears, LOUD, 3)
+    ears.finish()
+    assert events[-1] == f"turn_end:{words(3)}"
