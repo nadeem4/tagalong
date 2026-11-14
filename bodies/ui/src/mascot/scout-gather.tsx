@@ -109,7 +109,7 @@ export function ScoutGather({ state, size, onDone }: ScoutGatherProps) {
       lastK.current = k;
       tiles.forEach((tile, i) => {
         const p = speckPosition(tile, k, now, i);
-        ctx.fillStyle = colours[i] ?? '#000000';
+        ctx.fillStyle = colours[i] ?? 'transparent';
         ctx.fillRect(p.x, p.y, TILE, TILE);
       });
       drawEyes(ctx, size, still ? 0.25 : eyeLight(state, now, startedAt));
