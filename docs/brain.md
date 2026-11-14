@@ -2383,8 +2383,10 @@ this]` (`Memory.replace_last_message` rewrites the cut turn's message), never th
 - **Early fetch and the status line.** The voice is not fetched only at the first spoken turn:
   while the first-run tour is open the desktop calls the Home tool `fetch_voice` (each time the brain
   comes online, until the tour is finished), and `VoiceService.prefetch()` starts `Mouth.prefetch()`
-  (Kokoro, as a task off the event loop) and loads the listening models the same way (a failure there
-  is one warning; the next listen tries again). Nothing waits on it. `Mouth.download` is
+  (Kokoro, as a task off the event loop) and downloads the listening models' files the same way
+  (`ears_fetcher` in `voice/load.py`: the ONNX files, the chosen live and final files, and the NVIDIA
+  libraries only when a card needs them; no model is loaded into memory until somebody listens; a
+  failure there is one warning; the next listen downloads again). `close()` cancels it. Nothing waits on it. `Mouth.download` is
   `{status: idle | downloading | ready | failed, progress}`; each change, at most one per 2%, calls
   `on_download`, which `main.py` turns into `changed {what: "voice_download"}` (no new contract frame),
   and Home reads it with `voice_download`. Until `ready`, `_say` sends text-only `speech` frames (the

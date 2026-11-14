@@ -46,7 +46,11 @@ describe('VoiceDownloadLine', () => {
     const host = createFakeHostBridge();
     host.voiceDownloadState = { status: 'failed', progress: 0 };
     render(<VoiceDownloadLine host={host} />);
-    expect(await screen.findByText(/couldn.t download Scout.s voice/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        /^Couldn.t download Scout.s voice\. The computer.s voice is speaking for now\./,
+      ),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(host.voiceFetches).toEqual([true]);
   });

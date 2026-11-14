@@ -49,7 +49,7 @@ export function VoiceDownloadLine({ host }: { host: VoiceDownloadHost }) {
         </>
       ) : (
         <p className="tg-vdl__text">
-          {"Scout couldn't download Scout's voice. The computer's voice is speaking for now. "}
+          {"Couldn't download Scout's voice. The computer's voice is speaking for now. "}
           <button
             type="button"
             className="tg-vdl__retry"

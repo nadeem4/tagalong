@@ -235,3 +235,19 @@ async def test_tts_loader_reports_the_download_through_the_progress_callback(tmp
     seen: list[float] = []
     assert await load.tts_loader(tmp_path)(seen.append) == "tts"
     assert seen[:2] == [0.25, 1.0]
+
+
+async def test_the_fetcher_downloads_the_ears_files_and_loads_no_model(monkeypatch, tmp_path):
+    downloads: list[str] = []
+    _stubs(monkeypatch, parts(), downloads)
+
+    def never(*a, **k):
+        raise AssertionError("a model was loaded")
+
+    monkeypatch.setattr(load.silero, "load", never)
+    monkeypatch.setattr(load.smart_turn, "load", never)
+    monkeypatch.setitem(engines.ENGINES, "moonshine", Engine(True, never, None))
+    monkeypatch.setitem(engines.ENGINES, "faster-whisper", Engine(False, None, never))
+    await load.ears_fetcher(tmp_path, env_final="whisper-small-en")()
+    assert [f.path for f in load.EARS_FILES] == downloads[: len(load.EARS_FILES)]
+    assert any(d.startswith("stt/whisper-small-en/") for d in downloads)

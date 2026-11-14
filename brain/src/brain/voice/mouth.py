@@ -347,11 +347,11 @@ class Mouth:
 
         def progress(fraction: float) -> None:
             nonlocal last
-            if fraction >= 1 or fraction - last >= 0.02:  # a few dozen updates, not thousands
+            # Only while there is something left to fetch: a cached voice goes idle to ready.
+            if fraction < 1 and fraction - last >= 0.02:  # a few dozen updates, not thousands
                 last = fraction
-                self._set_download("downloading", min(max(fraction, 0.0), 1.0))
+                self._set_download("downloading", max(fraction, 0.0))
 
-        self._set_download("downloading", 0.0)
         try:
             self._tts = await self._load_tts(progress)
             self._set_download("ready", 1.0)

@@ -565,7 +565,7 @@ body across reconnects (the desktop resends it on every connect) and speaks any 
 downloads Kokoro.
 
 **The voice is fetched early.** While the first-run tour is open the brain downloads Kokoro and the
-listening models in the background (the desktop calls `fetch_voice` when the brain comes online and
+listening models' files in the background (download only: nothing is loaded into memory until you listen; the desktop calls `fetch_voice` when the brain comes online and
 the tour is not finished; see [brain.md](brain.md)). Until Kokoro is ready the computer's own voice
 speaks (the brain sends text-only `speech` frames); once it is ready Scout switches to Kokoro from
 the next sentence, not the current one. Settings' Voice page shows one status line under the Voice

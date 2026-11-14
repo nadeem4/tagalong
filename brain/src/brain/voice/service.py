@@ -74,9 +74,17 @@ class _Session:
 class VoiceService:
     """Implements VoiceHooks: the ears are here, the speaking is delegated to the Mouth."""
 
-    def __init__(self, bodies: _Sender, load_ears: LoadEars, load_tts: LoadTts) -> None:
+    def __init__(
+        self,
+        bodies: _Sender,
+        load_ears: LoadEars,
+        load_tts: LoadTts,
+        fetch_ears: Callable[[], Awaitable[None]] | None = None,
+    ) -> None:
         self._bodies = bodies
         self._load_ears = load_ears
+        self._fetch_ears = fetch_ears
+        self._prefetching: asyncio.Task | None = None
         self._mouth = Mouth(bodies, load_tts)
         self._sessions: dict[str, _Session] = {}
         self._parts: EarsParts | None = None
@@ -101,17 +109,21 @@ class VoiceService:
         self._loading = None
 
     def prefetch(self) -> None:
-        """Fetch the voice and the listening models now (the first-run tour), off the loop and
-        with no one waiting. Sentences meanwhile go out as text, in the system voice."""
+        """Download the voice and the listening models' files now (the first-run tour), off the
+        loop and with no one waiting; nothing is loaded into memory until somebody listens.
+        Sentences meanwhile go out as text, in the system voice."""
         self._mouth.prefetch()
+        if self._fetch_ears is None or (self._prefetching and not self._prefetching.done()):
+            return
+        fetch = self._fetch_ears
 
         async def ears() -> None:
             try:
-                await self._models()
-            except Exception:  # the next listen tries again and tells the person why
+                await fetch()
+            except Exception:  # the next listen downloads again and tells the person why
                 log.warning("the listening models could not be fetched early", exc_info=True)
 
-        asyncio.ensure_future(ears())
+        self._prefetching = asyncio.ensure_future(ears())
 
     def retry_download(self) -> None:
         self._mouth.retry()
@@ -146,6 +158,9 @@ class VoiceService:
             self._mouth.clear(turn)
 
     async def close(self) -> None:
+        if self._prefetching is not None:
+            self._prefetching.cancel()
+            await asyncio.gather(self._prefetching, return_exceptions=True)
         await self._mouth.close()
 
     def spoken(

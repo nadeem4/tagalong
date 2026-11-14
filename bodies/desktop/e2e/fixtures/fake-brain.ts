@@ -1032,6 +1032,10 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           models.push(model);
           notify('changed', { what: 'model' });
           value = { model };
+        } else if (params.tool === 'voice_download') {
+          value = { status: 'ready', progress: 1 };
+        } else if (params.tool === 'fetch_voice') {
+          value = { status: 'ready', progress: 1 };
         } else if (params.tool === 'stt_state') {
           value = {
             ...stt,

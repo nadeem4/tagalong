@@ -576,7 +576,7 @@ async def test_prefetch_loads_the_voice_without_a_sentence_and_reports_progress(
     m.prefetch()
     await settle()
     assert [d["status"] for d in seen][0] == "downloading"
-    assert [d["progress"] for d in seen if d["status"] == "downloading"] == [0.0, 0.5, 1.0]
+    assert [d["progress"] for d in seen if d["status"] == "downloading"] == [0.0, 0.5]
     assert m.download == {"status": "ready", "progress": 1.0}
     assert sent.frames == []  # nothing was said
 
@@ -590,7 +590,7 @@ async def test_system_voice_until_ready_then_kokoro_from_the_next_sentence():
         await gate.wait()
         return tts
 
-    m, _ = mouth(sent, load=slow)
+    m, _ = mouth(sent, load=slow, steps=(0.3,))
     m.prefetch()
     m.spoken("t", "d", None, None)
     m.reply("t", {"delta": f"{ONE} "})
@@ -611,11 +611,11 @@ async def test_a_failed_download_says_so_keeps_the_system_voice_and_retries_on_r
 
     async def flaky():
         attempts["n"] += 1
-        if attempts["n"] == 1:
+        if attempts["n"] <= 2:  # the prefetch, then the spoken turn that tries again
             raise OSError("no network")
         return tts
 
-    m, _ = mouth(sent, load=flaky)
+    m, _ = mouth(sent, load=flaky, steps=(0.5,))
     m.prefetch()
     await settle()
     assert m.download["status"] == "failed"
@@ -624,7 +624,20 @@ async def test_a_failed_download_says_so_keeps_the_system_voice_and_retries_on_r
     m.reply("t", {"done": True})
     await settle()
     assert [("pcm" in p) for p in sent.speech()][0] is False  # still spoken, by the system
+    seen: list[str] = []
+    m.on_download = lambda: seen.append(str(m.download["status"]))
     m.retry()
     await settle()
+    assert seen[0] == "downloading" and seen[-1] == "ready"
     assert m.download["status"] == "ready"
-    assert attempts["n"] >= 2
+    assert attempts["n"] == 3
+
+
+async def test_a_cached_voice_never_flashes_downloading():
+    sent = Sent()
+    seen: list[str] = []
+    m, _ = mouth(sent, steps=(1.0,))
+    m.on_download = lambda: seen.append(str(m.download["status"]))
+    m.prefetch()
+    await settle()
+    assert seen == ["ready"]

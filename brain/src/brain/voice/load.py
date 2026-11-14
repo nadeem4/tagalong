@@ -71,33 +71,12 @@ def ears_loader(
 
     async def load_ears(on_progress: Callable[[float], None]) -> EarsParts:
         loop = asyncio.get_running_loop()
-        # Read now, not at start: the choice Home saved applies from this load. The saved choice
-        # comes first, then the env default, then Auto.
-        saved_live, saved_final = saved()
-        cuda_dir = folder / "cuda"
-        await asyncio.to_thread(cuda.add_dll_directory, cuda_dir)  # before the library loads
-        hardware = await asyncio.to_thread(stt.detect_hardware, cuda_dir)  # imports ctranslate2
-        base = 0.0  # the fetch, when there is one, takes the first half of the bar
-
-        def fetching(f: float) -> None:
-            nonlocal base
-            base = FETCH_SHARE
-            on_progress(f * FETCH_SHARE)
-
-        if hardware.card and not hardware.gpu:
-            # A card without the NVIDIA libraries: fetch them (Windows only; a failure is one
-            # warning, no retry for 24 h, and the processor), then look again.
-            if await cuda.ensure_cuda(folder, fetch, fetching):
-                await asyncio.to_thread(cuda.add_dll_directory, cuda_dir)
-                hardware = await asyncio.to_thread(stt.detect_hardware, cuda_dir)
+        chosen, final_row, base = await _choose(folder, env_live, env_final, saved, on_progress)
+        saved_final = saved()[1]
 
         def report(f: float) -> None:
             on_progress(base + (1 - base) * f)
 
-        picked = stt.resolve(saved_live, saved_final, env_live, env_final, hardware)
-        chosen, final_row = picked.live, picked.final
-        if final_row is not None and final_row.gpu == "required" and not hardware.gpu:
-            final_row = None  # a card-only model: nothing downloaded, nothing on the processor
         engine = engines.ENGINES[chosen.engine]
         assert engine.load_live is not None  # the list only gives a live role to one that has it
         # The loading bar: ONNX files, then the live model, then (if chosen) the final model.
@@ -115,8 +94,8 @@ def ears_loader(
             live = await asyncio.to_thread(engine.load_live, chosen, folder, from_thread)
         final = None
         if final_row is not None:
-            # Auto's card-only row never lands on the processor; a model the person chose may.
-            # A card-only row never lands on the processor, chosen or not.
+            # A card-only row never lands on the processor, chosen or not; Auto's other rows
+            # may, and a model the person chose may.
             cpu_ok = final_row.gpu != "required" and (
                 final_row.id in (saved_final, env_final) or "cpu" in final_row.auto
             )
@@ -124,6 +103,59 @@ def ears_loader(
         return EarsParts(vad, live, turn, final)
 
     return load_ears
+
+
+async def _choose(
+    folder: Path,
+    env_live: str | None,
+    env_final: str | None,
+    saved: Callable[[], tuple[str | None, str | None]],
+    on_progress: Callable[[float], None],
+):
+    """Which live and final rows apply, after fetching the NVIDIA libraries when a card needs
+    them. Returns (live row, final row or None, where the rest of the bar starts)."""
+    # Read now, not at start: the choice Home saved applies from this load. The saved choice
+    # comes first, then the env default, then Auto.
+    saved_live, saved_final = saved()
+    cuda_dir = folder / "cuda"
+    await asyncio.to_thread(cuda.add_dll_directory, cuda_dir)  # before the library loads
+    hardware = await asyncio.to_thread(stt.detect_hardware, cuda_dir)  # imports ctranslate2
+    base = 0.0  # the fetch, when there is one, takes the first half of the bar
+
+    def fetching(f: float) -> None:
+        nonlocal base
+        base = FETCH_SHARE
+        on_progress(f * FETCH_SHARE)
+
+    if hardware.card and not hardware.gpu:
+        # A card without the NVIDIA libraries: fetch them (Windows only; a failure is one
+        # warning, no retry for 24 h, and the processor), then look again.
+        if await cuda.ensure_cuda(folder, fetch, fetching):
+            await asyncio.to_thread(cuda.add_dll_directory, cuda_dir)
+            hardware = await asyncio.to_thread(stt.detect_hardware, cuda_dir)
+    picked = stt.resolve(saved_live, saved_final, env_live, env_final, hardware)
+    final_row = picked.final
+    if final_row is not None and final_row.gpu == "required" and not hardware.gpu:
+        final_row = None  # a card-only model: nothing downloaded, nothing on the processor
+    return picked.live, final_row, base
+
+
+def ears_fetcher(
+    data_dir: Path,
+    env_live: str | None = None,
+    env_final: str | None = None,
+    saved: Callable[[], tuple[str | None, str | None]] = lambda: (None, None),
+) -> Callable[[], Awaitable[None]]:
+    """Download what the listening models need (the ONNX files, the chosen live and final files,
+    the NVIDIA libraries when Auto would use the card) and load nothing."""
+    folder = data_dir / "voice"
+
+    async def fetch_ears() -> None:
+        chosen, final_row, _ = await _choose(folder, env_live, env_final, saved, lambda _f: None)
+        files = [*EARS_FILES, *chosen.files, *(final_row.files if final_row else ())]
+        await ensure_files(folder, files, fetch, lambda _f: None)
+
+    return fetch_ears
 
 
 def tts_loader(data_dir: Path) -> Callable[[Callable[[float], None]], Awaitable[Tts]]:
