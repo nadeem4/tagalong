@@ -627,7 +627,7 @@ The words come from a list of models kept as data, not from one hard-wired model
   a failure logs the last lines of the child's stderr), then loads the model on CUDA in float16 and warms
   it up with one second of silence. If CUDA cannot run it, a row Auto picked only for the card
   (`whisper-large-v3-turbo`) gets no final pass, never int8 turbo on the processor; a model the
-  person chose still falls back to the processor in int8, with one warning. A `gpu: required` row
+  person chose still falls back to the processor in int8, with one warning; a `gpu: required` row never does. A `gpu: required` row
   (turbo) with no usable card is dropped before anything is downloaded or loaded: no final pass. The CUDA libraries
   are not bundled. On Windows, when a card is seen but cuBLAS or cuDNN is missing, the first
   listen fetches them (`voice/cuda.py`): two pinned PyPI wheels (`cuda_wheels.json`: cuBLAS

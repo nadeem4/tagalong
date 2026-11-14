@@ -116,7 +116,10 @@ def ears_loader(
         final = None
         if final_row is not None:
             # Auto's card-only row never lands on the processor; a model the person chose may.
-            cpu_ok = final_row.id in (saved_final, env_final) or "cpu" in final_row.auto
+            # A card-only row never lands on the processor, chosen or not.
+            cpu_ok = final_row.gpu != "required" and (
+                final_row.id in (saved_final, env_final) or "cpu" in final_row.auto
+            )
             final = await _load_final(final_row, folder, lambda f: report(0.3 + 0.7 * f), cpu_ok)
         return EarsParts(vad, live, turn, final)
 

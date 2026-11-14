@@ -481,11 +481,11 @@ async def _final_cpu_ok(monkeypatch, tmp_path, env_final):
     return got
 
 
-async def test_auto_turbo_is_for_the_card_only_but_a_chosen_model_may_use_the_processor(
+async def test_turbo_is_for_the_card_only_but_a_chosen_small_model_may_use_the_processor(
     monkeypatch, tmp_path
 ):
     assert await _final_cpu_ok(monkeypatch, tmp_path, None) == [False]  # Auto picked turbo
-    assert await _final_cpu_ok(monkeypatch, tmp_path, "whisper-large-v3-turbo") == [True]
+    assert await _final_cpu_ok(monkeypatch, tmp_path, "whisper-large-v3-turbo") == [False]
     assert await _final_cpu_ok(monkeypatch, tmp_path, "whisper-small-en") == [True]
 
 
