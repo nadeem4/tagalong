@@ -106,7 +106,7 @@ test("Scout's model: picking Sonnet saves at once and the brain records set_mode
 
 test('Speech to text: picking a live model saves at once and the brain records set_stt', async () => {
   const home = await windowFor('home');
-  const live = home.getByLabel('While you talk');
+  const live = home.getByRole('combobox', { name: 'While you talk', exact: true });
   await expect(live).toHaveValue('auto', { timeout: 30_000 });
   await expect(home.getByText('NVIDIA GeForce RTX 4060')).toBeVisible();
   await live.selectOption('moonshine-tiny');
