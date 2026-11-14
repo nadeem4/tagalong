@@ -139,6 +139,10 @@ def detect_hardware(cuda_dir: Path | None = None) -> Hardware:
     # Callers on the event loop run this in a thread (the first import is slow).
     import ctypes.util
 
+    from brain.voice import cuda
+
+    if cuda_dir:
+        cuda.add_dll_directory(cuda_dir)  # before CTranslate2 is imported
     try:
         import ctranslate2
 

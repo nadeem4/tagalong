@@ -127,7 +127,7 @@ async def test_loader_downloads_final_files_with_progress_share(monkeypatch, tmp
 
     monkeypatch.setitem(engines.ENGINES, "moonshine", Engine(True, live_load, None))
     monkeypatch.setitem(
-        engines.ENGINES, "faster-whisper", Engine(False, None, lambda m, f, p: final)
+        engines.ENGINES, "faster-whisper", Engine(False, None, lambda m, f, p, c: final)
     )
     got = await load.ears_loader(tmp_path, env_final="whisper-small-en")(seen.append)
     await asyncio.sleep(0)

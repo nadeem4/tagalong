@@ -20,7 +20,8 @@ Progress = Callable[[float], None]
 class Engine:
     streams: bool  # can take frames as they come (a live model needs this)
     load_live: "Callable[[SttModel, Path, Progress | None], LiveStt] | None"
-    load_final: "Callable[[SttModel, Path, Progress | None], FinalStt] | None"
+    # The last argument is `cpu_ok`: false means no model rather than the processor.
+    load_final: "Callable[[SttModel, Path, Progress | None, bool], FinalStt] | None"
 
 
 ENGINES: dict[str, Engine] = {

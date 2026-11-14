@@ -1,14 +1,14 @@
 [
   {
-    "url": "https://files.pythonhosted.org/packages/e2/2a/4f27ca96232e8b5269074a72e03b4e0d43aa68c9b965058b1684d07c6ff8/nvidia_cublas_cu12-12.4.5.8-py3-none-win_amd64.whl",
-    "path": "cuda/wheels/nvidia_cublas_cu12-12.4.5.8-py3-none-win_amd64.whl",
-    "bytes": 396895858,
-    "sha256": "5a796786da89203a0657eda402bcdcec6180254a8ac22d72213abc42069522dc"
+    "url": "https://files.pythonhosted.org/packages/70/61/7d7b3c70186fb651d0fbd35b01dbfc8e755f69fd58f817f3d0f642df20c3/nvidia_cublas_cu12-12.8.4.1-py3-none-win_amd64.whl",
+    "path": "cuda/wheels/nvidia_cublas_cu12-12.8.4.1-py3-none-win_amd64.whl",
+    "bytes": 567544208,
+    "sha256": "47e9b82132fa8d2b4944e708049229601448aaad7e6f296f630f2d1a32de35af"
   },
   {
-    "url": "https://files.pythonhosted.org/packages/3f/d0/f90ee6956a628f9f04bf467932c0a25e5a7e706a684b896593c06c82f460/nvidia_cudnn_cu12-9.1.0.70-py3-none-win_amd64.whl",
-    "path": "cuda/wheels/nvidia_cudnn_cu12-9.1.0.70-py3-none-win_amd64.whl",
-    "bytes": 679925892,
-    "sha256": "6278562929433d68365a07a4a1546c237ba2849852c0d4b2262a486e805b977a"
+    "url": "https://files.pythonhosted.org/packages/3d/90/0bd6e586701b3a890fd38aa71c387dab4883d619d6e5ad912ccbd05bfd67/nvidia_cudnn_cu12-9.10.2.21-py3-none-win_amd64.whl",
+    "path": "cuda/wheels/nvidia_cudnn_cu12-9.10.2.21-py3-none-win_amd64.whl",
+    "bytes": 692992268,
+    "sha256": "c6288de7d63e6cf62988f0923f96dc339cea362decb1bf5b3141883392a7d65e"
   }
 ]

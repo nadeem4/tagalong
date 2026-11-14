@@ -14,7 +14,8 @@ and how to run it again. Harness: `brain/tools/stt_bench/` (see [voice.md](voice
   numbers are friendlier than a real room and the ranking between close models is weak evidence.
 - Columns: WER (lower is better); name kept (the first word, after "hey", passes the
   sound-alike rule for "Scout"); CPU cores (process CPU time over wall time while decoding; it
-  adds up all threads); GPU peak % (nvidia-smi); s per clip (mean decode time for a whole clip
+  adds up all threads); device (what the final model really ran on: a requested-GPU run that
+  ended on the processor reads cpu); GPU peak % (nvidia-smi); s per clip (mean decode time for a whole clip
   fed at once, so for a final model it is the wait after the end of the turn; for a live model it
   is feed plus finish, not a real-time figure). Clips run about 3 to 5 s long.
 
