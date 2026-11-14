@@ -2279,9 +2279,9 @@ listen first loads the ears.
 - **Models** load on the first `listen`, not at start. Files live in `<TAGALONG_HOME>/voice`
   (no new setting): `ears/silero-vad/model.onnx` and `ears/smart-turn-v3/…onnx` (about 11 MB,
   pinned to a commit with a SHA-256, written to `.part` then renamed, one retry on a bad hash)
-  and `moonshine/` (about 45 MB for tiny, the default; small and medium are bigger; fetched by
+  and `moonshine/` (about 120 MB for small, the Auto live model; tiny is about 45 MB and medium bigger; fetched by
   `moonshine-voice` into that folder). The first `listen` on a new computer downloads about
-  56 MB. The live model is the row `voice/stt.py` resolves (`TAGALONG_STT_LIVE`, else Auto), loaded
+  130 MB (and about 1.5 GB more for turbo when a card is found). The live model is the row `voice/stt.py` resolves (`TAGALONG_STT_LIVE`, else Auto), loaded
   through `voice/engines`; see docs/voice.md, Speech models.
 - **Python** is pinned to `>=3.12,<3.14` (`kokoro-onnx` supports 3.10 to 3.13). Dependencies:
   `moonshine-voice`, `onnxruntime`, `numpy`, `kokoro-onnx`. Linux wheels exist for all of them, so

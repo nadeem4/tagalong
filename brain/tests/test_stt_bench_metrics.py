@@ -20,6 +20,14 @@ def test_wer_basic():
     assert wer("hello there", "") == 1.0
 
 
+def test_wer_reads_spelled_out_numbers_as_digits():
+    # Whisper writes digits where the corpus spells numbers out; the same words must score 0.
+    spoken = "find the file called budget two thousand twenty six"
+    assert wer(spoken, "Find the file called budget 2026.") == 0.0
+    assert wer("what is three hundred and forty seven times twelve", "What is 347 times 12?") == 0.0
+    assert wer("what is twelve times twelve", "what is 12 times 13") == 0.2
+
+
 @pytest.mark.parametrize(
     "text",
     ["Scott, what is this?", "scot what is this", "Scoot, help me", "Skout, help me",

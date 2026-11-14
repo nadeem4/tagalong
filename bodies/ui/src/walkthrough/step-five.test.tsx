@@ -105,11 +105,11 @@ describe('StepFive', () => {
     );
   });
 
-  it('mentions the 92 MB voice download and the 43 MB listening models', async () => {
+  it('mentions the 92 MB voice download and the 120 MB listening models', async () => {
     mount();
     await screen.findByLabelText('Talk key');
     expect(screen.getByText(/about 92 MB/)).toBeInTheDocument();
-    expect(screen.getByText(/about 43 MB/)).toBeInTheDocument();
+    expect(screen.getByText(/about 120 MB/)).toBeInTheDocument();
   });
 
   it('saves nothing when nothing was changed', async () => {
@@ -129,7 +129,7 @@ describe('StepFive', () => {
       'Hold the talk key, ask out loud, let go. Scout answers in short spoken sentences, and the words show in the bubble too.',
       'Reads answers aloud, so you can look away.',
       'Made on your computer. The voice downloads the first time Scout speaks (about 92 MB); until then Scout uses the Windows voice.',
-      'Your voice is turned into text by your own brain and is never stored. With the brain on this computer, it never leaves it. The listening models download the first time you talk (about 43 MB).',
+      'Your voice is turned into text by your own brain and is never stored. With the brain on this computer, it never leaves it. The listening models download the first time you talk (about 120 MB, and about 1.5 GB more on a PC with a graphics card).',
       '(hold it on its own)',
     ]) {
       expect(screen.getByText(text)).toBeInTheDocument();

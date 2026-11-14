@@ -1287,7 +1287,7 @@ popup); the answer is text only.
 
 Run from source with the brain running, a microphone and speakers.
 The brain hears and speaks: the first spoken question makes it fetch its speech models (Silero VAD,
-Moonshine tiny and Smart Turn, about 43 MB). With `TAGALONG_FAKE_MIC=1` Chromium's fake microphone
+Moonshine small and Smart Turn, about 120 MB). With `TAGALONG_FAKE_MIC=1` Chromium's fake microphone
 stands in for a real one (the brain still needs to hear something).
 
 ### T.1. Hold to talk
@@ -1295,7 +1295,7 @@ stands in for a real one (the brain still needs to hear something).
 1. **Setup:** a fresh brain data folder, so the speech models are not downloaded yet.
 2. **Action:** hold Right Ctrl on its own, say "what am I looking at?", let go.
 3. **Expected:** the bubble opens with a pulsing dot and "Listening…" while the key is held, and a
-   note while the brain loads its speech models (about 43 MB the first time). Once they have loaded, the
+   note while the brain loads its speech models (about 120 MB the first time). Once they have loaded, the
    words you are saying appear under "Listening…" as you talk. On letting go it says "Turning that
    into text…", then shows what it heard and answers. Windows shows the microphone in use only
    while the key is held.

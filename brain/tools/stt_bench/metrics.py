@@ -6,13 +6,53 @@ import re
 
 import numpy as np
 
-# Mirrors bodies/ui/src/shapes/addressing.ts: the first word after an optional hey/ok/okay,
-# which must end there ("Scout's" is talk about Scout, not to it).
+# Mirrors only the soundalike and first-word rule of bodies/ui/src/shapes/addressing.ts: the
+# first word after an optional hey/ok/okay, which must end there ("Scout's" is talk about Scout,
+# not to it).
 _LEADING = re.compile(r"^\s*(?:(?:hey|okay|ok)\b[\s\W]*)?([^\W\d_]+)(?![^\W\d_]|['’-])", re.I)
 
 
+_UNITS = {w: i for i, w in enumerate(
+    "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen "
+    "fifteen sixteen seventeen eighteen nineteen".split())}  # fmt: skip
+_TENS = {w: 10 * i for i, w in enumerate(
+    "_ _ twenty thirty forty fifty sixty seventy eighty ninety".split()) if w != "_"}  # fmt: skip
+
+
+def _digits(words: list[str]) -> list[str]:
+    """Spelled-out numbers ("two thousand twenty six") as digits, as Whisper writes them."""
+    out: list[str] = []
+    total = part = 0
+    run = False
+    for i, w in enumerate(words + [""]):
+        nxt = words[i + 1] if i + 1 < len(words) else ""
+        if (
+            w in _UNITS
+            or w in _TENS
+            or w in ("hundred", "thousand")
+            or (w == "and" and run and (nxt in _UNITS or nxt in _TENS))
+        ):
+            run = True
+            if w in _UNITS:
+                part += _UNITS[w]
+            elif w in _TENS:
+                part += _TENS[w]
+            elif w == "hundred":
+                part = max(part, 1) * 100
+            elif w == "thousand":
+                total, part = total + max(part, 1) * 1000, 0
+            continue
+        if run:
+            out.append(str(total + part))
+            total = part = 0
+            run = False
+        if w:
+            out.append(w)
+    return out
+
+
 def _words(text: str) -> list[str]:
-    return re.sub(r"[^\w\s']", " ", text.lower()).split()
+    return _digits(re.sub(r"[^\w\s']", " ", text.lower()).split())
 
 
 def wer(reference: str, hypothesis: str) -> float:

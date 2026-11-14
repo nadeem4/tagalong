@@ -110,6 +110,12 @@ def test_final_same_and_off_resolve_to_none():
     assert resolved(env_final="off").final is None
 
 
+def test_stale_final_id_is_auto():
+    gpu = resolve(None, "gone", None, None, Hardware(gpu=True))
+    assert gpu.final is not None and gpu.final.id == "whisper-large-v3-turbo"
+    assert resolved(saved_final="gone").final is None  # Auto on this hardware has no final
+
+
 def test_final_model_cannot_be_chosen_as_live(monkeypatch):
     final_only = stt.SttModel("w", "W", "final", "moonshine", (), 1, "none", ("en",), "", {})
     shipped = load_models()
@@ -145,10 +151,15 @@ def _fake_ct2(monkeypatch, count):
     )
 
 
-def _fake_cublas(monkeypatch, found):
+def _fake_cublas(monkeypatch, found, cudnn=True):
     import ctypes.util
 
-    monkeypatch.setattr(ctypes.util, "find_library", lambda name: "x.dll" if found else None)
+    def find(name):
+        if name.startswith("cudnn"):
+            return "d.dll" if cudnn else None
+        return "x.dll" if found else None
+
+    monkeypatch.setattr(ctypes.util, "find_library", find)
 
 
 def test_detect_hardware_counts_cuda_devices_through_ctranslate2(monkeypatch):
@@ -165,6 +176,47 @@ def test_detect_hardware_needs_the_cuda_libraries_not_only_the_card(monkeypatch)
     _fake_cublas(monkeypatch, False)
     _fake_ct2(monkeypatch, lambda: 1)
     assert stt.detect_hardware() == Hardware(gpu=False)
+
+
+def test_detect_hardware_needs_cudnn_too(monkeypatch):
+    _fake_cublas(monkeypatch, True, cudnn=False)
+    _fake_ct2(monkeypatch, lambda: 1)
+    assert stt.detect_hardware() == Hardware(gpu=False)
+
+
+def _auto_rows(**over):
+    hints = {
+        "a": {"cpu": "live", "gpu": "live"},
+        "b": {"gpu": "final"},
+        **over,
+    }
+    return [
+        row(id="a", auto=hints["a"]),
+        row(id="b", role="final", engine="moonshine", auto=hints["b"]),
+    ]
+
+
+def test_auto_hint_must_match_the_rows_role():
+    with pytest.raises(ValueError, match="b.*role"):
+        models(*_auto_rows(b={"gpu": "live"}))
+    with pytest.raises(ValueError, match="a.*role"):
+        models(*_auto_rows(a={"cpu": "live", "gpu": "final"}))
+
+
+def test_auto_needs_exactly_one_live_per_hardware():
+    only_cpu = [row(id="a", auto={"cpu": "live"})]
+    with pytest.raises(ValueError, match="gpu.*live"):
+        models(*only_cpu)
+    two = [*_auto_rows(), row(id="c", auto={"cpu": "live", "gpu": "live"})]
+    with pytest.raises(ValueError, match="cpu.*live"):
+        models(*two)
+
+
+def test_auto_allows_at_most_one_final_per_hardware():
+    two = [*_auto_rows(), row(id="c", role="final", auto={"gpu": "final"})]
+    with pytest.raises(ValueError, match="gpu.*final"):
+        models(*two)
+    assert len(models(*_auto_rows())) == 2
 
 
 def test_detect_hardware_says_no_gpu_when_the_probe_fails(monkeypatch):

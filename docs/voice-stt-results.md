@@ -48,6 +48,13 @@ Notes on the numbers, nothing rounded away:
 - WER differences of about 0.01 (0.193 against 0.199) are one or two words over the corpus, not a
   real ranking. Turbo (0.199) is not better than Moonshine small or medium (0.193, 0.199) here.
 - One run per cell; no repeat to estimate noise.
+- **The WER numbers carry a bias.** The corpus references spell numbers out ("two thousand twenty
+  six", "three hundred and forty seven times twelve") and Whisper writes digits, so Whisper was
+  scored as wrong on words it got right. Turbo and small.en were probably penalised on the 2
+  number lines out of 5. The scorer now reads spelled-out numbers as digits; the numbers above
+  were measured before that and were not re-run. The GPU re-run in V3b will re-score them.
+- Not built (YAGNI): the optional nemotron and parakeet candidates, and a search for existing WAVs
+  on the PC to use as clips.
 
 ## Decision
 
@@ -61,8 +68,9 @@ disagree with parts of that:
   final pass.** On the CPU turbo takes about 10 s after the end of a turn, which is too slow for
   a conversation, and `whisper-small-en` takes 1.1 s but hears worse than Moonshine small
   (0.225 against 0.193), so it would make the transcript worse. The turbo-on-GPU choice is
-  **not measured**: this PC could not run the GPU. It stays the plan's pick for a PC with a card
-  and CUDA libraries, and the harness is how to check it there.
+  **not measured**: this PC could not run the GPU. Turbo as the GPU final rests on the plan's
+  assumption, not on these numbers; V3b measures it on a GPU. It stays the plan's pick for a PC
+  with a card and CUDA libraries, and the harness is how to check it there.
 - **The GPU probe needs the libraries, not only the card.** `detect_hardware` counts CUDA devices
   through CTranslate2 (so a PC with a driver but no toolkit is seen, and `CUDA_VISIBLE_DEVICES=-1`
   hides the card) and also requires cuBLAS to be found. Without it, this PC would have been told

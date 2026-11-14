@@ -404,7 +404,7 @@ Nothing is said aloud about it.
   is on: that question is asked as said, then listening carries on.
 - **Closing the bubble does not stop listening.** It drops a question being asked; switch Always
   listening off to stop.
-- **Models and size.** The same three models as above, about 43 MB in all, run on the CPU.
+- **Models and size.** The same three models as above, about 120 MB in all (Moonshine small is the Auto live model), run on the CPU. A PC with a usable graphics card also downloads Whisper turbo (about 1.5 GB) for the final pass.
 
 ## Dozing: your idle time
 

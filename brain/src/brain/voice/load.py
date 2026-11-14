@@ -65,7 +65,9 @@ def ears_loader(
     async def load_ears(on_progress: Callable[[float], None]) -> EarsParts:
         loop = asyncio.get_running_loop()
         # No saved choice yet (Home picks it in a later slice): the env default, else Auto.
-        hardware = await asyncio.to_thread(stt.detect_hardware)  # may spawn a process to look
+        hardware = await asyncio.to_thread(
+            stt.detect_hardware
+        )  # imports ctranslate2 and probes the CUDA libraries
         picked = stt.resolve(None, None, env_live, env_final, hardware)
         chosen, final_row = picked.live, picked.final
         engine = engines.ENGINES[chosen.engine]

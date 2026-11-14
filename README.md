@@ -227,7 +227,7 @@ Scout speaks cuts it off. When it is done the bubble says "Hold Right Ctrl to re
 The microphone opens on that key or the mic button, or all the time only if you switch Always
 listening on in the bubble (then start with "Scout"; "Scout, stop" turns it off; it pauses while a
 call or a full-screen window is in front, and while the pets are hidden). Your speech is turned into text by your own brain, by
-small models (Silero VAD, Moonshine and Smart Turn) downloaded the first time (about 43 MB).
+small models (Silero VAD, Moonshine and Smart Turn) downloaded the first time (about 120 MB, and about 1.5 GB more on a PC with a graphics card, for the second listen).
 A larger Moonshine can be chosen with `TAGALONG_STT_LIVE`, and `TAGALONG_STT_FINAL` adds a second
 pass: when you finish, Whisper (small, or large on a graphics card) hears the whole turn again and its words
 are what Scout is asked (see `.env.example`). If it is missing or fails, the live words are used.
@@ -408,24 +408,24 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 
 ## Troubleshooting
 
-| Problem                                                  | What to do                                                                                                                                              |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Scout shows **Signed out**, **No brain** or **No key**   | Click Scout: the bubble's row says why it can't think. **Fix it** opens the right place in Settings.                                                    |
-| Scout says it has no API key                             | Open **Home → Settings → Anthropic key** and enter your key.                                                                                            |
-| Scout ignores the screenshot, or warns it cannot see     | Its model is text-only. Use a Claude model in the brain's setup.                                                                                        |
-| A hotkey does nothing                                    | Settings and the bubble name any key another app already owns; pick another. Check that sight is not paused (tray → **Pause sight**).                   |
-| Scout is silent                                          | Check **Scout talks** in Home → Settings → Voice, and your sound output. The stop key only silences the current answer.                                 |
-| Talk to Scout says it could not open the microphone      | Windows Settings → Privacy → Microphone: let desktop apps use it. Pick the right microphone in Home → Settings → Voice.                                 |
-| Scout shows **Mic busy**, **No mic** or **Can't listen** | Click Scout: the bubble's row says why, and **Fix it** opens Voice settings. Close the app holding the microphone; Can't listen retries itself.         |
-| With Always listening on, Scout doesn't react            | Say "Scout" first ("Scout, what is this?"). The dot pulses when it hears you. Right after Scout answers aloud, a reply needs no name for 20 s.          |
-| The first spoken question takes a while                  | The first time, Tagalong downloads its speech models (about 43 MB). After that they are read from disk.                                                 |
-| Scout's voice changes after the first answers            | The first time it speaks, Scout downloads its voice (about 92 MB) and uses the Windows voice until then. Offline, it keeps the Windows voice.           |
-| The browser popup says Scout's brain is not reachable    | Start a brain (`pnpm dev:desktop` does, or `cd brain && uv run brain`). If it runs elsewhere, set its address in the popup. The body retries by itself. |
-| "Windows protected your PC" when installing              | The installer is unsigned. Click **More info**, then **Run anyway**.                                                                                    |
-| Sending logs with a problem report                       | Ask Scout "what's wrong?", press **Open logs folder** (`%APPDATA%\Tagalong\logs`). Warnings and errors only, never speech or screen text.               |
-| You want to start over                                   | Quit Tagalong and delete `%APPDATA%\Tagalong`. That removes settings, conversations, memories and stored keys.                                          |
-| From source, Scout never knows which window you are on   | The active-window helper was not downloaded: run `node bodies/desktop/scripts/fetch-native.mjs`. The installer already includes it.                     |
-| It does not start on macOS or Linux                      | Not in this build: only Windows has a platform adapter so far.                                                                                          |
+| Problem                                                  | What to do                                                                                                                                                                       |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scout shows **Signed out**, **No brain** or **No key**   | Click Scout: the bubble's row says why it can't think. **Fix it** opens the right place in Settings.                                                                             |
+| Scout says it has no API key                             | Open **Home → Settings → Anthropic key** and enter your key.                                                                                                                     |
+| Scout ignores the screenshot, or warns it cannot see     | Its model is text-only. Use a Claude model in the brain's setup.                                                                                                                 |
+| A hotkey does nothing                                    | Settings and the bubble name any key another app already owns; pick another. Check that sight is not paused (tray → **Pause sight**).                                            |
+| Scout is silent                                          | Check **Scout talks** in Home → Settings → Voice, and your sound output. The stop key only silences the current answer.                                                          |
+| Talk to Scout says it could not open the microphone      | Windows Settings → Privacy → Microphone: let desktop apps use it. Pick the right microphone in Home → Settings → Voice.                                                          |
+| Scout shows **Mic busy**, **No mic** or **Can't listen** | Click Scout: the bubble's row says why, and **Fix it** opens Voice settings. Close the app holding the microphone; Can't listen retries itself.                                  |
+| With Always listening on, Scout doesn't react            | Say "Scout" first ("Scout, what is this?"). The dot pulses when it hears you. Right after Scout answers aloud, a reply needs no name for 20 s.                                   |
+| The first spoken question takes a while                  | The first time, Tagalong downloads its speech models (about 120 MB; a PC with a graphics card also fetches about 1.5 GB for the final pass). After that they are read from disk. |
+| Scout's voice changes after the first answers            | The first time it speaks, Scout downloads its voice (about 92 MB) and uses the Windows voice until then. Offline, it keeps the Windows voice.                                    |
+| The browser popup says Scout's brain is not reachable    | Start a brain (`pnpm dev:desktop` does, or `cd brain && uv run brain`). If it runs elsewhere, set its address in the popup. The body retries by itself.                          |
+| "Windows protected your PC" when installing              | The installer is unsigned. Click **More info**, then **Run anyway**.                                                                                                             |
+| Sending logs with a problem report                       | Ask Scout "what's wrong?", press **Open logs folder** (`%APPDATA%\Tagalong\logs`). Warnings and errors only, never speech or screen text.                                        |
+| You want to start over                                   | Quit Tagalong and delete `%APPDATA%\Tagalong`. That removes settings, conversations, memories and stored keys.                                                                   |
+| From source, Scout never knows which window you are on   | The active-window helper was not downloaded: run `node bodies/desktop/scripts/fetch-native.mjs`. The installer already includes it.                                              |
+| It does not start on macOS or Linux                      | Not in this build: only Windows has a platform adapter so far.                                                                                                                   |
 
 # For developers
 

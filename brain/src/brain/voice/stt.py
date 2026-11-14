@@ -101,7 +101,25 @@ def load_models(text: str | None = None) -> tuple[SttModel, ...]:
     for i in ids:
         if ids.count(i) > 1:
             raise ValueError(f"speech model {i!r} is listed twice")
+    _check_auto(rows)
     return rows
+
+
+def _check_auto(rows: tuple[SttModel, ...]) -> None:
+    for m in rows:
+        for kind in m.auto.values():
+            ok = m.role in ("live", "both") if kind == "live" else m.role in ("final", "both")
+            if not ok:
+                raise ValueError(f"speech model {m.id!r}: auto {kind} does not match its role")
+    if not any(m.auto for m in rows):
+        return  # a list with no hints at all (a test list) leaves the choice to the caller
+    for key in ("cpu", "gpu"):
+        lives = [m.id for m in rows if m.auto.get(key) == "live"]
+        finals = [m.id for m in rows if m.auto.get(key) == "final"]
+        if len(lives) != 1:
+            raise ValueError(f"auto needs exactly one {key} live row, found {lives}")
+        if len(finals) > 1:
+            raise ValueError(f"auto allows at most one {key} final row, found {finals}")
 
 
 def model_by_id(model_id: str) -> SttModel | None:
@@ -116,7 +134,7 @@ class Hardware:
 def detect_hardware() -> Hardware:
     # CTranslate2 (faster-whisper's engine) asks the NVIDIA driver itself, so a PC with a driver
     # but no CUDA toolkit still counts, and CUDA_VISIBLE_DEVICES=-1 hides the card. A card alone
-    # is not enough: without cuBLAS the final model cannot use it (measured on the dev PC).
+    # is not enough: without cuBLAS or cuDNN the final model cannot use it (measured on the dev PC).
     # Callers on the event loop run this in a thread (the first import is slow).
     import ctypes.util
 
@@ -126,8 +144,10 @@ def detect_hardware() -> Hardware:
         cards = ctranslate2.get_cuda_device_count() > 0
     except Exception:
         return Hardware(gpu=False)
-    libs = ctypes.util.find_library("cublas64_12") or ctypes.util.find_library("cublas")
-    return Hardware(gpu=cards and libs is not None)
+    find = ctypes.util.find_library
+    cublas = find("cublas64_12") or find("cublas")
+    cudnn = find("cudnn64_9") or find("cudnn")  # faster-whisper's GPU path needs both
+    return Hardware(gpu=cards and cublas is not None and cudnn is not None)
 
 
 @dataclass(frozen=True)
@@ -155,7 +175,7 @@ def resolve(
     hardware: Hardware,
 ) -> Resolved:
     """The models to load. A missing, stale or wrong-role id is Auto: the rows' `auto` hints for
-    this hardware. `same` and `off` (and any other non-model) mean no final pass."""
+    this hardware. Only `same` and `off` mean no final pass."""
     listed = load_models()
     live_id = _pick(saved_live, env_live)
     live = next((m for m in listed if m.id == live_id and m.role in ("live", "both")), None)
@@ -163,8 +183,9 @@ def resolve(
         live = auto_pick(listed, "live", hardware)
         assert live is not None, "stt_models.json has no Auto live row"
     final_id = _pick(saved_final, env_final)
-    if final_id == AUTO:
-        final = auto_pick(listed, "final", hardware)
-    else:
+    final = None
+    if final_id not in ("same", "off"):
         final = next((m for m in listed if m.id == final_id and m.role in ("final", "both")), None)
+        if final is None:  # Auto, or a stale or unknown id
+            final = auto_pick(listed, "final", hardware)
     return Resolved(live, final)
