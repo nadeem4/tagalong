@@ -1214,6 +1214,32 @@ popup); the answer is text only.
    **Automated (V3):** from `brain/`, run `uv run pytest tests/test_voice_stt.py` (the Auto rule
    and the hardware probe, on fakes).
 
+### V.5c1. Choose the speech models in Settings
+
+1. **Setup:** the app running on a real brain; open Settings and find **Speech to text** after Voice.
+2. **Expected:** a chip shows your graphics card's name with a green dot, or a grey "No graphics
+   card"; **While you talk** and **When you finish** both read **Auto**; the second list also has
+   **Don't double-check**; sizes show beside each model.
+3. **Action:** pick Moonshine tiny under **While you talk**.
+4. **Expected:** "Saved." shows at once. The next time you hold the talk key the brain loads that
+   model (the loading progress shows if it must download). A talk already running is not changed.
+5. **Action:** pick **Don't double-check** under **When you finish** and talk.
+6. **Expected:** no second pass runs; the live words are what Scout is asked.
+7. **Action:** with no graphics card, open **When you finish**.
+8. **Expected:** a model that needs a graphics card says so and cannot be picked.
+   **Automated (V4):** `uv run pytest tests/test_voice_stt_choice.py` from `brain/`;
+   `pnpm --filter @tagalong/ui exec vitest run src/voice/voice-models-field.test.tsx`; the e2e
+   `key-settings.spec.ts` (Speech to text).
+
+### V.5c3. Show words while I talk
+
+1. **Setup:** Settings → Speech to text → **Show words while I talk** is on (the default).
+2. **Action:** hold the talk key and speak.
+3. **Expected:** your words appear as you talk.
+4. **Action:** switch it off, Save, hold the key and speak.
+5. **Expected:** nothing shows while the key is held; the text appears when you let go. With
+   Always listening on, words still show as you talk, whichever way the switch is set.
+
 ### V.5c2. The NVIDIA libraries are fetched on demand (Windows, graphics card)
 
 1. **Setup:** a PC with an NVIDIA card and driver but no CUDA toolkit; `<TAGALONG_HOME>/voice/cuda`

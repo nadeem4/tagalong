@@ -58,7 +58,25 @@ describe('SettingsFormView', () => {
 
   it('draws every section as a home card', () => {
     const html = render();
-    expect(html.match(/<section [^>]*class="[^"]*tg-card/g)).toHaveLength(8);
+    expect(html.match(/<section [^>]*class="[^"]*tg-card/g)).toHaveLength(9);
+  });
+
+  it('has the Speech to text card after Voice, with the show-words switch on by default', () => {
+    const html = render();
+    expect(html.indexOf('>Speech to text<')).toBeGreaterThan(html.indexOf('id="voice"'));
+    expect(html).toContain('Show words while I talk');
+    expect(html).toMatch(/<input[^>]*type="hidden"[^>]*name="showWordsWhileTalking"/);
+  });
+
+  it('leaves the hidden show-words field out when the setting is off', () => {
+    const off = {
+      settings: {
+        ...SETTINGS_DEFAULTS,
+        voice: { ...SETTINGS_DEFAULTS.voice, showWordsWhileTalking: false },
+      },
+      platform: 'win32',
+    } as unknown as HostView;
+    expect(render('', false, off)).not.toContain('name="showWordsWhileTalking"');
   });
 
   it('shows the ask shortcut as keycaps, never CommandOrControl as text', () => {

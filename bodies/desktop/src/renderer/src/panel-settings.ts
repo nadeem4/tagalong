@@ -17,6 +17,8 @@ export interface PanelSettings {
   /** Who speaks: the brain's Kokoro audio, or the system voice. */
   mouth: 'kokoro' | 'system';
   speed: number;
+  /** Push-to-talk shows words as they come; off, only the final text at release. */
+  showWords: boolean;
 }
 
 export function panelSettings(settings: Settings): PanelSettings {
@@ -25,5 +27,6 @@ export function panelSettings(settings: Settings): PanelSettings {
     microphoneId: settings.voice.microphoneId,
     mouth: chosenMouth(settings.voice) === 'system' ? 'system' : 'kokoro',
     speed: settings.voice.speed,
+    showWords: settings.voice.showWordsWhileTalking !== false,
   };
 }

@@ -135,6 +135,11 @@ const settingsFields = {
     mouth: z.enum(MOUTH_IDS).optional(),
     /** Who listens. Absent: the local ears. */
     ears: z.enum(EARS_IDS).optional(),
+    /**
+     * Push-to-talk: show words as they come (the default) or only when the key is let go.
+     * Absent means on. Listening always ignores it.
+     */
+    showWordsWhileTalking: z.boolean().optional(),
   }),
   /** Whether Scout listens all the time, hearing only turns that start with its name. */
   listening: z.object({ always: z.boolean() }),

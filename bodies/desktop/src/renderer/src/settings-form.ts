@@ -21,6 +21,8 @@ export interface SettingsFormValues {
   microphoneId?: string;
   mouth?: string;
   ears?: string;
+  /** Whether push-to-talk shows words as they come. Absent when the form does not show it. */
+  showWordsWhileTalking?: boolean;
 }
 
 /**
@@ -68,6 +70,9 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
               : {}),
             ...(values.mouth !== undefined && values.mouth !== '' ? { mouth: values.mouth } : {}),
             ...(values.ears !== undefined && values.ears !== '' ? { ears: values.ears } : {}),
+            ...(values.showWordsWhileTalking !== undefined
+              ? { showWordsWhileTalking: values.showWordsWhileTalking }
+              : {}),
           },
         }
       : {}),

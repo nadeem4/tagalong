@@ -45,6 +45,7 @@ import type {
   BodiesState,
   LoopsState,
   ModelState,
+  SttState,
   TimerRow,
   UpdateKind,
   UpdateResult,
@@ -187,6 +188,9 @@ const bridge: PreloadBridge = {
   setDailyLimit: (usd: number) => ipcRenderer.invoke(IPC.limitSet, usd) as Promise<void>,
   modelState: () => ipcRenderer.invoke(IPC.modelState) as Promise<ModelState>,
   setModel: (model: string) => ipcRenderer.invoke(IPC.modelSet, model) as Promise<void>,
+  sttState: () => ipcRenderer.invoke(IPC.sttState) as Promise<SttState>,
+  setStt: (choice: { live?: string; final?: string }) =>
+    ipcRenderer.invoke(IPC.sttSet, choice) as Promise<void>,
   openWalkthrough: (step?: number) =>
     ipcRenderer.invoke(IPC.walkthroughOpen, { step }) as Promise<void>,
   onBrainChanged: (handler: (what: string) => void) => {

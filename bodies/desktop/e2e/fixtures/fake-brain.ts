@@ -98,6 +98,8 @@ export interface FakeBrain {
   limits: number[];
   /** Every model id Settings sent to `set_model`, in order. */
   models: string[];
+  /** Every pick Settings sent to `set_stt` (the speech models), in order. */
+  sttSets: Record<string, unknown>[];
   /** Every job id Home sent to `stop_job`, in order. */
   stops: string[];
   /** Every expert id the desktop sent to `setup_expert`, in order (the first one installs it). */
@@ -482,6 +484,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   let gmailConnected = false;
   const limits: number[] = [];
   const models: string[] = [];
+  const sttSets: Record<string, unknown>[] = [];
+  const stt = { live: 'auto', final: 'auto' };
   let model = 'claude-opus-5-5';
   let hasKey = options.hasKey ?? true;
   let dailyLimitUsd = 5;
@@ -1028,6 +1032,38 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           models.push(model);
           notify('changed', { what: 'model' });
           value = { model };
+        } else if (params.tool === 'stt_state') {
+          value = {
+            ...stt,
+            gpu_name: 'NVIDIA GeForce RTX 4060',
+            models: [
+              {
+                id: 'moonshine-tiny',
+                label: 'Moonshine tiny',
+                role: 'live',
+                size_mb: 45,
+                gpu: 'none',
+                languages: ['en'],
+                note: '',
+              },
+              {
+                id: 'whisper-small-en',
+                label: 'Whisper small (English)',
+                role: 'final',
+                size_mb: 462,
+                gpu: 'preferred',
+                languages: ['en'],
+                note: '',
+              },
+            ],
+          };
+        } else if (params.tool === 'set_stt') {
+          const pick = (params.input ?? {}) as Record<string, unknown>;
+          sttSets.push(pick);
+          if (typeof pick.live === 'string') stt.live = pick.live;
+          if (typeof pick.final === 'string') stt.final = pick.final;
+          notify('changed', { what: 'stt' });
+          value = { ...stt };
         } else if (params.tool === 'setup_overview') {
           if (failSearches === 'hang' && String(params.input?.query ?? '') !== '') return;
           if (failSearches && String(params.input?.query ?? '') !== '') {
@@ -1382,6 +1418,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     },
     limits,
     models,
+    sttSets,
     stops,
     knowStarts,
     expertSetups,

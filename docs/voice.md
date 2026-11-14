@@ -600,8 +600,22 @@ The words come from a list of models kept as data, not from one hard-wired model
   live is `moonshine-small` on any PC; Auto final is `whisper-large-v3-turbo` when a usable
   graphics card is found (`detect_hardware`: CTranslate2 sees an NVIDIA device and the NVIDIA libraries
   are found: a device plus cuBLAS and cuDNN, on the system or in `<TAGALONG_HOME>/voice/cuda`) and no final pass otherwise. `same` and `off` mean no final pass. The numbers behind
-  this are in [voice-stt-results.md](voice-stt-results.md). Only the environment values exist so
-  far; the saved choice comes with the Home picker. A change applies on the next listen, never under a running session.
+  this are in [voice-stt-results.md](voice-stt-results.md). The saved choice is the pair
+  `stt_live` and `stt_final` in the brain's `settings` table (`voice/stt_choice.py`): `auto` is the
+  default, `off` for the final pass means no final pass, and a stale id reads as unset. An explicit
+  saved Auto beats the environment default. Home sets it through two Home-only tools
+  (`voice/stt_tools.py`): `stt_state` (`{live, final, models, gpu_name}`; `gpu_name` is the first
+  line of `nvidia-smi --query-gpu=name --format=csv,noheader` on Windows, else null) and `set_stt
+{live?, final?}`, which validates, saves, makes the next listen reload the ears
+  (`VoiceService.reload`) and sends `changed {what: "stt"}`. A change applies on the next listen,
+  never under a running session.
+- **The picker.** Settings has a **Speech to text** card after Voice (`stt-section.tsx` over the shared
+  `VoiceModelsField`): a chip with the graphics card or "No graphics card", **While you talk** (Auto
+  and the live models with their sizes) and **When you finish** (Auto, "Don't double-check" and the
+  final models; a model that needs a graphics card says so and is disabled when there is none). A pick saves at
+  once. The same card has **Show words while I talk**, the desktop setting
+  `voice.showWordsWhileTalking` (default on): off, push-to-talk hides the words until the talk key is
+  let go and the final text appears. Always listening ignores it.
 - **The final pass.** The live model's words are a preview. While a turn runs, the ears keep its
   audio in memory (the pre-roll and every stretch, at most the last 60 s). When the turn ends,
   the final model (`faster-whisper`, rows `whisper-large-v3-turbo` and `whisper-small-en`,
