@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from brain.voice.moonshine import Moonshine
+from brain.voice.engines.moonshine import Moonshine
 
 
 class FakeStream:

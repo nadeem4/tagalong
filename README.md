@@ -228,6 +228,7 @@ The microphone opens on that key or the mic button, or all the time only if you 
 listening on in the bubble (then start with "Scout"; "Scout, stop" turns it off; it pauses while a
 call or a full-screen window is in front, and while the pets are hidden). Your speech is turned into text by your own brain, by
 small models (Silero VAD, Moonshine and Smart Turn) downloaded the first time (about 43 MB).
+A larger Moonshine can be chosen with `TAGALONG_STT_LIVE` (see `.env.example`).
 Audio goes only to your own brain and is never stored; with the brain on this computer it never leaves it.
 
 **Read it to me.** Type or say "read this to me" and Scout reads your selection, or the window in

@@ -390,3 +390,9 @@ def test_started_by_desktop():
 def test_build_reads_env():
     assert load_config({}).build is None
     assert load_config({"TAGALONG_BUILD": "0.9.2"}).build == "0.9.2"
+
+
+def test_stt_choice_env_names():
+    assert (load_config({}).stt_live, load_config({}).stt_final) == (None, None)
+    cfg = load_config({"TAGALONG_STT_LIVE": "moonshine-small", "TAGALONG_STT_FINAL": "off"})
+    assert (cfg.stt_live, cfg.stt_final) == ("moonshine-small", "off")

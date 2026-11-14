@@ -305,7 +305,9 @@ async def _run() -> None:
     lag_watch: asyncio.Task | None = None
     perf_dump: asyncio.Task | None = None
     voice = VoiceService(  # models load on first listen and first spoken turn
-        bodies, ears_loader(config.data_dir), tts_loader(config.data_dir)
+        bodies,
+        ears_loader(config.data_dir, config.stt_live, config.stt_final),
+        tts_loader(config.data_dir),
     )
     session.voice = voice
     voice.follow_speech(session.dispatcher.set_mouth_state)

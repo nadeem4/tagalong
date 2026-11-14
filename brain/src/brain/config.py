@@ -46,6 +46,8 @@ class Config:
     port: int
     data_dir: Path
     model: str = DEFAULT_MODEL
+    stt_live: str | None = None  # speech model id, auto or unset; see voice/stt.py
+    stt_final: str | None = None  # same, plus `same` and `off`
     daily_budget_usd: float = DEFAULT_DAILY_BUDGET_USD
     step_cap: int = DEFAULT_STEP_CAP
     loop_lag_ms: int = DEFAULT_LOOP_LAG_MS
@@ -109,6 +111,8 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
         port=port,
         data_dir=data_dir,
         model=env.get("TAGALONG_MODEL") or DEFAULT_MODEL,
+        stt_live=env.get("TAGALONG_STT_LIVE") or None,
+        stt_final=env.get("TAGALONG_STT_FINAL") or None,
         daily_budget_usd=_budget(env.get("TAGALONG_DAILY_BUDGET_USD")),
         step_cap=_step_cap(env.get("TAGALONG_STEP_CAP")),
         loop_lag_ms=_positive_int(env, "TAGALONG_LOOP_LAG_MS", DEFAULT_LOOP_LAG_MS),

@@ -1201,6 +1201,16 @@ popup); the answer is text only.
 3. **Action:** set the speed slider to its fastest, Save, and ask a question by voice.
 4. **Expected:** the answer is spoken in the system voice at the saved speed, not at normal speed.
 
+### V.5c. Choose the live speech model
+
+1. **Setup:** a fresh brain data folder; stop the brain.
+2. **Action:** start the brain with `TAGALONG_STT_LIVE=moonshine-small`, hold the talk key and say
+   a sentence.
+3. **Expected:** after the first listen downloads the model (the loading progress shows), the
+   words appear as you talk, as before. Repeat with the variable unset or set to `auto`:
+   Moonshine tiny is used, as before. With an id that is not listed (`TAGALONG_STT_LIVE=nope`)
+   the brain still listens, with tiny.
+
 ### V.7. Read aloud: the mind decides what is said
 
 1. **Setup:** a real brain, Scout talks on. Have a research paper

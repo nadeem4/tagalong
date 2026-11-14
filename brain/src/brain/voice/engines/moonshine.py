@@ -1,15 +1,19 @@
-"""Moonshine (tiny, streaming) speech-to-text through the `moonshine-voice` package.
+"""Moonshine (streaming) speech-to-text, the live engine, through the `moonshine-voice` package.
 
 Frames go in as they come; `text` is every line the stream has so far; `reset` stops and
 restarts the stream, which drops the words; `finish` is `reset` that returns the final words.
-The package downloads its own model into `<voice folder>/moonshine`. `load` needs the
+The package downloads its own model into `<voice folder>/moonshine`. `load_live` needs the
 real model and is covered by the hand run; `Moonshine` is tested on a fake stream.
 """
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from brain.voice.stt import SttModel
 
 
 class Moonshine:
@@ -40,13 +44,13 @@ def _join(lines) -> str:
     return " ".join(line.text.strip() for line in lines if line.text.strip())
 
 
-def load(folder: Path, on_progress: Callable[[float], None] | None = None):
+def load_live(model: "SttModel", folder: Path, on_progress: Callable[[float], None] | None = None):
     from moonshine_voice import ModelArch, get_model_for_language
     from moonshine_voice.transcriber import Transcriber
 
     path, arch = get_model_for_language(
         "en",
-        ModelArch.TINY_STREAMING,
+        ModelArch[model.options["arch"]],
         cache_root=folder / "moonshine",
         on_progress=(lambda fraction, _name: on_progress(fraction)) if on_progress else None,
     )

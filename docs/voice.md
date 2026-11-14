@@ -577,6 +577,38 @@ Chrome's prompt cannot show from an offscreen page, so the first use opens a sma
 the microphone. If the link drops, listening ends with an error and is not restarted. The full
 description is [browser-body.md](browser-body.md#voice).
 
+## Speech models
+
+The words come from a list of models kept as data, not from one hard-wired model.
+
+- **The list** is `brain/src/brain/voice/stt_models.json`. Each row has an `id`, a `role`
+  (`live`, `final` or `both`), an `engine`, its files (each with a size and SHA-256, fetched like
+  the other voice models), `size_mb`, `gpu` (`none`, `preferred`, `required`), `languages`, a
+  `note` and `options`. Today it holds three Moonshine rows: `moonshine-tiny` (the one used so
+  far), `moonshine-small` and `moonshine-medium`. A bad row (unknown role or engine, a live model
+  on an engine that cannot stream, a duplicate id, a file without a hash) stops the loader and the
+  error names the row.
+- **Engines** are code: `voice/engines/<engine>.py`, registered in `voice/engines/__init__.py`
+  (`ENGINES`: does it stream, how to load a live model, how to load a final one). The loader
+  reaches a model only through `ENGINES[model.engine]`, so a new engine is one module, rows in the
+  list and a dependency, with no change to `load.py`.
+- **The choice** is the saved choice, then `TAGALONG_STT_LIVE` / `TAGALONG_STT_FINAL`, then Auto
+  (`resolve` in `voice/stt.py`). An id that is not listed, or names a model of the wrong role,
+  reads as Auto. Auto live is `moonshine-tiny`, as before; a final model is not used yet. Only
+  the environment values exist so far; the saved choice comes with the Home picker. A change
+  applies on the next listen, never under a running session.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+flowchart LR
+  env[TAGALONG_STT_LIVE] --> resolve[resolve in stt.py]
+  list[stt_models.json] --> resolve
+  resolve --> row[chosen row]
+  row --> engines[ENGINES by engine name]
+  engines --> live[LiveStt: Moonshine]
+  live --> ears[Ears]
+```
+
 ## Interfaces
 
 ### IPC channels
@@ -654,7 +686,8 @@ thresholds, the sentence rules) is in [brain.md](brain.md#brain-ears).
 
 ## Storage
 
-- **Models.** None on the desktop. The brain keeps them in its own data folder.
+- **Models.** None on the desktop. The brain keeps them in its own data folder; which speech
+  model is used is chosen from `stt_models.json` (see Speech models).
 - **Settings.** `voice.*`, `listening.always` and `hotkeys.talk` are in the settings store. See
   `settings-and-secrets.md`.
 - **Nothing heard.** Audio, transcripts and key events are not stored or logged anywhere by the
