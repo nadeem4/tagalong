@@ -5,7 +5,7 @@ import json
 import threading
 
 import pytest
-from fake_voice import parts
+from fake_voice import FakeFinal, parts
 
 from brain.voice import engines, load, stt
 from brain.voice.engines import Engine
@@ -99,3 +99,76 @@ async def test_loader_default_is_unchanged_tiny(monkeypatch, tmp_path):
     monkeypatch.setitem(engines.ENGINES, "moonshine", Engine(True, fake_load, None))
     await load.ears_loader(tmp_path)(lambda f: None)
     assert arches == ["TINY_STREAMING"]
+
+
+def _final_row():
+    row = stt.model_by_id("whisper-small-en")
+    assert row is not None
+    return row
+
+
+async def test_loader_downloads_final_files_with_progress_share(monkeypatch, tmp_path):
+    made = parts()
+    final = FakeFinal()
+    seen: list[float] = []
+    downloads: list[str] = []
+    _stubs(monkeypatch, made, [])
+
+    async def record(folder, files, fetch, on_progress):
+        downloads.extend(f.path for f in files)
+        for f in (0.0, 0.5, 1.0):
+            on_progress(f)
+
+    monkeypatch.setattr(load, "ensure_files", record)
+
+    def live_load(model, folder, on_progress):
+        on_progress(0.5)
+        return made.stt
+
+    monkeypatch.setitem(engines.ENGINES, "moonshine", Engine(True, live_load, None))
+    monkeypatch.setitem(
+        engines.ENGINES, "faster-whisper", Engine(False, None, lambda m, f, p: final)
+    )
+    got = await load.ears_loader(tmp_path, env_final="whisper-small-en")(seen.append)
+    await asyncio.sleep(0)
+
+    assert got.final is final
+    assert [f.path for f in _final_row().files] == [
+        d for d in downloads if d.startswith("stt/whisper-small-en/")
+    ]
+    assert seen == sorted(seen) and seen[-1] <= 1.0  # monotonic, within the bar
+
+
+async def test_no_final_model_means_no_final_pass(monkeypatch, tmp_path):
+    made = parts()
+    _stubs(monkeypatch, made, [])
+    monkeypatch.setitem(engines.ENGINES, "moonshine", Engine(True, lambda m, f, p: made.stt, None))
+    got = await load.ears_loader(tmp_path)(lambda f: None)
+    assert got.final is None
+
+
+async def test_a_final_model_that_cannot_load_leaves_the_live_text(monkeypatch, tmp_path):
+    made = parts()
+    _stubs(monkeypatch, made, [])
+    monkeypatch.setitem(engines.ENGINES, "moonshine", Engine(True, lambda m, f, p: made.stt, None))
+
+    def broken(model, folder, on_progress):
+        raise RuntimeError("no weights")
+
+    monkeypatch.setitem(engines.ENGINES, "faster-whisper", Engine(False, None, broken))
+    got = await load.ears_loader(tmp_path, env_final="whisper-small-en")(lambda f: None)
+    assert got.stt is made.stt and got.final is None
+
+
+async def test_a_final_download_that_fails_leaves_the_live_text(monkeypatch, tmp_path):
+    made = parts()
+    _stubs(monkeypatch, made, [])
+    monkeypatch.setitem(engines.ENGINES, "moonshine", Engine(True, lambda m, f, p: made.stt, None))
+
+    async def offline(folder, files, fetch, on_progress):
+        if any(f.path.startswith("stt/") for f in files):
+            raise OSError("offline")
+
+    monkeypatch.setattr(load, "ensure_files", offline)
+    got = await load.ears_loader(tmp_path, env_final="whisper-small-en")(lambda f: None)
+    assert got.stt is made.stt and got.final is None

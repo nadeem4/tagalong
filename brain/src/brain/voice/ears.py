@@ -3,8 +3,8 @@
 Silero says speech or not, the live model gives the words so far, Smart Turn says whether the
 person has finished. At the end of a turn the final model (if any) hears the whole turn again and
 its text is what `turn_end` carries; the live text is the fallback. The turn's audio stays in
-memory only until the turn ends. Synchronous on purpose: the service runs it in a worker thread, so a slow
-decode never blocks the websocket. Ported from the desktop's local-ears.
+memory only until the turn ends. Synchronous on purpose: the service runs it in a worker thread,
+so a slow decode never blocks the websocket. Ported from the desktop's local-ears.
 """
 
 import logging

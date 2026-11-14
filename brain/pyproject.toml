@@ -6,6 +6,7 @@ requires-python = ">=3.12,<3.14"
 dependencies = [
     "agent-client-protocol==0.12.1",
     "anthropic>=2.3.0",
+    "faster-whisper==1.2.1",
     "httpx2>=2.16.0",
     "kokoro-onnx==0.6.1",
     "mcp==2.3.0",
@@ -15,6 +16,13 @@ dependencies = [
     "pydantic>=2.14.1",
     "pypdf==7.0.1",
     "websockets>=17.3",
+]
+
+[project.optional-dependencies]
+# CUDA runtime libraries for faster-whisper on a graphics card; CPU installs skip them.
+gpu = [
+    "nvidia-cublas-cu12; sys_platform != 'darwin'",
+    "nvidia-cudnn-cu12; sys_platform != 'darwin'",
 ]
 
 [project.scripts]

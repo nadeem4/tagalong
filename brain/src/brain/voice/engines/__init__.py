@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from brain.voice.engines import moonshine
+from brain.voice.engines import faster_whisper, moonshine
 
 if TYPE_CHECKING:
     from brain.voice.stt import FinalStt, LiveStt, SttModel
@@ -25,4 +25,5 @@ class Engine:
 
 ENGINES: dict[str, Engine] = {
     "moonshine": Engine(True, moonshine.load_live, None),
+    "faster-whisper": Engine(False, None, faster_whisper.load_final),
 }
