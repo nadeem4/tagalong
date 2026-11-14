@@ -105,6 +105,16 @@ Without WebGL2 (a VM, RDP, a blocklisted GPU) `ScoutFace` checks `isSupported()`
 nav tile, the tour's side panel) is the still SVG head `ScoutGlyph` / `ScoutMark` (`scout-mark.tsx`), so
 no WebGL canvas is created per chat line.
 
+While the brain starts, `DockPet` draws Scout's head as loose specks that drift and gather
+(`ScoutGather`, `bodies/ui/src/mascot/scout-gather.tsx`, maths in `scout-gather-math.ts`, pure and tested).
+It is a 2D canvas over the dock, not WebGL: the head is drawn once offscreen, cut into 3 px tiles, and each
+tile is a speck. The state comes from the status mark: `brain-starting` is `starting` (specks about 60% gathered,
+dim eyes, the live face hidden); the next status ends it: `brain-offline` is `failed` (specks drift to 40% and stop,
+dimmed), anything else is `ready` (specks settle into the head over 900 ms, the eyes light, the overlay fades over
+300 ms and the live face shows). `idle` draws nothing. One `requestAnimationFrame` loop runs only while the overlay
+is moving and stops after the ready fade (or once failed has settled). With reduced motion there is no loop: one
+still frame of the head at low opacity while starting, which fades out on ready. Colours come from the theme tokens.
+
 The renderer reducer (`bodies/desktop/src/renderer/src/dock.ts`, `nextDock` and `dockMood`) picks the
 mood. Priority, highest first: a flash, seeing or speech heard on the mic (Always listening), reading, speaking, thinking, working, a drop hover,
 dozing, idle.

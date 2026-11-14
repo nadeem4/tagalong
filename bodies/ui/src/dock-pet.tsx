@@ -4,11 +4,14 @@
  * Contains DockPet, DockMood and DOCK_MOODS. Used by the desktop avatar window.
  */
 
+import { useState } from 'react';
 import { STATUS_WORDS } from './shapes';
 import type { Pet, StatusMark as StatusMarkValue } from './shapes';
 import { StatusMark } from './status-mark';
 import { ScoutFace } from './scout-face';
 import { scout } from './mascot/scout';
+import { ScoutGather } from './mascot/scout-gather';
+import type { GatherState } from './mascot/scout-gather-math';
 import { themeTokens as t } from './theme/tokens';
 
 /**
@@ -92,6 +95,16 @@ const WORDS: Readonly<Record<DockMood, string>> = {
   happy: 'is happy to see you',
 };
 
+/**
+ * Scout gathers from specks while the brain starts. Once it has been starting, the next status
+ * decides how it ends: Offline is failed, anything else is ready (the face takes over).
+ */
+function nextGather(prev: GatherState, status: StatusMarkValue | null | undefined): GatherState {
+  if (status?.id === 'brain-starting') return 'starting';
+  if (prev === 'idle') return 'idle';
+  return status?.id === 'brain-offline' ? 'failed' : 'ready';
+}
+
 function isTagged(mood: DockMood): mood is TaggedMood {
   return mood in TAGS;
 }
@@ -106,6 +119,11 @@ export function DockPet({ pet, mood, sightPaused = false, listening, status }: D
   // pose and the label still say what Scout is doing.
   // `listening` is also the mood while speech is heard on the mic (Always listening): that is
   // hearing, not Seeing, so it takes no Seeing tag and says it only once.
+  const [gather, setGather] = useState<GatherState>('idle');
+  const nextState = nextGather(gather, status);
+  // Derived during render (not an effect) so the face never flashes between two statuses.
+  if (nextState !== gather) setGather(nextState);
+  const gathering = gather === 'starting' || gather === 'failed';
   const hearing = mood === 'listening' && listening === 'hearing';
   const tag = isTagged(mood) && !sightPaused && !hearing ? TAGS[mood] : undefined;
   const label = `${pet.name} ${hearing ? 'is listening' : WORDS[mood]}${sightPaused ? ', sight paused' : ''}${
@@ -119,7 +137,16 @@ export function DockPet({ pet, mood, sightPaused = false, listening, status }: D
       style={{ position: 'relative', display: 'block', width: SIZE, height: SIZE, padding: 0 }}
     >
       <style>{DOCK_CSS}</style>
-      <ScoutFace spec={scout} mood={mood} />
+      <span
+        style={{
+          display: 'block',
+          opacity: gathering ? 0 : 1,
+          transition: 'opacity 300ms ease',
+        }}
+      >
+        <ScoutFace spec={scout} mood={mood} />
+      </span>
+      {gather !== 'idle' && <ScoutGather state={gather} size={SIZE} />}
 
       {tag !== undefined && (
         <span

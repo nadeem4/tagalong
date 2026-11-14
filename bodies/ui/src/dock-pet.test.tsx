@@ -12,6 +12,12 @@ vi.mock('./scout-face', () => ({
   ScoutFace: ({ mood }: { mood: string }) => <span data-testid="scout-face" data-mood={mood} />,
 }));
 
+// The gather overlay draws on a canvas: it has its own tests, so here it only shows its state.
+vi.mock('./mascot/scout-gather', () => ({
+  ScoutGather: ({ state }: { state: string }) =>
+    state === 'idle' ? null : <span data-testid="scout-gather" data-state={state} />,
+}));
+
 const SCOUT: Pet = {
   id: 'scout',
   name: 'Scout',
@@ -175,5 +181,34 @@ describe('moods', () => {
     expect(screen.getByRole('img')).toHaveAccessibleName(
       'Scout is working on a job of its own, sight paused',
     );
+  });
+
+  describe('gather overlay', () => {
+    it('brain-starting shows the gather overlay', () => {
+      render(<DockPet pet={SCOUT} mood="idle" status={{ id: 'brain-starting' }} />);
+      expect(screen.getByTestId('scout-gather')).toHaveAttribute('data-state', 'starting');
+    });
+
+    it('shows no overlay when the brain was never starting', () => {
+      render(<DockPet pet={SCOUT} mood="idle" status={{ id: 'brain-offline' }} />);
+      expect(screen.queryByTestId('scout-gather')).toBeNull();
+    });
+
+    it('going online hands over to the face', () => {
+      const { rerender } = render(
+        <DockPet pet={SCOUT} mood="idle" status={{ id: 'brain-starting' }} />,
+      );
+      rerender(<DockPet pet={SCOUT} mood="idle" status={null} />);
+      expect(screen.getByTestId('scout-gather')).toHaveAttribute('data-state', 'ready');
+      expect(screen.getByTestId('scout-face')).toBeInTheDocument();
+    });
+
+    it('offline after starting shows failed', () => {
+      const { rerender } = render(
+        <DockPet pet={SCOUT} mood="idle" status={{ id: 'brain-starting' }} />,
+      );
+      rerender(<DockPet pet={SCOUT} mood="idle" status={{ id: 'brain-offline' }} />);
+      expect(screen.getByTestId('scout-gather')).toHaveAttribute('data-state', 'failed');
+    });
   });
 });
