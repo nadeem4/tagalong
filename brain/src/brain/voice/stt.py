@@ -5,7 +5,7 @@ engine is a row; a new engine is one module plus rows. Heavy libraries load only
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
@@ -17,7 +17,6 @@ LIST_FILE = Path(__file__).with_name("stt_models.json")
 ROLES = ("live", "final", "both")
 GPUS = ("none", "preferred", "required")
 AUTO = "auto"
-AUTO_LIVE_ID = "moonshine-tiny"
 
 
 class LiveStt(Protocol):
@@ -46,6 +45,8 @@ class SttModel:
     languages: tuple[str, ...]
     note: str
     options: dict[str, Any]
+    # Where this row is the Auto pick: {"cpu"|"gpu": "live"|"final"} (measured, see docs).
+    auto: dict[str, str] = field(default_factory=dict)
 
 
 SHA256 = re.compile(r"[0-9a-f]{64}")
@@ -73,6 +74,9 @@ def _build(raw: dict, engines: dict) -> SttModel:
     files = tuple(ModelFile(**f) for f in raw["files"])
     if any(not SHA256.fullmatch(f.sha256) or f.bytes <= 0 for f in files):
         raise ValueError(f"{where}: every file needs a 64-digit lowercase hex sha256 and a size")
+    auto = raw.get("auto", {})
+    if any(k not in ("cpu", "gpu") or v not in ("live", "final") for k, v in auto.items()):
+        raise ValueError(f"{where}: auto must map cpu or gpu to live or final")
     return SttModel(
         raw["id"],
         raw["label"],
@@ -84,6 +88,7 @@ def _build(raw: dict, engines: dict) -> SttModel:
         tuple(raw["languages"]),
         raw["note"],
         raw["options"],
+        auto,
     )
 
 
@@ -109,10 +114,20 @@ class Hardware:
 
 
 def detect_hardware() -> Hardware:
-    # A plain look for the CUDA runtime; no GPU library is imported just to ask.
+    # CTranslate2 (faster-whisper's engine) asks the NVIDIA driver itself, so a PC with a driver
+    # but no CUDA toolkit still counts, and CUDA_VISIBLE_DEVICES=-1 hides the card. A card alone
+    # is not enough: without cuBLAS the final model cannot use it (measured on the dev PC).
+    # Callers on the event loop run this in a thread (the first import is slow).
     import ctypes.util
 
-    return Hardware(gpu=ctypes.util.find_library("cudart64_12") is not None)
+    try:
+        import ctranslate2
+
+        cards = ctranslate2.get_cuda_device_count() > 0
+    except Exception:
+        return Hardware(gpu=False)
+    libs = ctypes.util.find_library("cublas64_12") or ctypes.util.find_library("cublas")
+    return Hardware(gpu=cards and libs is not None)
 
 
 @dataclass(frozen=True)
@@ -126,6 +141,12 @@ def _pick(saved: str | None, env: str | None) -> str:
     return saved or env or AUTO
 
 
+def auto_pick(listed: tuple[SttModel, ...], role: str, hardware: Hardware) -> SttModel | None:
+    """The row whose `auto` hint names this role for this hardware (the list is the rule)."""
+    key = "gpu" if hardware.gpu else "cpu"
+    return next((m for m in listed if m.auto.get(key) == role), None)
+
+
 def resolve(
     saved_live: str | None,
     saved_final: str | None,
@@ -133,13 +154,17 @@ def resolve(
     env_final: str | None,
     hardware: Hardware,
 ) -> Resolved:
-    """The models to load. A missing, stale or wrong-role id is Auto. V1's Auto is Moonshine
-    tiny live and no final pass (today's behaviour); `hardware` is for the later Auto rule."""
+    """The models to load. A missing, stale or wrong-role id is Auto: the rows' `auto` hints for
+    this hardware. `same` and `off` (and any other non-model) mean no final pass."""
     listed = load_models()
     live_id = _pick(saved_live, env_live)
     live = next((m for m in listed if m.id == live_id and m.role in ("live", "both")), None)
     if live is None:
-        live = next(m for m in listed if m.id == AUTO_LIVE_ID)
+        live = auto_pick(listed, "live", hardware)
+        assert live is not None, "stt_models.json has no Auto live row"
     final_id = _pick(saved_final, env_final)
-    final = next((m for m in listed if m.id == final_id and m.role in ("final", "both")), None)
+    if final_id == AUTO:
+        final = auto_pick(listed, "final", hardware)
+    else:
+        final = next((m for m in listed if m.id == final_id and m.role in ("final", "both")), None)
     return Resolved(live, final)

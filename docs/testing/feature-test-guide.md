@@ -1208,8 +1208,11 @@ popup); the answer is text only.
    a sentence.
 3. **Expected:** after the first listen downloads the model (the loading progress shows), the
    words appear as you talk, as before. Repeat with the variable unset or set to `auto`:
-   Moonshine tiny is used, as before. With an id that is not listed (`TAGALONG_STT_LIVE=nope`)
-   the brain still listens, with tiny.
+   Moonshine small is used (the measured Auto default; see docs/voice-stt-results.md). With an id
+   that is not listed (`TAGALONG_STT_LIVE=nope`) the brain still listens, with small. With no
+   usable graphics card, no final pass runs unless `TAGALONG_STT_FINAL` names a model.
+   **Automated (V3):** from `brain/`, run `uv run pytest tests/test_voice_stt.py` (the Auto rule
+   and the hardware probe, on fakes).
 
 ### V.5d. The whole turn is transcribed again at the end
 

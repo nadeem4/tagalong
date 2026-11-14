@@ -87,7 +87,7 @@ async def test_loader_uses_resolved_live_model(monkeypatch, tmp_path):
     assert downloads == [*(f.path for f in load.EARS_FILES), "stt/own.bin"]
 
 
-async def test_loader_default_is_unchanged_tiny(monkeypatch, tmp_path):
+async def test_loader_default_is_the_measured_small(monkeypatch, tmp_path):
     made = parts()
     arches: list[str] = []
     _stubs(monkeypatch, made, [])
@@ -98,7 +98,7 @@ async def test_loader_default_is_unchanged_tiny(monkeypatch, tmp_path):
 
     monkeypatch.setitem(engines.ENGINES, "moonshine", Engine(True, fake_load, None))
     await load.ears_loader(tmp_path)(lambda f: None)
-    assert arches == ["TINY_STREAMING"]
+    assert arches == ["SMALL_STREAMING"]
 
 
 def _final_row():
