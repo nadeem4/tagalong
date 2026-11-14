@@ -9,7 +9,7 @@ import type { ListenMode } from '@tagalong/ui/shapes';
 import { micFailure } from './mic-failure';
 
 export const FIRST_TIME =
-  'The first time, Tagalong downloads its speech models (about 43 MB). Speech is turned into text on this PC.';
+  'The first time, Tagalong downloads its speech models (about 120 MB). Speech is turned into text on this PC.';
 const EARS_FAILED = 'Listening stopped. Try again.';
 /** A held question that heard no words: a bubble note, never said aloud. */
 export const NOTHING_HEARD = 'Nothing heard.';

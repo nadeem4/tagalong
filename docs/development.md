@@ -33,6 +33,7 @@ tagalong/
                                     # (db.py, search.py, conversation.py, memory.py, connections.py,
                                     # outputs.py, rules.py, settings.py, work.py, migrations/; the only code
                                     # that runs SQL; see docs/storage.md)
+                                    # tools/stt_bench/ is a dev-only speech-model harness (not shipped, never in CI; see docs/voice.md)
   bodies/
     ui/src/
       index.ts, host-bridge.ts      # HostBridge contract and its React context

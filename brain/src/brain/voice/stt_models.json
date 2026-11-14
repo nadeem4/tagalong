@@ -25,6 +25,10 @@
     "note": "Better words than tiny, still light on the processor.",
     "options": {
       "arch": "SMALL_STREAMING"
+    },
+    "auto": {
+      "cpu": "live",
+      "gpu": "live"
     }
   },
   {
@@ -82,7 +86,10 @@
     "gpu": "preferred",
     "languages": ["multilingual"],
     "note": "The most accurate words, heard again when you finish; large, and quicker on a graphics card.",
-    "options": {}
+    "options": {},
+    "auto": {
+      "gpu": "final"
+    }
   },
   {
     "id": "whisper-small-en",

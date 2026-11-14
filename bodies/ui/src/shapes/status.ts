@@ -66,7 +66,7 @@ export const STATUS_WORDS: Readonly<
       'The microphone could not be opened. Check that Windows lets apps use it, or pick another in Settings.',
     fix: 'voice',
   },
-  'ears-loading': { tag: 'Ears', detail: 'Speech models downloading, about 43 MB.' },
+  'ears-loading': { tag: 'Ears', detail: 'Speech models downloading, about 120 MB.' },
   'listening-paused': {
     tag: 'Not listening',
     detail: 'Always listening is paused for a call or a full-screen window.',

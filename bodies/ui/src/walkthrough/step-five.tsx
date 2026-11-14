@@ -143,7 +143,7 @@ function VoiceForm({ host, settings }: { host: WalkthroughHost; settings: Walkth
       <p className="wt-help">
         Your voice is turned into text by your own brain and is never stored. With the brain on this
         computer, it never leaves it. The listening models download the first time you talk (about
-        43 MB).
+        120 MB, and about 1.5 GB more on a PC with a graphics card).
       </p>
     </div>
   );

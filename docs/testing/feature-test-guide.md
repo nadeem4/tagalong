@@ -1208,8 +1208,11 @@ popup); the answer is text only.
    a sentence.
 3. **Expected:** after the first listen downloads the model (the loading progress shows), the
    words appear as you talk, as before. Repeat with the variable unset or set to `auto`:
-   Moonshine tiny is used, as before. With an id that is not listed (`TAGALONG_STT_LIVE=nope`)
-   the brain still listens, with tiny.
+   Moonshine small is used (the measured Auto default; see docs/voice-stt-results.md). With an id
+   that is not listed (`TAGALONG_STT_LIVE=nope`) the brain still listens, with small. With no
+   usable graphics card, no final pass runs unless `TAGALONG_STT_FINAL` names a model.
+   **Automated (V3):** from `brain/`, run `uv run pytest tests/test_voice_stt.py` (the Auto rule
+   and the hardware probe, on fakes).
 
 ### V.5d. The whole turn is transcribed again at the end
 
@@ -1284,7 +1287,7 @@ popup); the answer is text only.
 
 Run from source with the brain running, a microphone and speakers.
 The brain hears and speaks: the first spoken question makes it fetch its speech models (Silero VAD,
-Moonshine tiny and Smart Turn, about 43 MB). With `TAGALONG_FAKE_MIC=1` Chromium's fake microphone
+Moonshine small and Smart Turn, about 120 MB). With `TAGALONG_FAKE_MIC=1` Chromium's fake microphone
 stands in for a real one (the brain still needs to hear something).
 
 ### T.1. Hold to talk
@@ -1292,7 +1295,7 @@ stands in for a real one (the brain still needs to hear something).
 1. **Setup:** a fresh brain data folder, so the speech models are not downloaded yet.
 2. **Action:** hold Right Ctrl on its own, say "what am I looking at?", let go.
 3. **Expected:** the bubble opens with a pulsing dot and "Listening…" while the key is held, and a
-   note while the brain loads its speech models (about 43 MB the first time). Once they have loaded, the
+   note while the brain loads its speech models (about 120 MB the first time). Once they have loaded, the
    words you are saying appear under "Listening…" as you talk. On letting go it says "Turning that
    into text…", then shows what it heard and answers. Windows shows the microphone in use only
    while the key is held.

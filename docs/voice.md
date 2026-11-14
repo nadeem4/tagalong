@@ -584,8 +584,9 @@ The words come from a list of models kept as data, not from one hard-wired model
 - **The list** is `brain/src/brain/voice/stt_models.json`. Each row has an `id`, a `role`
   (`live`, `final` or `both`), an `engine`, its files (each with a size and SHA-256, fetched like
   the other voice models), `size_mb`, `gpu` (`none`, `preferred`, `required`), `languages`, a
-  `note` and `options`. Today it holds three Moonshine rows: `moonshine-tiny` (the one used so
-  far), `moonshine-small` and `moonshine-medium`. A bad row (unknown role or engine, a live model
+  `note`, `options` and an optional `auto` hint. Today it holds three Moonshine rows
+  (`moonshine-tiny`, `moonshine-small`, `moonshine-medium`) and two final rows
+  (`whisper-large-v3-turbo`, `whisper-small-en`). A bad row (unknown role or engine, a live model
   on an engine that cannot stream, a duplicate id, a file without a 64-digit lowercase hex hash) stops the loader and the
   error names the row.
 - **Engines** are code: `voice/engines/<engine>.py`, registered in `voice/engines/__init__.py`
@@ -594,10 +595,13 @@ The words come from a list of models kept as data, not from one hard-wired model
   list and a dependency, with no change to `load.py`.
 - **The choice** is the saved choice, then `TAGALONG_STT_LIVE` / `TAGALONG_STT_FINAL`, then Auto
   (`resolve` in `voice/stt.py`). An id that is not listed, or names a model of the wrong role,
-  reads as Auto. Auto live is `moonshine-tiny`, as before; Auto has no final model yet (it comes
-  with the measured Auto rule), so the final pass runs only when `TAGALONG_STT_FINAL` names a
-  final model. Only the environment values exist so far; the saved choice comes with the Home
-  picker. A change applies on the next listen, never under a running session.
+  reads as Auto. **Auto** is data: a row's `auto` hint (`{"cpu"|"gpu": "live"|"final"}`) says where
+  it is the pick, and `auto_pick` in `stt.py` reads the hints with no branches on ids. Today Auto
+  live is `moonshine-small` on any PC; Auto final is `whisper-large-v3-turbo` when a usable
+  graphics card is found (`detect_hardware`: CTranslate2 sees an NVIDIA device and cuBLAS can be
+  found) and no final pass otherwise. `same` and `off` mean no final pass. The numbers behind
+  this are in [voice-stt-results.md](voice-stt-results.md). Only the environment values exist so
+  far; the saved choice comes with the Home picker. A change applies on the next listen, never under a running session.
 - **The final pass.** The live model's words are a preview. While a turn runs, the ears keep its
   audio in memory (the pre-roll and every stretch, at most the last 60 s). When the turn ends,
   the final model (`faster-whisper`, rows `whisper-large-v3-turbo` and `whisper-small-en`,
@@ -626,6 +630,27 @@ flowchart LR
   final --> ears
   ears -->|turn_end carries the final text| body[body]
 ```
+
+### Measuring speech models
+
+`brain/tools/stt_bench/` is a dev-only harness (not shipped, never run in CI, not in the wheel).
+From `brain/`:
+
+```
+uv run python -m tools.stt_bench [--models moonshine-tiny whisper-small-en ...] [--clips DIR ...] [--no-kokoro] [--snr 15] [--idle-seconds 60]
+```
+
+It downloads what it measures: Kokoro (to speak the test lines in three voices), the Silero
+model for the idle measure, and every listed speech model unless `--models` narrows it. Files go
+to `<TAGALONG_HOME>/voice`, checked by size and SHA-256 like the app's own downloads. The test
+set is Kokoro lines ("Scout, what time is it?", file names, numbers) with white noise at `--snr`
+dB, plus optional folders of your own clips (`name.wav` beside `name.txt` with what was said; a
+clip with no WAV is skipped and printed). It prints a table per model: word error rate, how
+often "Scout" survives as the first word (the same sound-alike rule as `addressing.ts`), CPU
+cores and peak GPU while decoding, seconds per clip (the delay after the end of a turn, for final
+models), and Silero's idle CPU. `MODES` in `__main__.py` is where a later wake-word mode plugs in.
+The results of the last run, the decision and the exact commands are in
+[voice-stt-results.md](voice-stt-results.md).
 
 ## Interfaces
 

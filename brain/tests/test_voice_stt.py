@@ -97,12 +97,12 @@ def test_env_used_when_nothing_saved():
 
 def test_auto_when_nothing_set():
     got = resolved()
-    assert got.live.id == "moonshine-tiny" and got.final is None
-    assert resolved(saved_live="auto", env_live="moonshine-small").live.id == "moonshine-tiny"
+    assert got.live.id == "moonshine-small" and got.final is None
+    assert resolved(saved_live="auto", env_live="moonshine-small").live.id == "moonshine-small"
 
 
 def test_unlisted_saved_id_falls_back_to_auto():
-    assert resolved(saved_live="gone").live.id == "moonshine-tiny"
+    assert resolved(saved_live="gone").live.id == "moonshine-small"
 
 
 def test_final_same_and_off_resolve_to_none():
@@ -110,11 +110,17 @@ def test_final_same_and_off_resolve_to_none():
     assert resolved(env_final="off").final is None
 
 
+def test_stale_final_id_is_auto():
+    gpu = resolve(None, "gone", None, None, Hardware(gpu=True))
+    assert gpu.final is not None and gpu.final.id == "whisper-large-v3-turbo"
+    assert resolved(saved_final="gone").final is None  # Auto on this hardware has no final
+
+
 def test_final_model_cannot_be_chosen_as_live(monkeypatch):
     final_only = stt.SttModel("w", "W", "final", "moonshine", (), 1, "none", ("en",), "", {})
     shipped = load_models()
     monkeypatch.setattr(stt, "load_models", lambda text=None: (*shipped, final_only))
-    assert resolved(saved_live="w").live.id == "moonshine-tiny"
+    assert resolved(saved_live="w").live.id == "moonshine-small"
 
 
 def test_a_live_row_needs_an_engine_that_can_load_live(monkeypatch):
@@ -134,3 +140,127 @@ def test_a_missing_key_names_the_row_and_the_key():
     del nameless["id"]
     with pytest.raises(ValueError, match=r"#0.*'id'"):
         models(nameless)
+
+
+def _fake_ct2(monkeypatch, count):
+    import sys
+    import types
+
+    monkeypatch.setitem(
+        sys.modules, "ctranslate2", types.SimpleNamespace(get_cuda_device_count=count)
+    )
+
+
+def _fake_cublas(monkeypatch, found, cudnn=True):
+    import ctypes.util
+
+    def find(name):
+        if name.startswith("cudnn"):
+            return "d.dll" if cudnn else None
+        return "x.dll" if found else None
+
+    monkeypatch.setattr(ctypes.util, "find_library", find)
+
+
+def test_detect_hardware_counts_cuda_devices_through_ctranslate2(monkeypatch):
+    _fake_cublas(monkeypatch, True)
+    _fake_ct2(monkeypatch, lambda: 1)
+    assert stt.detect_hardware() == Hardware(gpu=True)
+    _fake_ct2(monkeypatch, lambda: 0)
+    assert stt.detect_hardware() == Hardware(gpu=False)
+
+
+def test_detect_hardware_needs_the_cuda_libraries_not_only_the_card(monkeypatch):
+    # Measured on the dev PC: a driver and a card, but no cuBLAS, so the final model cannot
+    # use the card and Auto must not plan on it.
+    _fake_cublas(monkeypatch, False)
+    _fake_ct2(monkeypatch, lambda: 1)
+    assert stt.detect_hardware() == Hardware(gpu=False)
+
+
+def test_detect_hardware_needs_cudnn_too(monkeypatch):
+    _fake_cublas(monkeypatch, True, cudnn=False)
+    _fake_ct2(monkeypatch, lambda: 1)
+    assert stt.detect_hardware() == Hardware(gpu=False)
+
+
+def _auto_rows(**over):
+    hints = {
+        "a": {"cpu": "live", "gpu": "live"},
+        "b": {"gpu": "final"},
+        **over,
+    }
+    return [
+        row(id="a", auto=hints["a"]),
+        row(id="b", role="final", engine="moonshine", auto=hints["b"]),
+    ]
+
+
+def test_auto_hint_must_match_the_rows_role():
+    with pytest.raises(ValueError, match="b.*role"):
+        models(*_auto_rows(b={"gpu": "live"}))
+    with pytest.raises(ValueError, match="a.*role"):
+        models(*_auto_rows(a={"cpu": "live", "gpu": "final"}))
+
+
+def test_auto_needs_exactly_one_live_per_hardware():
+    only_cpu = [row(id="a", auto={"cpu": "live"})]
+    with pytest.raises(ValueError, match="gpu.*live"):
+        models(*only_cpu)
+    two = [*_auto_rows(), row(id="c", auto={"cpu": "live", "gpu": "live"})]
+    with pytest.raises(ValueError, match="cpu.*live"):
+        models(*two)
+
+
+def test_auto_allows_at_most_one_final_per_hardware():
+    two = [*_auto_rows(), row(id="c", role="final", auto={"gpu": "final"})]
+    with pytest.raises(ValueError, match="gpu.*final"):
+        models(*two)
+    assert len(models(*_auto_rows())) == 2
+
+
+def test_detect_hardware_says_no_gpu_when_the_probe_fails(monkeypatch):
+    def boom():
+        raise RuntimeError("driver")
+
+    _fake_cublas(monkeypatch, True)
+    _fake_ct2(monkeypatch, boom)
+    assert stt.detect_hardware() == Hardware(gpu=False)
+
+
+def test_auto_with_gpu_picks_whisper_turbo_final():
+    got = resolve(None, None, None, None, Hardware(gpu=True))
+    assert got.final is not None and got.final.id == "whisper-large-v3-turbo"
+
+
+def test_auto_without_gpu_picks_same_as_live_final():
+    # Measured: on the processor turbo takes ~10 s a turn and small.en hears worse than the
+    # live model, so there is no final pass.
+    assert resolve(None, None, None, None, Hardware(gpu=False)).final is None
+
+
+def test_auto_live_is_the_measured_default():
+    for gpu in (True, False):
+        assert resolve(None, None, None, None, Hardware(gpu=gpu)).live.id == "moonshine-small"
+
+
+def test_saved_final_beats_the_auto_hints():
+    got = resolve(None, "whisper-small-en", None, None, Hardware(gpu=True))
+    assert got.final is not None and got.final.id == "whisper-small-en"
+
+
+def test_auto_reads_the_hints_in_the_list_not_ids():
+    listed = models(
+        row(id="a", auto={"cpu": "live"}),
+        row(id="b", auto={"gpu": "live"}),
+        row(id="c", role="final", engine="faster-whisper", files=[FILE], auto={"gpu": "final"}),
+    )
+    assert stt.auto_pick(listed, "live", Hardware(gpu=False)).id == "a"
+    assert stt.auto_pick(listed, "live", Hardware(gpu=True)).id == "b"
+    assert stt.auto_pick(listed, "final", Hardware(gpu=True)).id == "c"
+    assert stt.auto_pick(listed, "final", Hardware(gpu=False)) is None
+
+
+def test_a_bad_auto_hint_is_rejected():
+    with pytest.raises(ValueError, match="auto"):
+        models(row(auto={"gpu": "both"}))
