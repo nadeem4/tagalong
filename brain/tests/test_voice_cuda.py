@@ -99,10 +99,10 @@ def test_add_dll_directory_puts_the_folder_first_on_path(monkeypatch, tmp_path, 
     # LoadLibrary (cuBLAS, the cuDNN sub-libraries) ignores add_dll_directory but reads PATH.
     monkeypatch.setattr(cuda.os, "add_dll_directory", lambda p: None, raising=False)
     (tmp_path / "cuda").mkdir()
-    env = {"PATH": "C:/a" + cuda.os.pathsep + "C:/b"}
+    env = {"PATH": "/a" + cuda.os.pathsep + "/b"}
     cuda.add_dll_directory(tmp_path / "cuda", env)
     cuda.add_dll_directory(tmp_path / "cuda", env)  # again: still once
-    assert env["PATH"].split(cuda.os.pathsep) == [str(tmp_path / "cuda"), "C:/a", "C:/b"]
+    assert env["PATH"].split(cuda.os.pathsep) == [str(tmp_path / "cuda"), "/a", "/b"]
 
 
 def test_detect_hardware_and_load_final_prepare_the_path(monkeypatch, tmp_path):
