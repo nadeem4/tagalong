@@ -47,7 +47,15 @@ class SttModel:
     options: dict[str, Any]
 
 
-def _row(raw: dict, engines: dict) -> SttModel:
+def _row(raw: dict, engines: dict, index: int = 0) -> SttModel:
+    try:
+        return _build(raw, engines)
+    except KeyError as missing:
+        name = raw.get("id") or f"#{index}"
+        raise ValueError(f"speech model {name!r}: missing {missing.args[0]!r}") from None
+
+
+def _build(raw: dict, engines: dict) -> SttModel:
     where = f"speech model {raw.get('id')!r}"
     if raw["role"] not in ROLES:
         raise ValueError(f"{where}: unknown role {raw['role']!r}")
@@ -56,8 +64,8 @@ def _row(raw: dict, engines: dict) -> SttModel:
     engine = engines.get(raw["engine"])
     if engine is None:
         raise ValueError(f"{where}: unknown engine {raw['engine']!r}")
-    if raw["role"] in ("live", "both") and not engine.streams:
-        raise ValueError(f"{where}: a live model needs an engine that can stream")
+    if raw["role"] in ("live", "both") and not (engine.streams and engine.load_live):
+        raise ValueError(f"{where}: a live model needs an engine that can stream and load live")
     files = tuple(ModelFile(**f) for f in raw["files"])
     if any(not f.sha256 or f.bytes <= 0 for f in files):
         raise ValueError(f"{where}: every file needs a sha256 and a size")
@@ -79,7 +87,7 @@ def load_models(text: str | None = None) -> tuple[SttModel, ...]:
     from brain.voice import engines  # late: the engines import this module's protocols
 
     raw = json.loads(text if text is not None else LIST_FILE.read_text(encoding="utf-8"))
-    rows = tuple(_row(r, engines.ENGINES) for r in raw)
+    rows = tuple(_row(r, engines.ENGINES, i) for i, r in enumerate(raw))
     ids = [m.id for m in rows]
     for i in ids:
         if ids.count(i) > 1:

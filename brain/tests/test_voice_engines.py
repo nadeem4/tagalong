@@ -33,6 +33,7 @@ async def test_adding_an_engine_touches_only_its_module_and_the_list(monkeypatch
         return None
 
     monkeypatch.setattr(load, "ensure_files", no_download)
+    monkeypatch.setattr(stt, "detect_hardware", lambda: stt.Hardware(gpu=False))
     monkeypatch.setattr(load.silero, "load", lambda path: made.vad)
     monkeypatch.setattr(load.smart_turn, "load", lambda path: made.turn)
     got = await load.ears_loader(tmp_path, env_live="fake-1")(lambda f: None)

@@ -45,9 +45,9 @@ def ears_loader(
     async def load_ears(on_progress: Callable[[float], None]) -> EarsParts:
         loop = asyncio.get_running_loop()
         # No saved choice yet (Home picks it in a later slice): the env default, else Auto.
-        chosen = stt.resolve(None, None, env_live, env_final, stt.detect_hardware()).live
+        hardware = await asyncio.to_thread(stt.detect_hardware)  # may spawn a process to look
+        chosen = stt.resolve(None, None, env_live, env_final, hardware).live
         engine = engines.ENGINES[chosen.engine]
-        assert engine.load_live is not None  # the list only gives a live role to one that has it
         files = [*EARS_FILES, *chosen.files]
         await ensure_files(folder, files, fetch, lambda f: on_progress(f * ONNX_SHARE))
 

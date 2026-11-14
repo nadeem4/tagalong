@@ -105,3 +105,22 @@ def test_final_model_cannot_be_chosen_as_live(monkeypatch):
     shipped = load_models()
     monkeypatch.setattr(stt, "load_models", lambda text=None: (*shipped, final_only))
     assert resolved(saved_live="w").live.id == "moonshine-tiny"
+
+
+def test_a_live_row_needs_an_engine_that_can_load_live(monkeypatch):
+    from brain.voice import engines
+
+    monkeypatch.setitem(engines.ENGINES, "nolive", engines.Engine(True, None, None))
+    with pytest.raises(ValueError, match="load live"):
+        models(row(engine="nolive"))
+
+
+def test_a_missing_key_names_the_row_and_the_key():
+    bad = row(id="m9")
+    del bad["note"]
+    with pytest.raises(ValueError, match=r"m9.*'note'"):
+        models(bad)
+    nameless = row()
+    del nameless["id"]
+    with pytest.raises(ValueError, match=r"#0.*'id'"):
+        models(nameless)
