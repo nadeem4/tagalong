@@ -39,7 +39,8 @@ PROBE_CODE = """
 import os, sys
 import numpy as np
 os.environ["PATH"] = sys.argv[2] + os.pathsep + os.environ.get("PATH", "")
-os.add_dll_directory(sys.argv[2])
+if hasattr(os, "add_dll_directory") and os.path.isdir(sys.argv[2]):
+    os.add_dll_directory(sys.argv[2])
 from faster_whisper import WhisperModel
 m = WhisperModel(sys.argv[1], device="cuda", compute_type="float16")
 list(m.transcribe(np.zeros(16000, np.float32), language="en", beam_size=1)[0])
@@ -114,16 +115,20 @@ async def ensure_cuda(voice: Path, fetch: Fetch, on_progress: Progress) -> bool:
     wheels = load_wheels()
     ok = False
     try:
-        for i, w in enumerate(wheels):
-            # A verified wheel stays until it is extracted; the next is not fetched before that.
+        for i, (w, dll) in enumerate(
+            zip(wheels, DLLS, strict=True)
+        ):  # wheels are listed in DLLS order
+            if (target / dll).is_file():
+                on_progress((i + 1) / len(wheels))
+                continue
+            # A verified wheel stays until it is extracted (a bad hash is deleted by the fetch);
+            # the next is not fetched before that.
             await ensure_files(voice, [w], fetch, lambda f, i=i: on_progress((i + f) / len(wheels)))
-            try:
-                await asyncio.to_thread(extract_dlls, voice / w.path, target)
-            except Exception:
-                (voice / w.path).unlink(missing_ok=True)  # a wheel that will not open is not kept
-                raise
+            await asyncio.to_thread(extract_dlls, voice / w.path, target)
             (voice / w.path).unlink(missing_ok=True)
         ok = libs_present(target)
+        if not ok:
+            log.warning("the NVIDIA libraries are still not present after the fetch")
     except Exception:
         log.warning(
             "the NVIDIA libraries could not be fetched; the final model will use the processor",
@@ -137,25 +142,41 @@ def _key() -> str:
     return hashlib.sha256("".join(w.sha256 for w in load_wheels()).encode()).hexdigest()
 
 
+def _cached_answer(cache: Path, key: str) -> bool | None:
+    """The kept answer; None when absent, for other wheels, or a False a day old."""
+    try:
+        saved = json.loads(cache.read_text(encoding="utf-8"))
+        if saved["key"] != key:
+            return None
+        if not saved["ok"] and time.time() - float(saved["at"]) >= RETRY_AFTER:
+            return None
+        return bool(saved["ok"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
 def probe_cuda(
     voice: Path, model_dir: str, run: Callable[..., "subprocess.CompletedProcess"] = subprocess.run
 ) -> bool:
-    """Whether the card can run the final model, tried once in a child process. The answer is
-    kept under `<voice>/cuda`, keyed by the wheels, so it is not repeated on every start.
+    """Whether the card can run the final model, tried once in a child process. A clean answer is
+    kept under `<voice>/cuda`, keyed by the wheels (a False for 24 hours), so it is not repeated
+    on every start; a timeout or a child that would not start is not kept.
     Blocking: callers are already off the event loop."""
     cache = voice / "cuda" / PROBED
     key = _key()
-    try:
-        saved = json.loads(cache.read_text(encoding="utf-8"))
-        if saved["key"] == key:
-            return bool(saved["ok"])
-    except (OSError, ValueError, KeyError, TypeError):
-        pass
+    saved = _cached_answer(cache, key)
+    if saved is not None:
+        return saved
     cmd = [sys.executable, "-c", PROBE_CODE, model_dir, str(voice / "cuda")]
     try:
-        ok = run(cmd, capture_output=True, timeout=PROBE_TIMEOUT).returncode == 0
+        done = run(cmd, capture_output=True, timeout=PROBE_TIMEOUT)
     except (OSError, subprocess.SubprocessError):
-        ok = False
+        log.warning("the CUDA probe did not finish", exc_info=True)
+        return False
+    ok = done.returncode == 0
+    if not ok:
+        tail = (getattr(done, "stderr", b"") or b"").decode("utf-8", "replace").splitlines()[-5:]
+        log.warning("the CUDA probe failed (exit %s): %s", done.returncode, " | ".join(tail))
     cache.parent.mkdir(parents=True, exist_ok=True)
-    cache.write_text(json.dumps({"key": key, "ok": ok}), encoding="utf-8")
+    cache.write_text(json.dumps({"key": key, "ok": ok, "at": time.time()}), encoding="utf-8")
     return ok

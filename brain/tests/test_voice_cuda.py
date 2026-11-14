@@ -3,7 +3,10 @@ directory, and every failure ending as one warning and the processor. Fakes only
 
 import hashlib
 import io
+import json
 import logging
+import os
+import subprocess
 import sys
 import types
 import zipfile
@@ -214,6 +217,104 @@ def test_a_probe_that_dies_or_times_out_is_false(monkeypatch, tmp_path):
         raise cuda.subprocess.TimeoutExpired(cmd, 1)
 
     assert cuda.probe_cuda(tmp_path / "x", "m", hang) is False
+
+
+def test_probe_code_survives_a_missing_dll_folder(tmp_path):
+    # Stubs stand in for numpy and faster_whisper; the probe must reach the model load even when
+    # the folder is absent (system CUDA) or os.add_dll_directory does not exist (Linux).
+    stubs = tmp_path / "stubs"
+    (stubs / "faster_whisper").mkdir(parents=True)
+    (stubs / "numpy").mkdir()
+    (stubs / "numpy" / "__init__.py").write_text(
+        "float32 = 0\ndef zeros(n, t):\n    return [0] * n\n", encoding="utf-8"
+    )
+    (stubs / "faster_whisper" / "__init__.py").write_text(
+        "class WhisperModel:\n    def __init__(self, *a, **k): pass\n"
+        "    def transcribe(self, *a, **k): return ([], None)\n",
+        encoding="utf-8",
+    )
+    env = {**os.environ, "PYTHONPATH": str(stubs)}
+    cmd = [sys.executable, "-c", cuda.PROBE_CODE, "m", str(tmp_path / "missing")]
+    done = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=60)
+    assert done.returncode == 0, done.stderr
+
+
+def _cached(tmp_path):
+    return json.loads((tmp_path / "cuda" / cuda.PROBED).read_text(encoding="utf-8"))
+
+
+def test_a_timeout_or_crash_to_start_is_not_cached(monkeypatch, tmp_path):
+    monkeypatch.setattr(cuda, "load_wheels", lambda: rows(("cuda/wheels/a.whl", GOOD)))
+
+    def hang(cmd, **kw):
+        raise cuda.subprocess.TimeoutExpired(cmd, 1)
+
+    def missing(cmd, **kw):
+        raise OSError("no python")
+
+    assert cuda.probe_cuda(tmp_path, "m", hang) is False
+    assert cuda.probe_cuda(tmp_path, "m", missing) is False
+    assert not (tmp_path / "cuda" / cuda.PROBED).exists()
+
+
+def test_a_clean_false_expires_after_24_hours_and_logs_stderr_once(monkeypatch, tmp_path, caplog):
+    monkeypatch.setattr(cuda, "load_wheels", lambda: rows(("cuda/wheels/a.whl", GOOD)))
+    clock = [1000.0]
+    monkeypatch.setattr(cuda.time, "time", lambda: clock[0])
+    outcomes = [1, 0]
+    runs = []
+
+    def run(cmd, **kw):
+        runs.append(cmd)
+        return types.SimpleNamespace(returncode=outcomes[len(runs) - 1], stderr=b"a\nb\nboom\n")
+
+    with caplog.at_level(logging.WARNING, logger="brain"):
+        assert cuda.probe_cuda(tmp_path, "m", run) is False
+        clock[0] += 23 * 3600
+        assert cuda.probe_cuda(tmp_path, "m", run) is False
+    assert len(runs) == 1
+    assert sum("boom" in r.getMessage() for r in caplog.records) == 1
+    clock[0] += 2 * 3600
+    assert cuda.probe_cuda(tmp_path, "m", run) is True  # retried after a day
+    assert _cached(tmp_path)["ok"] is True
+
+
+async def test_a_wheel_whose_dll_is_already_there_is_not_fetched(monkeypatch, tmp_path, windows):
+    listed = rows(("cuda/wheels/a.whl", GOOD), ("cuda/wheels/b.whl", DNN))
+    monkeypatch.setattr(cuda, "load_wheels", lambda: listed)
+    (tmp_path / "cuda").mkdir()
+    (tmp_path / "cuda" / "cublas64_12.dll").write_bytes(b"blas")
+    asked = []
+    inner = fetcher({listed[1].url: DNN})
+
+    async def net(url):
+        asked.append(url)
+        async for chunk in inner(url):
+            yield chunk
+
+    assert await cuda.ensure_cuda(tmp_path, net, lambda f: None) is True
+    assert asked == [listed[1].url]
+
+
+async def test_a_verified_wheel_is_kept_when_only_extraction_failed(monkeypatch, tmp_path, windows):
+    listed = rows(("cuda/wheels/a.whl", GOOD))
+    monkeypatch.setattr(cuda, "load_wheels", lambda: listed)
+
+    def boom(archive, target):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(cuda, "extract_dlls", boom)
+    assert await cuda.ensure_cuda(tmp_path, fetcher({listed[0].url: GOOD}), lambda f: None) is False
+    assert (tmp_path / "cuda" / "wheels" / "a.whl").is_file()
+
+
+async def test_a_wheel_without_its_dll_is_one_warning(monkeypatch, tmp_path, windows, caplog):
+    listed = rows(("cuda/wheels/a.whl", DNN), ("cuda/wheels/b.whl", DNN))  # no cublas
+    monkeypatch.setattr(cuda, "load_wheels", lambda: listed)
+    with caplog.at_level(logging.WARNING, logger="brain"):
+        net = fetcher({listed[0].url: DNN, listed[1].url: DNN})
+        assert await cuda.ensure_cuda(tmp_path, net, lambda f: None) is False
+    assert sum("still not" in r.getMessage() for r in caplog.records) == 1
 
 
 async def test_ensure_cuda_does_nothing_off_windows(monkeypatch, tmp_path):
