@@ -105,9 +105,14 @@ def test_unlisted_saved_id_falls_back_to_auto():
     assert resolved(saved_live="gone").live.id == "moonshine-small"
 
 
-def test_final_same_and_off_resolve_to_none():
-    assert resolved(saved_final="same").final is None
+def test_final_off_resolves_to_none():
+    assert resolved(saved_final="off").final is None
     assert resolved(env_final="off").final is None
+
+
+def test_same_is_no_longer_a_word_it_reads_as_unknown_so_auto():
+    got = resolve(None, None, None, "same", Hardware(gpu=True))
+    assert got.final is not None and got.final.id == "whisper-large-v3-turbo"
 
 
 def test_stale_final_id_is_auto():

@@ -47,7 +47,7 @@ class Config:
     data_dir: Path
     model: str = DEFAULT_MODEL
     stt_live: str | None = None  # speech model id, auto or unset; see voice/stt.py
-    stt_final: str | None = None  # same, plus `same` and `off`
+    stt_final: str | None = None  # same, plus `off`
     daily_budget_usd: float = DEFAULT_DAILY_BUDGET_USD
     step_cap: int = DEFAULT_STEP_CAP
     loop_lag_ms: int = DEFAULT_LOOP_LAG_MS

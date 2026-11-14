@@ -100,6 +100,13 @@ def test_set_stt_is_a_change_tool_home_only(rig):
     }
 
 
+@pytest.fixture(autouse=True)
+def _fresh_gpu_cache():
+    stt_choice.gpu_name.cache_clear()
+    yield
+    stt_choice.gpu_name.cache_clear()
+
+
 def test_gpu_name_is_the_first_line_on_windows(monkeypatch):
     class Done:
         stdout = "NVIDIA GeForce RTX 4060\nNVIDIA Other\n"
@@ -116,5 +123,24 @@ def test_gpu_name_is_none_on_failure_or_elsewhere(monkeypatch):
     monkeypatch.setattr(stt_choice.sys, "platform", "win32")
     monkeypatch.setattr(stt_choice.subprocess, "run", broken)
     assert stt_choice.gpu_name() is None
+    stt_choice.gpu_name.cache_clear()
     monkeypatch.setattr(stt_choice.sys, "platform", "linux")
     assert stt_choice.gpu_name() is None
+
+
+def test_gpu_name_asks_nvidia_smi_once_and_without_a_console_window(monkeypatch):
+    calls: list[dict] = []
+
+    class Done:
+        stdout = "NVIDIA GeForce RTX 4060\n"
+
+    def run(*a, **k):
+        calls.append(k)
+        return Done()
+
+    monkeypatch.setattr(stt_choice.sys, "platform", "win32")
+    monkeypatch.setattr(stt_choice.subprocess, "run", run)
+    stt_choice.gpu_name()
+    stt_choice.gpu_name()
+    assert len(calls) == 1
+    assert calls[0]["creationflags"] == getattr(stt_choice.subprocess, "CREATE_NO_WINDOW", 0)

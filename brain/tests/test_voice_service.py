@@ -58,6 +58,27 @@ async def settle(times: int = 40):
         await asyncio.sleep(0.005)
 
 
+async def test_a_reload_during_a_load_does_not_cache_the_old_choice():
+    sent = Sent()
+    gate = asyncio.Event()
+
+    async def slow(on_progress, n):
+        await gate.wait()
+        return parts()
+
+    svc, _, calls = service(sent, load=slow)
+    svc.listen("d", "held")
+    await settle(5)
+    svc.reload()  # the choice changed while the first load was still running
+    gate.set()
+    await settle()
+    svc.unlisten("d")
+    await settle()
+    svc.listen("d", "held")
+    await settle()
+    assert calls["n"] == 2  # the old choice's parts were not kept
+
+
 async def test_frames_before_the_models_load_are_not_lost():
     sent = Sent()
     gate = asyncio.Event()

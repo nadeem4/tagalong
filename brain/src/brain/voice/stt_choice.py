@@ -5,6 +5,7 @@ Scout pick for this PC". A stored id the list no longer has reads as Auto, so a 
 breaks listening. `gpu_name` is the card the brain can see, for the chip on Home's Voice page.
 """
 
+import functools
 import sqlite3
 import subprocess
 import sys
@@ -55,6 +56,7 @@ def save_final(db: sqlite3.Connection, model_id: str) -> None:
     set_setting(db, _FINAL, model_id)
 
 
+@functools.cache  # the card does not change while the brain runs: ask once
 def gpu_name() -> str | None:
     """The first NVIDIA card's name, or None (no card, no driver, too slow, or not Windows)."""
     if sys.platform != "win32":
@@ -66,6 +68,7 @@ def gpu_name() -> str | None:
             text=True,
             timeout=3,
             check=True,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),  # no console flash
         ).stdout
     except Exception:
         return None

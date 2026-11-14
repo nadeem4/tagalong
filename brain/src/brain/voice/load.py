@@ -96,6 +96,8 @@ def ears_loader(
 
         picked = stt.resolve(saved_live, saved_final, env_live, env_final, hardware)
         chosen, final_row = picked.live, picked.final
+        if final_row is not None and final_row.gpu == "required" and not hardware.gpu:
+            final_row = None  # a card-only model: nothing downloaded, nothing on the processor
         engine = engines.ENGINES[chosen.engine]
         assert engine.load_live is not None  # the list only gives a live role to one that has it
         # The loading bar: ONNX files, then the live model, then (if chosen) the final model.

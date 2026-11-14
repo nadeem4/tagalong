@@ -974,6 +974,9 @@ class RecordingVoice:
     def hush(self, body_id):
         self.calls.append(("hush", body_id))
 
+    def reload(self):
+        pass
+
 
 def notification(method, params):
     return {"jsonrpc": "2.0", "method": method, "params": params}

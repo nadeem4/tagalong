@@ -187,7 +187,7 @@ def resolve(
     hardware: Hardware,
 ) -> Resolved:
     """The models to load. A missing, stale or wrong-role id is Auto: the rows' `auto` hints for
-    this hardware. Only `same` and `off` mean no final pass."""
+    this hardware. Only `off` means no final pass."""
     listed = load_models()
     live_id = _pick(saved_live, env_live)
     live = next((m for m in listed if m.id == live_id and m.role in ("live", "both")), None)
@@ -196,7 +196,7 @@ def resolve(
         assert live is not None, "stt_models.json has no Auto live row"
     final_id = _pick(saved_final, env_final)
     final = None
-    if final_id not in ("same", "off"):
+    if final_id != "off":
         final = next((m for m in listed if m.id == final_id and m.role in ("final", "both")), None)
         if final is None:  # Auto, or a stale or unknown id
             final = auto_pick(listed, "final", hardware)
