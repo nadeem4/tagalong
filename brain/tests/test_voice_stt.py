@@ -181,7 +181,7 @@ def test_detect_hardware_needs_the_cuda_libraries_not_only_the_card(monkeypatch)
 def test_detect_hardware_needs_cudnn_too(monkeypatch):
     _fake_cublas(monkeypatch, True, cudnn=False)
     _fake_ct2(monkeypatch, lambda: 1)
-    assert stt.detect_hardware() == Hardware(gpu=False)
+    assert stt.detect_hardware() == Hardware(gpu=False, card=True)
 
 
 def _auto_rows(**over):
