@@ -15,7 +15,7 @@ export function Select({
   id: string;
   value: string;
   onChange(value: string): void;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; disabled?: boolean }[];
   label?: string;
   disabled?: boolean;
   /** Marks the select as refused by the last save. */
@@ -39,7 +39,7 @@ export function Select({
           onChange={(event) => onChange(event.target.value)}
         >
           {options.map((option) => (
-            <option key={option.value} value={option.value}>
+            <option key={option.value} value={option.value} disabled={option.disabled}>
               {option.label}
             </option>
           ))}

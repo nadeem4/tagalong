@@ -28,6 +28,7 @@ describe('ui package surface', () => {
         'useSpentToday',
         'MoneyField',
         'ModelField',
+        'VoiceModelsField',
         'RunForm',
         'ResultView',
         'gapsFrom',

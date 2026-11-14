@@ -607,6 +607,14 @@ The words come from a list of models kept as data, not from one hard-wired model
   `gpu` need, the effective choice, and the card name) and `set_stt {live?, final?}`, which saves and
   calls `VoiceService.reload()`. A change applies on the next listen, never under a running session; a load
   that was already running when the choice changed is not kept.
+- **The picker.** Settings has a **Speech to text** card after Voice (`stt-section.tsx` over the shared
+  `VoiceModelsField`): a chip with the graphics card or "No graphics card", **While you talk** (Auto
+  and the live models with their sizes) and **When you finish** (Auto, "Don't double-check" and the
+  final models; a model that needs a graphics card (`gpu: required`, today `whisper-large-v3-turbo`)
+  is disabled with "Needs a graphics card" when there is none). A pick saves at
+  once. The same card has **Show words while I talk**, the desktop setting
+  `voice.showWordsWhileTalking` (default on): off, push-to-talk hides the words until the talk key is
+  let go and the final text appears. Always listening ignores it.
 - **The final pass.** The live model's words are a preview. While a turn runs, the ears keep its
   audio in memory (the pre-roll and every stretch, at most the last 60 s). When the turn ends,
   the final model (`faster-whisper`, rows `whisper-large-v3-turbo` (`gpu: required`) and

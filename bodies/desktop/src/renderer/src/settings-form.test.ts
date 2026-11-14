@@ -125,6 +125,18 @@ describe('buildSettingsPatch voice', () => {
     expect(buildSettingsPatch({ ...values, ...voice }).voice).not.toHaveProperty('mouth');
   });
 
+  it('carries the show-words switch in the voice object, and leaves it out when not shown', () => {
+    expect(
+      buildSettingsPatch({ ...values, ...voice, showWordsWhileTalking: false }).voice,
+    ).toMatchObject({ showWordsWhileTalking: false });
+    expect(
+      buildSettingsPatch({ ...values, ...voice, showWordsWhileTalking: true }).voice,
+    ).toMatchObject({ showWordsWhileTalking: true });
+    expect(buildSettingsPatch({ ...values, ...voice }).voice).not.toHaveProperty(
+      'showWordsWhileTalking',
+    );
+  });
+
   it('turns Scout quiet when the switch is off', () => {
     expect(buildSettingsPatch({ ...values, ...voice, voiceEnabled: false }).voice?.enabled).toBe(
       false,

@@ -15,6 +15,7 @@ import { RegistriesSection } from './registries-section';
 import { SettingsUiContext } from './section';
 import type { SettingsUi } from './section';
 import { ShortcutsSection } from './shortcuts-section';
+import { SttSection } from './stt-section';
 import { VoiceSection } from './voice-section';
 import type { BrowserFolder, HostView } from '../../../shared/ipc';
 
@@ -122,6 +123,7 @@ export function SettingsPage() {
         voiceEnabled: form.get('voiceEnabled') !== null,
         voice: field('voice'),
         voiceSpeed: field('voiceSpeed'),
+        showWordsWhileTalking: form.get('showWordsWhileTalking') !== null,
       });
       const saved = await window.tagalongHost.saveSettings(patch);
       setView((current) => (current === null ? current : { ...current, settings: saved }));
@@ -218,6 +220,7 @@ export function SettingsFormView({
             onRemove={onRemoveFolder}
           />
           <VoiceSection settings={settings} hotkeyError={view.hotkeyError} />
+          <SttSection settings={settings} />
           <ShortcutsSection settings={settings} hotkeyError={view.hotkeyError} />
           <BrowserSection folder={browserFolder} />
           <RegistriesSection />

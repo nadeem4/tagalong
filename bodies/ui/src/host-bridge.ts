@@ -19,6 +19,7 @@ import type {
   MemoryEntry,
   ModelState,
   Pet,
+  SttState,
   SetupOverview,
   SetupResult,
   TimerRow,
@@ -360,6 +361,10 @@ export interface HostBridge {
   modelState(): Promise<ModelState>;
   /** Picks the model Scout thinks with, from its next reply; rejects with the brain's refusal. */
   setModel(model: string): Promise<void>;
+  /** Home's Speech to text card: the brain's speech models, the choice and the graphics card. */
+  sttState(): Promise<SttState>;
+  /** Saves the live and/or final speech model (`auto`; final also `off`); rejects with the brain's refusal. */
+  setStt(choice: { live?: string; final?: string }): Promise<void>;
   /** Opens the first-run walkthrough, at a step when one is named (9 is the key). */
   openWalkthrough(step?: number): Promise<void>;
   /** Home's Spend card: what was spent today and the daily limit, as the brain knows them. */

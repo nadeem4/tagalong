@@ -70,11 +70,16 @@ export function settles(mode: ListenMode | null): boolean {
 
 /**
  * The words heard so far. Listening all the time, without the "Scout" they start with; a held
- * question needs no name, so it shows as said.
+ * question needs no name, so it shows as said, unless the person turned "Show words while I
+ * talk" off: then nothing shows until the final text arrives at release. Always ignores it.
  */
-export function shownPartial(text: string | null, mode: ListenMode): string | null {
+export function shownPartial(
+  text: string | null,
+  mode: ListenMode,
+  showWords = true,
+): string | null {
   if (text === null || text === '') return null;
-  if (mode === 'held') return text;
+  if (mode === 'held') return showWords ? text : null;
   return addressedToScout(text) ?? text;
 }
 

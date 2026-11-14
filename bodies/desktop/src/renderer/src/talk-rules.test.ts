@@ -48,6 +48,19 @@ describe('shownPartial', () => {
     expect(shownPartial('Scout, what is this', 'held')).toBe('Scout, what is this');
   });
 
+  it('hides a held question while talking when show words is off', () => {
+    expect(shownPartial('what is this', 'held', false)).toBeNull();
+  });
+
+  it('shows a held question when show words is on, which is the default', () => {
+    expect(shownPartial('what is this', 'held', true)).toBe('what is this');
+    expect(shownPartial('what is this', 'held')).toBe('what is this');
+  });
+
+  it('ignores show words when listening all the time', () => {
+    expect(shownPartial('Scout, what is this', 'always', false)).toBe('what is this');
+  });
+
   it('shows nothing when nothing was heard', () => {
     expect(shownPartial(null, 'always')).toBeNull();
     expect(shownPartial('', 'held')).toBeNull();

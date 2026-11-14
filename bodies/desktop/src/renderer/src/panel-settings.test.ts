@@ -15,7 +15,17 @@ describe('panelSettings', () => {
       microphoneId: 'usb-mic',
       mouth: 'system',
       speed: 1.2,
+      showWords: true,
     });
+  });
+
+  it('shows words while talking unless the setting is off', () => {
+    const off = Settings.parse({
+      ...SETTINGS_DEFAULTS,
+      voice: { ...SETTINGS_DEFAULTS.voice, showWordsWhileTalking: false },
+    });
+    expect(panelSettings(off).showWords).toBe(false);
+    expect(panelSettings(Settings.parse(SETTINGS_DEFAULTS)).showWords).toBe(true);
   });
 
   it('speaks with Kokoro until another voice is picked', () => {

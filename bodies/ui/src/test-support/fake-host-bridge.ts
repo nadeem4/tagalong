@@ -17,6 +17,7 @@ import type {
   KnowSourceInfo,
   MemoryEntry,
   ModelState,
+  SttState,
   SetupOverview,
   SetupResult,
   TurnEvent,
@@ -71,6 +72,10 @@ export interface FakeHostBridge extends HostBridge {
   model: ModelState;
   readonly modelsSet: readonly string[];
   modelError: string | null;
+  /** The speech models as the brain reports them, every choice handed to setStt, and a refusal. */
+  stt: SttState;
+  readonly sttSets: readonly { live?: string; final?: string }[];
+  sttError: string | null;
   readonly walkthroughOpens: readonly (number | undefined)[];
   /** Every setPermission call, in order. */
   readonly permissionSets: readonly { tool: string; mode: 'off' | 'ask' | 'auto' }[];
@@ -179,6 +184,11 @@ const NO_BODIES: BodiesState = {
   },
 };
 
+/** One speech model as the brain lists it. */
+function sttRow(id: string, label: string, role: 'live' | 'final', size_mb: number) {
+  return { id, label, role, size_mb, gpu: 'none' as const, languages: ['en'], note: '' };
+}
+
 /**
  * Shipped from the package rather than kept in test files: the extension's side-panel tests
  * use the same bridge double without booting a brain.
@@ -277,6 +287,7 @@ export function createFakeHostBridge(
   const keysSet: string[] = [];
   const limitsSet: number[] = [];
   const modelsSet: string[] = [];
+  const sttSets: { live?: string; final?: string }[] = [];
   const walkthroughOpens: (number | undefined)[] = [];
 
   const fake: FakeHostBridge = {
@@ -614,6 +625,28 @@ export function createFakeHostBridge(
       if (fake.modelError !== null) return Promise.reject(new Error(fake.modelError));
       modelsSet.push(model);
       fake.model = { ...fake.model, model };
+      return Promise.resolve();
+    },
+    stt: {
+      live: 'auto',
+      final: 'auto',
+      gpu_name: 'NVIDIA GeForce RTX 4060',
+      models: [
+        sttRow('moonshine-tiny', 'Moonshine tiny', 'live', 45),
+        sttRow('moonshine-small', 'Moonshine small', 'live', 120),
+        sttRow('whisper-small-en', 'Whisper small (English)', 'final', 462),
+        sttRow('whisper-large-v3-turbo', 'Whisper large v3 turbo', 'final', 1543),
+      ],
+    },
+    sttSets,
+    sttError: null,
+    sttState() {
+      return Promise.resolve({ ...fake.stt });
+    },
+    setStt(choice) {
+      if (fake.sttError !== null) return Promise.reject(new Error(fake.sttError));
+      sttSets.push(choice);
+      fake.stt = { ...fake.stt, ...choice };
       return Promise.resolve();
     },
     walkthroughOpens,

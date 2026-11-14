@@ -159,6 +159,13 @@ not list, and applies it from the next reply. The picker is the shared `ModelFie
 `bodies/ui/src/model/`, saved at once with "Saved." and an inline error if the brain refuses.
 `TAGALONG_MODEL` is only the default until a model is chosen.
 
+**Speech to text** (Settings, after Voice) works the same way: the brain owns the two choices
+(`stt_live`, `stt_final` in its `settings` table); the card reads `stt_state` and a pick calls
+`set_stt` (`IPC.sttState`, `IPC.sttSet`, `src/main/ipc/voice-models.ts`), saved at once.
+`TAGALONG_STT_LIVE` and `TAGALONG_STT_FINAL` are only the defaults until a model is picked. The one
+desktop setting on the card is `voice.showWordsWhileTalking` in `settings.json` (default true,
+saved with the form's Save): off, push-to-talk shows no words until the talk key is let go.
+
 The daily limit is the one guard limit you can change in the app: **Settings → Anthropic key → Daily limit** (the amount and **Set** in one row, with "$1.20 of $5.00 used today" and a meter under it; the meter turns amber at the limit) calls the brain's `set_daily_limit` (a finite amount above 0). Other guard limits are not settings here. The brain's spend guards take `TAGALONG_DAILY_BUDGET_USD`
 and `TAGALONG_STEP_CAP`: `config.py` reads and checks them at start, and they are passed in when
 `sessions.py` registers the guards (a guard never imports `config`). They live in the brain's
