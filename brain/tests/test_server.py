@@ -792,9 +792,11 @@ async def test_hello_lists_home_tools_as_contract_records(env):
         "set_daily_limit",
         "set_model",
         "set_permission",
+        "set_stt",
         "speak_sample",
         "spend_today",
         "stop_job",
+        "stt_state",
         "timer_cancel",
         "timers_state",
         "watch",
@@ -971,6 +973,9 @@ class RecordingVoice:
 
     def hush(self, body_id):
         self.calls.append(("hush", body_id))
+
+    def reload(self):
+        self.calls.append(("reload",))
 
 
 def notification(method, params):

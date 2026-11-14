@@ -58,6 +58,27 @@ async def settle(times: int = 40):
         await asyncio.sleep(0.005)
 
 
+async def test_a_reload_during_a_load_does_not_cache_the_old_choice():
+    sent = Sent()
+    gate = asyncio.Event()
+
+    async def slow(on_progress, n):
+        await gate.wait()
+        return parts()
+
+    svc, _, calls = service(sent, load=slow)
+    svc.listen("d", "held")
+    await settle(5)
+    svc.reload()  # the choice changed while the first load was still running
+    gate.set()
+    await settle()
+    svc.unlisten("d")
+    await settle()
+    svc.listen("d", "held")
+    await settle()
+    assert calls["n"] == 2  # the old choice's parts were not kept
+
+
 async def test_frames_before_the_models_load_are_not_lost():
     sent = Sent()
     gate = asyncio.Event()
@@ -361,3 +382,39 @@ async def test_follow_speech_reports_the_mouths_state():
     await settle()
     await svc.close()
     assert "talking" in seen and seen[-1] == "idle"
+
+
+async def test_changing_choice_reloads_ears_on_next_listen():
+    sent = Sent()
+    svc, _, calls = service(sent)
+    svc.listen("d", "held")
+    await settle()
+    svc.unlisten("d")
+    await settle()
+    svc.listen("d", "held")
+    await settle()
+    assert calls["n"] == 1  # the loaded models are kept between listens
+    svc.unlisten("d")
+    await settle()
+    svc.reload()
+    svc.listen("d", "held")
+    await settle()
+    assert calls["n"] == 2
+
+
+async def test_running_session_keeps_its_models():
+    sent = Sent()
+    first, second = parts(), parts()
+
+    async def load(on_progress, n):
+        return first if n == 1 else second
+
+    svc, _, calls = service(sent, load=load)
+    svc.listen("d", "held")
+    await settle()
+    svc.reload()  # the choice changes while the session runs
+    svc.mic("d", pcm(LOUD, 12))
+    await settle()
+    svc.unlisten("d")
+    await settle()
+    assert calls["n"] == 1 and first.stt.fed and not second.stt.fed

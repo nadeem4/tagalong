@@ -82,6 +82,7 @@ class VoiceService:
         self._sessions: dict[str, _Session] = {}
         self._parts: EarsParts | None = None
         self._loading: asyncio.Task | None = None
+        self._gen = 0  # bumped by reload(): a load that started before it is not kept
         self._lock = asyncio.Lock()  # the models hold state: one session uses them at a time
 
     def listen(self, body_id: str, mode: Literal["held", "always"]) -> None:
@@ -92,6 +93,13 @@ class VoiceService:
         session = _Session(body_id, mode)
         self._sessions[body_id] = session
         session.task = asyncio.get_running_loop().create_task(self._work(session))
+
+    def reload(self) -> None:
+        """The speech-model choice changed: the next listen loads the new models. A session
+        already running keeps the ones it holds."""
+        self._gen += 1
+        self._parts = None
+        self._loading = None
 
     def mic(self, body_id: str, pcm: bytes) -> None:
         session = self._sessions.get(body_id)
@@ -169,6 +177,7 @@ class VoiceService:
     async def _models(self, session: _Session) -> EarsParts:
         if self._parts is not None:
             return self._parts
+        gen = self._gen
         if self._loading is None:
             last = -1.0
 
@@ -179,10 +188,18 @@ class VoiceService:
                     for other in list(self._sessions.values()):
                         self._send(other, "voice", {"status": "loading", "progress": fraction})
 
-            self._loading = asyncio.ensure_future(self._load_ears(progress))
-            self._loading.add_done_callback(lambda _t: setattr(self, "_loading", None))
-        self._parts = await asyncio.shield(self._loading)
-        return self._parts
+            task = asyncio.ensure_future(self._load_ears(progress))
+            self._loading = task
+
+            def done(t: asyncio.Task) -> None:
+                if self._loading is t:  # a reload may have started a newer load
+                    self._loading = None
+
+            task.add_done_callback(done)
+        parts = await asyncio.shield(self._loading)
+        if gen == self._gen:
+            self._parts = parts
+        return parts
 
     async def _work(self, session: _Session) -> None:
         try:

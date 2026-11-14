@@ -147,6 +147,40 @@ async def test_no_final_model_means_no_final_pass(monkeypatch, tmp_path):
     assert got.final is None
 
 
+async def test_a_card_only_final_model_is_never_fetched_or_run_without_a_card(
+    monkeypatch, tmp_path
+):
+    made = parts()
+    downloads: list[str] = []
+    _stubs(monkeypatch, made, downloads)  # detect_hardware says: no card
+    monkeypatch.setitem(engines.ENGINES, "moonshine", Engine(True, lambda m, f, p: made.stt, None))
+    ran: list[str] = []
+    monkeypatch.setitem(
+        engines.ENGINES, "faster-whisper", Engine(False, None, lambda *a: ran.append("x"))
+    )
+    got = await load.ears_loader(tmp_path, saved=lambda: (None, "whisper-large-v3-turbo"))(
+        lambda f: None
+    )
+    assert got.final is None and not ran
+    assert not any(d.startswith("stt/whisper-large-v3-turbo/") for d in downloads)
+
+
+async def test_a_chosen_card_only_model_never_may_use_the_processor(monkeypatch, tmp_path):
+    made = parts()
+    _stubs(monkeypatch, made, [])
+    monkeypatch.setattr(stt, "detect_hardware", lambda *a: stt.Hardware(gpu=True))
+    monkeypatch.setitem(engines.ENGINES, "moonshine", Engine(True, lambda m, f, p: made.stt, None))
+    seen: list[bool] = []
+
+    def final_load(model, folder, on_progress, cpu_ok):
+        seen.append(cpu_ok)
+        return FakeFinal()
+
+    monkeypatch.setitem(engines.ENGINES, "faster-whisper", Engine(False, None, final_load))
+    await load.ears_loader(tmp_path, saved=lambda: (None, "whisper-large-v3-turbo"))(lambda f: None)
+    assert seen == [False]
+
+
 async def test_a_final_model_that_cannot_load_leaves_the_live_text(monkeypatch, tmp_path):
     made = parts()
     _stubs(monkeypatch, made, [])
@@ -172,3 +206,20 @@ async def test_a_final_download_that_fails_leaves_the_live_text(monkeypatch, tmp
     monkeypatch.setattr(load, "ensure_files", offline)
     got = await load.ears_loader(tmp_path, env_final="whisper-small-en")(lambda f: None)
     assert got.stt is made.stt and got.final is None
+
+
+async def test_a_saved_choice_beats_the_env_default(monkeypatch, tmp_path):
+    made = parts()
+    names: list[str] = []
+    _stubs(monkeypatch, made, [])
+
+    def fake_load(model, folder, on_progress):
+        names.append(model.id)
+        return made.stt
+
+    monkeypatch.setitem(engines.ENGINES, "moonshine", Engine(True, fake_load, None))
+    loader = load.ears_loader(
+        tmp_path, "moonshine-small", "whisper-small-en", saved=lambda: ("moonshine-tiny", "off")
+    )
+    got = await loader(lambda f: None)
+    assert names == ["moonshine-tiny"] and got.final is None

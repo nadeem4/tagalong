@@ -39,6 +39,7 @@ from brain.tools import (
     timer_tools,
     voice_tools,
 )
+from brain.voice.stt_tools import stt_tools
 
 
 @pytest.fixture
@@ -280,6 +281,7 @@ def home(mem, tmp_path):
         brain_tools(mem, notify)
         + home_tools(budget, lambda: box)
         + model_tools(mem.db, "claude-sonnet-5-5", notify)
+        + stt_tools(mem.db, (None, None), notify, lambda: None)
         + expert_tools(jobs, lambda: owner["turn"])
     )
     box = Toolbox(
@@ -1001,6 +1003,8 @@ def test_home_tools_contract_records_have_no_for_or_mode(home):
         "set_permission",
         "model_state",
         "set_model",
+        "stt_state",
+        "set_stt",
     }
     for r in records:
         assert set(r.model_dump(exclude_none=True)) == {

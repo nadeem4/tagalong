@@ -83,9 +83,9 @@
       }
     ],
     "size_mb": 1543,
-    "gpu": "preferred",
+    "gpu": "required",
     "languages": ["multilingual"],
-    "note": "The most accurate words, heard again when you finish; large, and quicker on a graphics card.",
+    "note": "The most accurate words, heard again when you finish; large, and needs a graphics card.",
     "options": {},
     "auto": {
       "gpu": "final"

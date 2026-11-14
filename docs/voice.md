@@ -599,13 +599,18 @@ The words come from a list of models kept as data, not from one hard-wired model
   it is the pick, and `auto_pick` in `stt.py` reads the hints with no branches on ids. Today Auto
   live is `moonshine-small` on any PC; Auto final is `whisper-large-v3-turbo` when a usable
   graphics card is found (`detect_hardware`: CTranslate2 sees an NVIDIA device and the NVIDIA libraries
-  are found: a device plus cuBLAS and cuDNN, on the system or in `<TAGALONG_HOME>/voice/cuda`) and no final pass otherwise. `same` and `off` mean no final pass. The numbers behind
-  this are in [voice-stt-results.md](voice-stt-results.md). Only the environment values exist so
-  far; the saved choice comes with the Home picker. A change applies on the next listen, never under a running session.
+  are found: a device plus cuBLAS and cuDNN, on the system or in `<TAGALONG_HOME>/voice/cuda`) and no final pass otherwise. Only `off` means no final pass; any other
+  unknown word (an old `same` included) reads as Auto. The numbers behind
+  this are in [voice-stt-results.md](voice-stt-results.md). The saved choice is the text settings
+  `stt_live` and `stt_final` (`voice/stt_choice.py`; `auto` and `off` are words, a stored id the list no longer has
+  reads as Auto). Home reads and writes it with two tools, `stt_state` (the list with each model's role, size and
+  `gpu` need, the effective choice, and the card name) and `set_stt {live?, final?}`, which saves and
+  calls `VoiceService.reload()`. A change applies on the next listen, never under a running session; a load
+  that was already running when the choice changed is not kept.
 - **The final pass.** The live model's words are a preview. While a turn runs, the ears keep its
   audio in memory (the pre-roll and every stretch, at most the last 60 s). When the turn ends,
-  the final model (`faster-whisper`, rows `whisper-large-v3-turbo` and `whisper-small-en`,
-  `gpu: preferred`) transcribes all of it again, and that text is what `turn_end` carries. The
+  the final model (`faster-whisper`, rows `whisper-large-v3-turbo` (`gpu: required`) and
+  `whisper-small-en` (`gpu: preferred`)) transcribes all of it again, and that text is what `turn_end` carries. The
   per-stretch `final` events stay live text. It runs only on a turn that had speech (a stretch
   with live words), because Whisper invents words ("Thank you.") from silence or noise. With a
   graphics card it first probes CUDA once in a short child process (a missing cuDNN
@@ -614,7 +619,8 @@ The words come from a list of models kept as data, not from one hard-wired model
   a failure logs the last lines of the child's stderr), then loads the model on CUDA in float16 and warms
   it up with one second of silence. If CUDA cannot run it, a row Auto picked only for the card
   (`whisper-large-v3-turbo`) gets no final pass, never int8 turbo on the processor; a model the
-  person chose still falls back to the processor in int8, with one warning. The CUDA libraries
+  person chose still falls back to the processor in int8, with one warning, except a `gpu: required` row (it never does). A `gpu: required` row
+  (turbo) with no usable card is dropped before anything is downloaded or loaded: no final pass. The CUDA libraries
   are not bundled. On Windows, when a card is seen but cuBLAS or cuDNN is missing, the first
   listen fetches them (`voice/cuda.py`): two pinned PyPI wheels (`cuda_wheels.json`: cuBLAS
   12.8.4.1 and cuDNN 9.10.2.21, the cuDNN CTranslate2 4.9 ships; url, size, SHA-256, about 1.2 GB
