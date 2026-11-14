@@ -110,7 +110,7 @@ test('Speech to text: picking a live model saves at once and the brain records s
   await expect(live).toHaveValue('auto', { timeout: 30_000 });
   await expect(home.getByText('NVIDIA GeForce RTX 4060')).toBeVisible();
   await live.selectOption('moonshine-tiny');
-  await expect(home.getByText('Saved.', { exact: true })).toBeVisible();
+  await expect(home.locator('.tg-stt__ok')).toHaveText('Saved.');
   expect(brain.sttSets).toEqual([{ live: 'moonshine-tiny' }]);
 });
 
