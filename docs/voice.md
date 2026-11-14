@@ -594,9 +594,20 @@ The words come from a list of models kept as data, not from one hard-wired model
   list and a dependency, with no change to `load.py`.
 - **The choice** is the saved choice, then `TAGALONG_STT_LIVE` / `TAGALONG_STT_FINAL`, then Auto
   (`resolve` in `voice/stt.py`). An id that is not listed, or names a model of the wrong role,
-  reads as Auto. Auto live is `moonshine-tiny`, as before; a final model is not used yet. Only
-  the environment values exist so far; the saved choice comes with the Home picker. A change
-  applies on the next listen, never under a running session.
+  reads as Auto. Auto live is `moonshine-tiny`, as before; Auto has no final model yet (it comes
+  with the measured Auto rule), so the final pass runs only when `TAGALONG_STT_FINAL` names a
+  final model. Only the environment values exist so far; the saved choice comes with the Home
+  picker. A change applies on the next listen, never under a running session.
+- **The final pass.** The live model's words are a preview. While a turn runs, the ears keep its
+  audio in memory (the pre-roll and every stretch, at most the last 60 s). When the turn ends,
+  the final model (`faster-whisper`, rows `whisper-large-v3-turbo` and `whisper-small-en`,
+  `gpu: preferred`) transcribes all of it again, and that text is what `turn_end` carries. The
+  per-stretch `final` events stay live text. It runs only on a turn that had speech (a stretch
+  with live words), because Whisper invents words ("Thank you.") from silence or noise. With a
+  graphics card it uses CUDA in float16; without one, or if CUDA will not start, it logs one
+  warning and uses the processor in int8. Its files are downloaded by `ensure_files` (size and
+  SHA-256 checked) into `<TAGALONG_HOME>/voice/stt/<id>`, after the live model, in the same
+  loading progress; the library never downloads by itself.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
@@ -607,6 +618,9 @@ flowchart LR
   row --> engines[ENGINES by engine name]
   engines --> live[LiveStt: Moonshine]
   live --> ears[Ears]
+  row --> final[FinalStt: faster-whisper, if chosen]
+  final --> ears
+  ears -->|turn_end carries the final text| body[body]
 ```
 
 ## Interfaces
@@ -679,6 +693,7 @@ thresholds, the sentence rules) is in [brain.md](brain.md#brain-ears).
 | `TALK_CONFIRM_MS`                        | 250 ms                          | `talk-key.ts`                                   |
 | `FRESH_PRESS_MS`                         | 1,100 ms                        | `push-to-talk.ts`                               |
 | `FOLLOW_UP_MS`                           | 20,000 ms                       | `addressing.ts`                                 |
+| `FINAL_MAX_SAMPLES`                      | 60 s of 16 kHz audio            | `ears.py`                                       |
 | Ears retry                               | 30 s, doubling, max 5 min       | `listen-controller.ts`                          |
 | `LISTENING_GUARD_MS`                     | 2,000 ms                        | `always-listening.ts`                           |
 | `LISTENING_MARK_MS` / `SAY_NAME_MARK_MS` | 8,000 ms / 8,000 ms             | `status-marks.ts`                               |
@@ -691,7 +706,9 @@ thresholds, the sentence rules) is in [brain.md](brain.md#brain-ears).
 - **Settings.** `voice.*`, `listening.always` and `hotkeys.talk` are in the settings store. See
   `settings-and-secrets.md`.
 - **Nothing heard.** Audio, transcripts and key events are not stored or logged anywhere by the
-  desktop. Frames live only in memory: in the mic `Pushable`, and in flight to the brain. The text
+  desktop. Frames live only in memory: in the mic `Pushable`, and in flight to the brain. In the
+  brain the ears keep the turn's audio (at most 60 s) in memory for the final pass and drop it
+  when the turn ends; it is never written to disk. The text
   of a heard question is stored only as the ask it becomes, like a typed one (see `memory.md`).
 
 ## Failure handling
@@ -706,6 +723,7 @@ thresholds, the sentence rules) is in [brain.md](brain.md#brain-ears).
 | The brain's models cannot load                                                       | `voice { status: 'failed' }` becomes `ears-status: failed` and the `ears-failed` mark; the health row reads "The brain could not load its speech models." `earsFailed()` drops every question and ends the always session, then retries with back-off. |
 | Ears status `failed` in the panel                                                    | `EarsNotes` shows the failure line once. The note is shown only if a question was being asked or always listening was running.                                                                                                                         |
 | The brain cannot speak (no Kokoro)                                                   | It sends `speech` with text only; the panel speaks it with the system voice.                                                                                                                                                                           |
+| The final speech model is missing, still downloading, fails to load or fails to run, or returns nothing | The turn ends with the live words, exactly as without a final model: a failed download or load is logged and the session goes on without it; a failed or empty pass is logged and the live text is sent. |
 | A sentence fails to play                                                             | `SpeechPlayer` logs it and plays the next.                                                                                                                                                                                                             |
 | Key hook will not load                                                               | One warning, and a `talk` hotkey problem shown in the panel and Settings. The mic button still works.                                                                                                                                                  |
 | A mic frame cannot reach the brain                                                   | `brain.mic` drops it (the connection is down) and the next frame still goes; an error is logged.                                                                                                                                                       |
