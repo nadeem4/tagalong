@@ -277,6 +277,7 @@ run it on its own for those.
    **Expected:** no `uv` process starts; the app shows the offline mark (not Starting) and keeps retrying.
 5. **Action:** with no brain running, start the app normally.
    **Expected:** Scout shows **Starting** while the brain launches, then no mark once it connects. If the brain exits or does not connect within 3 minutes, the mark becomes **Offline**.
+   While Starting, Scout's head shows as drifting specks that gather (eyes dim); when the brain connects the specks settle into the head, the eyes light and the live Scout takes over. If it ends as **Offline**, the specks stop, dimmed. With Windows "Show animations" off, a still dim head shows instead, with no movement.
 
 ## Hand off to Claude Code (real brain, real Claude Code)
 
