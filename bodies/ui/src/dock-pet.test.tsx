@@ -1,6 +1,6 @@
 /** Tests for DockPet: Scout's mood on the live mascot, tags, marks and labels. */
 
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { STATUS_WORDS } from './shapes';
 import type { Pet } from './shapes';
@@ -14,8 +14,10 @@ vi.mock('./scout-face', () => ({
 
 // The gather overlay draws on a canvas: it has its own tests, so here it only shows its state.
 vi.mock('./mascot/scout-gather', () => ({
-  ScoutGather: ({ state }: { state: string }) =>
-    state === 'idle' ? null : <span data-testid="scout-gather" data-state={state} />,
+  ScoutGather: ({ state, onDone }: { state: string; onDone?: () => void }) =>
+    state === 'idle' ? null : (
+      <button data-testid="scout-gather" data-state={state} onClick={onDone} />
+    ),
 }));
 
 const SCOUT: Pet = {
@@ -201,6 +203,39 @@ describe('moods', () => {
       rerender(<DockPet pet={SCOUT} mood="idle" status={null} />);
       expect(screen.getByTestId('scout-gather')).toHaveAttribute('data-state', 'ready');
       expect(screen.getByTestId('scout-face')).toBeInTheDocument();
+    });
+
+    it('keeps the face hidden until the gather is done, then shows it', () => {
+      const { rerender } = render(
+        <DockPet pet={SCOUT} mood="idle" status={{ id: 'brain-starting' }} />,
+      );
+      expect(screen.getByTestId('dock-face')).toHaveStyle({ opacity: '0' });
+      rerender(<DockPet pet={SCOUT} mood="idle" status={null} />);
+      expect(screen.getByTestId('dock-face')).toHaveStyle({ opacity: '0' });
+      act(() => screen.getByTestId('scout-gather').click());
+      expect(screen.queryByTestId('scout-gather')).toBeNull();
+      expect(screen.getByTestId('dock-face')).toHaveStyle({ opacity: '1' });
+    });
+
+    it('a brain dying long after ready shows no overlay and keeps the face', () => {
+      const { rerender } = render(
+        <DockPet pet={SCOUT} mood="idle" status={{ id: 'brain-starting' }} />,
+      );
+      rerender(<DockPet pet={SCOUT} mood="idle" status={null} />);
+      act(() => screen.getByTestId('scout-gather').click());
+      rerender(<DockPet pet={SCOUT} mood="idle" status={{ id: 'brain-offline' }} />);
+      expect(screen.queryByTestId('scout-gather')).toBeNull();
+      expect(screen.getByTestId('dock-face')).toHaveStyle({ opacity: '1' });
+    });
+
+    it('starting, null, then offline before the hand-over ends shows no overlay', () => {
+      const { rerender } = render(
+        <DockPet pet={SCOUT} mood="idle" status={{ id: 'brain-starting' }} />,
+      );
+      rerender(<DockPet pet={SCOUT} mood="idle" status={null} />);
+      rerender(<DockPet pet={SCOUT} mood="idle" status={{ id: 'brain-offline' }} />);
+      expect(screen.queryByTestId('scout-gather')).toBeNull();
+      expect(screen.getByTestId('dock-face')).toHaveStyle({ opacity: '1' });
     });
 
     it('offline after starting shows failed', () => {

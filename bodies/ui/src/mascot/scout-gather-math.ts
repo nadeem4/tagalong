@@ -45,13 +45,18 @@ export function sampleTiles(data: Uint8ClampedArray, size: number, tile: number)
   return tiles;
 }
 
-/** How gathered the specks are: 0 is scattered, 1 is the whole head. */
-export function gatherProgress(state: GatherState, tMs: number, stateAtMs: number): number {
+/** How gathered the specks are: 0 is scattered, 1 is the whole head. `fromK` is where it was. */
+export function gatherProgress(
+  state: GatherState,
+  tMs: number,
+  stateAtMs: number,
+  fromK = STARTING_K,
+): number {
   const dt = tMs - stateAtMs;
   if (state === 'idle') return 1;
   if (state === 'starting') return STARTING_K + 0.05 * Math.sin(tMs / 400);
-  if (state === 'ready') return STARTING_K + (1 - STARTING_K) * easeOut(dt / GATHER_MS);
-  return STARTING_K - (STARTING_K - FAILED_K) * easeOut(dt / 600);
+  if (state === 'ready') return fromK + (1 - fromK) * easeOut(dt / GATHER_MS);
+  return fromK - (fromK - FAILED_K) * easeOut(dt / 600);
 }
 
 /** Where a speck is drawn: its tile, plus a per-speck drift that shrinks to nothing at k=1. */

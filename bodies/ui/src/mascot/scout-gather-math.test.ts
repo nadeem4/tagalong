@@ -30,6 +30,10 @@ describe('gatherProgress', () => {
     expect(gatherProgress('ready', 1000 + 900, 1000)).toBe(1);
     expect(gatherProgress('ready', 1000 + 450, 1000)).toBeLessThan(1);
   });
+  it('eases to ready from the k it was at, not from 0.6', () => {
+    expect(gatherProgress('ready', 1000, 1000, 0.4)).toBeCloseTo(0.4, 5);
+    expect(gatherProgress('ready', 1000 + 900, 1000, 0.4)).toBe(1);
+  });
   it('settles near 0.4 when failed', () => {
     expect(gatherProgress('failed', 5000, 0)).toBeCloseTo(0.4, 1);
   });

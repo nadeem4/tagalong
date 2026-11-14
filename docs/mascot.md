@@ -111,7 +111,9 @@ It is a 2D canvas over the dock, not WebGL: the head is drawn once offscreen, cu
 tile is a speck. The state comes from the status mark: `brain-starting` is `starting` (specks about 60% gathered,
 dim eyes, the live face hidden); the next status ends it: `brain-offline` is `failed` (specks drift to 40% and stop,
 dimmed), anything else is `ready` (specks settle into the head over 900 ms, the eyes light, the overlay fades over
-300 ms and the live face shows). `idle` draws nothing. One `requestAnimationFrame` loop runs only while the overlay
+300 ms; the live face stays hidden until then, when `ScoutGather` calls `onDone` and the state returns to `idle`, so a brain
+that dies later shows no overlay). The head shapes are `GLYPH_BOXES` and `GLYPH_EYES` in `scout-mark.tsx`, shared with the
+still glyph. `idle` draws nothing. One `requestAnimationFrame` loop runs only while the overlay
 is moving and stops after the ready fade (or once failed has settled). With reduced motion there is no loop: one
 still frame of the head at low opacity while starting, which fades out on ready. Colours come from the theme tokens.
 

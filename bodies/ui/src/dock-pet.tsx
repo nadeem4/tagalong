@@ -96,13 +96,17 @@ const WORDS: Readonly<Record<DockMood, string>> = {
 };
 
 /**
- * Scout gathers from specks while the brain starts. Once it has been starting, the next status
- * decides how it ends: Offline is failed, anything else is ready (the face takes over).
+ * Scout gathers from specks while the brain starts. Once it has been starting (or failed), the
+ * next status ends it: Offline is failed, anything else is ready (ScoutGather then reports it is
+ * done and the state returns to idle). Offline while ready, or any time later, is a brain that
+ * died: no overlay, the live face stays.
  */
 function nextGather(prev: GatherState, status: StatusMarkValue | null | undefined): GatherState {
   if (status?.id === 'brain-starting') return 'starting';
-  if (prev === 'idle') return 'idle';
-  return status?.id === 'brain-offline' ? 'failed' : 'ready';
+  const offline = status?.id === 'brain-offline';
+  if (prev === 'starting' || prev === 'failed') return offline ? 'failed' : 'ready';
+  if (prev === 'ready' && offline) return 'idle';
+  return prev;
 }
 
 function isTagged(mood: DockMood): mood is TaggedMood {
@@ -123,7 +127,8 @@ export function DockPet({ pet, mood, sightPaused = false, listening, status }: D
   const nextState = nextGather(gather, status);
   // Derived during render (not an effect) so the face never flashes between two statuses.
   if (nextState !== gather) setGather(nextState);
-  const gathering = gather === 'starting' || gather === 'failed';
+  // The face stays hidden until the specks have settled and faded, so two heads never overlap.
+  const gathering = gather !== 'idle';
   const hearing = mood === 'listening' && listening === 'hearing';
   const tag = isTagged(mood) && !sightPaused && !hearing ? TAGS[mood] : undefined;
   const label = `${pet.name} ${hearing ? 'is listening' : WORDS[mood]}${sightPaused ? ', sight paused' : ''}${
@@ -138,6 +143,7 @@ export function DockPet({ pet, mood, sightPaused = false, listening, status }: D
     >
       <style>{DOCK_CSS}</style>
       <span
+        data-testid="dock-face"
         style={{
           display: 'block',
           opacity: gathering ? 0 : 1,
@@ -146,7 +152,9 @@ export function DockPet({ pet, mood, sightPaused = false, listening, status }: D
       >
         <ScoutFace spec={scout} mood={mood} />
       </span>
-      {gather !== 'idle' && <ScoutGather state={gather} size={SIZE} />}
+      {gather !== 'idle' && (
+        <ScoutGather state={gather} size={SIZE} onDone={() => setGather('idle')} />
+      )}
 
       {tag !== undefined && (
         <span

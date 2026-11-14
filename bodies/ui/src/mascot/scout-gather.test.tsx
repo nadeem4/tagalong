@@ -7,6 +7,7 @@ import { ScoutGather } from './scout-gather';
 
 let now = 0;
 let frames: FrameRequestCallback[] = [];
+const cancel = vi.fn();
 
 function stubReducedMotion(reduced: boolean) {
   vi.stubGlobal('matchMedia', () => ({ matches: reduced }));
@@ -23,9 +24,10 @@ function tick(ms: number) {
 beforeEach(() => {
   now = 0;
   frames = [];
+  cancel.mockClear();
   stubReducedMotion(false);
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => frames.push(cb));
-  vi.stubGlobal('cancelAnimationFrame', () => {});
+  vi.stubGlobal('cancelAnimationFrame', cancel);
   vi.spyOn(performance, 'now').mockImplementation(() => now);
   const ctx = new Proxy(
     { getImageData: () => ({ data: new Uint8ClampedArray(96 * 96 * 4) }) } as Record<
@@ -56,6 +58,39 @@ describe('ScoutGather', () => {
     rerender(<ScoutGather state="ready" size={96} />);
     for (let i = 0; i < 150; i++) tick(16);
     expect(frames).toHaveLength(0);
+  });
+
+  it('cancels its frame when unmounted while starting', () => {
+    const { unmount } = render(<ScoutGather state="starting" size={96} />);
+    unmount();
+    expect(cancel).toHaveBeenCalled();
+  });
+
+  it('stops once failed has settled', () => {
+    render(<ScoutGather state="failed" size={96} />);
+    for (let i = 0; i < 100; i++) tick(16);
+    expect(frames).toHaveLength(0);
+  });
+
+  it('calls onDone once, after the ready fade', () => {
+    const onDone = vi.fn();
+    const { rerender } = render(<ScoutGather state="starting" size={96} onDone={onDone} />);
+    rerender(<ScoutGather state="ready" size={96} onDone={onDone} />);
+    tick(16);
+    expect(onDone).not.toHaveBeenCalled();
+    for (let i = 0; i < 150; i++) tick(16);
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onDone after the still fade with reduced motion', () => {
+    vi.useFakeTimers();
+    stubReducedMotion(true);
+    const onDone = vi.fn();
+    render(<ScoutGather state="ready" size={96} onDone={onDone} />);
+    expect(onDone).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(400));
+    expect(onDone).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 
   it('draws no loop for reduced motion', () => {

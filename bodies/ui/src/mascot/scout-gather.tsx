@@ -7,6 +7,7 @@
 
 import { useEffect, useRef } from 'react';
 import { themeTokens as t } from '../theme/tokens';
+import { GLYPH_BOXES, GLYPH_EYES, type GlyphBox } from '../scout-mark';
 import {
   eyeLight,
   gatherAlpha,
@@ -20,6 +21,8 @@ import {
 export interface ScoutGatherProps {
   state: GatherState;
   size: number;
+  /** Called once the overlay has finished fading after ready, so the face can take over. */
+  onDone?: () => void;
 }
 
 const TILE = 3;
@@ -28,6 +31,7 @@ const HEAD_SHARE = 0.7;
 /** Failed stops moving once it has settled. */
 const FAILED_SETTLED_MS = 1200;
 /** Reduced motion: the still head's opacity per state, then a fade out on ready. */
+const STILL_FADE_MS = 300;
 const STILL_OPACITY = { idle: 0, starting: 0.4, failed: 0.25, ready: 0 } as const;
 
 function prefersReducedMotion(): boolean {
@@ -37,22 +41,16 @@ function prefersReducedMotion(): boolean {
   );
 }
 
-/** The head without its eyes (they are drawn live), in the same shapes as ScoutGlyph's 32 box. */
+/** The head without its eyes (they are drawn live), from the shapes ScoutGlyph draws. */
 function drawHead(ctx: CanvasRenderingContext2D, size: number) {
   const s = (size * HEAD_SHARE) / 32;
   const o = (size - size * HEAD_SHARE) / 2;
-  const box = (x: number, y: number, w: number, h: number, r: number, fill: string) => {
-    ctx.fillStyle = fill;
+  for (const b of GLYPH_BOXES) {
+    ctx.fillStyle = b.fill;
     ctx.beginPath();
-    ctx.roundRect(o + x * s, o + y * s, w * s, h * s, r * s);
+    ctx.roundRect(o + b.x * s, o + b.y * s, b.w * s, b.h * s, b.r * s);
     ctx.fill();
-  };
-  box(15.4, 3.5, 1.2, 3.5, 0, t.color.textMuted);
-  box(14.3, 1.3, 3.4, 3.4, 1.7, t.color.sky);
-  box(0.8, 13, 3.2, 7.5, 1.6, t.color.keycapLine);
-  box(28, 13, 3.2, 7.5, 1.6, t.color.keycapLine);
-  box(3, 7, 26, 19, 7, t.color.gold);
-  box(6, 10, 20, 13, 4.5, t.color.goldInk);
+  }
 }
 
 function drawEyes(ctx: CanvasRenderingContext2D, size: number, light: number) {
@@ -60,18 +58,25 @@ function drawEyes(ctx: CanvasRenderingContext2D, size: number, light: number) {
   const o = (size - size * HEAD_SHARE) / 2;
   ctx.globalAlpha *= light;
   ctx.fillStyle = t.color.sky;
-  for (const x of [10.5, 17.9]) {
+  for (const e of GLYPH_EYES as readonly GlyphBox[]) {
     ctx.beginPath();
-    ctx.roundRect(o + x * s, o + 14 * s, 3.6 * s, 5.2 * s, 1.8 * s);
+    ctx.roundRect(o + e.x * s, o + e.y * s, e.w * s, e.h * s, e.r * s);
     ctx.fill();
   }
 }
 
 const hex = (c: number) => `#${c.toString(16).padStart(6, '0')}`;
 
-export function ScoutGather({ state, size }: ScoutGatherProps) {
+export function ScoutGather({ state, size, onDone }: ScoutGatherProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const tiles = useRef<Tile[] | null>(null);
+  // The tiles and their colour strings, made once so no frame builds strings.
+  const sampled = useRef<{ tiles: Tile[]; colours: string[] } | null>(null);
+  // Where the specks were when the last state began: the next state eases on from there.
+  const lastK = useRef(1);
+  const done = useRef(onDone);
+  useEffect(() => {
+    done.current = onDone;
+  });
   const reduced = prefersReducedMotion();
 
   useEffect(() => {
@@ -83,7 +88,7 @@ export function ScoutGather({ state, size }: ScoutGatherProps) {
       clear();
       return;
     }
-    if (tiles.current === null) {
+    if (sampled.current === null) {
       // Draw the head once on an offscreen canvas, then cut it into tiles.
       const off = document.createElement('canvas');
       off.width = size;
@@ -91,17 +96,20 @@ export function ScoutGather({ state, size }: ScoutGatherProps) {
       const octx = off.getContext('2d');
       if (octx === null) return;
       drawHead(octx, size);
-      tiles.current = sampleTiles(octx.getImageData(0, 0, size, size).data, size, TILE);
+      const tiles = sampleTiles(octx.getImageData(0, 0, size, size).data, size, TILE);
+      sampled.current = { tiles, colours: tiles.map((tile) => hex(tile.c)) };
     }
-    const specks = tiles.current;
+    const { tiles, colours } = sampled.current;
     const startedAt = performance.now();
+    const fromK = state === 'starting' ? 0.6 : lastK.current;
     const draw = (now: number, still: boolean) => {
       clear();
       ctx.globalAlpha = still ? 1 : gatherAlpha(state, now, startedAt);
-      const k = still ? 1 : gatherProgress(state, now, startedAt);
-      specks.forEach((tile, i) => {
+      const k = still ? 1 : gatherProgress(state, now, startedAt, fromK);
+      lastK.current = k;
+      tiles.forEach((tile, i) => {
         const p = speckPosition(tile, k, now, i);
-        ctx.fillStyle = hex(tile.c);
+        ctx.fillStyle = colours[i] ?? '#000000';
         ctx.fillRect(p.x, p.y, TILE, TILE);
       });
       drawEyes(ctx, size, still ? 0.25 : eyeLight(state, now, startedAt));
@@ -109,22 +117,27 @@ export function ScoutGather({ state, size }: ScoutGatherProps) {
     };
     if (reduced) {
       draw(startedAt, true);
-      return;
+      // The still head fades out over the CSS transition, then the face may take over.
+      if (state !== 'ready') return;
+      const id = setTimeout(() => done.current?.(), STILL_FADE_MS);
+      return () => clearTimeout(id);
     }
-    let cancelled = false;
+    let raf = 0;
+    let stopped = false;
     const frame = (now: number) => {
-      if (cancelled) return;
+      if (stopped) return;
       draw(now, false);
-      const over =
-        state === 'ready'
-          ? gatherAlpha(state, now, startedAt) === 0
-          : state === 'failed' && now - startedAt > FAILED_SETTLED_MS;
-      if (state === 'ready' && over) clear();
-      else if (!over) requestAnimationFrame(frame);
+      if (state === 'ready' && gatherAlpha(state, now, startedAt) === 0) {
+        clear();
+        done.current?.();
+      } else if (state !== 'failed' || now - startedAt <= FAILED_SETTLED_MS) {
+        raf = requestAnimationFrame(frame);
+      }
     };
-    requestAnimationFrame(frame);
+    raf = requestAnimationFrame(frame);
     return () => {
-      cancelled = true;
+      stopped = true;
+      cancelAnimationFrame(raf);
     };
   }, [state, size, reduced]);
 
@@ -142,7 +155,9 @@ export function ScoutGather({ state, size }: ScoutGatherProps) {
         height: size,
         pointerEvents: 'none',
         // Only reduced motion uses this: the still head fades out instead of animating.
-        ...(reduced ? { opacity: STILL_OPACITY[state], transition: 'opacity 300ms ease' } : {}),
+        ...(reduced
+          ? { opacity: STILL_OPACITY[state], transition: `opacity ${STILL_FADE_MS}ms ease` }
+          : {}),
       }}
     />
   );
