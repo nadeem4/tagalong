@@ -586,7 +586,7 @@ The words come from a list of models kept as data, not from one hard-wired model
   the other voice models), `size_mb`, `gpu` (`none`, `preferred`, `required`), `languages`, a
   `note` and `options`. Today it holds three Moonshine rows: `moonshine-tiny` (the one used so
   far), `moonshine-small` and `moonshine-medium`. A bad row (unknown role or engine, a live model
-  on an engine that cannot stream, a duplicate id, a file without a hash) stops the loader and the
+  on an engine that cannot stream, a duplicate id, a file without a 64-digit lowercase hex hash) stops the loader and the
   error names the row.
 - **Engines** are code: `voice/engines/<engine>.py`, registered in `voice/engines/__init__.py`
   (`ENGINES`: does it stream, how to load a live model, how to load a final one). The loader
@@ -604,10 +604,14 @@ The words come from a list of models kept as data, not from one hard-wired model
   `gpu: preferred`) transcribes all of it again, and that text is what `turn_end` carries. The
   per-stretch `final` events stay live text. It runs only on a turn that had speech (a stretch
   with live words), because Whisper invents words ("Thank you.") from silence or noise. With a
-  graphics card it uses CUDA in float16; without one, or if CUDA will not start, it logs one
-  warning and uses the processor in int8. Its files are downloaded by `ensure_files` (size and
-  SHA-256 checked) into `<TAGALONG_HOME>/voice/stt/<id>`, after the live model, in the same
-  loading progress; the library never downloads by itself.
+  graphics card it tries CUDA in float16 and warms the model up with one second of silence, so a
+  missing CUDA library shows at load; if CUDA fails to load or to run, it logs one warning and
+  uses the processor in int8. No CUDA libraries are bundled: the packaged build runs on the
+  processor unless a CUDA toolkit is on PATH. Its files are downloaded by `ensure_files` (size and
+  SHA-256 checked, each row pinned to a Hugging Face commit, never `main`) into
+  `<TAGALONG_HOME>/voice/stt/<id>`, after the live model, in the same loading progress. The
+  first listen waits for this download, with the loading bar; the library never downloads by
+  itself.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
@@ -723,7 +727,7 @@ thresholds, the sentence rules) is in [brain.md](brain.md#brain-ears).
 | The brain's models cannot load                                                       | `voice { status: 'failed' }` becomes `ears-status: failed` and the `ears-failed` mark; the health row reads "The brain could not load its speech models." `earsFailed()` drops every question and ends the always session, then retries with back-off. |
 | Ears status `failed` in the panel                                                    | `EarsNotes` shows the failure line once. The note is shown only if a question was being asked or always listening was running.                                                                                                                         |
 | The brain cannot speak (no Kokoro)                                                   | It sends `speech` with text only; the panel speaks it with the system voice.                                                                                                                                                                           |
-| The final speech model is missing, still downloading, fails to load or fails to run, or returns nothing | The turn ends with the live words, exactly as without a final model: a failed download or load is logged and the session goes on without it; a failed or empty pass is logged and the live text is sent. |
+| The final speech model fails to download or load (offline, a hash mismatch), fails to run, or returns nothing | The first listen waits for the download (loading bar), so there is no "still downloading" state. The turn ends with the live words, exactly as without a final model: a failed download or load is logged and the session goes on without it; a failed or empty pass is logged and the live text is sent. CUDA that fails to load or to run falls back to the processor with one warning. |
 | A sentence fails to play                                                             | `SpeechPlayer` logs it and plays the next.                                                                                                                                                                                                             |
 | Key hook will not load                                                               | One warning, and a `talk` hotkey problem shown in the panel and Settings. The mic button still works.                                                                                                                                                  |
 | A mic frame cannot reach the brain                                                   | `brain.mic` drops it (the connection is down) and the next frame still goes; an error is logged.                                                                                                                                                       |

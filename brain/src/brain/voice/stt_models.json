@@ -7,9 +7,13 @@
     "files": [],
     "size_mb": 45,
     "gpu": "none",
-    "languages": ["en"],
+    "languages": [
+      "en"
+    ],
     "note": "Small and quick; the words can come out rough.",
-    "options": { "arch": "TINY_STREAMING" }
+    "options": {
+      "arch": "TINY_STREAMING"
+    }
   },
   {
     "id": "moonshine-small",
@@ -19,9 +23,13 @@
     "files": [],
     "size_mb": 120,
     "gpu": "none",
-    "languages": ["en"],
+    "languages": [
+      "en"
+    ],
     "note": "Better words than tiny, still light on the processor.",
-    "options": { "arch": "SMALL_STREAMING" }
+    "options": {
+      "arch": "SMALL_STREAMING"
+    }
   },
   {
     "id": "moonshine-medium",
@@ -31,9 +39,13 @@
     "files": [],
     "size_mb": 250,
     "gpu": "none",
-    "languages": ["en"],
+    "languages": [
+      "en"
+    ],
     "note": "The best live words of the three; the biggest download.",
-    "options": { "arch": "MEDIUM_STREAMING" }
+    "options": {
+      "arch": "MEDIUM_STREAMING"
+    }
   },
   {
     "id": "whisper-large-v3-turbo",
@@ -42,39 +54,41 @@
     "engine": "faster-whisper",
     "files": [
       {
-        "url": "https://huggingface.co/deepdml/faster-whisper-large-v3-turbo-ct2/resolve/main/model.bin",
+        "url": "https://huggingface.co/deepdml/faster-whisper-large-v3-turbo-ct2/resolve/4df90f75321148c3a29a9e2351b7ddf8f5b115a8/model.bin",
         "path": "stt/whisper-large-v3-turbo/model.bin",
         "bytes": 1617884929,
-        "sha256": "PIN-BEFORE-RELEASE"
+        "sha256": "e76620f83d5f5b69efd3d87e3dc180c1bd21df9fbebacfd4335e5e1efcc018da"
       },
       {
-        "url": "https://huggingface.co/deepdml/faster-whisper-large-v3-turbo-ct2/resolve/main/config.json",
+        "url": "https://huggingface.co/deepdml/faster-whisper-large-v3-turbo-ct2/resolve/4df90f75321148c3a29a9e2351b7ddf8f5b115a8/config.json",
         "path": "stt/whisper-large-v3-turbo/config.json",
         "bytes": 2263,
-        "sha256": "PIN-BEFORE-RELEASE"
+        "sha256": "b0253ea6c0d3bea6b1e19e91a02acfd3b53f4467362efcb5a3e6b16c9b3a9b7e"
       },
       {
-        "url": "https://huggingface.co/deepdml/faster-whisper-large-v3-turbo-ct2/resolve/main/tokenizer.json",
+        "url": "https://huggingface.co/deepdml/faster-whisper-large-v3-turbo-ct2/resolve/4df90f75321148c3a29a9e2351b7ddf8f5b115a8/tokenizer.json",
         "path": "stt/whisper-large-v3-turbo/tokenizer.json",
         "bytes": 2710337,
-        "sha256": "PIN-BEFORE-RELEASE"
+        "sha256": "297b13372ac43916285644fb9687add3cc62ee2a1adb60da3dc25cc94c1871fd"
       },
       {
-        "url": "https://huggingface.co/deepdml/faster-whisper-large-v3-turbo-ct2/resolve/main/vocabulary.json",
+        "url": "https://huggingface.co/deepdml/faster-whisper-large-v3-turbo-ct2/resolve/4df90f75321148c3a29a9e2351b7ddf8f5b115a8/vocabulary.json",
         "path": "stt/whisper-large-v3-turbo/vocabulary.json",
         "bytes": 1068114,
-        "sha256": "PIN-BEFORE-RELEASE"
+        "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1"
       },
       {
-        "url": "https://huggingface.co/deepdml/faster-whisper-large-v3-turbo-ct2/resolve/main/preprocessor_config.json",
+        "url": "https://huggingface.co/deepdml/faster-whisper-large-v3-turbo-ct2/resolve/4df90f75321148c3a29a9e2351b7ddf8f5b115a8/preprocessor_config.json",
         "path": "stt/whisper-large-v3-turbo/preprocessor_config.json",
         "bytes": 340,
-        "sha256": "PIN-BEFORE-RELEASE"
+        "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711"
       }
     ],
     "size_mb": 1543,
     "gpu": "preferred",
-    "languages": ["multilingual"],
+    "languages": [
+      "multilingual"
+    ],
     "note": "The most accurate words, heard again when you finish; large, and quicker on a graphics card.",
     "options": {}
   },
@@ -85,34 +99,38 @@
     "engine": "faster-whisper",
     "files": [
       {
-        "url": "https://huggingface.co/Systran/faster-whisper-small.en/resolve/main/model.bin",
+        "url": "https://huggingface.co/Systran/faster-whisper-small.en/resolve/d1d751a5f8271d482d14ca55d9e2deeebbae577f/model.bin",
         "path": "stt/whisper-small-en/model.bin",
         "bytes": 483545366,
-        "sha256": "PIN-BEFORE-RELEASE"
+        "sha256": "62b2a45b05ee59acb4a5341b33ee35e041395d378d418a18acfe4c9e768ee37a"
       },
       {
-        "url": "https://huggingface.co/Systran/faster-whisper-small.en/resolve/main/config.json",
+        "url": "https://huggingface.co/Systran/faster-whisper-small.en/resolve/d1d751a5f8271d482d14ca55d9e2deeebbae577f/config.json",
         "path": "stt/whisper-small-en/config.json",
         "bytes": 2657,
-        "sha256": "PIN-BEFORE-RELEASE"
+        "sha256": "666a9605530ac1f61fa8177f3702b4dacec9966749e42610839fcc32661d5fae"
       },
       {
-        "url": "https://huggingface.co/Systran/faster-whisper-small.en/resolve/main/tokenizer.json",
+        "url": "https://huggingface.co/Systran/faster-whisper-small.en/resolve/d1d751a5f8271d482d14ca55d9e2deeebbae577f/tokenizer.json",
         "path": "stt/whisper-small-en/tokenizer.json",
         "bytes": 2128466,
-        "sha256": "PIN-BEFORE-RELEASE"
+        "sha256": "929c5252409436dce1b38a75d1abbcb5e132d170d8e324e4e04ed915fa2d22df"
       },
       {
-        "url": "https://huggingface.co/Systran/faster-whisper-small.en/resolve/main/vocabulary.txt",
+        "url": "https://huggingface.co/Systran/faster-whisper-small.en/resolve/d1d751a5f8271d482d14ca55d9e2deeebbae577f/vocabulary.txt",
         "path": "stt/whisper-small-en/vocabulary.txt",
         "bytes": 422309,
-        "sha256": "PIN-BEFORE-RELEASE"
+        "sha256": "ff77588746d3a2595d32ab5b69ffd7b95ce2441ac57533cb66fc3eb575a115cf"
       }
     ],
     "size_mb": 462,
     "gpu": "preferred",
-    "languages": ["en"],
+    "languages": [
+      "en"
+    ],
     "note": "Better words than the live model, light enough for a processor.",
-    "options": { "language": "en" }
+    "options": {
+      "language": "en"
+    }
   }
 ]

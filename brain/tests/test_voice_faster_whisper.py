@@ -12,6 +12,7 @@ from brain.voice.engines import ENGINES, faster_whisper
 class FakeWhisper:
     made: list[tuple] = []
     fail_cuda = False
+    fail_cuda_transcribe = False
     segments = ["  Hello ", "there.  "]
 
     def __init__(self, path, device, compute_type):
@@ -19,8 +20,11 @@ class FakeWhisper:
             raise RuntimeError("cublas64_12.dll not found")
         FakeWhisper.made.append((path, device, compute_type))
         self.calls: list[dict] = []
+        self.device = device
 
     def transcribe(self, audio, **kwargs):
+        if self.device == "cuda" and FakeWhisper.fail_cuda_transcribe:
+            raise RuntimeError("cublas64_12.dll not found")
         self.calls.append(kwargs)
         return iter(SimpleNamespace(text=t) for t in self.segments), None
 
@@ -28,6 +32,7 @@ class FakeWhisper:
 def setup_function():
     FakeWhisper.made = []
     FakeWhisper.fail_cuda = False
+    FakeWhisper.fail_cuda_transcribe = False
 
 
 def row(**options):
@@ -83,6 +88,15 @@ def test_cuda_failure_falls_back_to_cpu_int8_once(caplog):
     FakeWhisper.fail_cuda = True
     load(gpu=True)
     assert [m[1:] for m in FakeWhisper.made] == [("cpu", "int8")]
+    assert sum("graphics card" in r.getMessage() for r in caplog.records) == 1
+
+
+def test_cuda_that_loads_but_cannot_transcribe_falls_back_to_cpu_int8(caplog):
+    # CTranslate2 loads fine and only fails on the first decode when a CUDA library is missing.
+    FakeWhisper.fail_cuda_transcribe = True
+    engine = load(gpu=True)
+    assert [m[1:] for m in FakeWhisper.made] == [("cuda", "float16"), ("cpu", "int8")]
+    assert engine.transcribe(np.zeros(16000, np.float32)) == "Hello there."
     assert sum("graphics card" in r.getMessage() for r in caplog.records) == 1
 
 

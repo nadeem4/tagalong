@@ -1,6 +1,7 @@
 """The speech model list, its validation and the choice order (saved, env, Auto)."""
 
 import json
+import re
 
 import pytest
 
@@ -65,6 +66,15 @@ def test_every_file_has_sha256_and_size():
     assert models(row(files=[FILE]))[0].files[0].sha256 == FILE["sha256"]
     for m in load_models():  # the shipped list obeys it too
         assert all(f.sha256 and f.bytes > 0 for f in m.files)
+
+
+def test_sha256_must_be_64_lowercase_hex_and_the_shipped_list_is_pinned():
+    for bad in ("PIN-BEFORE-RELEASE", "AB" * 32, "ab" * 31):
+        with pytest.raises(ValueError, match="m1"):
+            models(row(files=[{**FILE, "sha256": bad}]))
+    for m in load_models():
+        assert all(re.fullmatch(r"[0-9a-f]{64}", f.sha256) for f in m.files)
+        assert all("/resolve/main/" not in f.url for f in m.files)
 
 
 def test_unknown_engine_rejected():

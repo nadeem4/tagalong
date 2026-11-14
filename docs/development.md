@@ -218,7 +218,7 @@ the browser body are not measured: the Playwright suites cover them.
   `resources/brain`. To bump uv, change both constants from the new release's `.sha256` file. The
   brain reads no `mode.txt`, so none is shipped. A new brain dependency (for example
   `faster-whisper`) needs no bundle change: `uv sync --frozen` installs it from `uv.lock` on first
-  run. The CUDA libraries are the optional `gpu` extra, not installed by default. First-run use of these files is a later slice.
+  run. The packaged build runs the final speech model on the CPU unless a CUDA toolkit is on PATH (no CUDA libraries are bundled). First-run use of these files is a later slice.
 - **Release.** Pushing a tag `vX.Y.Z` runs `.github/workflows/release.yml` on Windows: it checks the
   tag equals `v` plus the desktop `version`, runs `pnpm package:win`, and publishes the installer
   with `gh release create --generate-notes`. Bump `bodies/desktop/package.json` first, then tag.

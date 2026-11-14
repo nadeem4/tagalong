@@ -18,13 +18,6 @@ dependencies = [
     "websockets>=17.3",
 ]
 
-[project.optional-dependencies]
-# CUDA runtime libraries for faster-whisper on a graphics card; CPU installs skip them.
-gpu = [
-    "nvidia-cublas-cu12; sys_platform != 'darwin'",
-    "nvidia-cudnn-cu12; sys_platform != 'darwin'",
-]
-
 [project.scripts]
 brain = "brain.main:main"
 tagalong = "brain.cli:main"

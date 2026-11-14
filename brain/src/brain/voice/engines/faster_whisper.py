@@ -54,7 +54,11 @@ def load_final(
     if gpu:
         try:
             loaded = whisper(path, device="cuda", compute_type="float16")
+            # A missing CUDA library often shows only at the first decode; the segments are
+            # lazy, so consume them to find out now rather than mid-turn.
+            list(loaded.transcribe(np.zeros(16000, np.float32), language="en", beam_size=1)[0])
         except Exception:
+            loaded = None
             # Usually the CUDA libraries are missing; say it once and carry on with the processor.
             log.warning(
                 "the graphics card could not run the final speech model; using the processor"
