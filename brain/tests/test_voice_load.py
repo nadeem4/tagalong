@@ -23,7 +23,7 @@ async def test_moonshine_progress_is_delivered_on_the_event_loop(monkeypatch, tm
         return made.stt
 
     monkeypatch.setattr(load, "ensure_files", no_download)
-    monkeypatch.setattr(stt, "detect_hardware", lambda: stt.Hardware(gpu=False))
+    monkeypatch.setattr(stt, "detect_hardware", lambda *a: stt.Hardware(gpu=False))
     monkeypatch.setattr(load.silero, "load", lambda path: made.vad)
     monkeypatch.setattr(load.smart_turn, "load", lambda path: made.turn)
     monkeypatch.setitem(engines.ENGINES, "moonshine", Engine(True, moonshine_load, None))
@@ -56,7 +56,7 @@ def _stubs(monkeypatch, made, downloads):
         downloads.extend(f.path for f in files)
 
     monkeypatch.setattr(load, "ensure_files", record)
-    monkeypatch.setattr(stt, "detect_hardware", lambda: stt.Hardware(gpu=False))
+    monkeypatch.setattr(stt, "detect_hardware", lambda *a: stt.Hardware(gpu=False))
     monkeypatch.setattr(load.silero, "load", lambda path: made.vad)
     monkeypatch.setattr(load.smart_turn, "load", lambda path: made.turn)
 
@@ -127,7 +127,7 @@ async def test_loader_downloads_final_files_with_progress_share(monkeypatch, tmp
 
     monkeypatch.setitem(engines.ENGINES, "moonshine", Engine(True, live_load, None))
     monkeypatch.setitem(
-        engines.ENGINES, "faster-whisper", Engine(False, None, lambda m, f, p: final)
+        engines.ENGINES, "faster-whisper", Engine(False, None, lambda m, f, p, c: final)
     )
     got = await load.ears_loader(tmp_path, env_final="whisper-small-en")(seen.append)
     await asyncio.sleep(0)

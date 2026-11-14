@@ -598,8 +598,8 @@ The words come from a list of models kept as data, not from one hard-wired model
   reads as Auto. **Auto** is data: a row's `auto` hint (`{"cpu"|"gpu": "live"|"final"}`) says where
   it is the pick, and `auto_pick` in `stt.py` reads the hints with no branches on ids. Today Auto
   live is `moonshine-small` on any PC; Auto final is `whisper-large-v3-turbo` when a usable
-  graphics card is found (`detect_hardware`: CTranslate2 sees an NVIDIA device and cuBLAS can be
-  found) and no final pass otherwise. `same` and `off` mean no final pass. The numbers behind
+  graphics card is found (`detect_hardware`: CTranslate2 sees an NVIDIA device and the NVIDIA libraries
+  are found: a device plus cuBLAS and cuDNN, on the system or in `<TAGALONG_HOME>/voice/cuda`) and no final pass otherwise. `same` and `off` mean no final pass. The numbers behind
   this are in [voice-stt-results.md](voice-stt-results.md). Only the environment values exist so
   far; the saved choice comes with the Home picker. A change applies on the next listen, never under a running session.
 - **The final pass.** The live model's words are a preview. While a turn runs, the ears keep its
@@ -608,10 +608,24 @@ The words come from a list of models kept as data, not from one hard-wired model
   `gpu: preferred`) transcribes all of it again, and that text is what `turn_end` carries. The
   per-stretch `final` events stay live text. It runs only on a turn that had speech (a stretch
   with live words), because Whisper invents words ("Thank you.") from silence or noise. With a
-  graphics card it tries CUDA in float16 and warms the model up with one second of silence, so a
-  missing CUDA library shows at load; if CUDA fails to load or to run, it logs one warning and
-  uses the processor in int8. No CUDA libraries are bundled: the packaged build runs on the
-  processor unless a CUDA toolkit is on PATH. Its files are downloaded by `ensure_files` (size and
+  graphics card it first probes CUDA once in a short child process (a missing cuDNN
+  sub-library can kill the process instead of raising; a clean answer is kept in
+  `voice/cuda/probe.json`, keyed by the wheels, a False for 24 hours; a timeout is not kept, and
+  a failure logs the last lines of the child's stderr), then loads the model on CUDA in float16 and warms
+  it up with one second of silence. If CUDA cannot run it, a row Auto picked only for the card
+  (`whisper-large-v3-turbo`) gets no final pass, never int8 turbo on the processor; a model the
+  person chose still falls back to the processor in int8, with one warning. The CUDA libraries
+  are not bundled. On Windows, when a card is seen but cuBLAS or cuDNN is missing, the first
+  listen fetches them (`voice/cuda.py`): two pinned PyPI wheels (`cuda_wheels.json`: cuBLAS
+  12.8.4.1 and cuDNN 9.10.2.21, the cuDNN CTranslate2 4.9 ships; url, size, SHA-256, about 1.2 GB
+  together), one after the other (a wheel whose DLL is already there is skipped), each fetched, its `bin/*.dll` extracted (streamed, safe) into
+  `<TAGALONG_HOME>/voice/cuda` and the wheel deleted. The fetch is the first half of the loading
+  bar. CTranslate2 and cuDNN open cuBLAS and the cuDNN sub-libraries later with `LoadLibrary`,
+  which ignores `os.add_dll_directory`, so `cuda.add_dll_directory` also puts the folder first
+  on `PATH`; it runs before CTranslate2 is imported (in `detect_hardware` and `load_final`). A
+  failed or mismatched download is one warning, a failure marker (`voice/cuda/failed.json`) and
+  no retry for 24 hours; the verified wheel it had is kept until extracted, even when only the extraction failed. Linux uses its system
+  CUDA; nothing is fetched there. Its files are downloaded by `ensure_files` (size and
   SHA-256 checked, each row pinned to a Hugging Face commit, never `main`) into
   `<TAGALONG_HOME>/voice/stt/<id>`, after the live model, in the same loading progress. The
   first listen waits for this download, with the loading bar; the library never downloads by

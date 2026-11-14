@@ -4,6 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 from brain.voice import stt
 from brain.voice.engines import ENGINES, faster_whisper
@@ -41,8 +42,16 @@ def row(**options):
     return found if not options else stt.SttModel(**{**found.__dict__, "options": options})
 
 
-def load(model=None, folder=Path("v"), gpu=False):
-    return faster_whisper.load_final(model or row(), folder, whisper=FakeWhisper, gpu=gpu)
+def load(model=None, folder=Path("v"), gpu=False, cpu_ok=True, probe_ok=True):
+    return faster_whisper.load_final(
+        model or row(),
+        folder,
+        None,
+        cpu_ok,
+        whisper=FakeWhisper,
+        gpu=gpu,
+        probe=lambda voice, path: probe_ok,
+    )
 
 
 def test_the_final_engine_is_registered_and_does_not_stream():
@@ -105,3 +114,23 @@ def test_does_not_use_library_download(tmp_path):
     # library would fetch by itself (that would skip the SHA-256 check).
     load(folder=tmp_path)
     assert FakeWhisper.made[0][0] == str(tmp_path / "stt" / "whisper-large-v3-turbo")
+
+
+def test_a_card_only_row_gives_no_model_instead_of_cpu_turbo():
+    FakeWhisper.fail_cuda = True
+    with pytest.raises(RuntimeError):
+        load(gpu=True, cpu_ok=False)
+    assert FakeWhisper.made == []  # never built on the processor
+
+
+def test_a_failed_probe_skips_cuda_and_follows_the_same_rule():
+    # A missing cuDNN sub-library can kill the process, so the probe runs in a child.
+    assert load(gpu=True, probe_ok=False).device == "cpu"
+    assert [m[1] for m in FakeWhisper.made] == ["cpu"]
+    with pytest.raises(RuntimeError):
+        load(gpu=True, probe_ok=False, cpu_ok=False)
+
+
+def test_the_loaded_device_is_reported():
+    assert load(gpu=True).device == "cuda"
+    assert load(gpu=True, probe_ok=False).device == "cpu"

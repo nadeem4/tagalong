@@ -93,8 +93,10 @@ class GpuWatch:
         self._stop.set()
 
 
-def decode(model, engine, folder: Path, audio) -> tuple[list[str], float, float, float | None]:
-    """Transcripts, mean CPU cores busy, mean seconds per clip, peak GPU percent."""
+def decode(model, engine, folder: Path, audio) -> tuple[list[str], float, float, float | None, str]:
+    """Transcripts, mean CPU cores busy, mean seconds per clip, peak GPU percent, and the device
+    the model really ran on (a final model asked to use the card may end on the processor)."""
+    device = "cpu"
     if model.role in ("live", "both"):
         live = engine.load_live(model, folder, None)
 
@@ -104,7 +106,9 @@ def decode(model, engine, folder: Path, audio) -> tuple[list[str], float, float,
                 live.accept(a[i : i + FRAME])
             return live.finish()
     else:
-        run = engine.load_final(model, folder, None).transcribe
+        final = engine.load_final(model, folder, None, True)  # the loader's own path
+        device = final.device
+        run = final.transcribe
     run(audio[0][1][:RATE])  # warm up so load cost is not counted as decode
     texts: list[str] = []
     per_clip: list[float] = []
@@ -115,7 +119,7 @@ def decode(model, engine, folder: Path, audio) -> tuple[list[str], float, float,
             texts.append(run(a))
             per_clip.append(time.perf_counter() - t0)
     wall, cpu = time.perf_counter() - wall0, time.process_time() - cpu0
-    return texts, cpu / wall, sum(per_clip) / len(per_clip), gpu.peak
+    return texts, cpu / wall, sum(per_clip) / len(per_clip), gpu.peak, device
 
 
 def idle_cpu(home: Path, seconds: int) -> float:
@@ -147,18 +151,18 @@ def run_stt(args: argparse.Namespace) -> None:
         raise SystemExit("nothing to measure: no clips and Kokoro lines are off")
     audio = audio_for(corpus, home, args.snr)
     print(f"{len(audio)} clips, noise at {args.snr} dB SNR\n")
-    print("| model | role | WER | name kept | CPU cores | GPU peak % | s per clip |")
-    print("|---|---|---|---|---|---|---|")
+    print("| model | role | device | WER | name kept | CPU cores | GPU peak % | s per clip |")
+    print("|---|---|---|---|---|---|---|---|")
     for model in stt.load_models():
         if args.models and model.id not in args.models:
             continue
         _download(list(model.files), home / "voice")
         engine = engines.ENGINES[model.engine]
-        texts, cpu, delay, gpu = decode(model, engine, home / "voice", audio)
+        texts, cpu, delay, gpu, device = decode(model, engine, home / "voice", audio)
         rates = [wer(c.reference, t) for (c, _a), t in zip(audio, texts, strict=True)]
         gpu_text = "n/a" if gpu is None else f"{gpu:.0f}"
         print(
-            f"| {model.id} | {model.role} | {np.mean(rates):.3f} | "
+            f"| {model.id} | {model.role} | {device} | {np.mean(rates):.3f} | "
             f"{np.mean([name_kept(t) for t in texts]):.0%} | {cpu:.2f} | {gpu_text} | {delay:.2f} |"
         )
     if args.idle_seconds:
