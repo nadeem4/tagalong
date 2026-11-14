@@ -29,6 +29,8 @@ export interface LaunchOptions {
   platform: NodeJS.Platform;
   /** First-run progress for Home: installing while the sync runs, failed if it did not finish. */
   onSetup: (state: SetupState) => void;
+  /** True while the desktop is starting the brain (before sync or spawn), false when that start ends. */
+  onStarting: (on: boolean) => void;
   /** Where the detached brain's output goes. */
   logPath: string;
   /** Opens the log for append and returns its fd. */
@@ -100,6 +102,7 @@ export interface RealLaunch {
   /** The app's version; packaged, it is the brain's build id. */
   appVersion: string;
   onSetup?: (state: SetupState) => void;
+  onStarting?: (on: boolean) => void;
   env?: NodeJS.ProcessEnv;
 }
 
@@ -119,7 +122,7 @@ export function realStop(real: RealLaunch): Promise<boolean> {
 }
 
 export function realLaunch(real: RealLaunch): Promise<void> {
-  const { brainDir, packaged, onSetup = () => undefined } = real;
+  const { brainDir, packaged, onSetup = () => undefined, onStarting = () => undefined } = real;
   const env = brainEnv(real);
   return launchBrain({
     env,
@@ -128,6 +131,7 @@ export function realLaunch(real: RealLaunch): Promise<void> {
     sync: packaged !== undefined,
     platform: process.platform,
     onSetup,
+    onStarting,
     logPath: brainLogPath(env, homedir()),
     openLog: (path) => {
       mkdirSync(dirname(path), { recursive: true });
@@ -160,7 +164,8 @@ export function stopBrain(
 }
 
 export async function launchBrain(options: LaunchOptions): Promise<void> {
-  const { env, brainDir, uv, sync, platform, onSetup, logPath, openLog, closeLog, probe } = options;
+  const { env, brainDir, uv, sync, platform, onSetup, onStarting, logPath } = options;
+  const { openLog, closeLog, probe } = options;
   const { exists, spawn } = options;
   const { log } = options;
   const addr = env.TAGALONG_BRAIN_ADDR ?? DEFAULT_ADDR;
@@ -168,10 +173,12 @@ export async function launchBrain(options: LaunchOptions): Promise<void> {
   if (!exists(join(brainDir, 'pyproject.toml'))) return;
   if (await probe(addr)) return;
 
+  onStarting(true);
   if (sync) {
     onSetup('installing');
     if (!(await runSync())) {
       onSetup('failed');
+      onStarting(false);
       return;
     }
     onSetup('idle');
@@ -193,11 +200,13 @@ export async function launchBrain(options: LaunchOptions): Promise<void> {
   let running = true;
   child.on('error', (error) => {
     running = false;
+    onStarting(false);
     log.warn(`could not start the brain (${error.message}); the desktop keeps retrying`);
   });
   child.once('exit', (code) => {
     if (!running) return;
     running = false;
+    onStarting(false);
     log.warn(`brain exited with code ${code}; the desktop keeps retrying`);
   });
   // Unreferenced (and detached or hidden): quitting the app leaves the brain running.

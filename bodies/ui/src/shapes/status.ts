@@ -9,6 +9,7 @@ import { z } from 'zod';
 /** In order: of the marks set, the first one here is the one that shows on Scout. */
 export const StatusId = z.enum([
   'brain-offline',
+  'brain-starting',
   'brain-outdated',
   'no-key',
   'ears-failed',
@@ -39,6 +40,10 @@ export const STATUS_WORDS: Readonly<
   Record<StatusId, { tag: string; detail: string; fix?: FixTarget }>
 > = {
   'brain-offline': { tag: 'Offline', detail: "Scout's brain is not running." },
+  'brain-starting': {
+    tag: 'Starting',
+    detail: "Scout's brain is starting. The first start takes a little longer.",
+  },
   'brain-outdated': {
     tag: 'Update',
     detail: 'Update Tagalong to talk to this brain.',

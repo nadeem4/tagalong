@@ -32,12 +32,20 @@ import {
 } from './always-listening';
 import { watchPresence } from './presence';
 import { installLogFile, openLogsFolder, rendererConsole } from './log-file';
-import { StatusMarks, markBrainLink, markKey, markListening, setPanelMark } from './status-marks';
+import {
+  StatusMarks,
+  markBrainLink,
+  markBrainStarting,
+  markKey,
+  markListening,
+  setPanelMark,
+} from './status-marks';
 import { captureNotice, captureTooltip } from './capture-notice';
 import { captureActiveWindow, captureAskSnapshot } from './context';
 import type { TurnEvent } from '@tagalong/ui/shapes';
 import { createTurnEvents } from './brain/turn-events';
 import { startBrain } from './brain/start';
+import { startingGate } from './brain/starting-gate';
 import { homedir } from 'node:os';
 import { ownBuild } from './brain/build-id';
 import { brainLogPath, dataDir as brainDataDir, realLaunch, realStop } from './brain/launch';
@@ -163,8 +171,18 @@ const brainRun = (): RealLaunch => ({
   packaged: app.isPackaged ? { uv: join(process.resourcesPath, 'uv', 'uv.exe') } : undefined,
   appVersion: app.getVersion(),
 });
+/** The status marks, set before the first launch; the launch can report before that. */
+let startingMarks: StatusMarks | null = null;
+const startingGates = startingGate((on) => {
+  if (startingMarks !== null) markBrainStarting(startingMarks, on, () => brainStatus);
+});
 const brainSetup = createBrainSetup(
-  (onSetup) => realLaunch({ ...brainRun(), onSetup }),
+  (onSetup) =>
+    realLaunch({
+      ...brainRun(),
+      onSetup,
+      onStarting: startingGates.next(),
+    }),
   () => {
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send(IPC.brainChangedEvent, 'link');
@@ -258,6 +276,7 @@ async function start(): Promise<void> {
       if (!window.isDestroyed()) window.webContents.send(IPC.statusMarkEvent, top);
     }
   });
+  startingMarks = statusMarks;
   // "Listening" on Scout for a few seconds: the mark, not a spoken line, says it is on.
   markListening(statusMarks, listening);
 

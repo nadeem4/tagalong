@@ -1,7 +1,8 @@
 /**
  * The status marks main holds for every window: a plain map of marks, the top one by the shared
  * order, and an optional time limit per mark. No I/O; main broadcasts each change. Contains
- * StatusMarks, markListening, setPanelMark, markBrainLink and markKey.
+ * StatusMarks, markListening, setPanelMark, markBrainLink, markBrainStarting,
+ * BRAIN_START_GRACE_MS and markKey.
  */
 
 import { topStatus } from '@tagalong/ui/shapes';
@@ -32,6 +33,10 @@ export class StatusMarks {
     }
     this.#marks.set(mark.id, mark);
     this.#changed();
+  }
+
+  has(id: StatusId): boolean {
+    return this.#marks.has(id);
   }
 
   clear(id: StatusId): void {
@@ -107,8 +112,43 @@ export function markKey(marks: StatusMarks, hasKey: boolean): void {
 /** Whether the brain can be reached: Offline while it is down, Update when it is too new. */
 export function markBrainLink(marks: StatusMarks, status: BrainStatus): void {
   if (status === 'connecting') return;
-  if (status === 'offline') marks.set({ id: 'brain-offline' });
-  else marks.clear('brain-offline');
+  // While the desktop is starting the brain, "Starting" stands in for "Offline".
+  if (status === 'offline') {
+    if (!marks.has('brain-starting')) marks.set({ id: 'brain-offline' });
+  } else {
+    marks.clear('brain-offline');
+    marks.clear('brain-starting');
+    clearGrace(marks);
+  }
   if (status === 'outdated') marks.set({ id: 'brain-outdated' });
   else marks.clear('brain-outdated');
+}
+
+/** How long "Starting" may show before a brain that never answered counts as Offline. */
+export const BRAIN_START_GRACE_MS = 180_000;
+
+const graceTimers = new WeakMap<StatusMarks, ReturnType<typeof setTimeout>>();
+
+function clearGrace(marks: StatusMarks): void {
+  clearTimeout(graceTimers.get(marks));
+  graceTimers.delete(marks);
+}
+
+/**
+ * "Starting" while the desktop launches the brain, instead of a misleading "Offline". Ends when
+ * the launch ends or the grace runs out; if the brain is still not reachable it is Offline then.
+ */
+export function markBrainStarting(marks: StatusMarks, on: boolean, link: () => BrainStatus): void {
+  clearGrace(marks);
+  if (on) {
+    marks.clear('brain-offline');
+    marks.set({ id: 'brain-starting' });
+    graceTimers.set(
+      marks,
+      setTimeout(() => markBrainStarting(marks, false, link), BRAIN_START_GRACE_MS),
+    );
+    return;
+  }
+  marks.clear('brain-starting');
+  if (link() === 'offline') marks.set({ id: 'brain-offline' });
 }
