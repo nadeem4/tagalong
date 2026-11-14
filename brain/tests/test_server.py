@@ -975,7 +975,7 @@ class RecordingVoice:
         self.calls.append(("hush", body_id))
 
     def reload(self):
-        pass
+        self.calls.append(("reload",))
 
 
 def notification(method, params):
