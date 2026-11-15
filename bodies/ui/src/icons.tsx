@@ -9,6 +9,8 @@ const PATHS = {
   minus: <path d="M4 8h8" />,
   plus: <path d="M4 8h8M8 4v8" />,
   'chev-d': <path d="M3.5 6 8 10.5 12.5 6" />,
+  play: <path d="M5.5 3.5v9L12.5 8z" fill="currentColor" strokeWidth="1" />,
+  pause: <path d="M5.5 3.5v9M10.5 3.5v9" strokeWidth="2.2" />,
   search: (
     <>
       <circle cx="7" cy="7" r="4.6" />
