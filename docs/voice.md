@@ -666,7 +666,7 @@ and passes speed through; Kokoro is unchanged. Libraries are imported only insid
   Hugging Face API (`.../api/models/<repo>/tree/<commit>/<dir>?expand=true`, `lfs.oid` for large
   files; hash the small text files yourself) and pin the URL to the commit.
 - **Add an engine:** a module with an `Adapter` and a `load(row, folder)`, an entry in
-  `TTS_ENGINES` and in `tts.ENGINE_NAMES` (a test keeps the two in step), then rows.
+  `TTS_ENGINES`, then rows.
 - **Sample clips:** `cd brain && uv run python tools/voice_samples.py OUT_DIR` says
   `SAMPLE_TEXT` with every voice (it downloads the real models; hand run only), writes
   `<id>.wav` and prints each clip's size and sha256. Upload the WAVs to the GitHub release

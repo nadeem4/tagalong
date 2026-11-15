@@ -1,6 +1,6 @@
 """The text-to-speech engines by name: one `load` per engine that turns a roster row and the
-voice folder into a `Tts`. A new engine is a module with a `load` plus an entry here and in
-`tts.ENGINE_NAMES`. Each `load` imports its heavy library lazily.
+voice folder into a `Tts`. A new engine is a module with a `load` plus an entry here. Each
+`load` imports its heavy library lazily.
 """
 
 from collections.abc import Callable

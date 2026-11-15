@@ -215,7 +215,7 @@ class Mouth:
             samples, rate = await asyncio.to_thread(
                 tts.synth, text, voice or DEFAULT_VOICE, speed or DEFAULT_SPEED
             )
-        return _wav(shape_chunk(samples, rate, paragraph_end=False), rate)
+        return wav_bytes(shape_chunk(samples, rate, paragraph_end=False), rate)
 
     def _finish(self, st: _Turn) -> None:
         st.ended = True
@@ -361,7 +361,7 @@ class Mouth:
         self._bodies.send_live(st.body_id, "speech", params)
 
 
-def _wav(samples: np.ndarray, rate: int) -> bytes:
+def wav_bytes(samples: np.ndarray, rate: int) -> bytes:
     out = io.BytesIO()
     with wave.open(out, "wb") as w:
         w.setnchannels(1)

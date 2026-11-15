@@ -13,7 +13,7 @@ from pathlib import Path
 
 from brain.voice.load import fetch
 from brain.voice.models import ensure_files
-from brain.voice.mouth import _wav
+from brain.voice.mouth import wav_bytes
 from brain.voice.tts import SAMPLE_TEXT, load_voices
 from brain.voice.tts_engines import TTS_ENGINES
 
@@ -27,7 +27,7 @@ async def main() -> None:
         await ensure_files(folder, list(row.files), fetch, lambda _p: None)
         tts = await asyncio.to_thread(TTS_ENGINES[row.engine].load, row, folder)
         samples, rate = await asyncio.to_thread(tts.synth, SAMPLE_TEXT, row.voice, 1.0)
-        data = _wav(samples, rate)
+        data = wav_bytes(samples, rate)
         (out / f"{row.id}.wav").write_bytes(data)
         print(f"{row.id}: {len(data)} bytes sha256 {hashlib.sha256(data).hexdigest()}")
 

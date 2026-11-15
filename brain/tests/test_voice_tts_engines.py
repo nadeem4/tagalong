@@ -7,11 +7,10 @@ from types import SimpleNamespace
 import numpy as np
 
 from brain.voice import tts_engines
-from brain.voice.tts import ENGINE_NAMES, load_voices, voice_by_id
+from brain.voice.tts import load_voices, voice_by_id
 
 
 def test_every_roster_engine_has_an_adapter() -> None:
-    assert set(tts_engines.TTS_ENGINES) == set(ENGINE_NAMES)
     for v in load_voices():
         assert v.engine in tts_engines.TTS_ENGINES
 

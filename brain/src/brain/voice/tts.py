@@ -15,8 +15,6 @@ from brain.voice.models import ModelFile
 
 LIST_FILE = Path(__file__).with_name("tts_models.json")
 AUTO = "auto"
-# The engines `tts_engines.TTS_ENGINES` has an adapter for (a test keeps the two in step).
-ENGINE_NAMES = ("kokoro", "piper", "supertonic")
 RUNTIMES = ("brain", "helper")
 # The one line every sample clip says; short and plain so every engine reads it as written.
 SAMPLE_TEXT = "Hi, I'm Scout. This is how I sound."
@@ -53,8 +51,10 @@ def _row(raw: dict, index: int = 0) -> TtsVoice:
 
 
 def _build(raw: dict) -> TtsVoice:
+    from brain.voice import tts_engines  # late: the engines import this module's protocol
+
     where = f"text-to-speech voice {raw.get('id')!r}"
-    if raw["engine"] not in ENGINE_NAMES:
+    if raw["engine"] not in tts_engines.TTS_ENGINES:
         raise ValueError(f"{where}: unknown engine {raw['engine']!r}")
     if raw["runtime"] not in RUNTIMES:
         raise ValueError(f"{where}: unknown runtime {raw['runtime']!r}")

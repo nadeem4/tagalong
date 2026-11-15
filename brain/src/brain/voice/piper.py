@@ -2,8 +2,8 @@
 
 The voice object is handed to `Adapter`, so tests use a stub and never import the library; `load`
 imports it lazily. Piper yields one int16 chunk per sentence; they are joined into one clip at the
-voice's rate. Speed becomes Piper's `length_scale` (the inverse: below 1 is faster). Not unit
-tested against a real voice; covered by tests/voice_smoke.py, run by hand.
+voice's rate. Speed becomes Piper's `length_scale`: the voice's own scale divided by speed (below 1
+is faster). Not unit tested against a real voice; covered by tests/voice_smoke.py, run by hand.
 """
 
 from pathlib import Path
@@ -28,7 +28,8 @@ class Adapter:
         from piper import SynthesisConfig  # a small dataclass; imported here to keep load cheap
 
         # `voice` is unused: one Piper voice is one loaded model.
-        config = SynthesisConfig(length_scale=1.0 / speed)
+        # Scale the voice's own pace (each voice ships its own length_scale), never replace it.
+        config = SynthesisConfig(length_scale=self._engine.config.length_scale / speed)
         chunks = list(self._engine.synthesize(text, syn_config=config))
         if not chunks:
             return np.zeros(0, dtype="<i2"), self._engine.config.sample_rate

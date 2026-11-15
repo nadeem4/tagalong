@@ -8,9 +8,9 @@ from brain.voice.piper import Adapter
 
 
 class StubPiper:
-    def __init__(self, chunks: list[np.ndarray]) -> None:
+    def __init__(self, chunks: list[np.ndarray], length_scale: float = 1.0) -> None:
         self.chunks = chunks
-        self.config = SimpleNamespace(sample_rate=22050)
+        self.config = SimpleNamespace(sample_rate=22050, length_scale=length_scale)
         self.seen: list[tuple[str, float | None]] = []
 
     def synthesize(self, text: str, syn_config=None):
@@ -37,3 +37,9 @@ def test_piper_with_no_chunks_is_an_empty_clip_at_the_voice_rate() -> None:
     samples, rate = Adapter(StubPiper([])).synth("", "alan", 1.0)
     assert len(samples) == 0 and samples.dtype == np.dtype("<i2")
     assert rate == 22050
+
+
+def test_piper_scales_the_voices_own_length_scale() -> None:
+    stub = StubPiper([np.zeros(2, dtype="<i2")], length_scale=1.2)
+    Adapter(stub).synth("Hi", "alan", 2.0)
+    assert stub.seen == [("Hi", 0.6)]

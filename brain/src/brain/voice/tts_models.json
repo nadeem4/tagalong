@@ -19,7 +19,7 @@
         "sha256": "c0f0d124e5895c00e7c03b35dcc8287f319a6998a365b182deb5c8e752ee8c1e"
       }
     ],
-    "size_mb": 61,
+    "size_mb": 64,
     "sample": null,
     "licence": "Mycroft AI dataset (see docs)",
     "runtime": "brain",
@@ -45,7 +45,7 @@
         "sha256": "69557ed3d974463453e9b0c09dd99a7ed0e52b8b87b64b357dbeeb2540a97d47"
       }
     ],
-    "size_mb": 61,
+    "size_mb": 64,
     "sample": null,
     "licence": "CC-BY-SA-4.0",
     "runtime": "brain",
@@ -71,7 +71,7 @@
         "sha256": "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d"
       }
     ],
-    "size_mb": 120,
+    "size_mb": 121,
     "sample": null,
     "licence": "Apache-2.0",
     "runtime": "brain",
@@ -97,7 +97,7 @@
         "sha256": "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d"
       }
     ],
-    "size_mb": 120,
+    "size_mb": 121,
     "sample": null,
     "licence": "Apache-2.0",
     "runtime": "brain",
@@ -123,7 +123,7 @@
         "sha256": "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d"
       }
     ],
-    "size_mb": 120,
+    "size_mb": 121,
     "sample": null,
     "licence": "Apache-2.0",
     "runtime": "brain",
@@ -149,7 +149,7 @@
         "sha256": "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d"
       }
     ],
-    "size_mb": 120,
+    "size_mb": 121,
     "sample": null,
     "licence": "Apache-2.0",
     "runtime": "brain",

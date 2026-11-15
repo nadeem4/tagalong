@@ -15,7 +15,7 @@ import numpy as np
 
 from brain.voice.load import fetch
 from brain.voice.models import ensure_files
-from brain.voice.mouth import _wav
+from brain.voice.mouth import wav_bytes
 from brain.voice.shape import shape_chunk
 from brain.voice.tts import load_voices
 from brain.voice.tts_engines import TTS_ENGINES
@@ -49,7 +49,7 @@ async def main() -> None:
             shaped = shape_chunk(samples, rate, paragraph_end=False)
             print(f"chunk: {len(samples) / rate:.2f} s raw, {len(shaped) / rate:.2f} s shaped")
             pieces.append(shaped)
-        (out / f"{row.id}.wav").write_bytes(_wav(np.concatenate(pieces), rate))
+        (out / f"{row.id}.wav").write_bytes(wav_bytes(np.concatenate(pieces), rate))
     print(f"wrote {out}")
 
 

@@ -14,9 +14,13 @@ import numpy as np
 
 from brain.voice.tts import Tts, TtsVoice
 
+# The engine raises ValueError for a speed below 0.7; the mouth may ask for less.
+MIN_SPEED, MAX_SPEED = 0.7, 2.0
+
 
 class _Engine(Protocol):
     sample_rate: int
+    model: Any  # its `text_processor.validate_text` names the characters it cannot say
 
     def get_voice_style(self, name: str) -> Any: ...
 
@@ -29,11 +33,21 @@ class Adapter:
         self._styles: dict[str, Any] = {}
 
     def synth(self, text: str, voice: str, speed: float) -> tuple[np.ndarray, int]:
+        text = self._sayable(text)
+        if not text.strip():
+            return np.zeros(0, dtype="<i2"), self._engine.sample_rate
         if voice not in self._styles:
             self._styles[voice] = self._engine.get_voice_style(voice)
-        wav, _ = self._engine.synthesize(text, voice_style=self._styles[voice], speed=speed)
+        wav, _ = self._engine.synthesize(
+            text, voice_style=self._styles[voice], speed=min(max(speed, MIN_SPEED), MAX_SPEED)
+        )
         samples = (np.clip(np.asarray(wav).reshape(-1), -1.0, 1.0) * 32767).astype("<i2")
         return samples, self._engine.sample_rate
+
+    def _sayable(self, text: str) -> str:
+        # The engine raises on emoji, CJK and the like; speak what it can instead of nothing.
+        _, unsupported = self._engine.model.text_processor.validate_text(text)
+        return text.translate({ord(c): None for c in unsupported})
 
 
 def load(voice: TtsVoice, folder: Path) -> Tts:
