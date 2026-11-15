@@ -2,6 +2,7 @@
 name = "brain"
 version = "0.1.0"
 description = "Tagalong brain: the Python side of contract v1"
+license = "GPL-3.0-or-later"
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "agent-client-protocol==0.12.1",
