@@ -57,11 +57,13 @@ def audio_for(clips: list[Clip], home: Path, snr: float) -> list[tuple[Clip, np.
             audio = read_wav(clip.wav)
         else:
             if tts is None:
-                from brain.voice import kokoro
-                from brain.voice.models import KOKORO_FILES
+                from brain.voice.tts import voice_by_id
+                from brain.voice.tts_engines import TTS_ENGINES
 
-                _download(list(KOKORO_FILES), folder)
-                tts = kokoro.load(folder)
+                row = voice_by_id("kokoro-george")  # the clips are spoken in Kokoro voices
+                assert row is not None
+                _download(list(row.files), folder)
+                tts = TTS_ENGINES[row.engine].load(row, folder)
             pcm, rate = tts.synth(clip.reference, clip.voice or "bm_george", 1.0)
             audio = resample(pcm.astype(np.float32) / 32768, rate)
         out.append((clip, mix_noise(audio, snr, seed=i) if snr < 100 else audio))

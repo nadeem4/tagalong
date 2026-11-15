@@ -1,6 +1,8 @@
 """Tests for the real loader's glue, on fakes: thread-safe progress and the download timeout."""
 
 import asyncio
+import dataclasses
+import hashlib
 import json
 import threading
 
@@ -9,7 +11,10 @@ from fake_voice import FakeFinal, parts
 
 from brain.voice import engines, load, stt
 from brain.voice.engines import Engine
+from brain.voice.models import ModelFile, ModelIntegrityError
 from brain.voice.service import _why
+from brain.voice.tts import voice_by_id
+from brain.voice.tts_engines import TtsEngine
 
 
 async def test_moonshine_progress_is_delivered_on_the_event_loop(monkeypatch, tmp_path):
@@ -231,10 +236,17 @@ async def test_tts_loader_reports_the_download_through_the_progress_callback(tmp
         on_progress(1.0)
 
     monkeypatch.setattr(load, "ensure_files", fake_ensure)
-    monkeypatch.setattr(load.kokoro, "load", lambda folder: "tts")
+    loaded: list[str] = []
+
+    def fake_load(row, folder):
+        loaded.append(row.id)
+        return "tts"
+
+    monkeypatch.setitem(load.TTS_ENGINES, "piper", TtsEngine(fake_load))
     seen: list[float] = []
-    assert await load.tts_loader(tmp_path)(seen.append) == "tts"
-    assert seen[:2] == [0.25, 1.0]
+    row = voice_by_id("piper-alan")
+    assert await load.tts_loader(tmp_path)(row, seen.append) == "tts"
+    assert seen[:2] == [0.25, 1.0] and loaded == ["piper-alan"]
 
 
 async def test_the_fetcher_downloads_the_ears_files_and_loads_no_model(monkeypatch, tmp_path):
@@ -251,3 +263,44 @@ async def test_the_fetcher_downloads_the_ears_files_and_loads_no_model(monkeypat
     await load.ears_fetcher(tmp_path, env_final="whisper-small-en")()
     assert [f.path for f in load.EARS_FILES] == downloads[: len(load.EARS_FILES)]
     assert any(d.startswith("stt/whisper-small-en/") for d in downloads)
+
+
+# --- the release clip: fetched once, then played offline --------------------------------------
+
+
+def _clip_row(data: bytes):
+    sample = ModelFile(
+        "https://x/clip.wav",
+        "tts/piper-alan/sample.wav",
+        len(data),
+        hashlib.sha256(data).hexdigest(),
+    )
+    return dataclasses.replace(voice_by_id("piper-alan"), sample=sample)
+
+
+async def test_tts_clip_is_fetched_once_then_served_from_disk(tmp_path):
+    data = b"RIFFclip"
+    fetches: list[str] = []
+
+    async def fetch_file(url):
+        fetches.append(url)
+        yield data
+
+    clip = load.tts_clip(tmp_path, fetch_file)
+    row = _clip_row(data)
+    assert await clip(row) == data
+    assert await clip(row) == data
+    assert len(fetches) == 1  # the second Play made no fetch
+
+
+async def test_tts_clip_refuses_a_clip_with_the_wrong_hash(tmp_path):
+    async def fetch_file(url):
+        yield b"tampered"
+
+    with pytest.raises(ModelIntegrityError):
+        await load.tts_clip(tmp_path, fetch_file)(_clip_row(b"the real clip"))
+    assert not list(tmp_path.rglob("*.wav"))
+
+
+async def test_tts_clip_is_none_for_a_voice_with_no_clip(tmp_path):
+    assert await load.tts_clip(tmp_path)(voice_by_id("piper-alan")) is None

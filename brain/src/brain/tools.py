@@ -2,7 +2,7 @@
 
 Scout's memory tools (remember, recall, forget), the Claude Code hand-off tools, and Home-only
 tools (audience {"home"}, never offered to the model) that return one JSON string, among them
-speak_sample for Settings' voice Preview. Refusals
+speak_sample for Home's voice Play. Refusals
 and bad arguments raise; run_turn turns any exception into an is_error tool result the model
 reads. Handlers that change what Home shows send `changed` through the notify they are given.
 """
@@ -48,14 +48,14 @@ from brain.store.work import TITLE_CAP, TransitionRefused, WorkEvent, WorkRow, W
 from brain.timers import MIN_REPEAT_S, Timers, is_return_wake, note_of
 from brain.tool_words import GROUPS, Group, fallback, words_for
 from brain.toolbox import SEP, Handler, Toolbox, ToolSpec
-from brain.voice import VoiceHooks
+from brain.voice import NoSample, VoiceHooks
+from brain.voice.tts import AUTO, auto_voice, voice_by_id
 
 log = logging.getLogger("brain")
 
 Notify = Callable[[str, dict], None]
 LIST_MEMORIES_MAX = 700
 TIMER_NOTE_MAX = 500
-SAMPLE_MAX_CHARS = 500  # a Preview line, not a reading
 # One year; keeps now + timedelta far from datetime overflow.
 TIMER_MAX_MINUTES = 525600
 
@@ -1712,21 +1712,25 @@ def preference_tools(
 
 
 def voice_tools(voice: Callable[[], VoiceHooks | None]) -> list[tuple[ToolSpec, Handler]]:
-    """Home-only: a spoken sample for Settings' Preview. The voice is a getter because the
+    """Home-only: a voice's sample for Play. The voice is a getter because the
     session gets its voice after it is built."""
 
     async def speak_sample(args: dict) -> str:
         hooks = voice()
         if hooks is None:
             raise RpcError(ErrorCode.tool_failed, "Voice is not running on this brain.")
-        _need_text("speak_sample", args, "text")
-        if len(args["text"]) > SAMPLE_MAX_CHARS:
+        pick = args.get("voice")
+        if not isinstance(pick, str):
+            raise RpcError(ErrorCode.invalid_params, "speak_sample needs a voice id or auto.")
+        row = auto_voice() if pick == AUTO else voice_by_id(pick)
+        if row is None:
             raise RpcError(
-                ErrorCode.invalid_params,
-                f"speak_sample text is at most {SAMPLE_MAX_CHARS} characters.",
+                ErrorCode.invalid_params, f"speak_sample: {pick!r} is not a listed voice."
             )
         try:
-            wav = await hooks.sample(args["text"], args.get("voice"), args.get("speed"))
+            wav = await hooks.sample(row.id, args.get("speed"))
+        except NoSample as err:
+            raise RpcError(ErrorCode.tool_failed, "No sample yet.") from err
         except Exception as err:
             log.warning("speak_sample failed", exc_info=True)
             raise RpcError(ErrorCode.tool_failed, "The speaking voice could not start.") from err
@@ -1774,15 +1778,12 @@ def voice_tools(voice: Callable[[], VoiceHooks | None]) -> list[tuple[ToolSpec, 
         (
             ToolSpec(
                 "speak_sample",
-                "Say a short sample in the speaking voice, as a WAV, for Settings' Preview.",
+                "Play a voice's sample line as a WAV, for Home's Play. It works before the voice "
+                "is downloaded when the voice has a recorded clip.",
                 {
                     "type": "object",
-                    "properties": {
-                        "text": {"type": "string"},
-                        "voice": {"type": "string"},
-                        "speed": {"type": "number"},
-                    },
-                    "required": ["text"],
+                    "properties": {"voice": {"type": "string"}, "speed": {"type": "number"}},
+                    "required": ["voice"],
                 },
                 frozenset({"home"}),
                 effect="read",

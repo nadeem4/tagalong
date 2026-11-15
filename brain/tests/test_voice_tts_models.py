@@ -7,7 +7,6 @@ import pytest
 
 from brain.voice import tts
 from brain.voice.ear_text import for_the_ear
-from brain.voice.models import KOKORO_FILES
 from brain.voice.tts import AUTO, auto_voice, load_voices, voice_by_id
 
 # The weights licences recorded in docs/voice.md ("Voice licences").
@@ -58,10 +57,9 @@ def test_every_row_is_complete() -> None:
             assert "/resolve/main/" not in f.url  # pinned to a commit, never a branch
 
 
-def test_kokoro_rows_share_the_existing_files() -> None:
-    for v in load_voices():
-        if v.engine == "kokoro":
-            assert list(v.files) == KOKORO_FILES
+def test_kokoro_rows_share_one_set_of_files() -> None:
+    sets = {v.files for v in load_voices() if v.engine == "kokoro"}
+    assert len(sets) == 1
 
 
 def test_unknown_engine_is_refused() -> None:

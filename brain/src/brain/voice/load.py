@@ -12,12 +12,14 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
 
 from brain.telemetry import timed
-from brain.voice import cuda, engines, kokoro, silero, smart_turn, stt
+from brain.voice import cuda, engines, silero, smart_turn, stt
 from brain.voice.ears import EarsParts
-from brain.voice.models import EARS_FILES, KOKORO_FILES, ensure_files
+from brain.voice.models import EARS_FILES, Fetch, ensure_files, present
+from brain.voice.mouth import Clip, LoadTts
 from brain.voice.service import LoadEars
 from brain.voice.stt import FinalStt
-from brain.voice.tts import Tts
+from brain.voice.tts import Tts, TtsVoice
+from brain.voice.tts_engines import TTS_ENGINES
 
 log = logging.getLogger("brain")
 
@@ -158,12 +160,34 @@ def ears_fetcher(
     return fetch_ears
 
 
-def tts_loader(data_dir: Path) -> Callable[[Callable[[float], None]], Awaitable[Tts]]:
+def tts_loader(data_dir: Path) -> LoadTts:
+    """Fetch the row's pinned files (a no-op when they are here), then load it through its
+    engine. A cancelled fetch removes its own `.part` file."""
     folder = data_dir / "voice"
 
-    async def load_tts(on_progress: Callable[[float], None]) -> Tts:
-        await ensure_files(folder, KOKORO_FILES, fetch, on_progress)
+    async def load_tts(row: TtsVoice, on_progress: Callable[[float], None]) -> Tts:
+        await ensure_files(folder, list(row.files), fetch, on_progress)
         with timed("voice_hop", op="load_models"):
-            return await asyncio.to_thread(kokoro.load, folder)
+            return await asyncio.to_thread(TTS_ENGINES[row.engine].load, row, folder)
 
     return load_tts
+
+
+def tts_installed(data_dir: Path) -> Callable[[TtsVoice], bool]:
+    folder = data_dir / "voice"
+    return lambda row: present(folder, row.files)
+
+
+def tts_clip(data_dir: Path, fetch_file: Fetch = fetch) -> Clip:
+    """The voice's release sample as WAV bytes: fetched once (sha256 checked by `ensure_files`)
+    into the voice folder, then served from there, so Play works offline after the first time.
+    None when the row has no clip yet."""
+    folder = data_dir / "voice"
+
+    async def clip(row: TtsVoice) -> bytes | None:
+        if row.sample is None:
+            return None
+        await ensure_files(folder, [row.sample], fetch_file, lambda _f: None)
+        return await asyncio.to_thread((folder / row.sample.path).read_bytes)
+
+    return clip

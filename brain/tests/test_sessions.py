@@ -1943,8 +1943,8 @@ class RecordingVoice:
         self.calls = []
         self.system = []  # the system_voice flag of each `spoken` call
 
-    def spoken(self, turn, body_id, voice, speed, system_voice=False):
-        self.calls.append(("spoken", turn, body_id, voice, speed))
+    def spoken(self, turn, body_id, speed, system_voice=False):
+        self.calls.append(("spoken", turn, body_id, speed))
         self.system.append(system_voice)
 
     def reply(self, turn, body_id, params):
@@ -1966,9 +1966,9 @@ async def test_a_spoken_say_sends_its_reply_to_the_voice_with_its_body():
     session, sent = make(Gate(["hello"]))
     session.voice = voice = RecordingVoice()
     join(session, "desktop")
-    result = await session.say("desktop", spoken_say(voice="af_bella", speed=1.2))
+    result = await session.say("desktop", spoken_say(speed=1.2))
     await finish_quietly(session)
-    assert voice.calls[0] == ("spoken", result.turn, "desktop", "af_bella", 1.2)
+    assert voice.calls[0] == ("spoken", result.turn, "desktop", 1.2)
     replies = [c[3] for c in voice.calls if c[0] == "reply"]
     assert replies == [
         {"turn": result.turn, "body": "desktop", "delta": "hello"},
@@ -2041,10 +2041,10 @@ async def test_a_typed_say_is_spoken_when_the_body_asked_for_read_aloud():
     session, _ = make(Gate(["hello"]))
     session.voice = voice = RecordingVoice()
     join(session, "desktop")
-    read_aloud(session, voice="af_bella", speed=1.2)
+    read_aloud(session, speed=1.2)
     result = await session.say("desktop", say("typed"))
     await finish_quietly(session)
-    assert voice.calls[0] == ("spoken", result.turn, "desktop", "af_bella", 1.2)
+    assert voice.calls[0] == ("spoken", result.turn, "desktop", 1.2)
     assert "reply" in kinds_of(voice) and kinds_of(voice)[-1] == "ended"
 
 
@@ -2066,7 +2066,7 @@ async def test_a_spoken_say_is_silent_when_read_aloud_is_off():
     session.voice = voice = RecordingVoice()
     join(session, "desktop")
     read_aloud(session, on=False)
-    await session.say("desktop", spoken_say(voice="af_bella"))
+    await session.say("desktop", spoken_say())
     await finish_quietly(session)
     assert voice.calls == []
 
@@ -2086,12 +2086,12 @@ async def test_a_wake_remark_is_spoken_when_the_body_asked_for_read_aloud():
     session, sent = make(Gate(["welcome back"]), kinds=None)
     session.voice = voice = RecordingVoice()
     join(session, "desktop")
-    read_aloud(session, voice="bm_george")
+    read_aloud(session)
     session.body_event("desktop", "back", {"idle_seconds": 600})
     await idle(session)
     started = [p for m, p in sent if m == "turn" and p["state"] == "started"]
     assert started[0]["started_by"] == "brain"
-    assert voice.calls[0] == ("spoken", started[0]["turn"], "desktop", "bm_george", None)
+    assert voice.calls[0] == ("spoken", started[0]["turn"], "desktop", None)
     assert "reply" in kinds_of(voice)
 
 
@@ -2115,7 +2115,7 @@ async def test_read_aloud_survives_the_body_reconnecting():
     session._bodies.connect(body, [], QuietPeer(), None)
     result = await session.say("desktop", say("after the reconnect"))
     await finish_quietly(session)
-    assert voice.calls[0] == ("spoken", result.turn, "desktop", None, 1.5)
+    assert voice.calls[0] == ("spoken", result.turn, "desktop", 1.5)
 
 
 async def test_read_aloud_arriving_mid_turn_speaks_the_running_turn():
@@ -2130,7 +2130,7 @@ async def test_read_aloud_arriving_mid_turn_speaks_the_running_turn():
     read_aloud(session, speed=1.1)
     read_aloud(session, speed=1.1)  # a repeat must not speak it again
     spoken = [c for c in voice.calls if c[0] == "spoken"]
-    assert spoken == [("spoken", result.turn, "desktop", None, 1.1)]
+    assert spoken == [("spoken", result.turn, "desktop", 1.1)]
     gate.set()
     await finish_quietly(session)
 
@@ -2193,6 +2193,7 @@ async def test_a_hushed_read_aloud_turn_says_nothing_more():
     from fake_voice import FakeTts
 
     from brain.voice.mouth import Mouth
+    from brain.voice.tts import voice_by_id
 
     class Sent:
         frames: list = []
@@ -2205,8 +2206,8 @@ async def test_a_hushed_read_aloud_turn_says_nothing_more():
         def __init__(self, mouth):
             self.mouth = mouth
 
-        def spoken(self, turn, body_id, voice, speed, system_voice=False):
-            self.mouth.spoken(turn, body_id, voice, speed, system_voice)
+        def spoken(self, turn, body_id, speed, system_voice=False):
+            self.mouth.spoken(turn, body_id, speed, system_voice)
 
         def reply(self, turn, body_id, params):
             self.mouth.reply(turn, params)
@@ -2216,10 +2217,10 @@ async def test_a_hushed_read_aloud_turn_says_nothing_more():
 
     out = Sent()
 
-    async def load_tts(_on_progress):
+    async def load_tts(_voice, _on_progress):
         return FakeTts()
 
-    mouth = Mouth(out, load_tts)
+    mouth = Mouth(out, load_tts, lambda: voice_by_id("piper-alan"))
     gate = asyncio.Event()
     session, _ = make(Gate([gate, "A whole sentence to be read out loud."]))
     session.voice = MouthVoice(mouth)

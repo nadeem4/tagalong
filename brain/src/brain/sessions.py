@@ -786,14 +786,13 @@ class Session:
         if not self._wants_speech(shown_on, params):
             return
         ask = self._read_aloud.get(shown_on)
-        voice, speed = (ask.voice, ask.speed) if ask else (None, None)
-        if params is not None:
-            voice = params.voice if params.voice is not None else voice
-            speed = params.speed if params.speed is not None else speed
+        speed = ask.speed if ask else None
+        if params is not None and params.speed is not None:
+            speed = params.speed
         self._spoken.add(turn)
         # Every time: the voice drops a hushed turn, and a later say must re-arm it. It ignores
         # a say for a turn it is already speaking.
-        self.voice.spoken(turn, shown_on, voice, speed, ask.system_voice if ask else False)
+        self.voice.spoken(turn, shown_on, speed, ask.system_voice if ask else False)
 
     def _drop_news(self, kind: str, key: str) -> None:
         """A waiting event is superseded: the dispatcher forgets it wherever it waits."""
