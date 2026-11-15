@@ -120,6 +120,45 @@ describe('CompanionBubble', () => {
     expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull();
   });
 
+  // The brain can start, stream and end a turn before the ask's own answer reaches the bubble.
+  it('keeps turn events that arrive before the ask returns its turn id', async () => {
+    const base = createFakeHostBridge();
+    const bridge: FakeHostBridge = {
+      ...base,
+      ask: (input) => {
+        void base.ask(input);
+        base.emit({
+          type: 'turn.started',
+          turnId: 'turn-9',
+          petId: 'scout',
+          conversationId: CONVERSATION,
+        });
+        base.emit({ type: 'turn.delta', turnId: 'turn-9', text: 'This is the ' });
+        base.emit({ type: 'turn.delta', turnId: 'turn-9', text: 'fake brain.' });
+        base.emit(done('turn-9', 'This is the fake brain.'));
+        return Promise.resolve({ turnId: 'turn-9' });
+      },
+    };
+    renderBubble(bridge);
+    await act(async () => ask('hello'));
+    expect(screen.getByText('This is the fake brain.')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull();
+  });
+
+  it('drops early events of a turn that is not the one the ask returns', async () => {
+    const base = createFakeHostBridge();
+    const bridge: FakeHostBridge = {
+      ...base,
+      ask: () => {
+        base.emit({ type: 'turn.delta', turnId: 'other', text: 'not mine' });
+        return Promise.resolve({ turnId: 'turn-9' });
+      },
+    };
+    renderBubble(bridge);
+    await act(async () => ask('hello'));
+    expect(screen.queryByText(/not mine/)).toBeNull();
+  });
+
   it('formats the answer: bullets and bold, not raw Markdown', async () => {
     const bridge = createFakeHostBridge();
     renderBubble(bridge, { snapshot: SNAPSHOT });

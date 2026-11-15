@@ -207,6 +207,9 @@ export function CompanionBubble({
   const [question, setQuestion] = useState<string | null>(null);
   const conversation = useRef<string | undefined>(undefined);
   const mine = useRef<string | null>(null);
+  // Turn events that beat the ask's answer (the brain can run a whole turn first): kept while
+  // an ask is in flight, then the ones for the turn it returns are replayed and the rest dropped.
+  const early = useRef<TurnEvent[] | null>(null);
   // The running question was asked aloud: the brain speaks its answer, and the bubble offers the key to reply.
   const askedSpoken = useRef(false);
   // The last answer was to a spoken question: the bubble offers the key to reply.
@@ -257,6 +260,10 @@ export function CompanionBubble({
     if (event.type === 'turn.completed' || event.type === 'turn.error') {
       const ended = event.turnId;
       dropConfirms((c) => c.turnId === ended);
+    }
+    if (early.current !== null && mine.current === null && event.type.startsWith('turn.')) {
+      if (!(event.type === 'turn.started' && event.background === true)) early.current.push(event);
+      return;
     }
     switch (event.type) {
       case 'connector.confirm': {
@@ -344,6 +351,12 @@ export function CompanionBubble({
     }
   });
   useEffect(() => bridge.onTurnEvent(onTurnEvent), [bridge]);
+  // The early events of the returned turn run once the bubble shows it running (an Effect
+  // Event can only be called from an effect, not from the ask's promise).
+  const [replayed, setReplayed] = useState<TurnEvent[]>([]);
+  useEffect(() => {
+    for (const event of replayed) onTurnEvent(event);
+  }, [replayed]);
   // Cards whose ask arrived before this bubble mounted (a relaunch) are shown again.
   useEffect(() => {
     let live = true;
@@ -548,6 +561,8 @@ export function CompanionBubble({
     setAskedAloud(heard);
     mine.current = null;
     askedSpoken.current = asSpoken;
+    const held: TurnEvent[] = [];
+    early.current = held;
     bridge
       .ask({
         petId,
@@ -560,14 +575,18 @@ export function CompanionBubble({
         ...(interrupted !== undefined ? { interrupted } : {}),
       })
       .then(({ turnId }) => {
+        if (early.current !== held) return;
+        early.current = null;
         mine.current ??= turnId;
+        setReplayed(held.filter((event) => 'turnId' in event && event.turnId === turnId));
       })
-      .catch((error: unknown) =>
+      .catch((error: unknown) => {
+        if (early.current === held) early.current = null;
         setReply({
           state: 'failed',
           text: error instanceof Error ? error.message : 'Tagalong could not reach its brain.',
-        }),
-      );
+        });
+      });
   };
 
   /**

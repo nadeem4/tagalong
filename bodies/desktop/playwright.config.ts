@@ -1,3 +1,7 @@
+/**
+ * Playwright settings for the Electron e2e suites (serial, run on a fake brain).
+ * A trace is kept only for a failed test, so a flaky CI failure can be replayed.
+ */
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
@@ -9,4 +13,5 @@ export default defineConfig({
   timeout: 60_000,
   reporter: process.env.CI ? 'list' : 'line',
   retries: process.env.CI ? 1 : 0,
+  use: { trace: 'retain-on-failure' },
 });

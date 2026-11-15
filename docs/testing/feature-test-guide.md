@@ -225,7 +225,9 @@ The desktop talks to the Python brain. Needs `uv` and an Anthropic key (entered 
 1. **Setup:** in one terminal run `cd brain && uv run brain`. In another run `pnpm dev:desktop`.
    **Expected:** Scout appears. No "Scout's brain is not running." mark.
 2. **Action:** click Scout and ask "Say hello in five words."
-   **Expected:** the answer streams into the bubble and the turn ends done.
+   **Expected:** the answer streams into the bubble and the turn ends done. A fast brain that
+   finishes before the ask returns still shows the whole answer (automated: the bubble unit tests
+   and the smoke test "talking to Scout").
 3. **Action:** stop the brain (Ctrl+C in its terminal) while Scout is idle.
    **Expected:** within a few seconds the status mark reads "Scout's brain is not running." An ask
    now fails with that same sentence.
