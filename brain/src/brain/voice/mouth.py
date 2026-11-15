@@ -1,10 +1,11 @@
-"""Mouth: a spoken reply, sentence by sentence, as `speech` frames to the body that shows it.
+"""Mouth: a spoken reply, chunk by chunk, as `speech` frames to the body that shows it.
 
-One worker pulls sentences from one queue and synthesises each in a thread, so a slow voice
-never stalls the websocket or the ears and two syntheses never overlap. While the voice is
-loading or has failed the sentences go out as text only, and the body says them in its own system
-voice. `download` is the voice's fetch for Home's status line (idle, downloading, ready or
-failed, with a 0..1 progress); `prefetch` starts it early. Audio is live-only and never stored.
+A chunk is a few whole sentences (`chunker.py`). One worker pulls chunks from one queue and
+synthesises each in a thread, so a slow voice never stalls the websocket or the ears and two
+syntheses never overlap. While the voice is loading or has failed the chunks go out as text only,
+and the body says them in its own system voice. `download` is the voice's fetch for Home's status
+line (idle, downloading, ready or failed, with a 0..1 progress); `prefetch` starts it early.
+Audio is live-only and never stored.
 """
 
 import asyncio
@@ -20,7 +21,8 @@ from typing import Literal, Protocol
 import numpy as np
 
 from brain.telemetry import timed
-from brain.voice.speakable import SHORT_LINE, SpokenStream
+from brain.voice.chunker import Chunk, Chunker
+from brain.voice.speakable import SpokenStream
 
 log = logging.getLogger("brain")
 
@@ -53,14 +55,15 @@ class _Turn:
         self.system_voice = system_voice
         self.voice = voice
         self.speed = speed
-        self.unsent: list[str] = []  # sentences made but not yet sent: still Scout's to say
+        self.unsent: list[str] = []  # chunks made but not yet sent: still Scout's to say
         self.muted = False  # its writer is still going, but what it writes is no longer said
-        self.stream = SpokenStream(lambda line: enqueue(self, line))
+        self.chunker = Chunker(lambda chunk: enqueue(self, chunk))
+        self.stream = SpokenStream(self.chunker.push)
         self.ended = False
 
 
 class Mouth:
-    """One queue of sentences for every body and one worker that says them in order, so two
+    """One queue of chunks for every body and one worker that says them in order, so two
     syntheses never overlap (the phonemizer is not thread-safe) and a pause or clear never has
     to cancel a synth thread it cannot stop."""
 
@@ -76,7 +79,7 @@ class Mouth:
         self.on_download: Callable[[], None] | None = None
         self._synth = asyncio.Lock()  # Preview's sample shares the one synth with the worker
         self._turns: dict[str, _Turn] = {}
-        self._queue: deque[tuple[str, str | None]] = deque()  # (turn, sentence); None: turn done
+        self._queue: deque[tuple[str, Chunk | None]] = deque()  # (turn, chunk); None: turn done
         self._go = asyncio.Event()  # set while the worker may take the next item
         self._worker: asyncio.Task | None = None
         self._paused = False
@@ -89,12 +92,12 @@ class Mouth:
         self._sent: dict[str, list[str]] = {}
 
     def sentences(self, turn: str) -> list[str]:
-        """The sentences sent to the body for `turn` (frame `n` is index `n - 1`), then those
-        made but not yet sent, so a speaker cut off mid-reply still knows what was left."""
+        """The chunks sent to the body for `turn` (frame `n` is index `n - 1`), then those made
+        but not yet sent, so a speaker cut off mid-reply still knows what was left."""
         return [*self._sent.get(turn, []), *self.unsaid(turn)]
 
     def unsaid(self, turn: str) -> list[str]:
-        """Sentences of a live `turn` made but not yet sent, in order."""
+        """Chunks of a live `turn` made but not yet sent, in order."""
         live = self._turns.get(turn)
         return list(live.unsent) if live is not None else []
 
@@ -143,7 +146,7 @@ class Mouth:
         return st is not None and st.body_id == body_id
 
     def replace(self, turn: str, body_id: str, text: str) -> str | None:
-        """Drop what `turn` has not said (the body is told to clear it too, since sentences
+        """Drop what `turn` has not said (the body is told to clear it too, since chunks
         already sent sit in its player) and say `text` in the same voice as a turn of its own,
         whose id is returned. The old turn is muted, not ended: its writer still owns it. None
         when `turn` is no longer live, so nothing is said in a voice it cannot name."""
@@ -161,7 +164,7 @@ class Mouth:
         return new
 
     def pause(self) -> None:
-        """Stop after the sentence being made is sent; what is queued waits for `resume`."""
+        """Stop after the chunk being made is sent; what is queued waits for `resume`."""
         self._paused = True
         self._control("pause")
         self._poke()
@@ -176,7 +179,7 @@ class Mouth:
     def _control(self, action: str) -> None:
         """Tell each body that plays a turn to hold or go on: sentences already sent sit in its
         player, so pausing only the queue would not stop the sound."""
-        # A turn is dropped once its last sentence is sent while the body still plays it, so the
+        # A turn is dropped once its last chunk is sent while the body still plays it, so the
         # body of the last frame sent is a target too.
         live = (st.body_id for st in self._turns.values())
         targets = dict.fromkeys([*live, *([self._last_body] if self._last_body else [])])
@@ -186,17 +189,19 @@ class Mouth:
     def clear(self, turn: str | None = None) -> None:
         """Drop what is queued for `turn` (every turn when None) and ignore its later deltas.
         What was made but not yet sent moves to the log first, so an interruption can still
-        hand it over. The sentence being made is dropped when its synth ends."""
+        hand it over, and so does what the chunker still holds. The chunk being made is dropped
+        when its synth ends."""
         for name in [turn] if turn is not None else list(self._turns):
             st = self._turns.pop(name, None)
             if st is not None:
+                st.chunker.end()
                 self._log(name).extend(st.unsent)
                 st.unsent.clear()
         self._queue = deque(item for item in self._queue if item[0] in self._turns)
         self._poke()
 
     def _log(self, turn: str) -> list[str]:
-        """The turn's sentence log, keeping only the newest KEPT_TURNS logs."""
+        """The turn's chunk log, keeping only the newest KEPT_TURNS logs."""
         lines = self._sent.setdefault(turn, [])
         while len(self._sent) > KEPT_TURNS:
             del self._sent[next(iter(self._sent))]
@@ -218,12 +223,15 @@ class Mouth:
     def _finish(self, st: _Turn) -> None:
         st.ended = True
         st.stream.end()
+        st.chunker.end()
         self._queue.append((st.turn, None))
         self._poke()
 
-    def _enqueue(self, st: _Turn, line: str) -> None:
-        st.unsent.append(line)
-        self._queue.append((st.turn, line))
+    def _enqueue(self, st: _Turn, chunk: Chunk) -> None:
+        if st.muted:
+            return  # text the stream or chunker still held when the turn was replaced
+        st.unsent.append(chunk.text)
+        self._queue.append((st.turn, chunk))
         self._poke()
 
     def _poke(self) -> None:
@@ -259,36 +267,27 @@ class Mouth:
             try:
                 await self._take_one()
             except Exception:  # one bad item must not end the speech for good
-                log.exception("the mouth failed on a sentence")
+                log.exception("the mouth failed on a chunk")
             finally:
                 self._saying = False
                 self._poke()
 
     async def _take_one(self) -> None:
-        turn, line = self._queue.popleft()
+        turn, chunk = self._queue.popleft()
         st = self._turns.get(turn)
         if st is None:
             return
-        if line is None:
+        if chunk is None:
             del self._turns[turn]
             self._send(st, {"turn": turn, "done": True})
             return
-        taken = 1
-        # Short lines already waiting are said together; one alone would come out clipped.
-        while len(line) < SHORT_LINE and self._queue and self._queue[0][0] == turn:
-            nxt = self._queue[0][1]
-            if nxt is None:
-                break
-            self._queue.popleft()
-            line = f"{line} {nxt}"
-            taken += 1
         self._saying = True
         self._poke()
         try:
-            await self._say(st, line)
+            await self._say(st, chunk.text)
         finally:
             if self._turns.get(turn) is st:
-                del st.unsent[:taken]
+                del st.unsent[:1]
 
     async def _say(self, st: _Turn, line: str) -> None:
         frame: dict = {"turn": st.turn, "text": line}

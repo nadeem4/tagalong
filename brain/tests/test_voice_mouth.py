@@ -102,7 +102,7 @@ async def test_default_voice_and_speed_when_the_say_gave_none():
     m, tts = mouth(sent)
     await ready(m)
     m.spoken("t", "d", None, None)
-    m.reply("t", {"delta": f"{ONE} "})
+    m.reply("t", {"delta": f"{ONE} Then"})
     await settle()
     assert tts.calls[-1][1:] == ("bm_george", 1.0)
 
@@ -118,12 +118,12 @@ async def test_text_only_while_the_voice_loads_then_audio_once_ready():
 
     m, _ = mouth(sent, load=slow)
     m.spoken("t", "d", None, None)
-    m.reply("t", {"delta": f"{ONE} "})
+    m.reply("t", {"delta": f"{ONE} Then"})
     await settle()
     assert [("pcm" in p) for p in sent.speech()] == [False]
     gate.set()
     await settle()
-    m.reply("t", {"delta": f"{TWO} "})
+    m.reply("t", {"delta": " more words follow."})
     m.reply("t", {"done": True})
     await settle()
     assert [("pcm" in p) for p in sent.speech()] == [False, True, False]
@@ -147,7 +147,7 @@ async def test_a_failed_load_stays_text_only_and_is_retried_next_turn():
     assert sent.voice() == []
     assert attempts["n"] == 1
     m.spoken("u", "d", None, None)
-    m.reply("u", {"delta": f"{ONE} "})
+    m.reply("u", {"delta": f"{ONE} Then"})
     await settle()
     assert attempts["n"] == 2
 
@@ -211,7 +211,7 @@ async def test_spoken_twice_on_a_live_turn_is_one_turn():
     sent.frames.clear()
     m.spoken("t", "d", None, None)
     m.spoken("t", "d", None, None)
-    m.reply("t", {"delta": f"{ONE} "})
+    m.reply("t", {"delta": f"{ONE} Then"})
     m.reply("t", {"done": True})
     await settle()
     assert [p.get("done") for p in sent.speech() if "text" not in p].count(True) == 1
@@ -259,12 +259,12 @@ async def test_pause_keeps_unsaid_sentences():
     await ready(m)
     sent.frames.clear()
     m.spoken("t", "d", None, None)
-    m.reply("t", {"delta": f"{ONE} {TWO} Third one is here too. "})
+    m.reply("t", {"delta": f"{ONE} {big('a')} {big('b')} Next"})
     await asyncio.sleep(0.02)
     m.pause()
     await asyncio.sleep(0.3)
     assert [p.get("text") for p in sent.speech()] == [ONE]  # the one in flight was sent
-    assert m.unsaid("t") == [TWO, "Third one is here too."]
+    assert m.unsaid("t") == [big("a"), big("b")]
 
 
 async def test_resume_continues_in_order():
@@ -380,7 +380,7 @@ async def test_synthesis_runs_off_the_event_loop():
     await ready(m)
     tts.threads.clear()
     m.spoken("t", "d", None, None)
-    m.reply("t", {"delta": f"{ONE} "})
+    m.reply("t", {"delta": f"{ONE} Then"})
     ticks = 0
     for _ in range(8):  # the loop keeps ticking while the thread sleeps
         await asyncio.sleep(0.005)
@@ -456,9 +456,10 @@ async def test_sentences_include_those_made_but_not_yet_sent():
     m, _ = mouth(sent, FakeTts(sleep=0.05))
     await ready(m)
     m.spoken("t", "d", None, None)
-    m.reply("t", {"delta": f"{ONE} {TWO} Third one is here too. "})
+    m.reply("t", {"delta": f"{ONE} {big('a')} {big('b')}"})
+    m.reply("t", {"done": True})
     await asyncio.sleep(0.01)
-    assert m.sentences("t")[:2] == [ONE, TWO]
+    assert m.sentences("t")[:2] == [ONE, big("a")]
     assert len(m.sentences("t")) == 3
     m.clear()
 
@@ -468,7 +469,8 @@ async def test_unsent_sentences_survive_clear():
     m, _ = mouth(sent, FakeTts(sleep=0.05))
     await ready(m)
     m.spoken("t", "d", None, None)
-    m.reply("t", {"delta": f"{ONE} {TWO} Third one is here too. "})
+    m.reply("t", {"delta": f"{ONE} {big('a')} {big('b')}"})
+    m.reply("t", {"done": True})
     await asyncio.sleep(0.01)
     before = m.sentences("t")
     assert len(before) == 3
@@ -493,7 +495,7 @@ async def test_worker_survives_a_send_error():
 
     sent.send_live = flaky
     m.spoken("a", "d", None, None)
-    m.reply("a", {"delta": f"{ONE} "})
+    m.reply("a", {"delta": f"{ONE} Then"})
     await settle()
     m.spoken("b", "d", None, None)
     m.reply("b", {"delta": f"{TWO} "})
@@ -593,12 +595,12 @@ async def test_system_voice_until_ready_then_kokoro_from_the_next_sentence():
     m, _ = mouth(sent, load=slow, steps=(0.3,))
     m.prefetch()
     m.spoken("t", "d", None, None)
-    m.reply("t", {"delta": f"{ONE} "})
+    m.reply("t", {"delta": f"{ONE} Then"})
     await settle()
     assert m.download["status"] == "downloading"
     gate.set()
     await settle()
-    m.reply("t", {"delta": f"{TWO} "})
+    m.reply("t", {"delta": " more words follow."})
     m.reply("t", {"done": True})
     await settle()
     assert [("pcm" in p) for p in sent.speech()] == [False, True, False]
@@ -641,3 +643,76 @@ async def test_a_cached_voice_never_flashes_downloading():
     m.prefetch()
     await settle()
     assert seen == ["ready"]
+
+
+def big(tag: str) -> str:
+    """A 30-word sentence: a chunk of its own."""
+    return f"Part {tag} " + "word " * 27 + "ends."
+
+
+SECOND = "I also read the long notes twice over."
+THIRD = "Then I wrote the short summary for you."
+
+
+async def test_a_reply_goes_out_as_chunks():
+    sent = Sent()
+    m, _ = mouth(sent)
+    await ready(m)
+    sent.frames.clear()
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": f"{ONE} {SECOND} {THIRD}"})
+    m.reply("t", {"done": True})
+    await settle()
+    out = sent.speech()
+    assert [(p.get("n"), p.get("text")) for p in out] == [
+        (1, ONE),
+        (2, f"{SECOND} {THIRD}"),
+        (None, None),
+    ]
+
+
+async def test_every_frame_text_is_a_whole_chunk():
+    sent = Sent()
+    m, _ = mouth(sent)
+    await ready(m)
+    sent.frames.clear()
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": f"{ONE} {big('a')} {big('b')}"})
+    m.reply("t", {"done": True})
+    await settle()
+    assert [p.get("text") for p in sent.speech()] == [ONE, big("a"), big("b"), None]
+
+
+async def test_unsaid_after_a_cut_includes_the_interrupted_chunk():
+    sent = Sent()
+    m, _ = mouth(sent, FakeTts(sleep=0.05))
+    await ready(m)
+    sent.frames.clear()
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": f"{ONE} {big('a')} {big('b')}"})
+    m.reply("t", {"done": True})
+    await asyncio.sleep(0.08)  # chunk 1 is out, chunk 2 is being made
+    m.clear()
+    await asyncio.sleep(0.2)
+    assert [p.get("n") for p in sent.speech()] == [1]
+    assert m.sentences("t") == [ONE, big("a"), big("b")]
+
+
+async def test_text_the_chunker_still_holds_survives_a_cut():
+    sent = Sent()
+    m, _ = mouth(sent, FakeTts(sleep=0.05))
+    await ready(m)
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": f"{ONE} {SECOND} {THIRD} Last."})  # the last three wait for a chunk
+    await asyncio.sleep(0.02)
+    m.clear()
+    assert m.sentences("t") == [ONE, f"{SECOND} {THIRD}"]
+
+
+async def test_paragraph_end_is_carried_with_the_chunk():
+    sent = Sent()
+    m, _ = mouth(sent)
+    m.spoken("t", "d", None, None)
+    m.pause()  # keep the chunk in the queue to look at it
+    m.reply("t", {"delta": f"{ONE}\n\n{SECOND}"})
+    assert [c.paragraph_end for _, c in m._queue] == [True]

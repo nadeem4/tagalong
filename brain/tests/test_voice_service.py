@@ -355,7 +355,7 @@ async def test_a_spoken_reply_is_sent_as_speech_and_hush_stops_it():
     svc.reply("w", "d", {"done": True})
     await settle()  # the first turn loads the voice, so its sentence goes out as text
     svc.spoken("t", "d", None, None)
-    svc.reply("t", "d", {"delta": SENTENCE + " "})
+    svc.reply("t", "d", {"delta": SENTENCE + " Then"})
     await settle()
     speech = [p for b, m, p in sent.frames if m == "speech" and p["turn"] == "t"]
     assert [("pcm" in p) for p in speech] == [True]
