@@ -9,6 +9,7 @@ import { vi } from 'vitest';
 import type { MicWatcher } from '../controls';
 import type { KeyResult, KeyStatus } from '../host-bridge';
 import type { SetupOverview } from '../shapes';
+import { createFakeHostBridge } from '../test-support/fake-host-bridge';
 import { StepSaveContext } from './use-step-save';
 import type { WalkthroughHost, WalkthroughSettings } from './walkthrough-host';
 
@@ -23,14 +24,21 @@ export const HAS_KEY: KeyStatus = { ...NO_KEY, hasKey: true, source: 'file' };
 
 export const SETTINGS: WalkthroughSettings = {
   hotkeys: { ask: 'CommandOrControl+Shift+Space', pauseSight: 'CommandOrControl+Shift+Alt+P' },
-  voice: { enabled: true, voice: 'bm_george', speed: 0.95 },
+  voice: { enabled: true, speed: 0.95 },
 };
 
 export function makeWalkthroughHost(
   options: { key?: KeyStatus | 'offline'; settings?: WalkthroughSettings } = {},
 ) {
   const key = options.key ?? NO_KEY;
+  // The voice picker's calls come from the shared fake, so its roster is the one VoiceField's tests use.
+  const picker = createFakeHostBridge();
   return {
+    ttsState: picker.ttsState,
+    setTts: picker.setTts,
+    playVoiceSample: picker.playVoiceSample,
+    voiceDownload: picker.voiceDownload,
+    fetchVoice: picker.fetchVoice,
     keyStatus: vi.fn(() =>
       key === 'offline' ? Promise.reject(new Error('offline')) : Promise.resolve({ ...key }),
     ),
@@ -64,7 +72,6 @@ export function makeWalkthroughHost(
     openKeyPage: vi.fn(() => Promise.resolve()),
     getSettings: vi.fn(() => Promise.resolve(options.settings ?? SETTINGS)),
     saveSettings: vi.fn((_patch: unknown) => Promise.resolve()),
-    previewVoice: vi.fn((_options: unknown) => Promise.resolve()),
     listMicrophones: vi.fn(() => Promise.resolve([{ id: 'mic-1', label: 'Desk microphone' }])),
     watchMicLevel: vi.fn<MicWatcher>(() => ({ stop: vi.fn() })),
     browserFolder: vi.fn(() => Promise.resolve({ path: 'C:/app/browser/dist', exists: true })),

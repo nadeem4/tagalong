@@ -39,9 +39,10 @@ export const SETTINGS_DEFAULTS = {
   captureExclusions: { processNames: [] as string[], titlePatterns: [] as string[] },
   /**
    * Scout reads its bubble aloud, because the person may not be looking at the screen.
-   * On by default, in a calm British voice slightly slower than normal.
+   * On by default, slightly slower than normal. Which voice speaks is the brain's choice
+   * (`tts_state`), not a desktop setting.
    */
-  voice: { enabled: true, voice: 'bm_george', speed: 0.95 },
+  voice: { enabled: true, speed: 0.95 },
   /**
    * Whether Scout listens all the time. Off by default: only the person switches it on,
    * and it stays on across restarts until they switch it off. Scout never switches it on.
@@ -52,10 +53,6 @@ export const SETTINGS_DEFAULTS = {
   /** The folders Scout's file tools may touch. None until the person names one. */
   fileFolders: [] as string[],
 } as const;
-
-/** The local voices Scout can speak in: two British male voices of the Kokoro model. */
-const VOICE_IDS = ['bm_george', 'bm_fable'] as const;
-export type VoiceId = (typeof VOICE_IDS)[number];
 
 /** Bounds on the speaking speed. Outside them speech stops sounding like speech. */
 export const MIN_VOICE_SPEED = 0.7;
@@ -124,10 +121,9 @@ const settingsFields = {
   avatar: z.object({ x: z.number().nullable(), y: z.number().nullable() }),
   /** Windows where capture is refused outright. */
   captureExclusions: CaptureExclusions,
-  /** Whether Scout speaks its bubble, in which voice and how fast. */
+  /** Whether Scout speaks its bubble and how fast. An old file's `voice` id is dropped on parse. */
   voice: z.object({
     enabled: z.boolean(),
-    voice: z.enum(VOICE_IDS),
     speed: z.number().min(MIN_VOICE_SPEED).max(MAX_VOICE_SPEED),
     /** The microphone Talk to Scout listens on. Absent: the system default microphone. */
     microphoneId: z.string().optional(),

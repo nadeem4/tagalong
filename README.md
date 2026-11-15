@@ -331,7 +331,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   - **Privacy**: what Scout never looks at.
   - **Files Scout may use**: the folders Scout's file tools may touch. None until you add one with
     **Add folder**; **Remove** takes it away at once.
-  - **Voice**: **Scout talks** (on by default), the voice (George or Fable) with **▶ Preview**, the
+  - **Voice**: **Scout talks** (on by default), the **Scout's voice** card (pick a voice, play a sample), the
     speed, the **Talk to Scout** key and the microphone it listens on.
   - **Shortcuts**: the ask, pause and stop-speaking keys.
   - **Add Scout to your browser (optional)**: the folder to load unpacked in Chrome or Edge.

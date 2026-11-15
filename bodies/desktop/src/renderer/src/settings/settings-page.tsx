@@ -121,7 +121,6 @@ export function SettingsPage() {
         mouth: field('mouth'),
         ears: field('ears'),
         voiceEnabled: form.get('voiceEnabled') !== null,
-        voice: field('voice'),
         voiceSpeed: field('voiceSpeed'),
         showWordsWhileTalking: form.get('showWordsWhileTalking') !== null,
       });

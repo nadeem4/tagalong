@@ -35,7 +35,7 @@ function setup(
     },
     claimTurn: (turn) => void claimed.push(turn),
     stopVoice: () => void stopped.push('voice'),
-    voice: () => ({ enabled: options.voiceOn !== false, voice: 'bm_george', speed: 0.95 }),
+    voice: () => ({ enabled: options.voiceOn !== false, speed: 0.95 }),
     status: () => (options.outdated === true ? 'outdated' : 'online'),
     pendingSnapshot: () => snapshot as ContextSnapshot | null,
     ...(options.takeDrop ? { takeDrop: options.takeDrop } : {}),

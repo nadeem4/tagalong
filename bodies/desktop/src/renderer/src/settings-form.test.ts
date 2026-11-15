@@ -16,7 +16,6 @@ describe('buildSettingsPatch removed fields', () => {
     const patch = buildSettingsPatch({
       ...values,
       voiceEnabled: true,
-      voice: 'bm_george',
       voiceSpeed: '1',
     });
     const live = ['avatar', 'captureExclusions', 'hotkeys', 'listening', 'voice'];
@@ -82,7 +81,7 @@ describe('field errors', () => {
   it('names the field a refused value belongs to, so Settings can mark it', () => {
     let caught: unknown;
     try {
-      buildSettingsPatch({ ...values, voice: 'bm_george', voiceSpeed: '45' });
+      buildSettingsPatch({ ...values, voiceSpeed: '45' });
     } catch (error) {
       caught = error;
     }
@@ -94,14 +93,12 @@ describe('field errors', () => {
 describe('buildSettingsPatch voice', () => {
   const voice = {
     voiceEnabled: true,
-    voice: 'bm_fable',
     voiceSpeed: '1.05',
   };
 
-  it('carries the switch, the voice, and the speed', () => {
+  it('carries the switch and the speed, and no voice id', () => {
     expect(buildSettingsPatch({ ...values, ...voice }).voice).toEqual({
       enabled: true,
-      voice: 'bm_fable',
       speed: 1.05,
     });
   });

@@ -70,7 +70,7 @@ export function VoiceField({ host, speed }: { host: VoiceFieldHost; speed: numbe
     } catch {
       setNote("Couldn't play that sample.");
     } finally {
-      setPlaying(null);
+      setPlaying((now) => (now === id ? null : now));
     }
   }
 
@@ -206,6 +206,12 @@ const VF_CSS = `
 .tg-vf__play:hover { border-color: ${t.color.panelMuted}; }
 .tg-vf__play.is-on { background: ${t.color.gold}; border-color: ${t.color.gold}; }
 .tg-vf__play:disabled { cursor: default; }
+/* A small window (the tour at 150 percent scaling) narrows the size and state columns so a row never forces a sideways scroll. */
+@media (max-width: 760px) {
+  .tg-vf__size { width: 52px; }
+  .tg-vf__state { width: 84px; }
+  .tg-vf__pick { gap: ${t.space.md}px; }
+}
 .tg-vf__msg { min-height: 20px; margin-top: 8px; ${typeCss('small')}; font-weight: 600; }
 .tg-vf__err { color: ${t.color.errInk}; }
 `;

@@ -20,7 +20,7 @@ interface TurnIpcDeps {
   /** Stops Scout's speech everywhere: a cancelled turn does not hush its own. */
   stopVoice: () => void;
   /** Scout talks: on or off, how fast. Rides on each spoken ask. */
-  voice: () => { enabled: boolean; voice: string; speed: number };
+  voice: () => { enabled: boolean; speed: number };
   /** The snapshot the last hotkey captured, sent with the ask. */
   pendingSnapshot: () => ContextSnapshot | null;
   /**

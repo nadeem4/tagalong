@@ -581,12 +581,13 @@ flowchart LR
   British male name (`ryan|thomas|oliver|arthur|alfie|elliot|ethan|noah`), otherwise the system
   default. While it speaks, the level is held at 0.5.
   `getVoices()` is called once at load so the list is ready.
-- **Preview.** `previewVoice({ text, mouth, voice, speed })` is Settings' Preview button. For
-  Kokoro it calls the brain's `speak_sample {voice, speed}` tool through `IPC.speakSample` and plays
-  the returned WAV (`playWav`). The voice picker's Play is `playVoiceSample(voice, speed)` (a
-  `HostBridge` call the renderer supplies): it rejects when the brain has no sample. `ttsState()`
-  and `setTts(voice)` read the roster and save the pick through `tts_state` and `set_tts`. If the brain has no voice, is offline, or the mouth is "System voice", it
-  falls back to the system voice.
+- **The voice picker.** The shared `VoiceField` ("Scout's voice" card, `bodies/ui/src/voice/`) is
+  used by Settings' Voice page and the tour's voice step ("Pick Scout's voice"). Its Play is
+  `playVoiceSample(voice, speed)` (a `HostBridge` call the renderer supplies): the brain's
+  `speak_sample {voice, speed}` tool through `IPC.speakSample`, played as WAV (`playWav`); it
+  rejects when the brain has no sample. `ttsState()` and `setTts(voice)` read the roster and save
+  the pick through `tts_state` and `set_tts`; picking saves at once, so the tour's Next never waits
+  on a download. There is no separate Preview button and no voice id in the desktop's settings.
 
 **Read aloud.** With Scout talks on, the brain speaks every turn this desktop displays: a heard
 question, a typed one, the hello, a wake's remark and `pet.remark` lines. With Scout talks off the
@@ -868,19 +869,18 @@ hears them in the order the panel sent them. A failed step does not hold up the 
 ### Settings fields
 
 `bodies/desktop/src/shared/settings.ts`. Voice settings stay in the desktop; they ride along on
-each spoken `say` and each preview.
+each spoken `say`. Which voice speaks is the brain's (`tts_state`), not a desktop setting.
 
-| Field                | Default                          | Meaning                                                                                 |
-| -------------------- | -------------------------------- | --------------------------------------------------------------------------------------- |
-| `voice.enabled`      | `true`                           | Scout talks.                                                                            |
-| `voice.voice`        | `'bm_george'`                    | Kokoro voice: `bm_george` or `bm_fable`.                                                |
-| `voice.speed`        | `0.95`                           | `MIN_VOICE_SPEED` 0.7 to `MAX_VOICE_SPEED` 1.3                                          |
-| `voice.microphoneId` | absent                           | Absent means the system default.                                                        |
-| `voice.mouth`        | absent                           | `kokoro` ("Kokoro (on the brain)") or `system` ("System voice"). Absent means `kokoro`. |
-| `voice.ears`         | absent                           | Only `local` exists (`EARS_IDS`), labelled "The brain's ears".                          |
-| `listening.always`   | `false`                          | Always listening.                                                                       |
-| `hotkeys.talk`       | `'RightControl'`                 | One of `TALK_KEYS`.                                                                     |
-| `hotkeys.stopVoice`  | `'CommandOrControl+Shift+Alt+M'` | The stop key.                                                                           |
+| Field                | Default                          | Meaning                                                                                        |
+| -------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `voice.enabled`      | `true`                           | Scout talks.                                                                                   |
+| `voice.speed`        | `0.95`                           | `MIN_VOICE_SPEED` 0.7 to `MAX_VOICE_SPEED` 1.3                                                 |
+| `voice.microphoneId` | absent                           | Absent means the system default.                                                               |
+| `voice.mouth`        | absent                           | `kokoro` ("Scout's voice (on the brain)") or `system` ("System voice"). Absent means `kokoro`. |
+| `voice.ears`         | absent                           | Only `local` exists (`EARS_IDS`), labelled "The brain's ears".                                 |
+| `listening.always`   | `false`                          | Always listening.                                                                              |
+| `hotkeys.talk`       | `'RightControl'`                 | One of `TALK_KEYS`.                                                                            |
+| `hotkeys.stopVoice`  | `'CommandOrControl+Shift+Alt+M'` | The stop key.                                                                                  |
 
 See `settings-and-secrets.md` for the whole schema. The brain's side (model files, checksums,
 thresholds, the sentence rules) is in [brain.md](brain.md#brain-ears).

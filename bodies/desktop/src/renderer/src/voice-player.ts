@@ -402,29 +402,3 @@ export async function playVoiceSample(
   if (sample === null) throw new Error('The brain has no sample for this voice.');
   return deps.wav(sample.data, signal);
 }
-
-/**
- * Settings' Preview: the brain speaks the line in the form's voice and speed; with the System
- * voice picked, or if the brain cannot (Kokoro still loading, brain offline), the system
- * voice says it.
- */
-export async function previewVoice(
-  line: { text: string; mouth: 'kokoro' | 'system'; voice: string; speed: number },
-  signal: AbortSignal,
-  deps: {
-    sample: (text: string, voice: string, speed: number) => Promise<{ data: string } | null>;
-    wav: (base64: string, signal: AbortSignal) => Promise<void>;
-    system: (text: string, signal: AbortSignal, rate: number) => Promise<void>;
-  } = {
-    // The brain's sample is a recorded line, so the text is for the system voice only.
-    sample: (_text, voice, speed) => window.tagalongHost.speakSample(voice, speed),
-    wav: playWav,
-    system: speakWithSystem,
-  },
-): Promise<void> {
-  const sample =
-    line.mouth === 'kokoro' ? await deps.sample(line.text, line.voice, line.speed) : null;
-  if (signal.aborted) return;
-  if (sample !== null) return deps.wav(sample.data, signal);
-  return deps.system(line.text, signal, line.speed);
-}

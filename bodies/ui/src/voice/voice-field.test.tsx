@@ -95,6 +95,19 @@ describe('VoiceField', () => {
     expect(screen.getByText('Alan')).toBeInTheDocument();
   });
 
+  it('one sample ending does not clear another sample that is still playing', async () => {
+    const host = await setup();
+    const ends: (() => void)[] = [];
+    host.playVoiceSample = () => new Promise<void>((resolve) => ends.push(resolve));
+    fireEvent.click(screen.getByRole('button', { name: 'Play George' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Play Alan' }));
+    // Alan is now the playing one; George's sample ends first.
+    await act(async () => {
+      ends[0]!();
+    });
+    expect(screen.getByRole('button', { name: 'Play Alan' })).toBeDisabled();
+  });
+
   it('shows a loading line until ttsState resolves', async () => {
     const host = createFakeHostBridge();
     let release: () => void = () => {};

@@ -37,6 +37,30 @@ describe('VoiceSection speed slider', () => {
   });
 });
 
+describe('VoiceSection voice card', () => {
+  const html = renderToStaticMarkup(
+    <HostBridgeProvider bridge={{} as HostBridge}>
+      <VoiceSection settings={SETTINGS_DEFAULTS} />
+    </HostBridgeProvider>,
+  );
+
+  it('shows the shared Scout voice card, loading until the brain answers', () => {
+    expect(html).toContain('Scout&#x27;s voice');
+    expect(html).toContain('Loading voices');
+  });
+
+  it('has no two-voice dropdown, no voice field and no Preview button', () => {
+    expect(html).not.toContain('id="f-voice"');
+    expect(html).not.toContain('name="voice"');
+    expect(html).not.toContain('Preview');
+  });
+
+  it('names the brain voice Scout’s voice, not Kokoro', () => {
+    expect(html).toContain('Scout’s voice (on the brain)');
+    expect(html).not.toContain('Kokoro (on the brain)');
+  });
+});
+
 describe('VoiceSection microphone test', () => {
   it('offers Test your microphone with the meter off', () => {
     const html = renderToStaticMarkup(

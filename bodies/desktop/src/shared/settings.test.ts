@@ -167,17 +167,17 @@ describe('Settings.voice', () => {
     expect(Settings.safeParse(voiceWith({ ears: 'whisper' })).success).toBe(false);
   });
 
-  it('talks by default, in the calm British voice, a touch slower than normal', () => {
+  it('talks by default, a touch slower than normal', () => {
     expect(Settings.parse({}).voice).toEqual({
       enabled: true,
-      voice: 'bm_george',
       speed: 0.95,
     });
   });
 
-  it('offers the two British male voices only', () => {
-    expect(Settings.safeParse(voiceWith({ voice: 'bm_fable' })).success).toBe(true);
-    expect(Settings.safeParse(voiceWith({ voice: 'af_heart' })).success).toBe(false);
+  it('still loads an old settings file that saved a voice id, and drops the id', () => {
+    const parsed = Settings.parse(voiceWith({ voice: 'af_heart' })).voice;
+    expect(parsed).not.toHaveProperty('voice');
+    expect(parsed.speed).toBe(0.95);
   });
 
   it('keeps the speed within what still sounds like speech', () => {

@@ -10,7 +10,7 @@ describe('voice adapters', () => {
       'mouth:system',
     ]);
     expect(adaptersFor('mouth').map((adapter) => adapter.label)).toEqual([
-      'Kokoro (on the brain)',
+      'Scout’s voice (on the brain)',
       'System voice',
     ]);
     expect(adaptersFor('ears')).toEqual([expect.objectContaining({ id: 'local', offline: true })]);

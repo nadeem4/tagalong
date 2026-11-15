@@ -4,7 +4,6 @@ import {
   applySpeechControl,
   pickSystemVoice,
   playVoiceSample,
-  previewVoice,
   SpeechPlayer,
   speakWithSystem,
 } from './voice-player';
@@ -416,37 +415,6 @@ describe('speakWithSystem', () => {
     expect(spoken[0]?.rate).toBe(1.3);
     spoken[0]?.onend();
     await playing;
-  });
-});
-
-describe('previewVoice', () => {
-  const line = { text: 'Hello.', mouth: 'kokoro', voice: 'bm_fable', speed: 1.1 } as const;
-  const signal = new AbortController().signal;
-
-  it('plays the brain’s sample in the form’s voice and speed', async () => {
-    const deps = {
-      sample: vi.fn(() => Promise.resolve({ data: 'UklG' })),
-      wav: vi.fn(() => Promise.resolve()),
-      system: vi.fn(() => Promise.resolve()),
-    };
-    await previewVoice(line, signal, deps);
-    expect(deps.sample).toHaveBeenCalledWith('Hello.', 'bm_fable', 1.1);
-    expect(deps.wav).toHaveBeenCalledWith('UklG', signal);
-    expect(deps.system).not.toHaveBeenCalled();
-  });
-
-  it('uses the system voice when the brain has no sample, and never asks for System voice', async () => {
-    const deps = {
-      sample: vi.fn(() => Promise.resolve(null)),
-      wav: vi.fn(() => Promise.resolve()),
-      system: vi.fn(() => Promise.resolve()),
-    };
-    await previewVoice(line, signal, deps);
-    expect(deps.system).toHaveBeenCalledWith('Hello.', signal, 1.1);
-    deps.sample.mockClear();
-    await previewVoice({ ...line, mouth: 'system' }, signal, deps);
-    expect(deps.sample).not.toHaveBeenCalled();
-    expect(deps.system).toHaveBeenCalledTimes(2);
   });
 });
 
