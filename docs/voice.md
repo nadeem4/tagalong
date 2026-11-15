@@ -628,8 +628,8 @@ design: it is what was said.
 
 ### Voice licences
 
-Checked 2026-11-14. Tagalong's own licence is GPL-3.0-or-later (added to the repo in its own
-change), so a GPL-3.0 engine can run in the brain's process the way espeak-ng already does
+Checked 2026-11-14. Tagalong's own licence is GPL-3.0-or-later (its LICENSE file is at the repo root),
+so a GPL-3.0 engine can run in the brain's process the way espeak-ng already does
 through Kokoro.
 Tagalong never redistributes a voice file: the user's machine downloads each one, pinned to a
 commit and a SHA-256, from its upstream host.
