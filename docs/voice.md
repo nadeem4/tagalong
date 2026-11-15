@@ -591,6 +591,41 @@ question, a typed one, the hello, a wake's remark and `pet.remark` lines. With S
 brain speaks nothing, not even a `say` with `spoken: true` (a browser voice question gets a
 text-only answer).
 
+### Read for the ear
+
+Each sentence goes through `for_the_ear` (`voice/ear_text.py`) after `to_speakable` and before the
+chunker, so the voice and the `text` of the frame are the words as said ("3:30" is "three thirty").
+Our own small ordered rules, no library; the order matters and `test_voice_ear_text.py` pins it:
+
+1. emoji dropped, and a bracketed aside (`(see below)`) dropped; a sentence left empty is not said
+2. ISO dates that are real days (`2026-11-14` is "November fourteenth, twenty twenty six";
+   `2026-02-30` is left as written), then versions (`v1.2.3` is "version one point two point
+   three"; after the word "Version" it is not said twice), then ranges (`10-20`, `3–5` is "to")
+   and a leading minus ("minus five"); longer digit runs such as phone numbers are left alone
+3. times (`3:30pm`, `9:00` is "nine o'clock", `14:05` is "fourteen oh five"), then money
+   (`$4.50` is "four dollars fifty", `$3.2B` is "three point two billion dollars"; pounds and
+   euros too; `k`, `M`, `B` and `bn` scale), then percent, then `km/h` and `mph`
+4. ordinals (`22nd`), then plain, comma-grouped and decimal numbers: words for 0 to 999,999, a year
+   style for 1100 to 2099 ("eighteen fifty") (`2026` is "twenty twenty six"), a `.` is "point" only between digits;
+   larger numbers and codes with a leading zero stay digits for the engine
+5. `e.g.`, `i.e.`, `etc.`, `vs.`, `Dr.`, `and/or`, arrows (`->`, `→` is "to") and `&` ("and")
+
+The rewrite is idempotent: text that is already words comes back unchanged.
+
+Audio is then shaped by `shape_chunk` (`voice/shape.py`) before it is sent. The engine's own
+padding is trimmed (samples quieter than `TRIM_LEVEL` at an edge, keeping `KEEP_MS` of silence),
+each end fades over `FADE_MS` so there is no click, and a gap of zeros is appended: `GAP_MS` after a
+chunk, `PARAGRAPH_GAP_MS` after one that ends a paragraph. The gap is part of the chunk's PCM, so a
+chunk is still one frame and the player is unchanged. The Settings preview is shaped too, without
+the paragraph gap.
+
+To retune, edit the constants at the top of `shape.py` (`TRIM_LEVEL = 0.01`, `KEEP_MS = 20`,
+`FADE_MS = 8`, `GAP_MS = 180`, `PARAGRAPH_GAP_MS = 450`) and listen with
+`uv run python tests/voice_smoke.py` (hand run, it prints each chunk's duration).
+
+The text the model later sees as heard or unsaid is this ear text ("three thirty", not "3:30"), by
+design: it is what was said.
+
 ### How the brain learns a turn was spoken
 
 Two ways. A heard question is a `say` with `spoken: true`: `CompanionBubble.submit(text, context,

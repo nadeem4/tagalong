@@ -128,7 +128,7 @@ def test_a_line_that_only_starts_like_a_number_is_read():
     s.push("3.5 seconds, roughly. ")
     s.push("Fast enough.")
     s.end()
-    assert said == ["3.5 seconds, roughly.", "Fast enough."]
+    assert said == ["three point five seconds, roughly.", "Fast enough."]
 
 
 def test_all_blocks_say_nothing():
@@ -192,7 +192,7 @@ def test_a_rule_inside_a_sentence_is_not_a_divider():
     said, s = stream()
     s.push("It costs 5---maybe 6. Fine.")
     s.end()
-    assert said == ["It costs 5---maybe 6.", "Fine."]
+    assert said == ["It costs five---maybe six.", "Fine."]
 
 
 def test_lead_in_then_divider_in_a_later_step():
@@ -242,7 +242,9 @@ def test_a_list_marker_then_its_item_is_still_spoken():
         ("Mind etc. Then more. Fine.", ["Mind etc. Then more.", "Fine."]),
     ],
 )
-def test_find_sentence_end(text, sentences):
+def test_find_sentence_end(text, sentences, monkeypatch):
+    # The raw piece boundaries: the ear rewrite has its own tests, so it is out of the way here.
+    monkeypatch.setattr("brain.voice.speakable.for_the_ear", lambda line: line)
     said, s = stream()
     s.push(text)
     s.end()
@@ -286,3 +288,17 @@ def test_a_long_unpunctuated_paragraph_leaves_before_the_end():
     assert all(len(line.split()) <= 45 for line in said)
     s.end()
     assert " ".join(said).split() == text.split()
+
+
+def test_a_sentence_is_said_as_the_ear_reads_it():
+    said, s = stream()
+    s.push("We meet at 3:30 for $4.50.")
+    s.end()
+    assert said == ["We meet at three thirty for four dollars fifty."]
+
+
+def test_a_sentence_that_is_only_an_aside_says_nothing():
+    said, s = stream()
+    s.push("(see below)")
+    s.end()
+    assert said == []

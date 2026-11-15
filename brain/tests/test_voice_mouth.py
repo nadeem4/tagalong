@@ -4,9 +4,11 @@ import asyncio
 import base64
 import threading
 
+import numpy as np
 from fake_voice import FakeTts
 
 from brain.voice.mouth import Mouth
+from brain.voice.shape import shape_chunk
 
 ONE = "The build finished and every single test passed."
 TWO = "I also checked the docs and they are up to date."
@@ -66,7 +68,7 @@ async def test_two_sentences_give_two_speech_then_done_in_order():
     assert [p.get("text") for p in out] == [ONE, TWO, None]
     assert out[-1] == {"turn": "t", "done": True}
     assert out[0]["sample_rate"] == 24_000
-    assert len(base64.b64decode(out[0]["pcm"])) == 200  # 100 int16 samples
+    assert len(base64.b64decode(out[0]["pcm"])) == 8640  # quiet audio is just the 180 ms gap
     assert tts.calls[-1] == (TWO, "af_bella", 1.2)
 
 
@@ -727,3 +729,62 @@ async def test_a_cut_keeps_text_the_splitter_still_holds():
     await asyncio.sleep(0.02)
     m.clear()
     assert m.sentences("t")[-1] == "Then there is more to say"
+
+
+class ToneTts:
+    """One second of tone padded with half a second of silence each side, at 24 kHz."""
+
+    def __init__(self) -> None:
+        self.texts: list[str] = []
+
+    def synth(self, text: str, voice: str, speed: float):
+        self.texts.append(text)
+        tone = (np.sin(np.arange(24_000) * 0.3) * 12_000).astype(np.int16)
+        pad = np.zeros(12_000, dtype=np.int16)
+        return np.concatenate([pad, tone, pad]), 24_000
+
+
+async def test_the_voice_is_given_the_ear_text_and_the_audio_is_shaped():
+    sent = Sent()
+    tts = ToneTts()
+    m, _ = mouth(sent, tts)
+    await ready(m)
+    sent.frames.clear()
+    tts.texts.clear()
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": "We meet at 3:30."})
+    m.reply("t", {"done": True})
+    await settle()
+    out = sent.speech()
+    assert tts.texts == ["We meet at three thirty."]
+    assert out[0]["text"] == "We meet at three thirty."
+    raw, _rate = tts.synth("x", "v", 1.0)
+    expected = shape_chunk(raw, 24_000, paragraph_end=False)
+    assert len(base64.b64decode(out[0]["pcm"])) == len(expected) * 2
+
+
+async def test_an_aside_alone_sends_no_frame():
+    sent = Sent()
+    m, _ = mouth(sent)
+    await ready(m)
+    sent.frames.clear()
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": "(see below)"})
+    m.reply("t", {"done": True})
+    await settle()
+    assert [p.get("text") for p in sent.speech()] == [None]
+
+
+async def test_a_paragraph_end_chunk_has_the_longer_gap():
+    sent = Sent()
+    m, _ = mouth(sent, ToneTts())
+    await ready(m)
+    sent.frames.clear()
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": f"{ONE}\n\n"})
+    m.reply("t", {"delta": f"{TWO}"})
+    m.reply("t", {"done": True})
+    await settle()
+    first, second = sent.speech()[:2]
+    longer = len(base64.b64decode(first["pcm"])) - len(base64.b64decode(second["pcm"]))
+    assert longer == (24_000 * (450 - 180) // 1000) * 2
