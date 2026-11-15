@@ -2328,8 +2328,9 @@ brain sends and falls back to the system voice for a text-only `speech` frame.
   spoken with text-only `speech` frames and `Mouth` never loads Kokoro. `say` may carry `voice` (a Kokoro voice id, default `bm_george`) and `speed`
   (default 1.0); an unknown voice id speaks with `bm_george`.
 - **Sentences.** `voice/speakable.py` turns the streamed reply into sentences: fenced code, table rows, `>` quotes
-  and bare URLs are left out, list markers and Markdown dropped, nothing is added or cut. The
-  first complete sentence goes out at once. Short sentences (under 40 characters) that are
+  and bare URLs are left out, list markers and Markdown dropped, nothing is added or cut. Nothing
+  after a line of exactly `---` is said (the divider, see [Say and show](voice.md#say-and-show)).
+  The first complete sentence goes out at once. Short sentences (under 40 characters) that are
   already waiting are said together, because the voice clips a very short line.
 - **`Mouth`** (`voice/mouth.py`) keeps one queue of sentences for all turns and one worker task
   that says them in order. It synthesises each sentence with `asyncio.to_thread` and awaits it, so
@@ -2375,11 +2376,17 @@ this]` (`Memory.replace_last_message` rewrites the cut turn's message), never th
   model decides whether to stop, answer, carry on or offer the rest. A stale or unknown `turn`, or
   an empty unsaid on a turn that already ended, makes it a plain `say`; a turn still running is
   paused even with nothing unsaid. The echo guard lives in the body (`echoOf`), not here.
-- **The spoken note.** For a spoken `say` the user content gets one extra text block, after the
-  content: "This reply will be read aloud ... you may open with one short sentence in your own
-  words first." That sentence is the spoken ack; code never says it, there is no canned line and no
-  earcon. It sits in the user content rather than the system prompt so the cached system prompt is
-  the same for typed and spoken turns. It is an instruction to the model and not guaranteed.
+- **The ear guide.** Every turn that is read aloud gets one extra text block, `mind/ear.md`
+  (`prompt.ear_note()`), after the content: write the spoken part for the ear, put anything better
+  seen than heard after one `---` line (once, in the last message of the turn), and you may open
+  with one short sentence if the work will take a while. A turn is read aloud by one rule,
+  `Session._wants_speech` (a voice exists, the user spoke or the body asked for read-aloud, and the
+  body has not turned it off): `say` adds the guide through `user_content(params, read_aloud=...)`
+  and `_start_wake` appends it to a wake turn, so a typed turn on a read-aloud body and a
+  brain-started remark get it as a spoken `say` does. Code never says the opening sentence, there
+  is no canned line and no earcon. It sits in the user content rather than the system prompt so
+  the cached system prompt is the same for typed and spoken turns. It is an instruction to the
+  model and not guaranteed. See [Say and show](voice.md#say-and-show).
 - **Early fetch and the status line.** The voice is not fetched only at the first spoken turn:
   while the first-run tour is open the desktop calls the Home tool `fetch_voice` (each time the brain
   comes online, until the tour is finished), and `VoiceService.prefetch()` starts `Mouth.prefetch()`

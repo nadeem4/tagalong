@@ -489,6 +489,25 @@ flowchart TD
   finishes in the background and its result comes back through the front door as a
   `tool_result` event. See [Brain](brain.md).
 
+### Say and show
+
+One reply carries what Scout says and, when there is more, what it shows. The reply is Markdown;
+the spoken part comes first, and a line that is exactly `---` (a rule, with a blank line before and
+after) ends it. Everything after is the on-screen part. `SpokenStream` (`speakable.py`) says only
+the text before the divider, so speech starts at the first sentence and never reads the on-screen
+part. The divider stays in the stored text, so the chat keeps both parts and the bubble draws a
+horizontal rule between them with no body change. With no divider the whole reply is spoken; a
+divider with nothing before it says nothing at all. A second divider changes nothing, and a `---`
+inside a sentence (`5---6`) is not a divider, only a line of its own is.
+
+The model is told the rule by the ear guide (`mind/ear.md`), which every read-aloud turn carries
+(see [brain.md](brain.md#brain-mouth)): write the spoken part for the ear, put
+lists, links, code, tables and long numbers after the divider, use it once and only in the last
+message of the turn (so a lead-in before tool rounds is still spoken), and never repeat the
+on-screen part aloud. Why a divider and not a tool call or tags: a tool call cannot stream the
+spoken part before the model finishes, tags need every body to strip them, and a divider streams,
+needs no schema and degrades to today's behaviour.
+
 ### The mouth
 
 The brain speaks; the panel plays. What Scout says aloud about a long result is its own call: the
