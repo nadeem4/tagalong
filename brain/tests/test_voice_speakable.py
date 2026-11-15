@@ -161,3 +161,47 @@ def test_nothing_is_said_after_end():
     s.push(" More.")
     s.end()
     assert said == ["Done."]
+
+
+def test_divider_ends_the_spoken_part():
+    said, s = stream()
+    s.push("Found it. Two files changed.\n\n---\n\n- a.py\n- b.py\n")
+    s.end()
+    assert said == ["Found it.", "Two files changed."]
+
+
+def test_divider_split_across_deltas():
+    said, s = stream()
+    s.push("Done. Look below.\n\n-")
+    s.push("--\n\n| a | b |")
+    s.end()
+    assert said == ["Done.", "Look below."]
+
+
+def test_divider_first_says_nothing():
+    said, s = stream()
+    s.push("---\n\nhere is a list")
+    s.end()
+    assert said == []
+
+
+def test_second_divider_changes_nothing():
+    said, s = stream()
+    s.push("Hi there.\n\n---\n\nMore.\n\n---\n\nEven more prose here.")
+    s.end()
+    assert said == ["Hi there."]
+
+
+def test_a_rule_inside_a_sentence_is_not_a_divider():
+    said, s = stream()
+    s.push("It costs 5---maybe 6. Fine.")
+    s.end()
+    assert said == ["It costs 5---maybe 6.", "Fine."]
+
+
+def test_lead_in_then_divider_in_a_later_step():
+    said, s = stream()
+    for delta in ("Let me check.", "\n\n", "It is green.\n\n---\n\nlog: ok"):
+        s.push(delta)
+    s.end()
+    assert said == ["Let me check.", "It is green."]
