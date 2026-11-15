@@ -136,6 +136,7 @@ _RULES: list[tuple[re.Pattern, object]] = [
     ),
     (re.compile(r"(?<!\w)e\.g\."), "for example"),
     (re.compile(r"(?<!\w)i\.e\."), "that is"),
+    (re.compile(r"(?<!\w)etc\.(?=\s+[A-Z])"), "and so on."),  # keeps the sentence mark
     (re.compile(r"(?<!\w)etc\."), "and so on"),
     (re.compile(r"(?<!\w)vs\."), "versus"),
     (re.compile(r"(?<!\w)Dr\."), "Doctor"),

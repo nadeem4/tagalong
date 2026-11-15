@@ -9,6 +9,7 @@ import re
 from collections.abc import Callable
 
 from brain.voice.chunker import MAX_WORDS
+from brain.voice.ear_text import for_the_ear
 
 # A line of exactly this ends the spoken part; what follows is shown, never said.
 DIVIDER = "---"
@@ -228,6 +229,6 @@ class SpokenStream:
             self._buffer = self._buffer[cut:]
 
     def _speak(self, piece: str, paragraph_end: bool) -> None:
-        line = to_speakable(piece)
+        line = for_the_ear(to_speakable(piece))
         if re.search(r"\w", line):  # a lone "-" or "--" is no speech
             self._say(line, paragraph_end)

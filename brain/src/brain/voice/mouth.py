@@ -22,6 +22,7 @@ import numpy as np
 
 from brain.telemetry import timed
 from brain.voice.chunker import Chunk, Chunker
+from brain.voice.shape import shape_chunk
 from brain.voice.speakable import SpokenStream
 
 log = logging.getLogger("brain")
@@ -219,7 +220,7 @@ class Mouth:
             samples, rate = await asyncio.to_thread(
                 tts.synth, text, voice or DEFAULT_VOICE, speed or DEFAULT_SPEED
             )
-        return _wav(samples, rate)
+        return _wav(shape_chunk(samples, rate, paragraph_end=False), rate)
 
     def _finish(self, st: _Turn) -> None:
         st.ended = True
@@ -285,12 +286,12 @@ class Mouth:
         self._saying = True
         self._poke()
         try:
-            await self._say(st, chunk.text)
+            await self._say(st, chunk.text, chunk.paragraph_end)
         finally:
             if self._turns.get(turn) is st:
                 del st.unsent[:1]
 
-    async def _say(self, st: _Turn, line: str) -> None:
+    async def _say(self, st: _Turn, line: str, paragraph_end: bool) -> None:
         frame: dict = {"turn": st.turn, "text": line}
         tts = None if st.system_voice else self._tts_now()
         if tts is not None:
@@ -298,7 +299,7 @@ class Mouth:
                 async with self._synth:
                     with timed("voice_hop", op="synth"):
                         samples, rate = await asyncio.to_thread(tts.synth, line, st.voice, st.speed)
-                pcm = samples.astype("<i2").tobytes()
+                pcm = shape_chunk(samples, rate, paragraph_end).astype("<i2").tobytes()
                 frame |= {"pcm": base64.b64encode(pcm).decode("ascii"), "sample_rate": rate}
             except Exception:
                 log.warning("speech synthesis failed", exc_info=True)  # the body says it instead

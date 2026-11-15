@@ -128,7 +128,7 @@ def test_a_line_that_only_starts_like_a_number_is_read():
     s.push("3.5 seconds, roughly. ")
     s.push("Fast enough.")
     s.end()
-    assert said == ["3.5 seconds, roughly.", "Fast enough."]
+    assert said == ["three point five seconds, roughly.", "Fast enough."]
 
 
 def test_all_blocks_say_nothing():
@@ -192,7 +192,7 @@ def test_a_rule_inside_a_sentence_is_not_a_divider():
     said, s = stream()
     s.push("It costs 5---maybe 6. Fine.")
     s.end()
-    assert said == ["It costs 5---maybe 6.", "Fine."]
+    assert said == ["It costs five---maybe six.", "Fine."]
 
 
 def test_lead_in_then_divider_in_a_later_step():
@@ -229,17 +229,20 @@ def test_a_list_marker_then_its_item_is_still_spoken():
 @pytest.mark.parametrize(
     ("text", "sentences"),
     [
-        ("Use e.g. Python. Then stop.", ["Use e.g. Python.", "Then stop."]),
-        ("Ask Dr. Smith about it. Okay.", ["Ask Dr. Smith about it.", "Okay."]),
-        ("It is 3.5 percent. Fine.", ["It is 3.5 percent.", "Fine."]),
-        ("Version v1.2.3 is out. Update.", ["Version v1.2.3 is out.", "Update."]),
+        ("Use e.g. Python. Then stop.", ["Use for example Python.", "Then stop."]),
+        ("Ask Dr. Smith about it. Okay.", ["Ask Doctor Smith about it.", "Okay."]),
+        ("It is 3.5 percent. Fine.", ["It is three point five percent.", "Fine."]),
+        (
+            "Version v1.2.3 is out. Update.",
+            ["Version version one point two point three is out.", "Update."],
+        ),
         ("I waited... then left. Bye.", ["I waited... then left.", "Bye."]),
         ("Ask J. Smith. Then go.", ["Ask J. Smith.", "Then go."]),
         ("Line one\nstill line one. Next.", ["Line one still line one.", "Next."]),
         ("Wait. What?! Really.", ["Wait.", "What?!", "Really."]),
         ('She said "stop." Then left.', ['She said "stop."', "Then left."]),
         ("Hello world.", ["Hello world."]),
-        ("Mind etc. Then more. Fine.", ["Mind etc. Then more.", "Fine."]),
+        ("Mind etc. Then more. Fine.", ["Mind and so on. Then more.", "Fine."]),
     ],
 )
 def test_find_sentence_end(text, sentences):
@@ -286,3 +289,17 @@ def test_a_long_unpunctuated_paragraph_leaves_before_the_end():
     assert all(len(line.split()) <= 45 for line in said)
     s.end()
     assert " ".join(said).split() == text.split()
+
+
+def test_a_sentence_is_said_as_the_ear_reads_it():
+    said, s = stream()
+    s.push("We meet at 3:30 for $4.50.")
+    s.end()
+    assert said == ["We meet at three thirty for four dollars fifty."]
+
+
+def test_a_sentence_that_is_only_an_aside_says_nothing():
+    said, s = stream()
+    s.push("(see below)")
+    s.end()
+    assert said == []
