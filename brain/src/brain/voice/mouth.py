@@ -24,6 +24,7 @@ from brain.telemetry import timed
 from brain.voice.chunker import Chunk, Chunker
 from brain.voice.shape import shape_chunk
 from brain.voice.speakable import SpokenStream
+from brain.voice.tts import Tts
 
 log = logging.getLogger("brain")
 
@@ -32,12 +33,6 @@ DEFAULT_SPEED = 1.0
 State = Literal["talking", "sentence_break", "paused", "idle"]
 Download = dict[str, float | str]  # {"status": idle|downloading|ready|failed, "progress": 0..1}
 KEPT_TURNS = 3  # chunk logs kept, so a late interruption can still be answered
-
-
-class Tts(Protocol):
-    def synth(self, text: str, voice: str, speed: float) -> tuple[np.ndarray, int]:
-        """int16 samples and their sample rate."""
-        ...
 
 
 LoadTts = Callable[[Callable[[float], None]], Awaitable[Tts]]  # takes a progress callback
