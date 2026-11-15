@@ -1126,6 +1126,15 @@ aloud every answer the desktop shows (heard or typed), its hello and its wakes a
 it off nothing is read aloud, not even a question asked by voice (from the desktop or the browser
 popup); the answer is text only.
 
+### V.0. Every roster voice (hand run)
+
+1. **Setup:** from `brain/`, with the user's go-ahead for real downloads (about 500 MB in all).
+2. **Action:** `uv run python tests/voice_smoke.py <data dir> <out dir>`.
+3. **Expected:** for each of the eight voices in `tts_models.json` (Piper Alan and Northern
+   English man, Kokoro George, Fable, Emma and Heart, Supertonic M1 and F1) it prints a load time
+   and a real-time factor and writes `<id>.wav`. Each clip is clear speech at the right pitch for
+   its descriptor, with no clipped start or end.
+
 ### V.1. Scout reads an answer aloud
 
 1. **Setup:** a fresh brain data folder, so the voice model is not downloaded yet.

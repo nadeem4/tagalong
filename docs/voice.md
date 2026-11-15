@@ -628,8 +628,9 @@ design: it is what was said.
 
 ### Voice licences
 
-Checked 2026-11-14. Tagalong itself is GPL-3.0-or-later (`LICENSE` in the repo root), so a
-GPL-3.0 engine can run in the brain's process the way espeak-ng already does through Kokoro.
+Checked 2026-11-14. Tagalong's own licence is GPL-3.0-or-later (added to the repo in its own
+change), so a GPL-3.0 engine can run in the brain's process the way espeak-ng already does
+through Kokoro.
 Tagalong never redistributes a voice file: the user's machine downloads each one, pinned to a
 commit and a SHA-256, from its upstream host.
 
@@ -641,6 +642,36 @@ commit and a SHA-256, from its upstream host.
 | Kokoro (`hexgrad/Kokoro-82M`, via `kokoro-onnx`)                | Apache-2.0       | Apache-2.0                                                                                                                                                                                               | A download of the int8 model and voices                                                   | Yes.                                                                                                                                       |
 | Supertonic (`Supertone/supertonic`; `supertonic` 1.3.1 on PyPI) | MIT              | BigScience OpenRAIL-M                                                                                                                                                                                    | A download of four ONNX files, two config files and two voice styles                      | Yes, with the licence's use-based restrictions passed on. The repo is live (updated 2025-12-10). One male and one female style are listed. |
 | Pocket TTS (`kyutai/pocket-tts`)                                | MIT              | CC-BY-4.0 (attribution needed)                                                                                                                                                                           | Nothing yet                                                                               | Yes, later (VO5). The Hugging Face repo is gated, which the download step must handle.                                                     |
+
+### Voices
+
+The roster is `brain/src/brain/voice/tts_models.json`, read by `voice/tts.py` the way
+`stt_models.json` is read by `stt.py`. One row per voice: `id`, `label`, `descriptor` (the short
+words under the name), `engine` (a key of `TTS_ENGINES`), `voice` (the engine's own name for it),
+`files` (pinned `ModelFile`s under `tts/<engine>/`: URL pinned to a commit, size, sha256),
+`size_mb`, `sample` (the release clip, or `null` while the clips are pending), `licence` (see
+above), `runtime` (`brain` only for now) and `auto` (exactly one row is the default). The loader
+refuses an unknown engine or runtime, a duplicate id, a file without a size and 64-digit sha256,
+an empty licence and any number of auto rows other than one. Today's rows: Piper `piper-alan`
+(the default) and `piper-northern-english-male`, Kokoro `kokoro-george`, `kokoro-fable`,
+`kokoro-emma` and `kokoro-heart` (one download serves all four), and Supertonic `supertonic-m1`
+and `supertonic-f1` (styles M1 and F1 of the package's ten).
+
+Engines live in `tts_engines.TTS_ENGINES`; each `load(row, folder)` returns a `Tts` (the protocol
+in `tts.py`: `synth(text, voice, speed)` gives int16 samples and a rate). Piper joins its
+per-sentence chunks and maps speed to `length_scale = 1 / speed`; Supertonic loads its style once
+and passes speed through; Kokoro is unchanged. Libraries are imported only inside `load`.
+
+- **Add a voice of a known engine:** add a row. Take each file's size and sha256 from the
+  Hugging Face API (`.../api/models/<repo>/tree/<commit>/<dir>?expand=true`, `lfs.oid` for large
+  files; hash the small text files yourself) and pin the URL to the commit.
+- **Add an engine:** a module with an `Adapter` and a `load(row, folder)`, an entry in
+  `TTS_ENGINES` and in `tts.ENGINE_NAMES` (a test keeps the two in step), then rows.
+- **Sample clips:** `cd brain && uv run python tools/voice_samples.py OUT_DIR` says
+  `SAMPLE_TEXT` with every voice (it downloads the real models; hand run only), writes
+  `<id>.wav` and prints each clip's size and sha256. Upload the WAVs to the GitHub release
+  `voice-samples-v1` and paste each URL, size and sha256 into the row's `sample`. Until then
+  every row has `sample: null`.
 
 ### How the brain learns a turn was spoken
 
