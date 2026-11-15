@@ -1,0 +1,270 @@
+[
+  {
+    "id": "piper-alan",
+    "label": "Alan",
+    "descriptor": "British man, calm",
+    "engine": "piper",
+    "voice": "alan",
+    "files": [
+      {
+        "url": "https://huggingface.co/rhasspy/piper-voices/resolve/6b9cfaacb4fb2e02a9621227e3c1a48bec9710c3/en/en_GB/alan/medium/en_GB-alan-medium.onnx",
+        "path": "tts/piper/en_GB-alan-medium.onnx",
+        "bytes": 63201294,
+        "sha256": "0a309668932205e762801f1efc2736cd4b0120329622adf62be09e56339d3330"
+      },
+      {
+        "url": "https://huggingface.co/rhasspy/piper-voices/resolve/6b9cfaacb4fb2e02a9621227e3c1a48bec9710c3/en/en_GB/alan/medium/en_GB-alan-medium.onnx.json",
+        "path": "tts/piper/en_GB-alan-medium.onnx.json",
+        "bytes": 4888,
+        "sha256": "c0f0d124e5895c00e7c03b35dcc8287f319a6998a365b182deb5c8e752ee8c1e"
+      }
+    ],
+    "size_mb": 61,
+    "sample": null,
+    "licence": "Mycroft AI dataset (see docs)",
+    "runtime": "brain",
+    "auto": true
+  },
+  {
+    "id": "piper-northern-english-male",
+    "label": "Northern English man",
+    "descriptor": "Northern English man, easy-going",
+    "engine": "piper",
+    "voice": "northern_english_male",
+    "files": [
+      {
+        "url": "https://huggingface.co/rhasspy/piper-voices/resolve/6b9cfaacb4fb2e02a9621227e3c1a48bec9710c3/en/en_GB/northern_english_male/medium/en_GB-northern_english_male-medium.onnx",
+        "path": "tts/piper/en_GB-northern_english_male-medium.onnx",
+        "bytes": 63201294,
+        "sha256": "57a219ae8e638873db7d18893304be5069c42868f392bb95c3ff17f0690d0689"
+      },
+      {
+        "url": "https://huggingface.co/rhasspy/piper-voices/resolve/6b9cfaacb4fb2e02a9621227e3c1a48bec9710c3/en/en_GB/northern_english_male/medium/en_GB-northern_english_male-medium.onnx.json",
+        "path": "tts/piper/en_GB-northern_english_male-medium.onnx.json",
+        "bytes": 4847,
+        "sha256": "69557ed3d974463453e9b0c09dd99a7ed0e52b8b87b64b357dbeeb2540a97d47"
+      }
+    ],
+    "size_mb": 61,
+    "sample": null,
+    "licence": "CC-BY-SA-4.0",
+    "runtime": "brain",
+    "auto": false
+  },
+  {
+    "id": "kokoro-george",
+    "label": "George",
+    "descriptor": "British man, warm",
+    "engine": "kokoro",
+    "voice": "bm_george",
+    "files": [
+      {
+        "url": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.int8.onnx",
+        "path": "tts/kokoro/kokoro-v1.0.int8.onnx",
+        "bytes": 92361271,
+        "sha256": "6e742170d309016e5891a994e1ce1559c702a2ccd0075e67ef7157974f6406cb"
+      },
+      {
+        "url": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin",
+        "path": "tts/kokoro/voices-v1.0.bin",
+        "bytes": 28214398,
+        "sha256": "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d"
+      }
+    ],
+    "size_mb": 120,
+    "sample": null,
+    "licence": "Apache-2.0",
+    "runtime": "brain",
+    "auto": false
+  },
+  {
+    "id": "kokoro-fable",
+    "label": "Fable",
+    "descriptor": "British man, storyteller",
+    "engine": "kokoro",
+    "voice": "bm_fable",
+    "files": [
+      {
+        "url": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.int8.onnx",
+        "path": "tts/kokoro/kokoro-v1.0.int8.onnx",
+        "bytes": 92361271,
+        "sha256": "6e742170d309016e5891a994e1ce1559c702a2ccd0075e67ef7157974f6406cb"
+      },
+      {
+        "url": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin",
+        "path": "tts/kokoro/voices-v1.0.bin",
+        "bytes": 28214398,
+        "sha256": "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d"
+      }
+    ],
+    "size_mb": 120,
+    "sample": null,
+    "licence": "Apache-2.0",
+    "runtime": "brain",
+    "auto": false
+  },
+  {
+    "id": "kokoro-emma",
+    "label": "Emma",
+    "descriptor": "British woman, clear",
+    "engine": "kokoro",
+    "voice": "bf_emma",
+    "files": [
+      {
+        "url": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.int8.onnx",
+        "path": "tts/kokoro/kokoro-v1.0.int8.onnx",
+        "bytes": 92361271,
+        "sha256": "6e742170d309016e5891a994e1ce1559c702a2ccd0075e67ef7157974f6406cb"
+      },
+      {
+        "url": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin",
+        "path": "tts/kokoro/voices-v1.0.bin",
+        "bytes": 28214398,
+        "sha256": "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d"
+      }
+    ],
+    "size_mb": 120,
+    "sample": null,
+    "licence": "Apache-2.0",
+    "runtime": "brain",
+    "auto": false
+  },
+  {
+    "id": "kokoro-heart",
+    "label": "Heart",
+    "descriptor": "American woman, warm",
+    "engine": "kokoro",
+    "voice": "af_heart",
+    "files": [
+      {
+        "url": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.int8.onnx",
+        "path": "tts/kokoro/kokoro-v1.0.int8.onnx",
+        "bytes": 92361271,
+        "sha256": "6e742170d309016e5891a994e1ce1559c702a2ccd0075e67ef7157974f6406cb"
+      },
+      {
+        "url": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin",
+        "path": "tts/kokoro/voices-v1.0.bin",
+        "bytes": 28214398,
+        "sha256": "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d"
+      }
+    ],
+    "size_mb": 120,
+    "sample": null,
+    "licence": "Apache-2.0",
+    "runtime": "brain",
+    "auto": false
+  },
+  {
+    "id": "supertonic-m1",
+    "label": "Supertonic M1",
+    "descriptor": "Man, crisp",
+    "engine": "supertonic",
+    "voice": "M1",
+    "files": [
+      {
+        "url": "https://huggingface.co/Supertone/supertonic/resolve/b6856d033f622c63ea29441795be266a1133e227/onnx/duration_predictor.onnx",
+        "path": "tts/supertonic/onnx/duration_predictor.onnx",
+        "bytes": 1500789,
+        "sha256": "b861580c56a0cba2a2b82aa697ecb3c5a163c3240c60a0ddfac369d21d054092"
+      },
+      {
+        "url": "https://huggingface.co/Supertone/supertonic/resolve/b6856d033f622c63ea29441795be266a1133e227/onnx/text_encoder.onnx",
+        "path": "tts/supertonic/onnx/text_encoder.onnx",
+        "bytes": 27348373,
+        "sha256": "ba0c8ea74aeb5df00d21a89b8d47c71317f47120232e3deef95024dba37dbd88"
+      },
+      {
+        "url": "https://huggingface.co/Supertone/supertonic/resolve/b6856d033f622c63ea29441795be266a1133e227/onnx/vector_estimator.onnx",
+        "path": "tts/supertonic/onnx/vector_estimator.onnx",
+        "bytes": 132471364,
+        "sha256": "b3f82ecd2e9decc4e2236048b03628a1c1d5f14a792ba274a59b7325107aa6a6"
+      },
+      {
+        "url": "https://huggingface.co/Supertone/supertonic/resolve/b6856d033f622c63ea29441795be266a1133e227/onnx/vocoder.onnx",
+        "path": "tts/supertonic/onnx/vocoder.onnx",
+        "bytes": 101405066,
+        "sha256": "19bd51f47a186069c752403518a40f7ea4c647455056d2511f7249691ecddf7c"
+      },
+      {
+        "url": "https://huggingface.co/Supertone/supertonic/resolve/b6856d033f622c63ea29441795be266a1133e227/onnx/tts.json",
+        "path": "tts/supertonic/onnx/tts.json",
+        "bytes": 8645,
+        "sha256": "4dac5f986698a3ace9a97ea2545d43f6c8ba120d25e005f8c905128281be9b6d"
+      },
+      {
+        "url": "https://huggingface.co/Supertone/supertonic/resolve/b6856d033f622c63ea29441795be266a1133e227/onnx/unicode_indexer.json",
+        "path": "tts/supertonic/onnx/unicode_indexer.json",
+        "bytes": 262134,
+        "sha256": "0c3800ba4fb1fc760c9070eb43a0ad5a68279ec165742591a68ea3edca452978"
+      },
+      {
+        "url": "https://huggingface.co/Supertone/supertonic/resolve/b6856d033f622c63ea29441795be266a1133e227/voice_styles/M1.json",
+        "path": "tts/supertonic/voice_styles/M1.json",
+        "bytes": 421053,
+        "sha256": "273c9ba6582d2e00383d8fbe2f5d660d86e8fba849c91ff695384d1a6e2e02f1"
+      }
+    ],
+    "size_mb": 264,
+    "sample": null,
+    "licence": "OpenRAIL-M",
+    "runtime": "brain",
+    "auto": false
+  },
+  {
+    "id": "supertonic-f1",
+    "label": "Supertonic F1",
+    "descriptor": "Woman, crisp",
+    "engine": "supertonic",
+    "voice": "F1",
+    "files": [
+      {
+        "url": "https://huggingface.co/Supertone/supertonic/resolve/b6856d033f622c63ea29441795be266a1133e227/onnx/duration_predictor.onnx",
+        "path": "tts/supertonic/onnx/duration_predictor.onnx",
+        "bytes": 1500789,
+        "sha256": "b861580c56a0cba2a2b82aa697ecb3c5a163c3240c60a0ddfac369d21d054092"
+      },
+      {
+        "url": "https://huggingface.co/Supertone/supertonic/resolve/b6856d033f622c63ea29441795be266a1133e227/onnx/text_encoder.onnx",
+        "path": "tts/supertonic/onnx/text_encoder.onnx",
+        "bytes": 27348373,
+        "sha256": "ba0c8ea74aeb5df00d21a89b8d47c71317f47120232e3deef95024dba37dbd88"
+      },
+      {
+        "url": "https://huggingface.co/Supertone/supertonic/resolve/b6856d033f622c63ea29441795be266a1133e227/onnx/vector_estimator.onnx",
+        "path": "tts/supertonic/onnx/vector_estimator.onnx",
+        "bytes": 132471364,
+        "sha256": "b3f82ecd2e9decc4e2236048b03628a1c1d5f14a792ba274a59b7325107aa6a6"
+      },
+      {
+        "url": "https://huggingface.co/Supertone/supertonic/resolve/b6856d033f622c63ea29441795be266a1133e227/onnx/vocoder.onnx",
+        "path": "tts/supertonic/onnx/vocoder.onnx",
+        "bytes": 101405066,
+        "sha256": "19bd51f47a186069c752403518a40f7ea4c647455056d2511f7249691ecddf7c"
+      },
+      {
+        "url": "https://huggingface.co/Supertone/supertonic/resolve/b6856d033f622c63ea29441795be266a1133e227/onnx/tts.json",
+        "path": "tts/supertonic/onnx/tts.json",
+        "bytes": 8645,
+        "sha256": "4dac5f986698a3ace9a97ea2545d43f6c8ba120d25e005f8c905128281be9b6d"
+      },
+      {
+        "url": "https://huggingface.co/Supertone/supertonic/resolve/b6856d033f622c63ea29441795be266a1133e227/onnx/unicode_indexer.json",
+        "path": "tts/supertonic/onnx/unicode_indexer.json",
+        "bytes": 262134,
+        "sha256": "0c3800ba4fb1fc760c9070eb43a0ad5a68279ec165742591a68ea3edca452978"
+      },
+      {
+        "url": "https://huggingface.co/Supertone/supertonic/resolve/b6856d033f622c63ea29441795be266a1133e227/voice_styles/F1.json",
+        "path": "tts/supertonic/voice_styles/F1.json",
+        "bytes": 420622,
+        "sha256": "1450bcad84a2790eaf73f85e763dd5bae7c399f55d692c4835cf4f7686b5a10f"
+      }
+    ],
+    "size_mb": 264,
+    "sample": null,
+    "licence": "OpenRAIL-M",
+    "runtime": "brain",
+    "auto": false
+  }
+]
