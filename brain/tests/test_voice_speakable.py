@@ -225,6 +225,7 @@ def test_a_list_marker_then_its_item_is_still_spoken():
     s.end()
     assert said == ["apples"]
 
+
 @pytest.mark.parametrize(
     ("text", "sentences"),
     [
