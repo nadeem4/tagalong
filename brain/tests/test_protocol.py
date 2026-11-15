@@ -258,8 +258,9 @@ def test_tab_and_download_data_parse_the_examples():
 
 def test_read_aloud_data_parses_the_example_and_bounds_speed():
     data = ReadAloudData.model_validate(event_data("read_aloud"))
-    assert (data.on, data.voice, data.speed, data.system_voice) == (True, "bm_george", 1.1, False)
-    assert ReadAloudData.model_validate({"on": False}).voice is None
+    assert (data.on, data.speed, data.system_voice) == (True, 1.1, False)
+    assert not hasattr(data, "voice")  # the brain owns the voice choice now
+    assert not hasattr(ReadAloudData.model_validate({"on": True, "voice": "x"}), "voice")
     assert ReadAloudData.model_validate({"on": True, "system_voice": True}).system_voice is True
     for bad in ({}, {"on": "yes"}, {"on": True, "speed": 3}, {"on": True, "system_voice": 1}):
         with pytest.raises(ValidationError):
@@ -331,7 +332,6 @@ def test_speech_control_takes_three_actions_and_an_optional_turn():
         ("body", "mic", {"pcm": ""}),
         ("body", "say", {"text": "hi", "speed": 3}),
         ("body", "say", {"text": "hi", "speed": 0.4}),
-        ("body", "say", {"text": "hi", "voice": None}),
         ("brain", "heard", {"event": "mumble"}),
         ("brain", "voice", {"status": "loading", "progress": 1.5}),
         ("brain", "voice", {"status": "loading", "progress": None}),
@@ -347,11 +347,10 @@ def test_voice_params_rejected(origin, method, params):
         MAPS[origin][method][0].model_validate(params)
 
 
-def test_say_voice_and_speed_edges():
+def test_say_speed_edges():
     say = BODY_TO_BRAIN["say"][0]
-    assert say.model_validate({"text": "hi", "speed": 0.5, "voice": "v"}).speed == 0.5
+    assert say.model_validate({"text": "hi", "speed": 0.5}).speed == 0.5
     assert say.model_validate({"text": "hi", "speed": 2}).speed == 2
-    assert say.model_validate({"text": "hi"}).voice is None
 
 
 def test_answer_carries_an_optional_kept_apps_list():
@@ -431,3 +430,8 @@ def test_know_me_status_bounds():
             KnowMeStatusParams.model_validate(bad)
     with pytest.raises(ValidationError):
         KnowMePdf.model_validate({"name": "p.pdf", "data": "A" * (KNOW_ME_PDF_B64_MAX + 1)})
+
+
+def test_say_ignores_a_voice_the_brain_owns_the_choice():
+    params = SayParams.model_validate({"text": "a", "voice": "x"})
+    assert not hasattr(params, "voice")

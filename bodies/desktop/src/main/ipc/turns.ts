@@ -68,7 +68,7 @@ export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
         text: input.text ?? '',
         ...(parts.length > 0 ? { parts } : {}),
         ...(windowTitle !== undefined ? { context: { window: windowTitle } } : {}),
-        ...(spoken ? { spoken: true, voice: voice.voice, speed: voice.speed } : {}),
+        ...(spoken ? { spoken: true, speed: voice.speed } : {}),
         ...(input.interrupted !== undefined ? { interrupted: input.interrupted } : {}),
       };
       try {

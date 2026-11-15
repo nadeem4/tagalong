@@ -20,10 +20,9 @@ afterEach(() => vi.useRealTimers());
 describe('readAloudEvent', () => {
   const voice = { enabled: true, voice: 'bm_fable', speed: 1.2 } as const;
 
-  it('asks for read-aloud with the chosen voice and speed when Scout talks is on', () => {
+  it('asks for read-aloud with the chosen speed when Scout talks is on', () => {
     expect(readAloudEvent(voice)).toEqual({
       on: true,
-      voice: 'bm_fable',
       speed: 1.2,
       system_voice: false,
     });

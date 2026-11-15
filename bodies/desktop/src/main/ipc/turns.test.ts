@@ -56,7 +56,7 @@ describe('registerTurnIpc', () => {
     expect(await invoke(IPC.ask, { petId: 'scout', text: 'hi', spoken: true })).toEqual({
       turnId: 't1',
     });
-    expect(said).toEqual([{ text: 'hi', spoken: true, voice: 'bm_george', speed: 0.95 }]);
+    expect(said).toEqual([{ text: 'hi', spoken: true, speed: 0.95 }]);
   });
 
   it('an interrupted ask carries it to the brain, and only that ask', async () => {
