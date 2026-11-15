@@ -209,11 +209,12 @@ def part_blocks(parts: list[Part]) -> list[dict[str, Any]]:
     return blocks
 
 
-SPOKEN_NOTE = (
-    "This reply will be read aloud, so write plain spoken sentences (no tables or code unless "
-    "asked). If the work will take a while, you may open with one short sentence in your own "
-    "words first."
-)
+@cache
+def ear_note() -> str:
+    """How to write a reply that is read aloud, and the `---` divider before the on-screen part.
+    Added to the user message, not the system prompt, so the cached system prompt is the same
+    for typed and spoken turns."""
+    return files("brain.mind").joinpath("ear.md").read_text(encoding="utf-8").strip()
 
 
 # Saved in place of a reply the owner spoke over, after the part they heard.
@@ -259,7 +260,7 @@ def check_part_sizes(parts: list[Part]) -> None:
             raise RpcError(ErrorCode.over_limit, "That attachment is too big to send.")
 
 
-def user_content(params: SayParams) -> list[dict[str, Any]]:
+def user_content(params: SayParams, read_aloud: bool = False) -> list[dict[str, Any]]:
     blocks: list[dict[str, Any]] = []
     if params.text:
         blocks.append(_text(params.text))
@@ -273,8 +274,6 @@ def user_content(params: SayParams) -> list[dict[str, Any]]:
         )
     if not blocks:
         raise ValueError("say has no content")
-    if params.spoken:
-        # Here, not in the system prompt, so the cached system prompt is the same for typed and
-        # spoken turns. An instruction to the model; code never speaks this line itself.
-        blocks.append(_text(SPOKEN_NOTE))
+    if params.spoken or read_aloud:
+        blocks.append(_text(ear_note()))
     return blocks
