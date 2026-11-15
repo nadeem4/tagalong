@@ -598,12 +598,15 @@ chunker, so the voice and the `text` of the frame are the words as said ("3:30" 
 Our own small ordered rules, no library; the order matters and `test_voice_ear_text.py` pins it:
 
 1. emoji dropped, and a bracketed aside (`(see below)`) dropped; a sentence left empty is not said
-2. ISO dates (`2026-11-14` is "November fourteenth, twenty twenty six"), then versions
-   (`v1.2.3` is "version one point two point three")
+2. ISO dates that are real days (`2026-11-14` is "November fourteenth, twenty twenty six";
+   `2026-02-30` is left as written), then versions (`v1.2.3` is "version one point two point
+   three"; after the word "Version" it is not said twice), then ranges (`10-20`, `3–5` is "to")
+   and a leading minus ("minus five"); longer digit runs such as phone numbers are left alone
 3. times (`3:30pm`, `9:00` is "nine o'clock", `14:05` is "fourteen oh five"), then money
-   (`$4.50` is "four dollars fifty"; pounds and euros too), then percent, then `km/h` and `mph`
+   (`$4.50` is "four dollars fifty", `$3.2B` is "three point two billion dollars"; pounds and
+   euros too; `k`, `M`, `B` and `bn` scale), then percent, then `km/h` and `mph`
 4. ordinals (`22nd`), then plain, comma-grouped and decimal numbers: words for 0 to 999,999, a year
-   style for 1900 to 2099 (`2026` is "twenty twenty six"), a `.` is "point" only between digits;
+   style for 1100 to 2099 ("eighteen fifty") (`2026` is "twenty twenty six"), a `.` is "point" only between digits;
    larger numbers and codes with a leading zero stay digits for the engine
 5. `e.g.`, `i.e.`, `etc.`, `vs.`, `Dr.`, `and/or`, arrows (`->`, `→` is "to") and `&` ("and")
 
@@ -619,6 +622,9 @@ the paragraph gap.
 To retune, edit the constants at the top of `shape.py` (`TRIM_LEVEL = 0.01`, `KEEP_MS = 20`,
 `FADE_MS = 8`, `GAP_MS = 180`, `PARAGRAPH_GAP_MS = 450`) and listen with
 `uv run python tests/voice_smoke.py` (hand run, it prints each chunk's duration).
+
+The text the model later sees as heard or unsaid is this ear text ("three thirty", not "3:30"), by
+design: it is what was said.
 
 ### How the brain learns a turn was spoken
 

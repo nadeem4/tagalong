@@ -7,6 +7,7 @@ numbers). Pure and idempotent on text that is already words.
 """
 
 import re
+from datetime import date
 
 _ONES = (
     "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen "
@@ -25,6 +26,7 @@ _ORDINAL_WORD = {
     "nine": "ninth",
     "twelve": "twelfth",
 }
+_SCALE = {"k": "thousand", "K": "thousand", "M": "million", "B": "billion", "bn": "billion"}
 _MAX_SPOKEN = 999_999  # larger numbers stay digits for the engine
 _CURRENCY = {"$": ("dollar", "dollars"), "£": ("pound", "pounds"), "€": ("euro", "euros")}
 _EMOJI = re.compile("[\U0001f000-\U0001faff☀-➿⬀-⯿️‍]")
@@ -68,8 +70,9 @@ def _year(n: int) -> str:
     return f"{_cardinal(head)} " + ("hundred" if tail == 0 else _two_digits(tail))
 
 
-def _number(text: str) -> str:
-    """A plain, comma-grouped or decimal number as words; digits again when too large."""
+def _number(text: str, year: bool = True) -> str:
+    """A plain, comma-grouped or decimal number as words; digits again when too large. A whole
+    number from 1100 to 2099 reads as a year unless `year` is off (an amount)."""
     whole, _, fraction = text.partition(".")
     comma = "," in whole
     digits = whole.replace(",", "")
@@ -78,7 +81,7 @@ def _number(text: str) -> str:
     n = int(digits)
     if n > _MAX_SPOKEN:
         spoken = digits
-    elif not comma and not fraction and 1900 <= n <= 2099:
+    elif year and not comma and not fraction and 1100 <= n <= 2099:
         spoken = _year(n)
     else:
         spoken = _cardinal(n)
@@ -89,13 +92,16 @@ def _number(text: str) -> str:
 
 def _date(m: re.Match) -> str:
     year, month, day = int(m[1]), int(m[2]), int(m[3])
-    if not (1 <= month <= 12 and 1 <= day <= 31):
-        return m[0]
+    try:
+        date(year, month, day)
+    except ValueError:
+        return m[0]  # not a real day: left as written
     return f"{_MONTHS[month - 1]} {_ordinal(day)}, {_number(str(year))}"
 
 
 def _version(m: re.Match) -> str:
-    return "version " + " point ".join(_cardinal(int(p)) for p in m[1].split("."))
+    # "Version v1.2" keeps its own word; a bare "v1.2" gets one.
+    return (m[1] or "version ") + " point ".join(_cardinal(int(p)) for p in m[2].split("."))
 
 
 def _time(m: re.Match) -> str:
@@ -108,19 +114,26 @@ def _time(m: re.Match) -> str:
 
 def _money(m: re.Match) -> str:
     one, many = _CURRENCY[m[1]]
-    amount = _number(m[2])
-    unit = one if m[2] == "1" else many
-    cents = int(m[3]) if m[3] else 0
-    return f"{amount} {unit}" + (f" {_two_digits(cents)}" if cents else "")
+    whole, fraction, scale = m[2], m[3] or "", m[4]
+    # Exactly two digits after a plain amount are cents; anything else is a decimal.
+    cents = len(fraction) == 2 and not scale
+    amount = _number(whole if cents or not fraction else f"{whole}.{fraction}", year=False)
+    spoken = f"{amount} {_SCALE[scale]}" if scale else amount
+    unit = one if whole == "1" and not fraction and not scale else many
+    tail = f" {_two_digits(int(fraction))}" if cents and int(fraction) else ""
+    return f"{spoken} {unit}{tail}"
 
 
 # Each rule is (pattern, replacement); applied in this order.
 _RULES: list[tuple[re.Pattern, object]] = [
     (re.compile(r"\s*\([^)]*\)"), ""),  # a bracketed aside is for the eye
     (re.compile(r"(?<!\d)(\d{4})-(\d{2})-(\d{2})(?!\d)"), _date),
-    (re.compile(r"(?<![A-Za-z0-9])v(\d+(?:\.\d+)+)(?![A-Za-z0-9])"), _version),
+    (re.compile(r"(?<!\w)([Vv]ersion\s+)?v(\d+(?:\.\d+)+)(?!\w|\.\w)"), _version),
+    # 10-20 is a range; longer runs of digits (phone numbers, codes) are left alone.
+    (re.compile(r"(?<![\w-])(\d{1,3})\s?[-–]\s?(\d{1,3})(?![\w-])"), lambda m: f"{m[1]} to {m[2]}"),
+    (re.compile(r"(?<!\w)[-−](?=\d)"), "minus "),
     (re.compile(r"(?<!\d)(\d{1,2}):(\d{2})(?:\s?([AaPp])[Mm])?(?![A-Za-z0-9])"), _time),
-    (re.compile(r"([$£€])(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?(?!\d)"), _money),
+    (re.compile(r"([$£€])(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?(k|K|M|B|bn)?(?![\w])"), _money),
     (re.compile(r"(\d[\d,]*(?:\.\d+)?)%"), lambda m: f"{_number(m[1])} percent"),
     (
         re.compile(r"(\d+(?:\.\d+)?)\s?(km/h|mph)"),
@@ -131,7 +144,9 @@ _RULES: list[tuple[re.Pattern, object]] = [
         lambda m: _ordinal(int(m[1])) if int(m[1]) <= _MAX_SPOKEN else m[0],
     ),
     (
-        re.compile(r"(?<![A-Za-z0-9.])(\d{1,3}(?:,\d{3})+|\d+)((?:\.\d+)?)(?![A-Za-z0-9])"),
+        re.compile(
+            r"(?<![\w.:])(?<!\d-)(?<![A-Za-z]-)(\d{1,3}(?:,\d{3})+|\d+)((?:\.\d+)?)(?![A-Za-z0-9])(?!\.\d|:\d|-\d)"
+        ),
         lambda m: _number(m[1] + m[2]),
     ),
     (re.compile(r"(?<!\w)e\.g\."), "for example"),

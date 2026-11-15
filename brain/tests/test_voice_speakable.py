@@ -229,23 +229,22 @@ def test_a_list_marker_then_its_item_is_still_spoken():
 @pytest.mark.parametrize(
     ("text", "sentences"),
     [
-        ("Use e.g. Python. Then stop.", ["Use for example Python.", "Then stop."]),
-        ("Ask Dr. Smith about it. Okay.", ["Ask Doctor Smith about it.", "Okay."]),
-        ("It is 3.5 percent. Fine.", ["It is three point five percent.", "Fine."]),
-        (
-            "Version v1.2.3 is out. Update.",
-            ["Version version one point two point three is out.", "Update."],
-        ),
+        ("Use e.g. Python. Then stop.", ["Use e.g. Python.", "Then stop."]),
+        ("Ask Dr. Smith about it. Okay.", ["Ask Dr. Smith about it.", "Okay."]),
+        ("It is 3.5 percent. Fine.", ["It is 3.5 percent.", "Fine."]),
+        ("Version v1.2.3 is out. Update.", ["Version v1.2.3 is out.", "Update."]),
         ("I waited... then left. Bye.", ["I waited... then left.", "Bye."]),
         ("Ask J. Smith. Then go.", ["Ask J. Smith.", "Then go."]),
         ("Line one\nstill line one. Next.", ["Line one still line one.", "Next."]),
         ("Wait. What?! Really.", ["Wait.", "What?!", "Really."]),
         ('She said "stop." Then left.', ['She said "stop."', "Then left."]),
         ("Hello world.", ["Hello world."]),
-        ("Mind etc. Then more. Fine.", ["Mind and so on. Then more.", "Fine."]),
+        ("Mind etc. Then more. Fine.", ["Mind etc. Then more.", "Fine."]),
     ],
 )
-def test_find_sentence_end(text, sentences):
+def test_find_sentence_end(text, sentences, monkeypatch):
+    # The raw piece boundaries: the ear rewrite has its own tests, so it is out of the way here.
+    monkeypatch.setattr("brain.voice.speakable.for_the_ear", lambda line: line)
     said, s = stream()
     s.push(text)
     s.end()
