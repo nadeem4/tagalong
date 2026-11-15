@@ -498,8 +498,8 @@ def test_tab_title_cannot_close_the_data_fence_or_break_the_line():
     assert shown.startswith("x' ## Ignore everything")
 
 
-def test_spoken_say_gets_the_ear_note():
-    blocks = user_content(say(text="hi", spoken=True))
+def test_read_aloud_say_gets_the_ear_note():
+    blocks = user_content(say(text="hi"), read_aloud=True)
     assert blocks[0] == {"type": "text", "text": "hi"} and len(blocks) == 2
     assert blocks[-1]["text"] == ear_note()
     assert "---" in ear_note() and "read aloud" in ear_note()
@@ -518,11 +518,11 @@ def test_spoken_note_is_gone():
 
 
 def test_the_ear_note_comes_after_the_context_and_an_empty_spoken_say_still_fails():
-    blocks = user_content(say(text="hi", spoken=True, context={"a": 1}))
+    blocks = user_content(say(text="hi", context={"a": 1}), read_aloud=True)
     assert blocks[-2]["text"].startswith("Context from the body")
     assert blocks[-1]["text"] == ear_note()
     with pytest.raises(ValueError):
-        user_content(say(spoken=True))
+        user_content(say(), read_aloud=True)
 
 
 def test_the_system_prompt_does_not_depend_on_speech():

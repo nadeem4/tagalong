@@ -2383,7 +2383,10 @@ this]` (`Memory.replace_last_message` rewrites the cut turn's message), never th
   `Session._wants_speech` (a voice exists, the user spoke or the body asked for read-aloud, and the
   body has not turned it off): `say` adds the guide through `user_content(params, read_aloud=...)`
   and `_start_wake` appends it to a wake turn, so a typed turn on a read-aloud body and a
-  brain-started remark get it as a spoken `say` does. Code never says the opening sentence, there
+  brain-started remark get it as a spoken `say` does. `user_content` adds the guide on
+  `read_aloud` alone (`say` decides it at say time, speech is decided at turn start, so a toggle in
+  between can differ). If the body's `read_aloud` event arrives after a wake turn began, the guide
+  is queued in the session inbox and the next step carries it. Code never says the opening sentence, there
   is no canned line and no earcon. It sits in the user content rather than the system prompt so
   the cached system prompt is the same for typed and spoken turns. It is an instruction to the
   model and not guaranteed. See [Say and show](voice.md#say-and-show).

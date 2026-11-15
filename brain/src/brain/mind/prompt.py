@@ -274,6 +274,6 @@ def user_content(params: SayParams, read_aloud: bool = False) -> list[dict[str, 
         )
     if not blocks:
         raise ValueError("say has no content")
-    if params.spoken or read_aloud:
+    if read_aloud:
         blocks.append(_text(ear_note()))
     return blocks

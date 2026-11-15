@@ -441,11 +441,10 @@ class Session:
         shown_on: str | None = body_id
         if sender is not None and sender.display is False:
             shown_on = self._display_target()  # its answer must appear where someone can see it
-        # The ear guide follows the same rule as the voice, so a silenced body never gets it.
-        # `spoken` is cleared because the guide is added here, once, by that rule.
+        # The guide is decided here, at say time, and speech at turn start, so a read-aloud toggle
+        # in between can make them differ.
         content = user_content(
-            params.model_copy(update={"spoken": False}),
-            read_aloud=self._wants_speech(shown_on, params),
+            params, read_aloud=self._wants_speech(shown_on, params)
         )  # may raise ValueError before anything changes
         if not (sender is not None and sender.display is False):
             self._last_body = body_id
@@ -767,6 +766,7 @@ class Session:
         for read-aloud; on that body only, because speech never goes to a body that did not
         display the turn. A body that turned read-aloud off silences everything, spoken or not.
         `params` is None for a turn the brain started."""
+        # The first three checks are for type narrowing; `_wants_speech` holds the rule.
         if turn is None or shown_on is None or self.voice is None:
             return
         if not self._wants_speech(shown_on, params):
@@ -808,6 +808,8 @@ class Session:
                 and self._turn_id not in self._spoken
             ):
                 self._speak(self._turn_id, body_id, None)
+                if self._inbox_open:  # the wake began without the guide; the next step gets it
+                    self._inbox.append([{"type": "text", "text": ear_note()}])
             return
         if name == "reading":  # a status of the body for Home, not something that happened
             try:

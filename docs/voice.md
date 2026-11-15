@@ -496,7 +496,8 @@ the spoken part comes first, and a line that is exactly `---` (a rule, with a bl
 after) ends it. Everything after is the on-screen part. `SpokenStream` (`speakable.py`) says only
 the text before the divider, so speech starts at the first sentence and never reads the on-screen
 part. The divider stays in the stored text, so the chat keeps both parts and the bubble draws a
-horizontal rule between them with no body change. With no divider the whole reply is spoken; a
+horizontal rule between them with no body change. The blank line before the divider matters:
+without it Markdown renders the spoken part above as a heading. With no divider the whole reply is spoken; a
 divider with nothing before it says nothing at all. A second divider changes nothing, and a `---`
 inside a sentence (`5---6`) is not a divider, only a line of its own is.
 

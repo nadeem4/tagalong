@@ -4,6 +4,8 @@ A spoken say, a typed say on a body that asked for read-aloud, and a brain-start
 carry the guide; a silenced or unread turn does not. Fake model, voice and bodies only.
 """
 
+import asyncio
+
 from test_sessions import (
     Gate,
     RecordingVoice,
@@ -13,6 +15,7 @@ from test_sessions import (
     make,
     read_aloud,
     say,
+    settle,
     spoken_say,
 )
 
@@ -85,3 +88,17 @@ async def test_a_wake_turn_that_is_not_read_aloud_carries_no_note():
     session.body_event("desktop", "back", {"idle_seconds": 600})
     await idle(session)
     assert not has_note(model)
+
+
+async def test_read_aloud_arriving_mid_wake_turn_sends_the_note_with_the_next_step():
+    gate = asyncio.Event()
+    model = Gate([gate, "welcome back", "again"])
+    session, _ = make(model, kinds=None)
+    session.voice = RecordingVoice()
+    join(session, "desktop")
+    session.body_event("desktop", "back", {"idle_seconds": 600})
+    await settle()
+    read_aloud(session)  # arrives after the connect wake began
+    gate.set()
+    await idle(session)
+    assert any(has_note(model, i) for i in range(len(model.seen)))

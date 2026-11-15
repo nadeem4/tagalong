@@ -144,5 +144,5 @@ class SpokenStream:
 
     def _speak(self, piece: str) -> None:
         line = to_speakable(piece)
-        if line:
+        if re.search(r"\w", line):  # a lone "-" or "--" is no speech
             self._say(line)

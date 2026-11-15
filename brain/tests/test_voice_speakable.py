@@ -205,3 +205,26 @@ def test_lead_in_then_divider_in_a_later_step():
         s.push(delta)
     s.end()
     assert said == ["Let me check.", "It is green."]
+
+
+def test_a_divider_at_the_very_end_says_only_the_spoken_part():
+    said, s = stream()
+    s.push("Hi.\n\n---")
+    s.end()
+    assert said == ["Hi."]
+
+
+@pytest.mark.parametrize("tail", ["--", "-"])
+def test_a_half_divider_at_the_end_is_not_said(tail):
+    said, s = stream()
+    s.push(f"Hi.\n\n{tail}")
+    s.end()
+    assert said == ["Hi."]
+
+
+def test_a_list_marker_then_its_item_is_still_spoken():
+    said, s = stream()
+    s.push("- ")
+    s.push("apples\n")
+    s.end()
+    assert said == ["apples"]
