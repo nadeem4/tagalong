@@ -3,10 +3,14 @@
 The server routes `listen`, `mic`, `unlisten` and `hush` here; the session reports spoken turns
 (`spoken`, `reply`, `turn_ended`), asks for a turn's `sentences` and, for an interjection, takes
 the queue (`speaking`, `pause`, `replace`, `resume`);
-Home asks for a `sample`. Neither knows about models.
+Home asks for a `sample`, and picks a voice (`choose_voice`). Neither knows about models.
 """
 
 from typing import Literal, Protocol
+
+
+class NoSample(Exception):
+    """The voice is not installed and has no release clip: Home's Play has nothing to say."""
 
 
 class VoiceHooks(Protocol):
@@ -25,7 +29,13 @@ class VoiceHooks(Protocol):
         ...
 
     def voice_download(self) -> dict:
-        """`{"status": idle|downloading|ready|failed, "progress": 0..1}` for Home's status line."""
+        """`{"voice": id, "status": idle|downloading|ready|failed, "progress": 0..1}` for Home's
+        status line."""
+        ...
+
+    def choose_voice(self, voice_id: str) -> None:
+        """Home picked a voice: it loads in the background (latest pick only) and is used from
+        the next chunk; speech goes on in the ready voice meanwhile."""
         ...
 
     def mic(self, body_id: str, pcm: bytes) -> None: ...
@@ -38,7 +48,6 @@ class VoiceHooks(Protocol):
         self,
         turn: str,
         body_id: str,
-        voice: str | None,
         speed: float | None,
         system_voice: bool = False,
     ) -> None: ...
@@ -64,4 +73,4 @@ class VoiceHooks(Protocol):
         None when the turn is gone."""
         ...
 
-    async def sample(self, text: str, voice: str | None, speed: float | None) -> bytes: ...
+    async def sample(self, voice_id: str, speed: float | None) -> bytes: ...

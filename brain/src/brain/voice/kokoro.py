@@ -11,7 +11,6 @@ from typing import Protocol
 
 import numpy as np
 
-from brain.voice.models import KOKORO_FILES
 from brain.voice.tts import TtsVoice
 
 FALLBACK_VOICE = "bm_george"
@@ -40,11 +39,6 @@ def _build(model: Path, voices: Path) -> Adapter:
     from kokoro_onnx import Kokoro
 
     return Adapter(Kokoro(str(model), str(voices)))
-
-
-def load(folder: Path) -> Adapter:
-    model, voices = (folder / f.path for f in KOKORO_FILES)
-    return _build(model, voices)
 
 
 def load_row(voice: TtsVoice, folder: Path) -> Adapter:

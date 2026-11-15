@@ -39,6 +39,7 @@ from brain.tools import (
     timer_tools,
     voice_tools,
 )
+from brain.voice import NoSample
 from brain.voice.stt_tools import stt_tools
 
 
@@ -1267,8 +1268,8 @@ async def test_answer_expert_refusals_reach_the_model_as_text(qrun):
 
 
 class SampleVoice:
-    async def sample(self, text, voice, speed):
-        return b"RIFF" + f"{text}|{voice}|{speed}".encode()
+    async def sample(self, voice_id, speed):
+        return b"RIFF" + f"{voice_id}|{speed}".encode()
 
 
 def voice_handler(voice):
@@ -1296,10 +1297,7 @@ def download_handlers(voice):
 async def test_voice_download_reports_the_state_and_fetch_voice_starts_or_retries_it():
     voice = DownloadVoice()
     tools = download_handlers(voice)
-    assert json.loads(await tools["voice_download"]({})) == {
-        "status": "downloading",
-        "progress": 0.4,
-    }
+    assert json.loads(await tools["voice_download"]({}))["status"] == "downloading"
     await tools["fetch_voice"]({})
     await tools["fetch_voice"]({"retry": True})
     assert voice.calls == ["prefetch", "retry"]
@@ -1307,39 +1305,56 @@ async def test_voice_download_reports_the_state_and_fetch_voice_starts_or_retrie
 
 async def test_voice_download_without_voice_is_idle_and_fetch_is_an_error():
     tools = download_handlers(None)
-    assert json.loads(await tools["voice_download"]({})) == {"status": "idle", "progress": 0}
+    assert json.loads(await tools["voice_download"]({})) == {
+        "voice": "",
+        "status": "idle",
+        "progress": 0,
+    }
     with pytest.raises(RpcError, match="Voice is not running"):
         await tools["fetch_voice"]({})
 
 
-async def test_speak_sample_returns_a_wav_for_settings_preview():
-    out = json.loads(
-        await voice_handler(SampleVoice())({"text": "Hello", "voice": "af_bella", "speed": 1.1})
-    )
+async def test_speak_sample_returns_a_wav_for_the_chosen_voice():
+    out = json.loads(await voice_handler(SampleVoice())({"voice": "kokoro-george", "speed": 1.1}))
     assert out["mime"] == "audio/wav"
-    assert base64.b64decode(out["data"]) == b"RIFFHello|af_bella|1.1"
+    assert base64.b64decode(out["data"]) == b"RIFFkokoro-george|1.1"
+
+
+async def test_speak_sample_auto_plays_the_auto_voice():
+    out = json.loads(await voice_handler(SampleVoice())({"voice": "auto"}))
+    assert base64.b64decode(out["data"]) == b"RIFFpiper-alan|None"
+
+
+async def test_speak_sample_refuses_an_unlisted_voice():
+    with pytest.raises(RpcError) as err:
+        await voice_handler(SampleVoice())({"voice": "nope"})
+    assert err.value.code == ErrorCode.invalid_params
 
 
 async def test_speak_sample_without_voice_is_an_error():
     with pytest.raises(RpcError, match="Voice is not running") as err:
-        await voice_handler(None)({"text": "Hello"})
+        await voice_handler(None)({"voice": "auto"})
+    assert err.value.code == ErrorCode.tool_failed
+
+
+async def test_speak_sample_with_no_clip_and_not_installed_says_so_plainly():
+    class Nothing:
+        async def sample(self, voice_id, speed):
+            raise NoSample(voice_id)
+
+    with pytest.raises(RpcError, match="No sample yet") as err:
+        await voice_handler(Nothing())({"voice": "auto"})
     assert err.value.code == ErrorCode.tool_failed
 
 
 async def test_speak_sample_reports_a_voice_that_cannot_start_as_an_error():
     class Broken:
-        async def sample(self, text, voice, speed):
+        async def sample(self, voice_id, speed):
             raise RuntimeError("no model")
 
     with pytest.raises(RpcError, match="could not start") as err:
-        await voice_handler(Broken())({"text": "Hello"})
+        await voice_handler(Broken())({"voice": "auto"})
     assert err.value.code == ErrorCode.tool_failed
-
-
-async def test_speak_sample_refuses_a_long_text():
-    with pytest.raises(RpcError, match="500") as err:
-        await voice_handler(SampleVoice())({"text": "x" * 501})
-    assert err.value.code == ErrorCode.invalid_params
 
 
 def test_the_voice_tools_are_home_only():

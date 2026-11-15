@@ -858,9 +858,11 @@ so there is one gate and no second path.
 | `spend_today`      | `{}`                                           | `{"spent_usd": float, "limit_usd": float}`                                                                                                                                                                                                                                                  |
 | `list_permissions` | `{}`                                           | `{"tools": [{"name", "description", "title", "line", "info", "group", "effect", "mode", "locked", "self_asks", "person_only", "server_tool", "online", "source", "source_name"}], "groups": [{"id", "title", "note"}]}`, sorted by name, Scout tools only; `mode` is `off`, `ask` or `auto` |
 | `set_permission`   | `{"tool": str, "mode": str}`                   | `{"tool", "mode"}`; `mode` is `off`, `ask` or `auto` (`off` works while the body is offline)                                                                                                                                                                                                |
-| `voice_download`   | `{}`                                           | `{"status": "idle"\|"downloading"\|"ready"\|"failed", "progress": 0..1}`, how far Scout's speaking voice has got (see [Brain mouth](#brain-mouth))                                                                                                                                          |
+| `voice_download`   | `{}`                                           | `{"voice": id, "status": "idle"\|"downloading"\|"ready"\|"failed", "progress": 0..1}`, how far the chosen speaking voice has got (see [Brain mouth](#brain-mouth))                                                                                                                          |
 | `fetch_voice`      | `{"retry?": bool}`                             | the same state; starts the voice and listening-model fetch in the background (`retry: true` after a failure)                                                                                                                                                                                |
-| `speak_sample`     | `{"text", "voice?", "speed?"}`                 | `{"mime": "audio/wav", "data": base64}`, for Settings' Preview (see [Brain mouth](#brain-mouth))                                                                                                                                                                                            |
+| `tts_state`        | `{}`                                           | `{"chosen", "resolved", "voices": [{"id", "label", "descriptor", "engine", "size_mb", "licence", "installed", "sample"}], "download"}`; `chosen` is `auto` or a voice id, `resolved` the id Auto stands for (see [Brain mouth](#brain-mouth))                                               |
+| `set_tts`          | `{"voice": str}`                               | `{"chosen", "resolved"}`; saves the pick (`tts_voice`), starts loading it and sends `changed {what: "tts"}`; an unlisted id is `invalid_params`                                                                                                                                             |
+| `speak_sample`     | `{"voice": str, "speed?"}`                     | `{"mime": "audio/wav", "data": base64}` of the sample text, for the voice list's Play (see [Brain mouth](#brain-mouth))                                                                                                                                                                     |
 | `list_jobs`        | `{}`                                           | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Home only, Scout reads `work_status`                                                                                                                                                                               |
 | `stop_job`         | `{"job": str, "part?": str}`                   | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                                                                                                                                                                                          |
 | `timers_state`     | `{}`                                           | `{"timers": [{id, note, next_at, repeat_minutes, pending}]}`, soonest first; Home only                                                                                                                                                                                                      |
@@ -2325,8 +2327,9 @@ brain sends and falls back to the system voice for a text-only `speech` frame.
   read-aloud on while a turn is already running on that body (a connect wake), that turn starts
   speaking then. A typed `say` that joins a turn re-arms speech after a hush, as a spoken one does.
   A bad event shape is ignored. With `system_voice` the turn is
-  spoken with text-only `speech` frames and `Mouth` never loads Kokoro. `say` may carry `voice` (a Kokoro voice id, default `bm_george`) and `speed`
-  (default 1.0); an unknown voice id speaks with `bm_george`.
+  spoken with text-only `speech` frames and `Mouth` never loads a voice. `say` may carry `speed`
+  (default 1.0). The voice is the brain's own choice (`tts_voice`), never the body's: a `voice`
+  field an older body sends is ignored.
 - **Sentences and chunks.** `voice/speakable.py` turns the streamed reply into sentences: fenced
   code, table rows, `>` quotes and bare URLs are left out, list markers and Markdown dropped,
   nothing is added or cut. Nothing after a line of exactly `---` is said (the divider, see
@@ -2405,16 +2408,27 @@ this]` (`Memory.replace_last_message` rewrites the cut turn's message), never th
   (`ears_fetcher` in `voice/load.py`: the ONNX files, the chosen live and final files, and the NVIDIA
   libraries only when a card needs them; no model is loaded into memory until somebody listens; a
   failure there is one warning; the next listen downloads again). `close()` cancels it. Nothing waits on it. `Mouth.download` is
-  `{status: idle | downloading | ready | failed, progress}`; each change, at most one per 2%, calls
+  `{voice, status: idle | downloading | ready | failed, progress}`; each change, at most one per 2%, calls
   `on_download`, which `main.py` turns into `changed {what: "voice_download"}` (no new contract frame),
   and Home reads it with `voice_download`. Until `ready`, `_say` sends text-only `speech` frames (the
   body's system voice); the voice is looked at again for every sentence, so Kokoro takes over from the
   next sentence, never mid-sentence. A failure keeps the system voice working and shows `failed`;
   `fetch_voice {retry: true}` (Settings' Try again) clears it and loads again.
-- **Settings Preview.** The Home tool `speak_sample {text, voice?, speed?}` returns a text part
-  holding the JSON `{"mime": "audio/wav", "data": <base64>}` (Home calls answer in text). It
-  fails with `RpcError` `tool_failed` when voice is off or cannot start, and `invalid_params`
-  when `text` is over 500 characters.
+- **The chosen voice.** `voice/tts_choice.py` keeps the pick in the `tts_voice` setting (`auto`
+  or a roster id; a stale id reads as Auto). `Mouth` takes it through `chosen()` and loads the pick in
+  the background, latest pick only: a newer pick cancels the older load (its `.part` file goes with
+  it). The voice is fixed per chunk, so a pick takes effect at the next chunk, never inside one;
+  until it is ready chunks go on in the most recently ready voice, and with none ready (first run,
+  offline) they go out as text only, said in the body's system voice. A chunk the voice cannot say
+  (an odd character) goes out as text and the turn's speech goes on. `tts_state` and `set_tts`
+  (`voice/tts_tools.py`, Home only) read and change the pick; `installed` there is a read-only
+  size-and-hash check of the files on disk.
+- **Play before download.** The Home tool `speak_sample {voice, speed?}` returns a text part
+  holding the JSON `{"mime": "audio/wav", "data": <base64>}` (Home calls answer in text) of
+  `SAMPLE_TEXT`. An installed voice speaks it live; otherwise the row's release clip is fetched once
+  (size and sha256 checked) into the voice folder and served from there, so Play works offline
+  afterwards. No clip and not installed is `tool_failed` "No sample yet." (every row's `sample` is
+  `null` until the clips are uploaded); an unlisted id is `invalid_params`.
 - **Models.** Kokoro v1.0 int8 (about 88 MB) and its voices file (about 27 MB), pinned to the
   `kokoro-onnx` release `model-files-v1.0` with a size and SHA-256, in
   `<TAGALONG_HOME>/voice/tts/kokoro/`, downloaded with the same checked download as the
@@ -2422,8 +2436,8 @@ this]` (`Memory.replace_last_message` rewrites the cut turn's message), never th
   setting.
 - **Voice roster.** `voice/tts_models.json` lists the voices (Piper, Kokoro, Supertonic), loaded by
   `voice/tts.py` (which also holds the `Tts` protocol); `voice/tts_engines.py` maps each engine to
-  its adapter (`kokoro.py`, `piper.py`, `supertonic.py`). Nothing chooses a voice yet: the mouth
-  still loads Kokoro. See [voice.md](voice.md#voices).
+  its adapter (`kokoro.py`, `piper.py`, `supertonic.py`). The mouth loads the one Home chose (see
+  above). See [voice.md](voice.md#voices).
 - **Hand check.** `cd brain && uv run python tests/voice_smoke.py [DATA_DIR] [OUT_DIR]` runs every
   roster voice once and prints load time, time per sentence and the real-time factor (not part of
   `pytest`); `tools/voice_samples.py` makes the sample clips.

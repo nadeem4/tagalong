@@ -17,7 +17,8 @@ import numpy as np
 from brain.telemetry import timed
 from brain.voice.ears import FRAME, Ears, EarsParts
 from brain.voice.models import ModelIntegrityError
-from brain.voice.mouth import LoadTts, Mouth
+from brain.voice.mouth import Clip, LoadTts, Mouth
+from brain.voice.tts import TtsVoice, voice_by_id
 
 log = logging.getLogger("brain")
 
@@ -79,13 +80,16 @@ class VoiceService:
         bodies: _Sender,
         load_ears: LoadEars,
         load_tts: LoadTts,
+        chosen: Callable[[], TtsVoice],
         fetch_ears: Callable[[], Awaitable[None]] | None = None,
+        installed: Callable[[TtsVoice], bool] = lambda _v: False,
+        clip: Clip | None = None,
     ) -> None:
         self._bodies = bodies
         self._load_ears = load_ears
         self._fetch_ears = fetch_ears
         self._prefetching: asyncio.Task | None = None
-        self._mouth = Mouth(bodies, load_tts)
+        self._mouth = Mouth(bodies, load_tts, chosen, installed, clip)
         self._sessions: dict[str, _Session] = {}
         self._parts: EarsParts | None = None
         self._loading: asyncio.Task | None = None
@@ -131,6 +135,10 @@ class VoiceService:
     def voice_download(self) -> dict:
         return dict(self._mouth.download)
 
+    def choose_voice(self, voice_id: str) -> None:
+        if (voice := voice_by_id(voice_id)) is not None:
+            self._mouth.choose(voice)
+
     def follow_download(self, on_change: Callable[[], None]) -> None:
         self._mouth.on_download = on_change
 
@@ -167,11 +175,10 @@ class VoiceService:
         self,
         turn: str,
         body_id: str,
-        voice: str | None,
         speed: float | None,
         system_voice: bool = False,
     ) -> None:
-        self._mouth.spoken(turn, body_id, voice, speed, system_voice)
+        self._mouth.spoken(turn, body_id, speed, system_voice)
 
     def reply(self, turn: str, body_id: str | None, params: dict) -> None:
         self._mouth.reply(turn, params)
@@ -194,8 +201,8 @@ class VoiceService:
     def replace(self, turn: str, body_id: str, text: str) -> str | None:
         return self._mouth.replace(turn, body_id, text)
 
-    async def sample(self, text: str, voice: str | None, speed: float | None) -> bytes:
-        return await self._mouth.sample(text, voice, speed)
+    async def sample(self, voice_id: str, speed: float | None) -> bytes:
+        return await self._mouth.sample(voice_id, speed)
 
     def _send(self, session: _Session, method: str, params: dict) -> None:
         if session.live:

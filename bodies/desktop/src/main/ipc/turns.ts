@@ -19,7 +19,7 @@ interface TurnIpcDeps {
   status: () => BrainStatus;
   /** Stops Scout's speech everywhere: a cancelled turn does not hush its own. */
   stopVoice: () => void;
-  /** Scout talks: on or off, which voice, how fast. Rides on each spoken ask. */
+  /** Scout talks: on or off, how fast. Rides on each spoken ask. */
   voice: () => { enabled: boolean; voice: string; speed: number };
   /** The snapshot the last hotkey captured, sent with the ask. */
   pendingSnapshot: () => ContextSnapshot | null;
@@ -68,7 +68,7 @@ export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
         text: input.text ?? '',
         ...(parts.length > 0 ? { parts } : {}),
         ...(windowTitle !== undefined ? { context: { window: windowTitle } } : {}),
-        ...(spoken ? { spoken: true, voice: voice.voice, speed: voice.speed } : {}),
+        ...(spoken ? { spoken: true, speed: voice.speed } : {}),
         ...(input.interrupted !== undefined ? { interrupted: input.interrupted } : {}),
       };
       try {

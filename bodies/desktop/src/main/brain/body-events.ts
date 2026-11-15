@@ -13,14 +13,13 @@ import type { Settings } from '../../shared/settings';
 import { chosenMouth } from '../../shared/voice';
 
 /**
- * The `read_aloud` event data: Scout talks, the voice and speed, and whether the system voice
+ * The `read_aloud` event data: Scout talks, how fast, and whether the system voice
  * was picked (the brain then sends text only and never loads its own voice). Sent on every
  * connect and whenever these settings change.
  */
 export function readAloudEvent(voice: Settings['voice']): ReadAloudEventData {
   return {
     on: voice.enabled,
-    voice: voice.voice,
     speed: voice.speed,
     system_voice: chosenMouth(voice) === 'system',
   };

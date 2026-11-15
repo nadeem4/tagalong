@@ -817,10 +817,10 @@ describe('voice', () => {
     await expect(client.listen('held')).rejects.toBeInstanceOf(BrainOffline);
   });
 
-  it('say carries voice and speed', async () => {
+  it('say carries speed', async () => {
     const { client, s } = await online();
-    void client.say({ text: 'hi', spoken: true, voice: 'bm_george', speed: 1.2 });
-    expect(s.sent[1]!.params).toEqual({ text: 'hi', spoken: true, voice: 'bm_george', speed: 1.2 });
+    void client.say({ text: 'hi', spoken: true, speed: 1.2 });
+    expect(s.sent[1]!.params).toEqual({ text: 'hi', spoken: true, speed: 1.2 });
   });
 });
 

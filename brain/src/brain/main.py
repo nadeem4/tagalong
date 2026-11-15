@@ -62,8 +62,8 @@ from brain.setup.why import WhyPick
 from brain.store.work import WorkStore
 from brain.telemetry import LoopLagMonitor, dump_timings
 from brain.tools import KeySettings, anthropic_check, brain_status_tools
-from brain.voice import stt_choice
-from brain.voice.load import ears_fetcher, ears_loader, tts_loader
+from brain.voice import stt_choice, tts_choice
+from brain.voice.load import ears_fetcher, ears_loader, tts_clip, tts_installed, tts_loader
 from brain.voice.service import VoiceService
 
 log = logging.getLogger("brain")
@@ -271,6 +271,7 @@ async def _run() -> None:
         keys=keys,
         model_default=config.model,
         stt_default=(config.stt_live, config.stt_final),
+        voice_dir=config.data_dir / "voice",
         setup_facts=partial(setup_facts, registry, inspect_machine),
         extra_tools=setup_tools(config.data_dir, registry, inspect_machine)
         + expert_tools
@@ -315,12 +316,15 @@ async def _run() -> None:
             lambda: (stt_choice.saved_live(memory.db), stt_choice.saved_final(memory.db)),
         ),
         tts_loader(config.data_dir),
+        lambda: tts_choice.resolved(memory.db),
         ears_fetcher(
             config.data_dir,
             config.stt_live,
             config.stt_final,
             lambda: (stt_choice.saved_live(memory.db), stt_choice.saved_final(memory.db)),
         ),
+        tts_installed(config.data_dir),
+        tts_clip(config.data_dir),
     )
     session.voice = voice
     voice.follow_speech(session.dispatcher.set_mouth_state)

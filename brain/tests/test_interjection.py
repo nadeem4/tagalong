@@ -18,6 +18,7 @@ import brain.sessions as sessions_module
 from brain.events import Event, EventKind
 from brain.mind.turn import Final
 from brain.voice.mouth import Mouth
+from brain.voice.tts import voice_by_id
 
 KINDS = {"nudge": EventKind("nudge", urgency="next_pause", batch_seconds=0, max_per_hour=10)}
 # Each is a chunk of its own: the first is a whole sentence, the others are at the chunk target.
@@ -59,13 +60,13 @@ class MouthVoice:
     def __init__(self):
         self.bodies = Bodies()
 
-        async def load():
+        async def load(voice, on_progress):
             return FakeTts()
 
-        self.mouth = Mouth(self.bodies, load)
+        self.mouth = Mouth(self.bodies, load, lambda: voice_by_id("piper-alan"))
 
-    def spoken(self, turn, body_id, voice, speed, system_voice=False):
-        self.mouth.spoken(turn, body_id, voice, speed, system_voice)
+    def spoken(self, turn, body_id, speed, system_voice=False):
+        self.mouth.spoken(turn, body_id, speed, system_voice)
 
     def reply(self, turn, body_id, params):
         self.mouth.reply(turn, params)

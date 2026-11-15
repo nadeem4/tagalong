@@ -14,6 +14,7 @@ import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import ValidationError
@@ -112,6 +113,7 @@ from brain.tools import (
 )
 from brain.voice import VoiceHooks
 from brain.voice.stt_tools import stt_tools
+from brain.voice.tts_tools import tts_tools
 from brain.web_tools import WebSource, without_server_blocks, without_thinking
 
 log = logging.getLogger("brain")
@@ -165,6 +167,7 @@ class Session:
         keys: KeySettings | None = None,
         model_default: str = DEFAULT_MODEL_ID,  # TAGALONG_MODEL; a saved choice overrides it
         stt_default: tuple[str | None, str | None] = (None, None),  # TAGALONG_STT_LIVE, _FINAL
+        voice_dir: Path = Path("voice"),  # <TAGALONG_HOME>/voice, where voices are installed
         extra_tools: list[tuple[ToolSpec, Handler]] | None = None,
         setup_facts: Callable[[], Awaitable[dict]] | None = None,
         preview_chars: int = DEFAULT_TOOL_PREVIEW_CHARS,
@@ -318,6 +321,7 @@ class Session:
             + model_tools(memory.db, model_default, notify)
             + voice_tools(lambda: self.voice)
             + stt_tools(memory.db, stt_default, notify, lambda: self.voice and self.voice.reload())
+            + tts_tools(memory.db, notify, self._pick_voice, voice_dir, self._voice_download)
             + expert_tools(self.jobs, self.owner_turn)
             + work_tools(self.records.work, self.jobs, timers.changed)
             + timer_tools(self.records, timers, now)
@@ -751,6 +755,16 @@ class Session:
         notify("turn", started)
         notify("turn", {"turn": turn_id, "body": body_id, "state": "ended", "reason": "cancelled"})
 
+    def _pick_voice(self, voice_id: str) -> None:
+        """Home chose a voice: the mouth switches at the next chunk, fetching it if needed."""
+        if self.voice is not None:
+            self.voice.choose_voice(voice_id)
+
+    def _voice_download(self) -> dict:
+        if self.voice is None:
+            return {"voice": "", "status": "idle", "progress": 0.0}
+        return self.voice.voice_download()
+
     def _wants_speech(self, shown_on: str | None, params: SayParams | None) -> bool:
         """Whether a turn shown on `shown_on` is read aloud: a voice exists, and the user spoke or
         the body asked for read-aloud. A body that turned read-aloud off silences everything."""
@@ -772,14 +786,13 @@ class Session:
         if not self._wants_speech(shown_on, params):
             return
         ask = self._read_aloud.get(shown_on)
-        voice, speed = (ask.voice, ask.speed) if ask else (None, None)
-        if params is not None:
-            voice = params.voice if params.voice is not None else voice
-            speed = params.speed if params.speed is not None else speed
+        speed = ask.speed if ask else None
+        if params is not None and params.speed is not None:
+            speed = params.speed
         self._spoken.add(turn)
         # Every time: the voice drops a hushed turn, and a later say must re-arm it. It ignores
         # a say for a turn it is already speaking.
-        self.voice.spoken(turn, shown_on, voice, speed, ask.system_voice if ask else False)
+        self.voice.spoken(turn, shown_on, speed, ask.system_voice if ask else False)
 
     def _drop_news(self, kind: str, key: str) -> None:
         """A waiting event is superseded: the dispatcher forgets it wherever it waits."""

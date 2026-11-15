@@ -185,7 +185,6 @@ class SayParams(Model):
     parts: list[Part] | None = None
     context: Any = None
     spoken: bool | None = None
-    voice: str | None = None
     speed: Annotated[float, Field(ge=0.5, le=2)] | None = None
     interrupted: Interrupted | None = None
 
@@ -231,10 +230,10 @@ class DownloadData(Model):
 
 class ReadAloudData(Model):
     # Data of the `read_aloud` event: whether this body wants every turn it shows read aloud, in
-    # which voice, and whether it speaks with its own system voice (the brain then sends text
-    # only and never loads its voice). Sent on connect and whenever the setting changes.
+    # at what speed, and whether it speaks with its own system voice (the brain then sends text
+    # only and never loads its voice). The voice itself is the brain's choice, not the body's.
+    # Sent on connect and whenever the setting changes.
     on: bool
-    voice: str | None = None
     speed: Annotated[float, Field(ge=0.5, le=2)] | None = None
     system_voice: bool = False
 

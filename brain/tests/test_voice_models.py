@@ -8,10 +8,10 @@ import pytest
 
 from brain.voice.models import (
     EARS_FILES,
-    KOKORO_FILES,
     ModelFile,
     ModelIntegrityError,
     ensure_files,
+    present,
 )
 
 
@@ -46,15 +46,6 @@ def test_ears_files_are_pinned_to_a_commit():
     assert len(EARS_FILES) == 2
     for f in EARS_FILES:
         assert re.search(r"/resolve/[0-9a-f]{40}/", f.url), f.url
-        assert re.fullmatch(r"[0-9a-f]{64}", f.sha256)
-        assert f.bytes > 0
-
-
-def test_kokoro_files_are_pinned_to_a_release():
-    assert len(KOKORO_FILES) == 2
-    for f in KOKORO_FILES:
-        assert re.search(r"/releases/download/[\w.-]+/", f.url), f.url
-        assert "resolve/main" not in f.url
         assert re.fullmatch(r"[0-9a-f]{64}", f.sha256)
         assert f.bytes > 0
 
@@ -124,3 +115,32 @@ async def test_progress_counts_files_already_good_from_the_start(tmp_path):
     seen: list[float] = []
     await ensure_files(tmp_path, [fa, fb], Net({fb.url: [b]}), seen.append)
     assert seen[0] == 0.5 and seen[-1] == 1
+
+
+def test_present_is_true_only_when_every_file_is_on_disk_and_matches(tmp_path):
+    a, b = file_for("tts/x/a.bin", b"aaa"), file_for("tts/x/b.bin", b"bbb")
+    assert not present(tmp_path, [a, b])
+    for f, data in ((a, b"aaa"), (b, b"bbb")):
+        (tmp_path / f.path).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / f.path).write_bytes(data)
+    assert present(tmp_path, [a, b])
+    (tmp_path / b.path).write_bytes(b"damaged")
+    assert not present(tmp_path, [a, b])
+
+
+async def test_a_cancelled_download_leaves_no_part_file(tmp_path):
+    data = b"abcdefgh"
+    f = file_for("tts/x/a.bin", data)
+    stop = asyncio.Event()
+
+    async def blocked(url):
+        yield data[:4]  # one chunk, then the connection stalls
+        await stop.wait()
+
+    task = asyncio.create_task(ensure_files(tmp_path, [f], blocked, lambda p: None))
+    await asyncio.sleep(0.05)
+    assert list(tmp_path.rglob("*.part"))  # it really was mid-download
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert not list(tmp_path.rglob("*.part"))

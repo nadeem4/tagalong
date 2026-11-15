@@ -51,7 +51,6 @@ export const SayParams = z
     parts: z.array(Part).optional(),
     context: z.unknown().optional(),
     spoken: z.boolean().optional(),
-    voice: z.string().optional(),
     speed: z.number().min(0.5).max(2).optional(),
     interrupted: Interrupted.optional(),
   })
@@ -79,7 +78,6 @@ export type FocusEventData = z.infer<typeof FocusEventData>;
 // Data of the `read_aloud` event: this body wants every turn it shows read aloud.
 export const ReadAloudEventData = z.object({
   on: z.boolean(),
-  voice: z.string().optional(),
   speed: z.number().min(0.5).max(2).optional(),
   system_voice: z.boolean().optional(),
 });

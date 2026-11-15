@@ -2,10 +2,11 @@
 
 A chunk is a few whole sentences (`chunker.py`). One worker pulls chunks from one queue and
 synthesises each in a thread, so a slow voice never stalls the websocket or the ears and two
-syntheses never overlap. While the voice is loading or has failed the chunks go out as text only,
-and the body says them in its own system voice. `download` is the voice's fetch for Home's status
-line (idle, downloading, ready or failed, with a 0..1 progress); `prefetch` starts it early.
-Audio is live-only and never stored.
+syntheses never overlap. The voice is the one Home chose (`chosen`): a new pick loads in the
+background, latest pick only, while chunks go on in the most recently ready voice; with none ready
+(first run, offline) they go out as text only and the body says them in its own system voice. The
+switch happens between chunks, never inside one. `download` is the fetch for Home's status line
+(the voice, idle, downloading, ready or failed, and a 0..1 progress). Audio is live-only.
 """
 
 import asyncio
@@ -21,21 +22,22 @@ from typing import Literal, Protocol
 import numpy as np
 
 from brain.telemetry import timed
+from brain.voice import NoSample
 from brain.voice.chunker import Chunk, Chunker
 from brain.voice.shape import shape_chunk
 from brain.voice.speakable import SpokenStream
-from brain.voice.tts import Tts
+from brain.voice.tts import SAMPLE_TEXT, Tts, TtsVoice, voice_by_id
 
 log = logging.getLogger("brain")
 
-DEFAULT_VOICE = "bm_george"
 DEFAULT_SPEED = 1.0
 State = Literal["talking", "sentence_break", "paused", "idle"]
-Download = dict[str, float | str]  # {"status": idle|downloading|ready|failed, "progress": 0..1}
+Download = dict[str, float | str]  # {"voice": id, "status": idle|..|failed, "progress": 0..1}
 KEPT_TURNS = 3  # chunk logs kept, so a late interruption can still be answered
 
 
-LoadTts = Callable[[Callable[[float], None]], Awaitable[Tts]]  # takes a progress callback
+LoadTts = Callable[[TtsVoice, Callable[[float], None]], Awaitable[Tts]]  # row, progress
+Clip = Callable[[TtsVoice], Awaitable[bytes | None]]  # the voice's release sample, fetched once
 
 
 class _Sender(Protocol):
@@ -43,13 +45,10 @@ class _Sender(Protocol):
 
 
 class _Turn:
-    def __init__(
-        self, turn: str, body_id: str, voice: str, speed: float, system_voice: bool, enqueue
-    ) -> None:
+    def __init__(self, turn: str, body_id: str, speed: float, system_voice: bool, enqueue) -> None:
         self.turn = turn
         self.body_id = body_id
         self.system_voice = system_voice
-        self.voice = voice
         self.speed = speed
         self.unsent: list[str] = []  # chunks made but not yet sent: still Scout's to say
         self.muted = False  # its writer is still going, but what it writes is no longer said
@@ -64,14 +63,24 @@ class Mouth:
     to cancel a synth thread it cannot stop."""
 
     def __init__(
-        self, bodies: _Sender, load_tts: Callable[[Callable[[float], None]], Awaitable[Tts]]
+        self,
+        bodies: _Sender,
+        load_tts: LoadTts,
+        chosen: Callable[[], TtsVoice],
+        installed: Callable[[TtsVoice], bool] = lambda _v: False,
+        clip: Clip | None = None,
     ) -> None:
         self._bodies = bodies
         self._load_tts = load_tts
-        self._tts: Tts | None = None
+        self._chosen = chosen
+        self._installed = installed  # files on disk: a sample can be made live without a fetch
+        self._clip = clip
+        self._ready: dict[str, tuple[TtsVoice, Tts]] = {}
+        self._last_ready: str | None = None  # the voice chunks fall back to while a pick loads
         self._loading: asyncio.Task | None = None
+        self._loading_id: str | None = None
         self._failed = False  # until the next spoken turn, which tries again
-        self.download: Download = {"status": "idle", "progress": 0.0}
+        self.download: Download = {"voice": chosen().id, "status": "idle", "progress": 0.0}
         self.on_download: Callable[[], None] | None = None
         self._synth = asyncio.Lock()  # Preview's sample shares the one synth with the worker
         self._turns: dict[str, _Turn] = {}
@@ -104,7 +113,6 @@ class Mouth:
         self,
         turn: str,
         body_id: str | None,
-        voice: str | None,
         speed: float | None,
         system_voice: bool = False,
     ) -> None:
@@ -113,9 +121,8 @@ class Mouth:
         if body_id is None or turn in self._turns:
             return  # already speaking this turn; a cleared one is replaced
         self._failed = False
-        voice = voice or DEFAULT_VOICE
         speed = speed or DEFAULT_SPEED
-        self._turns[turn] = _Turn(turn, body_id, voice, speed, system_voice, self._enqueue)
+        self._turns[turn] = _Turn(turn, body_id, speed, system_voice, self._enqueue)
         if self._worker is None or self._worker.done():
             self._worker = asyncio.get_running_loop().create_task(self._work())
         self._refresh()
@@ -154,7 +161,7 @@ class Mouth:
         st.muted = True
         self._bodies.send_live(body_id, "speech_control", {"action": "clear", "turn": turn})
         new = f"{turn}-{uuid.uuid4().hex[:8]}"  # the body silences a cleared turn id for good
-        self.spoken(new, body_id, st.voice, st.speed, st.system_voice)
+        self.spoken(new, body_id, st.speed, st.system_voice)
         self.reply(new, {"delta": text})
         self.end_turn(new)
         return new
@@ -204,18 +211,36 @@ class Mouth:
             del self._sent[next(iter(self._sent))]
         return lines
 
-    async def sample(self, text: str, voice: str | None, speed: float | None) -> bytes:
-        """One WAV for Settings' Preview. Waits for the voice to load; raises if it cannot."""
-        if self._tts is None:
-            await asyncio.shield(self._start_load())
-        if self._tts is None:
-            raise RuntimeError("the speaking voice is not available")
-        tts = self._tts
-        async with self._synth:
-            samples, rate = await asyncio.to_thread(
-                tts.synth, text, voice or DEFAULT_VOICE, speed or DEFAULT_SPEED
-            )
-        return wav_bytes(shape_chunk(samples, rate, paragraph_end=False), rate)
+    async def sample(self, voice_id: str, speed: float | None) -> bytes:
+        """One WAV of SAMPLE_TEXT for Home's Play. Live when the voice is installed; otherwise
+        the release clip (fetched once, then cached); NoSample when there is neither."""
+        voice = voice_by_id(voice_id)
+        if voice is None:
+            raise ValueError(f"unknown voice {voice_id!r}")
+        ready = self._ready.get(voice.id)
+        if ready is None and self._loading is not None and voice.id == self._loading_id:
+            # The chosen voice is mid-load: wait for that one load, never start a second.
+            try:
+                await asyncio.shield(self._loading)
+            except Exception:
+                pass  # a failed load falls through to the clip
+            ready = self._ready.get(voice.id)
+        if ready is None and await asyncio.to_thread(self._installed, voice):  # hashes big files
+            tts = await self._load_tts(voice, lambda _f: None)  # files are here: no download
+            ready = (voice, tts)
+            if voice.id == self._chosen().id:
+                self._ready[voice.id] = ready  # else a Play must not keep a voice in memory
+        if ready is not None:
+            tts = ready[1]
+            async with self._synth:
+                samples, rate = await asyncio.to_thread(
+                    tts.synth, SAMPLE_TEXT, voice.voice, speed or DEFAULT_SPEED
+                )
+            return wav_bytes(shape_chunk(samples, rate, paragraph_end=False), rate)
+        clip = await self._clip(voice) if self._clip is not None else None
+        if clip is None:
+            raise NoSample(voice.id)
+        return clip
 
     def _finish(self, st: _Turn) -> None:
         st.ended = True
@@ -288,16 +313,22 @@ class Mouth:
 
     async def _say(self, st: _Turn, line: str, paragraph_end: bool) -> None:
         frame: dict = {"turn": st.turn, "text": line}
-        tts = None if st.system_voice else self._tts_now()
-        if tts is not None:
+        # The voice is fixed here, so a pick made while this chunk is made waits for the next.
+        now = None if st.system_voice else self._voice_now()
+        if now is not None:
+            voice, tts = now
             try:
                 async with self._synth:
                     with timed("voice_hop", op="synth"):
-                        samples, rate = await asyncio.to_thread(tts.synth, line, st.voice, st.speed)
+                        samples, rate = await asyncio.to_thread(
+                            tts.synth, line, voice.voice, st.speed
+                        )
                 pcm = shape_chunk(samples, rate, paragraph_end).astype("<i2").tobytes()
                 frame |= {"pcm": base64.b64encode(pcm).decode("ascii"), "sample_rate": rate}
             except Exception:
-                log.warning("speech synthesis failed", exc_info=True)  # the body says it instead
+                # One chunk the voice cannot say (an odd character) goes out as text, the body
+                # says it, and the turn's speech goes on.
+                log.warning("speech synthesis failed", exc_info=True)
         if self._turns.get(st.turn) is not st:
             return  # cleared while it was being made
         # Logged only once sent, so frame `n` and the log index agree; the log outlives the turn.
@@ -305,40 +336,69 @@ class Mouth:
         lines.append(line)
         self._send(st, {**frame, "n": len(lines)})
 
-    def _tts_now(self) -> Tts | None:
-        """The voice if it is ready. Otherwise start loading it (once): the chunk goes out as
-        text only, which already tells the body to use its own voice."""
-        if self._tts is not None:
-            return self._tts
-        if not self._failed:
-            self._start_load()
-        return None
+    def _voice_now(self) -> tuple[TtsVoice, Tts] | None:
+        """The chosen voice if it is ready; else start loading it (once) and use the most
+        recently ready one; else None, and the chunk goes out as text only."""
+        row = self._chosen()
+        if row.id in self._ready:
+            return self._ready[row.id]
+        self._ensure(row)
+        return self._ready.get(self._last_ready) if self._last_ready else None
 
-    def _start_load(self) -> asyncio.Task:
-        if self._loading is None:
-            self._loading = asyncio.ensure_future(self._load())
-            self._loading.add_done_callback(lambda _t: setattr(self, "_loading", None))
-        return self._loading
+    def _ensure(self, row: TtsVoice) -> None:
+        """Load `row` unless it is loading or failed. Latest pick only: a load of another voice
+        is cancelled first (its `.part` file goes with it)."""
+        if self._failed or self._loading_id == row.id:
+            return
+        self._cancel_load()
+        self._loading_id = row.id
+        if self.download["voice"] != row.id:  # a different voice: the status line moves on
+            self._set_download(row.id, "idle", 0.0)
+        task = asyncio.ensure_future(self._load(row))
+        self._loading = task
+
+        def done(t: asyncio.Task) -> None:
+            if self._loading is t:
+                self._loading, self._loading_id = None, None
+
+        task.add_done_callback(done)
+
+    def _cancel_load(self) -> None:
+        if self._loading is not None and not self._loading.done():
+            self._loading.cancel()
+        self._loading, self._loading_id = None, None
+
+    def choose(self, voice: TtsVoice) -> None:
+        """Home picked `voice`. Ready: it is current from the next chunk. Otherwise it loads."""
+        self._failed = False
+        if voice.id in self._ready:
+            self._cancel_load()
+            self._set_download(voice.id, "ready", 1.0)
+        else:
+            self._ensure(voice)
 
     def prefetch(self) -> None:
-        """Start fetching the voice now (the first-run tour), without a chunk to say."""
-        if self._tts is None:
-            self._start_load()
+        """Start fetching the chosen voice now (the first-run tour), without a chunk to say."""
+        row = self._chosen()
+        if row.id not in self._ready:
+            self._ensure(row)
 
     def retry(self) -> None:
-        """Home's retry after a failed download."""
-        if self._tts is None:
+        """Home's retry after a failed download: the chosen voice again."""
+        row = self._chosen()
+        if row.id not in self._ready:
             self._failed = False
-            self._start_load()
+            self._ensure(row)
 
-    def _set_download(self, status: str, progress: float) -> None:
-        if self.download == {"status": status, "progress": progress}:
+    def _set_download(self, voice: str, status: str, progress: float) -> None:
+        new = {"voice": voice, "status": status, "progress": progress}
+        if self.download == new:
             return
-        self.download = {"status": status, "progress": progress}
+        self.download = new
         if self.on_download is not None:
             self.on_download()
 
-    async def _load(self) -> None:
+    async def _load(self, row: TtsVoice) -> None:
         last = -1.0
 
         def progress(fraction: float) -> None:
@@ -346,15 +406,17 @@ class Mouth:
             # Only while there is something left to fetch: a cached voice goes idle to ready.
             if fraction < 1 and fraction - last >= 0.02:  # a few dozen updates, not thousands
                 last = fraction
-                self._set_download("downloading", max(fraction, 0.0))
+                self._set_download(row.id, "downloading", max(fraction, 0.0))
 
         try:
-            self._tts = await self._load_tts(progress)
-            self._set_download("ready", 1.0)
-        except Exception:
+            tts = await self._load_tts(row, progress)
+            self._ready[row.id] = (row, tts)
+            self._last_ready = row.id
+            self._set_download(row.id, "ready", 1.0)
+        except Exception:  # a cancelled load is a BaseException: the new pick owns the status
             log.warning("the speaking voice failed to load", exc_info=True)
             self._failed = True
-            self._set_download("failed", 0.0)
+            self._set_download(row.id, "failed", 0.0)
 
     def _send(self, st: _Turn, params: dict) -> None:
         self._last_body = st.body_id

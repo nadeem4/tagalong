@@ -7,6 +7,7 @@ from fake_voice import LOUD, FakeTts, parts
 
 from brain.voice.models import ModelIntegrityError
 from brain.voice.service import MAX_BUFFER_SECONDS, VoiceService
+from brain.voice.tts import voice_by_id
 
 PAUSE = 8
 
@@ -46,11 +47,13 @@ def service(sent, *, load=None, p=None):
             return await load(on_progress, calls["n"])
         return made
 
-    async def load_tts(on_progress):
+    async def load_tts(voice, on_progress):
         on_progress(0.5)
         return FakeTts()
 
-    svc = VoiceService(sent, load_ears, load_tts)
+    svc = VoiceService(
+        sent, load_ears, load_tts, lambda: voice_by_id("piper-alan"), installed=lambda _v: True
+    )
     return svc, made, calls
 
 
@@ -350,11 +353,11 @@ SENTENCE = "The build finished and every single test passed."
 async def test_a_spoken_reply_is_sent_as_speech_and_hush_stops_it():
     sent = Sent()
     svc, _, _ = service(sent)
-    svc.spoken("w", "d", None, None)
+    svc.spoken("w", "d", None)
     svc.reply("w", "d", {"delta": SENTENCE + " "})
     svc.reply("w", "d", {"done": True})
     await settle()  # the first turn loads the voice, so its sentence goes out as text
-    svc.spoken("t", "d", None, None)
+    svc.spoken("t", "d", None)
     svc.reply("t", "d", {"delta": SENTENCE + " Then"})
     await settle()
     speech = [p for b, m, p in sent.frames if m == "speech" and p["turn"] == "t"]
@@ -369,14 +372,14 @@ async def test_a_spoken_reply_is_sent_as_speech_and_hush_stops_it():
 
 async def test_sample_returns_a_wav():
     svc, _, _ = service(Sent())
-    assert (await svc.sample("Hello.", None, None))[:4] == b"RIFF"
+    assert (await svc.sample("piper-alan", None))[:4] == b"RIFF"
 
 
 async def test_follow_speech_reports_the_mouths_state():
     svc, _, _ = service(Sent())
     seen: list[str] = []
     svc.follow_speech(seen.append)
-    svc.spoken("t", "d", None, None)
+    svc.spoken("t", "d", None)
     svc.reply("t", "d", {"delta": "Hello there my friend. "})
     await settle()
     svc.turn_ended("t")
@@ -429,7 +432,7 @@ async def test_prefetch_fetches_the_voice_with_no_one_listening():
     svc.prefetch()
     await settle()
     assert calls["n"] == 0  # no listening model was loaded
-    assert svc.voice_download() == {"status": "ready", "progress": 1.0}
+    assert svc.voice_download() == {"voice": "piper-alan", "status": "ready", "progress": 1.0}
     assert told[-1]["status"] == "ready"
     await svc.close()
 

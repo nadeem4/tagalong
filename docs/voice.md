@@ -673,6 +673,15 @@ and passes speed through; Kokoro is unchanged. Libraries are imported only insid
   `voice-samples-v1` and paste each URL, size and sha256 into the row's `sample`. Until then
   every row has `sample: null`.
 
+**The choice.** The brain owns it: the `tts_voice` setting is `auto` (the roster's default
+row) or a voice id. Home reads and changes it with the tools `tts_state` and `set_tts` (a
+`changed {what: "tts"}` follows) and plays a voice with `speak_sample {voice, speed?}`: live if
+the voice is installed, else its release clip, fetched once and cached, else "No sample yet.".
+A pick loads in the background (latest pick only; an older load is cancelled and its partial
+file removed). Speech goes on in the most recently ready voice, or in the body's system voice
+when none is ready, and switches at the next chunk. `say` and `read_aloud` carry no voice any
+more, only `speed`.
+
 ### How the brain learns a turn was spoken
 
 Two ways. A heard question is a `say` with `spoken: true`: `CompanionBubble.submit(text, context,

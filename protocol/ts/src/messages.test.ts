@@ -84,6 +84,8 @@ describe('voice messages', () => {
     expect(SayParams.safeParse({ text: 'a', speed: 0.5 }).success).toBe(true);
     expect(SayParams.safeParse({ text: 'a', speed: 2 }).success).toBe(true);
     expect(SayParams.safeParse({ text: 'a', speed: 3 }).success).toBe(false);
+    // The brain owns the voice choice: an old body's `voice` is ignored, not carried.
+    expect(SayParams.parse({ text: 'a', voice: 'x' })).not.toHaveProperty('voice');
     expect(ListenParams.safeParse({ mode: 'held' }).success).toBe(true);
     expect(ListenParams.safeParse({ mode: 'x' }).success).toBe(false);
   });
@@ -190,7 +192,6 @@ describe('read_aloud event data', () => {
   it('parses the example and bounds speed', () => {
     expect(ReadAloudEventData.parse(eventData('read_aloud'))).toEqual({
       on: true,
-      voice: 'bm_george',
       speed: 1.1,
       system_voice: false,
     });

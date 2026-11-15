@@ -753,7 +753,10 @@ query and cursor together, so each page has its own file. `why-registry.json` ma
 Not in `tagalong.db`: model files under `<TAGALONG_HOME>/voice/`, each checked against a pinned
 SHA-256 (`ears/`, `tts/`, and the speech models' own folders). `voice/cuda/` holds the NVIDIA
 DLLs (cuBLAS, cuDNN) the brain fetched for the final speech model on a Windows PC with a
-graphics card; safe to delete, fetched again on the next listen.
+graphics card; safe to delete, fetched again on the next listen. `tts/<engine>/` holds the
+speaking voices Home chose (one folder per engine; a voice's release clip is cached beside its
+files). The chosen voice is the `tts_voice` row in `settings` in `tagalong.db` (`auto` or a roster
+id).
 
 ## In memory only
 
