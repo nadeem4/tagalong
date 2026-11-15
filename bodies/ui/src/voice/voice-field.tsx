@@ -166,6 +166,8 @@ export function VoiceField({ host, speed }: { host: VoiceFieldHost; speed: numbe
 
 // Rows are flat, divided by hairlines; the picked row gets the panel tint and a filled radio.
 const VF_CSS = `
+/* Inside Settings' panel the section is already a card: drop this one's own box. */
+.tg-panel .tg-vf { border: 0; background: none; padding: 0; }
 .tg-vf__title { ${typeCss('bodyLead')}; font-weight: 600; margin: 0; color: ${t.color.panelText}; }
 .tg-vf__lead { ${typeCss('body')}; margin: 2px 0 0; color: ${t.color.panelMuted}; }
 .tg-vf__loading { ${typeCss('body')}; margin: 16px 0 0; color: ${t.color.panelMuted}; }

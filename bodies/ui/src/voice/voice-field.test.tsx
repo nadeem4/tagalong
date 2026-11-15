@@ -132,4 +132,10 @@ describe('VoiceField', () => {
       expect(screen.getByRole('radio', { name: /George/ })).toHaveAttribute('aria-checked', 'true'),
     );
   });
+
+  it('goes flat inside a panel so Settings does not double the card', async () => {
+    await setup();
+    const css = document.querySelector('.tg-vf style')?.textContent ?? '';
+    expect(css).toMatch(/\.tg-panel \.tg-vf \{[^}]*border: 0[^}]*background: none[^}]*padding: 0/);
+  });
 });
