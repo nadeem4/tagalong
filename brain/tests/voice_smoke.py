@@ -14,6 +14,7 @@ import numpy as np
 
 from brain.voice.load import tts_loader
 from brain.voice.mouth import _wav
+from brain.voice.shape import shape_chunk
 
 SENTENCES = [
     "Hello, I am Scout. How can I help you today?",
@@ -36,7 +37,9 @@ async def main() -> None:
             f"synth: {took * 1000:.0f} ms for {len(samples) / rate:.1f} s of audio "
             f"(real-time factor {took / (len(samples) / rate):.2f}), {rate} Hz {samples.dtype}"
         )
-        pieces.append(samples)
+        shaped = shape_chunk(samples, rate, paragraph_end=False)
+        print(f"chunk: {len(samples) / rate:.2f} s raw, {len(shaped) / rate:.2f} s shaped")
+        pieces.append(shaped)
     out.write_bytes(_wav(np.concatenate(pieces), rate))
     print(f"wrote {out}")
 

@@ -1162,6 +1162,14 @@ popup); the answer is text only.
    one-word or two-word lines. "e.g.", "Dr." and "3.5" are never cut in the middle by a pause.
    Talking over Scout mid-chunk makes Scout carry on from the start of that chunk.
 
+### V.2c. Read for the ear
+
+1. **Action:** with Scout talks on, say "meet me at 3:30 for $4.50" and ask Scout to repeat it back,
+   then ask for a long answer in several paragraphs.
+2. **Expected:** the time and the price are heard as words ("three thirty", "four dollars fifty"),
+   the pauses between chunks are even with a longer one between paragraphs, and there are no clicks
+   at the joins. Nothing in brackets is read out.
+
 ### V.3. Stopping
 
 1. **Action:** while Scout speaks, press `Ctrl+Shift+Alt+M`; on the next answer click the bars; on the

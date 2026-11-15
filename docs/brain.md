@@ -2336,7 +2336,10 @@ brain sends and falls back to the system voice for a text-only `speech` frame.
   ends the sentence and the paragraph. `voice/chunker.py` groups the sentences into chunks: the
   first complete sentence of at least 4 words goes out at once, later chunks grow to about 30
   words (45 at most), a sentence over 45 words is cut at its last comma or space, and a 1-3 word
-  paragraph joins its neighbour. See [Voice](voice.md#the-mouths-queue).
+  paragraph joins its neighbour. See [Voice](voice.md#the-mouths-queue). Each sentence is first
+  rewritten for the ear (`voice/ear_text.py`: times, money, dates, numbers and symbols as words)
+  and each chunk's audio is trimmed, faded and followed by a set gap (`voice/shape.py`); see
+  [Read for the ear](voice.md#read-for-the-ear).
 - **`Mouth`** (`voice/mouth.py`) keeps one queue of chunks for all turns and one worker task
   that says them in order. It synthesises each chunk with `asyncio.to_thread` and awaits it, so
   a slow voice never stalls the websocket or the ears, and sends
