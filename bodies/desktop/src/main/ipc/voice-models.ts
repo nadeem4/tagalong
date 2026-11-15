@@ -2,8 +2,9 @@
  * IPC for Settings' Voice page: Scout's voice download (voice_download, fetch_voice), and for the
  * Speech to text card: read the speech-model choice and set it; and the voice picker: read the
  * speaking voices and set one. All go through the brain's Home tools (stt_state, set_stt,
- * tts_state, set_tts); the brain owns the lists and refuses an id it does not know. The page is not trusted, so the pick is checked to be text before the brain
- * hears of it. Contains registerVoiceModelsIpc.
+ * tts_state, set_tts); the brain owns the lists and refuses an id it does not know. The page is
+ * not trusted, so the pick is checked to be text before the brain hears of it. Contains
+ * registerVoiceModelsIpc.
  */
 
 import { parseSttState, parseTtsState, parseVoiceDownload } from '@tagalong/ui/shapes';
