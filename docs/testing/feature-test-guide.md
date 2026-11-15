@@ -1214,10 +1214,18 @@ popup); the answer is text only.
 
 ### V.5. Settings → Voice
 
-1. **Action:** pick Fable and press **▶ Preview**; move the speed slider and preview again; switch
-   **Scout talks** off, Save, and ask a question.
-2. **Expected:** each preview plays in the chosen voice and speed before saving; with Scout talks off
-   the answer is silent, and Preview still plays.
+1. **Action:** in the **Scout's voice** card press a voice's play button, then pick another voice;
+   move the speed slider and play again; switch **Scout talks** off, Save, and ask a question.
+2. **Expected:** each sample plays in that voice at the slider's speed; picking saves at once
+   (a voice not yet downloaded starts downloading); with Scout talks off the answer is silent.
+3. **Action:** pick a voice that is not downloaded, and while its row shows Downloading, pick
+   another voice.
+4. **Expected:** the new pick is saved at once and its row takes over the progress line; the card
+   never shows an older percent after a newer one, and Scout speaks with the Windows voice until
+   the chosen one is ready.
+5. **Action:** with a voice's sample already played once and the brain offline from the network,
+   press its play button again.
+6. **Expected:** the cached sample plays; a sample never heard before says it could not play.
 
 ### V.5a. Test your microphone
 
@@ -1232,8 +1240,8 @@ popup); the answer is text only.
 ### V.5b. Who speaks: System voice
 
 1. **Action:** in Settings → Voice pick **System voice** under **Who speaks** (the other choice is
-   **Kokoro (on the brain)**), then press **▶ Preview**.
-2. **Expected:** the preview plays in the system voice, with no Save needed.
+   **Scout's voice (on the brain)**), then save.
+2. **Expected:** the card's play buttons still play the brain's samples; answers are spoken by the system voice.
 3. **Action:** set the speed slider to its fastest, Save, and ask a question by voice.
 4. **Expected:** the answer is spoken in the system voice at the saved speed, not at normal speed.
 
@@ -2419,7 +2427,7 @@ from a terminal.
 
 ### V.1b. The voice choice lives in the brain
 
-Needs the brain running; the desktop's own voice list comes in a later slice, so this is by Home tool.
+Needs the brain running; this is by Home tool; the desktop's voice picker (V.5) does the same through the same tools.
 
 1. **Action:** call `tts_state`, then `set_tts {"voice": "piper-alan"}`, then `set_tts {"voice": "nope"}`.
 2. **Expected:** the state lists eight voices with `installed` flags and `chosen: auto`; the first
@@ -2518,8 +2526,8 @@ brain; this checks it on the real one.
    4 shows the ask and pause keys as keycaps (never "CommandOrControl").
 3. **Action:** on step 4 press **Change**, type `Ctrl+Shift+K`, press **Next**. **Expected:** the ask
    key is now Ctrl+Shift+K (see Home → Settings). Unchanged, **Next** saves nothing.
-4. **Action:** on step 5 pick a talk key, switch **Scout talks** off, change the voice and speed,
-   press **Preview**, then **Next**. **Expected:** Preview plays the chosen voice; the choices
+4. **Action:** on step 5 pick a talk key, switch **Scout talks** off, pick a voice in **Pick Scout's voice**
+   (press play to hear it) and set the speed, then **Next** (never waits on a download). **Expected:** the choices
    appear in Home → Settings. There is no Always listening control. From the keyboard, Space or
    Enter flips **Scout talks** (On/Off), the arrow keys move **Speed** and change the selects.
 5. **Action:** with a key set, press **Skip**. **Expected:** the window closes, the pet

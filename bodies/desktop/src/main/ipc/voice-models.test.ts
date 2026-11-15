@@ -26,13 +26,38 @@ const STATE = {
 
 const DOWNLOAD = { status: 'downloading', progress: 0.5 };
 
+const TTS_STATE = {
+  chosen: 'auto',
+  resolved: 'piper-alan',
+  voices: [
+    {
+      id: 'piper-alan',
+      label: 'Alan',
+      descriptor: 'Warm, British',
+      engine: 'piper',
+      size_mb: 63,
+      licence: 'MIT',
+      installed: true,
+      sample: true,
+    },
+  ],
+  download: { voice: 'piper-alan', status: 'ready', progress: 1 },
+};
+
 function setup() {
   const ipc = fakeIpc();
   const calls: [string, object | undefined][] = [];
   const brain = {
     call: (tool: string, input?: object) => {
       calls.push([tool, input]);
-      const answer = tool === 'stt_state' ? STATE : tool === 'voice_download' ? DOWNLOAD : {};
+      const answer =
+        tool === 'stt_state'
+          ? STATE
+          : tool === 'tts_state'
+            ? TTS_STATE
+            : tool === 'voice_download'
+              ? DOWNLOAD
+              : {};
       return Promise.resolve(text(answer)) as Promise<never>;
     },
   };
@@ -71,6 +96,27 @@ describe('registerVoiceModelsIpc', () => {
       ['set_stt', { live: 'moonshine-tiny' }],
       ['set_stt', { final: 'off' }],
     ]);
+  });
+
+  it('reads the voice roster from tts_state and parses it', async () => {
+    const { invoke, calls } = setup();
+    expect(await invoke(IPC.ttsState)).toEqual(TTS_STATE);
+    expect(calls).toEqual([['tts_state', {}]]);
+  });
+
+  it('passes the picked voice to set_tts, and refuses an empty or odd one', async () => {
+    const { invoke, calls } = setup();
+    await invoke(IPC.ttsSet, 'piper-alan');
+    await invoke(IPC.ttsSet, 'auto');
+    expect(calls).toEqual([
+      ['set_tts', { voice: 'piper-alan' }],
+      ['set_tts', { voice: 'auto' }],
+    ]);
+    calls.length = 0;
+    for (const bad of ['', 5, undefined, null, { voice: 'x' }]) {
+      await expect(invoke(IPC.ttsSet, bad)).rejects.toThrow();
+    }
+    expect(calls).toEqual([]);
   });
 
   it('refuses an empty pick or an odd one before the brain hears of it', async () => {

@@ -20,6 +20,7 @@ import type {
   ModelState,
   Pet,
   SttState,
+  TtsState,
   VoiceDownload,
   SetupOverview,
   SetupResult,
@@ -366,6 +367,12 @@ export interface HostBridge {
   sttState(): Promise<SttState>;
   /** Saves the live and/or final speech model (`auto`; final also `off`); rejects with the brain's refusal. */
   setStt(choice: { live?: string; final?: string }): Promise<void>;
+  /** The voice picker: the speaking voices, the choice, which are installed and the download. */
+  ttsState(): Promise<TtsState>;
+  /** Saves Scout's speaking voice (a listed id or `auto`); rejects with the brain's refusal. */
+  setTts(voice: string): Promise<void>;
+  /** Plays a voice's sample at a speed; resolves once the sound has played, rejects if it cannot. */
+  playVoiceSample(voice: string, speed: number): Promise<void>;
   /** Settings' Voice page: how far Scout's speaking voice has downloaded (the brain's state). */
   voiceDownload(): Promise<VoiceDownload>;
   /** Starts the voice download in the brain, or `retry` after a failure. */

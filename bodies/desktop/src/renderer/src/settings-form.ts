@@ -15,7 +15,6 @@ export interface SettingsFormValues {
   talkHotkey: string;
   /** Voice. Present together when the form shows the Voice section. */
   voiceEnabled?: boolean;
-  voice?: string;
   voiceSpeed?: string;
   /** The microphone Talk to Scout listens on. Blank: the system default. */
   microphoneId?: string;
@@ -59,11 +58,10 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
       stopVoice: values.stopVoiceHotkey.trim(),
       talk: values.talkHotkey.trim(),
     },
-    ...(values.voice !== undefined
+    ...(values.voiceSpeed !== undefined
       ? {
           voice: {
             enabled: values.voiceEnabled === true,
-            voice: values.voice,
             speed: parseSpeed(values.voiceSpeed ?? ''),
             ...(values.microphoneId !== undefined && values.microphoneId !== ''
               ? { microphoneId: values.microphoneId }

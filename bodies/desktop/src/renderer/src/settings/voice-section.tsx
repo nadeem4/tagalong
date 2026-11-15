@@ -1,20 +1,12 @@
 /**
- * Settings' Voice section: Scout's voice on or off, who speaks and who listens, which voice, how
- * fast. Preview plays the form's choice before it is saved. Then Talk to Scout: the key you hold
+ * Settings' Voice section: Scout's voice on or off, who speaks and who listens, the shared
+ * "Scout's voice" card (it saves its own pick at once), how fast. Then Talk to Scout: the key you hold
  * to speak, and which microphone listens, with a local level test. The pickers and the speed
  * are the shared controls, which have no form name, so each value rides in a hidden input
  * that buildSettingsPatch reads.
  */
 import { useEffect, useState } from 'react';
-import {
-  Button,
-  MicTest,
-  Select,
-  Slider,
-  Toggle,
-  VoiceDownloadLine,
-  useHostBridge,
-} from '@tagalong/ui';
+import { MicTest, Select, Slider, Toggle, VoiceField, useHostBridge } from '@tagalong/ui';
 import type { MicWatcher } from '@tagalong/ui';
 import {
   MAX_VOICE_SPEED,
@@ -24,11 +16,10 @@ import {
   TALK_KEY_LABELS,
 } from '../../../shared/settings';
 import { adaptersFor, chosenMouth } from '../../../shared/voice';
-import type { Settings, VoiceId } from '../../../shared/settings';
+import type { Settings } from '../../../shared/settings';
 import { listMicrophones, openMic } from '../mic';
 import { watchLevel } from '../mic-level';
 import { voiceFacts } from '../settings-form';
-import { previewVoice } from '../voice-player';
 import { Info, Section, Tip, useInvalid } from './section';
 
 /**
@@ -38,17 +29,8 @@ import { Info, Section, Tip, useInvalid } from './section';
 const watchMicLevel: MicWatcher = (deviceId, onLevel, onError) =>
   watchLevel(() => openMic(deviceId), onLevel, onError);
 
-/** What ▶ Preview says, in the voice and at the speed the form shows. */
-const PREVIEW_LINE = 'Certainly. I shall let you know what I find.';
-
 const MOUTHS = adaptersFor('mouth');
 const EARS = adaptersFor('ears');
-
-/** The local voices, as a person picks them. */
-const VOICES: readonly { id: VoiceId; label: string }[] = [
-  { id: 'bm_george', label: 'George: calm and measured (default)' },
-  { id: 'bm_fable', label: 'Fable: warmer, a storyteller' },
-];
 
 export function VoiceSection({
   settings,
@@ -71,22 +53,10 @@ export function VoiceSection({
   const [ears, setEars] = useState<string>(settings.voice.ears ?? 'local');
   const [talkChoice, setTalkChoice] = useState<string>(talkKey);
   const [mouth, setMouth] = useState<string>(chosenMouth(settings.voice));
-  const [voice, setVoice] = useState<VoiceId>(settings.voice.voice);
   const [speed, setSpeed] = useState(settings.voice.speed);
-  const [previewing, setPreviewing] = useState(false);
   const speedField = useInvalid('voiceSpeed');
   // The refused-key sentence names the key in brackets; the Talk key select points at it too.
   const hotkeyRefused = hotkeyError?.includes(`(${talkKey})`) === true;
-
-  const preview = (): void => {
-    setPreviewing(true);
-    previewVoice(
-      { text: PREVIEW_LINE, mouth: mouth === 'system' ? 'system' : 'kokoro', voice, speed },
-      new AbortController().signal,
-    )
-      .catch((error: unknown) => console.warn('[voice] preview failed', error))
-      .finally(() => setPreviewing(false));
-  };
 
   return (
     <Section id="voice" info={{ tip: 'voice', label: 'About Scout’s voice' }}>
@@ -102,10 +72,10 @@ export function VoiceSection({
       </div>
       <Tip tip="voice">
         Scout reads aloud the answers you ask for by voice. Code and long lists it puts in a block,
-        which shows in the bubble and is not read. Under Who speaks, Kokoro runs on the brain, which
-        downloads its model the first time it is needed; until it is ready Scout speaks with the
-        system voice. The system voice needs nothing. Closing the bubble or the stop key silences it
-        at once.
+        which shows in the bubble and is not read. Under Who speaks, Scout's voice runs on the
+        brain, which starts downloading the voice you pick as soon as you pick it; until it is ready
+        Scout speaks with the system voice. The system voice needs nothing. Closing the bubble or
+        the stop key silences it at once.
       </Tip>
       <div className="tg-grid">
         <div>
@@ -133,23 +103,8 @@ export function VoiceSection({
           <p className="tg-help">{voiceFacts(EARS[0]!)}</p>
         </div>
       </div>
+      <VoiceField host={bridge} speed={speed} />
       <div className="tg-grid">
-        <div>
-          <div className="tg-actions tg-voice-pick">
-            <Select
-              id="f-voice"
-              label="Voice"
-              value={voice}
-              onChange={(next) => setVoice(next as VoiceId)}
-              options={VOICES.map((choice) => ({ value: choice.id, label: choice.label }))}
-            />
-            <Button variant="quiet" onClick={preview} disabled={previewing}>
-              <span aria-hidden="true">▶</span> Preview
-            </Button>
-          </div>
-          <input type="hidden" name="voice" value={voice} />
-          <VoiceDownloadLine host={bridge} />
-        </div>
         <div>
           <Slider
             id={speedField.props.id}

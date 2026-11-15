@@ -14,7 +14,6 @@ import type { SettingsPatch } from '../../shared/settings';
 import { fullBridge } from './full-bridge';
 import { listMicrophones, openMic } from './mic';
 import { watchLevel } from './mic-level';
-import { previewVoice } from './voice-player';
 
 const bridge = fullBridge();
 const host = window.tagalongHost;
@@ -27,6 +26,12 @@ const walkthroughHost: WalkthroughHost = {
   onBrainChanged: bridge.onBrainChanged,
   openWalkthrough: bridge.openWalkthrough,
   setupOverview: bridge.setupOverview,
+  // The voice picker's calls: the same ones Settings uses, so the tour and Settings agree.
+  ttsState: bridge.ttsState,
+  setTts: bridge.setTts,
+  playVoiceSample: bridge.playVoiceSample,
+  voiceDownload: bridge.voiceDownload,
+  fetchVoice: bridge.fetchVoice,
   // The button press is the OK, so the tour asks for no card.
   setupExpert: async (id) => {
     const result = await bridge.setupExpert(id, true);
@@ -44,7 +49,6 @@ const walkthroughHost: WalkthroughHost = {
   getSettings: async () => (await host.getHostView()).settings,
   // Main validates the patch; the steps send plain strings the form already limited.
   saveSettings: (patch) => host.saveSettings(patch as SettingsPatch),
-  previewVoice: (preview) => previewVoice(preview, new AbortController().signal),
   listMicrophones: () => listMicrophones(),
   // The meter's own short-lived mic: only the level leaves watchLevel, never a frame.
   watchMicLevel: (deviceId, onLevel, onError) =>

@@ -100,6 +100,10 @@ export interface FakeBrain {
   models: string[];
   /** Every pick Settings sent to `set_stt` (the speech models), in order. */
   sttSets: Record<string, unknown>[];
+  /** Every voice Settings sent to `set_tts` (the speaking voice), in order. */
+  ttsSets: string[];
+  /** Every `{voice, speed}` Home sent to `speak_sample`, in order. */
+  samples: Record<string, unknown>[];
   /** Every job id Home sent to `stop_job`, in order. */
   stops: string[];
   /** Every expert id the desktop sent to `setup_expert`, in order (the first one installs it). */
@@ -486,6 +490,9 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   const models: string[] = [];
   const sttSets: Record<string, unknown>[] = [];
   const stt = { live: 'auto', final: 'auto' };
+  const ttsSets: string[] = [];
+  const samples: Record<string, unknown>[] = [];
+  let tts = 'auto';
   let model = 'claude-opus-5-5';
   let hasKey = options.hasKey ?? true;
   let dailyLimitUsd = 5;
@@ -928,6 +935,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             filter?: string;
             usd?: number;
             model?: string;
+            voice?: string;
             approved?: boolean;
             community_ok?: boolean;
             query?: string;
@@ -1033,7 +1041,10 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           notify('changed', { what: 'model' });
           value = { model };
         } else if (params.tool === 'voice_download') {
-          value = { status: 'ready', progress: 1 };
+          value =
+            tts === 'kokoro-bm-george'
+              ? { status: 'downloading', progress: 0.4 }
+              : { status: 'ready', progress: 1 };
         } else if (params.tool === 'fetch_voice') {
           value = { status: 'ready', progress: 1 };
         } else if (params.tool === 'stt_state') {
@@ -1077,6 +1088,50 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           if (typeof pick.final === 'string') stt.final = pick.final;
           notify('changed', { what: 'stt' });
           value = { ...stt };
+        } else if (params.tool === 'tts_state') {
+          value = {
+            chosen: tts,
+            resolved: tts === 'auto' ? 'piper-alan' : tts,
+            voices: [
+              {
+                id: 'piper-alan',
+                label: 'Alan',
+                descriptor: 'Warm, British',
+                engine: 'piper',
+                size_mb: 63,
+                licence: 'MIT',
+                installed: true,
+                sample: true,
+              },
+              {
+                id: 'kokoro-bm-george',
+                label: 'George',
+                descriptor: 'Deep, British',
+                engine: 'kokoro',
+                size_mb: 92,
+                licence: 'Apache-2.0',
+                installed: false,
+                sample: true,
+              },
+            ],
+            // George is not installed: picking him starts a download that never ends here.
+            download:
+              tts === 'kokoro-bm-george'
+                ? { voice: tts, status: 'downloading', progress: 0.4 }
+                : { voice: 'piper-alan', status: 'ready', progress: 1 },
+          };
+        } else if (params.tool === 'set_tts') {
+          tts = String(params.input?.voice);
+          ttsSets.push(tts);
+          notify('changed', { what: 'tts' });
+          value = { chosen: tts, resolved: tts === 'auto' ? 'piper-alan' : tts };
+        } else if (params.tool === 'speak_sample') {
+          samples.push((params.input ?? {}) as Record<string, unknown>);
+          // The smallest valid WAV: a 44-byte header and no samples.
+          value = {
+            mime: 'audio/wav',
+            data: 'UklGRiQAAABXQVZFZm10IBAAAAABAAEAgLsAAAB3AQACABAAZGF0YQAAAAA=',
+          };
         } else if (params.tool === 'setup_overview') {
           if (failSearches === 'hang' && String(params.input?.query ?? '') !== '') return;
           if (failSearches && String(params.input?.query ?? '') !== '') {
@@ -1432,6 +1487,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     limits,
     models,
     sttSets,
+    ttsSets,
+    samples,
     stops,
     knowStarts,
     expertSetups,

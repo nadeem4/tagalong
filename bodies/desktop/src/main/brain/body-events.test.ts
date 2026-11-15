@@ -18,7 +18,7 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
 describe('readAloudEvent', () => {
-  const voice = { enabled: true, voice: 'bm_fable', speed: 1.2 } as const;
+  const voice = { enabled: true, speed: 1.2 } as const;
 
   it('asks for read-aloud with the chosen speed when Scout talks is on', () => {
     expect(readAloudEvent(voice)).toEqual({
@@ -26,6 +26,10 @@ describe('readAloudEvent', () => {
       speed: 1.2,
       system_voice: false,
     });
+  });
+
+  it('never carries a voice id: the brain owns the choice', () => {
+    expect(readAloudEvent(voice)).not.toHaveProperty('voice');
   });
 
   it('turns it off with Scout talks', () => {

@@ -1,11 +1,13 @@
 /**
- * Walkthrough step 5: talking to Scout. Talk key, Scout talks, who speaks, voice, speed and
- * microphone (with a local level test), all staged here and saved only on Next. Contains
+ * Walkthrough step 5: talking to Scout. Talk key, Scout talks, who speaks, speed and microphone
+ * (with a local level test), staged here and saved only on Next, plus the shared "Pick Scout's
+ * voice" card, which saves its own pick at once so Next never waits on a download. Contains
  * StepFive. Words are the spec's step copy; the choices match Settings.
  */
 
 import { useEffect, useState } from 'react';
-import { Button, MicTest, Select, Slider, Toggle } from '../controls';
+import { MicTest, Select, Slider, Toggle } from '../controls';
+import { VoiceField } from '../voice/voice-field';
 import { useStepSave, useWalkthroughSettings } from './use-step-save';
 import type { WalkthroughHost, WalkthroughSettings } from './walkthrough-host';
 
@@ -17,13 +19,6 @@ export const TALK_KEYS: readonly { value: string; label: string }[] = [
   { value: 'ScrollLock', label: 'Scroll Lock' },
 ];
 
-const VOICES: readonly { value: string; label: string }[] = [
-  { value: 'bm_george', label: 'George, Calm and measured' },
-  { value: 'bm_fable', label: 'Fable, Warmer, a storyteller' },
-];
-
-const SAMPLE = 'Hi, I’m Scout. This is how I sound.';
-
 function VoiceForm({ host, settings }: { host: WalkthroughHost; settings: WalkthroughSettings }) {
   const start = settings.voice;
   const startTalk = settings.hotkeys.talk ?? 'RightControl';
@@ -31,10 +26,8 @@ function VoiceForm({ host, settings }: { host: WalkthroughHost; settings: Walkth
   const [talk, setTalk] = useState(startTalk);
   const [enabled, setEnabled] = useState(start.enabled);
   const [mouth, setMouth] = useState<'kokoro' | 'system'>(startMouth);
-  const [voice, setVoice] = useState(start.voice);
   const [speed, setSpeed] = useState(start.speed);
   const [mic, setMic] = useState(start.microphoneId ?? '');
-  const [previewFailed, setPreviewFailed] = useState(false);
   const [mics, setMics] = useState<{ id: string; label: string }[]>([]);
 
   const { listMicrophones } = host;
@@ -46,15 +39,9 @@ function VoiceForm({ host, settings }: { host: WalkthroughHost; settings: Walkth
     const patch: Partial<WalkthroughSettings> = {};
     if (talk !== startTalk) patch.hotkeys = { ...settings.hotkeys, talk };
     const micChanged = mic !== (start.microphoneId ?? '');
-    if (
-      enabled !== start.enabled ||
-      voice !== start.voice ||
-      speed !== start.speed ||
-      mouth !== startMouth ||
-      micChanged
-    ) {
+    if (enabled !== start.enabled || speed !== start.speed || mouth !== startMouth || micChanged) {
       // A patch replaces the whole voice object, so the untouched fields go with it.
-      const next = { ...start, enabled, voice, speed };
+      const next = { ...start, enabled, speed };
       if (mouth !== startMouth) next.mouth = mouth;
       if (micChanged) {
         if (mic === '') delete next.microphoneId;
@@ -96,37 +83,17 @@ function VoiceForm({ host, settings }: { host: WalkthroughHost; settings: Walkth
           value={mouth}
           onChange={(next) => setMouth(next === 'system' ? 'system' : 'kokoro')}
           options={[
-            { value: 'kokoro', label: 'Kokoro (on the brain)' },
+            { value: 'kokoro', label: 'Scout’s voice (on the brain)' },
             { value: 'system', label: 'System voice' },
           ]}
         />
         <p className="wt-help">
-          Made on your computer. The voice downloads the first time Scout speaks (about 92 MB);
-          until then Scout uses the Windows voice.
+          Made on your computer. The voice you pick below starts downloading as soon as you pick it;
+          until it is ready, Scout uses the Windows voice.
         </p>
       </div>
-      <div>
-        <div className="wt-pair">
-          <Select
-            id="wt-voice"
-            label="Voice"
-            value={voice}
-            onChange={setVoice}
-            options={[...VOICES]}
-          />
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setPreviewFailed(false);
-              host
-                .previewVoice({ text: SAMPLE, mouth, voice, speed })
-                .catch(() => setPreviewFailed(true));
-            }}
-          >
-            Preview
-          </Button>
-        </div>
-        {previewFailed && <p className="wt-help">The preview could not play.</p>}
+      <div className="wt-voice">
+        <VoiceField host={host} speed={speed} title="Pick Scout's voice" />
       </div>
       <Slider
         id="wt-speed"

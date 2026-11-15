@@ -135,6 +135,7 @@ export const WALKTHROUGH_CSS = `
 /* Steps 5 to 9 */
 .wt-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 32px; margin-top: 24px; align-items: start; }
 .wt-form > .wt-help:last-child { grid-column: 1 / -1; }
+.wt-form > .wt-voice { grid-column: 1 / -1; }
 .wt-switchrow { justify-content: space-between; flex-wrap: nowrap; padding: 12px 16px; }
 .wt-pair { display: flex; align-items: flex-end; gap: 8px; }
 .wt-pair > :first-child { flex: 1; min-width: 0; }

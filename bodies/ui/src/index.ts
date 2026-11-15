@@ -61,6 +61,7 @@ export type { KnowMe } from './know-me/use-know-me';
 export { ModelField } from './model/model-field';
 export { VoiceModelsField } from './voice/voice-models-field';
 export { VoiceDownloadLine } from './voice/voice-download-line';
+export { VoiceField } from './voice/voice-field';
 export type { KeyHost } from './key/use-key-status';
 
 /** Shared controls: toggle, select, slider, money field, keycap, buttons, and their sheet. */
@@ -89,8 +90,4 @@ export type { HealthFacts } from './health';
 
 /** The first-run walkthrough window's content. */
 export { Walkthrough } from './walkthrough/walkthrough';
-export type {
-  VoicePreview,
-  WalkthroughHost,
-  WalkthroughSettings,
-} from './walkthrough/walkthrough-host';
+export type { WalkthroughHost, WalkthroughSettings } from './walkthrough/walkthrough-host';

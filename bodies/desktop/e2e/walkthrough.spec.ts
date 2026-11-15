@@ -433,6 +433,24 @@ test('the voice step works from the keyboard: switch, slider and select', async 
   await expect(talk).not.toHaveValue('RightControl');
 });
 
+test('the voice card plays a sample at the chosen speed, saves a pick at once, and Next never waits on its download', async () => {
+  await launchWith({ hasKey: true });
+  const tour = await windowFor('walkthrough');
+  await nextTo(tour, 5);
+  await tour.getByRole('button', { name: 'Play George' }).click();
+  await expect.poll(() => brain!.samples.length).toBe(1);
+  expect(brain!.samples[0]).toMatchObject({ voice: 'kokoro-bm-george', speed: 0.95 });
+
+  await tour.getByRole('radio', { name: /George/ }).click();
+  await expect.poll(() => brain!.ttsSets).toEqual(['kokoro-bm-george']);
+  await expect(tour.getByRole('radio', { name: /^George/ })).toContainText('Downloading 40%');
+  await tour.getByRole('button', { name: 'Next' }).click();
+  await expect(tour.getByRole('listitem').nth(5).getByRole('button')).toHaveAttribute(
+    'aria-current',
+    'step',
+  );
+});
+
 async function fitOf(tour: Page) {
   await tour.locator('.wt-footer').waitFor();
   return tour.evaluate(() => {

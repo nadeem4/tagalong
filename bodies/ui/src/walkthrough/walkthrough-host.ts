@@ -1,6 +1,6 @@
 /**
  * What the walkthrough needs from its host: the key calls it shares with Settings, today's spend, Claude Code
- * set-up, finishing the tour, and the settings, voice, browser-folder and Home calls the steps use. Contains
+ * set-up, finishing the tour, and the settings, voice picker, browser-folder and Home calls the steps use. Contains
  * WalkthroughHost and WalkthroughSettings.
  */
 
@@ -9,7 +9,7 @@ import type { HostBridge } from '../host-bridge';
 
 /**
  * The slice of the host's settings the steps read and write. Plain strings: the host
- * validates a patch itself (an unknown talk key or voice is refused there).
+ * validates a patch itself (an unknown talk key is refused there).
  */
 export interface WalkthroughSettings {
   hotkeys: {
@@ -20,20 +20,11 @@ export interface WalkthroughSettings {
   };
   voice: {
     enabled: boolean;
-    voice: string;
     speed: number;
     microphoneId?: string | undefined;
     mouth?: string | undefined;
     ears?: string | undefined;
   };
-}
-
-/** What the step 5 preview plays. */
-export interface VoicePreview {
-  text: string;
-  mouth: 'kokoro' | 'system';
-  voice: string;
-  speed: number;
 }
 
 export type WalkthroughHost = Pick<
@@ -45,6 +36,11 @@ export type WalkthroughHost = Pick<
   | 'openWalkthrough'
   | 'usageSummary'
   | 'setupOverview'
+  | 'ttsState'
+  | 'setTts'
+  | 'playVoiceSample'
+  | 'voiceDownload'
+  | 'fetchVoice'
 > & {
   /**
    * Sets an expert up (install, then log in) with the person's press as the OK, Tagalong's own
@@ -65,7 +61,6 @@ export type WalkthroughHost = Pick<
   getSettings(): Promise<WalkthroughSettings>;
   /** A patch replaces each top-level object it names, so a step sends the whole object. */
   saveSettings(patch: Partial<WalkthroughSettings>): Promise<unknown>;
-  previewVoice(preview: VoicePreview): Promise<void>;
   listMicrophones(): Promise<{ id: string; label: string }[]>;
   /**
    * Reads the microphone's loudness (0..1) for step 5's meter until stop(). The sound itself

@@ -32,7 +32,7 @@ export const VOICE_ADAPTERS: readonly VoiceAdapterFacts[] = [
   {
     id: 'kokoro',
     slot: 'mouth',
-    label: 'Kokoro (on the brain)',
+    label: 'Scout’s voice (on the brain)',
     offline: true,
     screenshots: false,
   },

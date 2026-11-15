@@ -10,6 +10,7 @@ import type { HostBridge } from '@tagalong/ui';
 import { SETTINGS_DEFAULTS } from '../../../shared/settings';
 import type { Settings } from '../../../shared/settings';
 
+import { SettingsUiContext } from './section';
 import { VoiceSection } from './voice-section';
 
 function slider(voice: Partial<Settings['voice']>): { max: string; value: string; saved: string } {
@@ -34,6 +35,44 @@ describe('VoiceSection speed slider', () => {
     const expected = { max: '1.3', value: '1.3', saved: '1.3' };
     expect(slider({ mouth: 'kokoro', speed: 1.3 })).toEqual(expected);
     expect(slider({ mouth: 'system', speed: 1.3 })).toEqual(expected);
+  });
+});
+
+describe('VoiceSection voice card', () => {
+  const html = renderToStaticMarkup(
+    <HostBridgeProvider bridge={{} as HostBridge}>
+      <VoiceSection settings={SETTINGS_DEFAULTS} />
+    </HostBridgeProvider>,
+  );
+
+  it('shows the shared Scout voice card, loading until the brain answers', () => {
+    expect(html).toContain('Scout&#x27;s voice');
+    expect(html).toContain('Loading voices');
+  });
+
+  it('has no two-voice dropdown, no voice field and no Preview button', () => {
+    expect(html).not.toContain('id="f-voice"');
+    expect(html).not.toContain('name="voice"');
+    expect(html).not.toContain('Preview');
+  });
+
+  it('says a picked voice starts downloading at once, not the first time it is needed', () => {
+    const withTip = renderToStaticMarkup(
+      <SettingsUiContext.Provider
+        value={{ tip: 'voice', toggleTip: () => undefined, invalid: null }}
+      >
+        <HostBridgeProvider bridge={{} as HostBridge}>
+          <VoiceSection settings={SETTINGS_DEFAULTS} />
+        </HostBridgeProvider>
+      </SettingsUiContext.Provider>,
+    ).replace(/\s+/g, ' ');
+    expect(withTip).toContain('starts downloading the voice you pick as soon as you pick it');
+    expect(withTip).not.toContain('the first time it is needed');
+  });
+
+  it('names the brain voice Scout’s voice, not Kokoro', () => {
+    expect(html).toContain('Scout’s voice (on the brain)');
+    expect(html).not.toContain('Kokoro (on the brain)');
   });
 });
 

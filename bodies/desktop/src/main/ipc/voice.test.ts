@@ -132,46 +132,42 @@ describe('registerVoiceIpc', () => {
     await expect(invoke(IPC.setFollowUp, 'yes')).rejects.toThrow('open or closed');
   });
 
-  it('previews a voice through the brain’s speak_sample, and gives back the audio', async () => {
+  it('plays a voice sample through the brain’s speak_sample with the voice and speed', async () => {
     const { invoke, brain } = setup();
     brain.call.mockResolvedValue([
       { type: 'text', text: JSON.stringify({ mime: 'audio/wav', data: 'UklGRg==' }) },
     ]);
-    expect(await invoke(IPC.speakSample, 'Hello', 'bm_george', 1.1)).toEqual({
+    expect(await invoke(IPC.speakSample, 'piper-alan', 0.95)).toEqual({
       mime: 'audio/wav',
       data: 'UklGRg==',
     });
-    expect(brain.call).toHaveBeenCalledWith('speak_sample', {
-      text: 'Hello',
-      voice: 'bm_george',
-      speed: 1.1,
-    });
+    expect(brain.call).toHaveBeenCalledWith('speak_sample', { voice: 'piper-alan', speed: 0.95 });
   });
 
-  it('gives back null when the brain has no voice to preview with', async () => {
+  it('gives back null when the brain has no voice to sample', async () => {
     const { invoke, brain } = setup();
     brain.call.mockResolvedValue([{ type: 'text', text: 'Voice is not running on this brain.' }]);
-    expect(await invoke(IPC.speakSample, 'Hello', 'bm_george', 1)).toBeNull();
+    expect(await invoke(IPC.speakSample, 'piper-alan', 1)).toBeNull();
     brain.call.mockRejectedValue(new BrainOffline());
-    expect(await invoke(IPC.speakSample, 'Hello', 'bm_george', 1)).toBeNull();
+    expect(await invoke(IPC.speakSample, 'piper-alan', 1)).toBeNull();
   });
 
-  it('coerces what the panel sends for a preview before it reaches the brain', async () => {
+  it('coerces what the page sends for a sample before it reaches the brain', async () => {
     const { invoke, brain } = setup();
     brain.call.mockResolvedValue([
       { type: 'text', text: JSON.stringify({ mime: 'audio/wav', data: 'AA==' }) },
     ]);
-    await invoke(IPC.speakSample, 'Hi', 5, '1.5');
-    expect(brain.call).toHaveBeenCalledWith('speak_sample', { text: 'Hi', voice: '5', speed: 1.5 });
+    await invoke(IPC.speakSample, 5, '1.5');
+    expect(brain.call).toHaveBeenCalledWith('speak_sample', { voice: '5', speed: 1.5 });
     brain.call.mockClear();
-    expect(await invoke(IPC.speakSample, 'Hi', 'bm_george', 'fast')).toBeNull();
+    expect(await invoke(IPC.speakSample, 'piper-alan', 'fast')).toBeNull();
     expect(brain.call).not.toHaveBeenCalled();
   });
 
-  it('gives back null when the brain rejects the preview as an RPC error', async () => {
+  it('gives back null when the brain refuses the sample as an RPC error', async () => {
     const { invoke, brain } = setup();
-    brain.call.mockRejectedValue(new Error('speak_sample: text is too long'));
-    expect(await invoke(IPC.speakSample, 'Hello', 'bm_george', 1)).toBeNull();
+    brain.call.mockRejectedValue(new Error('speak_sample: No sample yet.'));
+    expect(await invoke(IPC.speakSample, 'piper-alan', 1)).toBeNull();
   });
 });
 

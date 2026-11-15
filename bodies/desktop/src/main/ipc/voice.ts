@@ -254,17 +254,16 @@ export function registerVoiceIpc(handle: IpcHandle, deps: VoiceIpcDeps): void {
     deps.listening().setFollowUp(open);
   });
 
-  // Settings' Preview: the brain speaks one line and sends the audio back. Anything but audio
-  // (no voice running, brain offline) is null, and the form falls back to the system voice.
+  // The picker's Play: the brain makes a voice's sample and sends the audio back. Anything but
+  // audio (no voice running, no sample yet, brain offline) is null, and Play says it could not.
   handle(
     IPC.speakSample,
-    async (_event, text: unknown, voice: unknown, speed: unknown): Promise<SpeakSample | null> => {
-      // Whatever the panel sends is coerced here; a speed that is no number is no preview.
+    async (_event, voice: unknown, speed: unknown): Promise<SpeakSample | null> => {
+      // Whatever the page sends is coerced here; a speed that is no number is no sample.
       const rate = Number(speed);
       if (!Number.isFinite(rate)) return null;
       try {
         const sample = (await callJson(deps.brain, 'speak_sample', {
-          text: String(text),
           voice: String(voice),
           speed: rate,
         })) as Partial<SpeakSample>;

@@ -56,9 +56,9 @@ describe('SettingsFormView', () => {
     expect(html.indexOf('>Save<')).toBeLessThan(html.indexOf('<section'));
   });
 
-  it('draws every section as a home card', () => {
+  it('draws every section as a home card, and the voice card inside Voice', () => {
     const html = render();
-    expect(html.match(/<section [^>]*class="[^"]*tg-card/g)).toHaveLength(9);
+    expect(html.match(/<section [^>]*class="[^"]*tg-card/g)).toHaveLength(10);
   });
 
   it('has the Speech to text card after Voice, with the show-words switch on by default', () => {

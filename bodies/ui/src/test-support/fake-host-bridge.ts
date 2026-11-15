@@ -18,6 +18,7 @@ import type {
   MemoryEntry,
   ModelState,
   SttState,
+  TtsState,
   VoiceDownload,
   SetupOverview,
   SetupResult,
@@ -77,6 +78,13 @@ export interface FakeHostBridge extends HostBridge {
   stt: SttState;
   readonly sttSets: readonly { live?: string; final?: string }[];
   sttError: string | null;
+  /** The speaking voices as the brain reports them, every voice handed to setTts, and a refusal. */
+  tts: TtsState;
+  readonly ttsSets: readonly string[];
+  ttsError: string | null;
+  /** Every `[voice, speed]` handed to playVoiceSample; sampleError makes the next ones reject. */
+  readonly samplesPlayed: readonly [string, number][];
+  sampleError: string | null;
   /** What voiceDownload answers; null makes it fail. Each fetchVoice call's `retry` is kept. */
   voiceDownloadState: VoiceDownload | null;
   readonly voiceFetches: boolean[];
@@ -193,6 +201,19 @@ function sttRow(id: string, label: string, role: 'live' | 'final', size_mb: numb
   return { id, label, role, size_mb, gpu: 'none' as const, languages: ['en'], note: '' };
 }
 
+function ttsRow(id: string, label: string, size_mb: number, installed: boolean) {
+  return {
+    id,
+    label,
+    descriptor: 'Warm, British',
+    engine: id.split('-')[0] ?? 'piper',
+    size_mb,
+    licence: 'MIT',
+    installed,
+    sample: true,
+  };
+}
+
 /**
  * Shipped from the package rather than kept in test files: the extension's side-panel tests
  * use the same bridge double without booting a brain.
@@ -292,6 +313,8 @@ export function createFakeHostBridge(
   const limitsSet: number[] = [];
   const modelsSet: string[] = [];
   const sttSets: { live?: string; final?: string }[] = [];
+  const ttsSets: string[] = [];
+  const samplesPlayed: [string, number][] = [];
   const voiceFetches: boolean[] = [];
   const walkthroughOpens: (number | undefined)[] = [];
 
@@ -645,6 +668,33 @@ export function createFakeHostBridge(
     },
     sttSets,
     sttError: null,
+    tts: {
+      chosen: 'auto',
+      resolved: 'piper-alan',
+      voices: [
+        ttsRow('piper-alan', 'Alan', 63, true),
+        ttsRow('kokoro-bm-george', 'George', 92, false),
+      ],
+      download: { voice: 'piper-alan', status: 'ready', progress: 1 },
+    },
+    ttsSets,
+    ttsError: null,
+    samplesPlayed,
+    sampleError: null,
+    ttsState() {
+      return Promise.resolve({ ...fake.tts });
+    },
+    setTts(voice) {
+      if (fake.ttsError !== null) return Promise.reject(new Error(fake.ttsError));
+      ttsSets.push(voice);
+      fake.tts = { ...fake.tts, chosen: voice };
+      return Promise.resolve();
+    },
+    playVoiceSample(voice, speed) {
+      if (fake.sampleError !== null) return Promise.reject(new Error(fake.sampleError));
+      samplesPlayed.push([voice, speed]);
+      return Promise.resolve();
+    },
     voiceDownloadState: { status: 'ready', progress: 1 },
     voiceFetches,
     voiceDownload() {

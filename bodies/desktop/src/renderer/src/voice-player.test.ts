@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   applySpeechControl,
   pickSystemVoice,
-  previewVoice,
+  playVoiceSample,
   SpeechPlayer,
   speakWithSystem,
 } from './voice-player';
@@ -418,33 +418,25 @@ describe('speakWithSystem', () => {
   });
 });
 
-describe('previewVoice', () => {
-  const line = { text: 'Hello.', mouth: 'kokoro', voice: 'bm_fable', speed: 1.1 } as const;
+describe('playVoiceSample', () => {
   const signal = new AbortController().signal;
 
-  it('plays the brain’s sample in the form’s voice and speed', async () => {
+  it('plays the brain’s sample of the voice at the speed', async () => {
     const deps = {
       sample: vi.fn(() => Promise.resolve({ data: 'UklG' })),
       wav: vi.fn(() => Promise.resolve()),
-      system: vi.fn(() => Promise.resolve()),
     };
-    await previewVoice(line, signal, deps);
-    expect(deps.sample).toHaveBeenCalledWith('Hello.', 'bm_fable', 1.1);
+    await playVoiceSample('piper-alan', 0.95, signal, deps);
+    expect(deps.sample).toHaveBeenCalledWith('piper-alan', 0.95);
     expect(deps.wav).toHaveBeenCalledWith('UklG', signal);
-    expect(deps.system).not.toHaveBeenCalled();
   });
 
-  it('uses the system voice when the brain has no sample, and never asks for System voice', async () => {
+  it('rejects when the brain has no sample, so the picker can say so', async () => {
     const deps = {
       sample: vi.fn(() => Promise.resolve(null)),
       wav: vi.fn(() => Promise.resolve()),
-      system: vi.fn(() => Promise.resolve()),
     };
-    await previewVoice(line, signal, deps);
-    expect(deps.system).toHaveBeenCalledWith('Hello.', signal, 1.1);
-    deps.sample.mockClear();
-    await previewVoice({ ...line, mouth: 'system' }, signal, deps);
-    expect(deps.sample).not.toHaveBeenCalled();
-    expect(deps.system).toHaveBeenCalledTimes(2);
+    await expect(playVoiceSample('piper-alan', 1, signal, deps)).rejects.toThrow('sample');
+    expect(deps.wav).not.toHaveBeenCalled();
   });
 });

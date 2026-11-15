@@ -2359,7 +2359,8 @@ brain sends and falls back to the system voice for a text-only `speech` frame.
   `voice` frame: that channel is the ears' alone, and text without `pcm` already means "use your
   own voice". A failed load is tried again on the next spoken turn.
 - **One synth at a time.** One worker makes and sends one chunk at a time, and a lock keeps
-  Preview's `sample` from overlapping it, because the espeak phonemizer is not thread-safe.
+  a voice sample (`sample`) from overlapping it, because the espeak phonemizer is not
+  thread-safe.
 - **Pause, resume, clear.** `Mouth.pause()` takes effect after the sentence in flight is sent;
   what is queued stays and `resume()` carries on in order. `clear(turn)` (every turn when `None`)
   drops that turn's queued sentences, ignores its later deltas and sends no more `speech` for it

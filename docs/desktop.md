@@ -216,7 +216,7 @@ The same call backs **Start brain** on the offline card, so it also runs when th
   events to every window on `IPC.turnEvent`. After a reconnect the client reports `resync`, and
   main ends any turn that was open when the socket dropped (the bubble shows it as failed).
 - **Settings.** The desktop's local `SettingsStore` holds its own settings (hotkeys, listening,
-  exclusions, `voice.showWordsWhileTalking`). The brain's model, speech models, key and budget belong to the brain; the app only asks it (`key:status`, `key:set`, `limit:set`, `IPC.sttState` and `IPC.sttSet` in `ipc/voice-models.ts`, which call the Home tools `stt_state` and `set_stt`).
+  exclusions, `voice.showWordsWhileTalking`). The brain's model, speech models, key and budget belong to the brain; the app only asks it (`key:status`, `key:set`, `limit:set`, `IPC.sttState` and `IPC.sttSet` in `ipc/voice-models.ts`, which call the Home tools `stt_state` and `set_stt`; `IPC.ttsState` and `IPC.ttsSet`, which call `tts_state` and `set_tts`).
   Settings' **Speech to text** card (`renderer/src/settings/stt-section.tsx`) picks the models and
   holds **Show words while I talk**: `panelSettings` carries it to `useTalk`, and `shownPartial`
   (`talk-rules.ts`) hides a held (push-to-talk) question's live words when it is off, so the text
@@ -279,14 +279,14 @@ Rules each module enforces:
   `moments.ts`) and asking (the ask and pause keys as keycaps, a static bubble preview, what Scout
   never looks at). The side panel carries the `on-navy` class so shared controls draw a gold focus
   ring there. Steps 5 to 9 sit on the shared controls: voice (a `Select` for the talk key, who
-  speaks, voice and microphone, a `Toggle` for Scout talks, a `Slider` for speed, and a "Test your microphone" `MicTest` under the microphone that shows its level through the host's `watchMicLevel`; see [voice.md](voice.md#the-level-meter)), everyday jobs (a list from `bodies/ui/src/jobs-kinds.ts` that only explains, with no buttons: connecting happens on step 11), browser (a numbered list; copy `chrome://extensions` or `edge://extensions`, Show
+  speaks and microphone, the shared `VoiceField` ("Pick Scout's voice") that saves its own pick at once, a `Toggle` for Scout talks, a `Slider` for speed, and a "Test your microphone" `MicTest` under the microphone that shows its level through the host's `watchMicLevel`; see [voice.md](voice.md#the-level-meter)), everyday jobs (a list from `bodies/ui/src/jobs-kinds.ts` that only explains, with no buttons: connecting happens on step 11), browser (a numbered list; copy `chrome://extensions` or `edge://extensions`, Show
   folder and Copy folder path for the add-on), "Scout asks first, and you set the limit" (a static
   approval card, the daily limit in the shared `MoneyField` stepper, saved with `set_daily_limit`
   only on Next, and only if it changed; an amount of 0 or less blocks Next; Settings' `LimitField`
   uses the same field; the tour shows a quiet "Spent today: $0.42" line under it, read once through
   `usageSummary`, which the walkthrough host carries; Settings shows "$0.42 of $5.00 used today" with a slim meter instead, read again after a turn starts or
   ends; an unreadable spend shows nothing) and the key. Steps 4 and 5 stage their choices (ask
-  key, talk key, Scout talks, voice, speed, microphone) and write them through `saveSettings`
+  key, talk key, Scout talks, who speaks, speed, microphone; the voice pick is not staged) and write them through `saveSettings`
   only on Next, sending the whole `hotkeys` or `voice` object. The side list jumps only to steps
   already reached. Skip finishes when a key is set, else goes to step 9 (the key step).
   Step 9 wraps the shared `KeyField` and reports whether the key is good (checked, already set,
