@@ -14,8 +14,6 @@ There are three ways in:
 
 The [user guide](#using-tagalong) follows.
 
-Tagalong is licensed GPL-3.0-or-later (see [LICENSE](LICENSE)).
-
 ## Download and run it
 
 Download `Tagalong-Setup-<version>-x64.exe` from the
