@@ -1,11 +1,11 @@
-"""Tests for to_speakable, merge_short_lines and SpokenStream: what Scout says aloud.
+"""Tests for to_speakable and SpokenStream: what Scout says aloud.
 
 Cases are ported from the desktop's speakable and spoken-stream tests, which this replaces.
 """
 
 import pytest
 
-from brain.voice.speakable import SpokenStream, merge_short_lines, to_speakable
+from brain.voice.speakable import SpokenStream, to_speakable
 
 
 @pytest.mark.parametrize(
@@ -41,21 +41,17 @@ def test_to_speakable_says_every_sentence_of_a_long_answer():
     assert to_speakable(long) == long
 
 
-def test_merge_short_lines_joins_short_ones():
-    assert merge_short_lines(["Done.", "All green.", "Shall I push?"]) == [
-        "Done. All green. Shall I push?"
-    ]
-
-
-def test_merge_short_lines_leaves_a_long_line_alone():
-    long = "The tests passed on the first run, and the build is ready to ship."
-    assert merge_short_lines([long, "Done."]) == [long, "Done."]
-    assert merge_short_lines([]) == []
-
-
 def stream():
     said: list[str] = []
-    return said, SpokenStream(said.append)
+    paragraphs: list[bool] = []
+
+    def say(line: str, paragraph_end: bool) -> None:
+        said.append(line)
+        paragraphs.append(paragraph_end)
+
+    s = SpokenStream(say)
+    s.paragraphs = paragraphs  # type: ignore[attr-defined]
+    return said, s
 
 
 def test_first_sentence_is_said_before_the_answer_ends():
@@ -228,3 +224,65 @@ def test_a_list_marker_then_its_item_is_still_spoken():
     s.push("apples\n")
     s.end()
     assert said == ["apples"]
+
+
+@pytest.mark.parametrize(
+    ("text", "sentences"),
+    [
+        ("Use e.g. Python. Then stop.", ["Use e.g. Python.", "Then stop."]),
+        ("Ask Dr. Smith about it. Okay.", ["Ask Dr. Smith about it.", "Okay."]),
+        ("It is 3.5 percent. Fine.", ["It is 3.5 percent.", "Fine."]),
+        ("Version v1.2.3 is out. Update.", ["Version v1.2.3 is out.", "Update."]),
+        ("I waited... then left. Bye.", ["I waited... then left.", "Bye."]),
+        ("Ask J. Smith. Then go.", ["Ask J. Smith.", "Then go."]),
+        ("Line one\nstill line one. Next.", ["Line one still line one.", "Next."]),
+        ("Wait. What?! Really.", ["Wait.", "What?!", "Really."]),
+        ('She said "stop." Then left.', ['She said "stop."', "Then left."]),
+        ("Hello world.", ["Hello world."]),
+        ("Mind etc. Then more. Fine.", ["Mind etc. Then more.", "Fine."]),
+    ],
+)
+def test_find_sentence_end(text, sentences):
+    said, s = stream()
+    s.push(text)
+    s.end()
+    assert said == sentences
+
+
+def test_a_blank_line_ends_the_sentence_and_the_paragraph():
+    said, s = stream()
+    s.push("First paragraph.\n\nSecond one here.")
+    s.end()
+    assert said == ["First paragraph.", "Second one here."]
+    assert s.paragraphs == [True, False]  # type: ignore[attr-defined]
+
+
+def test_a_blank_line_ends_a_sentence_with_no_mark():
+    said, s = stream()
+    s.push("A heading line\n\nThen text here.")
+    s.end()
+    assert said == ["A heading line", "Then text here."]
+    assert s.paragraphs[0] is True  # type: ignore[attr-defined]
+
+
+def test_a_sentence_mark_at_the_very_end_waits_for_more():
+    said, s = stream()
+    s.push("It is done. ")
+    assert said == []
+    s.push("Next")
+    assert said == ["It is done."]
+
+
+def test_punctuation_only_lines_are_not_spoken():
+    assert to_speakable("Hi there friend one.\n-\n--\n") == "Hi there friend one."
+
+
+def test_a_long_unpunctuated_paragraph_leaves_before_the_end():
+    said, s = stream()
+    text = " ".join(f"w{i}" for i in range(300))
+    for i in range(0, len(text), 7):
+        s.push(text[i : i + 7])
+    assert len(said) >= 5  # cut under the word cap while it streams, not held for end()
+    assert all(len(line.split()) <= 45 for line in said)
+    s.end()
+    assert " ".join(said).split() == text.split()

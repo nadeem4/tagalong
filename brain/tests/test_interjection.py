@@ -20,11 +20,17 @@ from brain.mind.turn import Final
 from brain.voice.mouth import Mouth
 
 KINDS = {"nudge": EventKind("nudge", urgency="next_pause", batch_seconds=0, max_per_hour=10)}
+# Each is a chunk of its own: the first is a whole sentence, the others are at the chunk target.
 SENTENCES = [
-    "The first part of the story is about a quiet harbour town.",
-    "The second part is about the old lighthouse keeper's cat.",
-    "The third part is about a storm that nobody saw coming.",
-    "The fourth part is about how the town rebuilt together.",
+    "The first part of the story is about a quiet harbour town, where the fishing boats "
+    "come home each evening and the whole street smells of salt, smoke and warm bread.",
+    "The second part is about the old lighthouse keeper's cat, who sleeps on the warm lamp "
+    "housing all day and, on every clear night, watches the ships cross the dark bay.",
+    "The third part is about a storm that nobody saw coming, which pushed the water over "
+    "the harbour wall and scattered every net, every crate and every small boat along the shore.",
+    "The fourth part is about how the town rebuilt together, with neighbours lending tools, "
+    "children carrying planks, and the keeper's cat supervising from the highest dry wall "
+    "of the whole harbour.",
 ]
 HEARD = 2  # the body finished two sentences when the break came
 SAID = "Sam wrote back, want it now?"
@@ -110,7 +116,7 @@ class Scripted:
             }
         )
         if max_tokens is None:
-            text = " ".join(SENTENCES) + " "
+            text = " ".join(SENTENCES) + "\n\n"  # a blank line proves the last sentence over
             yield text
             await self.gate.wait()
             yield Final([{"type": "text", "text": text}], "end_turn", SimpleNamespace())

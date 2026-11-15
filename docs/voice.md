@@ -67,22 +67,41 @@ flowchart LR
 
 ### The mouth's queue
 
-Every spoken sentence of every turn goes into one queue and one worker says them in order: it
+Every spoken chunk of every turn goes into one queue and one worker says them in order: it
 makes the audio in a thread, waits for it, then sends the `speech` frame. Two syntheses therefore
 never overlap, and a talk-over or a pause never has to cancel a synth thread.
+
+A chunk is a few whole sentences, because a voice reads them better together than one by one.
+`SpokenStream` (`speakable.py`) finds the sentences as the reply streams: a `.`, `!` or `?` ends one
+when a capital, digit or quote follows, but not after an abbreviation (`e.g.`, `i.e.`, `etc.`,
+`Dr.`, `St.`, an initial like `J.`), inside `3.5` or `v1.2.3`, or after a list number; a single
+line break is a space except that a sentence ends before a list, table, quote, fence, `---` or
+heading line and after a heading line (a sentence with no mark gets a `.` when chunks are joined);
+a blank line ends the sentence and the paragraph, a line with no word in it (`-`, `--`) is
+dropped, and text that ends right after a mark waits for more; an unpunctuated run over 45 words
+is cut at its last comma or space as it streams. The `Chunker` (`chunker.py`) groups them, with constants meant for
+tuning by ear: the first chunk is the first complete sentence of at least `FIRST_MIN_WORDS = 4`
+words; later chunks grow by whole sentences to `TARGET_WORDS = 30`; a sentence that would pass
+`MAX_WORDS = 45` starts the next chunk; one sentence over 45 words is cut at its last comma or
+semicolon before the cap, else at the last space; a paragraph break ends the chunk; a chunk or
+paragraph of `LONE_WORDS = 3` words or fewer joins the previous unsent chunk, else waits for the
+next sentence, and is said alone only when it is the whole reply. One `speech` frame is one chunk,
+`n` counts chunks, and `interrupted.heard` counts whole chunks: the chunk being played when the
+person talks over Scout is unheard, and everything from it on is in the unsaid rest. A chunk the
+chunker still holds when the turn is cut is kept in that rest too.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 flowchart LR
-  SAY["reply deltas"] --> SENT["sentences"] --> Q["one queue"]
+  SAY["reply deltas"] --> SENT["sentences"] --> CH["chunks"] --> Q["one queue"]
   Q --> W["worker: one at a time"]
   W -->|"synth in a thread, awaited"| F["speech frame to the body"]
-  PAUSE["pause"] -.->|"takes effect after the sentence in flight"| W
+  PAUSE["pause"] -.->|"takes effect after the chunk in flight"| W
   RESUME["resume"] -.-> W
-  CLEAR["clear(turn)"] -.->|"drops queued sentences, keeps them in the log"| Q
+  CLEAR["clear(turn)"] -.->|"drops queued chunks, keeps them in the log"| Q
 ```
 
-`Mouth.state` is `talking` (a sentence is being made or sent, or more are queued),
+`Mouth.state` is `talking` (a chunk is being made or sent, or more are queued),
 `sentence_break` (a reply is still open but nothing is queued), `paused` or `idle`; `on_state` is
 called on each change (the brain wires it to the dispatcher as the fallback when no body reports
 what it plays; the desktop's `speech_state` wins). `pause()` and `resume()` also send
@@ -97,19 +116,19 @@ every turn spoken on that body.
 
 Contract v1 (see [protocol/README.md](../protocol/README.md)):
 
-| Frame                                            | Direction     | Meaning                                                                                                                                                                                                                                                                                                                                        |
-| ------------------------------------------------ | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `listen { mode: 'held' or 'always' }`            | body to brain | Request: start hearing. Rejected with `BrainOffline` while the brain is down; the desktop then shows "Listening could not start" or the offline words.                                                                                                                                                                                         |
-| `mic { pcm }`                                    | body to brain | A frame of 16 kHz mono 16-bit samples, base64. Main converts the renderer's Float32 frame (clamped, rounded).                                                                                                                                                                                                                                  |
-| `unlisten`                                       | body to brain | Notification: stop hearing. In held mode the brain then ends the turn with what it heard.                                                                                                                                                                                                                                                      |
-| `hush`                                           | body to brain | Notification: stop speaking now.                                                                                                                                                                                                                                                                                                               |
-| `speech_state { turn, n?, state }`               | body to brain | Notification: the player started or ended sentence `n`, paused, or went idle (`started`, `ended`, `paused`, `idle`). Live only. The brain feeds it to the dispatcher (`started` is talking, `ended` a sentence break, then `paused` or `idle`); it wins over the mouth's own state while a body reports it, and `idle` ends that body's claim. |
-| `say { ..., spoken: true, voice, speed }`        | body to brain | A heard question is asked as spoken, with the voice and speed from Settings. Other turns are spoken per `read_aloud`.                                                                                                                                                                                                                          |
-| `heard { event, text? }`                         | brain to body | `speech_start`, `partial`, `final`, `turn_end`. Main maps these to the renderer's `speechStart`, `partial`, `final`, `turnEnd`.                                                                                                                                                                                                                |
-| `voice { status, message?, progress? }`          | brain to body | The ears' models: `loading` (with `progress`), `ready` or `failed`. Only the ears send it; the mouth sends none.                                                                                                                                                                                                                               |
-| `speech { turn, n?, text?, pcm?, sample_rate? }` | brain to body | One sentence: `n` (1-based within its turn), `text`, plus `pcm` (16-bit, 24,000 Hz, base64) when Kokoro spoke it. A frame with `text` only means use the system voice.                                                                                                                                                                         |
-| `speech { turn, done: true }`                    | brain to body | The last sentence of that turn has been sent.                                                                                                                                                                                                                                                                                                  |
-| `speech_control { action, turn? }`               | brain to body | `pause` holds the player where it is, `resume` carries on from the held sentence, `clear` drops what is queued (one turn's, if `turn` is given). Live only. The mouth sends `pause` and `resume` to the body playing the turn when it pauses or resumes (an interjection holds the queue this way); `clear` is not sent yet.                   |
+| Frame                                            | Direction     | Meaning                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------ | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `listen { mode: 'held' or 'always' }`            | body to brain | Request: start hearing. Rejected with `BrainOffline` while the brain is down; the desktop then shows "Listening could not start" or the offline words.                                                                                                                                                                                   |
+| `mic { pcm }`                                    | body to brain | A frame of 16 kHz mono 16-bit samples, base64. Main converts the renderer's Float32 frame (clamped, rounded).                                                                                                                                                                                                                            |
+| `unlisten`                                       | body to brain | Notification: stop hearing. In held mode the brain then ends the turn with what it heard.                                                                                                                                                                                                                                                |
+| `hush`                                           | body to brain | Notification: stop speaking now.                                                                                                                                                                                                                                                                                                         |
+| `speech_state { turn, n?, state }`               | body to brain | Notification: the player started or ended chunk `n`, paused, or went idle (`started`, `ended`, `paused`, `idle`). Live only. The brain feeds it to the dispatcher (`started` is talking, `ended` a chunk break, then `paused` or `idle`); it wins over the mouth's own state while a body reports it, and `idle` ends that body's claim. |
+| `say { ..., spoken: true, voice, speed }`        | body to brain | A heard question is asked as spoken, with the voice and speed from Settings. Other turns are spoken per `read_aloud`.                                                                                                                                                                                                                    |
+| `heard { event, text? }`                         | brain to body | `speech_start`, `partial`, `final`, `turn_end`. Main maps these to the renderer's `speechStart`, `partial`, `final`, `turnEnd`.                                                                                                                                                                                                          |
+| `voice { status, message?, progress? }`          | brain to body | The ears' models: `loading` (with `progress`), `ready` or `failed`. Only the ears send it; the mouth sends none.                                                                                                                                                                                                                         |
+| `speech { turn, n?, text?, pcm?, sample_rate? }` | brain to body | One chunk (a few whole sentences): `n` (1-based within its turn), `text`, plus `pcm` (16-bit, 24,000 Hz, base64) when Kokoro spoke it. A frame with `text` only means use the system voice.                                                                                                                                              |
+| `speech { turn, done: true }`                    | brain to body | The last chunk of that turn has been sent.                                                                                                                                                                                                                                                                                               |
+| `speech_control { action, turn? }`               | brain to body | `pause` holds the player where it is, `resume` carries on from the held chunk, `clear` drops what is queued (one turn's, if `turn` is given). Live only. The mouth sends `pause` and `resume` to the body playing the turn when it pauses or resumes (an interjection holds the queue this way); `clear` is not sent yet.                |
 
 `heard`, `voice`, `speech`, `speech_state` and `speech_control` are live only (no `seq`), so they are not replayed after a
 reconnect. `createVoiceBridge` remembers the open listening mode (also when `listen` found the
@@ -419,7 +438,7 @@ or for a partial that `mightBeStop`. Main and the panel apply the same addressin
 `answering`, both from `SpeechPlayer`'s `onState`.
 
 - **Opening.** The window opens when Scout's answer to a question asked by voice has finished
-  both streaming and speaking, and some of it was said aloud. A gap between sentences does not
+  both streaming and speaking, and some of it was said aloud. A gap between chunks does not
   open it.
 - **What opens nothing.** Talking over Scout (`cue.hushed()` in `begin`), the stop button or stop key
   (`hush`), and the bubble's close (`cancel`).
@@ -476,15 +495,15 @@ flowchart TD
   voice coming back: `echoOf(transcript, playingText)` is a plain match of at least two words,
   in a row, inside the text of the turn being spoken. A lone word is never an echo, so a bare
   "stop" always reaches Scout. No model and no word lists.
-- **What the brain gets.** `interrupted { turn, heard }`: `heard` is the number of sentences
+- **What the brain gets.** `interrupted { turn, heard }`: `heard` is the number of chunks
   played to the end (`SpeechPlayer.interruption()`, counted from the numbered `speech` frames).
   It travels on the `ask` payload itself (`AskInput.interrupted`), so it can never attach to a
   later question. The player's `cutOff()` hushes the brain first, so the mouth keeps the turn's
-  sentence log (sent and made-but-unsent) through the hush: the unsaid rest survives.
-  `SpeechPlayer.text()` (the echo check) is only the sentence playing and the one before it.
+  chunk log (sent and made-but-unsent) through the hush: the unsaid rest survives.
+  `SpeechPlayer.text()` (the echo check) is only the chunk playing and the one before it.
 - **What the brain does.** `Session.say` pauses that turn (`Session.interrupt`: generation stops,
-  nothing is cancelled and no open item is closed), saves only the sentences that were said,
-  marked `[interrupted: the owner spoke over this]`, and gives the model the unsaid sentences
+  nothing is cancelled and no open item is closed), saves only the chunks that were said,
+  marked `[interrupted: the owner spoke over this]`, and gives the model the unsaid chunks
   once, in a `<data kind="interruption">` block with the owner's words. A tool still running
   finishes in the background and its result comes back through the front door as a
   `tool_result` event. See [Brain](brain.md).
@@ -500,6 +519,9 @@ horizontal rule between them with no body change. The blank line before the divi
 without it Markdown renders the spoken part above as a heading. With no divider the whole reply is spoken; a
 divider with nothing before it says nothing at all. A second divider changes nothing, and a `---`
 inside a sentence (`5---6`) is not a divider, only a line of its own is.
+
+A short lead-in said before a tool round is held by the chunker until more text arrives, so it can
+wait through the round; this is accepted.
 
 The model is told the rule by the ear guide (`mind/ear.md`), which every read-aloud turn carries
 (see [brain.md](brain.md#brain-mouth)): write the spoken part for the ear, put
@@ -519,7 +541,7 @@ unasked), and a long tool result reaches it as a capped preview (see
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 flowchart LR
-  B["Brain: speech frames, one per sentence"] --> VB["Main: createVoiceBridge"]
+  B["Brain: speech frames, one per chunk"] --> VB["Main: createVoiceBridge"]
   VB -->|"IPC speechChunk"| SP["SpeechPlayer.enqueue"]
   VB -->|"IPC speechDone"| SD["SpeechPlayer.done(turn)"]
   SP -->|"mouth kokoro and pcm present"| WA["WebAudio + AnalyserNode"]
