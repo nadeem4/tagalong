@@ -51,7 +51,9 @@ are required:
 
 - `ask(input: AskInput): Promise<{ turnId }>`. `AskInput` is `{ petId, conversationId?, text?,
 snapshot?, spoken?, drop? }`. No `conversationId` opens a new conversation; `turn.started`
-  reports its id. `spoken: true` marks a question asked by voice. `drop: true` is set only by a
+  reports its id. The brain may run a whole turn before the ask returns, so the bubble keeps the
+  turn events that arrive while an ask is in flight and replays those of the turn it returns.
+  `spoken: true` marks a question asked by voice. `drop: true` is set only by a
   button on the drop card, and the host then reads the dropped item and attaches it as
   `snapshot.dropped`.
 - `interrupt(turnId)`.
