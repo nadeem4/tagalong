@@ -439,3 +439,7 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 - [Feature test guide](docs/testing/feature-test-guide.md): manual tests for this build.
 - [Product](bodies/PRODUCT.md) and [design system](bodies/DESIGN.md).
 - [Privacy in detail](docs/privacy.md): exactly what is read, when, and what never is.
+
+## Licence
+
+Tagalong is free software under the [GNU General Public License v3.0 or later](LICENSE). The mascot engine in `bodies/mascot` is a fork of wobnimo and keeps its MIT licence ([bodies/mascot/LICENSE](bodies/mascot/LICENSE)).
