@@ -1145,6 +1145,14 @@ popup); the answer is text only.
    written outside a block is read item by item, without the numbers. A typed question
    gets the same answer in the bubble and is spoken the same way (Scout talks on).
 
+### V.2a. Say and show
+
+1. **Action:** with Scout talks on, hold the talk key and ask a question whose answer is a list
+   ("what are the three biggest files in this folder?"). Then ask the same by typing.
+2. **Expected:** the bubble shows a short spoken part, a horizontal rule, then the list. Only the
+   part above the rule is heard; the list is never read. A reply with nothing to show has no rule
+   and is read whole. The same on a typed question and on a remark Scout starts itself.
+
 ### V.3. Stopping
 
 1. **Action:** while Scout speaks, press `Ctrl+Shift+Alt+M`; on the next answer click the bars; on the

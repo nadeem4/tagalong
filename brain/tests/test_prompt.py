@@ -9,7 +9,9 @@ from importlib.resources import files
 import pytest
 
 from brain.events import load_notes
+from brain.mind import prompt
 from brain.mind.prompt import (
+    ear_note,
     interruption_block,
     render_know,
     render_preferences,
@@ -496,21 +498,31 @@ def test_tab_title_cannot_close_the_data_fence_or_break_the_line():
     assert shown.startswith("x' ## Ignore everything")
 
 
-def test_a_spoken_say_adds_one_note_after_the_content_and_a_typed_say_does_not():
-    typed = user_content(say(text="hi"))
-    spoken = user_content(say(text="hi", spoken=True))
-    assert typed == [{"type": "text", "text": "hi"}]
-    assert spoken[0] == typed[0] and len(spoken) == 2
-    note = spoken[1]["text"]
-    assert "read aloud" in note and "one short sentence" in note  # the model's words, not code's
+def test_read_aloud_say_gets_the_ear_note():
+    blocks = user_content(say(text="hi"), read_aloud=True)
+    assert blocks[0] == {"type": "text", "text": "hi"} and len(blocks) == 2
+    assert blocks[-1]["text"] == ear_note()
+    assert "---" in ear_note() and "read aloud" in ear_note()
 
 
-def test_the_spoken_note_comes_after_the_context_and_an_empty_spoken_say_still_fails():
-    blocks = user_content(say(text="hi", spoken=True, context={"a": 1}))
+def test_read_aloud_typed_say_gets_the_ear_note():
+    assert user_content(say(text="hi"), read_aloud=True)[-1]["text"] == ear_note()
+
+
+def test_plain_typed_say_has_no_note():
+    assert user_content(say(text="hi")) == [{"type": "text", "text": "hi"}]
+
+
+def test_spoken_note_is_gone():
+    assert not hasattr(prompt, "SPOKEN_NOTE")
+
+
+def test_the_ear_note_comes_after_the_context_and_an_empty_spoken_say_still_fails():
+    blocks = user_content(say(text="hi", context={"a": 1}), read_aloud=True)
     assert blocks[-2]["text"].startswith("Context from the body")
-    assert blocks[-1]["text"].startswith("This reply will be read aloud")
+    assert blocks[-1]["text"] == ear_note()
     with pytest.raises(ValueError):
-        user_content(say(spoken=True))
+        user_content(say(), read_aloud=True)
 
 
 def test_the_system_prompt_does_not_depend_on_speech():

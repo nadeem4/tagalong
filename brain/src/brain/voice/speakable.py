@@ -1,7 +1,8 @@
 """What Scout says aloud: Markdown stripped, show-only blocks left out, split into sentences.
 
 The model decides what is said; this only shapes it for the voice. Contains to_speakable,
-merge_short_lines, SHORT_LINE and SpokenStream (a streaming reply, said sentence by sentence).
+merge_short_lines, SHORT_LINE, DIVIDER and SpokenStream (a streaming reply, said sentence by
+sentence, up to the divider that starts the on-screen part).
 """
 
 import re
@@ -10,7 +11,13 @@ from collections.abc import Callable
 # Below this a line is short enough that the voice says it badly on its own ("Done." clipped).
 SHORT_LINE = 40
 
+# A line of exactly this ends the spoken part; what follows is shown, never said.
+DIVIDER = "---"
+
 _FENCE = "```"
+_DIVIDER_LINE = re.compile(rf"^[ \t]*{DIVIDER}[ \t]*$")
+# A line start that could still turn into the divider once more arrives.
+_MAYBE_DIVIDER = re.compile(r"^[ \t]*-{1,3}[ \t]*$")
 # The end of a sentence that is surely over: its mark and a space after it, or a line break.
 _SENTENCE_END = re.compile(r"[.!?]+[\"')\]’”]*\s|\n")
 # A show-only line, judged from its start: a table row or a quote (a quote mostly holds a
@@ -63,10 +70,11 @@ class SpokenStream:
         self._in_code = False
         self._line_start = True  # the buffer starts a new line, which may be a list item
         self._in_show_line = False  # everything up to the next line break is dropped
+        self._shown_only = False  # the divider was seen: nothing after it is said
         self._ended = False
 
     def push(self, delta: str) -> None:
-        if self._ended:
+        if self._ended or self._shown_only:
             return
         self._buffer += delta
         self._drain(final=False)
@@ -74,7 +82,8 @@ class SpokenStream:
     def end(self) -> None:
         if self._ended:
             return
-        self._drain(final=True)
+        if not self._shown_only:
+            self._drain(final=True)
         self._ended = True
 
     def _drain(self, final: bool) -> None:
@@ -99,6 +108,13 @@ class SpokenStream:
                 continue
             if self._line_start:
                 first_line = self._buffer.split("\n", 1)[0]
+                complete = final or "\n" in self._buffer
+                if complete and _DIVIDER_LINE.match(first_line):
+                    self._shown_only = True
+                    self._buffer = ""
+                    return
+                if not complete and _MAYBE_DIVIDER.match(first_line):
+                    return
                 if _SHOW_LINE.match(first_line):
                     self._in_show_line = True
                     continue
@@ -128,5 +144,5 @@ class SpokenStream:
 
     def _speak(self, piece: str) -> None:
         line = to_speakable(piece)
-        if line:
+        if re.search(r"\w", line):  # a lone "-" or "--" is no speech
             self._say(line)
