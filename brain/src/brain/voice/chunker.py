@@ -12,6 +12,7 @@ FIRST_MIN_WORDS = 4  # the first chunk is a complete sentence of at least this m
 TARGET_WORDS = 30  # later chunks grow by whole sentences until they reach this
 MAX_WORDS = 45  # a hard cap: past it a sentence starts the next chunk, or is cut
 LONE_WORDS = 3  # 1-3 words alone come out clipped, so they join their neighbour
+_MARKS = (".", "!", "?", ";", ":")
 
 
 @dataclass(frozen=True)
@@ -41,7 +42,12 @@ class Chunker:
             words = words[cut:]
         if self._held and self._held_words + len(words) > MAX_WORDS:
             self._flush(False)
-        self._held.append(" ".join(words))
+        text = " ".join(words)
+        # A list item or heading has no mark of its own; one is added so the voice stops there
+        # instead of running the lines together.
+        if self._held and not self._held[-1].endswith(_MARKS):
+            self._held[-1] += "."
+        self._held.append(text)
         self._held_words += len(words)
         if paragraph_end:
             self._held_paragraph = True
@@ -72,7 +78,7 @@ class Chunker:
 def _cut_point(words: list[str]) -> int:
     """How many of the first MAX_WORDS words make the chunk: up to the last one ending a comma
     or semicolon, else all MAX_WORDS."""
-    for i in range(MAX_WORDS - 1, -1, -1):
+    for i in range(MAX_WORDS - 1, LONE_WORDS - 1, -1):  # never a 1-3 word chunk before the cut
         if words[i].endswith((",", ";")):
             return i + 1
     return MAX_WORDS

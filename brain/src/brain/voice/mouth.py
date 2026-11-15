@@ -30,7 +30,7 @@ DEFAULT_VOICE = "bm_george"
 DEFAULT_SPEED = 1.0
 State = Literal["talking", "sentence_break", "paused", "idle"]
 Download = dict[str, float | str]  # {"status": idle|downloading|ready|failed, "progress": 0..1}
-KEPT_TURNS = 3  # sentence logs kept, so a late interruption can still be answered
+KEPT_TURNS = 3  # chunk logs kept, so a late interruption can still be answered
 
 
 class Tts(Protocol):
@@ -177,7 +177,7 @@ class Mouth:
         self._poke()
 
     def _control(self, action: str) -> None:
-        """Tell each body that plays a turn to hold or go on: sentences already sent sit in its
+        """Tell each body that plays a turn to hold or go on: chunks already sent sit in its
         player, so pausing only the queue would not stop the sound."""
         # A turn is dropped once its last chunk is sent while the body still plays it, so the
         # body of the last frame sent is a target too.
@@ -194,6 +194,7 @@ class Mouth:
         for name in [turn] if turn is not None else list(self._turns):
             st = self._turns.pop(name, None)
             if st is not None:
+                st.stream.end()  # text the splitter still holds goes on to the chunker
                 st.chunker.end()
                 self._log(name).extend(st.unsent)
                 st.unsent.clear()
@@ -309,7 +310,7 @@ class Mouth:
         self._send(st, {**frame, "n": len(lines)})
 
     def _tts_now(self) -> Tts | None:
-        """The voice if it is ready. Otherwise start loading it (once): the sentence goes out as
+        """The voice if it is ready. Otherwise start loading it (once): the chunk goes out as
         text only, which already tells the body to use its own voice."""
         if self._tts is not None:
             return self._tts
@@ -324,7 +325,7 @@ class Mouth:
         return self._loading
 
     def prefetch(self) -> None:
-        """Start fetching the voice now (the first-run tour), without a sentence to say."""
+        """Start fetching the voice now (the first-run tour), without a chunk to say."""
         if self._tts is None:
             self._start_load()
 

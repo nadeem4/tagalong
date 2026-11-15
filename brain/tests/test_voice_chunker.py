@@ -110,3 +110,31 @@ def test_end_flushes_and_is_idempotent():
     c.end()
     c.end()
     assert len(out) == 2
+
+
+def test_list_items_and_a_heading_are_joined_with_full_stops():
+    out, c = make()
+    for line in (
+        "Here are things to do:",
+        "Buy milk today",
+        "Get bread now",
+        "That is all for today.",
+    ):
+        c.push(line)
+    c.end()
+    assert [k.text for k in out] == [
+        "Here are things to do:",
+        "Buy milk today. Get bread now. That is all for today.",
+    ]
+    out, c = make()
+    c.push("Title")
+    c.push("Some text follows right here.")
+    assert [k.text for k in out] == ["Title. Some text follows right here."]
+
+
+def test_a_comma_cut_never_leaves_a_one_to_three_word_chunk():
+    out, c = make()
+    c.push("Well, " + " ".join(["word"] * 60) + ".")  # the only comma is at word 1
+    c.end()
+    assert all(count(k) > 3 for k in out)
+    assert sum(count(k) for k in out) == 61

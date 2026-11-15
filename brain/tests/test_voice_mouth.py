@@ -85,7 +85,7 @@ async def test_first_sentence_goes_before_the_second_delta_arrives():
     assert [p.get("text") for p in sent.speech()] == [ONE, "Then more.", None]
 
 
-async def test_short_sentences_queued_together_are_said_as_one():
+async def test_short_sentences_are_grouped_into_one_chunk():
     sent = Sent()
     m, _ = mouth(sent)
     await ready(m)
@@ -706,7 +706,7 @@ async def test_text_the_chunker_still_holds_survives_a_cut():
     m.reply("t", {"delta": f"{ONE} {SECOND} {THIRD} Last."})  # the last three wait for a chunk
     await asyncio.sleep(0.02)
     m.clear()
-    assert m.sentences("t") == [ONE, f"{SECOND} {THIRD}"]
+    assert m.sentences("t") == [ONE, f"{SECOND} {THIRD} Last."]  # "Last." was still in the stream
 
 
 async def test_paragraph_end_is_carried_with_the_chunk():
@@ -716,3 +716,14 @@ async def test_paragraph_end_is_carried_with_the_chunk():
     m.pause()  # keep the chunk in the queue to look at it
     m.reply("t", {"delta": f"{ONE}\n\n{SECOND}"})
     assert [c.paragraph_end for _, c in m._queue] == [True]
+
+
+async def test_a_cut_keeps_text_the_splitter_still_holds():
+    sent = Sent()
+    m, _ = mouth(sent, FakeTts(sleep=0.05))
+    await ready(m)
+    m.spoken("t", "d", None, None)
+    m.reply("t", {"delta": f"{ONE} Then there is more to say"})  # no mark yet: held in the stream
+    await asyncio.sleep(0.02)
+    m.clear()
+    assert m.sentences("t")[-1] == "Then there is more to say"

@@ -104,7 +104,7 @@ describe('voice messages', () => {
     expect('seq' in SpeechStateParams.shape).toBe(false);
     expect('seq' in SpeechControlParams.shape).toBe(false);
   });
-  it('bounds speech_state to a turn, a sentence number and four states', () => {
+  it('bounds speech_state to a turn, a chunk number and four states', () => {
     for (const state of ['started', 'ended', 'paused', 'idle']) {
       expect(SpeechStateParams.safeParse({ turn: 't', n: 1, state }).success).toBe(true);
     }

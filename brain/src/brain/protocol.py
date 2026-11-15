@@ -175,7 +175,7 @@ class ToolsParams(Model):
 
 
 class Interrupted(Model):
-    # The owner talked over turn `turn` after the body had played `heard` of its sentences.
+    # The owner talked over turn `turn` after the body had played `heard` of its chunks.
     turn: Id
     heard: Annotated[int, Field(ge=0)]
 
@@ -414,8 +414,8 @@ class VoiceParams(Model):
     progress: Annotated[float, Field(ge=0, le=1)] | None = None
 
 
-# One sentence of a spoken reply, or the `done` that ends the turn's speech, never both.
-# `n` numbers the turn's sentences from 1. `pcm` and `sample_rate` come together; without
+# One chunk of a spoken reply, or the `done` that ends the turn's speech, never both.
+# `n` numbers the turn's chunks from 1. `pcm` and `sample_rate` come together; without
 # them the body says `text` in its own voice.
 class SpeechParams(Model):
     turn: Id
@@ -442,8 +442,8 @@ class SpeechParams(Model):
         return self
 
 
-# What the body's speaker is doing: one frame per sentence started or ended (`n` is that
-# sentence), and paused or idle for the whole player. Live-only, no `seq`.
+# What the body's speaker is doing: one frame per chunk started or ended (`n` is that
+# chunk), and paused or idle for the whole player. Live-only, no `seq`.
 class SpeechStateParams(Model):
     turn: Id
     n: Annotated[int, Field(ge=1)] | None = None
@@ -451,7 +451,7 @@ class SpeechStateParams(Model):
 
 
 # The brain holds, resumes or drops what the body is saying; `turn` narrows a clear to one
-# turn's sentences. Live-only, no `seq`.
+# turn's chunks. Live-only, no `seq`.
 class SpeechControlParams(Model):
     action: Literal["pause", "resume", "clear"]
     turn: Id | None = None

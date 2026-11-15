@@ -75,8 +75,11 @@ A chunk is a few whole sentences, because a voice reads them better together tha
 `SpokenStream` (`speakable.py`) finds the sentences as the reply streams: a `.`, `!` or `?` ends one
 when a capital, digit or quote follows, but not after an abbreviation (`e.g.`, `i.e.`, `etc.`,
 `Dr.`, `St.`, an initial like `J.`), inside `3.5` or `v1.2.3`, or after a list number; a single
-line break is a space, a blank line ends the sentence and the paragraph, and text that ends right
-after a mark waits for more. The `Chunker` (`chunker.py`) groups them, with constants meant for
+line break is a space except that a sentence ends before a list, table, quote, fence, `---` or
+heading line and after a heading line (a sentence with no mark gets a `.` when chunks are joined);
+a blank line ends the sentence and the paragraph, a line with no word in it (`-`, `--`) is
+dropped, and text that ends right after a mark waits for more; an unpunctuated run over 45 words
+is cut at its last comma or space as it streams. The `Chunker` (`chunker.py`) groups them, with constants meant for
 tuning by ear: the first chunk is the first complete sentence of at least `FIRST_MIN_WORDS = 4`
 words; later chunks grow by whole sentences to `TARGET_WORDS = 30`; a sentence that would pass
 `MAX_WORDS = 45` starts the next chunk; one sentence over 45 words is cut at its last comma or
@@ -435,7 +438,7 @@ or for a partial that `mightBeStop`. Main and the panel apply the same addressin
 `answering`, both from `SpeechPlayer`'s `onState`.
 
 - **Opening.** The window opens when Scout's answer to a question asked by voice has finished
-  both streaming and speaking, and some of it was said aloud. A gap between sentences does not
+  both streaming and speaking, and some of it was said aloud. A gap between chunks does not
   open it.
 - **What opens nothing.** Talking over Scout (`cue.hushed()` in `begin`), the stop button or stop key
   (`hush`), and the bubble's close (`cancel`).
@@ -497,10 +500,10 @@ flowchart TD
   It travels on the `ask` payload itself (`AskInput.interrupted`), so it can never attach to a
   later question. The player's `cutOff()` hushes the brain first, so the mouth keeps the turn's
   chunk log (sent and made-but-unsent) through the hush: the unsaid rest survives.
-  `SpeechPlayer.text()` (the echo check) is only the sentence playing and the one before it.
+  `SpeechPlayer.text()` (the echo check) is only the chunk playing and the one before it.
 - **What the brain does.** `Session.say` pauses that turn (`Session.interrupt`: generation stops,
-  nothing is cancelled and no open item is closed), saves only the sentences that were said,
-  marked `[interrupted: the owner spoke over this]`, and gives the model the unsaid sentences
+  nothing is cancelled and no open item is closed), saves only the chunks that were said,
+  marked `[interrupted: the owner spoke over this]`, and gives the model the unsaid chunks
   once, in a `<data kind="interruption">` block with the owner's words. A tool still running
   finishes in the background and its result comes back through the front door as a
   `tool_result` event. See [Brain](brain.md).
@@ -516,6 +519,9 @@ horizontal rule between them with no body change. The blank line before the divi
 without it Markdown renders the spoken part above as a heading. With no divider the whole reply is spoken; a
 divider with nothing before it says nothing at all. A second divider changes nothing, and a `---`
 inside a sentence (`5---6`) is not a divider, only a line of its own is.
+
+A short lead-in said before a tool round is held by the chunker until more text arrives, so it can
+wait through the round; this is accepted.
 
 The model is told the rule by the ear guide (`mind/ear.md`), which every read-aloud turn carries
 (see [brain.md](brain.md#brain-mouth)): write the spoken part for the ear, put

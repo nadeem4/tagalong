@@ -8,6 +8,8 @@ the divider that starts the on-screen part).
 import re
 from collections.abc import Callable
 
+from brain.voice.chunker import MAX_WORDS
+
 # A line of exactly this ends the spoken part; what follows is shown, never said.
 DIVIDER = "---"
 
@@ -48,6 +50,7 @@ def to_speakable(text: str) -> str:
     lines = [ln for ln in without_blocks.split("\n") if not re.match(r"^\s*(?:>|\|)", ln)]
     lines = [re.sub(r"^\s*#{1,6}\s+", "", ln) for ln in lines]
     lines = [re.sub(r"^\s*(?:[-*+•]|\d+[.)])\s+", "", ln) for ln in lines]
+    lines = [ln for ln in lines if re.search(r"\w", ln)]  # a lone "-" or "--" says nothing
     out = " ".join(lines)
     out = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", out)
     out = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", out)
@@ -57,6 +60,17 @@ def to_speakable(text: str) -> str:
     out = re.sub(r"\s+", " ", out)
     out = re.sub(r"\s+([.,!?;:])", r"\1", out)
     return out.strip()
+
+
+def _overlong_cut(buffer: str) -> int | None:
+    """Where to cut a buffer of more than MAX_WORDS words that has no sentence end, or None."""
+    spans = [m.span() for m in re.finditer(r"\S+", buffer)]
+    if len(spans) <= MAX_WORDS:  # the last word may be unfinished, so MAX_WORDS+1 are needed
+        return None
+    for i in range(MAX_WORDS - 1, -1, -1):
+        if buffer[spans[i][1] - 1] in ",;":
+            return spans[i][1]
+    return spans[MAX_WORDS - 1][1]
 
 
 def _block_start(rest: str, final: bool) -> bool | None:
@@ -204,7 +218,14 @@ class SpokenStream:
             if final:
                 self._speak(self._buffer, False)
                 self._buffer = ""
-            return
+                return
+            # No mark in a long run: speak up to the last comma, else the last word, under the
+            # cap, so unpunctuated text is not held until the reply ends.
+            cut = _overlong_cut(self._buffer)
+            if cut is None:
+                return
+            self._speak(self._buffer[:cut], False)
+            self._buffer = self._buffer[cut:]
 
     def _speak(self, piece: str, paragraph_end: bool) -> None:
         line = to_speakable(piece)

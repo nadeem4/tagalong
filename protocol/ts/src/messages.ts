@@ -41,7 +41,7 @@ export type HelloResult = z.infer<typeof HelloResult>;
 export const ToolsParams = z.object({ tools: z.array(Tool) });
 export type ToolsParams = z.infer<typeof ToolsParams>;
 
-// The owner talked over turn `turn` after the body had played `heard` of its sentences.
+// The owner talked over turn `turn` after the body had played `heard` of its chunks.
 export const Interrupted = z.object({ turn: Id, heard: z.int().nonnegative() });
 export type Interrupted = z.infer<typeof Interrupted>;
 
@@ -259,8 +259,8 @@ export const VoiceParams = z.object({
 });
 export type VoiceParams = z.infer<typeof VoiceParams>;
 
-// One sentence of a spoken reply, or the `done` that ends the turn's speech, never both.
-// n numbers the turn's sentences from 1. pcm and sample_rate come together; without them the body says `text` in its own voice.
+// One chunk of a spoken reply, or the `done` that ends the turn's speech, never both.
+// n numbers the turn's chunks from 1. pcm and sample_rate come together; without them the body says `text` in its own voice.
 export const SpeechParams = z
   .object({
     turn: Id,
@@ -284,7 +284,7 @@ export const SpeechParams = z
 export type SpeechParams = z.infer<typeof SpeechParams>;
 
 // What the body's speaker is doing, so the brain knows whether Scout is talking: one frame per
-// sentence started or ended (n is that sentence), and paused or idle for the whole player.
+// chunk started or ended (n is that chunk), and paused or idle for the whole player.
 // Live-only, no seq.
 export const SpeechStateParams = z.object({
   turn: Id,
@@ -294,7 +294,7 @@ export const SpeechStateParams = z.object({
 export type SpeechStateParams = z.infer<typeof SpeechStateParams>;
 
 // The brain holds, resumes or drops what the body is saying. `turn` narrows a clear to one
-// turn's sentences. Live-only, no seq.
+// turn's chunks. Live-only, no seq.
 export const SpeechControlParams = z.object({
   action: z.enum(['pause', 'resume', 'clear']),
   turn: Id.optional(),

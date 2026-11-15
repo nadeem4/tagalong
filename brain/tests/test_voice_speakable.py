@@ -271,3 +271,18 @@ def test_a_sentence_mark_at_the_very_end_waits_for_more():
     assert said == []
     s.push("Next")
     assert said == ["It is done."]
+
+
+def test_punctuation_only_lines_are_not_spoken():
+    assert to_speakable("Hi there friend one.\n-\n--\n") == "Hi there friend one."
+
+
+def test_a_long_unpunctuated_paragraph_leaves_before_the_end():
+    said, s = stream()
+    text = " ".join(f"w{i}" for i in range(300))
+    for i in range(0, len(text), 7):
+        s.push(text[i : i + 7])
+    assert len(said) >= 5  # cut under the word cap while it streams, not held for end()
+    assert all(len(line.split()) <= 45 for line in said)
+    s.end()
+    assert " ".join(said).split() == text.split()
