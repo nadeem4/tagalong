@@ -88,14 +88,13 @@ function VoiceForm({ host, settings }: { host: WalkthroughHost; settings: Walkth
           ]}
         />
         <p className="wt-help">
-          Made on your computer. The voice you pick below downloads the first time Scout speaks;
-          until then Scout uses the Windows voice.
+          Made on your computer. The voice you pick below starts downloading as soon as you pick it;
+          until it is ready, Scout uses the Windows voice.
         </p>
       </div>
-      <section className="wt-voice" aria-labelledby="wt-voice-title">
-        <h2 id="wt-voice-title">Pick Scout&apos;s voice</h2>
-        <VoiceField host={host} speed={speed} />
-      </section>
+      <div className="wt-voice">
+        <VoiceField host={host} speed={speed} title="Pick Scout's voice" />
+      </div>
       <Slider
         id="wt-speed"
         label="Speed"

@@ -11,6 +11,22 @@ import { listMicrophones } from './mic';
 import { playVoiceSample } from './voice-player';
 
 /**
+ * One voice sample at a time: starting a sample stops the one before it, so two voices never
+ * play together and a sample never outlives the one that replaced it.
+ */
+export function makeSamplePlayer(
+  play: (voice: string, speed: number, signal: AbortSignal) => Promise<void> = playVoiceSample,
+): (voice: string, speed: number) => Promise<void> {
+  let current: AbortController | null = null;
+  return (voice, speed) => {
+    current?.abort();
+    const mine = new AbortController();
+    current = mine;
+    return play(voice, speed, mine.signal);
+  };
+}
+
+/**
  * The preload's bridge, plus the health check ("Scout, what's wrong?"), read from calls Home
  * and Settings already make, its Fix it, which opens the right place, and Open logs folder.
  */
@@ -37,6 +53,6 @@ export function fullBridge(): HostBridge {
     openLogs: () => host.openLogsFolder(),
     readingRecheck: () => host.readingRecheck(),
     openLanguageSettings: () => host.openLanguageSettings(),
-    playVoiceSample: (voice, speed) => playVoiceSample(voice, speed, new AbortController().signal),
+    playVoiceSample: makeSamplePlayer(),
   };
 }

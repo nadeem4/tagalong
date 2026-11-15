@@ -78,6 +78,8 @@ describe('StepFive', () => {
   it("shows Pick Scout's voice with the roster, and no old dropdown or Preview", async () => {
     mount();
     expect(await screen.findByRole('heading', { name: "Pick Scout's voice" })).toBeInTheDocument();
+    // One title, not the tour's own above the card's.
+    expect(screen.queryByRole('heading', { name: "Scout's voice" })).not.toBeInTheDocument();
     expect(await screen.findByText('Alan')).toBeInTheDocument();
     expect(screen.getByRole('radiogroup', { name: "Scout's voice" })).toBeInTheDocument();
     expect(screen.queryByLabelText('Voice')).not.toBeInTheDocument();
@@ -135,7 +137,7 @@ describe('StepFive', () => {
     for (const text of [
       'Hold the talk key, ask out loud, let go. Scout answers in short spoken sentences, and the words show in the bubble too.',
       'Reads answers aloud, so you can look away.',
-      'Made on your computer. The voice you pick below downloads the first time Scout speaks; until then Scout uses the Windows voice.',
+      'Made on your computer. The voice you pick below starts downloading as soon as you pick it; until it is ready, Scout uses the Windows voice.',
       'Your voice is turned into text by your own brain and is never stored. With the brain on this computer, it never leaves it. The listening models download the first time you talk (about 120 MB, and about 1.5 GB more on a PC with a graphics card).',
       '(hold it on its own)',
     ]) {

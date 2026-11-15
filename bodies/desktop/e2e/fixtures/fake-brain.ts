@@ -1041,7 +1041,10 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           notify('changed', { what: 'model' });
           value = { model };
         } else if (params.tool === 'voice_download') {
-          value = { status: 'ready', progress: 1 };
+          value =
+            tts === 'kokoro-bm-george'
+              ? { status: 'downloading', progress: 0.4 }
+              : { status: 'ready', progress: 1 };
         } else if (params.tool === 'fetch_voice') {
           value = { status: 'ready', progress: 1 };
         } else if (params.tool === 'stt_state') {
@@ -1111,7 +1114,11 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
                 sample: true,
               },
             ],
-            download: { voice: 'piper-alan', status: 'ready', progress: 1 },
+            // George is not installed: picking him starts a download that never ends here.
+            download:
+              tts === 'kokoro-bm-george'
+                ? { voice: tts, status: 'downloading', progress: 0.4 }
+                : { voice: 'piper-alan', status: 'ready', progress: 1 },
           };
         } else if (params.tool === 'set_tts') {
           tts = String(params.input?.voice);

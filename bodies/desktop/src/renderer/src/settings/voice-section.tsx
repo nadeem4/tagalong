@@ -73,7 +73,7 @@ export function VoiceSection({
       <Tip tip="voice">
         Scout reads aloud the answers you ask for by voice. Code and long lists it puts in a block,
         which shows in the bubble and is not read. Under Who speaks, Scout's voice runs on the
-        brain, which downloads the voice you pick the first time it is needed; until it is ready
+        brain, which starts downloading the voice you pick as soon as you pick it; until it is ready
         Scout speaks with the system voice. The system voice needs nothing. Closing the bubble or
         the stop key silences it at once.
       </Tip>

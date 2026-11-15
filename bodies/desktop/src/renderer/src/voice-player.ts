@@ -86,7 +86,7 @@ async function playPcm(pcm: string, rate: number, signal: AbortSignal): Promise<
   await playBuffer(buffer, signal);
 }
 
-/** A preview WAV from the brain (Settings), base64. */
+/** A voice sample WAV from the brain (the picker's Play), base64. */
 export async function playWav(base64: string, signal: AbortSignal): Promise<void> {
   context ??= new AudioContext();
   const buffer = await context.decodeAudioData(bytesOf(base64).buffer);

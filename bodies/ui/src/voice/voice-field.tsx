@@ -4,7 +4,7 @@
  * starts the download of a voice that is not installed and the chosen voice's download line
  * shows it. VoiceField.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { HostBridge } from '../host-bridge';
 import { Icon } from '../icons';
 import { formatSize } from '../shapes';
@@ -33,22 +33,59 @@ function stateLabel(voice: TtsVoiceRow, state: TtsState): string {
   return state.resolved === voice.id ? 'In use' : 'Downloaded';
 }
 
-export function VoiceField({ host, speed }: { host: VoiceFieldHost; speed: number }) {
+export function VoiceField({
+  host,
+  speed,
+  title = "Scout's voice",
+}: {
+  host: VoiceFieldHost;
+  speed: number;
+  title?: string;
+}) {
   const [state, setState] = useState<TtsState | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
-  const { ttsState, onBrainChanged } = host;
+  const { ttsState, voiceDownload, onBrainChanged } = host;
+  // Answers can arrive out of order (the full state hashes files off-thread), so only the
+  // newest request may write; an older one is dropped.
+  const latest = useRef(0);
 
   const refresh = useCallback(() => {
-    ttsState().then(setState, () => setState(null));
+    latest.current += 1;
+    const mine = latest.current;
+    ttsState().then(
+      (next) => {
+        if (mine === latest.current) setState(next);
+      },
+      () => {
+        if (mine === latest.current) setState(null);
+      },
+    );
   }, [ttsState]);
 
   useEffect(() => {
     refresh();
     return onBrainChanged((what) => {
-      if (what === 'tts' || what === 'voice_download' || what === 'link') refresh();
+      if (what === 'tts' || what === 'link') {
+        refresh();
+      } else if (what === 'voice_download') {
+        // A download reports every couple of percent: only its progress is read, and the full
+        // state again when it ends (a voice just became installed, or failed).
+        voiceDownload().then(
+          (download) => {
+            if (download.status === 'ready' || download.status === 'failed') {
+              refresh();
+            } else {
+              setState((now) =>
+                now === null ? now : { ...now, download: { ...now.download, ...download } },
+              );
+            }
+          },
+          () => {},
+        );
+      }
     });
-  }, [refresh, onBrainChanged]);
+  }, [refresh, voiceDownload, onBrainChanged]);
 
   async function pick(id: string): Promise<void> {
     if (state === null || state.chosen === id) return;
@@ -79,7 +116,7 @@ export function VoiceField({ host, speed }: { host: VoiceFieldHost; speed: numbe
   return (
     <section className="tg-card tg-vf">
       <style>{VF_CSS}</style>
-      <h2 className="tg-vf__title">Scout&apos;s voice</h2>
+      <h2 className="tg-vf__title">{title}</h2>
       <p className="tg-vf__lead">Press play to hear a voice before you download it.</p>
       {state === null ? (
         <p className="tg-vf__loading">Loading voices…</p>
@@ -142,10 +179,10 @@ export function VoiceField({ host, speed }: { host: VoiceFieldHost; speed: numbe
                   type="button"
                   className={`tg-vf__play${playing === voice.id ? ' is-on' : ''}`}
                   aria-label={`Play ${voice.label}`}
-                  disabled={playing === voice.id}
+                  disabled={playing !== null}
                   onClick={() => void play(voice.id)}
                 >
-                  <Icon name={playing === voice.id ? 'pause' : 'play'} />
+                  <Icon name="play" />
                 </button>
               )}
             </div>
@@ -176,7 +213,7 @@ const VF_CSS = `
 .tg-vf__row { position: relative; display: flex; align-items: stretch; }
 .tg-vf__pick {
   all: unset; box-sizing: border-box; flex: 1; min-width: 0; min-height: 60px; display: flex; align-items: center; gap: ${t.space.lg}px;
-  padding: 10px ${t.space.lg}px; cursor: pointer; border-top: 1px solid ${t.color.panelLine}; color: ${t.color.panelText};
+  padding: ${t.space.lg}px; cursor: pointer; border-top: 1px solid ${t.color.panelLine}; color: ${t.color.panelText};
 }
 .tg-vf__row:first-child .tg-vf__pick { border-top: 0; border-radius: ${t.radius.sm}px; }
 .tg-vf__pick:hover, .tg-vf__pick[aria-checked='true'] { background: ${t.color.panel}; }

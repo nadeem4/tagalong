@@ -30,6 +30,7 @@ describe('ui package surface', () => {
         'ModelField',
         'VoiceModelsField',
         'VoiceDownloadLine',
+        'VoiceField',
         'RunForm',
         'ResultView',
         'gapsFrom',

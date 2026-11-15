@@ -95,17 +95,16 @@ describe('VoiceField', () => {
     expect(screen.getByText('Alan')).toBeInTheDocument();
   });
 
-  it('one sample ending does not clear another sample that is still playing', async () => {
+  it('a sample that ends enables Play again', async () => {
     const host = await setup();
-    const ends: (() => void)[] = [];
-    host.playVoiceSample = () => new Promise<void>((resolve) => ends.push(resolve));
+    let end: () => void = () => {};
+    host.playVoiceSample = () => new Promise<void>((resolve) => (end = resolve));
     fireEvent.click(screen.getByRole('button', { name: 'Play George' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Play Alan' }));
-    // Alan is now the playing one; George's sample ends first.
+    expect(screen.getByRole('button', { name: 'Play George' })).toBeDisabled();
     await act(async () => {
-      ends[0]!();
+      end();
     });
-    expect(screen.getByRole('button', { name: 'Play Alan' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Play George' })).toBeEnabled();
   });
 
   it('shows a loading line until ttsState resolves', async () => {
@@ -137,5 +136,88 @@ describe('VoiceField', () => {
     await setup();
     const css = document.querySelector('.tg-vf style')?.textContent ?? '';
     expect(css).toMatch(/\.tg-panel \.tg-vf \{[^}]*border: 0[^}]*background: none[^}]*padding: 0/);
+  });
+
+  it('a slow older answer never overwrites a newer one', async () => {
+    const host = createFakeHostBridge();
+    const releases: (() => void)[] = [];
+    host.ttsState = () => {
+      const mine = releases.length;
+      const answer = { ...host.tts, chosen: mine === 1 ? 'kokoro-bm-george' : 'auto' };
+      return new Promise((resolve) => releases.push(() => resolve(answer)));
+    };
+    render(<VoiceField host={host} speed={1} />);
+    act(() => host.emitChanged('tts'));
+    // Request 0 is the mount, 1 the event: answer the newer first, then the stale mount.
+    await act(async () => {
+      releases[1]!();
+    });
+    await act(async () => {
+      releases[0]!();
+    });
+    const george = await screen.findByRole('radio', { name: /George/ });
+    expect(george).toHaveAttribute('aria-checked', 'true');
+    expect(releases).toHaveLength(2);
+  });
+
+  it('a voice_download event only updates the download, not the whole state', async () => {
+    const host = createFakeHostBridge();
+    host.tts = {
+      ...host.tts,
+      chosen: 'kokoro-bm-george',
+      download: { voice: 'kokoro-bm-george', status: 'downloading', progress: 0.1 },
+    };
+    let stateCalls = 0;
+    const real = host.ttsState;
+    host.ttsState = () => {
+      stateCalls += 1;
+      return real();
+    };
+    render(<VoiceField host={host} speed={1} />);
+    await screen.findByText('Alan');
+    host.voiceDownloadState = { status: 'downloading', progress: 0.5 };
+    act(() => host.emitChanged('voice_download'));
+    await waitFor(() =>
+      expect(screen.getByRole('radio', { name: /George/ })).toHaveTextContent('Downloading 50%'),
+    );
+    expect(stateCalls).toBe(1);
+  });
+
+  it('a voice_download event that ends the download refreshes the whole state', async () => {
+    const host = await setup((h) => {
+      h.tts = {
+        ...h.tts,
+        chosen: 'kokoro-bm-george',
+        download: { voice: 'kokoro-bm-george', status: 'downloading', progress: 0.9 },
+      };
+    });
+    host.tts = {
+      ...host.tts,
+      voices: host.tts.voices.map((v) => ({ ...v, installed: true })),
+      download: { voice: 'kokoro-bm-george', status: 'ready', progress: 1 },
+    };
+    host.voiceDownloadState = { status: 'ready', progress: 1 };
+    act(() => host.emitChanged('voice_download'));
+    await waitFor(() =>
+      expect(screen.getByRole('radio', { name: /George/ })).toHaveTextContent('Downloaded'),
+    );
+  });
+
+  it('while a sample plays every Play button is disabled and the icon stays play', async () => {
+    const host = await setup();
+    const before = screen.getByRole('button', { name: 'Play George' }).innerHTML;
+    host.playVoiceSample = () => new Promise<void>(() => {});
+    fireEvent.click(screen.getByRole('button', { name: 'Play George' }));
+    const george = screen.getByRole('button', { name: 'Play George' });
+    expect(george).toHaveClass('is-on');
+    expect(george.innerHTML).toBe(before);
+    expect(screen.getByRole('button', { name: 'Play Alan' })).toBeDisabled();
+  });
+
+  it('takes an optional title for the card heading', async () => {
+    const host = createFakeHostBridge();
+    render(<VoiceField host={host} speed={1} title="Pick Scout's voice" />);
+    expect(await screen.findByRole('heading', { name: "Pick Scout's voice" })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: "Scout's voice" })).not.toBeInTheDocument();
   });
 });
