@@ -24,6 +24,7 @@ from brain.telemetry import timed
 from brain.voice.chunker import Chunk, Chunker
 from brain.voice.shape import shape_chunk
 from brain.voice.speakable import SpokenStream
+from brain.voice.tts import Tts
 
 log = logging.getLogger("brain")
 
@@ -32,12 +33,6 @@ DEFAULT_SPEED = 1.0
 State = Literal["talking", "sentence_break", "paused", "idle"]
 Download = dict[str, float | str]  # {"status": idle|downloading|ready|failed, "progress": 0..1}
 KEPT_TURNS = 3  # chunk logs kept, so a late interruption can still be answered
-
-
-class Tts(Protocol):
-    def synth(self, text: str, voice: str, speed: float) -> tuple[np.ndarray, int]:
-        """int16 samples and their sample rate."""
-        ...
 
 
 LoadTts = Callable[[Callable[[float], None]], Awaitable[Tts]]  # takes a progress callback
@@ -220,7 +215,7 @@ class Mouth:
             samples, rate = await asyncio.to_thread(
                 tts.synth, text, voice or DEFAULT_VOICE, speed or DEFAULT_SPEED
             )
-        return _wav(shape_chunk(samples, rate, paragraph_end=False), rate)
+        return wav_bytes(shape_chunk(samples, rate, paragraph_end=False), rate)
 
     def _finish(self, st: _Turn) -> None:
         st.ended = True
@@ -366,7 +361,7 @@ class Mouth:
         self._bodies.send_live(st.body_id, "speech", params)
 
 
-def _wav(samples: np.ndarray, rate: int) -> bytes:
+def wav_bytes(samples: np.ndarray, rate: int) -> bytes:
     out = io.BytesIO()
     with wave.open(out, "wb") as w:
         w.setnchannels(1)

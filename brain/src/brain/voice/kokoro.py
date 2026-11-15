@@ -12,6 +12,7 @@ from typing import Protocol
 import numpy as np
 
 from brain.voice.models import KOKORO_FILES
+from brain.voice.tts import TtsVoice
 
 FALLBACK_VOICE = "bm_george"
 
@@ -35,8 +36,18 @@ class Adapter:
         return (np.clip(audio, -1.0, 1.0) * 32767).astype("<i2"), rate
 
 
-def load(folder: Path) -> Adapter:
+def _build(model: Path, voices: Path) -> Adapter:
     from kokoro_onnx import Kokoro
 
-    model, voices = (folder / f.path for f in KOKORO_FILES)
     return Adapter(Kokoro(str(model), str(voices)))
+
+
+def load(folder: Path) -> Adapter:
+    model, voices = (folder / f.path for f in KOKORO_FILES)
+    return _build(model, voices)
+
+
+def load_row(voice: TtsVoice, folder: Path) -> Adapter:
+    """The roster's way in: the row's own pinned files (model, then voices)."""
+    model, voices = (folder / f.path for f in voice.files)
+    return _build(model, voices)

@@ -2420,9 +2420,13 @@ this]` (`Memory.replace_last_message` rewrites the cut turn's message), never th
   `<TAGALONG_HOME>/voice/tts/kokoro/`, downloaded with the same checked download as the
   ears. `kokoro-onnx` and `espeakng-loader` are imported only when the voice loads. No new
   setting.
-- **Hand check.** `cd brain && uv run python tests/voice_smoke.py [DATA_DIR] [OUT.wav]` runs the
-  real voice once and prints load time, time per sentence and the real-time factor (not part of
-  `pytest`).
+- **Voice roster.** `voice/tts_models.json` lists the voices (Piper, Kokoro, Supertonic), loaded by
+  `voice/tts.py` (which also holds the `Tts` protocol); `voice/tts_engines.py` maps each engine to
+  its adapter (`kokoro.py`, `piper.py`, `supertonic.py`). Nothing chooses a voice yet: the mouth
+  still loads Kokoro. See [voice.md](voice.md#voices).
+- **Hand check.** `cd brain && uv run python tests/voice_smoke.py [DATA_DIR] [OUT_DIR]` runs every
+  roster voice once and prints load time, time per sentence and the real-time factor (not part of
+  `pytest`); `tools/voice_samples.py` makes the sample clips.
 
 ## Front door and urgency
 

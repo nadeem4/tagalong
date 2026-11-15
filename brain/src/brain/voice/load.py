@@ -15,9 +15,9 @@ from brain.telemetry import timed
 from brain.voice import cuda, engines, kokoro, silero, smart_turn, stt
 from brain.voice.ears import EarsParts
 from brain.voice.models import EARS_FILES, KOKORO_FILES, ensure_files
-from brain.voice.mouth import Tts
 from brain.voice.service import LoadEars
 from brain.voice.stt import FinalStt
+from brain.voice.tts import Tts
 
 log = logging.getLogger("brain")
 
