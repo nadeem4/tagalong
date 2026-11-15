@@ -12,6 +12,7 @@ from brain.voice.models import (
     ModelFile,
     ModelIntegrityError,
     ensure_files,
+    present,
 )
 
 
@@ -124,3 +125,14 @@ async def test_progress_counts_files_already_good_from_the_start(tmp_path):
     seen: list[float] = []
     await ensure_files(tmp_path, [fa, fb], Net({fb.url: [b]}), seen.append)
     assert seen[0] == 0.5 and seen[-1] == 1
+
+
+def test_present_is_true_only_when_every_file_is_on_disk_and_matches(tmp_path):
+    a, b = file_for("tts/x/a.bin", b"aaa"), file_for("tts/x/b.bin", b"bbb")
+    assert not present(tmp_path, [a, b])
+    for f, data in ((a, b"aaa"), (b, b"bbb")):
+        (tmp_path / f.path).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / f.path).write_bytes(data)
+    assert present(tmp_path, [a, b])
+    (tmp_path / b.path).write_bytes(b"damaged")
+    assert not present(tmp_path, [a, b])

@@ -271,6 +271,7 @@ async def _run() -> None:
         keys=keys,
         model_default=config.model,
         stt_default=(config.stt_live, config.stt_final),
+        voice_dir=config.data_dir / "voice",
         setup_facts=partial(setup_facts, registry, inspect_machine),
         extra_tools=setup_tools(config.data_dir, registry, inspect_machine)
         + expert_tools

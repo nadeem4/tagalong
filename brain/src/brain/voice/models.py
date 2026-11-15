@@ -72,6 +72,12 @@ def _sha256_of(path: Path) -> str:
     return digest.hexdigest()
 
 
+def present(folder: Path, files: list[ModelFile] | tuple[ModelFile, ...]) -> bool:
+    """Every file is on disk and matches its pinned hash. Read-only: unlike `_verified` it
+    never deletes, so Home can ask about a voice without touching it."""
+    return all((p := folder / f.path).exists() and _sha256_of(p) == f.sha256 for f in files)
+
+
 async def _verified(target: Path, file: ModelFile) -> bool:
     if not target.exists():
         return False
