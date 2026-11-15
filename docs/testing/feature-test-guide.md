@@ -2415,6 +2415,19 @@ from a terminal.
    seconds of audio and the real-time factor; it writes `voice_smoke.wav`, which plays as the same
    British voice (`bm_george`) saying both sentences, clearly, with no clipping.
 
+### V.1b. The voice choice lives in the brain
+
+Needs the brain running; the desktop's own voice list comes in a later slice, so this is by Home tool.
+
+1. **Action:** call `tts_state`, then `set_tts {"voice": "piper-alan"}`, then `set_tts {"voice": "nope"}`.
+2. **Expected:** the state lists eight voices with `installed` flags and `chosen: auto`; the first
+   `set_tts` echoes the pick and a `changed {what: "tts"}` arrives; the unlisted id is `invalid_params`.
+3. **Action:** call `speak_sample {"voice": "kokoro-fable"}` with that voice not installed.
+4. **Expected:** `tool_failed` "No sample yet." until the release clips exist; for an installed voice, a WAV.
+5. **Action:** switch voice while Scout is speaking.
+6. **Expected:** the sentence in progress finishes in the old voice; the next one is in the new voice
+   once it is ready, and speech never stops while it downloads.
+
 ### V.2. Brain ears keep the last word and invent no first word
 
 Needs a microphone and the voice models (the first listen downloads about 56 MB).
