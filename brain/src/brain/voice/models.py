@@ -53,10 +53,23 @@ def _sha256_of(path: Path) -> str:
     return digest.hexdigest()
 
 
-def present(folder: Path, files: list[ModelFile] | tuple[ModelFile, ...]) -> bool:
+def present(
+    folder: Path,
+    files: list[ModelFile] | tuple[ModelFile, ...],
+    checked: dict[str, bool] | None = None,
+) -> bool:
     """Every file is on disk and matches its pinned hash. Read-only: unlike `_verified` it
-    never deletes, so Home can ask about a voice without touching it."""
-    return all((p := folder / f.path).exists() and _sha256_of(p) == f.sha256 for f in files)
+    never deletes, so Home can ask about a voice without touching it. `checked` remembers each
+    path's answer, so rows that share a big file hash it once per call."""
+    seen = {} if checked is None else checked
+
+    def good(f: ModelFile) -> bool:
+        if f.path not in seen:
+            p = folder / f.path
+            seen[f.path] = p.exists() and _sha256_of(p) == f.sha256
+        return seen[f.path]
+
+    return all(good(f) for f in files)
 
 
 async def _verified(target: Path, file: ModelFile) -> bool:

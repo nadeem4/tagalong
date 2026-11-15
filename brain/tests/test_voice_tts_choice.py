@@ -106,6 +106,33 @@ async def test_tts_state_lists_installed_flags(rig):
 
 
 async def test_tts_state_marks_a_verified_voice_installed(rig, monkeypatch):
-    monkeypatch.setattr("brain.voice.tts_tools.present", lambda folder, files: True)
+    monkeypatch.setattr("brain.voice.tts_tools.present", lambda folder, files, checked=None: True)
     state = json.loads(await rig.run("tts_state"))
     assert all(v["installed"] for v in state["voices"])
+
+
+async def test_tts_state_hashes_each_shared_file_once(rig, monkeypatch):
+    from brain.voice import models
+
+    seen: list[str] = []
+    real = models._sha256_of
+
+    def counting(path):
+        seen.append(path.name)
+        return real(path)
+
+    monkeypatch.setattr(models, "_sha256_of", counting)
+    kokoro = [v for v in load_voices() if v.engine == "kokoro"]
+    for f in kokoro[0].files:  # the four Kokoro rows share these files
+        target = rig.folder / f.path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"x")
+    await rig.run("tts_state")
+    assert seen and len(seen) == len(set(seen))
+
+
+async def test_set_tts_returns_the_choice_only(rig):
+    assert json.loads(await rig.run("set_tts", {"voice": "piper-alan"})).keys() == {
+        "chosen",
+        "resolved",
+    }

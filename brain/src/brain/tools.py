@@ -1740,7 +1740,9 @@ def voice_tools(voice: Callable[[], VoiceHooks | None]) -> list[tuple[ToolSpec, 
     async def voice_download(args: dict) -> str:
         hooks = voice()
         return json.dumps(
-            {"status": "idle", "progress": 0} if hooks is None else hooks.voice_download()
+            {"voice": "", "status": "idle", "progress": 0}
+            if hooks is None
+            else hooks.voice_download()
         )
 
     async def fetch_voice(args: dict) -> str:

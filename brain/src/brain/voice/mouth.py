@@ -218,9 +218,18 @@ class Mouth:
         if voice is None:
             raise ValueError(f"unknown voice {voice_id!r}")
         ready = self._ready.get(voice.id)
-        if ready is None and self._installed(voice):
+        if ready is None and self._loading is not None and voice.id == self._loading_id:
+            # The chosen voice is mid-load: wait for that one load, never start a second.
+            try:
+                await asyncio.shield(self._loading)
+            except Exception:
+                pass  # a failed load falls through to the clip
+            ready = self._ready.get(voice.id)
+        if ready is None and await asyncio.to_thread(self._installed, voice):  # hashes big files
             tts = await self._load_tts(voice, lambda _f: None)  # files are here: no download
-            ready = self._ready[voice.id] = (voice, tts)
+            ready = (voice, tts)
+            if voice.id == self._chosen().id:
+                self._ready[voice.id] = ready  # else a Play must not keep a voice in memory
         if ready is not None:
             tts = ready[1]
             async with self._synth:

@@ -1305,7 +1305,11 @@ async def test_voice_download_reports_the_state_and_fetch_voice_starts_or_retrie
 
 async def test_voice_download_without_voice_is_idle_and_fetch_is_an_error():
     tools = download_handlers(None)
-    assert json.loads(await tools["voice_download"]({})) == {"status": "idle", "progress": 0}
+    assert json.loads(await tools["voice_download"]({})) == {
+        "voice": "",
+        "status": "idle",
+        "progress": 0,
+    }
     with pytest.raises(RpcError, match="Voice is not running"):
         await tools["fetch_voice"]({})
 

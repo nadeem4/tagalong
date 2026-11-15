@@ -31,6 +31,7 @@ def tts_tools(
 
     async def tts_state(args: dict) -> str:
         # Hashing the installed files is disk work: off the loop.
+        checked: dict[str, bool] = {}  # one hash per distinct file, not per row
         voices = await asyncio.to_thread(
             lambda: [
                 {
@@ -40,7 +41,7 @@ def tts_tools(
                     "engine": v.engine,
                     "size_mb": v.size_mb,
                     "licence": v.licence,
-                    "installed": present(folder, v.files),
+                    "installed": present(folder, v.files, checked),
                     "sample": v.sample is not None,
                 }
                 for v in load_voices()

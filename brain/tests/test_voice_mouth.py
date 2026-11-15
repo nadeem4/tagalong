@@ -956,3 +956,41 @@ async def test_a_synth_error_in_one_chunk_does_not_stop_the_turns_speech():
     spoken = [p for p in sent.speech() if p.get("text")]
     assert "pcm" not in spoken[0] and "pcm" in spoken[-1]  # the bad chunk went out as text
     assert sent.speech()[-1] == {"turn": "a", "done": True}
+
+
+async def test_play_while_the_chosen_voice_is_loading_loads_it_once():
+    sent, v = Sent(), Voices()
+    m = Mouth(sent, v.load, lambda: ALAN, lambda _v: True)
+    await say(m, "a")  # the chosen voice starts loading
+    play = asyncio.create_task(m.sample(ALAN.id, None))
+    await settle()
+    v.arrive(ALAN)
+    await play
+    assert v.loads == [ALAN.id]
+
+
+async def test_play_of_a_voice_that_is_not_chosen_is_not_kept_in_memory():
+    sent, v = Sent(), Voices()
+    m = Mouth(sent, v.load, lambda: ALAN, lambda _v: True)
+    task = asyncio.create_task(m.sample(GEORGE.id, None))
+    await settle()
+    v.arrive(GEORGE)
+    await task
+    assert GEORGE.id not in m._ready
+
+
+async def test_a_failed_new_pick_keeps_speaking_in_the_ready_voice():
+    sent, v = Sent(), Voices()
+    m = v.mouth(sent)
+    await say(m, "a")
+    v.arrive(ALAN)
+    await settle()
+    v.pick = GEORGE
+    m.choose(GEORGE)
+    await settle()
+    v.futures[GEORGE.id].set_exception(OSError("offline"))
+    await settle()
+    sent.frames.clear()
+    await say(m, "b")
+    assert all("pcm" in p for p in sent.speech() if p.get("text"))
+    assert m.download["status"] == "failed" and m.download["voice"] == GEORGE.id

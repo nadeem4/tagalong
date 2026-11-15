@@ -126,3 +126,21 @@ def test_present_is_true_only_when_every_file_is_on_disk_and_matches(tmp_path):
     assert present(tmp_path, [a, b])
     (tmp_path / b.path).write_bytes(b"damaged")
     assert not present(tmp_path, [a, b])
+
+
+async def test_a_cancelled_download_leaves_no_part_file(tmp_path):
+    data = b"abcdefgh"
+    f = file_for("tts/x/a.bin", data)
+    stop = asyncio.Event()
+
+    async def blocked(url):
+        yield data[:4]  # one chunk, then the connection stalls
+        await stop.wait()
+
+    task = asyncio.create_task(ensure_files(tmp_path, [f], blocked, lambda p: None))
+    await asyncio.sleep(0.05)
+    assert list(tmp_path.rglob("*.part"))  # it really was mid-download
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert not list(tmp_path.rglob("*.part"))
