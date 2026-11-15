@@ -214,8 +214,8 @@ is shown in the bubble and not read. Bars beside the × show while it speaks;
 click them, close the bubble or press `Ctrl+Shift+Alt+M` to stop it at once. With Always listening on,
 speaking over Scout pauses it with no name needed: a cough or its own echo lets it carry on,
 words are passed to Scout, who decides whether to stop, answer or finish what it was saying. The voice is
-the brain's chosen voice, made on this computer (the brain owns the choice; Home lists the voices): the first time Scout speaks it downloads the voice model (about
-92 MB) and uses the Windows voice until that is done. Turn it off, pick a voice, preview it or
+the brain's chosen voice, made on this computer (the brain owns the choice; Home lists the voices): picking a voice starts its download (about
+92 MB for Kokoro) and Scout uses the Windows voice until that is done. Turn it off, pick a voice, play a sample or
 change the speed in **Home → Settings → Voice**.
 
 **Talk to Scout.** Hold `Right Ctrl` on its own (or click the mic in the bubble), say

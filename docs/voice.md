@@ -588,7 +588,12 @@ flowchart LR
   `speak_sample {voice, speed}` tool through `IPC.speakSample`, played as WAV (`playWav`); it
   rejects when the brain has no sample. `ttsState()` and `setTts(voice)` read the roster and save
   the pick through `tts_state` and `set_tts`; picking saves at once, so the tour's Next never waits
-  on a download. There is no separate Preview button and no voice id in the desktop's settings.
+  on a download. The brain starts a download as soon as a voice is picked (`mouth.choose`), the
+  chosen row shows its progress from `voice_download`, and the card reads only that cheap call while
+  it runs, reading the full state again on `tts` and `link` changes and when the download ends;
+  answers carry a request number so a late one never overwrites a newer one. One sample plays at a
+  time: the bridge stops the previous one, and every Play is disabled while one plays. `title`
+  renames the card's heading (the tour uses "Pick Scout's voice"). There is no separate Preview button and no voice id in the desktop's settings.
 
 **Read aloud.** With Scout talks on, the brain speaks every turn this desktop displays: a heard
 question, a typed one, the hello, a wake's remark and `pet.remark` lines. With Scout talks off the
@@ -620,7 +625,7 @@ Audio is then shaped by `shape_chunk` (`voice/shape.py`) before it is sent. The 
 padding is trimmed (samples quieter than `TRIM_LEVEL` at an edge, keeping `KEEP_MS` of silence),
 each end fades over `FADE_MS` so there is no click, and a gap of zeros is appended: `GAP_MS` after a
 chunk, `PARAGRAPH_GAP_MS` after one that ends a paragraph. The gap is part of the chunk's PCM, so a
-chunk is still one frame and the player is unchanged. The Settings preview is shaped too, without
+chunk is still one frame and the player is unchanged. The picker's sample is shaped too, without
 the paragraph gap.
 
 To retune, edit the constants at the top of `shape.py` (`TRIM_LEVEL = 0.01`, `KEEP_MS = 20`,

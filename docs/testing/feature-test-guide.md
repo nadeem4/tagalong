@@ -1218,6 +1218,14 @@ popup); the answer is text only.
    move the speed slider and play again; switch **Scout talks** off, Save, and ask a question.
 2. **Expected:** each sample plays in that voice at the slider's speed; picking saves at once
    (a voice not yet downloaded starts downloading); with Scout talks off the answer is silent.
+3. **Action:** pick a voice that is not downloaded, and while its row shows Downloading, pick
+   another voice.
+4. **Expected:** the new pick is saved at once and its row takes over the progress line; the card
+   never shows an older percent after a newer one, and Scout speaks with the Windows voice until
+   the chosen one is ready.
+5. **Action:** with a voice's sample already played once and the brain offline from the network,
+   press its play button again.
+6. **Expected:** the cached sample plays; a sample never heard before says it could not play.
 
 ### V.5a. Test your microphone
 
@@ -2419,7 +2427,7 @@ from a terminal.
 
 ### V.1b. The voice choice lives in the brain
 
-Needs the brain running; the desktop's own voice list comes in a later slice, so this is by Home tool.
+Needs the brain running; this is by Home tool; the desktop's voice picker (V.5) does the same through the same tools.
 
 1. **Action:** call `tts_state`, then `set_tts {"voice": "piper-alan"}`, then `set_tts {"voice": "nope"}`.
 2. **Expected:** the state lists eight voices with `installed` flags and `chosen: auto`; the first
