@@ -57,6 +57,7 @@ from brain.mind.capabilities import AppCaps, BodyCaps, ExpertCaps, capability_pi
 from brain.mind.prompt import (
     INTERRUPTED_MARK,
     check_part_sizes,
+    ear_note,
     interjection_block,
     interruption_block,
     render_know,
@@ -436,12 +437,17 @@ class Session:
 
     async def say(self, body_id: str, params: SayParams) -> SayResult:
         check_part_sizes(params.parts or [])  # over_limit, before anything changes
-        content = user_content(params)  # may raise ValueError before anything changes
         sender = self._bodies.body(body_id)
         shown_on: str | None = body_id
         if sender is not None and sender.display is False:
             shown_on = self._display_target()  # its answer must appear where someone can see it
-        else:
+        # The ear guide follows the same rule as the voice, so a silenced body never gets it.
+        # `spoken` is cleared because the guide is added here, once, by that rule.
+        content = user_content(
+            params.model_copy(update={"spoken": False}),
+            read_aloud=self._wants_speech(shown_on, params),
+        )  # may raise ValueError before anything changes
+        if not (sender is not None and sender.display is False):
             self._last_body = body_id
         if params.interrupted is not None and self._ready():
             after = self._task if self._busy() else None
@@ -746,18 +752,26 @@ class Session:
         notify("turn", started)
         notify("turn", {"turn": turn_id, "body": body_id, "state": "ended", "reason": "cancelled"})
 
+    def _wants_speech(self, shown_on: str | None, params: SayParams | None) -> bool:
+        """Whether a turn shown on `shown_on` is read aloud: a voice exists, and the user spoke or
+        the body asked for read-aloud. A body that turned read-aloud off silences everything."""
+        if self.voice is None or shown_on is None:
+            return False
+        ask = self._read_aloud.get(shown_on)
+        if ask is not None and not ask.on:
+            return False
+        return bool((params is not None and params.spoken) or (ask and ask.on))
+
     def _speak(self, turn: str | None, shown_on: str | None, params: SayParams | None) -> None:
         """A turn is read aloud when the user spoke (`params.spoken`) or the body showing it asked
         for read-aloud; on that body only, because speech never goes to a body that did not
         display the turn. A body that turned read-aloud off silences everything, spoken or not.
         `params` is None for a turn the brain started."""
-        if self.voice is None or shown_on is None or turn is None:
+        if turn is None or shown_on is None or self.voice is None:
+            return
+        if not self._wants_speech(shown_on, params):
             return
         ask = self._read_aloud.get(shown_on)
-        if ask is not None and not ask.on:
-            return
-        if not (params is not None and params.spoken) and not (ask and ask.on):
-            return
         voice, speed = (ask.voice, ask.speed) if ask else (None, None)
         if params is not None:
             voice = params.voice if params.voice is not None else voice
@@ -1016,6 +1030,8 @@ class Session:
     def _start_wake(self, body_id: str | None, content: list) -> str:
         if not self._ready():
             raise WakeSkipped  # dropped quietly; unreported jobs are told at a later start
+        if self._wants_speech(body_id, None):
+            content = [*content, {"type": "text", "text": ear_note()}]
         turn = self._start_turn(body_id, content, "brain")
         self._speak(turn, body_id, None)  # remarks and hellos are read aloud like any reply
         return turn
