@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   applySpeechControl,
   pickSystemVoice,
+  playVoiceSample,
   previewVoice,
   SpeechPlayer,
   speakWithSystem,
@@ -446,5 +447,28 @@ describe('previewVoice', () => {
     await previewVoice({ ...line, mouth: 'system' }, signal, deps);
     expect(deps.sample).not.toHaveBeenCalled();
     expect(deps.system).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('playVoiceSample', () => {
+  const signal = new AbortController().signal;
+
+  it('plays the brain’s sample of the voice at the speed', async () => {
+    const deps = {
+      sample: vi.fn(() => Promise.resolve({ data: 'UklG' })),
+      wav: vi.fn(() => Promise.resolve()),
+    };
+    await playVoiceSample('piper-alan', 0.95, signal, deps);
+    expect(deps.sample).toHaveBeenCalledWith('piper-alan', 0.95);
+    expect(deps.wav).toHaveBeenCalledWith('UklG', signal);
+  });
+
+  it('rejects when the brain has no sample, so the picker can say so', async () => {
+    const deps = {
+      sample: vi.fn(() => Promise.resolve(null)),
+      wav: vi.fn(() => Promise.resolve()),
+    };
+    await expect(playVoiceSample('piper-alan', 1, signal, deps)).rejects.toThrow('sample');
+    expect(deps.wav).not.toHaveBeenCalled();
   });
 });

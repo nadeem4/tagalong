@@ -162,6 +162,8 @@ export const IPC = {
   // The speech models in Settings: read the choice and the card, save a choice.
   sttState: 'tagalong:stt:state',
   sttSet: 'tagalong:stt:set',
+  ttsState: 'tagalong:tts:state',
+  ttsSet: 'tagalong:tts:set',
   voiceDownload: 'tagalong:voice:download',
   voiceFetch: 'tagalong:voice:fetch',
   // The first-run walkthrough: open it (at a step) or finish it.
@@ -221,7 +223,7 @@ export interface SpeechChunk {
   n?: number;
 }
 
-/** A Settings preview line, spoken by the brain's voice: a WAV, base64. */
+/** A voice's sample from the brain: a WAV, base64. */
 export interface SpeakSample {
   mime: string;
   data: string;
@@ -284,7 +286,12 @@ export interface BrowserFolder {
  */
 export type PreloadBridge = Omit<
   HostBridge,
-  'checkHealth' | 'openFix' | 'openLogs' | 'readingRecheck' | 'openLanguageSettings'
+  | 'checkHealth'
+  | 'openFix'
+  | 'openLogs'
+  | 'readingRecheck'
+  | 'openLanguageSettings'
+  | 'playVoiceSample'
 >;
 
 /**
@@ -349,8 +356,8 @@ export interface TagalongHostApi {
   /** The drag ended: remember where the pet was left. */
   dropAvatar(): Promise<void>;
   togglePanel(): Promise<void>;
-  /** A preview line in the brain's voice; null when the brain cannot speak it. */
-  speakSample(text: string, voice: string, speed: number): Promise<SpeakSample | null>;
+  /** A voice's sample at a speed, from the brain; null when it cannot make one. */
+  speakSample(voice: string, speed: number): Promise<SpeakSample | null>;
   /** Scout stops speaking at once: tells the brain too. */
   hush(): Promise<void>;
   /** The player started or ended a sentence, paused, or went idle: told to the brain. */

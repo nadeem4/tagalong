@@ -46,6 +46,7 @@ import type {
   LoopsState,
   ModelState,
   SttState,
+  TtsState,
   VoiceDownload,
   TimerRow,
   UpdateKind,
@@ -192,6 +193,8 @@ const bridge: PreloadBridge = {
   sttState: () => ipcRenderer.invoke(IPC.sttState) as Promise<SttState>,
   setStt: (choice: { live?: string; final?: string }) =>
     ipcRenderer.invoke(IPC.sttSet, choice) as Promise<void>,
+  ttsState: () => ipcRenderer.invoke(IPC.ttsState) as Promise<TtsState>,
+  setTts: (voice: string) => ipcRenderer.invoke(IPC.ttsSet, voice) as Promise<void>,
   voiceDownload: () => ipcRenderer.invoke(IPC.voiceDownload) as Promise<VoiceDownload>,
   fetchVoice: (retry = false) => ipcRenderer.invoke(IPC.voiceFetch, retry) as Promise<void>,
   openWalkthrough: (step?: number) =>
@@ -268,8 +271,8 @@ const host: TagalongHostApi = {
   showBrowserFolder: () => ipcRenderer.invoke(IPC.showBrowserFolder) as Promise<void>,
   hidePanel: () => ipcRenderer.invoke(IPC.hidePanel) as Promise<void>,
   togglePanel: () => ipcRenderer.invoke(IPC.togglePanel) as Promise<void>,
-  speakSample: (text, voice, speed) =>
-    ipcRenderer.invoke(IPC.speakSample, text, voice, speed) as Promise<SpeakSample | null>,
+  speakSample: (voice, speed) =>
+    ipcRenderer.invoke(IPC.speakSample, voice, speed) as Promise<SpeakSample | null>,
   hush: () => ipcRenderer.invoke(IPC.hush) as Promise<void>,
   speechState: (event) => ipcRenderer.send(IPC.speechState, event),
   onSpeaking: (handler) => {

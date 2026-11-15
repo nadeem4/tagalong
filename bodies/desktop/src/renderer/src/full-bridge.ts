@@ -1,12 +1,14 @@
 /**
- * The HostBridge a window hands to @tagalong/ui: the preload's calls plus the three the preload
- * cannot make itself (the health check, Fix it, Open logs folder), which need renderer code.
+ * The HostBridge a window hands to @tagalong/ui: the preload's calls plus the ones the preload
+ * cannot make itself (the health check, Fix it, Open logs folder, playing a voice sample), which
+ * need renderer code.
  * Contains fullBridge.
  */
 import type { HostBridge } from '@tagalong/ui';
 import type { FixTarget } from '@tagalong/ui/shapes';
 import { gatherHealth, HEALTH_TEST_BUDGET_MS } from './health-facts';
 import { listMicrophones } from './mic';
+import { playVoiceSample } from './voice-player';
 
 /**
  * The preload's bridge, plus the health check ("Scout, what's wrong?"), read from calls Home
@@ -35,5 +37,6 @@ export function fullBridge(): HostBridge {
     openLogs: () => host.openLogsFolder(),
     readingRecheck: () => host.readingRecheck(),
     openLanguageSettings: () => host.openLanguageSettings(),
+    playVoiceSample: (voice, speed) => playVoiceSample(voice, speed, new AbortController().signal),
   };
 }

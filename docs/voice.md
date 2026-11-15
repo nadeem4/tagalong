@@ -138,8 +138,8 @@ renderer an `earsStatusEvent` of `online`, which makes `ListenController.retryNo
 the brain is up. Spoken audio (`speechChunk`, `speechDone`) and `speechControl` go to the panel alone;
 the panel's `speechState` events arrive over IPC and `createVoiceBridge.speechState` checks their
 shape before sending them on (a bad one is dropped); everything
-else the ears send goes to every window. The preview (`speakSample`) coerces what the panel
-sends: the voice to a string, the speed to a number, and a speed that is no number is no preview.
+else the ears send goes to every window. The sample (`speakSample(voice, speed)`) coerces what the page
+sends: the voice to a string, the speed to a number, and a speed that is no number is no sample.
 
 `models()` (the health check) reports `{ ears: !failed }`: the ears are fine until
 the brain sends `voice { status: 'failed' }`; the mouth has no status of its own and is not reported. Its row
@@ -582,8 +582,10 @@ flowchart LR
   default. While it speaks, the level is held at 0.5.
   `getVoices()` is called once at load so the list is ready.
 - **Preview.** `previewVoice({ text, mouth, voice, speed })` is Settings' Preview button. For
-  Kokoro it calls the brain's `speak_sample` tool through `IPC.speakSample` and plays the returned
-  WAV (`playWav`). If the brain has no voice, is offline, or the mouth is "System voice", it
+  Kokoro it calls the brain's `speak_sample {voice, speed}` tool through `IPC.speakSample` and plays
+  the returned WAV (`playWav`). The voice picker's Play is `playVoiceSample(voice, speed)` (a
+  `HostBridge` call the renderer supplies): it rejects when the brain has no sample. `ttsState()`
+  and `setTts(voice)` read the roster and save the pick through `tts_state` and `set_tts`. If the brain has no voice, is offline, or the mouth is "System voice", it
   falls back to the system voice.
 
 **Read aloud.** With Scout talks on, the brain speaks every turn this desktop displays: a heard
