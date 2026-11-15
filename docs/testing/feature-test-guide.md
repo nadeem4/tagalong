@@ -1153,6 +1153,15 @@ popup); the answer is text only.
    part above the rule is heard; the list is never read. A reply with nothing to show has no rule
    and is read whole. The same on a typed question and on a remark Scout starts itself.
 
+### V.2b. Chunks and sentence splitting
+
+1. **Action:** with Scout talks on, ask for a long answer ("explain how a DNS lookup works in a
+   few paragraphs"). Then ask for something with "e.g.", "Dr." and a number like 3.5 in it ("give me
+   an example of a version number, e.g. 3.5, and who is Dr. Smith").
+2. **Expected:** the first words start quickly, then the rest comes in whole chunks with no clipped
+   one-word or two-word lines. "e.g.", "Dr." and "3.5" are never cut in the middle by a pause.
+   Talking over Scout mid-chunk makes Scout carry on from the start of that chunk.
+
 ### V.3. Stopping
 
 1. **Action:** while Scout speaks, press `Ctrl+Shift+Alt+M`; on the next answer click the bars; on the

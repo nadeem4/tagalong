@@ -2327,27 +2327,32 @@ brain sends and falls back to the system voice for a text-only `speech` frame.
   A bad event shape is ignored. With `system_voice` the turn is
   spoken with text-only `speech` frames and `Mouth` never loads Kokoro. `say` may carry `voice` (a Kokoro voice id, default `bm_george`) and `speed`
   (default 1.0); an unknown voice id speaks with `bm_george`.
-- **Sentences.** `voice/speakable.py` turns the streamed reply into sentences: fenced code, table rows, `>` quotes
-  and bare URLs are left out, list markers and Markdown dropped, nothing is added or cut. Nothing
-  after a line of exactly `---` is said (the divider, see [Say and show](voice.md#say-and-show)).
-  The first complete sentence goes out at once. Short sentences (under 40 characters) that are
-  already waiting are said together, because the voice clips a very short line.
-- **`Mouth`** (`voice/mouth.py`) keeps one queue of sentences for all turns and one worker task
-  that says them in order. It synthesises each sentence with `asyncio.to_thread` and awaits it, so
+- **Sentences and chunks.** `voice/speakable.py` turns the streamed reply into sentences: fenced
+  code, table rows, `>` quotes and bare URLs are left out, list markers and Markdown dropped,
+  nothing is added or cut. Nothing after a line of exactly `---` is said (the divider, see
+  [Say and show](voice.md#say-and-show)). `find_sentence_end` ends a sentence at `.`, `!` or `?`
+  followed by a capital, digit or quote, not after an abbreviation (`e.g.`, `Dr.`, `etc.`, an
+  initial), a decimal, a version or a list number; a single line break is a space and a blank line
+  ends the sentence and the paragraph. `voice/chunker.py` groups the sentences into chunks: the
+  first complete sentence of at least 4 words goes out at once, later chunks grow to about 30
+  words (45 at most), a sentence over 45 words is cut at its last comma or space, and a 1-3 word
+  paragraph joins its neighbour. See [Voice](voice.md#the-mouths-queue).
+- **`Mouth`** (`voice/mouth.py`) keeps one queue of chunks for all turns and one worker task
+  that says them in order. It synthesises each chunk with `asyncio.to_thread` and awaits it, so
   a slow voice never stalls the websocket or the ears, and sends
   `speech {turn, n, text, pcm, sample_rate}` with `Bodies.send_live` (24 kHz int16 little endian,
-  base64; `n` is the 1-based sentence number within the turn). After the last sentence it sends
+  base64; `n` is the 1-based chunk number within the turn). After the last chunk it sends
   `speech {turn, done: true}`. `Mouth.sentences(turn)` returns what was sent for the newest three
-  turns (frame `n` is index `n - 1`), then the sentences made but not yet sent; it survives a clear.
+  turns (frame `n` is index `n - 1`), then the chunks made but not yet sent; it survives a clear.
   `Mouth.unsaid(turn)` is only the made-but-unsent part. `Mouth.state` (`talking`,
-  `sentence_break`, `paused`, `idle`) and `on_state` report what the mouth is doing. A failure on one sentence is
+  `sentence_break`, `paused`, `idle`) and `on_state` report what the mouth is doing. A failure on one chunk is
   logged and the worker goes on; `close()` (called at brain shutdown) stops the worker.
 - **No voice yet.** The Kokoro voice loads on the first spoken turn, not at start. Until it is
-  ready (first run downloads about 120 MB), and when it fails to load, sentences go out as `speech
+  ready (first run downloads about 120 MB), and when it fails to load, chunks go out as `speech
 {turn, text}` with no `pcm`, so the body says them with its system voice. The mouth sends no
   `voice` frame: that channel is the ears' alone, and text without `pcm` already means "use your
   own voice". A failed load is tried again on the next spoken turn.
-- **One synth at a time.** One worker makes and sends one sentence at a time, and a lock keeps
+- **One synth at a time.** One worker makes and sends one chunk at a time, and a lock keeps
   Preview's `sample` from overlapping it, because the espeak phonemizer is not thread-safe.
 - **Pause, resume, clear.** `Mouth.pause()` takes effect after the sentence in flight is sent;
   what is queued stays and `resume()` carries on in order. `clear(turn)` (every turn when `None`)
