@@ -3833,3 +3833,36 @@ async def test_stopping_a_turn_that_will_not_end_does_not_hang(monkeypatch):
     await asyncio.wait_for(session.stop_turn(), 1)
     task.cancel()  # the second cancel ends it, so the test leaves nothing running
     await asyncio.gather(task, return_exceptions=True)
+
+
+class _StubbornAfterAStep(_Stubborn):
+    """One tool round is saved, then the turn ignores its first cancel."""
+
+    async def stream(self, system, messages, tools):
+        if not self.started.is_set():
+            self.started.set()
+            yield tool_use("recall", query="x")
+            return
+        async for chunk in super().stream(system, messages, tools):
+            yield chunk  # pragma: no cover
+
+
+async def test_a_say_whose_turn_would_not_stop_is_resumed_not_said_again(monkeypatch):
+    monkeypatch.setattr(sessions_module, "STOP_TURN_WAIT_S", 0.05)
+    memory = Memory(":memory:")
+    model = _StubbornAfterAStep()
+    session, _ = make(model, memory)
+    join(session, "desktop")
+    said = say("remember the milk" + chr(10) + "and the eggs too")  # a resume names line one
+    await session.say("desktop", said)
+    await until(lambda: session._saved >= 3)  # the request and its tool round are saved
+    task = session._task
+    await asyncio.wait_for(session.stop_turn(), 1)
+    again = Gate(["ok"])
+    revived, _ = make(again, memory)
+    join(revived, "desktop")
+    revived.runner.poke()
+    await idle(revived)
+    task.cancel()  # the second cancel ends it, so the test leaves nothing running
+    await asyncio.gather(task, return_exceptions=True)
+    assert json.dumps(again.seen[0]).count("and the eggs too") == 1

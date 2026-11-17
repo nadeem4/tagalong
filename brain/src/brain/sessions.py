@@ -679,6 +679,9 @@ class Session:
         done, _ = await asyncio.wait({task}, timeout=STOP_TURN_WAIT_S)
         if not done:
             log.warning("the turn did not end within %.0f s of its cancel", STOP_TURN_WAIT_S)
+            # Its request was saved before the model was asked, and with no end to mark it
+            # cut, the next run would load its words: name it instead of sending them again.
+            self.events.set_resume(ids)
             return
         if ids and not self._wordless_cancel:
             self.events.set_resume(ids)
