@@ -27,7 +27,7 @@ _KINDS = {
     "offer": ("Offer", ""),
     "held": ("Held news", ""),
 }
-# Why the dispatcher kept news instead of telling it (dispatcher.py), in plain words.
+# Why news was held instead of told, in plain words, for `held` open items.
 _HELD_WHY = {
     "budget_spent": "held because the daily budget was spent",
     "quiet_hours": "held during quiet hours",

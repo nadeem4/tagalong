@@ -1,7 +1,7 @@
 """ScoutQuestions: an expert's question goes to Scout first, who answers it or passes it on.
 
 ask() emits a job_question wake and waits; answer() or pass_to_user() settle it. A question
-that Scout never settles (wake dropped, turn ended) resolves to None, which means "ask the
+that Scout never settles (its event ended unanswered) resolves to None, which means "ask the
 owner", so the expert is never left hanging on a silent Scout. Each question is a `question`
 row under its job, so a job that ends takes its open questions with it.
 """
@@ -37,13 +37,20 @@ def _line(field) -> str:
 
 
 class ScoutQuestions:
-    def __init__(self, emit: Callable[..., None], work: WorkStore) -> None:
+    def __init__(
+        self, emit: Callable[..., None], work: WorkStore, can_answer: Callable[[], bool]
+    ) -> None:
+        """`can_answer`: Scout could take a turn now (a key is set, the budget not spent). When
+        it cannot, the question goes to the owner at once instead of waiting on Scout."""
         self._emit = emit
         self._work = work
+        self._can_answer = can_answer
         self._open: dict[str, _Open] = {}
         work.on_transition(self._row_ended)
 
     async def ask(self, job_id: str, question: Question) -> dict | None:
+        if not self._can_answer():
+            return None
         qid = uuid.uuid4().hex[:8]
         while qid in self._open or self._work.get(qid) is not None:
             qid = uuid.uuid4().hex[:8]
@@ -62,13 +69,12 @@ class ScoutQuestions:
             "message": question.message,
             "fields": "\n".join(_line(f) for f in question.fields),
         }
-        # Resolving twice is harmless: on_end fires after an answer too, so settle() guards.
-        settle = lambda: self._settle(qid, None, "expired", "Scout did not answer")  # noqa: E731
+        # The event ending in any way (told, given up, returned at a stop) settles an unanswered
+        # question, so no job waits forever; after an answer, settle() is a no-op.
         try:
             self._emit(
                 Event("job_question", f"job:{job_id}", facts),
-                on_drop=settle,
-                on_end=lambda reason: settle(),
+                on_end=lambda _state: self._settle(qid, None, "expired", "Scout did not answer"),
             )
             return await future
         finally:

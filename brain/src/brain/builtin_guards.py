@@ -1,6 +1,6 @@
 """Built-in guards: the spend caps (daily budget, step cap) and the wake caps.
 
-The budget also sits on emit so the dispatcher holds wakes; model_call guards the turn loop.
+The budget also sits on emit so the runner holds news; model_call guards the turn loop.
 Budget comes first so a spent day reports over_budget even when the step cap is also reached.
 Asks are not here: the permission engine decides every one of them.
 """
@@ -9,7 +9,7 @@ import dataclasses
 
 from brain.guards import ALLOW, EmitCtx, Guard, Guards, Hook, ModelCallCtx, Verdict, block, stop
 
-_WINDOW = 3600  # seconds in the rolling wake-cap window
+WAKE_WINDOW_S = 3600  # seconds in the rolling wake-cap window
 
 
 def daily_budget(budget) -> Guard:
@@ -20,7 +20,7 @@ def daily_budget(budget) -> Guard:
 
 
 def daily_budget_on_emit(budget) -> Guard:
-    # Same check and name on the emit hook, so the dispatcher holds wakes once the day is spent.
+    # Same check and name on the emit hook, so the runner holds news once the day is spent.
     return dataclasses.replace(daily_budget(budget), hook=Hook.emit)
 
 
@@ -39,7 +39,7 @@ def wake_caps(per_hour: int) -> Guard:
     def check(ctx: EmitCtx) -> Verdict:
         if ctx.kind is None or ctx.kind.max_per_hour is None:
             return ALLOW
-        recent = [(t, k) for t, k in ctx.wakes if (ctx.now - t).total_seconds() < _WINDOW]
+        recent = [(t, k) for t, k in ctx.wakes if (ctx.now - t).total_seconds() < WAKE_WINDOW_S]
         waits = []
         for times, cap in (
             ([t for t, k in recent if k == ctx.kind.name], ctx.kind.max_per_hour),
@@ -47,7 +47,7 @@ def wake_caps(per_hour: int) -> Guard:
         ):
             if len(times) >= cap:
                 oldest_blocking = times[len(times) - cap]
-                waits.append(_WINDOW - (ctx.now - oldest_blocking).total_seconds())
+                waits.append(WAKE_WINDOW_S - (ctx.now - oldest_blocking).total_seconds())
         if not waits:
             return ALLOW
         return dataclasses.replace(block("wake cap reached", "held"), value=max(waits))

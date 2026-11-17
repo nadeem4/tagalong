@@ -159,7 +159,7 @@ def test_expired_since_lists_what_ended_while_away(tmp_path):
 
 
 def test_held_news_is_an_open_item_kind(tmp_path):
-    # Migration 0032 widens the kind list so the dispatcher can hold any event's news.
+    # Migration 0032 widens the kind list so any event's news can be held.
     items, _ = make(tmp_path)
     item = items.open("held", "desktop", saved_call={"event": "timer", "why": "budget_spent"})
     assert items.list_open(kind="held") == [item]

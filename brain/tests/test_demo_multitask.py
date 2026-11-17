@@ -110,9 +110,6 @@ class Overlap(Gate):
             self.active -= 1
 
 
-@pytest.mark.xfail(
-    strict=True, reason="C1: _ended starts a wake and the pending turn at once, two on one history"
-)
 async def test_2_stop_while_a_job_finishes_never_runs_two_turns_at_once():
     gate = asyncio.Event()
     model = Overlap([gate, "w1", "p1", "x", "y", "z"])
@@ -134,7 +131,7 @@ async def test_2_stop_while_a_job_finishes_never_runs_two_turns_at_once():
     session._start_turn = spy
     first = await said(session, sent, "desktop", say("task one"))
     await settle()
-    joined = await said(session, sent, "desktop", say("task two"))  # joins the running turn's inbox
+    joined = await said(session, sent, "desktop", say("task two"))  # waits for the turn's next step
     session.jobs._on_finished(end_job(memory))  # a job's news is due...
     session.cancel(first.turn)  # ...as the person presses Stop
     await asyncio.sleep(0.2)
@@ -260,14 +257,11 @@ def _timer_rig(tmp_path):
     return memory, now
 
 
-@pytest.mark.xfail(
-    strict=True, reason="C5: a timer whose wake turn errored is marked done and never told again"
-)
 async def test_4_a_reminder_whose_wake_errored_is_told_again_after_a_restart(tmp_path):
     memory, now = _timer_rig(tmp_path)
     session, sent = make(Failing([]), memory, kinds=TIMER, now=lambda: now)
     join(session, "desktop")
-    session.dispatcher.pump()
+    session.runner.poke()
     await idle(session)
     reason = sent[-1][1]["reason"]
     row = records_for(memory).work.of_kind("timer", ["done", "active", "planned"])[0]
@@ -275,7 +269,7 @@ async def test_4_a_reminder_whose_wake_errored_is_told_again_after_a_restart(tmp
     again = Gate(["ok", "ok"])
     session2, _ = make(again, memory, kinds=TIMER, now=lambda: now)  # the brain restarts
     join(session2, "desktop")
-    session2.dispatcher.pump()
+    session2.runner.poke()
     await idle(session2)
     told = any("3pm reminder" in json.dumps(c) for c in again.seen)
     print(f"[4] after restart, reminder told again: {told}")
@@ -292,7 +286,7 @@ async def test_4_control_a_job_whose_wake_errored_is_told_again_after_a_restart(
     again = Gate(["ok", "ok"])
     session2, _ = make(again, memory)
     join(session2, "desktop")
-    session2.dispatcher.pump()
+    session2.runner.poke()
     await idle(session2)
     told = any("job_ended" in json.dumps(c) for c in again.seen)
     print(f"\n[4 control] job result told again after restart: {told}")
@@ -357,9 +351,10 @@ async def test_6b_a_browser_says_origin_is_recorded_as_the_browser():
     session, sent = make(Gate(["a"]))
     join(session, "desktop")
     join_headless(session, "browser")
-    await session.say("browser", say("summarise this page"))
+    asked = say("summarise this page")
+    await session.say("browser", asked)
     await idle(session)
-    [row] = session.events.ready()
+    row = session.events.get(asked.id)
     print(f"\n[6b] browser say recorded source: {row.source}")
     assert (row.kind, row.source) == ("say", "browser")
 

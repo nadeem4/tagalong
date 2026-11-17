@@ -330,7 +330,7 @@ async def _run() -> None:
         tts_clip(config.data_dir),
     )
     session.voice = voice
-    voice.follow_speech(session.dispatcher.set_mouth_state)
+    voice.follow_speech(session.presence.mouth)
     voice.follow_download(lambda: bodies.notify("changed", {"what": "voice_download"}))
     session.loops = loops  # focus and tab events also surface loops
     setup_events.resume()  # news of an install or login the last run never told
@@ -392,7 +392,7 @@ async def _run() -> None:
         await session.jobs.shutdown()
         await apps.shutdown()
         await session.stop_background()  # tools a talked-over turn left running end here
-        await session.dispatcher.stop()  # news still waiting is held, so the next run shows it
+        await session.runner.stop()  # the running turn's events wait for the next run
         memory.close()
         clear_pid(config.data_dir, os.getpid())
 

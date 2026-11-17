@@ -4,7 +4,7 @@ Each connection owns one bounded queue drained by a single writer task, so Peer.
 or awaits (Bodies.notify loops over peers) and the hello result always precedes its backlog.
 Hello, tools, say, call, answer and cancel are handled, and listen, mic, unlisten and hush
 go to the voice seam (Session.voice); any other request answers method_not_found.
-`speech_state` (the desktop's speaker) feeds the dispatcher, which follows it over the mouth.
+`speech_state` (the desktop's speaker) feeds presence, which follows it over the mouth.
 `call` runs in its own task and replies through the peer queue.
 A body that joins without a usable backlog is sent the asks still open.
 Response frames (a body's answer to `use`) go to Bodies.resolve.
@@ -132,7 +132,7 @@ async def _handler(
                 if body_id is None:
                     break
                 # A new connection of this body: what an older one reported no longer holds.
-                session.dispatcher.speech_body_gone(body_id)
+                session.presence.speech_gone(body_id)
                 continue
             if not isinstance(method, str):
                 try:
@@ -189,12 +189,12 @@ async def _handler(
             if was_current and body_id in listening and session.voice is not None:
                 session.voice.unlisten(body_id)  # a gone body's mic must not keep a session
             if was_current:  # a replaced connection's claim was cleared by its successor's hello
-                session.dispatcher.speech_body_gone(body_id)
+                session.presence.speech_gone(body_id)
         peer.close()
         await asyncio.gather(writer, return_exceptions=True)
 
 
-# The speaker's frames in the dispatcher's words: a sentence started is talking, one ended is a
+# The speaker's frames in presence's words: a sentence started is talking, one ended is a
 # break until the next starts.
 _SPEECH_STATES = {
     "started": "talking",
@@ -210,9 +210,7 @@ def _speech_state(message: dict, body_id: str, session: Session) -> None:
     except ValidationError as exc:
         log.debug("dropped a bad speech_state frame: %s", exc)
         return
-    session.dispatcher.set_speech_state(
-        _SPEECH_STATES[params.state], body_id, params.turn, params.n
-    )
+    session.presence.speech(body_id, _SPEECH_STATES[params.state], params.turn, params.n)
 
 
 def _hello(
@@ -325,7 +323,7 @@ async def _know_me_start(
 
 
 async def _say(message: dict, req_id: Any, body_id: str, peer: _Peer, session: Session) -> None:
-    """A say is answered once the front door delivers it, so it runs in its own task and the read
+    """A say is answered once it is saved, so it runs in its own task and the read
     loop keeps going. Says from one body are posted in the order they arrived."""
     try:
         say = SayParams.model_validate(message.get("params"))

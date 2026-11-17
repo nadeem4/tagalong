@@ -1458,12 +1458,12 @@ stands in for a real one (the brain still needs to hear something).
 12. **Action:** while Scout speaks, say "Scout, stop listening".
 13. **Expected:** Scout stops and Always listening switches off.
 
-### T.3c. Speech state frames (the front door follows the speaker)
+### T.3c. Speech state frames (the runner follows the speaker)
 
 1. **Setup:** Kokoro voice picked; the brain's log at debug level.
 2. **Action:** ask a spoken question whose answer runs several sentences, and let it finish.
 3. **Expected:** the desktop sends the brain one `speech_state` per sentence started and one per
-   sentence ended (`n` counting from 1), then `idle` when the last one ends. The brain's front door
+   sentence ended (`n` counting from 1), then `idle` when the last one ends. The brain's runner
    follows them: a timer that fires mid-reply (a `next_pause` item) is told at a sentence break, not
    in the middle of a sentence. With the desktop closed and only a typed chat open, the same timer
    waits until the running reply has finished.
@@ -2798,10 +2798,10 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 1. `cd brain && uv run pytest tests/test_bridges.py -q`: off or incomplete setup runs nothing, a
    bridge that exits is restarted after 1, 2, 4, 8, 16, 30 s, `stop` ends the child, and a secret in
    the child's output is masked in the log.
-2. `uv run pytest tests/test_bodies.py tests/test_dispatcher.py tests/test_sessions.py -q -k "whatsapp or display_ids"` and `tests/test_front_door_routing.py`:
+2. `uv run pytest tests/test_bodies.py tests/test_runner.py tests/test_sessions.py -q -k "whatsapp or display_ids or phone"` and `tests/test_front_door_routing.py`:
    a body's say or event is answered on that body (a WhatsApp say during a desktop turn is answered
-   on WhatsApp), a timer or held-mail wake prefers a screen to a phone, and a job's question
-   reaches a phone-only setup.
+   on WhatsApp), news prefers a screen to a phone (the phone comes last while a screen is online), and a job's
+   question reaches a phone-only setup.
 3. `uv run pytest tests/test_main.py -q -k "bridge or whatsapp"`: the brain starts the bridge after
    the server and stops it at shutdown.
 4. By hand, before the bridge package exists: set `TAGALONG_WHATSAPP_ENABLED=1` and five fake values
@@ -2892,18 +2892,17 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 6. Ask Scout to stop a job with a blank job id: the refusal reads `stop_job needs job as non-empty text.` in every blank or missing case.
 7. Clear the focus after Scout answered from it and ask again: Scout says it can no longer see it, not that its earlier answer was made up.
 
-## Held news: one front door, one set of rules (F12 attention framework)
+## Waiting news: one runner, one set of rules
 
-1. Automated: `cd brain && uv run pytest tests/test_dispatcher.py tests/test_open_items.py tests/test_loops_home_tools.py tests/test_config.py -q`, then `tests/test_sessions.py -q -k "gives_up"`.
-2. Budget spent: set `TAGALONG_DAILY_BUDGET_USD=0.01`, spend it, then let a job end. Scout stays silent, and Home's Held list shows "Held news" for the job (`job_ended: held because the daily budget was spent`). Nothing is logged as dropped.
-3. Quiet hours: set `TAGALONG_QUIET_HOURS` to a window around the current time (for example `14:00-15:00`, or `22:00-07:00` across midnight) and let a timer fire. Scout does not speak, and the timer shows as held news. Outside the window the same timer wakes Scout.
-4. Away: close every body for over two hours (or set the clock forward), let a job end, then open the desktop. The report is a held item on Home, and Scout does not start a late wake turn.
-5. Stop: with a job report waiting (no body online), run `uv run tagalong stop`. After the next start the report shows as held news.
+1. Automated: `cd brain && uv run pytest tests/test_runner.py tests/test_presence.py tests/test_open_items.py tests/test_loops_home_tools.py tests/test_config.py -q`, then `tests/test_sessions.py -q -k "give_up"`. It covers the order (a person's words first, then news oldest first), the gate (key, quiet hours, budget, speech, idle window, caps), the target body, the group cap of 20, the 60 s recheck, and the ends: done, cancelled, rejected and over budget are handled, any other end goes back to new.
+2. Budget spent: set `TAGALONG_DAILY_BUDGET_USD=0.01`, spend it, then let a job end. Scout stays silent and the report waits as a new event in the log; it is told once the budget is open again. Nothing is logged as dropped.
+3. Quiet hours: set `TAGALONG_QUIET_HOURS` to a window around the current time (for example `14:00-15:00`, or `22:00-07:00` across midnight) and let a timer fire. Scout does not speak, and the timer waits in the log. When the window ends (within a minute) Scout is woken with it.
+4. No body: close every body, let a job end, then open the desktop. The report waits until a body that displays is online, then Scout tells it once.
+5. Stop: with a job report waiting (no body online), run `uv run tagalong stop`. After the next start Scout tells the report once a body is online.
 6. A word spoken while the brain is stopping fails (no hang), and a wake still starts on the next run.
-7. Quiet hours and a running job: during `TAGALONG_QUIET_HOURS`, an expert's question to the person still reaches Scout (it is never held), while a timer is held.
-8. No key: with no Anthropic key, let a timer fire. It shows as held news ("there is no Anthropic key yet") and is not lost.
-9. A held line names what it is about, for example `job_ended (Job a1 ended.): held during quiet hours`. A held job report that is told later (after a restart) leaves the list.
-10. A job output containing a key-like secret that was held shows `[secret]` in the Held line, never the secret.
+7. Quiet hours and a running job: during `TAGALONG_QUIET_HOURS`, an expert's question to the person still reaches Scout (it is never held), while a timer waits.
+8. No key: with no Anthropic key, let a timer fire. It waits in the log and is not lost; set a key and Scout tells it. An expert's question asked with no key (or the budget spent) goes to the person as a card instead.
+9. A say that fails its turn (for example the model errors) is tried again with a short retry note, not sent twice in full.
 
 ## Live-test fixes (F12)
 
@@ -2926,10 +2925,10 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 
 The four moments the framework was built for. Run them on a real brain and desktop once per release.
 
-1. Automated: `cd brain && uv run pytest tests/test_no_leftovers.py tests/test_dispatcher.py tests/test_open_items.py -q` (it pins that the removed names, the scheduler and waiting modules stay gone; the dispatcher and open-item tests cover their own rules).
-2. Card during speech: ask Scout a question with a long spoken answer, and while it speaks ask it to connect an app or install an expert so a card appears. Scout mentions the card at the next sentence break and carries on; the card stays until you answer. Click Allow after Scout has finished: it counts (no "not found").
-3. Talk over Scout: while Scout speaks a long answer, hold the talk key and say something. Speech pauses at once and nothing is cancelled (a running tool call finishes). Real words are answered by Scout's own judgment: it carries on, answers you, or drops what it was saying. Silence or echo resumes the speech. Open cards are untouched.
-4. Restart with open items: leave a permission card and an install card unanswered, run `uv run tagalong stop`, start the desktop again and open the bubble. Saved-call cards show again and answering one runs the call. An expert's own permission ask (tied to the live process) shows as expired. Held news shows on Home's Tasks > Held tab.
+1. Automated: `cd brain && uv run pytest tests/test_no_leftovers.py tests/test_runner.py tests/test_open_items.py -q` (it pins that the removed names, the dispatcher, the scheduler and waiting modules stay gone; the runner and open-item tests cover their own rules).
+2. Card during speech: ask Scout a question with a long spoken answer, and while it speaks ask it to connect an app or install an expert so a card appears. Scout mentions the card at the next sentence break and carries on; the card stays until you answer. Click Allow after Scout has finished: it counts (no "not found"). The answer is saved as a handled `card_answer` event and starts no turn.
+3. Talk over Scout: while Scout speaks a long answer, hold the talk key and say something. Speech pauses at once and only the turn you talked over is stopped (a running tool call finishes). Your words wait for that turn to wind down, then get their own turn, which is told what was heard and what was left. Real words are answered by Scout's own judgment: it carries on, answers you, or drops what it was saying. Silence or echo resumes the speech. Open cards are untouched.
+4. Restart with open items: leave a permission card and an install card unanswered, run `uv run tagalong stop`, start the desktop again and open the bubble. Saved-call cards show again and answering one runs the call. An expert's own permission ask (tied to the live process) shows as expired.
 5. WhatsApp only: close the desktop and every other body, leave only WhatsApp connected, and have a job ask you a question. The question reaches WhatsApp (no hang), and a reply typed in WhatsApp answers it. A WhatsApp message sent while the desktop is mid-turn is answered on WhatsApp, not on the desktop.
 6. Install progress: install an expert from the chat. The card shows real steps (checking this computer, getting what it needs, finding the version, downloading with a percent, unpacking, setting it up), never one "Installing" line for minutes. Asking twice for the same expert joins the one install.
 

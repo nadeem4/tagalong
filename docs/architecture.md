@@ -171,39 +171,49 @@ records a clean close and closes the brain client.
 ## What wakes Scout
 
 Everything that wants Scout's attention (the person's own words, a timer, a finished job, a loop, a
-card answer, setup news) enters the brain through one front door, `brain/src/brain/dispatcher.py`.
-Each event kind carries an urgency set by code (`now`, `next_pause`, `idle`, `hold`); neither the
-model nor the payload can raise it. The dispatcher delivers by the speech state, which the desktop
-reports because it plays the audio (the brain's own mouth only when no body plays): at once, at the
-next sentence break, only when quiet, or kept as a `held` open item. It also batches and caps the
-wakes it hands on.
+card answer, setup news) is saved first as an event in the log (`brain/src/brain/events.py`). One
+runner (`brain/src/brain/runner.py`) is the only thing that starts a Scout turn, and it runs one at a
+time. `pick` takes the person's words first, then news oldest first. `gate` decides whether news may
+be told now: a key is set, not quiet hours, budget left, the batch window and idle window are over,
+the cap is not spent, and Scout is not mid-speech unless a sentence break gives a pause. `target`
+picks the body that answers: the one that sent the message, else where the person is. Each event kind
+carries an urgency set by code (`now`, `next_pause`, `idle`, `hold`); neither the model nor the
+payload can raise it. News the gate holds back stays `new` in the log, so nothing is lost. What the
+person hears and the sentence break come from `presence.py`, which the desktop feeds because it plays
+the audio (the brain's own mouth only when no body plays).
 
 Turns are short. A turn that needs the person (a permission card, a choice, a sign-in, an install)
-opens an open item (`open_items.py`, saved in `tagalong.db`) and ends; the person's answer arrives
-later through the front door and runs the saved call, even after a restart. Talking over Scout
-pauses the speech queue and cancels nothing: the next turn sees what was said, what was left and
-what was heard, and decides. A short interjection turn at a sentence break works a due item into
-speech, then continues or replaces the queued sentences.
+opens an open item (`open_items.py`, saved in `tagalong.db`) and ends; the person's answer is saved
+as a `card_answer` event, handled at once, and runs the saved call, even after a restart. It starts
+no turn. Talking over Scout is an ordinary say that stops the turn it names (tools already running
+finish) and then waits its place in the order; that turn's heard and unsaid words lead it. A short
+interjection at a sentence break takes one waiting `next_pause` event, works it into speech, then
+continues or replaces the queued sentences; untold, the event goes back to `new`.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 flowchart LR
-  SRC["Sources: say, timers, loops,<br/>jobs, setup news, card answers"] --> FD["Front door<br/>dispatcher.py: the kind sets the urgency"]
-  FD -->|"now, or idle when speech is idle"| TURN["Scout's turn (short)"]
-  FD -->|"next_pause"| INT["Interjection at a sentence break"]
-  FD -->|"hold, or a wake it cannot tell (budget, quiet hours, stale, no key)"| OI
+  SRC["Sources: say, timers, loops,<br/>jobs, setup news"] --> LOG["Event log<br/>events.py: saved first, state new"]
+  LOG --> RUN["Runner<br/>runner.py: pick, gate, target"]
+  PRES["Presence<br/>presence.py: who is here,<br/>what they hear, sentence break"] --> RUN
+  RUN -->|"gate open"| TURN["Scout's turn (short)"]
+  RUN -->|"next_pause at a break"| INT["Interjection: one event"]
+  RUN -->|"gate shut: stays new"| LOG
+  TURN -->|"done, cancelled, rejected, over budget: handled"| LOG
+  TURN -->|"other end: back to new"| LOG
   TURN -->|"needs the person"| OI["Open items<br/>saved, one lifecycle"]
-  OI -->|"answer or result"| FD
+  OI -->|"answer: card_answer event, handled, runs the saved call"| LOG
   TURN -->|"reply sentences"| SQ["Speech queue<br/>mouth.py: one worker"]
   INT -->|"continue or replace"| SQ
+  INT -->|"untold: back to new"| LOG
   SQ -->|"speech frames"| BODY["Body plays the audio"]
-  BODY -->|"speech_state"| FD
+  BODY -->|"speech_state"| PRES
   SQ -->|"speech_control: pause, resume, clear"| BODY
 ```
 
-Words go in through the front door; replies go out through the one speech queue; open items sit
-beside the turn and hand their answers and results back through the same door. See
-[brain.md](brain.md#front-door-and-urgency), [voice.md](voice.md#the-mouths-queue) and
+Words go into the log; the runner starts every turn from it; replies go out through the one speech
+queue; open items sit beside the turn and hand their answers back through the log. See
+[brain.md](brain.md#the-turn-runner-and-urgency), [voice.md](voice.md#the-mouths-queue) and
 [storage.md](storage.md#open-items).
 
 ## Subsystem map

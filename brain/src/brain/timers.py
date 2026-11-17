@@ -1,7 +1,7 @@
 """Timers: runs the due `timer` and `watch` work rows as `timer` events and keeps one wake armed.
 
 Rows live in the work table so they survive a restart; this class only decides when to emit.
-The dispatcher decides when Scout actually hears it, and a cancelled timer's waiting wake is
+The runner decides when Scout actually hears it, and a cancelled timer's waiting wake is
 finished, never told. It also hands a due `tool_call` or `expert_call` step (a retry that waited
 out its backoff) to `rerun`.
 """
@@ -154,12 +154,11 @@ class Timers:
         if repeat_s:
             self._emit(event, then=then)
         else:
-            # Told only when Scout's turn finishes, so a cancelled wake leaves it untold.
+            # Told only when its event was handled; one returned at a stop stays untold.
             self._emit(
                 event,
                 then=then,
-                on_end=lambda reason: self._told(row.id) if reason == "done" else None,
-                retell=True,  # a cancelled wake did not tell it: once more
+                on_end=lambda state: self._told(row.id) if state == "handled" else None,
             )
 
     def _told(self, id: str) -> None:

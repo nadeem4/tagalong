@@ -1,9 +1,8 @@
 """Setup events that wake Scout (an install or a login finished) saved as `setup` open items.
 
-The item stays open until Scout's wake turn has finished, so a restart or a wake dropped because
-the budget was spent no longer loses the news: `resume` sends the saved ones again at start.
-A cancelled wake turn leaves it open. A newer event from the same source (one expert or app)
-replaces the saved one.
+The item stays open until its event was handled, so a restart no longer loses the news:
+`resume` sends the saved ones again at start. A newer event from the same source (one expert or
+app) replaces the saved one.
 """
 
 from collections.abc import Callable
@@ -20,7 +19,7 @@ class SetupEvents:
         self, items: OpenItems, emit: Callable[..., None], now: Callable[[], datetime]
     ) -> None:
         self._items = items
-        self._emit = emit  # the session's post_event: takes the event and on_start
+        self._emit = emit  # the session's post_event: takes the event and on_end
         self._now = now
 
     def emit(self, event: Event) -> None:
@@ -48,10 +47,10 @@ class SetupEvents:
         return self._items.list_open(kind="setup")
 
     def _send(self, item_id: str, event: Event) -> None:
-        # Told only when the turn for it finishes; a dropped or cancelled wake leaves it open
-        # for the next start.
-        def told(reason: str) -> None:
-            if reason == "done":  # a cancelled wake did not tell it: it stays open
+        # Told only when its event was handled; one returned at a stop stays open for the next
+        # start.
+        def told(state: str) -> None:
+            if state == "handled":
                 self._items.finish(item_id, "told")
 
-        self._emit(event, on_end=told, retell=True)
+        self._emit(event, on_end=told)

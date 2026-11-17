@@ -19,9 +19,9 @@ from brain.memory import Memory
 from brain.mind.turn import Final
 from brain.toolbox import ToolSpec
 
-KINDS = {
-    "choice": EventKind("choice", batch_seconds=None, max_per_hour=None),
-    "setup_done": EventKind("setup_done", batch_seconds=None, max_per_hour=None),
+KINDS = {  # the real urgency; uncapped and unbatched so the test needs no clock
+    "choice": EventKind("choice", "next_pause", batch_seconds=None, max_per_hour=None),
+    "setup_done": EventKind("setup_done", "next_pause", batch_seconds=None, max_per_hour=None),
 }
 REQUEST = "put lunch with Sam on my calendar tomorrow"
 CONNECT = "Connect Google Calendar"
@@ -65,7 +65,7 @@ def rig(steps, memory=None):
 
 
 async def idle(session):
-    await settle()  # a say or an answer reaches its turn through the dispatcher
+    await settle()  # a say or an answer reaches its turn through the runner
     while session._task is not None:
         task = session._task
         await asyncio.wait({task})
@@ -118,7 +118,7 @@ async def test_after_a_restart_nothing_resumes():
     )
     session, model, installs = rig([], memory=saved)
     join(session, "desktop")
-    session.dispatcher.pump()
+    session.runner.poke()
     await idle(session)
     assert len(session.history) == 2  # rebuilt through mind/resume.py, as saved text only
     assert session._task is None and model.seen == [] and installs == []

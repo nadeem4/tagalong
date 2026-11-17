@@ -1,7 +1,8 @@
-"""Sources enter through the dispatcher: a say, a wake's news, a card answer.
+"""Sources enter through the one front door, the event log: a say, a wake's news, a card answer.
 
-A reply goes to the body the item came from, news is marked told only when the turn carrying it
-finishes, and a phone-only setup still hears a job's question. Fake model and bodies only.
+The runner starts every turn: a reply goes to the body the event came from, news is marked told
+only when the turn carrying it ends, and a phone-only setup still hears a job's question. Fake
+model and bodies only.
 """
 
 import asyncio
@@ -23,10 +24,10 @@ from test_sessions import (
     said,
     say,
     settle,
+    until,
     wake_started,
 )
 
-from brain.dispatcher import Item
 from brain.events import EVENT_KINDS, Event
 from brain.jobs import JobId
 from brain.memory import Memory
@@ -35,14 +36,14 @@ from brain.protocol import Body
 
 
 def spy_posts(session):
-    posted: list[Item] = []
-    real = session.dispatcher.post
+    posted: list[Event] = []
+    real = session.events.post
 
-    def post(item):
-        posted.append(item)
-        real(item)
+    def post(event, **kw):
+        posted.append(event)
+        return real(event, **kw)
 
-    session.dispatcher.post = post
+    session.events.post = post
     return posted
 
 
@@ -56,7 +57,7 @@ async def test_reply_goes_to_origin_body():
     posted = spy_posts(session)
     await session.say("whatsapp", say("hi from the phone"))
     await idle(session)
-    assert [(i.kind, i.origin_body) for i in posted] == [("say", "whatsapp")]
+    assert [(e.kind, e.source) for e in posted] == [("say", "whatsapp")]
     assert wake_started(sent) == ["whatsapp"]
     replies = [p["body"] for m, p in sent if m == "reply"]
     assert replies and set(replies) == {"whatsapp"}
@@ -96,7 +97,7 @@ async def test_wake_not_reported_until_turn_finishes():
     assert records_for(memory).get_job("j1").parts[-1].reported
 
 
-async def test_cancelled_wake_news_survives():
+async def test_cancelled_wake_news_is_handled():
     gate = asyncio.Event()
     memory = Memory(":memory:")
     session, sent = make(Gate([gate, "never"]), memory)
@@ -105,14 +106,14 @@ async def test_cancelled_wake_news_survives():
     await settle()
     session.cancel(session._turn_id)
     await finish_quietly(session)
-    # Cancelled, so not told yet; the news is posted again and the next wake tells it.
+    # A cancel is the person's choice: the news counts as told and no second wake runs.
     await idle(session)
     assert records_for(memory).get_job("j1").parts[-1].reported
-    assert len(wake_started(sent)) == 2
+    assert len(wake_started(sent)) == 1
 
 
 async def test_job_question_reaches_whatsapp_only_setup():
-    session, sent = make(Gate(["asked"]), kinds=None)
+    session, sent = make(Gate(["asked"]), kinds=None, screen=False)
     session._bodies.connect(Body(id="wa", kind="whatsapp", name="WA"), [], QuietPeer(), None)
     session.post_event(Event("job_question", "scout", {"job": "j1", "message": "Which db?"}))
     await settle()
@@ -125,7 +126,7 @@ async def test_card_answer_enters_front_door():
     session._asks.show("a1", Call("c1", "tool", {}, "", "do it"), "tool", False)
     posted = spy_posts(session)
     session.answer("a1", "allow", "desktop")
-    assert [(i.kind, i.origin_body, i.payload["ask"]) for i in posted] == [
+    assert [(e.kind, e.source, e.payload["ask"]) for e in posted] == [
         ("card_answer", "desktop", "a1")
     ]
 
@@ -133,7 +134,7 @@ async def test_card_answer_enters_front_door():
 async def test_post_refuses_a_kind_nobody_registered():
     session, _ = make(Gate([]))
     try:
-        session.dispatcher.post(Item("nonsense", "brain", {}, "idle"))
+        session.post_event(Event("nonsense", "brain", {}))
     except ValueError as err:
         assert "nonsense" in str(err)
     else:
@@ -145,7 +146,7 @@ async def test_whatsapp_event_reply_goes_to_whatsapp():
     session, sent = make(Gate(["got it"]), kinds=None)
     join(session, "desktop")
     session._bodies.connect(Body(id="wa", kind="whatsapp", name="WA"), [], QuietPeer(), None)
-    session._last_body = "desktop"  # a wake would otherwise go to the screen
+    session.presence.touch("desktop")  # a wake would otherwise go to the screen
     event = Event("back", "wa", {"body": "wa", "idle_seconds": 900})
     session._from_body(event)
     await idle(session)
@@ -162,15 +163,15 @@ async def test_cancelling_a_say_queued_behind_a_turn_ends_it_cancelled():
     join(session, "whatsapp")
     await session.say("desktop", say("first"))
     await settle()
-    await session.say("whatsapp", say("from the phone"))  # waits for its own turn
+    queued = say("from the phone")
+    await session.say("whatsapp", queued)  # waits for its own turn
     await settle()
-    # A queued say has no turn id on the wire until T1c's runner, so this reads _later on purpose.
-    [(_, queued, *_)] = session._later  # a body learns a turn id only when its turn starts
-    session.cancel(queued)
+    session.cancel(queued.id)  # a body cancels a say that has no turn yet by the say's id
     gate.set()
     await idle(session)
+    (started,) = [p for m, p in sent if m == "turn" and queued.id in (p.get("events") or [])]
     ends = [(p["turn"], p["reason"]) for m, p in sent if m == "turn" and p["state"] == "ended"]
-    assert (queued, "cancelled") in ends
+    assert (started["turn"], "cancelled") in ends
     assert len(model.seen) == 1  # the cancelled say never reached the model
 
 
@@ -184,14 +185,14 @@ async def test_card_answer_not_held_behind_waiting_say():
     await session.say("whatsapp", say("from the phone"))  # its own turn, queued behind the first
     seen: list[str] = []
     session.ask_runner.answered = lambda ask, option, body: seen.append(ask)
-    session.dispatcher.post(Item("card_answer", "desktop", {"ask": "a1", "option": "allow"}, "now"))
+    session._asks.on_item_answer("a1", "allow", "desktop")  # the card hook the answer frame calls
     await settle()
     assert seen == ["a1"]  # the door was not blocked by the say waiting for the turn
     gate.set()
     await idle(session)
 
 
-async def test_say_during_turn_joins_through_the_dispatcher():
+async def test_say_during_turn_joins_at_the_turns_next_step():
     gate = asyncio.Event()
     model = Gate([gate, "first", "second"])
     session, sent = make(model)
@@ -199,12 +200,11 @@ async def test_say_during_turn_joins_through_the_dispatcher():
     first = await said(session, sent, "desktop", say("one"))
     await settle()
     second = await said(session, sent, "desktop", say("two"))
-    assert second.joined is True and second.turn == first.turn
-    await settle()
-    assert len(session._inbox) == 1  # handed to the running turn, which takes it at its next step
+    assert second.frame is None  # saved; the turn takes it at its next step, not before
     gate.set()
     await idle(session)
-    assert session._inbox == []
+    assert second.joined is True and second.turn == first.turn
+    assert session.events.get(second.id).state == "handled"
     assert any("two" in json.dumps(m) for m in model.seen[-1])
 
 
@@ -212,70 +212,6 @@ class Boom(Gate):
     async def stream(self, system, messages, tools):
         raise RuntimeError("the model is down")
         yield  # pragma: no cover
-
-
-async def test_joined_is_decided_when_the_say_is_delivered():
-    gate = asyncio.Event()
-    model = Gate([gate, "one", "two"])
-    session, sent = make(model)
-    join(session, "desktop")
-    first = await said(session, sent, "desktop", say("a"))
-    await settle()
-    real = session.dispatcher.deliver
-
-    async def late(items):
-        gate.set()  # the running turn ends before this say is delivered
-        for _ in range(100):
-            if session._task is None:
-                break
-            await asyncio.wait({session._task})
-            await asyncio.sleep(0)
-        await real(items)
-
-    session.dispatcher.deliver = late
-    second = await said(session, sent, "desktop", say("b"))
-    assert second.joined is False and second.turn != first.turn
-    await idle(session)
-    assert {"type": "text", "text": "b"} in model.seen[-1][-1]["content"]
-    starts = [p["turn"] for m, p in sent if m == "turn" and p["state"] == "started"]
-    assert starts == [first.turn, second.turn]
-
-
-async def test_a_say_after_the_turns_last_read_gets_a_turn_of_its_own():
-    gate = asyncio.Event()
-    model = Gate([gate, "one", "two"])
-    session, sent = make(model)
-    join(session, "desktop")
-    first = await said(session, sent, "desktop", say("a"))
-    await settle()
-    session._inbox_open = False  # the turn has done its last read of what was said
-    second = await said(session, sent, "desktop", say("late"))
-    assert second.joined is False and second.turn != first.turn
-    gate.set()
-    await idle(session)
-    assert {"type": "text", "text": "late"} in model.seen[-1][-1]["content"]
-
-
-async def test_news_is_posted_again_once_when_its_turn_is_cancelled_twice():
-    g1, g2 = asyncio.Event(), asyncio.Event()
-    memory = Memory(":memory:")
-    session, _ = make(Gate([g1, g2]), memory)
-    join(session, "desktop")
-    posted = spy_posts(session)
-    session.jobs._on_finished(end_job(memory))
-    await settle()
-    first = session._turn_id
-    session.cancel(first)
-    for _ in range(100):  # the news is posted again and its wake starts
-        if session._turn_id not in (None, first):
-            break
-        await asyncio.sleep(0)
-    assert session._turn_id not in (None, first)
-    session.cancel(session._turn_id)
-    await finish_quietly(session)
-    await idle(session)
-    assert [i.kind for i in posted].count("job_ended") == 2  # the first, and one more
-    assert not records_for(memory).get_job("j1").parts[-1].reported
 
 
 async def test_an_error_end_does_not_post_the_news_again():
@@ -287,38 +223,6 @@ async def test_an_error_end_does_not_post_the_news_again():
     await idle(session)
     assert [i.kind for i in posted].count("job_ended") == 1
     assert not records_for(memory).get_job("j1").parts[-1].reported
-
-
-async def test_news_that_did_not_opt_in_is_not_posted_again():
-    session, _ = make(Gate([asyncio.Event(), "never"]))
-    join(session, "desktop")
-    posted = spy_posts(session)
-    session.post_event(Event("job_ended", "scout", {"report": "r"}), on_end=lambda reason: None)
-    await settle()
-    session.cancel(session._turn_id)
-    await finish_quietly(session)
-    await settle()
-    assert [i.kind for i in posted].count("job_ended") == 1  # a settled question is not re-asked
-
-
-async def test_a_say_survives_its_body_disconnecting_before_delivery():
-    model = Gate(["answered"])
-    session, _ = make(model)
-    join(session, "desktop")
-    real = session.dispatcher.deliver
-    release = asyncio.Event()
-
-    async def late(items):
-        await release.wait()
-        await real(items)
-
-    session.dispatcher.deliver = late
-    task = asyncio.create_task(session.say("desktop", say("still here")))
-    await settle()
-    task.cancel()  # the connection closed; its handler task is cancelled
-    release.set()
-    await idle(session)
-    assert {"type": "text", "text": "still here"} in model.seen[0][-1]["content"]
 
 
 class BoomLater(Gate):
@@ -333,17 +237,24 @@ class BoomLater(Gate):
         yield  # pragma: no cover
 
 
-async def test_a_say_joined_to_a_turn_that_errors_gets_its_own_turn():
+async def test_a_say_waiting_on_a_turn_that_errors_gets_the_next_turn_with_it():
     gate = asyncio.Event()
     model = BoomLater(gate)
     session, sent = make(model)
     join(session, "desktop")
-    await session.say("desktop", say("a"))
+    a = say("a")
+    await session.say("desktop", a)
     await settle()
-    assert (await said(session, sent, "desktop", say("b"))).joined is True
+    await session.say("desktop", say("b"))
     gate.set()
     await idle(session)
-    assert len(model.seen) == 2  # b was not left unanswered in the failed turn's history
+    assert len(model.seen) == 2  # b was not left unanswered behind the failed turn
+    last = model.seen[-1][-1]["content"]
+    assert {"type": "text", "text": "b"} in last
+    # a rode along: its words are already in the history, so only the retry is named
+    assert {"type": "text", "text": "a"} not in last and "tried again" in last[0]["text"]
+    blocks = [b for m in model.seen[-1] for b in m["content"]]
+    assert blocks.count({"type": "text", "text": "a"}) == 1
 
 
 async def test_whatsapp_moments_wake_on_the_whatsapp_body():
@@ -364,7 +275,7 @@ async def test_whatsapp_moments_wake_on_the_whatsapp_body():
         posted = spy_posts(session)
         session.body_event("whatsapp", name, data)
         await idle(session)
-        assert [(i.kind, i.origin_body) for i in posted] == [(name, "whatsapp")]
+        assert [(e.kind, e.source) for e in posted] == [(name, "whatsapp")]
         assert wake_started(sent) == ["whatsapp"]
         replies = [p["body"] for m, p in sent if m == "reply"]
         assert replies and set(replies) == {"whatsapp"}
@@ -397,11 +308,11 @@ async def test_job_news_carries_the_say_as_its_cause(tmp_path):
     session, _ = make(Gate([gate, "ok"]), memory)
     join(session, "desktop")
     join_headless(session, "browser")
-    await session.say("browser", say("hand this off"))
+    asked = say("hand this off")
+    await session.say("browser", asked)
     await settle()  # its turn is running, and it took the say
-    [say_row] = [r for r in session.events.ready() if r.kind == "say"]
     job_id = await hand_off(session, tmp_path)
-    assert job_ended_cause(session, memory, job_id) == say_row.id
+    assert job_ended_cause(session, memory, job_id) == asked.id
     gate.set()
     await idle(session)
 
@@ -413,30 +324,29 @@ async def test_a_barge_in_say_that_hands_off_is_the_jobs_cause(tmp_path):
     first = await said(session, sent, "desktop", say("tell me"))
     voice.logs[first.turn] = ["One.", "Two."]
     await settle()
-    await session.say("desktop", over("wait", first.turn, 1))
-    await settle()
-    row = next(r for r in session.events.ready() if r.payload.get("text") == "wait")
+    barge = over("wait", first.turn, 1)
+    await session.say("desktop", barge)
+    await until(lambda: session._turn_cause == barge.id)  # its turn, once the cut one ended
     job_id = await hand_off(session, tmp_path)
-    assert job_ended_cause(session, memory, job_id) == row.id
+    assert job_ended_cause(session, memory, job_id) == barge.id
     gate.set()
     await idle(session)
 
 
-async def test_a_say_joined_to_a_cut_turn_is_the_next_turns_cause(tmp_path):
+async def test_a_say_the_cancelled_turn_never_took_gets_a_turn_of_its_own():
     gate = asyncio.Event()
-    memory = Memory(":memory:")
-    session, sent = make(Gate([gate, gate, "ok"]), memory)
+    session, sent = make(Gate([gate, "ok"]))
     join(session, "desktop")
-    await session.say("desktop", say("tell me"))
+    first = say("tell me")
+    await session.say("desktop", first)
     await settle()
-    joined = await said(session, sent, "desktop", say("and also"))
-    assert joined.joined is True
-    session.cancel(session._turn_id)  # the turn ends with the joined words unanswered
-    await settle()
-    row = next(r for r in session.events.ready() if r.payload.get("text") == "and also")
-    assert session._turn_cause == row.id
-    gate.set()
+    later = await said(session, sent, "desktop", say("and also"))
+    session.cancel(session._turn_id)  # the person stopped the turn before its next step
     await idle(session)
+    row = session.events.get(first.id)
+    assert (row.state, row.end_reason) == ("handled", "cancelled")
+    assert later.frame["state"] == "started" and session.events.get(later.id).state == "handled"
+    assert len(wake_started(sent)) == 2
 
 
 async def test_a_wake_turn_that_hands_off_is_the_jobs_cause(tmp_path):
@@ -446,10 +356,24 @@ async def test_a_wake_turn_that_hands_off_is_the_jobs_cause(tmp_path):
     session, _ = make(Gate([gate, "ok"]), memory, kinds=kinds)
     join(session, "desktop")
     join(session, "whatsapp")
+    posted = spy_posts(session)
     session.body_event("whatsapp", "ask_closed", {"via": "tap"})
     await settle()
-    [wake_row] = [r for r in session.events.ready() if r.kind == "ask_closed"]
+    [wake] = posted
     job_id = await hand_off(session, tmp_path)
-    assert job_ended_cause(session, memory, job_id) == wake_row.id
+    assert job_ended_cause(session, memory, job_id) == wake.id
     gate.set()
     await idle(session)
+
+
+async def test_a_waiting_say_cancelled_with_no_screen_ends_on_its_own_body():
+    # No body displays, so the say has no target; its frames still name the body it came from.
+    session, sent = make(Gate(["unused"]), screen=False)
+    join_headless(session, "browser")
+    waiting = say("hello")
+    await session.say("browser", waiting)
+    await settle()
+    session.cancel(waiting.id)
+    frames = [p for m, p in sent if m == "turn" and waiting.id in (p.get("events") or [])]
+    ended = [p for m, p in sent if m == "turn" and p["state"] == "ended"]
+    assert [p["body"] for p in frames + ended] == ["browser", "browser"]

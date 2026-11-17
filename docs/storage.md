@@ -655,12 +655,15 @@ never saved. Nothing acts on an event before its row exists, so a brain kill los
 | `resume`       | INTEGER          | 1 when the turn that took it is to be resumed; default 0                                   |
 | `handled_at`   | TEXT             | When it was handled, or null                                                               |
 
-- Written by: `events.py` `EventLog` (`post`, `take`, `finish`, `finish_matching`) through
-  `store/events.py`; `Session.say` and `Session.post_event` save before the dispatcher sees the event.
+- Written by: `events.py` `EventLog` (`post`, `amend`, `take`, `finish`, `finish_matching`) through
+  `store/events.py`; `Session.say` and `Session.post_event` save before the runner sees the event.
+  `amend` merges masked fields into a saved payload: a say that talked over a turn gains `cut`
+  (`spoken`, `unsaid`) after it is saved, and the cut is read back masked, so a secret in the unsaid
+  words reaches the model as `[secret]`.
   A timer's event is saved in the same transaction that fires the timer.
 - Read by: `EventLog.get`, `ready` and `origin_body` (the `caused_by` chain back to a body).
-- Known gap: until the runner arrives, a saved event whose turn never started is not delivered
-  again after a restart. Nothing sweeps old rows yet.
+- Known gap: an event a turn had taken when the brain died stays `taken` and is not delivered
+  again; events still `new` are picked up by the runner after a restart. Nothing sweeps old rows yet.
 - Index: `events_pick(state, not_before, at)` for "what is ready".
 
 ## Open items
@@ -796,13 +799,13 @@ id).
 
 These are lost when the brain restarts.
 
-| State                | Where                           | What a restart means                                                                                                                                                                                                                                |
-| -------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Open asks            | `asks.py` `Asks`                | The waiting is gone. A job's ask or card row is expired ("brain restarted"); a Scout ask is an `ask` open item that stays open and its card returns when a displaying body joins                                                                    |
-| Expert questions     | `questions.py` `ScoutQuestions` | The waiting is gone; its `question` row is expired ("brain restarted")                                                                                                                                                                              |
-| Dispatcher wakes     | `dispatcher.py` `Dispatcher`    | Wake batches still waiting for a body or a turn (their events are saved in `events`, but nothing re-delivers them yet), and the rolling hour's wake count, start empty. News the dispatcher held is an `open_items` row of kind `held` and survives |
-| Outboxes             | `bodies.py` `Outbox`            | The replay buffer (500 frames, 24 hours per body) is empty, so a reconnecting body gets a fresh start                                                                                                                                               |
-| Running jobs         | `jobs.py`, `experts.py`         | The expert processes end; their rows become `cancelled`                                                                                                                                                                                             |
-| Live history         | `sessions.py` `history`         | Rebuilt from `messages`                                                                                                                                                                                                                             |
-| App connection state | `apps.py`                       | Each enabled app reconnects; state and tool lists are rebuilt                                                                                                                                                                                       |
-| Voice session        | `voice/service.py`              | The listening session ends; the body starts a new `listen`                                                                                                                                                                                          |
+| State                | Where                           | What a restart means                                                                                                                                                                                                                              |
+| -------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Open asks            | `asks.py` `Asks`                | The waiting is gone. A job's ask or card row is expired ("brain restarted"); a Scout ask is an `ask` open item that stays open and its card returns when a displaying body joins                                                                  |
+| Expert questions     | `questions.py` `ScoutQuestions` | The waiting is gone; its `question` row is expired ("brain restarted")                                                                                                                                                                            |
+| Runner state         | `runner.py` `Runner`            | The rolling hour's wake count, the events an errored turn left waiting for something new, and the events an interjection already tried, start empty. The events themselves are saved in `events`, still `new`, and the runner picks them up again |
+| Outboxes             | `bodies.py` `Outbox`            | The replay buffer (500 frames, 24 hours per body) is empty, so a reconnecting body gets a fresh start                                                                                                                                             |
+| Running jobs         | `jobs.py`, `experts.py`         | The expert processes end; their rows become `cancelled`                                                                                                                                                                                           |
+| Live history         | `sessions.py` `history`         | Rebuilt from `messages`                                                                                                                                                                                                                           |
+| App connection state | `apps.py`                       | Each enabled app reconnects; state and tool lists are rebuilt                                                                                                                                                                                     |
+| Voice session        | `voice/service.py`              | The listening session ends; the body starts a new `listen`                                                                                                                                                                                        |

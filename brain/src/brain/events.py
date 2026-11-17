@@ -44,8 +44,8 @@ Urgency = Literal["now", "next_pause", "idle", "hold"]
 @dataclass(frozen=True)
 class EventKind:
     name: str
-    # When the dispatcher may hand this kind to Scout. Code sets it per kind; neither the
-    # model nor an item's payload can raise it (see dispatcher.py).
+    # When the runner may tell Scout this kind. Code sets it per kind; neither the model nor
+    # an event's payload can raise it (see runner.py).
     urgency: Urgency = "idle"
     wakes: bool = True
     enabled: bool = True
@@ -56,7 +56,7 @@ class EventKind:
 
 
 _KINDS = (
-    # Items the dispatcher delivers itself (a person's words, a card answer), never a wake.
+    # A person's words and card answers: never a wake (see runner.PERSON_KINDS).
     EventKind("say", urgency="now", wakes=False),
     EventKind("card_answer", urgency="now", wakes=False),
     EventKind("timer", urgency="next_pause", batch_seconds=0, max_per_hour=6),
@@ -178,19 +178,30 @@ class EventLog:
         self._db = db
         self._masker = masker
         self._now = now
+        self.on_post: Callable[[], None] = lambda: None  # the runner's poke
+        # In memory on purpose: a hook is a live caller waiting (a job's question); after a
+        # restart nobody waits, and the event row alone carries on.
+        self._on_end: dict[str, Callable[[str], None]] = {}
 
     def post(
-        self, event: Event, *, then: Callable[[sqlite3.Connection], None] | None = None
+        self,
+        event: Event,
+        *,
+        then: Callable[[sqlite3.Connection], None] | None = None,
+        on_end: Callable[[str], None] | None = None,
     ) -> bool:
         """Save the event; False when its id is already known (a retried say is one event).
 
-        `then` runs in the same transaction, so a failure leaves no row behind.
+        `then` runs in the same transaction, so a failure leaves no row behind. `on_end(state)`
+        is called once, when the event is handled or given up, or returned to `new` at a stop.
         """
         if event.kind not in EVENT_KINDS:
             raise ValueError(f"unknown event kind {event.kind!r}")
         if event.kind not in SAVED_KINDS:
             if then is not None:  # nothing would run it: refuse rather than drop the write
                 raise ValueError(f"event kind {event.kind!r} is not saved, so `then` cannot run")
+            if on_end is not None:  # nothing would end it: the hook would never fire
+                raise ValueError(f"event kind {event.kind!r} is not saved, so it never ends")
             return True
         payload = self._mask(event.payload)
         at = utc_text(event.at or self._now())
@@ -207,6 +218,9 @@ class EventLog:
                 return False
             if then is not None:
                 then(self._db)
+        if on_end is not None:
+            self._on_end[event.id] = on_end
+        self.on_post()
         return True
 
     def _mask(self, value):
@@ -230,19 +244,42 @@ class EventLog:
     def ready(self) -> list[store.EventRow]:
         return store.list_new(self._db, utc_text(self._now()))
 
+    def amend(self, id: str, fields: dict) -> None:
+        """Add facts learned after the save (what an interrupted say cut off), masked too."""
+        row = self.get(id)
+        if row is None:
+            return
+        with transaction(self._db):
+            store.set_payload(self._db, id, {**row.payload, **self._mask(fields)})
+
     def take(self, ids: list[str], turn_id: str) -> list[str]:
         with transaction(self._db):
             return store.set_taken(self._db, ids, turn_id)
 
     def finish(self, ids: list[str], state: str, end_reason: str | None = None) -> None:
+        """Move events to `state`; `new` puts them back to be taken again."""
         with transaction(self._db):
             store.set_state(self._db, ids, state, end_reason=end_reason, at=utc_text(self._now()))
+        if state in ("handled", "gave_up"):
+            self.ended(ids, state)
 
     def finish_matching(self, kind: str, source: str, state: str = "handled") -> None:
         """End the waiting events of this kind and source: stale news is never told."""
         with transaction(self._db):
             ids = store.new_ids(self._db, kind, source)
             store.set_state(self._db, ids, state, end_reason=None, at=utc_text(self._now()))
+        self.ended(ids, state)
+
+    def ended(self, ids: list[str], state: str) -> None:
+        """Call each event's `on_end` once; a raising hook must not stop the others."""
+        for id in ids:
+            hook = self._on_end.pop(id, None)
+            if hook is None:
+                continue
+            try:
+                hook(state)
+            except Exception:
+                _log.exception("an event's on_end failed id=%s", id)
 
     def origin_body(self, id: str, is_body: Callable[[str], bool]) -> str | None:
         """The first source on the way back through `caused_by` that is a body."""

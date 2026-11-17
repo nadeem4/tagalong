@@ -86,14 +86,20 @@ def set_taken(db: sqlite3.Connection, ids: list[str], turn_id: str) -> list[str]
     return moved
 
 
+def set_payload(db: sqlite3.Connection, id: str, payload: dict) -> None:
+    db.execute("UPDATE events SET payload_json=? WHERE id=?", (json.dumps(payload), id))
+
+
 def set_state(
     db: sqlite3.Connection, ids: list[str], state: str, *, end_reason: str | None, at: str
 ) -> None:
     done = at if state in ("handled", "gave_up") else None
     for id in ids:
+        # Back to `new` frees it from its turn, so the next taker's turn id is the only one.
         db.execute(
-            "UPDATE events SET state=?, end_reason=?, handled_at=? WHERE id=?",
-            (state, end_reason, done, id),
+            "UPDATE events SET state=?, end_reason=?, handled_at=?,"
+            " turn_id=CASE WHEN ?='new' THEN NULL ELSE turn_id END WHERE id=?",
+            (state, end_reason, done, state, id),
         )
 
 

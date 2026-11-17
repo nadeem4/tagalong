@@ -77,7 +77,7 @@ def expert_setup_tools(
             raise RpcError(ErrorCode.tool_failed, failure(*_facts(err))) from err
 
     async def run_install(entry: RegistryEntry) -> InstalledExpert:
-        """Install and tell the front door how it ended; the failure is raised after telling, for
+        """Install and post how it ended as an event; the failure is raised after telling, for
         `update`, which waits on the same flight (a joiner of either kind gets the same events)."""
 
         def progress(step: dict) -> None:
