@@ -260,3 +260,13 @@ async def test_question_of_a_missing_job_is_a_root():
     assert work.get(emit.id()).parent_id is None
     sq.pass_to_user(emit.id())
     await task
+
+
+async def test_a_job_question_is_sourced_by_its_job():
+    emit = _Emit()
+    sq = ScoutQuestions(emit, fresh_work())
+    task = await _ask(sq, emit)
+    event = emit.calls[0][0]
+    assert event.source == "job:j1"
+    sq.pass_to_user(event.payload["question"])
+    await task

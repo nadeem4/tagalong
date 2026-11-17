@@ -178,3 +178,12 @@ async def test_choose_tool_needs_a_question_and_a_list_of_at_most_six():
         await handler({"options": ["a"]})
     with pytest.raises(MemoryRefused):
         await handler({"question": "Q", "options": list("abcdefg")})
+
+
+async def test_a_choice_event_names_scout_as_source():
+    _, events, choices = rig()
+    ask_id = choices.ask("Which?", ["a"], None, False)
+    await settle()
+    choices._asks.answer(ask_id, "a", "desktop")
+    await settle()
+    assert events[0].source == "scout"

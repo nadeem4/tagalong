@@ -372,6 +372,7 @@ class Session:
             now,
             approvals,
             self._turn_origin,
+            lambda: self._turn_cause,
         )
         self._asks.on_item_answer = self._post_card_answer
         self.toolbox = Toolbox(

@@ -91,6 +91,7 @@ class Rig:
             lambda event, **kw: self.events.append(event),
             lambda: self.clock[0],
             self.approvals,
+            cause=lambda: "evt-ask-turn",
         )
         self.asks.on_item_answer = self.runner.answered
         self.box = Toolbox(
@@ -499,3 +500,13 @@ async def test_person_answers_first_then_side_check_yes_changes_nothing():
     assert rig.source.ran == [("t", {"n": 1})]  # the saved call ran exactly once
     rows = rig.work.list_asks("all", 10, None)
     assert all(r.decided_by != "scout" for r in rows)
+
+
+async def test_ask_ended_is_caused_by_the_asking_turn():
+    rig = Rig()
+    await rig.box.run(call())
+    [card] = rig.opened()
+    rig.asks.answer(card["id"], "allow", "desktop")
+    await rig.settle()
+    [ended] = rig.events
+    assert (ended.kind, ended.source, ended.caused_by) == ("ask_ended", "scout", "evt-ask-turn")
