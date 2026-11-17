@@ -215,7 +215,6 @@ async def test_question_row_lifecycle():
     assert await task == {"way": "a"}
     row = work.get(emit.id())
     assert (row.state, row.end_reason, row.summary) == ("done", "answered", '{"way": "a"}')
-    assert row.reported_at is not None
 
 
 async def test_passed_question_ends_with_an_event():

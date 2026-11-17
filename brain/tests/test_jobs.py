@@ -30,6 +30,7 @@ from brain.permission import Decision, Engine, Grant, Person, SideCheckDecider
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.store import InstalledExpert
 from brain.store import rules
+from brain.store.events import list_state
 from brain.store.work import ActivityEntry, WorkStore
 from brain.tools import work_tools
 
@@ -661,13 +662,20 @@ async def test_shutdown_swallows_one_runs_failure_and_stops_the_rest(make_rig):
 
 
 async def test_shutdown_leaves_the_report_for_the_next_start(make_rig):
-    # A job stopped by shutdown must not wake a turn the exiting brain would drop.
+    # The runner is stopped first, so job_ended is only a row: it stays new and the next
+    # start's runner tells it.
     rig = make_rig(FakeAsks(Answer("Plan")))
+
+    def finished(job) -> None:  # what Session._on_job_finished does
+        rig.finished.append(job)
+        rig.events.post(Event("job_ended", f"job:{job.id}", {}))
+
+    rig.jobs._on_finished = finished
     job_id = await rig.jobs.start("one", str(rig.folder))
     await rig.jobs.shutdown()
-    assert rig.finished == []
+    assert [j.id for j in rig.finished] == [job_id]
     assert rig.records.get_job(job_id).state == "cancelled"
-    assert not rig.records.get_job(job_id).parts[-1].reported
+    assert [r.source for r in list_state(rig.memory.db, "new")] == [f"job:{job_id}"]
 
 
 async def test_cancelling_start_while_it_waits_on_the_mode_ask_cleans_up(make_rig):
@@ -694,7 +702,6 @@ async def test_restart_blocks_running_part_with_session(make_rig):
         "blocked",
         "brain restarted",
     )
-    assert [r.id for r in rig.records.unreported_jobs()] == ["old"]  # Scout is told once
 
 
 async def test_restart_fails_part_that_cannot_reload(make_rig, monkeypatch):
@@ -708,13 +715,13 @@ async def test_restart_fails_part_that_cannot_reload(make_rig, monkeypatch):
     assert "cannot reload" in job.parts[-1].reason
 
 
-async def test_restart_marks_expired_asks_and_questions_reported(make_rig):
+async def test_restart_expires_asks_and_questions(make_rig):
     rig = make_rig(FakeAsks())
     work = rig.records.work
     work.create("ask", "an ask", id="ask1", state="active")
     work.create("question", "a question", id="q1", state="active")
     rig.jobs.startup()
-    assert [r.id for r in work.unreported(["ask", "question"])] == []
+    assert {work.get(i).state for i in ("ask1", "q1")} == {"expired"}
 
 
 async def test_restart_ends_each_stopped_parts_log_once(make_rig):
@@ -752,7 +759,7 @@ async def test_mode_card_refusal_tells_scout_why(make_rig, answer, why):
         await rig.jobs.start("task", str(rig.folder))
 
 
-def a_job(id, task, state, reason=None, report=None, reported=False) -> Job:
+def a_job(id, task, state, reason=None, report=None) -> Job:
     """A stored one-part job, built by hand."""
     part = JobPart(
         id,
@@ -764,7 +771,6 @@ def a_job(id, task, state, reason=None, report=None, reported=False) -> Job:
         None,
         "s",
         report,
-        reported,
         "t0",
         "t1",
         "C:/x",
@@ -1383,7 +1389,6 @@ async def test_carrying_on_from_a_restart_blocked_part_settles_the_old_job(make_
     await rig.jobs.start("two", str(rig.folder), continue_job="old")
     old = rig.records.get_job("old")
     assert (old.parts[-1].state, old.state) == ("cancelled", "cancelled")
-    assert [j.id for j in rig.records.unreported_jobs() if j.id == "old"] == []
     assert "old" not in [r.id for r in rig.records.work.open_roots()]
 
 
@@ -1400,7 +1405,6 @@ async def test_carrying_on_from_a_part_that_failed_on_restart_closes_the_old_job
     assert rig.records.get_job("old").parts[-1].state == "failed"
     await rig.jobs.start("two", str(rig.folder), continue_job="old")
     assert "old" not in [r.id for r in rig.records.work.open_roots()]
-    assert [j.id for j in rig.records.unreported_jobs() if j.id == "old"] == []
 
 
 async def test_an_implicit_same_folder_hand_off_leaves_a_genuine_failure_open(make_rig):
@@ -1412,7 +1416,6 @@ async def test_an_implicit_same_folder_hand_off_leaves_a_genuine_failure_open(ma
     rig.records.update_part("old", "p1", state="failed", reason="it broke")
     await rig.jobs.start("two", str(rig.folder))
     assert "old" in [r.id for r in rig.records.work.open_roots()]
-    assert [j.id for j in rig.records.unreported_jobs() if j.id == "old"] == ["old"]
 
 
 async def test_carrying_on_from_a_job_a_shutdown_stopped_closes_the_old_job(make_rig):
@@ -1938,7 +1941,7 @@ async def test_job_ended_note_carries_the_activity_summary_beside_the_result(mak
 
 
 def test_job_note_without_facts_is_unchanged():
-    job = a_job("a1", "t", "done", "", "r", True)
+    job = a_job("a1", "t", "done", "", "r")
     assert "Activity:" not in job_note(job)
     assert job_note(job, {"activity": "steps: 1"}).endswith("Activity:\nsteps: 1")
 

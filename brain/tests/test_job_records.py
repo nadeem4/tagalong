@@ -58,7 +58,7 @@ def test_add_job_and_part_round_trip(records):
     assert job.started_at == "2026-01-01T12:00:00+00:00"
     (part,) = job.parts
     assert (part.job_id, part.id, part.agent, part.task) == ("j1", "p1", "claude-acp", "fix it")
-    assert (part.state, part.reason, part.report, part.reported) == ("active", None, None, False)
+    assert (part.state, part.reason, part.report) == ("active", None, None)
     assert part.folder == "C:/a" and part.session_id is None
     assert records.next_part_id("j1") == "p2"
     assert records.add_part("j1", "gemini", "check", "C:/b") == "p2"
@@ -101,9 +101,7 @@ def test_update_part_session_progress_and_reported(records, work):
     assert part.session_id == "s-9"
     assert part.progress == "x" * 2000  # a running tail
     records.update_part("j1", "p1", state="done", reason="done")
-    assert not records.get_job("j1").parts[0].reported
-    records.update_part("j1", "p1", reported=True)
-    assert records.get_job("j1").parts[0].reported
+    assert records.get_job("j1").parts[0].state == "done"
 
 
 def test_close_job_done_and_failed(records, work):
@@ -200,22 +198,11 @@ def test_last_part_for_matches_agent_and_folder(records):
     assert records.last_part_for("claude-acp", "C:/other") is None
 
 
-def test_unreported_jobs_and_mark_reported(records):
-    records.add_job("run", "claude-acp", "t", "C:/a", "ask")
-    records.add_job("fin", "claude-acp", "t", "C:/a", "ask")
-    records.update_part("fin", "p1", state="done", reason="done")
-    assert [j.id for j in records.unreported_jobs()] == ["fin"]  # a running job is not news
-    records.mark_reported("fin")
-    assert records.unreported_jobs() == []
-    assert records.get_job("fin").parts[0].reported
-
-
 def test_blocked_part_after_a_restart_is_news_with_its_reason(records, work):
     records.add_job("run", "claude-acp", "t", "C:/a", "ask")
     records.update_part("run", "p1", session_id="s1")
     records.add_job("fin", "claude-acp", "t", "C:/a", "ask")
     records.update_part("fin", "p1", state="done", reason="done")
-    records.mark_reported("fin")
     assert work.resume_scan(lambda row: True) == [("run.p1", "blocked")]
     job = records.get_job("run")
     assert (job.state, job.parts[0].state, job.parts[0].reason) == (
@@ -224,7 +211,6 @@ def test_blocked_part_after_a_restart_is_news_with_its_reason(records, work):
         "brain restarted",
     )
     assert job.closed_at is None  # Scout can carry on
-    assert [j.id for j in records.unreported_jobs()] == ["run"]
 
 
 @pytest.mark.parametrize("state", ["cancelled", "failed"])

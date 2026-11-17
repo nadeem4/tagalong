@@ -152,14 +152,31 @@ class Memory:
     def add_summary(self, text: str) -> Item:
         return memory_store.add_summary(self._db, self.mask(text), self._now().isoformat())
 
-    def save_messages(self, messages: list[dict], body: str = BODY_DESKTOP) -> None:
-        conversation.save_messages(self._db, messages, self._now().isoformat(), body)
+    def save_messages(
+        self,
+        messages: list[dict],
+        body: str = BODY_DESKTOP,
+        *,
+        event_ids: list[str | None] | None = None,
+        sources: list[str | None] | None = None,
+    ) -> list[int]:
+        return conversation.save_messages(
+            self._db,
+            messages,
+            self._now().isoformat(),
+            body,
+            event_ids=event_ids,
+            sources=sources,
+        )
 
     def replace_last_message(self, message: dict) -> None:
         conversation.replace_last_message(self._db, message)
 
-    def set_last_cut(self, cut: bool) -> None:
-        conversation.set_last_cut(self._db, cut)
+    def rows_of_events(self, event_ids: list[str]) -> list[int]:
+        return conversation.rows_of_events(self._db, event_ids)
+
+    def set_cut(self, ids: list[int], cut: bool) -> None:
+        conversation.set_cut(self._db, ids, cut)
 
     def load_messages(self, include_cut: bool = False) -> list[dict]:
         return conversation.load_messages(self._db, include_cut)

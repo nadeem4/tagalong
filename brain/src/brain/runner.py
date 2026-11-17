@@ -4,7 +4,7 @@ the same body, up to a cap. `pick` is pure: the gate and the target come in as c
 choosing never records a wake or spends a cap; the wake is counted by `record_take`. A say on
 the running turn's body joins it at its next step (`take_more`); next-pause news is told at a
 sentence break, by an interjection first, which takes the event and gives it back untold. A
-turn's events end with it, or wait again.
+turn's events end with it, or wait out a growing backoff in the log and are tried again.
 """
 
 import asyncio
@@ -29,6 +29,9 @@ PERSON_KINDS = frozenset({"say", "card_answer"})
 IDLE_WINDOW_S = 10  # idle news stays quiet this long after the person last spoke
 GROUP_CAP = 20  # one turn tells at most this many events, so a long backlog cannot swamp it
 RECHECK_S = 60.0  # news behind a closed gate is looked at again at least this often
+# Ends that settle a turn: done, cancelled by the person, no screen to answer on, and a request
+# the API refuses (sent again it would be refused again, so it is not retried).
+_HANDLED = frozenset({"done", "cancelled", "rejected", "unanswered"})
 
 
 @dataclass
@@ -60,9 +63,16 @@ def pick(
     return Pick(body, events)
 
 
-def wake_text(kind: EventKind, rows: list[EventRow], note: str, tz: tzinfo | None) -> str:
-    """The facts of a batch of one kind, fenced as data: the model reads them, never obeys them."""
-    lines = [f"Event: {kind.name}", f"How to weigh it: {note}"]
+def wake_text(
+    kind: EventKind,
+    rows: list[EventRow],
+    note: str,
+    tz: tzinfo | None,
+    attrs: dict[str, str] | None = None,
+) -> str:
+    """The facts of a batch of one kind, fenced as data: the model reads them, never obeys them.
+    `attrs` mark the block (a resumed or given-up event); code sets them, never a payload."""
+    lines = [f"Event: {kind.name}", *([f"How to weigh it: {note}"] if note else [])]
     for row in rows:
         at = datetime.fromisoformat(row.at).astimezone(tz)
         lines.append(f"- at {at.strftime('%Y-%m-%d %H:%M %z')}")
@@ -70,7 +80,8 @@ def wake_text(kind: EventKind, rows: list[EventRow], note: str, tz: tzinfo | Non
             first, *rest = str(value).split("\n")
             lines.append(f"  {name}: {first}")
             lines.extend(f"    {r}" for r in rest)
-    return f'<data kind="event">\n{_fence_safe(chr(10).join(lines))}\n</data>'
+    marks = "".join(f' {k}="{v}"' for k, v in (attrs or {}).items() if v)  # none empty
+    return f'<data kind="event"{marks}>\n{_fence_safe(chr(10).join(lines))}\n</data>'
 
 
 class TurnHost(Protocol):
@@ -78,9 +89,10 @@ class TurnHost(Protocol):
 
     def ready(self) -> bool: ...  # a model can answer (a key is set)
 
-    # `retry`: the rows an errored turn already sent; their words are in history already.
+    # A row with `resume` was sent by a failed turn: its words are in the history already.
+    # `gave_up`: events Scout could not finish, told once on a person's turn.
     def start_events(
-        self, turn_id: str, body: str, rows: list[EventRow], retry: set[str]
+        self, turn_id: str, body: str, rows: list[EventRow], gave_up: list[EventRow]
     ) -> None: ...
 
     def cancel_turn(self) -> None: ...
@@ -119,12 +131,7 @@ class Runner:
         self._person_at: datetime | None = None
         self._turn: _Turn | None = None  # the running turn
         self._taken: dict[str, list[str]] = {}  # turn id -> the events it took
-        # Events of an errored turn wait for something new, else a failing model would be asked
-        # again and again. In memory, so a restart tries them once more.
-        self._held: set[str] = set()
-        # Events an errored turn already sent: the next turn names them as a retry instead of
-        # sending their words again, since the failed request stays in the history.
-        self._retried: set[str] = set()
+        self._riders: dict[str, list[str]] = {}  # turn id -> the given-up events it carries
         self._tried: set[str] = set()  # next-pause news an interjection already tried
         self._interjecting: tuple[asyncio.Task, str] | None = None  # the call and its event
         self._wake = asyncio.Event()
@@ -152,13 +159,15 @@ class Runner:
             self.start()
         self._wake.set()
 
-    async def stop(self) -> None:
+    async def stop(self) -> list[str]:
         """The brain is closing: the running turn's events go back to `new` (no attempt), so a
-        quit never loses a say, and their hooks hear it; then the turn is cancelled."""
+        quit never loses a say, and their hooks hear it; then the turn is cancelled. Returns
+        the turn's events, which the session marks `resume` if the turn saved any work."""
         self._stopped = True
         if self._alarm is not None:
             self._alarm.cancel()
         turn, self._turn = self._turn, None
+        ids: list[str] = []
         if turn is not None:
             ids = self._taken.pop(turn.id, [])
             self._events.finish(ids, "new")
@@ -173,20 +182,30 @@ class Runner:
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
+        return ids
 
     def turn_ended(self, turn_id: str, reason: str) -> None:
-        """A finished, cancelled, rejected or over-budget turn handled its events: the person
-        was answered or told why not, and the same request would fail the same way again. Any
-        other end (an error) puts them back, held until something new or the recheck."""
+        """Spec 6.5. A done, person-cancelled or rejected turn handled its events. Over budget,
+        a say was answered (the person sees why) while news waits as `new` for the budget, no
+        attempt counted. Any other end (an error, a timeout, the step cap) backs them off and
+        tries again; the fourth failure gives them up. Given-up events a done turn carried
+        were told."""
         if self._stopped:
             return  # the cancel the stop caused: stop already put them back
         ids = self._taken.pop(turn_id, [])
-        if reason in ("done", "cancelled", "rejected", "over_budget"):
+        riders = self._riders.pop(turn_id, [])
+        if reason in _HANDLED:
             self._events.finish(ids, "handled", end_reason=reason)
+            if reason == "done":  # told: the state says so, and why it was given up stays
+                for row in filter(None, map(self._events.get, riders)):
+                    self._events.finish([row.id], "handled", end_reason=row.end_reason)
+        elif reason == "over_budget":
+            rows = [r for r in map(self._events.get, ids) if r is not None]
+            says = [r.id for r in rows if r.kind in PERSON_KINDS]
+            self._events.finish(says, "handled", end_reason=reason)
+            self._events.finish([r.id for r in rows if r.id not in says], "new")
         else:
-            self._events.finish(ids, "new")
-            self._held.update(ids)
-            self._retried.update(ids)
+            self._events.backoff(ids, reason)
         if self._turn is not None and self._turn.id == turn_id:
             self._turn = None
         self.poke()
@@ -200,7 +219,7 @@ class Runner:
             r
             for r in self._events.ready()
             if r.kind == "say"
-            and r.id not in self._held | self._retried
+            and not r.resume  # its words are in the history: it waits for a turn of its own
             and self.target(r) == turn.body
         ]
         taken = set(self._events.take([r.id for r in rows], turn.id))
@@ -243,42 +262,35 @@ class Runner:
         # give-back pokes again, so an untold event still gets its turn.
         if self._turn is not None or self._interjecting is not None:
             return
+        # A backing-off event is not ready until its wait is over: it gives up its place.
         ready = self._release_questions(self._events.ready())
-        # Held and retried ids are `new` here (no interjection holds one): any other was ended
-        # some other way (by id, as stale news, told by an interjection).
-        waiting = {r.id for r in ready}
-        self._held &= waiting
-        self._retried &= waiting
-        got = pick(
-            [r for r in ready if r.id not in self._held],
-            self.target,
-            lambda r: self.gate(r, at_break),
-        )
+        got = pick(ready, self.target, lambda r: self.gate(r, at_break))
         if got is None:
-            if any(r.id not in self._held for r in ready) or self._held:
-                self._arm([r for r in ready if r.id not in self._held])
+            if ready or self._events.next_retry() is not None:
+                self._arm(ready)
             return
-        # Events an errored turn left go along with the next turn for their body.
-        held = [r for r in ready if r.id in self._held and self.target(r) == got.body]
-        self._held -= {r.id for r in held}
         turn_id = uuid.uuid4().hex
-        rows = sorted([*held, *got.events], key=_order)  # held first: older on a tie
-        taken = set(self._events.take([r.id for r in rows], turn_id))
-        rows = [r for r in rows if r.id in taken]
+        taken = set(self._events.take([r.id for r in got.events], turn_id))
+        rows = [r for r in got.events if r.id in taken]
         if not rows:
             return
         self._tried -= taken
-        retry = self._retried & taken
-        self._retried -= taken
         self.record_take(rows)
         self._taken[turn_id] = [r.id for r in rows]
+        # What Scout could not finish is told once, on a turn the person is there for.
+        riders = self._events.gave_up() if any(r.kind in PERSON_KINDS for r in rows) else []
+        self._riders[turn_id] = [r.id for r in riders]
         self._turn = _Turn(turn_id, got.body)
         try:
-            self._session.start_events(turn_id, got.body, rows, retry)
+            self._session.start_events(turn_id, got.body, rows, riders)
         except Exception:
-            self.turn_ended(turn_id, "error")  # else the one turn would stay taken for good
-            # This turn never ran: only rows already in the history from before are a retry.
-            self._retried -= taken - retry
+            # Else the one turn would stay taken for good. An attempt, so a start that always
+            # breaks gives up; not a resume, since nothing of this turn reached the history.
+            self._taken.pop(turn_id, None)
+            self._riders.pop(turn_id, None)
+            self._turn = None
+            self._events.backoff(list(taken), "error", resume=False)
+            self.poke()
             raise
 
     def _release_questions(self, ready: list[EventRow]) -> list[EventRow]:
@@ -301,7 +313,6 @@ class Runner:
         for r in sorted(self._events.ready(), key=_order):
             if (
                 r.id in self._tried
-                or r.id in self._held
                 or r.kind in PERSON_KINDS
                 or self._kinds[r.kind].urgency != "next_pause"
                 or self.target(r) is None
@@ -350,11 +361,14 @@ class Runner:
         self.poke()
 
     def _arm(self, waiting: list[EventRow]) -> None:
-        """Look again when the soonest closed gate can open: a batch or the idle window. A cap,
-        quiet hours, no key or no body has no known time, so those are looked at again later;
-        so are an errored turn's held events, which the alarm frees to be tried once more."""
+        """Look again when the soonest closed gate can open (a batch or the idle window) or a
+        backing-off event's wait ends. A cap, quiet hours, no key or no body has no known time,
+        so those are looked at again later."""
         now = self._now()
         delay = RECHECK_S
+        retry = self._events.next_retry()
+        if retry is not None:
+            delay = min(delay, max((retry - now).total_seconds(), 0))
         for r in waiting:
             if r.kind in PERSON_KINDS:
                 continue
@@ -368,8 +382,6 @@ class Runner:
         self._alarm = asyncio.get_running_loop().call_later(delay, self._rang)
 
     def _rang(self) -> None:
-        # Held events wait at most one recheck: an expert waiting on a question must not hang.
-        self._held.clear()
         self.poke()
 
     def target(self, row: EventRow) -> str | None:

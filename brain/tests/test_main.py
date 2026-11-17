@@ -9,6 +9,7 @@ import os
 import sys
 
 import pytest
+from test_sessions import Gate, idle, join, say
 
 from brain import main
 from brain.main import _run
@@ -582,3 +583,113 @@ def test_status_marks_work_running_while_a_job_runs(monkeypatch, tmp_path):
     assert status["log_path"] == str(tmp_path / "brain.log")
     assert status["addr"] == "127.0.0.1:47321" and status["places"] == []
     assert seen["build"][1] == "9.9.9"
+
+
+class _Stop(Exception):
+    pass
+
+
+class _Hang:
+    """A model whose turn never ends on its own: the brain is stopped mid-turn."""
+
+    model_id = "claude-sonnet-5-5"
+
+    def __init__(self):
+        self.started = asyncio.Event()
+
+    async def stream(self, system, messages, tools):
+        self.started.set()
+        await asyncio.Event().wait()
+        yield  # pragma: no cover
+
+
+def _stop_mid_turn(model, said, seen):
+    """A server stand-in: a desktop says something, its turn starts, then the brain stops."""
+
+    async def start(host, port, bodies, session_id, session, build):
+        session._model = model
+        join(session, "desktop")
+        await session.say("desktop", said)
+        await asyncio.wait_for(model.started.wait(), 5)
+        seen["session"] = session
+        raise _Stop
+
+    return start
+
+
+def test_shutdown_persists_the_running_turn_before_memory_closes(monkeypatch, tmp_path):
+    seen = {}
+    real = main.Memory
+
+    class Spy(real):
+        def close(self):
+            session = seen["session"]
+            seen["turn_over"] = session._task is None  # the turn ended and saved its steps
+            seen["say"] = session.events.get(said.id).state
+            super().close()
+
+    said = say("hello")
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake")
+    monkeypatch.setattr(main, "Memory", Spy)
+    monkeypatch.setattr(main, "start_server", _stop_mid_turn(_Hang(), said, seen))
+    with pytest.raises(_Stop):
+        asyncio.run(_run())
+    assert seen["turn_over"] is True
+    assert seen["say"] == "new"  # a stop is not an attempt: it waits for the next run
+
+
+def test_a_say_survives_a_stop_and_restart(monkeypatch, tmp_path):
+    said = say("hello")
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake")
+    monkeypatch.setattr(main, "start_server", _stop_mid_turn(_Hang(), said, {}))
+    with pytest.raises(_Stop):
+        asyncio.run(_run())
+    answer = Gate(["hi there"])
+    state = {}
+
+    async def restart(host, port, bodies, session_id, session, build):
+        session._model = answer
+        state["first"] = session.events.get(said.id).state
+        join(session, "desktop")
+        await idle(session)
+        state["last"] = session.events.get(said.id).state
+        raise _Stop
+
+    monkeypatch.setattr(main, "start_server", restart)
+    with pytest.raises(_Stop):
+        asyncio.run(_run())
+    assert state == {"first": "new", "last": "handled"}
+    [request] = answer.seen
+    assert "hello" in json.dumps(request)
+
+
+def test_shutdown_stops_the_turn_before_anything_can_post_news(monkeypatch, tmp_path):
+    """Installs, logins and bridges post setup news as they stop; the runner is stopped
+    first, so none of it starts a turn while the brain closes."""
+    order = []
+
+    async def stop_turn(self):
+        order.append("stop_turn")
+
+    real = main.expert_setup_tools
+
+    def expert_setup_tools(*args, **kwargs):
+        tools, reinstall, _ = real(*args, **kwargs)
+
+        async def stop_installs():
+            order.append("stop_installs")
+
+        return tools, reinstall, stop_installs
+
+    async def start(host, port, bodies, session_id, session, build):
+        raise _Stop
+
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.setattr(main.Session, "stop_turn", stop_turn)
+    monkeypatch.setattr(main, "expert_setup_tools", expert_setup_tools)
+    monkeypatch.setattr(main, "start_server", start)
+    with pytest.raises(_Stop):
+        asyncio.run(_run())
+    assert order == ["stop_turn", "stop_installs"]

@@ -159,14 +159,10 @@ async def _run() -> None:
         handler.addFilter(SecretLogFilter(masker))
     registry = Registry(config.data_dir)
     inspect_machine = partial(inspect, config.data_dir)
-    # Setup news is saved as open items until Scout's wake turn ends; the session exists later.
-    setup_items = OpenItems(memory.db, lambda: datetime.now(UTC))
-    setup_events = SetupEvents(
-        setup_items,
-        lambda event, **hooks: session.post_event(event, **hooks),
-        lambda: datetime.now(UTC),
-    )
-    emit_event = setup_events.emit
+    setup_items = OpenItems(memory.db, lambda: datetime.now(UTC))  # install and sign-in cards
+    events = EventLog(memory.db, masker, lambda: datetime.now().astimezone())
+    # Setup news waits in the event log until a turn tells it; the session exists later.
+    emit_event = SetupEvents(lambda event: session.post_event(event), events.finish_matching).emit
     logins = LoginDriver(
         config.data_dir, experts, real_open_terminal, emit_event, setup_items, notify=bodies.notify
     )
@@ -249,7 +245,6 @@ async def _run() -> None:
             "model": model_name(chosen_model(memory.db, config.model)),
         }
 
-    events = EventLog(memory.db, masker, lambda: datetime.now().astimezone())
     session = Session(
         model,
         budget,
@@ -333,7 +328,6 @@ async def _run() -> None:
     voice.follow_speech(session.presence.mouth)
     voice.follow_download(lambda: bodies.notify("changed", {"what": "voice_download"}))
     session.loops = loops  # focus and tab events also surface loops
-    setup_events.resume()  # news of an install or login the last run never told
     loops.start()  # wakes Scout for a loop already due, and arms the next one
     try:
         try:
@@ -376,6 +370,10 @@ async def _run() -> None:
         log.info("brain listening on ws://%s:%d", config.host, port)
         await server.serve_forever()
     finally:
+        # The runner stops first: the running turn's events wait for the next run, and news
+        # posted while the rest stops (an install, a login, a stopped job) stays new instead of
+        # starting a turn. The turn is cancelled and awaited, so its steps are saved.
+        await session.stop_turn()
         # Stop the experts and apps while the cancelled loop can still await them, then close
         # memory.
         for task in (update_loop, lag_watch, perf_dump):
@@ -392,7 +390,6 @@ async def _run() -> None:
         await session.jobs.shutdown()
         await apps.shutdown()
         await session.stop_background()  # tools a talked-over turn left running end here
-        await session.runner.stop()  # the running turn's events wait for the next run
         memory.close()
         clear_pid(config.data_dir, os.getpid())
 

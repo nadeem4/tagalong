@@ -71,7 +71,7 @@ def test_approvals_become_ended_asks(db):
     }
     row = work(db).get("a2")
     assert row.kind == "ask" and row.title == "summary 2"
-    assert row.created_at == row.ended_at == row.reported_at == "2026-01-02T10:00:00+00:00"
+    assert row.created_at == row.ended_at == "2026-01-02T10:00:00+00:00"
     events = work(db).events("a2")
     assert [(e.kind, e.data) for e in events] == [
         ("decided", {"outcome": "refused", "decided_by": "person"})

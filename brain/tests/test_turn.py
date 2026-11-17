@@ -80,6 +80,7 @@ def start(
     turn_timeout=None,
     stop=None,
     on_detached=None,
+    on_step=None,
 ):
     return run_turn(
         turn_id="t1",
@@ -97,6 +98,7 @@ def start(
         turn_timeout=turn_timeout,
         stop=stop,
         on_detached=on_detached,
+        on_step=on_step or (lambda messages: None),
     )
 
 
@@ -213,6 +215,25 @@ async def test_say_queued_after_end_turn_runs_another_step():
     assert [p for _, p in sent if p.get("done")] == [
         {"turn": "t1", "body": "desktop", "done": True}
     ]
+
+
+async def test_each_tool_round_is_handed_on_whole_before_the_next_call():
+    steps = []
+    calls_then = []
+
+    class Watching(FakeModel):
+        def stream(self, system, messages, tools):
+            calls_then.append(len(steps))  # how many rounds were handed on before this call
+            return super().stream(system, messages, tools)
+
+    paused = text_step("looking", stop="pause_turn")
+    model = Watching([paused, tool_step(("c1", "x")), text_step("ok")])
+    history = [{"role": "user", "content": "go"}]
+    await start(model, history, [], on_step=lambda messages: steps.append(list(messages)))
+    # The paused message waits for the round it belongs to; the closing reply is not a round.
+    assert steps == [history[1:4]]
+    assert [m["role"] for m in steps[0]] == ["assistant", "assistant", "user"]
+    assert calls_then == [0, 0, 1]
 
 
 async def test_pause_turn_continues_without_user_message():

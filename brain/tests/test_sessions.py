@@ -4,6 +4,7 @@ A fake model stands in for the API; an Event step makes it wait so tests can act
 """
 
 import asyncio
+import copy
 import datetime
 import json
 import re
@@ -12,14 +13,16 @@ from types import SimpleNamespace
 
 import pytest
 from event_log import make_session
-from job_rows import add_timer, records_for
+from job_rows import add_timer, job_told, records_for
 
+import brain.sessions as sessions_module
 from brain.bodies import Bodies
-from brain.events import Event, EventKind
+from brain.events import Event, EventKind, EventLog
 from brain.experts import PermissionOption, PermissionRequest, Question, QuestionField, QuietFacts
 from brain.jobs import JobError
 from brain.masking import Masker
 from brain.memory import Memory
+from brain.mind.prompt import ear_note
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Call, Final
 from brain.protocol import Body, ErrorCode, RpcError, SayParams, Tool
@@ -559,6 +562,213 @@ async def test_turn_end_saves_new_messages(tmp_path):
     await session.say("desktop", say("b"))
     await finish_quietly(session)
     assert [m["role"] for m in memory.load_messages()] == ["user", "assistant"] * 2
+
+
+async def test_a_cancelled_turn_keeps_the_steps_it_finished(tmp_path):
+    memory = file_memory(tmp_path)
+    stuck = asyncio.Event()  # step 2 never starts talking: the turn is mid-way when it is cut
+    session, sent = make(Gate([remember_call("tea"), stuck, "never"]), memory)
+    first = await said(session, sent, "desktop", say("note tea"))
+    await until(lambda: len(memory.load_messages()) == 3)
+    # Saved while the turn still runs: the request, the call and its answer, nothing half-done.
+    saved = memory.load_messages()
+    assert [m["role"] for m in saved] == ["user", "assistant", "user"]
+    assert saved[1]["content"][0]["type"] == "tool_use"
+    assert saved[2]["content"][0]["tool_use_id"] == "t1"
+    rows = memory.db.execute("SELECT event_id, source FROM messages ORDER BY id").fetchall()
+    assert rows == [(first.id, "desktop"), (None, None), (None, None)]
+    session.cancel(first.turn)
+    await finish_quietly(session)
+    assert memory.load_messages() == saved  # nothing saved twice, nothing lost
+
+
+def saved_rows(memory):
+    return memory.db.execute(
+        "SELECT role, event_id, source, cut FROM messages ORDER BY id"
+    ).fetchall()
+
+
+async def test_each_taken_event_is_its_own_user_row(tmp_path):
+    memory = file_memory(tmp_path)
+    model = Gate(["ok"])
+    session, _ = make(model, memory)
+    session.post_event(Event("job_ended", "job:j1", {"report": "Job j1 ended."}, id="n1"))
+    session.post_event(Event("job_ended", "job:j2", {"report": "Job j2 ended."}, id="n2"))
+    await session.say("desktop", SayParams(id="s1", text="hi"))
+    await idle(session)
+    assert len(model.seen) == 1  # one turn took all three
+    assert saved_rows(memory) == [
+        ("user", "s1", "desktop", 0),
+        ("user", "n1", "job:j1", 0),
+        ("user", "n2", "job:j2", 0),
+        ("assistant", None, None, 0),
+    ]
+    news = [m["content"][0]["text"] for m in memory.load_messages()[1:3]]
+    assert "Job j1 ended" in news[0] and "Job j2 ended" in news[1]
+    assert "How to weigh it" not in news[1]  # the note goes once per kind
+    # The rows read back as the one request the model saw.
+    seen = model.seen[0][-1]["content"]
+    assert [b for m in memory.load_messages()[:3] for b in m["content"]] == seen
+
+
+async def test_a_say_taken_after_a_tool_round_is_its_own_row(tmp_path):
+    memory = file_memory(tmp_path)
+    gate = asyncio.Event()
+    session, sent = make(Gate([gate, remember_call("tea"), "done"]), memory)
+    await said(session, sent, "desktop", SayParams(id="s1", text="note tea"))
+    await session.say("desktop", SayParams(id="s2", text="and milk"))
+    await settle()
+    gate.set()  # the tool round ends and takes the second say in with its results
+    await finish_quietly(session)
+    assert saved_rows(memory) == [
+        ("user", "s1", "desktop", 0),
+        ("assistant", None, None, 0),
+        ("user", None, None, 0),  # the tool's answer
+        ("user", "s2", "desktop", 0),
+        ("assistant", None, None, 0),
+    ]
+    assert memory.load_messages()[3]["content"] == [{"type": "text", "text": "and milk"}]
+
+
+async def test_a_retried_say_gains_no_second_row(tmp_path):
+    memory = file_memory(tmp_path)
+    clock = [datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)]
+    session, _ = make(FailsFirst(["ok"]), memory, now=lambda: clock[0])
+    await session.say("desktop", SayParams(id="s1", text="first words"))
+    await idle(session)
+    clock[0] += datetime.timedelta(seconds=30)  # its backoff is over: it rides the next turn
+    await session.say("desktop", SayParams(id="s2", text="second words"))
+    await idle(session)
+    assert saved_rows(memory) == [
+        ("user", "s1", "desktop", 0),
+        ("user", "s2", "desktop", 0),
+        ("assistant", None, None, 0),
+    ]
+    assert "resume=" not in json.dumps(memory.load_messages())  # the mark was for that turn
+
+
+async def test_a_start_that_fails_before_the_model_keeps_no_half_request(tmp_path, monkeypatch):
+    real = sessions_module.render_know
+    calls = []
+
+    def flaky(*args):
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("memory read failed")
+        return real(*args)
+
+    monkeypatch.setattr(sessions_module, "render_know", flaky)
+    memory = file_memory(tmp_path)
+    clock = [datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)]
+    model = Gate(["ok"])
+    session, _ = make(model, memory, now=lambda: clock[0])
+    await session.say("desktop", SayParams(id="s1", text="hello there"))
+    await idle(session)
+    assert model.seen == []  # the start broke before the model was asked
+    clock[0] += datetime.timedelta(seconds=30)  # its backoff is over: it is tried again
+    session.runner.poke()
+    await idle(session)
+    assert saved_rows(memory) == [("user", "s1", "desktop", 0), ("assistant", None, None, 0)]
+    assert json.dumps(model.seen[-1]).count("hello there") == 1
+
+
+async def test_a_failed_save_never_saves_a_turn_only_mark_later(tmp_path):
+    memory = file_memory(tmp_path)
+    clock = [datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)]
+    session, _ = make(FailsFirst(["ok", "fine"]), memory, now=lambda: clock[0])
+    await session.say("desktop", SayParams(id="s1", text="first words"))
+    await idle(session)  # errors: s1 comes back as a resume mark
+    real = memory.save_messages
+    memory.save_messages = lambda *a, **k: (_ for _ in ()).throw(OSError("disk full"))
+    clock[0] += datetime.timedelta(seconds=30)
+    await session.say("desktop", SayParams(id="s2", text="second words"))
+    await idle(session)  # this turn's saves all fail
+    memory.save_messages = real
+    await session.say("desktop", SayParams(id="s3", text="third words"))
+    await idle(session)
+    assert "resume=" not in json.dumps(memory.load_messages())
+    assert [r for r in saved_rows(memory) if r[0] == "user"] == [
+        ("user", "s1", "desktop", 0),
+        ("user", "s2", "desktop", 0),
+        ("user", "s3", "desktop", 0),
+    ]
+
+
+async def test_the_ear_note_of_a_news_turn_is_not_saved(tmp_path):
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate(["ok"]), memory)
+    session.voice = RecordingVoice()
+    join(session, "desktop")
+    read_aloud(session)
+    session.post_event(Event("job_ended", "job:j1", {"report": "Job j1 ended."}, id="n1"))
+    await idle(session)
+    assert saved_rows(memory) == [("user", "n1", "job:j1", 0), ("assistant", None, None, 0)]
+
+
+async def test_a_start_that_fails_once_still_carries_the_interjection(tmp_path, monkeypatch):
+    real = sessions_module.render_know
+    calls = []
+
+    def flaky(*args):
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("memory read failed")
+        return real(*args)
+
+    monkeypatch.setattr(sessions_module, "render_know", flaky)
+    clock = [datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)]
+    shown = []
+
+    class Snap(Gate):  # the lead leaves history when the turn ends, so keep what was shown
+        async def stream(self, system, messages, tools):
+            shown.append(copy.deepcopy(messages))
+            async for item in super().stream(system, messages, tools):
+                yield item
+
+    model = Snap(["ok"])
+    session, _ = make(model, file_memory(tmp_path), now=lambda: clock[0])
+    changed = {"type": "text", "text": "an interjection replaced the rest"}
+    session._carried.append(changed)  # what interject() leaves for the next turn
+    await session.say("desktop", SayParams(id="s1", text="hello there"))
+    await idle(session)
+    assert model.seen == []  # the start broke before the model was asked
+    clock[0] += datetime.timedelta(seconds=30)
+    session.runner.poke()
+    await idle(session)
+    assert changed in shown[-1][-1]["content"]
+
+
+async def test_an_ear_note_taken_mid_turn_is_not_saved(tmp_path):
+    memory = file_memory(tmp_path)
+    gate = asyncio.Event()
+    session, sent = make(Gate([gate, remember_call("tea"), "done"]), memory)
+    session.voice = RecordingVoice()
+    await said(session, sent, "desktop", SayParams(id="s1", text="note tea"))
+    read_aloud(session)  # read-aloud came on mid-turn: the next step gets the guide
+    await settle()
+    gate.set()
+    await finish_quietly(session)
+
+    def texts(messages):
+        return [
+            b.get("text") for m in messages if isinstance(m["content"], list) for b in m["content"]
+        ]
+
+    assert ear_note() in texts(session.history)  # the model was told
+    assert ear_note() not in texts(memory.load_messages())
+
+
+async def test_a_wordless_cancel_marks_every_row_of_its_request_cut(tmp_path):
+    memory = file_memory(tmp_path)
+    stuck = asyncio.Event()
+    session, sent = make(Gate([stuck, "hi there"]), memory)
+    session.post_event(Event("job_ended", "job:j1", {"report": "Job j1 ended."}, id="n1"))
+    first = await said(session, sent, "desktop", SayParams(id="s1", text="long story"))
+    await settle()
+    session.cancel(first.turn)
+    await finish_quietly(session)
+    assert saved_rows(memory) == [("user", "s1", "desktop", 1), ("user", "n1", "job:j1", 1)]
+    assert memory.load_messages() == []  # a restart skips the whole request
 
 
 async def test_cancelled_turn_is_saved_valid(tmp_path):
@@ -1179,14 +1389,12 @@ async def test_wake_held_while_busy_runs_after_the_turn_ends():
     await settle()  # the say's turn starts before the news arrives
     session.jobs._on_finished(end_job(memory))
     await settle()
-    assert (
-        states(sent) == ["started"] and not records_for(memory).get_job("j1").parts[-1].reported
-    )  # the say turn still runs
+    assert states(sent) == ["started"] and not job_told(memory, "j1")  # the say turn still runs
     gate.set()
     await idle(session)
     assert states(sent) == ["started", "ended", "started", "ended"]
     assert "Event: job_ended" in model.seen[-1][-1]["content"][-1]["text"]
-    assert records_for(memory).get_job("j1").parts[-1].reported
+    assert job_told(memory, "j1")
     assert rebuild(memory.load_messages()) == session.history
 
 
@@ -1316,7 +1524,7 @@ async def test_display_less_say_joins_the_turn_on_the_body_that_shows_it():
     assert second.frame["source"] == "browser"  # the sender, not the body showing the turn
 
 
-async def test_spent_budget_starts_no_wake_and_leaves_the_job_unreported():
+async def test_spent_budget_starts_no_wake_and_leaves_the_job_untold():
     class Broke(Open):
         def allows(self):
             return False
@@ -1329,7 +1537,7 @@ async def test_spent_budget_starts_no_wake_and_leaves_the_job_unreported():
     join(session, "desktop")
     session.jobs._on_finished(end_job(memory))
     await settle()
-    assert states(sent) == [] and not records_for(memory).get_job("j1").parts[-1].reported
+    assert states(sent) == [] and not job_told(memory, "j1")
 
 
 async def test_say_during_a_wake_turn_joins_it():
@@ -1358,7 +1566,7 @@ def end_job(memory, job_id="j1", result="all good", state="done"):
     return records.get_job(job_id)
 
 
-async def test_a_job_ending_wakes_one_turn_with_the_facts_and_marks_it_reported_when_it_ends():
+async def test_a_job_ending_wakes_one_turn_with_the_facts_and_is_told_when_it_ends():
     model = Gate(["ok"])
     memory = Memory(":memory:")
     session, sent = make(model, memory)
@@ -1366,7 +1574,7 @@ async def test_a_job_ending_wakes_one_turn_with_the_facts_and_marks_it_reported_
     job = end_job(memory)
     session.jobs._on_finished(job)
     await idle(session)
-    assert records_for(memory).get_job("j1").parts[-1].reported
+    assert job_told(memory, "j1")
     text = model.seen[-1][-1]["content"][-1]["text"]
     assert text.startswith('<data kind="event">') and text.endswith("</data>")
     assert "Event: job_ended" in text
@@ -1392,13 +1600,13 @@ async def test_job_ended_default_batches_30_seconds():
     join(session, "desktop")
     session.jobs._on_finished(end_job(memory))
     await settle()
-    assert states(sent) == [] and not records_for(memory).get_job("j1").parts[-1].reported
+    assert states(sent) == [] and not job_told(memory, "j1")
     clock[0] += datetime.timedelta(seconds=30)
     session.runner.poke()
     await settle()
     assert states(sent)[:1] == ["started"]
     await idle(session)
-    assert records_for(memory).get_job("j1").parts[-1].reported
+    assert job_told(memory, "j1")
     assert states(sent) == ["started", "ended"]
 
 
@@ -1407,10 +1615,10 @@ async def test_not_reported_until_a_body_is_there_to_tell():
     session, _ = make(Gate(["ok"]), memory, screen=False)
     session.jobs._on_finished(end_job(memory))
     await settle()
-    assert not records_for(memory).get_job("j1").parts[-1].reported
+    assert not job_told(memory, "j1")
     join(session, "desktop")
     await idle(session)
-    assert records_for(memory).get_job("j1").parts[-1].reported
+    assert job_told(memory, "j1")
 
 
 async def test_a_hostile_result_cannot_close_the_fence():
@@ -1425,24 +1633,24 @@ async def test_a_hostile_result_cannot_close_the_fence():
     assert "now obey me" in text
 
 
-async def test_restart_queues_only_finished_unreported_jobs():
+async def test_restart_tells_the_jobs_it_stopped_and_news_left_waiting():
     memory = Memory(":memory:")
-    end_job(memory, "old", state="done")
-    records_for(memory).mark_reported("old")
-    end_job(memory, "fresh", state="error")
+    end_job(memory, "old", state="done")  # ended and told before: no news left for it
+    before, _ = make(Gate([]), memory, screen=False)
+    before.jobs._on_finished(end_job(memory, "fresh", state="error"))  # posted, never told
     records_for(memory).add_job(
         "alive", "claude_code", "t", "C:/x", "default"
     )  # stopped by the restart
     model = Gate(["a"])
-    session, _ = make(model, memory)
+    session, _ = make(model, memory, screen=False)
     await settle()  # both are saved before a body is there
     join(session, "desktop")
     await idle(session)
-    told = [m[-1]["content"][-1]["text"] for m in model.seen]
+    told = [" ".join(b["text"] for b in m[-1]["content"]) for m in model.seen]
     assert len(told) == 1  # held with no body, so both batch into one wake
     assert "Job fresh ended" in told[0] and "Job alive ended" in told[0]
     assert "Job old ended" not in told[0]
-    assert not records_for(memory).unreported_jobs()
+    assert job_told(memory, "fresh") and job_told(memory, "alive")
 
 
 async def test_restart_wakes_scout_once_for_blocked_job(tmp_path):
@@ -2006,19 +2214,69 @@ class FailsFirst(Gate):
 
 
 async def test_an_errored_say_reaches_the_model_once_and_is_named_as_a_retry():
+    clock = [datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)]
     model = FailsFirst(["ok"])
-    session, sent = make(model)
-    await session.say("desktop", say("first words"))
+    session, sent = make(model, now=lambda: clock[0])
+    await session.say("desktop", say("first words\nand a second line"))
     await idle(session)
     assert states(sent) == ["started", "ended"] and sent[-1][1]["reason"] == "error"
+    clock[0] += datetime.timedelta(seconds=30)  # its backoff is over: it rides the next turn
     await session.say("desktop", say("second words"))
     await idle(session)
     sent_texts = [b.get("text", "") for m in model.seen[-1] for b in m["content"]]
-    assert sum("first words" in t for t in sent_texts) == 1  # kept in history, not added again
+    # kept in history, not added again: only the retry fact names it, by its first line
+    assert sum("and a second line" in t for t in sent_texts) == 1
     last = model.seen[-1][-1]["content"]
     assert {"type": "text", "text": "second words"} in last
-    assert any("failed" in b["text"] and "again" in b["text"] for b in last)
+    fact = next(b["text"] for b in last if "resume=" in b.get("text", ""))
+    assert fact.startswith('<data kind="event" resume="true" reason="error">')
+    assert "Event: say" in fact and "text: first words" in fact
+    assert "second line" not in fact and "above" not in fact
     assert session._live_params == {}
+
+
+async def test_a_step_cap_turns_say_comes_back_as_a_resume_fact_not_its_words():
+    clock = [datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)]
+    model = Gate([tool_use("recall", query="x"), "ok"])
+    bodies = Bodies()
+    sent = []
+    bodies.notify = lambda m, p: sent.append((m, p))
+    session = make_session(model, Open(), bodies, 1, Memory(":memory:"), now=lambda: clock[0])
+    join(session, "desktop")
+    first = say("plan my week")
+    await session.say("desktop", first)
+    await idle(session)
+    assert sent[-1][1]["reason"] == "step_cap"
+    row = session.events.get(first.id)
+    assert (row.state, row.resume, row.end_reason) == ("new", True, "step_cap")
+    clock[0] += datetime.timedelta(seconds=30)
+    await session.say("desktop", say("go on"))
+    await idle(session)
+    last = model.seen[-1][-1]["content"]
+    fact = next(b["text"] for b in last if "resume=" in b.get("text", ""))
+    assert fact.startswith('<data kind="event" resume="true" reason="step_cap">')
+    assert "Event: say" in fact and "text: plan my week" in fact  # named by its first line
+    assert "How to weigh it" not in fact  # a say has no note; no empty line for one
+    blocks = [b.get("text") for m in model.seen[-1] for b in m["content"]]
+    assert blocks.count("plan my week") == 1
+    assert session.events.get(first.id).state == "handled"
+
+
+async def test_gave_up_events_are_told_as_facts_on_a_person_turn_once():
+    model = Gate(["ok", "ok"])
+    session, _ = make(model)
+    session.events.post(Event("job_ended", "job:j1", {"report": "the build broke"}, id="g"))
+    session.events.take(["g"], "old")  # given up before the runner looked: no turn for it
+    session.events.finish(["g"], "gave_up", end_reason="error")
+    await session.say("desktop", say("hi"))
+    await idle(session)
+    fact = next(b["text"] for b in model.seen[-1][-1]["content"] if "gave_up=" in b["text"])
+    assert fact.startswith('<data kind="event" gave_up="true" reason="error">')
+    assert "the build broke" in fact
+    assert session.events.get("g").state == "handled"
+    await session.say("desktop", say("again"))
+    await idle(session)
+    assert not any("gave_up=" in b["text"] for b in model.seen[-1][-1]["content"])
 
 
 async def test_idle_news_waits_out_the_quiet_after_a_say_on_a_moving_clock():
@@ -2049,7 +2307,8 @@ def model_text(session):
 
 
 def told(model):
-    return [m[-1]["content"][-1]["text"] for m in model.seen]
+    """Each wake's news: one block per event, read together."""
+    return [" ".join(b.get("text", "") for b in m[-1]["content"]) for m in model.seen]
 
 
 async def test_finished_job_is_told_when_the_person_returns():
@@ -2067,7 +2326,8 @@ async def test_finished_job_is_told_when_the_person_returns():
 
 async def test_job_ended_while_the_brain_was_down_is_told_on_start():
     memory = Memory(":memory:")
-    end_job(memory)  # ended, never told
+    before, _ = make(Gate([]), memory, screen=False)
+    before.jobs._on_finished(end_job(memory))  # ended, never told
     records_for(memory).add_job(
         "j2", "claude_code", "still going", "C:/x", "default"
     )  # killed by the restart
@@ -2124,7 +2384,7 @@ async def test_news_is_told_once_not_twice():
     await idle(session)
     assert len(model.seen) == 1
     again, _ = make(Gate(["never"]), memory)  # nor does a restart
-    assert not records_for(memory).unreported_jobs()
+    assert job_told(memory, "j1")
     join(again, "desktop")
     await idle(again)
     assert again._model.seen == []
@@ -2520,9 +2780,7 @@ async def test_wake_without_key_does_nothing():
     await settle()
     assert states(sent) == []
     assert session.history == []
-    assert (
-        not records_for(memory).get_job("j1").parts[-1].reported
-    )  # told at a later start, once a key is set
+    assert not job_told(memory, "j1")  # told at a later start, once a key is set
 
 
 async def test_job_ended_wake_carries_the_activity_summary():
@@ -3026,19 +3284,22 @@ async def restart(memory):
     return session
 
 
-async def test_a_give_up_whose_wake_never_started_is_told_again_at_start_once(monkeypatch):
+async def test_a_give_up_whose_wake_never_started_is_told_after_a_restart_once():
     memory = Memory(":memory:")
     records = records_for(memory)
     records.add_job("j1", "claude_code", "fix", "C:/x", "default")
     records.work.create(
         "tool_call", "files__list", parent_id="j1", state="active", id="j1.s", safe_to_retry=False
     )
-    records.work.fail("j1.s", "permanent", "boom")  # failed and never told
-    seen = work_failed_emits(monkeypatch)
-    await restart(memory)
-    await restart(memory)
-    assert [e.payload["step"] for e in seen] == ["j1.s"]
-    assert records.work.get("j1.s").reported_at is not None
+    row = records.work.fail("j1.s", "permanent", "boom")
+    before, _ = make(Gate([]), memory, screen=False)
+    before._tell_given_up(row)
+    before._tell_given_up(row)  # told twice: the log keeps one event for one failure
+    told = []
+    for _ in range(2):
+        session = await restart(memory)
+        told += [t for m in session._model.seen for t in [m[-1]["content"][-1]["text"]]]
+    assert len(told) == 1 and "Event: work_failed" in told[0] and "j1.s" in told[0]
 
 
 async def test_a_step_the_resume_scan_failed_as_unsure_is_told_once(monkeypatch):
@@ -3075,7 +3336,6 @@ async def test_bookkeeping_tools_are_not_recorded():
 async def test_owner_turn_without_a_job_records_nothing():
     memory = Memory(":memory:")
     end_job(memory)
-    records_for(memory).mark_reported("j1")  # no wake of its own: only the owner turn runs
     session, _ = make(Gate([tool_use("recall", query="x"), "ok"]), memory)
     join(session, "desktop")
     await session.say("desktop", say("what do you remember"))
@@ -3086,7 +3346,6 @@ async def test_owner_turn_without_a_job_records_nothing():
 async def test_an_owner_turn_binds_to_the_job_a_job_tool_names_and_the_binding_ends_with_the_turn():
     memory = Memory(":memory:")
     end_job(memory)
-    records_for(memory).mark_reported("j1")  # no wake of its own: only the owner turn runs
     session, _ = make(
         Gate(
             [
@@ -3112,9 +3371,7 @@ async def test_an_owner_turn_binds_to_the_job_a_job_tool_names_and_the_binding_e
 async def test_a_job_tool_for_another_job_records_on_that_job_plain_tools_stay_on_the_turns_job():
     memory = Memory(":memory:")
     end_job(memory)
-    records_for(memory).mark_reported("j1")  # no wake of its own: only the owner turn runs
     end_job(memory, "j2")
-    records_for(memory).mark_reported("j2")
     session, _ = make(
         Gate([tool_use("close_job", "a", job="j2"), tool_use("recall", "b", query="x"), "ok"]),
         memory,
@@ -3167,7 +3424,6 @@ async def test_scouts_tool_steps_stay_out_of_the_summary_and_never_wake_for_a_fa
     memory = Memory(":memory:")
     session, _ = make(Gate(["ok"]), memory)
     end_job(memory)
-    records_for(memory).mark_reported("j1")
     emitted = []
     session.jobs._emit = lambda event, **hooks: emitted.append(event.kind)
     session.jobs.record_step("j1", "app:files", "list", "failed")
@@ -3475,3 +3731,234 @@ async def test_year_only_in_body_context_is_not_said_by_the_person():
     await idle(session)
     [item] = [i for i in memory.list_items(10) if i.kind == "about_you"]
     assert item.span_start is None
+
+
+async def test_session_start_runs_the_event_sweep(monkeypatch):
+    swept = []
+    monkeypatch.setattr(EventLog, "sweep", lambda self, days: swept.append(days) or 0)
+    make(Gate([]))
+    assert swept == [sessions_module.DEFAULT_WORK_KEEP_DAYS]
+
+
+def _crash_on(monkeypatch, kind):
+    """The brain dies the moment it posts news of `kind`."""
+    real = EventLog.post
+
+    def post(self, event, **hooks):
+        if event.kind == kind:
+            raise RuntimeError("killed")
+        return real(self, event, **hooks)
+
+    monkeypatch.setattr(EventLog, "post", post)
+
+
+async def test_restart_news_lost_to_a_crash_after_the_scan_is_told_once(monkeypatch):
+    memory = Memory(":memory:")
+    records_for(memory).add_job("j1", "claude_code", "t", "C:/x", "default")  # running at death
+    _crash_on(monkeypatch, "job_ended")
+    with pytest.raises(RuntimeError, match="killed"):
+        make(Gate([]), memory, screen=False)  # the scan ran, then the brain died before the news
+    monkeypatch.undo()
+    for _ in range(2):  # started again, twice
+        session, _ = make(Gate([]), memory, screen=False)
+    ended_at = session.records.get_job("j1").ended_at
+    news = [r for r in session.events.ready() if r.kind == "job_ended"]
+    assert [r.id for r in news] == [f"job_ended:j1@{ended_at}"]
+
+
+async def test_a_step_that_fails_and_its_news_are_saved_together(monkeypatch):
+    memory = Memory(":memory:")
+    session, _ = make(Gate([]), memory, screen=False)
+    work = session.records.work
+    session.records.add_job("j1", "claude_code", "fix", "C:/x", "default")
+    work.create(
+        "tool_call", "files__list", parent_id="j1", state="active", id="j1.s", safe_to_retry=False
+    )
+    _crash_on(monkeypatch, "work_failed")
+    with pytest.raises(RuntimeError, match="killed"):
+        session._step_failed("j1.s", ValueError("boom"))
+    monkeypatch.undo()
+    # Not failed without its news: the restart scan settles the step and tells it.
+    assert work.get("j1.s").state == "active"
+    again, _ = make(Gate([]), memory, screen=False)
+    assert [r.kind for r in again.events.ready()].count("work_failed") == 1
+
+
+async def test_a_say_stopped_after_a_saved_step_is_resumed_not_said_again():
+    memory = Memory(":memory:")
+    hold = asyncio.Event()
+    model = Gate([tool_use("recall", query="x"), hold, "never"])
+    session, _ = make(model, memory)
+    join(session, "desktop")
+    said = say("remember the milk" + chr(10) + "and the eggs too")  # a resume names line one
+    await session.say("desktop", said)
+    await until(lambda: len(model.seen) == 2)  # one tool round saved, the next step running
+    await session.stop_turn()
+    assert session.events.get(said.id).state == "new"
+    again = Gate(["ok"])
+    revived, _ = make(again, memory)
+    join(revived, "desktop")
+    revived.runner.poke()
+    await idle(revived)
+    sent = again.seen[0]
+    assert json.dumps(sent).count("and the eggs too") == 1  # its words once: the saved row
+    assert "resume" in json.dumps(sent[-1])  # the restart names it as going on
+
+
+class _Stubborn:
+    """A model whose turn ignores the first cancel: shutdown must not wait on it forever."""
+
+    model_id = "claude-sonnet-5-5"
+
+    def __init__(self):
+        self.started = asyncio.Event()
+
+    async def stream(self, system, messages, tools):
+        self.started.set()
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            await asyncio.sleep(3600)  # swallowed once; a second cancel ends it
+        yield  # pragma: no cover
+
+
+async def test_stopping_a_turn_that_will_not_end_does_not_hang(monkeypatch):
+    monkeypatch.setattr(sessions_module, "STOP_TURN_WAIT_S", 0.05)
+    model = _Stubborn()
+    session, _ = make(model)
+    join(session, "desktop")
+    await session.say("desktop", say("hi"))
+    await asyncio.wait_for(model.started.wait(), 1)
+    task = session._task
+    await asyncio.wait_for(session.stop_turn(), 1)
+    task.cancel()  # the second cancel ends it, so the test leaves nothing running
+    await asyncio.gather(task, return_exceptions=True)
+
+
+class _StubbornAfterAStep(_Stubborn):
+    """One tool round is saved, then the turn ignores its first cancel."""
+
+    async def stream(self, system, messages, tools):
+        if not self.started.is_set():
+            self.started.set()
+            yield tool_use("recall", query="x")
+            return
+        async for chunk in super().stream(system, messages, tools):
+            yield chunk  # pragma: no cover
+
+
+async def test_a_say_whose_turn_would_not_stop_is_resumed_not_said_again(monkeypatch):
+    monkeypatch.setattr(sessions_module, "STOP_TURN_WAIT_S", 0.05)
+    memory = Memory(":memory:")
+    model = _StubbornAfterAStep()
+    session, _ = make(model, memory)
+    join(session, "desktop")
+    said = say("remember the milk" + chr(10) + "and the eggs too")  # a resume names line one
+    await session.say("desktop", said)
+    await until(lambda: session._saved >= 3)  # the request and its tool round are saved
+    task = session._task
+    await asyncio.wait_for(session.stop_turn(), 1)
+    again = Gate(["ok"])
+    revived, _ = make(again, memory)
+    join(revived, "desktop")
+    revived.runner.poke()
+    await idle(revived)
+    task.cancel()  # the second cancel ends it, so the test leaves nothing running
+    await asyncio.gather(task, return_exceptions=True)
+    assert json.dumps(again.seen[0]).count("and the eggs too") == 1
+
+
+async def test_a_given_up_say_whose_words_were_saved_is_told_by_its_first_line():
+    clock = [datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)]
+    model = FailsFirst(["ok"])
+    session, _ = make(model, now=lambda: clock[0])
+    first = say("first words\nand a second line")
+    await session.say("desktop", first)
+    await idle(session)
+    assert session.events.get(first.id).resume  # its row was saved before the model failed
+    session.events.finish([first.id], "gave_up", end_reason="error")  # its last try failed
+    await session.say("desktop", say("hi"))
+    await idle(session)
+    assert json.dumps(model.seen[-1]).count("and a second line") == 1  # the saved row only
+    last = model.seen[-1][-1]["content"]
+    fact = next(b["text"] for b in last if "gave_up=" in b.get("text", ""))
+    assert "text: first words" in fact
+
+
+async def test_a_wordless_cancel_of_a_retry_cuts_the_say_it_retried(tmp_path):
+    memory = file_memory(tmp_path)
+    clock = [datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)]
+    stuck = asyncio.Event()
+    model = FailsFirst([stuck, "never", "hello"])
+    session, _ = make(model, memory, now=lambda: clock[0])
+    first = say("book the flight")
+    await session.say("desktop", first)
+    await idle(session)
+    clock[0] += datetime.timedelta(seconds=30)  # its backoff is over: the retry runs
+    session.runner.poke()
+    await until(lambda: session._task is not None)
+    await settle()
+    session.cancel(session._turn_id)  # stopped before a word: the say is done with
+    await finish_quietly(session)
+    assert session.events.get(first.id).state == "handled"
+    assert "book the flight" not in json.dumps(memory.load_messages())  # a restart skips it
+    await session.say("desktop", say("hi"))
+    await idle(session)
+    assert "book the flight" not in json.dumps(model.seen[-1])  # nor does the next turn
+
+
+class _FailsOn(Gate):
+    """Gate, but the calls numbered in `fail` (from 1) raise: a failed try of a turn."""
+
+    def __init__(self, steps, fail):
+        super().__init__(steps)
+        self.fail = set(fail)
+        self.calls = 0
+
+    async def stream(self, system, messages, tools):
+        self.calls += 1
+        if self.calls in self.fail:
+            self.seen.append(list(messages))
+            raise RuntimeError("the API fell over")
+        async for item in super().stream(system, messages, tools):
+            yield item
+
+
+async def _cancel_the_retry(session, clock):
+    clock[0] += datetime.timedelta(seconds=30)  # the backoff is over: the retry runs
+    session.runner.poke()
+    await until(lambda: session._task is not None)
+    await settle()
+    session.cancel(session._turn_id)  # stopped before a word
+    await finish_quietly(session)
+
+
+async def test_a_cut_retry_after_a_tool_round_keeps_the_history_valid(tmp_path):
+    memory = file_memory(tmp_path)
+    clock = [datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)]
+    stuck = asyncio.Event()
+    model = _FailsOn([tool_use("recall", query="x"), stuck, "never", "hello"], fail=[2])
+    session, _ = make(model, memory, now=lambda: clock[0])
+    await session.say("desktop", say("book the flight"))
+    await idle(session)  # one tool round saved, then the error
+    await _cancel_the_retry(session, clock)
+    assert [r[3] for r in saved_rows(memory)] == [0, 0, 0]  # nothing is cut
+    await session.say("desktop", say("hi"))
+    await idle(session)
+    sent = model.seen[-1]
+    assert sent[1]["content"][0]["type"] == "tool_use"
+    assert any(b.get("type") == "tool_result" for b in sent[2]["content"])  # kept its answer
+
+
+async def test_a_cut_retry_of_requests_from_two_turns_cuts_nothing(tmp_path):
+    memory = file_memory(tmp_path)
+    clock = [datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)]
+    stuck = asyncio.Event()
+    model = _FailsOn([stuck, "never"], fail=[1, 2])
+    session, _ = make(model, memory, now=lambda: clock[0])
+    await session.say("desktop", say("book the flight"))
+    await idle(session)
+    await session.say("desktop", say("email the landlord"))  # its own turn, failed too
+    await idle(session)
+    await _cancel_the_retry(session, clock)  # one retry takes both
+    assert [r[3] for r in saved_rows(memory)] == [0, 0]

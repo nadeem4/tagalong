@@ -116,7 +116,19 @@ def open_db(path: Path | str) -> sqlite3.Connection:
 
 @contextmanager
 def transaction(db: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
-    """One write transaction: commit on success, roll back and re-raise on any error."""
+    """One write transaction: commit on success, roll back and re-raise on any error. Inside
+    another it is a savepoint, so a caller can make several writes one (a restart's scan and
+    its news): an error undoes only its own writes, and the outer one commits the rest."""
+    if db.in_transaction:
+        db.execute("SAVEPOINT nested")
+        try:
+            yield db
+        except BaseException:
+            db.execute("ROLLBACK TO nested")
+            db.execute("RELEASE nested")
+            raise
+        db.execute("RELEASE nested")
+        return
     db.execute("BEGIN IMMEDIATE")
     try:
         yield db

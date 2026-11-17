@@ -230,7 +230,7 @@ def test_terminal_needs_reason_and_sets_ended(store, clock):
     clock.at += timedelta(seconds=9)
     got = store.transition(row.id, "done", reason="finished")
     assert got.end_reason == "finished" and got.ended_at == utc_text(clock.at)
-    assert got.progress is None and got.reported_at is None
+    assert got.progress is None
     event = store.events(row.id)[-1]
     assert event.kind == "state"
     assert event.data == {"from": "active", "to": "done", "reason": "finished"}
@@ -294,18 +294,15 @@ def test_goal_close_cancels_children_and_expires_asks(store):
     done = store.create("tool_call", "d", parent_id=goal.id)
     store.transition(done.id, "active")
     store.transition(done.id, "done", reason="ok")
-    store.mark_reported(done.id)
     closed = store.close_goal(goal.id, "done", "all good")
     assert closed.state == "done" and closed.summary == "all good"
-    assert closed.end_reason == "closed by Scout" and closed.reported_at is not None
+    assert closed.end_reason == "closed by Scout"
     t = store.get(timer.id)
     assert (t.state, t.end_reason) == ("cancelled", "goal closed")
     a = store.get(ask.id)
     assert (a.state, a.end_reason) == ("expired", "parent ended: closed by Scout")
     assert store.get(grand.id).state == "cancelled"
     assert store.get(done.id).state == "done"
-    # rows ended by the close are already known to Scout
-    assert store.unreported() == []
 
 
 def test_close_goal_refuses_non_goal_or_ended(store):
@@ -356,7 +353,6 @@ def test_retry_transient_safe_backs_off(store, clock):
         store.transition(row.id, "active")
     got = store.fail(row.id, "transient", "timed out")
     assert got.state == "failed" and got.end_reason == "gave up after 3 tries: timed out"
-    assert got.reported_at is None
 
 
 def test_not_safe_fails_at_once(store):
@@ -408,19 +404,7 @@ def test_retry_step_from_blocked(store):
     assert store.retry_step(row.id).state == "planned"
 
 
-# ---- unreported and due ----
-
-
-def test_unreported_and_mark_reported(store):
-    a = _active(store)
-    store.transition(a.id, "done", reason="ok")
-    b = _active(store)
-    store.transition(b.id, "blocked", reason="needs you")
-    store.create("tool_call", "c")
-    assert {r.id for r in store.unreported()} == {a.id, b.id}
-    assert store.unreported(kinds=["timer"]) == []
-    store.mark_reported(a.id)
-    assert [r.id for r in store.unreported()] == [b.id]
+# ---- due ----
 
 
 def test_due_next_due_and_open_roots(store, clock):
@@ -487,7 +471,6 @@ def test_cannot_add_or_retry_under_an_ended_parent(store):
     step = store.create("tool_call", "s", parent_id=goal.id)
     store.transition(step.id, "active")
     store.transition(step.id, "failed", reason="boom")
-    store.mark_reported(step.id)
     store.close_goal(goal.id, "failed", "gave up")
     with pytest.raises(TransitionRefused):
         store.create("tool_call", "late", parent_id=goal.id)
@@ -502,14 +485,6 @@ def test_reason_is_masked(store):
     got = store.transition(row.id, "failed", reason="bad key sk-x")
     assert got.end_reason == "bad key [secret]"
     assert store.events(row.id)[-1].data["reason"] == "bad key [secret]"
-
-
-def test_unreported_index_matches_the_query(db):
-    plan = db.execute(
-        "EXPLAIN QUERY PLAN SELECT id FROM work WHERE reported_at IS NULL"
-        " AND state IN ('done','failed','cancelled','expired','blocked')"
-    ).fetchall()
-    assert any("work_unreported" in str(r) for r in plan)
 
 
 def test_close_goal_from_planned(store):

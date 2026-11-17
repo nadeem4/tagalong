@@ -6,11 +6,12 @@ model and bodies only.
 """
 
 import asyncio
+import datetime
 import json
 from dataclasses import replace
 from types import SimpleNamespace
 
-from job_rows import records_for
+from job_rows import job_told
 from test_session_interrupt import make_voiced, over
 from test_sessions import (
     Gate,
@@ -91,10 +92,10 @@ async def test_wake_not_reported_until_turn_finishes():
     session.jobs._on_finished(end_job(memory))
     await settle()
     assert wake_started(sent) == ["desktop"]  # the wake is running...
-    assert not records_for(memory).get_job("j1").parts[-1].reported  # ...but has not finished
+    assert not job_told(memory, "j1")  # ...but has not finished
     gate.set()
     await idle(session)
-    assert records_for(memory).get_job("j1").parts[-1].reported
+    assert job_told(memory, "j1")
 
 
 async def test_cancelled_wake_news_is_handled():
@@ -108,7 +109,7 @@ async def test_cancelled_wake_news_is_handled():
     await finish_quietly(session)
     # A cancel is the person's choice: the news counts as told and no second wake runs.
     await idle(session)
-    assert records_for(memory).get_job("j1").parts[-1].reported
+    assert job_told(memory, "j1")
     assert len(wake_started(sent)) == 1
 
 
@@ -222,7 +223,7 @@ async def test_an_error_end_does_not_post_the_news_again():
     session.jobs._on_finished(end_job(memory))
     await idle(session)
     assert [i.kind for i in posted].count("job_ended") == 1
-    assert not records_for(memory).get_job("j1").parts[-1].reported
+    assert not job_told(memory, "j1")
 
 
 class BoomLater(Gate):
@@ -237,10 +238,11 @@ class BoomLater(Gate):
         yield  # pragma: no cover
 
 
-async def test_a_say_waiting_on_a_turn_that_errors_gets_the_next_turn_with_it():
+async def test_a_say_waiting_on_a_turn_that_errors_still_gets_its_own_turn():
+    clock = [datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)]
     gate = asyncio.Event()
     model = BoomLater(gate)
-    session, sent = make(model)
+    session, sent = make(model, now=lambda: clock[0])
     join(session, "desktop")
     a = say("a")
     await session.say("desktop", a)
@@ -251,10 +253,19 @@ async def test_a_say_waiting_on_a_turn_that_errors_gets_the_next_turn_with_it():
     assert len(model.seen) == 2  # b was not left unanswered behind the failed turn
     last = model.seen[-1][-1]["content"]
     assert {"type": "text", "text": "b"} in last
-    # a rode along: its words are already in the history, so only the retry is named
-    assert {"type": "text", "text": "a"} not in last and "tried again" in last[0]["text"]
+    # a waits out its backoff; its words are already in the history, so b goes alone
+    assert {"type": "text", "text": "a"} not in last
     blocks = [b for m in model.seen[-1] for b in m["content"]]
     assert blocks.count({"type": "text", "text": "a"}) == 1
+    clock[0] += datetime.timedelta(seconds=30)  # both backoffs are over: they are retried
+    session.runner.poke()
+    await until(lambda: len(model.seen) == 3)
+    await idle(session)
+    last = model.seen[-1][-1]["content"]
+    facts = [b["text"] for b in last if 'resume="true" reason="error"' in b.get("text", "")]
+    assert len(facts) == 1 and "text: a" in facts[0] and "text: b" in facts[0]
+    blocks = [b for m in model.seen[-1] for b in m["content"]]
+    assert blocks.count({"type": "text", "text": "a"}) == 1  # a's words reach the model once
 
 
 async def test_whatsapp_moments_wake_on_the_whatsapp_body():

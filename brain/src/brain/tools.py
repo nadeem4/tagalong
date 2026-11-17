@@ -472,7 +472,6 @@ def timer_tools(
 
     def end(row: WorkRow, reason: str) -> None:
         work.transition(row.id, "cancelled", reason=reason)
-        work.mark_reported(row.id)  # Scout did it, so there is nothing to report
 
     async def cancel_timer(args: dict) -> str:
         tid = text_id("cancel_timer", args)
@@ -480,6 +479,8 @@ def timer_tools(
         if row is None:
             raise MemoryRefused(f"no timer with id {tid}.")
         if not timers.cancel(tid, "cancelled by Scout"):
+            if row.state == "done":  # its news is told, or being told by a turn already
+                raise MemoryRefused(f"timer {tid} already fired; nothing is left to cancel.")
             raise MemoryRefused(f"no timer with id {tid}.")
         return f"timer {tid} cancelled"
 
@@ -523,7 +524,6 @@ def timer_tools(
                 end(row, "cancelled by Scout")
             elif action == "pause":
                 work.transition(wid, "paused", reason="paused by Scout", expect="planned")
-                work.mark_reported(wid)  # the person's own pause is not news to Scout
             else:
                 repeat_s = work.repeat_of(wid)
                 if args.get("every_minutes") is not None:
@@ -736,7 +736,6 @@ def work_tools(
                     for r in work.open_roots()
                     if r.kind != "loop" and not is_return_wake(r)
                 ],
-                "unreported": [_work_summary(r) for r in work.unreported()],
             }
         )
 

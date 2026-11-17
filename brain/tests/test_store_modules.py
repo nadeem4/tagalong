@@ -62,3 +62,23 @@ def test_saved_messages_record_their_body(tmp_path):
     conversation.save_messages(db, msg, AT)
     rows = db.execute("SELECT body FROM messages ORDER BY id").fetchall()
     assert rows == [("whatsapp",), ("desktop",)]
+
+
+def test_saved_user_rows_keep_their_event_and_source(tmp_path):
+    db = _db(tmp_path)
+    msgs = [
+        {"role": "user", "content": "from the desktop"},
+        {"role": "user", "content": "a job ended"},
+        {"role": "assistant", "content": "ok"},
+    ]
+    ids = conversation.save_messages(
+        db, msgs, AT, event_ids=["e1", "e2", None], sources=["desktop", "job:j1", None]
+    )
+    rows = db.execute("SELECT id, event_id, source FROM messages ORDER BY id").fetchall()
+    assert rows == [
+        (ids[0], "e1", "desktop"),
+        (ids[1], "e2", "job:j1"),
+        (ids[2], None, None),
+    ]
+    conversation.set_cut(db, ids[:2], True)
+    assert conversation.load_messages(db) == [msgs[2]]

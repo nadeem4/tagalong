@@ -1,10 +1,11 @@
 """The thinking loop: ask the model, stream its words, run its tools, repeat until it is done.
 
 History is append-only and always valid: a half-streamed message is never stored and a
-tool_use never goes unanswered, even when the turn is cancelled. A cancelled step keeps the
-words the person already saw as its reply, so the cut-off request counts as answered and the
-next turn does not resume it. The loop writes no words of its own; it only reports why it stopped
-(a timeout ends the turn with `error`; the body says so).
+tool_use never goes unanswered, even when the turn is cancelled. Each finished tool round (the
+model's messages with their results) is handed to `on_step` at once, so a crash keeps it. A
+cancelled step keeps the words the person already saw as its reply, so the cut-off request
+counts as answered and the next turn does not resume it. The loop writes no words of its own;
+it only reports why it stopped (a timeout ends the turn with `error`; the body says so).
 
 A pause (`stop`) is not a cancel: generation ends at once, but tools already running are handed
 to `on_detached` and finish on their own, so the person talking over Scout destroys no work.
@@ -167,6 +168,7 @@ async def _run_turn(
     on_rejected: Callable[[], None] | None = None,
     stop: asyncio.Event | None = None,
     on_detached: Callable[[dict, asyncio.Future], None] | None = None,
+    on_step: Callable[[list[dict]], None] = lambda messages: None,
 ) -> str:
     guards = guards or spend_guards(budget, step_cap)
     if begin := getattr(model, "begin_turn", None):
@@ -177,6 +179,7 @@ async def _run_turn(
     spoke = False  # the contract wants exactly one reply.done iff any delta went out
     tail = ""  # the last words sent, so a new step's text can be set apart from them
     paused = False  # `stop` was set while the model was talking: end now, keeping what was shown
+    handed = len(history)  # history[handed:] is not yet handed to on_step
     try:
         try:
             async with asyncio.timeout(turn_timeout) as limit:
@@ -257,6 +260,10 @@ async def _run_turn(
                         if due is not None:
                             limit.reschedule(due + clock() - began)
                         history.append({"role": "user", "content": results + take_more()})
+                        # Every tool_use here has its result: a whole, valid piece to keep. A
+                        # pause_turn message waits for this point, as a cancel may still drop it.
+                        on_step(history[handed:])
+                        handed = len(history)
                         continue
                     closed = _close_dangling_tool_use(history)
                     if final.stop_reason == "refusal":

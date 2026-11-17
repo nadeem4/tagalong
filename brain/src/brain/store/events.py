@@ -103,6 +103,96 @@ def set_state(
         )
 
 
+def set_backoff(
+    db: sqlite3.Connection, ids: list[str], not_before: str, reason: str, *, resume: bool = True
+) -> None:
+    """A failed attempt: back to `new`, one more attempt, waiting until `not_before`. Only a
+    row still `taken` moves, so one that ended meanwhile (cancelled by id) stays ended.
+    `resume=False` keeps the flag as it was: a turn that never started sent nothing."""
+    for id in ids:
+        db.execute(
+            "UPDATE events SET state='new', attempts=attempts+1, not_before=?, end_reason=?,"
+            " resume=CASE WHEN ? THEN 1 ELSE resume END, turn_id=NULL"
+            " WHERE id=? AND state='taken'",
+            (not_before, reason, int(resume), id),
+        )
+
+
+def set_gave_up(db: sqlite3.Connection, ids: list[str], reason: str, at: str) -> list[str]:
+    """The last failure: the row stays for Home and is told once later. Returns what moved."""
+    moved = []
+    for id in ids:
+        cur = db.execute(
+            "UPDATE events SET state='gave_up', end_reason=?, handled_at=?"
+            " WHERE id=? AND state='taken'",
+            (reason, at, id),
+        )
+        if cur.rowcount:
+            moved.append(id)
+    return moved
+
+
+def list_state(db: sqlite3.Connection, state: str) -> list[EventRow]:
+    rows = db.execute(
+        f"SELECT {_COLS} FROM events WHERE state=? ORDER BY at, rowid", (state,)
+    ).fetchall()
+    return [_row(r) for r in rows]
+
+
+def next_not_before(db: sqlite3.Connection, now: str) -> str | None:
+    """When the soonest backing-off event may be taken again; None when none waits."""
+    return db.execute(
+        "SELECT MIN(not_before) FROM events WHERE state='new' AND not_before>?", (now,)
+    ).fetchone()[0]
+
+
+def recover_taken(db: sqlite3.Connection, at: str) -> list[str]:
+    """At start, what a dead brain left held: an orphan card answer (saved, never finished)
+    ends handled, since code answers it and it never starts a turn; an event an interjection
+    held goes back to `new`, since an interjection is not an attempt. Returns the ids still
+    `taken`, which a crashed turn held."""
+    db.execute(
+        "UPDATE events SET state='handled', end_reason='restart', handled_at=?, turn_id=NULL"
+        " WHERE kind='card_answer' AND state IN ('new','taken')",
+        (at,),
+    )
+    db.execute(
+        "UPDATE events SET state='new', turn_id=NULL"
+        " WHERE state='taken' AND turn_id LIKE 'interjection:%'"
+    )
+    return [r[0] for r in db.execute("SELECT id FROM events WHERE state='taken' ORDER BY rowid")]
+
+
+def set_resume(db: sqlite3.Connection, ids: list[str]) -> None:
+    """Mark waiting rows as sent before, those with a saved chat row only (the rest never
+    reached the history, so they are told in full again). A stop left no reason: `stop`."""
+    for id in ids:
+        db.execute(
+            "UPDATE events SET resume=1, end_reason=COALESCE(end_reason, 'stop')"
+            " WHERE id=? AND state='new'"
+            " AND EXISTS (SELECT 1 FROM messages WHERE event_id=events.id AND cut=0)",
+            (id,),
+        )
+
+
+def saved(db: sqlite3.Connection, ids: list[str]) -> set[str]:
+    """Which of these events have a row in the saved chat: their words reached the history."""
+    marks = ",".join("?" * len(ids))
+    return {
+        r[0]
+        for r in db.execute(
+            f"SELECT DISTINCT event_id FROM messages WHERE event_id IN ({marks}) AND cut=0", ids
+        )
+    }
+
+
+def sweep(db: sqlite3.Connection, before: str) -> int:
+    """Delete `handled` rows ended before `before`; waiting, running and given-up rows stay."""
+    return db.execute(
+        "DELETE FROM events WHERE state='handled' AND handled_at<?", (before,)
+    ).rowcount
+
+
 def chain(db: sqlite3.Connection, id: str, limit: int = 20) -> list[EventRow]:
     """This event, then what caused it, and so on; stops at a missing parent or the limit."""
     out: list[EventRow] = []

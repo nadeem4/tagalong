@@ -158,7 +158,9 @@ def test_starts_at_turn_start_of_latest_compaction():
 
 def test_compaction_mid_turn_starts_at_that_turn_start():
     msgs = [u("old"), a("x"), u("go"), call("1"), result("1"), compaction(), a("end")]
-    assert rebuild(msgs) == msgs[2:]
+    # The compaction row and the reply after it are neighbours, so they join into one message.
+    joined = {"role": "assistant", "content": msgs[5]["content"] + msgs[6]["content"]}
+    assert rebuild(msgs) == [*msgs[2:5], joined]
 
 
 def test_cap_trims_front_to_whole_turns():
@@ -195,7 +197,8 @@ def test_cap_with_one_huge_turn_keeps_the_whole_turn():
 def test_failed_compaction_block_is_not_a_cut_point():
     failed = {"role": "assistant", "content": [{"type": "compaction", "content": None}]}
     msgs = [u("one"), a("x"), u("two"), failed, a("y")]
-    assert rebuild(msgs) == msgs
+    joined = {"role": "assistant", "content": failed["content"] + a("y")["content"]}
+    assert rebuild(msgs) == [*msgs[:3], joined]
 
 
 def test_dangling_tool_use_is_closed():
@@ -267,3 +270,58 @@ def test_resume_heals_a_saved_reply_whose_thinking_lost_its_search_blocks():
     }
     history = rebuild([old[0], with_search])
     assert history[-1]["content"] == [{"type": "text", "text": "Found."}]
+
+
+def test_adjacent_user_rows_rebuild_as_one_user_message():
+    history = rebuild([u("a"), u("b"), a("c")])
+    assert history == [
+        {
+            "role": "user",
+            "content": [{"type": "text", "text": "a"}, {"type": "text", "text": "b"}],
+        },
+        a("c"),
+    ]
+
+
+def test_a_tool_result_row_joins_the_user_row_after_its_tool_use():
+    use = {"type": "tool_use", "id": "t1", "name": "n", "input": {}}
+    result = {"type": "tool_result", "tool_use_id": "t1", "content": "ok"}
+    history = rebuild(
+        [u("q"), {"role": "assistant", "content": [use]}]
+        + [{"role": "user", "content": [result]}, u("news"), a("done")]
+    )
+    assert [m["role"] for m in history] == ["user", "assistant", "user", "assistant"]
+    assert history[2]["content"] == [result, {"type": "text", "text": "news"}]
+
+
+def test_adjacent_assistant_rows_rebuild_as_one_message_in_order():
+    history = rebuild([u("q"), a("one"), a("two"), u("next")])
+    assert history[1] == {
+        "role": "assistant",
+        "content": [{"type": "text", "text": "one"}, {"type": "text", "text": "two"}],
+    }
+    assert [m["role"] for m in history] == ["user", "assistant", "user"]
+
+
+def test_a_reply_with_no_request_before_it_is_dropped_so_history_opens_on_a_user():
+    history = rebuild([a("orphan"), u("q"), a("r")])
+    assert history == [u("q"), a("r")]
+    assert rebuild([a("orphan")]) == []
+
+
+def test_a_compaction_summary_at_the_front_is_kept():
+    assert rebuild([compaction(), a("after")]) == [
+        {"role": "assistant", "content": compaction()["content"] + a("after")["content"]}
+    ]
+
+
+def test_an_orphan_reply_with_a_tool_round_leaves_no_orphan_tool_result():
+    history = rebuild([call("1"), result("1"), a("done"), u("q"), a("r")])
+    assert history == [u("q"), a("r")]
+
+
+def test_roles_alternate_after_a_silent_reply_leaves_two_user_rows_together():
+    silent = {"role": "assistant", "content": []}
+    history = rebuild([u("q"), call("1"), result("1"), silent, u("next"), a("r")])
+    assert [m["role"] for m in history] == ["user", "assistant", "user", "assistant"]
+    assert history[2]["content"] == result("1")["content"] + [{"type": "text", "text": "next"}]

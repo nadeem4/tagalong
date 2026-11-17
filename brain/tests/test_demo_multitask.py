@@ -265,9 +265,10 @@ async def test_4_a_reminder_whose_wake_errored_is_told_again_after_a_restart(tmp
     await idle(session)
     reason = sent[-1][1]["reason"]
     row = records_for(memory).work.of_kind("timer", ["done", "active", "planned"])[0]
-    print(f"\n[4] wake ended '{reason}'; timer row state='{row.state}', told={row.reported_at}")
+    print(f"\n[4] wake ended '{reason}'; timer row state='{row.state}'")
     again = Gate(["ok", "ok"])
-    session2, _ = make(again, memory, kinds=TIMER, now=lambda: now)  # the brain restarts
+    later = now + datetime.timedelta(seconds=31)  # the failed wake waits out its first backoff
+    session2, _ = make(again, memory, kinds=TIMER, now=lambda: later)  # the brain restarts
     join(session2, "desktop")
     session2.runner.poke()
     await idle(session2)
@@ -284,7 +285,8 @@ async def test_4_control_a_job_whose_wake_errored_is_told_again_after_a_restart(
     await idle(session)
     assert sent[-1][1]["reason"] == "error"
     again = Gate(["ok", "ok"])
-    session2, _ = make(again, memory)
+    later = datetime.datetime(2026, 1, 1, 9, 0, 31, tzinfo=datetime.UTC)  # past the backoff
+    session2, _ = make(again, memory, now=lambda: later)
     join(session2, "desktop")
     session2.runner.poke()
     await idle(session2)
@@ -296,9 +298,6 @@ async def test_4_control_a_job_whose_wake_errored_is_told_again_after_a_restart(
 # 5. Crash mid-turn (C4) -------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True, reason="C4: says accepted mid-turn exist only in memory until the turn ends"
-)
 async def test_5_says_accepted_before_a_crash_are_not_lost(tmp_path):
     memory = file_memory(tmp_path)
     gate = asyncio.Event()
@@ -312,6 +311,7 @@ async def test_5_says_accepted_before_a_crash_are_not_lost(tmp_path):
         # A hard kill: no turn end, nothing saved. A new brain opens the same database.
         saved = json.dumps(memory.load_messages())
         revived, _ = make(Gate(["x"]), memory)
+        await settle()  # a say still waiting in the log gets its turn in the new brain
         known = json.dumps(revived.history)
         has_a = "task A" in saved or "task A" in known
         has_b = "task B" in saved or "task B" in known

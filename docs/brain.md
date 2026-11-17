@@ -265,8 +265,8 @@ flowchart TD
   part is over 5 MB (decoded), or whose parts total over 20 MB, is refused with `over_limit`
   before anything is saved or sent. A cancel during a tool step ends on the
   cancelled `tool_result`, which is valid as is.
-- Chat is saved at the end of each turn (see [memory.md](memory.md)). A crash mid-turn loses that
-  turn's unsaved messages.
+- Chat is saved after every step (see [memory.md](memory.md)): when the turn starts, after each tool
+  round (`on_step`) and at its end. A crash mid-turn loses only the step in flight.
 - On start the history is rebuilt from the saved chat. It begins at the turn of the latest
   compaction block, is capped at 50 messages trimmed to whole turns (a newest turn over 50 is kept whole), and a tool call left
   unanswered by a crash is closed with a "cancelled" result (stored on the next save).
@@ -423,11 +423,14 @@ setup still hears a job's question.
 
 **News is told when the turn ends.** An event is handled when the turn that took it ends `done`
 or `cancelled` (the person was answered or the turn was stopped on purpose), `rejected` (the API
-refused the request, which would fail the same way again) or `over_budget`. Any other end (an
-error) puts its events back to `new` with no attempt counted, and they wait for something new or
-`RECHECK_S`, so a failing model is not asked again in a loop. A say that was sent by an errored turn
-is retried with a one-line retry note instead of its words, since the failed request is still in
-history. `on_end` carries the state to the one who posted it. A loop is marked surfaced only after
+refused the request, which would fail the same way again) or `unanswered` (no key is set, so
+nothing can answer). A
+say that ran over budget is handled too, since the person sees why; news that ran over budget goes
+back to `new` with no attempt counted and waits for the budget. An error, a timeout or the step cap
+counts as an attempt: the event waits 30 s, then 2 min, then 10 min (`not_before`) and is tried
+again, and the fourth failure gives it up (`gave_up`). See [When a turn ends](#when-a-turn-ends)
+and [Start-up and shutdown](#start-up-and-shutdown). `on_end` carries the state to the one who
+posted it. A loop is marked surfaced only after
 its
 event was accepted.
 
@@ -1118,9 +1121,10 @@ words what the person reads (guidance in `mind/soul.md`).
   `version_changed` (`"<shown> -> <now>"`) and installs nothing. It emits non-waking `setup_progress` events (`expert`, `stage`,
   `percent`) plus `changed {what: "setup"}`, and one waking `setup_done` event when it ends:
   `expert`, `ok`, and either `installed` (the expert as JSON) or `error` and `detail`. A waking
-  `setup_done` or `setup_login` is saved as a `setup` open item (`setup/events.py`) until Scout's
-  wake turn has ended, so a restart or a budget-dropped wake does not lose it (a cancelled wake turn still ends it); at start the saved
-  ones are sent again, and a newer event for the same expert or app replaces the older. Brain
+  `setup_done` or `setup_login` is an event like any other news, saved in the log until a turn has
+  told it, so a restart or a budget-dropped wake does not lose it. `SetupEvents` (`setup/events.py`)
+  posts the new one first and then ends the older waiting one for the same expert or app
+  (`finish_matching`), so a crash between the two loses no news. Brain
   shutdown cancels running installs, each of which cleans up what it staged.
   An `npx` entry runs `npm install --prefix tools/<id>.part <package>@<version>` (the card shows that same version; an unpinned package gets the entry's) with a system
   Node that is new enough (and has its own npm), else Tagalong's own Node; the Node floor is 22 for
@@ -1540,13 +1544,14 @@ ready event for the same body, up to `GROUP_CAP` (20). With the daily budget spe
 stays `new` in the log and the runner looks again when something changes, and at least every
 `RECHECK_S` (60 s). The text is fenced as `<data kind="event">` with the kind's name, its note on how
 to weigh it and the facts, so it is data, not instructions. A start that raises is logged and its
-events go back to `new`, never raised into the caller.
+events count as an attempt (they wait out the backoff, with no `resume` mark since nothing of the
+turn reached the history), never raised into the caller.
 
 When a job ends, the session emits a `job_ended` event whose fact is a note (id, task, folder,
 state, reason and the report of the part that just ended (other parts of a multi-part job appear as facts only: expert, folder, state, reason; Scout reads one with `job_report`); a report over the preview cap arrives as a preview with
-an `output_id`, see [Long tool output](#long-tool-output)). `reported` is set once that
-turn has started (a failed start leaves it unreported). At brain start every finished unreported
-job (including those just stopped) is emitted again. Scout's prompt says an event is not a request
+an `output_id`, see [Long tool output](#long-tool-output)). The event's id is
+`job_ended:{job}@{ended_at}`, so a restart that derives the same ending again posts it once. The
+log is what keeps it until a turn has told it. Scout's prompt says an event is not a request
 from the owner; the model decides whether to speak, and may say nothing.
 
 The person is told what an expert did even when they were away. A finished or
@@ -1567,7 +1572,6 @@ Event kinds (`EVENT_KINDS` in `events.py`):
 | `work_failed`     | 0 s          | 10           | A goal's step gave up after its retries or was not retryable (facts: goal, step, title, reason); Scout says which step failed and offers `resolve_step`                                                           |
 | `job_quiet`       | 0 s          | 3            | A running job showed no new step or message for `TAGALONG_JOB_QUIET_MIN` minutes (facts: job, quiet minutes, whether the adapter lives, the running step and how long)                                            |
 | `timer`           | 0 s          | 6            | One of Scout's timers or watches came due                                                                                                                                                                         |
-| `watches_paused`  | 0 s          | 2            | Watches an update paused, told once at the first start after it                                                                                                                                                   |
 | `loop`            | 0 s          | 4            | A held loop needs a look (facts: reason, id, title, asks, direction, people, due); for now only `reason=due`. Its text may come from someone else, so it is data                                                  |
 | `body_online`     | 0 s          | 2            | A body came back after 10+ minutes away                                                                                                                                                                           |
 | `back`            | 0 s          | 2            | The owner returned after 5+ minutes idle                                                                                                                                                                          |
@@ -1585,7 +1589,7 @@ A kind can also set `wakes` (false: keep only the latest fact, no turn) and `ena
 no key: a newer one never replaces an older one. Stale news is ended instead: `EventLog.finish_matching(kind,
 source)` finishes the waiting events of that kind and source (a cancelled timer's `timer:<id>`, an
 ended job's `job_quiet` and `job_step_failed`). Waiting events are saved, so a brain restart does
-not lose them, and unreported jobs are emitted again at start.
+not lose them.
 
 **Body events.** A body reports what it noticed with the `event` notification (`name`, `data`). The
 brain knows four names: `back {idle_seconds}`, `focus {app, title}`, `tab {title, url}` and
@@ -1652,7 +1656,7 @@ flowchart TD
 | `list_jobs`      | home        | read   | `auto`                        | `{"jobs": [...]}`, the last 20 rows newest first, with `parts` (each: `id`, `expert`, `state`, `reason`, `progress`, `result`, `session_id_known`, times), a one-line `summary` of its steps, Scout's `watch` list, `title`, `closed_at` and `parent_job`                                                                                                                                                                                                                                                                          |
 | `stop_job`       | scout, home | change | `auto`                        | `{job, part?}`. Stops a running job (all its running parts, or the named one); Home gets `{"job", "stopping": true}`                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `resolve_step`   | scout, home | change | `auto`                        | `{id, choice}`, `choice` is `retry`, `skip` or `stop`. `retry` sends a failed or blocked step back to `planned`, due now, with its tries reset; `skip` ends it as `cancelled` ("skipped") and the job carries on; `stop` stops the job's running parts and closes the whole job as failed. Only for `tool_call` and `expert_call` rows; `retry` and `skip` only from `failed` or `blocked`. Returns `{id, choice, state}` (`{id, choice, goal}` for stop), or `{error}` as a plain line when the step is gone or has already moved |
-| `work_status`    | scout       | read   | `auto`                        | `{id?, words?}`. With `id`: `{goal, steps, events}` (the goal, its steps and the last 20 events across them); with `words`: `{found: [...]}`, the best 5 matches by title; with neither: `{open: [...], unreported: [...]}`, the open goals and timers and anything that ended or got stuck that Scout has not been told. Rows carry `id`, `kind`, `state`, `title`, `summary`, `progress`, `attempt`, `end_reason`, `due_at`. Replaces Scout's `list_jobs`                                                                        |
+| `work_status`    | scout       | read   | `auto`                        | `{id?, words?}`. With `id`: `{goal, steps, events}` (the goal, its steps and the last 20 events across them); with `words`: `{found: [...]}`, the best 5 matches by title; with neither: `{open: [...]}`, the open goals and timers (loops and the quiet digest are left out). Rows carry `id`, `kind`, `state`, `title`, `summary`, `progress`, `attempt`, `end_reason`, `due_at`. Replaces Scout's `list_jobs`                                                                                                                   |
 | `job_activity`   | home        | read   | `auto`                        | `{job?, after_rev?}`. Serves the activity log by cursor (see Activity log); Scout never gets it                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `job_report`     | scout, home | read   | `auto`                        | `{job, part}`. One part's whole report as `{"text"}`. Scout's copy is previewed by the output cap, `read_output` pages the rest; Home gets it whole                                                                                                                                                                                                                                                                                                                                                                                |
 
@@ -1826,7 +1830,8 @@ flowchart LR
   (only closing the job removes them). Running it twice changes nothing.
 - **Shutdown.** On exit `main.py` calls `Jobs.shutdown()` before closing memory: it stops every
   running job (rows become `stopped`, adapters end) and ignores a run that fails to stop. Shutdown
-  sends no report: those jobs stay unreported and are told about at the next start.
+  still posts a `job_ended` for each job it stops; the runner is already stopped, so the event waits
+  `new` in the log and the next start tells it.
 
 ## Retries and give-ups
 
@@ -1854,7 +1859,9 @@ person (or Scout for them) answers with `resolve_step`: retry, skip or stop. It 
 job's running experts, then closes the job as failed through `Jobs.close`. A step that ended while
 the brain was down is not repeated unless it was safe (see the resume scan in
 [storage.md](storage.md)). A failed step nobody was told about (the wake never started, or the
-scan failed it as "unsure if it ran") is told again at the next start, once.
+scan failed it as "unsure if it ran") is told at the next start, once: the `work_failed` event's
+id is `work_failed:{step}@{ended_at}`, so a second telling is refused by the log. A step that gives
+up and its news are saved in one transaction.
 
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
@@ -1923,7 +1930,8 @@ is not running is refused (`no job with id j9.`, `job j9 is not running (done).`
   once at the next start. There is no heartbeat: Scout wakes only for events and its own timers.
   Cancelling a timer finishes its waiting event (`finish_matching`, source `timer:<id>`), so the
   runner never tells it: Scout is not woken with the note of a cancelled timer. This includes a
-  one-off that has fired (`done`) but not yet been told; one already told cannot be cancelled.
+  one-off that has fired (`done`) but not yet been told; one already told cannot be cancelled, and
+  `cancel_timer` on it says the timer already fired.
 
 ### Watches
 
@@ -1932,12 +1940,8 @@ is not running is refused (`no job with id j9.`, `job j9 is not running (done).`
 state, every_minutes, next_at, cadence_text}]}` for planned and paused watches; `pause` moves a
 planned watch to `paused`; `switch_on` moves a paused one back to `planned` one interval from now
 and needs a repeat (`every_minutes`, or one already saved); a refused `switch_on` changes nothing.
-`cancel` ends it. A paused watch never fires. Scout's own `pause` marks the watch told, so it is
-not announced. The old `tracking` memories became paused watches when the database was migrated;
-on the next start the Session emits `watches_paused` once (0 s batch, 2 an hour) with the facts
-`watches` (whole `id: note (cadence)` entries, up to 1500 characters; any left over are told at
-the next start), and Scout mentions them and offers to switch each on. It does not switch any on
-itself.
+`cancel` ends it. A paused watch never fires. The old `tracking` memories became paused watches when the database was migrated;
+they stay paused until switched on, and nothing announces them.
 
 ## Loops
 
@@ -2156,7 +2160,7 @@ There is no `ask` hook: every permission ask, Scout's and Claude Code's, goes th
 permission engine (`permission.py`), which owns the floor, the deciders and the one
 approvals-log write.
 
-The `save` hook runs through `mask_message` over the new chat messages (`Session._persist`, which
+The `save` hook runs through `mask_message` over the new chat messages (`Session._save_new`, which
 saves a masked copy while `history` keeps the real values for the live turn), an approval's
 summary and input (`Approvals`) and a job's result (`Jobs._end`) and progress (`Jobs._progress`) through `mask_json`, and, through `SecretLogFilter` on
 every log handler, each log line. The `Masker` replaces exact stored secret values of 8+
@@ -2164,14 +2168,14 @@ characters and common key shapes with `[secret]`; its list of values is cached f
 guard that raises or blocks stores `[withheld]` instead of the raw text, but `mask_message` leaves
 the values of structural keys (`role`, `type`, `id`, `tool_use_id`, `name`, `signature`) alone on
 a message, its content blocks and the blocks inside a tool result's content (a `name` or `id` inside a
-tool's input is still masked), so a saved chat always rebuilds. `Session._persist` also drops a `thinking` block from the saved copy
+tool's input is still masked), so a saved chat always rebuilds. `Session._save_new` also drops a `thinking` block from the saved copy
 when masking would change it (a message left empty is saved with empty content); `redacted_thinking`
 blocks are kept. The log filter calls the
 masker directly, not the runner, because the runner logs. Scout's live turn and the side-check
 prompt are not masked. See [privacy](privacy.md#what-is-masked-on-disk-what-is-not).
 
 Each turn's saved batch is tagged with the kind of body it was shown on (`messages.body`): `Session._start_turn`
-reads the turn body's `kind` once, so it holds even if the body leaves first, and `Session._persist(body)` passes
+reads the turn body's `kind` once, so it holds even if the body leaves first, and `Session._save_new(body)` passes
 it to `Memory.save_messages`. A turn with no body (a wake) or no longer-online body reads `desktop`. The
 kinds are the `BODY_*` constants in `protocol.py`. Nothing reads the column yet.
 
@@ -2495,11 +2499,59 @@ the body that caused it, else the first screen. The phone comes last: it is chos
 screen is online, or when the event came from it. A say from a display-less body is answered on the
 body in use.
 
-**When a turn ends.** `done`, `cancelled`, `rejected` and `over_budget` mean handled. Any other end
-puts the events back to `new` with no attempt counted; they are held until something new arrives or
-the recheck, so a failing model is not asked in a loop. A say that an errored turn already sent is
-retried with the one-line retry note, not its words. Stopping the brain gives the running turn's
-events back to `new`, so a quit never loses a say.
+**When a turn ends.** `done`, `cancelled` by the person, `rejected` and `unanswered` (no key is
+set, so nothing can answer) mean handled. A say that ends over budget is handled too; news that ends over budget goes
+back to `new` with no attempt counted. An error, a timeout or the step cap counts as an attempt:
+the events get `not_before` 30 s, then 2 min, then 10 min ahead (`BACKOFF_S`, `events.py`) and are
+tried again; the fourth failure ends them `gave_up` with the reason. The runner skips an event
+that is not due yet and arms its alarm for the earliest `not_before`, so a backing-off event lets
+later ones run and a new say from the person still starts at once. A `gave_up` event rides the
+next `done` turn the person is in (one with a say), once: it keeps its reason, is shown as a
+`gave_up="true"` fact block and is then handled. One whose request was saved (`resume`) is named
+like a retried event, a say by its first line, since its words are in the history already; one
+that never reached a save shows its facts in full, a say only its words, never its settings.
+
+**Retried events.** A row that a failed turn left is a resume: its words are already in the
+history, so the next turn gets a marked fact block instead, `resume="true"
+reason=error|step_cap|restart|stop`, with the kind, `at` and the kind's note (an empty mark is
+left out). Only an event with a saved chat row (`messages.event_id`) is marked `resume`. A say shows only its first
+line, cut at 80 characters. These marks, the `gave_up` marks, the interruption and interjection
+lead blocks and the ear note are for that turn only and are never saved, so a retried say gains no
+second row. Two cases are accepted: a rider carried by an errored or cancelled turn can be told
+again by the next `done` person turn, and news returned to `new` after going over budget is sent
+again in full.
+
+**History is saved each step.** `Session._save_new` runs when the turn starts (after its task
+exists), after every tool round through `on_step`, and at the turn's end. Each taken event gets its
+own `user` row with its `event_id` and `source`; a tool result is a row with neither. A wordless
+cancel marks every row of its request `cut` (`set_cut(ids)`). A retry's message is turn-only
+(its resume facts), so when a wordless cancel stops a retry right after its request, the cut
+covers the request's saved rows (found by `event_id`) and the history drops that request too;
+otherwise it would be answered again. Only when the message before the retry holds no
+`tool_result` and its saved rows are exactly the retried events' rows: after a failed try that
+did a tool round, or for retried events saved by different earlier turns, nothing is cut, so no
+tool call loses its answer. A cut row does not count as saved: `set_resume` and the restart's
+split skip it, so that event is told in full again. See
+[memory.md](memory.md#saved-chat).
+
+### Start-up and shutdown
+
+- **Start.** In `Session.__init__`, in one transaction: `EventLog.recover()`, the work resume scan
+  and the news it settles. A recovered event was `taken` when the brain died, so it counts as a
+  failed attempt (the fourth time gives it up, which ends a crash loop) and comes back `new`
+  with `end_reason` `restart` and no wait; it is marked `resume` only when its request was saved,
+  so one that died before the save comes back in full. Events an interjection held go back to `new`
+  with no attempt counted. Orphan `card_answer` rows are handled. Next to the work sweep,
+  `EventLog.sweep(keep_days)` deletes handled events older than `TAGALONG_WORK_KEEP_DAYS`; events
+  that are not handled are kept.
+- **Shutdown.** `session.stop_turn()` runs first in `main.py`'s `finally`. It stops the runner
+  (the turn's events go back to `new`, no attempt), cancels the running turn and waits up to 5 s
+  for it, so its end saves its steps. Its events are then marked `resume` (reason `stop`), so
+  the restart names them instead of sending the words again, unless the turn was a wordless
+  cancel (its request is saved but marked `cut`, so a restart skips it). A turn that did not end
+  in the 5 s is marked too, since its request was saved when it started. Only events with a saved
+  chat row are marked. The existing order follows; `memory.close` comes last. A clean quit
+  still posts `job_ended` for the jobs it stops.
 
 **An expert's question Scout cannot answer.** With no key, or the budget spent, a waiting
 `job_question` is given up (`gave_up`, reason `no_key` or `over_budget`) and its end hook hands the

@@ -2,7 +2,7 @@
 event's facts to Scout is tested with the runner, in test_runner.py.)
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -16,6 +16,7 @@ from brain.events import (
     load_notes,
 )
 from brain.masking import Masker
+from brain.store.conversation import save_messages, set_cut
 from brain.store.db import open_db
 
 
@@ -105,14 +106,6 @@ def test_from_connect_needs_ten_minutes_away():
 def test_timer_defaults():
     kind = EVENT_KINDS["timer"]
     assert kind.wakes and kind.batch_seconds == 0 and kind.max_per_hour == 6
-
-
-def test_watches_paused_defaults_and_has_a_note():
-    kind = EVENT_KINDS["watches_paused"]
-    assert kind.wakes and kind.batch_seconds == 0 and kind.max_per_hour == 2
-    from importlib.resources import files
-
-    assert "## watches_paused" in files("brain.mind").joinpath("events.md").read_text("utf-8")
 
 
 def test_job_question_defaults_never_merge_and_ignore_caps():
@@ -338,3 +331,174 @@ def test_a_failing_masker_withholds_the_text_but_saves_the_event(tmp_path):
     event = Event("say", "desktop", {"text": "hello", "n": 3})
     assert log.post(event) is True
     assert log.get(event.id).payload == {"text": "[withheld]", "n": 3}
+
+
+def _clocked(tmp_path):
+    clock = [NOW]
+    return EventLog(open_db(tmp_path / "b.db"), Masker(lambda: []), lambda: clock[0]), clock
+
+
+def _fail_once(log, id: str, reason: str = "error") -> None:
+    assert log.take([id], "t") == [id]
+    log.backoff([id], reason)
+
+
+def test_backoff_waits_grow_30s_2min_10min(tmp_path):
+    log, clock = _clocked(tmp_path)
+    log.post(Event("say", "desktop", {}, id="e1"))
+    for attempt, wait in enumerate((30, 120, 600), start=1):
+        _fail_once(log, "e1", "step_cap")
+        row = log.get("e1")
+        assert (row.state, row.attempts, row.resume, row.end_reason) == (
+            "new",
+            attempt,
+            True,
+            "step_cap",
+        )
+        assert row.not_before == (clock[0] + timedelta(seconds=wait)).isoformat()
+        clock[0] += timedelta(seconds=wait - 1)
+        assert log.ready() == []  # it gives up its place until the wait is over
+        assert log.next_retry() == clock[0] + timedelta(seconds=1)
+        clock[0] += timedelta(seconds=1)
+        assert [r.id for r in log.ready()] == ["e1"]
+
+
+def test_the_fourth_failure_gives_up(tmp_path):
+    log, clock = _clocked(tmp_path)
+    ended = []
+    log.post(Event("say", "desktop", {}, id="e1"), on_end=ended.append)
+    for _ in range(3):
+        _fail_once(log, "e1")
+        clock[0] += timedelta(minutes=10)
+    assert ended == []  # a retry is not an end: a waiting caller keeps waiting
+    _fail_once(log, "e1")
+    row = log.get("e1")
+    assert (row.state, row.attempts, row.end_reason) == ("gave_up", 3, "error")
+    assert ended == ["gave_up"] and log.ready() == [] and log.next_retry() is None
+    assert [r.id for r in log.gave_up()] == ["e1"]
+
+
+def test_backoff_leaves_an_event_that_ended_meanwhile(tmp_path):
+    log, _ = _clocked(tmp_path)
+    log.post(Event("say", "desktop", {}, id="e1"))
+    log.take(["e1"], "t")
+    log.finish(["e1"], "handled", end_reason="cancelled")  # cancelled by id while it ran
+    log.backoff(["e1"], "error")
+    assert (log.get("e1").state, log.get("e1").attempts) == ("handled", 0)
+
+
+def test_recover_returns_taken_events_as_resumed_attempts(tmp_path):
+    log, clock = _clocked(tmp_path)
+    log.post(Event("say", "desktop", {}, id="e1"))
+    log.post(Event("say", "desktop", {}, id="e2"))
+    log.take(["e1"], "t")  # the brain died while a turn held it
+    _saved(log, "e1")
+    assert log.recover() == 1
+    row = log.get("e1")
+    assert (row.state, row.attempts, row.resume, row.end_reason, row.turn_id) == (
+        "new",
+        1,
+        True,
+        "restart",
+        None,
+    )
+    assert row.not_before == clock[0].isoformat()  # an attempt, but no wait (spec 6.14)
+    assert (log.get("e2").state, log.get("e2").attempts) == ("new", 0)  # never taken
+
+
+def test_a_crash_loop_ends_in_gave_up(tmp_path):
+    log, clock = _clocked(tmp_path)
+    log.post(Event("say", "desktop", {}, id="e1"))
+    for _ in range(4):  # the brain dies on the same event at every start
+        assert log.take(["e1"], "t") == ["e1"]
+        log.recover()
+        clock[0] += timedelta(minutes=10)
+    row = log.get("e1")
+    assert (row.state, row.attempts, row.end_reason) == ("gave_up", 3, "restart")
+    assert log.ready() == []
+
+
+def test_recover_ends_an_orphan_card_answer_as_handled(tmp_path):
+    log, _ = _clocked(tmp_path)
+    # Saved, then the brain died before code finished it: it must never start a turn.
+    log.post(Event("card_answer", "desktop", {"ask": "a1", "option": "allow"}, id="c1"))
+    assert log.recover() == 0
+    row = log.get("c1")
+    assert (row.state, row.attempts) == ("handled", 0)
+    assert log.ready() == []
+
+
+def test_recover_returns_an_interjections_event_without_an_attempt(tmp_path):
+    log, _ = _clocked(tmp_path)
+    log.post(Event("timer", "timer:t1", {}, id="e1"))
+    log.take(["e1"], "interjection:abc")  # an interjection held it at the crash
+    assert log.recover() == 0
+    row = log.get("e1")
+    assert (row.state, row.attempts, row.resume, row.turn_id) == ("new", 0, False, None)
+    assert [r.id for r in log.ready()] == ["e1"]
+
+
+def test_sweep_removes_old_handled_events_only(tmp_path):
+    log, clock = _clocked(tmp_path)
+    for id in ("old", "fresh", "waiting", "running", "lost"):
+        log.post(Event("say", "desktop", {}, id=id))
+    log.take(["old"], "t")
+    log.finish(["old"], "handled", end_reason="done")
+    log.take(["lost"], "t")
+    log.finish(["lost"], "gave_up", end_reason="error")
+    clock[0] += timedelta(days=8)
+    log.take(["fresh"], "t")
+    log.finish(["fresh"], "handled", end_reason="done")
+    log.take(["running"], "t")
+    assert log.sweep(7) == 1
+    assert log.get("old") is None
+    assert [log.get(i).state for i in ("fresh", "waiting", "running", "lost")] == [
+        "handled",
+        "new",
+        "taken",
+        "gave_up",
+    ]
+
+
+def test_a_recovered_event_runs_again_at_once(tmp_path):
+    log, _ = _clocked(tmp_path)
+    log.post(Event("say", "desktop", {}, id="e1"))
+    log.take(["e1"], "t1")
+    log.recover()
+    assert [r.id for r in log.ready()] == ["e1"]
+
+
+def _saved(log, id):
+    """The say's own row in the chat: the turn that took it saved its words."""
+    save_messages(log._db, [{"role": "user", "content": "words"}], "t", event_ids=[id])
+
+
+def test_recover_brings_back_a_say_never_saved_in_full(tmp_path):
+    log, _ = _clocked(tmp_path)
+    log.post(Event("say", "desktop", {}, id="e1"))
+    log.take(["e1"], "t")  # the brain died before the turn saved its request
+    log.recover()
+    row = log.get("e1")
+    assert (row.state, row.attempts, row.resume) == ("new", 1, False)
+
+
+def test_set_resume_marks_only_saved_events_and_names_the_stop(tmp_path):
+    log, _ = _clocked(tmp_path)
+    log.post(Event("say", "desktop", {}, id="e1"))
+    log.post(Event("say", "desktop", {}, id="e2"))
+    _saved(log, "e1")
+    log.set_resume(["e1", "e2"])
+    one, two = log.get("e1"), log.get("e2")
+    assert (one.resume, one.end_reason) == (True, "stop")
+    assert (two.resume, two.end_reason) == (False, None)  # never saved: told in full again
+
+
+def test_recover_brings_back_a_say_whose_only_row_is_cut_in_full(tmp_path):
+    log, _ = _clocked(tmp_path)
+    log.post(Event("say", "desktop", {}, id="e1"))
+    log.take(["e1"], "t")
+    [row] = save_messages(log._db, [{"role": "user", "content": "words"}], "t", event_ids=["e1"])
+    set_cut(log._db, [row], True)  # a restart skips that row: the words are not in the history
+    log.recover()
+    log.set_resume(["e1"])
+    assert log.get("e1").resume is False

@@ -491,7 +491,6 @@ async def test_answered_ask_done_with_the_option_in_its_event():
     await task
     row = work.get(params["id"])
     assert (row.state, row.end_reason) == ("done", "answered")
-    assert row.reported_at is not None  # the person's own answer is no news to Scout
     assert work.events(params["id"])[-1].data["option"] == "always"
     assert work.ask_detail(params["id"])["decided_by"] is None  # the log is written by Approvals
 
@@ -547,7 +546,6 @@ async def test_open_ask_expired_after_restart():
     assert work.resume_scan(lambda row: None) == [("x1", "expired")]
     row = work.get("x1")
     assert (row.state, row.end_reason) == ("expired", "brain restarted")
-    assert row.reported_at is None  # Scout can still say what happened
     assert work.resume_scan(lambda row: None) == []
     with pytest.raises(AskExpired):  # this test's waiter outlived the "crash"; a real one cannot
         await task

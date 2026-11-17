@@ -306,11 +306,8 @@ def test_jobs_become_goals_with_mapped_states(work):
     assert run.created_at == T
     assert run.input == {"watch": [{"text": "tests pass", "done": False}]}
     assert work.get("err1").input is None  # an unreadable watch list reads as none
-    assert work.get("stop1").reported_at == "2026-01-01T09:30:00+00:00"  # closed_at
     assert work.get("stop1").ended_at == "2026-01-01T09:30:00+00:00"
     assert work.get("open1").ended_at is None and work.get("open1").end_reason is None
-    assert work.get("open1").reported_at is None
-    assert work.get("run1").reported_at is None
 
 
 def test_parts_become_expert_calls_in_seq(work):
@@ -321,8 +318,7 @@ def test_parts_become_expert_calls_in_seq(work):
     ]
     assert calls[0].title == "find cause" and calls[0].input == {"task": "find cause"}
     assert calls[0].end_reason == "done" and calls[0].summary == "found it"
-    assert calls[0].reported_at == "2026-01-01T10:05:00+00:00"  # reported=1: its ended_at
-    assert calls[1].reported_at is None and calls[1].progress == "editing"
+    assert calls[1].progress == "editing"
     assert work.get("err1.p1").state == "failed"
     assert work.get("err1.p1").end_reason == "crashed"
     assert work.get("stop1.p1").state == "cancelled"

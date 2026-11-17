@@ -19,7 +19,9 @@ connection from `store.db.open_db`; nothing else opens the file.
 
 - `store/db.py`: `open_db(path)` makes the folder, runs the FTS5 probe, sets WAL and runs the
   migrations. `migrate(db, migrations, upto)` applies every migration newer than `user_version`,
-  `transaction(db)` is a `BEGIN IMMEDIATE` block, and `utc_text(at)` writes the stored time text.
+  `transaction(db)` is a `BEGIN IMMEDIATE` block that can nest (an inner call is a SAVEPOINT, so a
+  caller can group several writes into one transaction), and `utc_text(at)` writes the stored time
+  text.
 - `store/search.py`: the SQLite-only full-text helpers, `probe_fts5` and `fts_query`, plus
   `search(db, query, kind, limit)` over `memories_fts` and `messages_fts` and its `Hit`.
 - `store/conversation.py`: owns `messages` (`save_messages`, `replace_last_message`,
@@ -46,7 +48,7 @@ Nothing outside this package runs SQL: `tests/test_store_boundary.py` fails if a
 under `brain/src/brain` calls `.execute`, `.executescript` or `.executemany`.
 
 - `store/migrations/`: `NNNN_name.sql` (or `NNNN_name.py` with a `migrate(db)` function) files,
-  `0001_memories` to `0035_events`. The numbers have no gaps (the loader refuses a gap or a
+  `0001_memories` to `0036_message_events`. The numbers have no gaps (the loader refuses a gap or a
   duplicate). Each file runs in one transaction together with its `user_version` bump, so a
   failure leaves the file at the last good version. A file is never edited after it has merged;
   a schema change is a new file.
@@ -159,14 +161,19 @@ The saved chat, so a restart picks the conversation back up.
 | `content_json` | TEXT                | The message content as JSON, rebuilt into model history at start                                                                              |
 | `text`         | TEXT                | Searchable text of the message; images and documents appear as `[screenshot]` and `[document]`                                                |
 | `body`         | TEXT                | Kind of body the turn was shown on (`desktop`, `browser` or `whatsapp`); old rows and turns with no body read `desktop`. Nothing reads it yet |
+| `event_id`     | TEXT                | The event a `user` row came from (one row per taken event); null for tool results, replies and old rows                                       |
+| `source`       | TEXT                | That event's source (a body id, `scout`, `timer:<id>`, ...); null with `event_id`                                                             |
 
-- Written by: `store/conversation.py` `save_messages`, `replace_last_message` (through `Memory`,
-  called from `sessions.py`).
+- Written by: `store/conversation.py` `save_messages` (one `BEGIN IMMEDIATE`; it takes parallel
+  `event_ids` and `sources` and returns the new row ids), `set_cut(ids)` and `replace_last_message`
+  (through `Memory`, called from `sessions.py`, which saves after every step of a turn).
 - Read by: `store/conversation.py` `load_messages` (skips `cut` rows; via `mind/resume.py` `rebuild_history`, which also says whether it added a cancelled tool_result) and `search`.
 - Retention: kept forever.
 - Upgrade: migration `0026_message_body` adds `body`; every old row reads `desktop`.
 - Upgrade: migration `0027_message_cut` adds `cut` (0 or 1): a request cancelled before any
-  reply is kept in the chat but `load_messages` skips it unless asked, so it is not resumed.
+  reply is kept in the chat but `load_messages` skips it unless asked, so it is not resumed. A
+  cancelled request can span several rows, so `set_cut` takes all their ids.
+- Upgrade: migration `0036_message_events` adds `event_id` and `source`, both null on old rows.
 - Masked: yes, through the `save` guard (`mask_message`) before saving. Image and document blocks
   are replaced by text markers and never stored.
 
@@ -256,11 +263,12 @@ One row per piece of work, in a tree: a goal has steps, and a step can have asks
 | `due_at`                               | TEXT             | Next time something should happen: timer, retry backoff, cadence                   |
 | `created_at`, `updated_at`, `ended_at` | TEXT             | UTC ISO text                                                                       |
 | `end_reason`                           | TEXT             | Why it ended, in a short phrase                                                    |
-| `reported_at`                          | TEXT             | Null means Scout has not told the person                                           |
 | `source_message_id`                    | INTEGER          | The chat message that started it, if any                                           |
 
-Indexes: `(state, due_at)`, `(root_id, seq)`, `(parent_id, seq)`, `(kind, state)`, and
-`(reported_at)` for ended rows only.
+Indexes: `(state, due_at)`, `(root_id, seq)`, `(parent_id, seq)` and `(kind, state)`. Whether
+Scout has told the person is not kept on the row: news is an event in the `events` table, and the
+log says whether it was told. Migration `0036_message_events` dropped the old `reported_at` column
+and its index.
 
 ```mermaid
 %%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
@@ -307,12 +315,11 @@ has already changed (`expect=`), so two writers on one row never overwrite each 
   `blocked` or `failed` any more and one moves to `planned`, `active` or `cancelled`, the goal is
   `active` again. A goal is never failed automatically.
 - Parent end: when a row ends, its open children end too: asks and questions `expired` ("parent
-  ended: ..."), everything else `cancelled` ("goal closed"). Rows ended this way are marked
-  reported, since Scout already knows the parent ended.
+  ended: ..."), everything else `cancelled` ("goal closed").
 - Retry: `fail(id, "transient", reason)` on a `safe_to_retry` row with tries left goes back to
   `planned` with `attempt + 1` and `due_at` = now + backoff (30 s, 2 min, 10 min; the last value
   repeats). Otherwise the row is `failed` ("gave up after N tries: ..." or "not retryable: ...")
-  with `reported_at` null. `retry_step` is the person's retry choice.
+  and its news is saved with it in one transaction. `retry_step` is the person's retry choice.
   The retry columns are used by Scout's goal `tool_call` rows (`safe_to_retry` comes from the
   tool's effect and name, `error_kind` from `retry.classify`) and by `expert_call` restarts;
   `Timers` reruns the due ones, and a step that gives up emits `work_failed`
@@ -394,12 +401,11 @@ active, failed once the goal failed, otherwise the state of the part that ended 
 | `checkpoint`  | `{"session_id": ...}`: the expert's own session id, used to resume it                                                                                             |
 | `summary`     | The expert's final report, masked; the first 2,000 characters, with the whole text in `tool_outputs` (pointed at by `detail_id`) when longer, capped at 1,000,000 |
 | `end_reason`  | Why it ended, such as `end_turn` or `brain restarted`                                                                                                             |
-| `reported_at` | Null until Scout has been told it ended                                                                                                                           |
 
 - Written by: `jobs.py` through `JobRecords` (`add_job`, `add_part`, `update_part`, `set_title`,
-  `set_result`, `set_watch`, `close_job`, `mark_reported`).
+  `set_result`, `set_watch`, `close_job`).
 - Read by: `jobs.py`, `tools.py` (`list_jobs`, Home only), `timers.py`, `job_activity.py` through
-  `JobRecords` (`get_job`, `parts_of`, `last_part_for`, `unreported_jobs`, `running_jobs`).
+  `JobRecords` (`get_job`, `parts_of`, `last_part_for`, `running_jobs`).
 - Retention: swept with the whole job `TAGALONG_WORK_KEEP_DAYS` after it ended (see
   [Cleanup](#cleanup)). Parts still active when the brain starts are settled by the resume scan:
   `blocked` with the reason `brain restarted` when they saved a session the expert can reload,
@@ -411,7 +417,7 @@ active, failed once the goal failed, otherwise the state of the part that ended 
 - Upgrade: migration `0019_jobs_to_work` moves every `jobs` and `job_parts` row into this shape
   (old part states `running`, `done`, `stopped`, `error` become `active`, `done`, `cancelled`,
   `failed`), then drops both tables. Only a job Scout closed (`closed_at` set) becomes an ended
-  goal, with `ended_at` and `reported_at` set to that `closed_at`; a job never closed stays `active`
+  goal, with `ended_at` set to that `closed_at`; a job never closed stays `active`
   (`blocked` if its last part failed) so it can still take a follow-up part. Ended parts have no
   progress, as at runtime. A part with no job is dropped and counted in the log.
 
@@ -464,8 +470,8 @@ The repeat of a `timer` or `watch` row. The timer itself is a row in `work`: `ti
   `due_at` forward from now, so a brain that was off fires an overdue repeat once.
 - Migrated: the old `timers` table became `timer` rows (`t<id>`), and each `tracking` memory
   became a `paused` `watch` row (`w<id>`) with its cadence in `repeat_s` when it parsed (daily,
-  every N hours, and so on) or in `input.cadence` when it did not. Scout mentions the paused
-  watches once, as a `watches_paused` event, and the person switches them on.
+  every N hours, and so on) or in `input.cadence` when it did not. The paused watches stay
+  paused until the person switches them on.
 - Masked: yes, the title and a long note, like all work text.
 
 ### work_loop
@@ -655,15 +661,22 @@ never saved. Nothing acts on an event before its row exists, so a brain kill los
 | `resume`       | INTEGER          | 1 when the turn that took it is to be resumed; default 0                                   |
 | `handled_at`   | TEXT             | When it was handled, or null                                                               |
 
-- Written by: `events.py` `EventLog` (`post`, `amend`, `take`, `finish`, `finish_matching`) through
-  `store/events.py`; `Session.say` and `Session.post_event` save before the runner sees the event.
+- Written by: `events.py` `EventLog` (`post`, `amend`, `take`, `finish`, `finish_matching`,
+  `backoff`, `recover`, `set_resume`, `sweep`) through `store/events.py`; `Session.say` and `Session.post_event` save before the runner sees the event.
   `amend` merges masked fields into a saved payload: a say that talked over a turn gains `cut`
   (`spoken`, `unsaid`) after it is saved, and the cut is read back masked, so a secret in the unsaid
   words reaches the model as `[secret]`.
-  A timer's event is saved in the same transaction that fires the timer.
+  A timer's event is saved in the same transaction that fires the timer. An event whose news is
+  derived (a job ending, a step giving up) has a fixed id, `job_ended:{job}@{ended_at}` or
+  `work_failed:{step}@{ended_at}`, so a restart telling it again is one row.
 - Read by: `EventLog.get`, `ready` and `origin_body` (the `caused_by` chain back to a body).
-- Known gap: an event a turn had taken when the brain died stays `taken` and is not delivered
-  again; events still `new` are picked up by the runner after a restart. Nothing sweeps old rows yet.
+- Restart: `EventLog.recover()` runs at start. A row still `taken` counts as a failed attempt
+  (`attempts` + 1, `resume` 1, `end_reason` `restart`, ready at once); the fourth time it is
+  `gave_up`. A row an interjection held goes back to `new` with no attempt counted, and an orphan
+  `card_answer` is `handled`. A clean quit marks the stopped turn's rows `resume` without an attempt.
+- Retention: `EventLog.sweep(keep_days)` deletes only `handled` rows older than
+  `TAGALONG_WORK_KEEP_DAYS`, at start next to the work sweep (see [Cleanup](#cleanup)). `new`,
+  `taken` and `gave_up` rows stay.
 - Index: `events_pick(state, not_before, at)` for "what is ready".
 
 ## Open items
@@ -756,7 +769,7 @@ A long tool result stored whole, so Scout can read the rest of a capped preview 
 
 ## Cleanup
 
-At brain start, `Session` runs two things, in this order:
+At brain start, `Session` runs three things, in this order:
 
 1. `WorkStore.sweep(TAGALONG_WORK_KEEP_DAYS)` (default 30). A tree is removed when its root
    is `done`, `failed`, `cancelled` or `expired`, its `ended_at` is older than the setting, and
@@ -764,7 +777,9 @@ At brain start, `Session` runs two things, in this order:
    goal with a running child is never swept. Per root, in one transaction, it deletes the `work`
    rows, their `work_events`, the job's `job_steps`, the `work_job`, `work_timer`, `work_loop` and
    `work_ask` rows, and the `tool_outputs` rows named by `detail_id`. A crash leaves whole trees.
-2. `prune_outputs(TAGALONG_OUTPUTS_KEEP)` (default 200), for outputs no work row names.
+2. `EventLog.sweep(TAGALONG_WORK_KEEP_DAYS)`: deletes `handled` events older than the setting.
+   Events still owed or shown (`new`, `taken`, `gave_up`) are never swept.
+3. `prune_outputs(TAGALONG_OUTPUTS_KEEP)` (default 200), for outputs no work row names.
 
 Chat, memories, rules, apps and cursors are not swept.
 

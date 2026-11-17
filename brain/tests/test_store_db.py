@@ -19,7 +19,7 @@ def _version(db: sqlite3.Connection) -> int:
 
 
 def test_migrations_are_numbered_without_gaps():
-    assert [m.number for m in load_migrations()] == list(range(1, 36))
+    assert [m.number for m in load_migrations()] == list(range(1, 37))
 
 
 def test_fresh_file_reaches_latest(tmp_path):
@@ -146,6 +146,33 @@ def test_transaction_rolls_back_and_reraises(tmp_path):
     db.close()
 
 
+def test_a_nested_transaction_commits_with_the_outer_one(tmp_path):
+    db = sqlite3.connect(tmp_path / "t.db", isolation_level=None)
+    db.execute("CREATE TABLE t(x)")
+    with pytest.raises(ValueError, match="outer"):
+        with transaction(db):
+            db.execute("INSERT INTO t VALUES (1)")
+            with transaction(db):
+                db.execute("INSERT INTO t VALUES (2)")
+            assert db.in_transaction  # the inner one did not commit on its own
+            raise ValueError("outer")
+    assert db.execute("SELECT count(*) FROM t").fetchone()[0] == 0
+    db.close()
+
+
+def test_a_failed_nested_transaction_undoes_only_its_own_writes(tmp_path):
+    db = sqlite3.connect(tmp_path / "t.db", isolation_level=None)
+    db.execute("CREATE TABLE t(x)")
+    with transaction(db):
+        db.execute("INSERT INTO t VALUES (1)")
+        with pytest.raises(ValueError, match="inner"):
+            with transaction(db):
+                db.execute("INSERT INTO t VALUES (2)")
+                raise ValueError("inner")
+    assert [r[0] for r in db.execute("SELECT x FROM t")] == [1]
+    db.close()
+
+
 def test_failed_open_leaves_no_write_open(tmp_path, monkeypatch):
     path = tmp_path / "f.db"
     bad = [
@@ -192,4 +219,16 @@ def test_settings_round_trip(tmp_path):
     set_setting(db, "model", "a")
     set_setting(db, "model", "b")
     assert get_setting(db, "model") == "b"
+    db.close()
+
+
+def test_saving_messages_inside_another_transaction_joins_it(tmp_path):
+    from brain.store.conversation import save_messages
+
+    db = open_db(tmp_path / "t.db")
+    with pytest.raises(ValueError, match="outer"):
+        with transaction(db):
+            save_messages(db, [{"role": "user", "content": "hi"}], "t")
+            raise ValueError("outer")
+    assert db.execute("SELECT count(*) FROM messages").fetchone()[0] == 0
     db.close()
