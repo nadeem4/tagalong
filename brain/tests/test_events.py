@@ -384,3 +384,75 @@ def test_backoff_leaves_an_event_that_ended_meanwhile(tmp_path):
     log.finish(["e1"], "handled", end_reason="cancelled")  # cancelled by id while it ran
     log.backoff(["e1"], "error")
     assert (log.get("e1").state, log.get("e1").attempts) == ("handled", 0)
+
+
+def test_recover_returns_taken_events_as_resumed_attempts(tmp_path):
+    log, clock = _clocked(tmp_path)
+    log.post(Event("say", "desktop", {}, id="e1"))
+    log.post(Event("say", "desktop", {}, id="e2"))
+    log.take(["e1"], "t")  # the brain died while a turn held it
+    assert log.recover() == 1
+    row = log.get("e1")
+    assert (row.state, row.attempts, row.resume, row.end_reason, row.turn_id) == (
+        "new",
+        1,
+        True,
+        "restart",
+        None,
+    )
+    assert row.not_before == (clock[0] + timedelta(seconds=30)).isoformat()  # the retry rule
+    assert (log.get("e2").state, log.get("e2").attempts) == ("new", 0)  # never taken
+
+
+def test_a_crash_loop_ends_in_gave_up(tmp_path):
+    log, clock = _clocked(tmp_path)
+    log.post(Event("say", "desktop", {}, id="e1"))
+    for _ in range(4):  # the brain dies on the same event at every start
+        assert log.take(["e1"], "t") == ["e1"]
+        log.recover()
+        clock[0] += timedelta(minutes=10)
+    row = log.get("e1")
+    assert (row.state, row.attempts, row.end_reason) == ("gave_up", 3, "restart")
+    assert log.ready() == []
+
+
+def test_recover_ends_an_orphan_card_answer_as_handled(tmp_path):
+    log, _ = _clocked(tmp_path)
+    # Saved, then the brain died before code finished it: it must never start a turn.
+    log.post(Event("card_answer", "desktop", {"ask": "a1", "option": "allow"}, id="c1"))
+    assert log.recover() == 0
+    row = log.get("c1")
+    assert (row.state, row.attempts) == ("handled", 0)
+    assert log.ready() == []
+
+
+def test_recover_returns_an_interjections_event_without_an_attempt(tmp_path):
+    log, _ = _clocked(tmp_path)
+    log.post(Event("timer", "timer:t1", {}, id="e1"))
+    log.take(["e1"], "interjection:abc")  # an interjection held it at the crash
+    assert log.recover() == 0
+    row = log.get("e1")
+    assert (row.state, row.attempts, row.resume, row.turn_id) == ("new", 0, False, None)
+    assert [r.id for r in log.ready()] == ["e1"]
+
+
+def test_sweep_removes_old_handled_events_only(tmp_path):
+    log, clock = _clocked(tmp_path)
+    for id in ("old", "fresh", "waiting", "running", "lost"):
+        log.post(Event("say", "desktop", {}, id=id))
+    log.take(["old"], "t")
+    log.finish(["old"], "handled", end_reason="done")
+    log.take(["lost"], "t")
+    log.finish(["lost"], "gave_up", end_reason="error")
+    clock[0] += timedelta(days=8)
+    log.take(["fresh"], "t")
+    log.finish(["fresh"], "handled", end_reason="done")
+    log.take(["running"], "t")
+    assert log.sweep(7) == 1
+    assert log.get("old") is None
+    assert [log.get(i).state for i in ("fresh", "waiting", "running", "lost")] == [
+        "handled",
+        "new",
+        "taken",
+        "gave_up",
+    ]

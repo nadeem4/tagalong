@@ -17,7 +17,7 @@ from job_rows import add_timer, job_told, records_for
 
 import brain.sessions as sessions_module
 from brain.bodies import Bodies
-from brain.events import Event, EventKind
+from brain.events import Event, EventKind, EventLog
 from brain.experts import PermissionOption, PermissionRequest, Question, QuestionField, QuietFacts
 from brain.jobs import JobError
 from brain.masking import Masker
@@ -3731,3 +3731,54 @@ async def test_year_only_in_body_context_is_not_said_by_the_person():
     await idle(session)
     [item] = [i for i in memory.list_items(10) if i.kind == "about_you"]
     assert item.span_start is None
+
+
+async def test_session_start_runs_the_event_sweep(monkeypatch):
+    swept = []
+    monkeypatch.setattr(EventLog, "sweep", lambda self, days: swept.append(days) or 0)
+    make(Gate([]))
+    assert swept == [sessions_module.DEFAULT_WORK_KEEP_DAYS]
+
+
+def _crash_on(monkeypatch, kind):
+    """The brain dies the moment it posts news of `kind`."""
+    real = EventLog.post
+
+    def post(self, event, **hooks):
+        if event.kind == kind:
+            raise RuntimeError("killed")
+        return real(self, event, **hooks)
+
+    monkeypatch.setattr(EventLog, "post", post)
+
+
+async def test_restart_news_lost_to_a_crash_after_the_scan_is_told_once(monkeypatch):
+    memory = Memory(":memory:")
+    records_for(memory).add_job("j1", "claude_code", "t", "C:/x", "default")  # running at death
+    _crash_on(monkeypatch, "job_ended")
+    with pytest.raises(RuntimeError, match="killed"):
+        make(Gate([]), memory, screen=False)  # the scan ran, then the brain died before the news
+    monkeypatch.undo()
+    for _ in range(2):  # started again, twice
+        session, _ = make(Gate([]), memory, screen=False)
+    ended_at = session.records.get_job("j1").ended_at
+    news = [r for r in session.events.ready() if r.kind == "job_ended"]
+    assert [r.id for r in news] == [f"job_ended:j1@{ended_at}"]
+
+
+async def test_a_step_that_fails_and_its_news_are_saved_together(monkeypatch):
+    memory = Memory(":memory:")
+    session, _ = make(Gate([]), memory, screen=False)
+    work = session.records.work
+    session.records.add_job("j1", "claude_code", "fix", "C:/x", "default")
+    work.create(
+        "tool_call", "files__list", parent_id="j1", state="active", id="j1.s", safe_to_retry=False
+    )
+    _crash_on(monkeypatch, "work_failed")
+    with pytest.raises(RuntimeError, match="killed"):
+        session._step_failed("j1.s", ValueError("boom"))
+    monkeypatch.undo()
+    # Not failed without its news: the restart scan settles the step and tells it.
+    assert work.get("j1.s").state == "active"
+    again, _ = make(Gate([]), memory, screen=False)
+    assert [r.kind for r in again.events.ready()].count("work_failed") == 1

@@ -298,9 +298,6 @@ async def test_4_control_a_job_whose_wake_errored_is_told_again_after_a_restart(
 # 5. Crash mid-turn (C4) -------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True, reason="C4: says accepted mid-turn exist only in memory until the turn ends"
-)
 async def test_5_says_accepted_before_a_crash_are_not_lost(tmp_path):
     memory = file_memory(tmp_path)
     gate = asyncio.Event()
@@ -314,6 +311,7 @@ async def test_5_says_accepted_before_a_crash_are_not_lost(tmp_path):
         # A hard kill: no turn end, nothing saved. A new brain opens the same database.
         saved = json.dumps(memory.load_messages())
         revived, _ = make(Gate(["x"]), memory)
+        await settle()  # a say still waiting in the log gets its turn in the new brain
         known = json.dumps(revived.history)
         has_a = "task A" in saved or "task A" in known
         has_b = "task B" in saved or "task B" in known

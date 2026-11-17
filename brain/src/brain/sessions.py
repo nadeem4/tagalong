@@ -102,6 +102,7 @@ from brain.side_check import SideCheck
 from brain.speech_tools import interject
 from brain.store import rules
 from brain.store.conversation import compaction_text
+from brain.store.db import transaction
 from brain.store.events import EventRow
 from brain.store.work import TransitionRefused, WorkRow, WorkStore
 from brain.timers import Timers
@@ -227,9 +228,10 @@ class Session:
         self.events = events
         # Long tool results and expert reports reach the model as a capped preview; the full text
         # is stored masked for read_output. At startup finished work goes first (with the reports
-        # it points at), then the oldest outputs nothing points at.
+        # it points at), then handled events as old, then the oldest outputs nothing points at.
         outputs = OutputStore(memory, self.guards, preview_chars)
         work.sweep(work_keep_days)
+        events.sweep(work_keep_days)
         outputs.prune(outputs_keep)
         notify = bodies.notify
         # main passes the installed experts and the quiet threshold; the defaults keep tests short.
@@ -307,8 +309,12 @@ class Session:
             apps=apps,
             before_start=before_job,
         )
-        # Parts left running by a dead brain: held for a carry-on, or failed. Told below.
-        settled = self.jobs.startup()
+        # What a dead brain left: the events its turn held, then the parts it left running (held
+        # for a carry-on, or failed) and their news, in one transaction: a crash between the scan
+        # and the news would lose the news, since the scan never settles a row twice.
+        with transaction(memory.db):
+            events.recover()
+            self._tell_settled(self.jobs.startup())
         timers = self.timers = Timers(
             self.records.work,
             self.post_event,
@@ -430,9 +436,6 @@ class Session:
         # whether it uses its system voice. Kept across a reconnect; the body also resends it.
         self._read_aloud: dict[str, ReadAloudData] = {}
         bodies.on_connect = self._on_connect
-        # News posted before the stop waits in the event log; what the restart scan settled
-        # is news now. A crash between the scan and these posts loses it (the scan won't redo).
-        self._tell_settled(settled)
         timers.start()
         self.ask_runner.start()
         self.runner.start()  # a no-op until a loop runs; a post starts it then
@@ -663,6 +666,13 @@ class Session:
             self._record_cut(cut)
         return cut
 
+    async def stop_turn(self) -> None:
+        """The brain is closing: the runner stops (the turn's events wait as `new`, no attempt)
+        and cancels the running turn, which is awaited so its end saves what it did."""
+        await self.runner.stop()
+        if self._task is not None:
+            await asyncio.gather(self._task, return_exceptions=True)
+
     async def stop_background(self) -> None:
         """The brain is closing: tools a paused turn left running end with it. (The Stop button
         cannot reach them; a paused turn is gone, so nothing holds their calls any more.)"""
@@ -892,8 +902,14 @@ class Session:
             self._offers.resume()  # offers the last run left unanswered are shown again
 
     def _on_job_finished(self, job: Job) -> None:
+        # One id per ending, so telling it twice (a restart re-deriving it) is one event.
         self._emit_job_event(
-            Event("job_ended", f"job:{job.id}", {"report": self.jobs.note(job)}),
+            Event(
+                "job_ended",
+                f"job:{job.id}",
+                {"report": self.jobs.note(job)},
+                id=f"job_ended:{job.id}@{job.ended_at}",
+            ),
         )
 
     def _emit_job_event(self, event: Event, **hooks) -> None:
@@ -971,18 +987,21 @@ class Session:
     def _step_failed(self, id: str, error: BaseException | None) -> None:
         """A step failed: the retry rule backs it off or ends it. A step that ended is news."""
         work = self.records.work
-        try:
-            row = work.fail(id, classify(error or RuntimeError()), str(error or "failed"))
-        except TransitionRefused:
-            # The goal was closed while it ran (handled), or a failed start already ended the
-            # row itself; its news has one id per failure, so a second tell is a no-op.
-            row = work.get(id)
-            if row is None or row.state != "failed":
+        # The failure and its news are one save: a crash between them would leave a failed step
+        # no restart tells, since the scan settles only unfinished rows.
+        with transaction(work.db):
+            try:
+                row = work.fail(id, classify(error or RuntimeError()), str(error or "failed"))
+            except TransitionRefused:
+                # The goal was closed while it ran (handled), or a failed start already ended the
+                # row itself; its news has one id per failure, so a second tell is a no-op.
+                row = work.get(id)
+                if row is None or row.state != "failed":
+                    return
+            if row.state == "failed":
+                self._tell_given_up(row)
                 return
-        if row.state != "failed":
-            self.timers.changed()  # the next try is waiting out its backoff
-            return
-        self._tell_given_up(row)
+        self.timers.changed()  # the next try is waiting out its backoff
 
     def _tell_given_up(self, row: WorkRow) -> None:
         """Scout is told once about a step that ended failed: the event's id names this failure,

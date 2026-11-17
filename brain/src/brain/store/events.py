@@ -146,6 +146,30 @@ def next_not_before(db: sqlite3.Connection, now: str) -> str | None:
     ).fetchone()[0]
 
 
+def recover_taken(db: sqlite3.Connection, at: str) -> list[str]:
+    """At start, what a dead brain left held: an orphan card answer (saved, never finished)
+    ends handled, since code answers it and it never starts a turn; an event an interjection
+    held goes back to `new`, since an interjection is not an attempt. Returns the ids still
+    `taken`, which a crashed turn held."""
+    db.execute(
+        "UPDATE events SET state='handled', end_reason='restart', handled_at=?, turn_id=NULL"
+        " WHERE kind='card_answer' AND state IN ('new','taken')",
+        (at,),
+    )
+    db.execute(
+        "UPDATE events SET state='new', turn_id=NULL"
+        " WHERE state='taken' AND turn_id LIKE 'interjection:%'"
+    )
+    return [r[0] for r in db.execute("SELECT id FROM events WHERE state='taken' ORDER BY rowid")]
+
+
+def sweep(db: sqlite3.Connection, before: str) -> int:
+    """Delete `handled` rows ended before `before`; waiting, running and given-up rows stay."""
+    return db.execute(
+        "DELETE FROM events WHERE state='handled' AND handled_at<?", (before,)
+    ).rowcount
+
+
 def chain(db: sqlite3.Connection, id: str, limit: int = 20) -> list[EventRow]:
     """This event, then what caused it, and so on; stops at a missing parent or the limit."""
     out: list[EventRow] = []

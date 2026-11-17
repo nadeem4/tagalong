@@ -283,6 +283,21 @@ class EventLog:
                     gave_up += store.set_gave_up(self._db, [id], reason, utc_text(now))
         self.ended(gave_up, "gave_up")
 
+    def recover(self) -> int:
+        """At start: each event a crashed turn held counts as a failed attempt by the retry
+        rule (a crash loop ends in `gave_up`) and comes back with `resume`. A clean stop already
+        returned its events without an attempt. Returns how many came back as attempts."""
+        with transaction(self._db):
+            ids = store.recover_taken(self._db, utc_text(self._now()))
+            self.backoff(ids, "restart")
+        return len(ids)
+
+    def sweep(self, keep_days: int) -> int:
+        """Delete handled events older than `keep_days`; the rest are still owed or shown."""
+        before = utc_text(self._now() - timedelta(days=keep_days))
+        with transaction(self._db):
+            return store.sweep(self._db, before)
+
     def gave_up(self) -> list[store.EventRow]:
         """Events Scout could not finish, not yet told: the next person turn hears of them."""
         return store.list_state(self._db, "gave_up")
