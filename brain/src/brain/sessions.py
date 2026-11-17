@@ -1328,10 +1328,7 @@ class Session:
             and (reason == "cancelled" or rejected)
             and last is not None
             and last["role"] == "user"
-            and not (
-                isinstance(last["content"], list)
-                and any(b.get("type") == "tool_result" for b in last["content"])
-            )
+            and not _has_tool_result(last)
         )
         if owns:
             self._turn_id = None
@@ -1387,10 +1384,12 @@ class Session:
                     new, body, event_ids=[e for _, e, _ in rows], sources=[s for _, _, s in rows]
                 )
             if per:
+                # The message before the new one, when it was the newest saved: its rows.
+                before = self._last_rows if len(per) == 1 else None
                 # The newest message's rows: what a wordless cancel marks as cut.
                 self._last_rows = ids[len(ids) - len(per[-1]) :]
                 self._cut_messages = 1
-                if not self._last_rows and self._retries_its_request():
+                if not self._last_rows and self._retries_its_request(before):
                     # A retry's message is turn-only: its request is the say saved before it,
                     # which a wordless cancel cuts too, or it is answered again next time.
                     self._last_rows = self._memory.rows_of_events(self._retried)
@@ -1408,10 +1407,15 @@ class Session:
         except Exception:
             log.exception("could not save the chat")
 
-    def _retries_its_request(self) -> bool:
-        """The newest message only names retried events, right after their saved request (the
-        failed try saved nothing after it)."""
-        return bool(self._retried) and len(self.history) >= 2 and self.history[-2]["role"] == "user"
+    def _retries_its_request(self, before: list[int] | None) -> bool:
+        """The newest message only names retried events, right after their request: a message
+        whose rows are exactly theirs (one earlier turn saved them all, and nothing after)."""
+        if not self._retried or len(self.history) < 2 or before is None:
+            return False
+        request = self.history[-2]
+        if request["role"] != "user" or _has_tool_result(request):
+            return False
+        return bool(before) and before == self._memory.rows_of_events(self._retried)
 
     def _rows_of(self, message: dict) -> list[tuple[dict, str | None, str | None]]:
         """The rows `message` is saved as, each with its event id and source. A run of blocks
@@ -1433,3 +1437,9 @@ class Session:
 
 def _is_in(block: Any, blocks: list) -> bool:
     return any(block is b for b in blocks)
+
+
+def _has_tool_result(message: dict) -> bool:
+    """A user message that answers tool calls: dropping it would orphan them."""
+    content = message["content"]
+    return isinstance(content, list) and any(b.get("type") == "tool_result" for b in content)

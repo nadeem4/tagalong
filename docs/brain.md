@@ -2525,9 +2525,13 @@ again in full.
 exists), after every tool round through `on_step`, and at the turn's end. Each taken event gets its
 own `user` row with its `event_id` and `source`; a tool result is a row with neither. A wordless
 cancel marks every row of its request `cut` (`set_cut(ids)`). A retry's message is turn-only
-(its resume facts), so when a wordless cancel stops a retry whose failed try saved nothing after
-its request, the cut covers the request's saved rows (found by `event_id`) and the history drops
-that request too; otherwise it would be answered again. See
+(its resume facts), so when a wordless cancel stops a retry right after its request, the cut
+covers the request's saved rows (found by `event_id`) and the history drops that request too;
+otherwise it would be answered again. Only when the message before the retry holds no
+`tool_result` and its saved rows are exactly the retried events' rows: after a failed try that
+did a tool round, or for retried events saved by different earlier turns, nothing is cut, so no
+tool call loses its answer. A cut row does not count as saved: `set_resume` and the restart's
+split skip it, so that event is told in full again. See
 [memory.md](memory.md#saved-chat).
 
 ### Start-up and shutdown

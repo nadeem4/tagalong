@@ -16,7 +16,7 @@ from brain.events import (
     load_notes,
 )
 from brain.masking import Masker
-from brain.store.conversation import save_messages
+from brain.store.conversation import save_messages, set_cut
 from brain.store.db import open_db
 
 
@@ -491,3 +491,14 @@ def test_set_resume_marks_only_saved_events_and_names_the_stop(tmp_path):
     one, two = log.get("e1"), log.get("e2")
     assert (one.resume, one.end_reason) == (True, "stop")
     assert (two.resume, two.end_reason) == (False, None)  # never saved: told in full again
+
+
+def test_recover_brings_back_a_say_whose_only_row_is_cut_in_full(tmp_path):
+    log, _ = _clocked(tmp_path)
+    log.post(Event("say", "desktop", {}, id="e1"))
+    log.take(["e1"], "t")
+    [row] = save_messages(log._db, [{"role": "user", "content": "words"}], "t", event_ids=["e1"])
+    set_cut(log._db, [row], True)  # a restart skips that row: the words are not in the history
+    log.recover()
+    log.set_resume(["e1"])
+    assert log.get("e1").resume is False

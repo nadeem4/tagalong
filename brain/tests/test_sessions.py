@@ -3905,3 +3905,60 @@ async def test_a_wordless_cancel_of_a_retry_cuts_the_say_it_retried(tmp_path):
     await session.say("desktop", say("hi"))
     await idle(session)
     assert "book the flight" not in json.dumps(model.seen[-1])  # nor does the next turn
+
+
+class _FailsOn(Gate):
+    """Gate, but the calls numbered in `fail` (from 1) raise: a failed try of a turn."""
+
+    def __init__(self, steps, fail):
+        super().__init__(steps)
+        self.fail = set(fail)
+        self.calls = 0
+
+    async def stream(self, system, messages, tools):
+        self.calls += 1
+        if self.calls in self.fail:
+            self.seen.append(list(messages))
+            raise RuntimeError("the API fell over")
+        async for item in super().stream(system, messages, tools):
+            yield item
+
+
+async def _cancel_the_retry(session, clock):
+    clock[0] += datetime.timedelta(seconds=30)  # the backoff is over: the retry runs
+    session.runner.poke()
+    await until(lambda: session._task is not None)
+    await settle()
+    session.cancel(session._turn_id)  # stopped before a word
+    await finish_quietly(session)
+
+
+async def test_a_cut_retry_after_a_tool_round_keeps_the_history_valid(tmp_path):
+    memory = file_memory(tmp_path)
+    clock = [datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)]
+    stuck = asyncio.Event()
+    model = _FailsOn([tool_use("recall", query="x"), stuck, "never", "hello"], fail=[2])
+    session, _ = make(model, memory, now=lambda: clock[0])
+    await session.say("desktop", say("book the flight"))
+    await idle(session)  # one tool round saved, then the error
+    await _cancel_the_retry(session, clock)
+    assert [r[3] for r in saved_rows(memory)] == [0, 0, 0]  # nothing is cut
+    await session.say("desktop", say("hi"))
+    await idle(session)
+    sent = model.seen[-1]
+    assert sent[1]["content"][0]["type"] == "tool_use"
+    assert any(b.get("type") == "tool_result" for b in sent[2]["content"])  # kept its answer
+
+
+async def test_a_cut_retry_of_requests_from_two_turns_cuts_nothing(tmp_path):
+    memory = file_memory(tmp_path)
+    clock = [datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)]
+    stuck = asyncio.Event()
+    model = _FailsOn([stuck, "never"], fail=[1, 2])
+    session, _ = make(model, memory, now=lambda: clock[0])
+    await session.say("desktop", say("book the flight"))
+    await idle(session)
+    await session.say("desktop", say("email the landlord"))  # its own turn, failed too
+    await idle(session)
+    await _cancel_the_retry(session, clock)  # one retry takes both
+    assert [r[3] for r in saved_rows(memory)] == [0, 0]

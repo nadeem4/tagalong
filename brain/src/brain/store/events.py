@@ -170,7 +170,7 @@ def set_resume(db: sqlite3.Connection, ids: list[str]) -> None:
         db.execute(
             "UPDATE events SET resume=1, end_reason=COALESCE(end_reason, 'stop')"
             " WHERE id=? AND state='new'"
-            " AND EXISTS (SELECT 1 FROM messages WHERE event_id=events.id)",
+            " AND EXISTS (SELECT 1 FROM messages WHERE event_id=events.id AND cut=0)",
             (id,),
         )
 
@@ -181,7 +181,7 @@ def saved(db: sqlite3.Connection, ids: list[str]) -> set[str]:
     return {
         r[0]
         for r in db.execute(
-            f"SELECT DISTINCT event_id FROM messages WHERE event_id IN ({marks})", ids
+            f"SELECT DISTINCT event_id FROM messages WHERE event_id IN ({marks}) AND cut=0", ids
         )
     }
 
