@@ -5,7 +5,9 @@ tool_use left hanging by a crash so the API accepts the next request. Also drops
 tool blocks, so chats saved with orphaned results heal. Drops all thinking too: the API only
 accepts thinking blocks cut from the front of a history, so none at all is the safe rebuild.
 A reply left empty by that (a silent wake) goes with the message it answered: a stand-in text
-would be copied by the model as if it were a real reply.
+would be copied by the model as if it were a real reply. Each taken event is saved as its own
+row, so neighbouring rows of one role join into one message (blocks, never strings) and a reply
+with no request before it is dropped, which keeps the roles alternating from a user message.
 """
 
 from brain.web_tools import without_server_blocks, without_thinking
@@ -21,6 +23,25 @@ def _without_server_blocks(message: dict) -> dict:
         out = {**out, "content": without_thinking(out["content"])}
     if out["content"] == message["content"]:
         return message  # unchanged: callers tell a rebuilt tail from a loaded one by identity
+    return out
+
+
+def _blocks(content: str | list) -> list:
+    return [{"type": "text", "text": content}] if isinstance(content, str) else content
+
+
+def _joined(history: list[dict]) -> list[dict]:
+    """Joins neighbouring rows of one role into one message, then drops any reply left at the
+    front (its request never reached the chat). A tool_result stays in the user message that
+    follows its tool_use because rows are only ever joined, never reordered."""
+    out: list[dict] = []
+    for m in history:
+        if out and out[-1]["role"] == m["role"]:
+            out[-1] = {**m, "content": _blocks(out[-1]["content"]) + _blocks(m["content"])}
+        else:
+            out.append(m)
+    while out and out[0]["role"] == "assistant":
+        out.pop(0)
     return out
 
 
@@ -65,7 +86,9 @@ def rebuild_history(messages: list[dict]) -> tuple[list[dict], bool]:
         start = marks[-1]
         while start > 0 and not _is_turn_start(messages[start]):
             start -= 1
-    history = _without_silent_replies([_without_server_blocks(m) for m in messages[start:]])
+    history = _without_silent_replies(
+        _joined([_without_server_blocks(m) for m in messages[start:]])
+    )
 
     if len(history) > RESUME_MAX_MESSAGES:
         cut = next(
