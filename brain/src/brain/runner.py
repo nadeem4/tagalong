@@ -234,19 +234,19 @@ class Runner:
         if self._alarm is not None:
             self._alarm.cancel()
             self._alarm = None
+        # Read on every step, before any return: a break latched while no news waited for it
+        # (or while a turn ran) is spent here, so it cannot let later news cut a sentence.
+        at_break = self._presence.break_seen() or self._presence.at_break()
         if self._interjecting is None and self._presence.at_break() and self._interject():
             return
-        if self._turn is not None:
+        # An interjection is speaking into the reply: no plain turn starts around it. Its
+        # give-back pokes again, so an untold event still gets its turn.
+        if self._turn is not None or self._interjecting is not None:
             return
-        # Read once: a break latched while no news waited for it is spent here, so it cannot
-        # let later news cut a sentence.
-        at_break = self._presence.break_seen()
         ready = self._release_questions(self._events.ready())
-        # Held and retried ids are `new`, or taken by an interjection that gives them back:
-        # any other was ended some other way (by id, as stale news, told by an interjection).
+        # Held and retried ids are `new` here (no interjection holds one): any other was ended
+        # some other way (by id, as stale news, told by an interjection).
         waiting = {r.id for r in ready}
-        if self._interjecting is not None:
-            waiting.add(self._interjecting[1])
         self._held &= waiting
         self._retried &= waiting
         got = pick(

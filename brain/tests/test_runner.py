@@ -786,3 +786,43 @@ async def test_an_interrupted_say_cancels_the_named_turn_then_waits_in_order():
     assert last_user_texts(model, 1) == ["from the laptop"]
     cut, words = last_user_texts(model, 2)[:2]
     assert '<data kind="interruption">' in cut and "Two. Three." in cut and words == "wait"
+
+
+async def test_a_break_passed_mid_turn_does_not_let_later_news_cut_a_sentence():
+    # The latch from a break no news waited for is spent, even while a turn ran.
+    rig = LoopRig()
+    rig.say("s1")
+    await ticks()
+    [(turn, _, _)] = rig.session.started
+    rig.presence.speech("desktop", "sentence_break", turn, 1)
+    await ticks()
+    rig.presence.speech("desktop", "talking")
+    rig.news("n1")
+    await ticks()
+    rig.runner.turn_ended(turn, "done")  # the model is done, the voice is mid-sentence
+    await ticks()
+    assert rig.turns() == [["s1"]]
+    await rig.runner.stop()
+
+
+async def test_no_plain_turn_starts_while_an_interjection_runs():
+    rig = LoopRig()
+    release = asyncio.Event()
+
+    async def slow(body: str, content: list) -> bool:
+        await release.wait()
+        return False
+
+    rig.session.interject = slow
+    rig.presence.speech("desktop", "talking")
+    rig.news("n1")
+    rig.news("n2")
+    await ticks()
+    rig.presence.speech("desktop", "sentence_break", "t0", 1)
+    await ticks()
+    rig.presence.speech("desktop", "paused")  # the voice waits for the interjection call
+    await ticks()
+    assert rig.turns() == []  # the second news must not start a turn around the call
+    release.set()
+    await ticks()
+    await rig.runner.stop()
