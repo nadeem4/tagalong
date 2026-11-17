@@ -133,13 +133,19 @@ saved. Forgetting a loop deletes its rows; wiping deletes every loop and the mai
 
 ### Saved chat
 
-- Every turn end saves its messages to a `messages` table (migration 2) with its own FTS index.
-  Screenshots and PDFs are stored only as the markers `[screenshot]` and `[document]`.
+- Messages are saved to a `messages` table (migration 2) with its own FTS index after every step of
+  a turn, not only at its end. Each taken event (a say, one news item) is its own `user` row, with
+  the `event_id` and `source` of the event; a tool result is a row with neither. Text blocks that
+  are for one turn only (resume and given-up marks, interruption and interjection leads, ear notes)
+  are never saved. Screenshots and PDFs are stored only as the markers `[screenshot]` and `[document]`.
 - On start the history is rebuilt from it: from the turn of the latest compaction block, at most
   50 messages trimmed to whole turns (if the newest turn alone is over 50, it is kept whole;
   server-side compaction bounds its size). A tool call left unanswered by a crash is closed as
-  "cancelled", and that result is stored on the next save. A crash mid-turn loses that turn's
-  unsaved messages.
+  "cancelled", and that result is stored on the next save. A crash mid-turn loses only the step in
+  flight. Rebuilding joins neighbouring rows of one role into one message (one event is one row, so
+  a turn can start with several), drops any leading rows up to the first turn start or compaction
+  message (a reply whose request never reached the chat), and joins again after the silent-reply
+  drop so roles still alternate.
 - Each compaction block's text becomes one `summary` memory (an episodic `day` entry, search-only, written by code), once
   per block.
 
@@ -152,7 +158,7 @@ flowchart LR
     P --> M
     M -->|recall| T
     T -->|search| S
-    SE[session] -->|save each turn| MS[(messages table)]
+    SE[session] -->|save each step| MS[(messages table)]
     MS -->|rebuild on start| R[resume]
     R --> SE
     MS -->|recall chat| T
@@ -164,5 +170,4 @@ A standing check is a `watch` work row, not a memory (storage.md, `work_timer`).
 the `watch` tool (`add` with a note and `every_minutes`, at least 5), lists them, `pause`s,
 `switch_on`s or `cancel`s one. A watch wakes Scout as a `timer` event every `every_minutes` until it
 is cancelled or paused; a paused watch never fires. The old `tracking` memories became paused
-watches; on the first start after the update Scout is told once (`watches_paused`) and offers to
-switch each on.
+watches; they stay paused until switched on.

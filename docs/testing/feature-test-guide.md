@@ -2894,7 +2894,7 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 
 ## Waiting news: one runner, one set of rules
 
-1. Automated: `cd brain && uv run pytest tests/test_runner.py tests/test_presence.py tests/test_open_items.py tests/test_loops_home_tools.py tests/test_config.py -q`, then `tests/test_sessions.py -q -k "give_up"`. It covers the order (a person's words first, then news oldest first), the gate (key, quiet hours, budget, speech, idle window, caps), the target body, the group cap of 20, the 60 s recheck, and the ends: done, cancelled, rejected and over budget are handled, any other end goes back to new.
+1. Automated: `cd brain && uv run pytest tests/test_runner.py tests/test_presence.py tests/test_open_items.py tests/test_loops_home_tools.py tests/test_config.py -q`, then `tests/test_sessions.py -q -k "give_up"`. It covers the order (a person's words first, then news oldest first), the gate (key, quiet hours, budget, speech, idle window, caps), the target body, the group cap of 20, the 60 s recheck, and the ends: done, cancelled, rejected and unanswered are handled (a say over budget too), news over budget goes back to new with no attempt, and any other end backs off and is tried again (see "Retries, per-step history and restart (T1d)").
 2. Budget spent: set `TAGALONG_DAILY_BUDGET_USD=0.01`, spend it, then let a job end. Scout stays silent and the report waits as a new event in the log; it is told once the budget is open again. Nothing is logged as dropped.
 3. Quiet hours: set `TAGALONG_QUIET_HOURS` to a window around the current time (for example `14:00-15:00`, or `22:00-07:00` across midnight) and let a timer fire. Scout does not speak, and the timer waits in the log. When the window ends (within a minute) Scout is woken with it.
 4. No body: close every body, let a job end, then open the desktop. The report waits until a body that displays is online, then Scout tells it once.
@@ -2902,7 +2902,7 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 6. A word spoken while the brain is stopping fails (no hang), and a wake still starts on the next run.
 7. Quiet hours and a running job: during `TAGALONG_QUIET_HOURS`, an expert's question to the person still reaches Scout (it is never held), while a timer waits.
 8. No key: with no Anthropic key, let a timer fire. It waits in the log and is not lost; set a key and Scout tells it. An expert's question asked with no key (or the budget spent) goes to the person as a card instead.
-9. A say that fails its turn (for example the model errors) is tried again with a short retry note, not sent twice in full.
+9. A say that fails its turn (for example the model errors) is tried again after a wait, and the second turn names it as a resume instead of sending its words twice in full (see the T1d section).
 
 ## Live-test fixes (F12)
 
@@ -3057,4 +3057,18 @@ Automated: `brain/tests/test_events.py`, `test_store_events.py`, `test_sessions.
 - A timer that fires is saved with its event in one transaction; cancelling a fired timer that was not yet told ends its news, so Scout is not woken for it.
 - `ask_ended` carries the `caused_by` of the turn that asked.
 
-**Manual, real brain.** Send a say, end the brain process before Scout answers, then look in `tagalong.db`: the say is in `events` with state `new` or `taken`. Known gap until the runner lands: Scout does not answer it after the restart.
+**Manual, real brain.** Send a say, end the brain process before Scout answers, then look in `tagalong.db`: the say is in `events` with state `new` or `taken`. After the restart Scout answers it once (see the T1d section).
+
+## Retries, per-step history and restart (T1d)
+
+Automated: `cd brain && uv run pytest tests/test_events.py tests/test_runner.py tests/test_sessions.py tests/test_resume.py tests/test_main.py tests/test_setup_events.py tests/test_store_db.py -q`. It covers the retry waits and the give-up, the per-step save, the resume marks, the rebuild, recovery at start, the shutdown order and the event sweep.
+
+**Manual, real brain** (needs a key; ask for something that takes several steps, for example a web search and a summary).
+
+1. **Kill mid-reply.** Send the say. When Scout has shown it is working (a tool step is on screen), end the brain hard (`uv run tagalong stop`, or end the process). Start the brain again. **Expected:** Scout answers the say once, not twice; the steps that finished before the kill are in the chat history and are not run again; the say is not repeated in full in the saved chat (look at `messages` in `tagalong.db`: one `user` row for the say, with its `event_id` and `source`).
+2. **Quit cleanly mid-reply.** Send the same kind of say, then press Ctrl+C in the terminal running `uv run brain`, so its shutdown code runs. Start it again. **Expected:** the same as step 1: the finished steps were kept and the say is answered once. A job running at the time is told once as ended.
+3. **A failing turn retries.** Start the brain with a wrong key and say something. **Expected:** the turn ends with an error. In `brain.log` and in the `events` table the say is `new` with a `not_before` 30 s ahead; it is tried again after about 30 s, then after 2 min, then after 10 min, and the fourth failure ends it `gave_up` with the reason. A new say sent meanwhile starts at once and is not held behind the waiting one.
+4. **A given-up say rides the next one.** After step 3, fix the key and say hello. **Expected:** Scout answers hello and is also shown that the earlier request was given up, so it may say so; the earlier row is then `handled` and keeps its reason; it is not told again on the next say.
+5. **Crash loop.** Kill the brain during the same say four starts in a row. **Expected:** the fourth start gives the say up (`gave_up`, reason `restart`) and runs nothing.
+6. **Old events are swept.** Set `TAGALONG_WORK_KEEP_DAYS=1`, make an event `handled` more than a day ago (edit `handled_at` in `tagalong.db`), and restart. **Expected:** that row is gone; `new`, `taken` and `gave_up` rows stay.
+7. **Timers.** Let a one-off timer fire and be told, then ask Scout to cancel it. **Expected:** Scout says it already fired.
