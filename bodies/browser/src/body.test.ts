@@ -4,7 +4,7 @@
  * or brain is needed and every case is fast and repeatable.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { HelloParams } from '@tagalong/contract';
+import { HelloParams, SayParams } from '@tagalong/contract';
 import type { PermissionBroker } from './permissions';
 import { createBody, type BodyDeps } from './body';
 import { FakeBrainSocket, memoryStorage, settle } from './test-support/fake-brain-socket';
@@ -119,7 +119,26 @@ describe('the browser body', () => {
     const context = { url: 'https://a.test/docs', title: 'Docs' };
     void body.say('what is this?', context);
     await settle();
-    expect(sockets[0]!.request('say')?.['params']).toEqual({ text: 'what is this?', context });
+    expect(sockets[0]!.request('say')?.['params']).toEqual({
+      id: expect.any(String),
+      text: 'what is this?',
+      context,
+    });
+  });
+
+  it('a say carries an id', async () => {
+    const { body, sockets } = setup();
+    await body.start();
+    await online(sockets[0]!);
+    void body.say('one');
+    void body.say('two');
+    await settle();
+    const ids = sockets[0]!.sent
+      .filter((m) => m['method'] === 'say')
+      .map((m) => (m['params'] as { id: string }).id);
+    expect(ids).toHaveLength(2);
+    expect(ids[0]).not.toBe(ids[1]);
+    expect(SayParams.safeParse({ id: ids[0], text: 'one' }).success).toBe(true);
   });
 
   it('say_while_connecting_is_sent_once_online', async () => {
@@ -133,6 +152,7 @@ describe('the browser body', () => {
     await vi.advanceTimersByTimeAsync(300);
     expect(sockets[0]!.sent.filter((m) => m['method'] === 'say')).toHaveLength(1);
     expect(sockets[0]!.request('say')?.['params']).toEqual({
+      id: expect.any(String),
       text: 'what is this?',
       context: { url: 'https://a.test/', title: 'A' },
     });
@@ -144,7 +164,7 @@ describe('the browser body', () => {
     await online(sockets[0]!);
     void body.say('hi');
     await settle();
-    expect(sockets[0]!.request('say')?.['params']).toEqual({ text: 'hi' });
+    expect(sockets[0]!.request('say')?.['params']).toEqual({ id: expect.any(String), text: 'hi' });
   });
 
   it('say_while_the_brain_never_comes_up_is_dropped_without_throwing', async () => {
@@ -362,6 +382,7 @@ describe('the browser body voice', () => {
     });
     await settle();
     expect(sockets[0]!.request('say')?.['params']).toEqual({
+      id: expect.any(String),
       text: 'what is this page',
       spoken: true,
     });

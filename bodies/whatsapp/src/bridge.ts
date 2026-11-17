@@ -1,5 +1,5 @@
 /**
- * The WhatsApp body: a contract v1 client that turns the one allowed sender's texts into
+ * The WhatsApp body: a contract v2 client that turns the one allowed sender's texts into
  * `say`, buffers Scout's `reply` until `done`, and sends the finished text back through the
  * Graph API while the 24-hour window is open. It has no tools and shows no display, so the
  * brain treats it as a plain chat body. Permission asks are shown as reply buttons or a
@@ -11,6 +11,7 @@ import {
   BrainClient,
   ErrorCode,
   ReplyParams,
+  TurnParams,
   RpcError,
   type BrainClientOptions,
 } from '@tagalong/contract';
@@ -53,6 +54,10 @@ export function createBridge(deps: BridgeDeps): {
   const desk = new AskDesk();
   // Reply text per turn, held until that turn's `done`.
   const buffers = new Map<string, string[]>();
+  // The ids of the says sent from the phone, and the turns that took one: a turn of mine that
+  // ends without finishing is dropped, not sent as a half reply.
+  const says = new Set<string>();
+  const mine = new Set<string>();
 
   // One chain for all sends, so parts of two turns never interleave.
   let sending: Promise<void> = Promise.resolve();
@@ -112,8 +117,24 @@ export function createBridge(deps: BridgeDeps): {
     else enqueue(() => showAsk(ask));
   };
 
+  const onTurn = (params: unknown): void => {
+    const parsed = TurnParams.safeParse(params);
+    if (!parsed.success) return;
+    const turn = parsed.data;
+    if (turn.state === 'ended') {
+      if (mine.delete(turn.turn) && turn.reason !== 'done') buffers.delete(turn.turn);
+      return;
+    }
+    const taken = (turn.events ?? []).filter((id) => says.has(id));
+    if (taken.length === 0) return;
+    mine.add(turn.turn);
+    // The id has done its job once its turn is known; forgetting keeps the set small.
+    for (const id of taken) says.delete(id);
+  };
+
   const onNotification = (method: string, params: unknown): void => {
     if (method === 'ask') return onAsk(params);
+    if (method === 'turn') return onTurn(params);
     if (method !== 'reply') return;
     const parsed = ReplyParams.safeParse(params);
     if (!parsed.success || parsed.data.body !== BODY.id) return;
@@ -137,13 +158,19 @@ export function createBridge(deps: BridgeDeps): {
     ...(deps.retryMs === undefined ? {} : { retryMs: deps.retryMs }),
     onResync: () => {
       buffers.clear();
+      says.clear();
+      mine.clear();
       // The brain re-sends the asks it still holds after a resync.
       desk.clear();
     },
   });
 
   const say = (text: string): void => {
-    client.say({ text, context: CONTEXT }).catch(() => {
+    const id = crypto.randomUUID();
+    // Recorded before sending: the brain's turn frame can beat its answer.
+    says.add(id);
+    client.say({ id, text, context: CONTEXT }).catch(() => {
+      says.delete(id);
       // Nothing goes to the phone: the person simply sees no answer, as with a brain that is down.
       log('whatsapp: the brain is not reachable, message not delivered');
     });

@@ -176,7 +176,7 @@ export function createBody(deps: BodyDeps): BrowserBody {
     await starting;
   }
 
-  async function ask(params: SayParams): Promise<void> {
+  async function ask(params: Omit<SayParams, 'id'>): Promise<void> {
     // A woken worker has no client yet and a fresh one is still connecting, so wait for it.
     await start();
     const deadline = Date.now() + SAY_WAIT_MS;
@@ -184,7 +184,8 @@ export function createBody(deps: BodyDeps): BrowserBody {
       await new Promise((resolve) => setTimeout(resolve, SAY_POLL_MS));
     }
     try {
-      await client?.say(params);
+      // The id lets the brain tell a retried say from a new one; the browser shows no answer to follow.
+      await client?.say({ id: crypto.randomUUID(), ...params });
     } catch (error) {
       if (!(error instanceof BrainOffline)) throw error;
     }

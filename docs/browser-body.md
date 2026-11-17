@@ -441,7 +441,7 @@ in the desktop bubble, not in the browser.
   `contextMenus` permission). A click with no selected text asks nothing.
 - **Address bar.** Type `scout`, a space and your question, then Enter. No permission is needed.
 
-The `say` carries your text and, when known, the context `{url, title}` of the tab you asked from.
+The `say` carries a fresh `id` (a UUID, so the brain can tell a retry from a new say), your text and, when known, the context `{url, title}` of the tab you asked from.
 The title and the address come only when the `tabs` permission is allowed; a right-click still
 sends the page address, which Chrome supplies with the click. With neither known, the `context` is
 left out. The address is the origin plus the path, with no query string and no fragment, the same

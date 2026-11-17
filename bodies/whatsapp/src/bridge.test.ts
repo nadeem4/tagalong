@@ -1,5 +1,5 @@
 /**
- * Tests for the bridge as a contract v1 body, on a fake brain socket, a fake Graph fetch,
+ * Tests for the bridge as a contract v2 body, on a fake brain socket, a fake Graph fetch,
  * a movable clock and signed local webhook posts. No Meta, no brain, no network.
  */
 import { createHmac } from 'node:crypto';
@@ -37,9 +37,9 @@ class FakeBrain {
       if (msg.method === 'hello') {
         const resync = this.resyncNext;
         this.resyncNext = false;
-        this.respond(msg.id, { protocol: 1, session: 's1', tools: [], seq: this.seq, resync });
+        this.respond(msg.id, { protocol: 2, session: 's1', tools: [], seq: this.seq, resync });
       } else if (msg.method === 'say') {
-        this.respond(msg.id, { turn: 't1', joined: false });
+        this.respond(msg.id, {});
       } else if (msg.method === 'answer') {
         if (this.answerGone) {
           this.onMessage(
@@ -111,6 +111,29 @@ class FakeBrain {
         jsonrpc: '2.0',
         method: 'reply',
         params: { seq: ++this.seq, turn, body, ...fields },
+      }),
+    );
+  }
+
+  /** A `turn` frame, as the brain sends it when a turn starts, joins or ends. */
+  turn(
+    state: 'started' | 'joined' | 'ended',
+    turn: string,
+    fields: { events?: string[]; reason?: string } = {},
+  ) {
+    const taking = state === 'ended' ? {} : { events: [], source: 'whatsapp', ...fields };
+    this.onMessage(
+      JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'turn',
+        params: {
+          seq: ++this.seq,
+          turn,
+          body: 'whatsapp',
+          state,
+          ...taking,
+          ...(state === 'ended' ? fields : {}),
+        },
       }),
     );
   }
@@ -191,7 +214,7 @@ describe('bridge', () => {
     await online(brain);
     const hello = brain.sent.find((m) => m.method === 'hello');
     expect(hello?.params).toEqual({
-      protocol: 1,
+      protocol: 2,
       body: { id: 'whatsapp', kind: 'whatsapp', name: 'WhatsApp' },
       tools: [],
     });
@@ -204,6 +227,7 @@ describe('bridge', () => {
     await inbound('what is on my plate');
     await vi.waitFor(() => expect(brain.says()).toHaveLength(1));
     expect(brain.says()[0]?.params).toEqual({
+      id: expect.any(String),
       text: 'what is on my plate',
       context: {
         channel: 'whatsapp',
@@ -227,6 +251,35 @@ describe('bridge', () => {
       to: CONFIG.allowedNumber,
       text: { body: 'Hello there' },
     });
+  });
+
+  test('replies on the turn whose events hold the message say id', async () => {
+    const { brain, graph, inbound } = await setup();
+    await online(brain);
+    await inbound('hi');
+    await vi.waitFor(() => expect(brain.says()).toHaveLength(1));
+    const id = (brain.says()[0]?.params as { id: string }).id;
+    expect(id).toMatch(/^[0-9a-f-]{36}$/);
+    brain.turn('started', 't9', { events: [id] });
+    brain.reply('whatsapp', { delta: 'cut off' }, 't9');
+    brain.turn('ended', 't9', { reason: 'cancelled' });
+    brain.reply('whatsapp', { done: true }, 't9');
+    await new Promise((r) => setTimeout(r, 30));
+    expect(graph.bodies).toEqual([]);
+  });
+
+  test('a joined turn with my say id is mine too, and its reply is sent', async () => {
+    const { brain, graph, inbound } = await setup();
+    await online(brain);
+    await inbound('hi');
+    await vi.waitFor(() => expect(brain.says()).toHaveLength(1));
+    const id = (brain.says()[0]?.params as { id: string }).id;
+    brain.turn('started', 't9', { events: ['other'] });
+    brain.turn('joined', 't9', { events: [id] });
+    brain.reply('whatsapp', { delta: 'ok' }, 't9');
+    brain.turn('ended', 't9', { reason: 'done' });
+    brain.reply('whatsapp', { done: true }, 't9');
+    await vi.waitFor(() => expect(graph.bodies).toHaveLength(1));
   });
 
   test('test_a_huge_reply_sends_four_messages_and_the_note', async () => {

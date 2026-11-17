@@ -2808,7 +2808,11 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
    (in `<TAGALONG_HOME>/.env`) and start the brain. `brain.log` gets one plain line saying the bridge is
    not built and to run `pnpm --filter @tagalong/whatsapp build`; no `node` process starts and the brain
    keeps working.
-5. By hand, once the bridge is built (a later slice): set the real values, start the brain and check
+5. `pnpm --filter @tagalong/whatsapp exec vitest run src/bridge.test.ts` and
+   `pnpm --filter @tagalong/browser exec vitest run src/body.test.ts`: each say carries a fresh
+   `id`; the WhatsApp bridge marks the turn whose `events` hold its say id as its own and drops
+   the half reply of such a turn that ends without `done`.
+6. By hand, once the bridge is built (a later slice): set the real values, start the brain and check
    `brain.log` for the bridge's lines; `tagalong stop` leaves no `node` process behind.
 
 ## WhatsApp bridge core (automated, no Meta account)
