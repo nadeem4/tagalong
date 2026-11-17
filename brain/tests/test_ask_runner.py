@@ -510,3 +510,16 @@ async def test_ask_ended_is_caused_by_the_asking_turn():
     await rig.settle()
     [ended] = rig.events
     assert (ended.kind, ended.source, ended.caused_by) == ("ask_ended", "scout", "evt-ask-turn")
+
+
+async def test_the_saved_cause_survives_a_restart():
+    rig = Rig()
+    await rig.box.run(call())
+    [card] = rig.opened()
+    again = Rig(rig.memory, clock=rig.clock)
+    again.runner._cause = lambda: "other-turn"  # a new process has a different current turn
+    again.runner.start()
+    again.runner.answered(card["id"], "allow", "desktop")
+    await again.settle()
+    ended = [e for e in again.events if e.kind == "ask_ended"]
+    assert ended and ended[0].caused_by == "evt-ask-turn"

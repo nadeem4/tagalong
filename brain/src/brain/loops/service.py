@@ -156,6 +156,7 @@ class LoopService:
             self._store.set_status(loop.id, "stale")
         lines = "\n".join(f"{lp.id}: {lp.title} ({lp.asks})" for lp in found)
         facts: dict[str, str | int] = {"reason": "stale", "count": len(found), "loops": lines}
+        # no caused_by on purpose: aggregate news, no single cause
         self._emit(Event("loop", "scout", facts))
         self._notify("changed", {"what": "loops"})
 
@@ -176,6 +177,7 @@ class LoopService:
             return
         lines = "\n".join(f"{lp.id}: {lp.title} ({lp.asks})" for lp in held)
         facts: dict[str, str | int] = {"reason": "digest", "count": len(held), "loops": lines}
+        # no caused_by on purpose: aggregate news, no single cause
         self._emit(Event("loop", "scout", facts))
 
     def _today(self) -> str:

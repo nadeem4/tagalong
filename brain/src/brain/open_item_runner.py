@@ -311,6 +311,8 @@ class AskRunner:
                 for i in back
             ]
             facts: dict[str, str | int] = {"count": len(asks), "asks": json.dumps(asks)}
+            # no caused_by on purpose: aggregate news, no single cause
+            # no caused_by on purpose: aggregate news, no single cause
             self._emit(Event("asks_waiting", "scout", facts))
 
     async def _show_again(self, item: OpenItem) -> bool:
