@@ -7,8 +7,10 @@ finishes, and a phone-only setup still hears a job's question. Fake model and bo
 import asyncio
 import json
 from dataclasses import replace
+from types import SimpleNamespace
 
 from job_rows import records_for
+from test_session_interrupt import make_voiced, over
 from test_sessions import (
     Gate,
     QuietPeer,
@@ -25,6 +27,7 @@ from test_sessions import (
 
 from brain.dispatcher import Item
 from brain.events import EVENT_KINDS, Event
+from brain.jobs import JobId
 from brain.memory import Memory
 from brain.mind.turn import Call
 from brain.protocol import Body
@@ -363,7 +366,28 @@ async def test_whatsapp_moments_wake_on_the_whatsapp_body():
         assert replies and set(replies) == {"whatsapp"}
 
 
-async def test_job_news_carries_the_say_as_its_cause():
+async def hand_off(session, folder) -> str:
+    """A real `Jobs.start` with only the expert launch faked; returns the new job's id."""
+
+    async def pick(_expert):
+        return SimpleNamespace(id="claude_code")
+
+    async def start_part(job_id, *_a, **_k):
+        return JobId(job_id)
+
+    session.jobs._pick = pick
+    session.jobs._start_part = start_part
+    return str(await session.jobs.start("fix it", str(folder)))
+
+
+def job_ended_cause(session, memory, job_id):
+    session.jobs._on_finished(end_job(memory, job_id))
+    row = next(r for r in session.events.ready() if r.kind == "job_ended")
+    assert row.source == f"job:{job_id}"
+    return row.caused_by
+
+
+async def test_job_news_carries_the_say_as_its_cause(tmp_path):
     gate = asyncio.Event()
     memory = Memory(":memory:")
     session, _ = make(Gate([gate, "ok"]), memory)
@@ -372,12 +396,56 @@ async def test_job_news_carries_the_say_as_its_cause():
     await session.say("browser", say("hand this off"))
     await settle()  # its turn is running, and it took the say
     [say_row] = [r for r in session.events.ready() if r.kind == "say"]
+    job_id = await hand_off(session, tmp_path)
+    assert job_ended_cause(session, memory, job_id) == say_row.id
+    gate.set()
+    await idle(session)
 
-    # What `Jobs.start` records for the turn that hands a job off.
-    assert session.jobs._turn_cause() == say_row.id
-    session.jobs._causes["j1"] = session.jobs._turn_cause()
-    session.jobs._on_finished(end_job(memory))
-    row = next(r for r in session.events.ready() if r.kind == "job_ended")
-    assert (row.source, row.caused_by) == ("job:j1", say_row.id)
+
+async def test_a_barge_in_say_that_hands_off_is_the_jobs_cause(tmp_path):
+    gate = asyncio.Event()
+    memory = Memory(":memory:")
+    session, _, voice = make_voiced(Gate([gate, gate, "ok"]), memory)
+    first = await session.say("desktop", say("tell me"))
+    voice.logs[first.turn] = ["One.", "Two."]
+    await settle()
+    await session.say("desktop", over("wait", first.turn, 1))
+    await settle()
+    row = next(r for r in session.events.ready() if r.payload.get("text") == "wait")
+    job_id = await hand_off(session, tmp_path)
+    assert job_ended_cause(session, memory, job_id) == row.id
+    gate.set()
+    await idle(session)
+
+
+async def test_a_say_joined_to_a_cut_turn_is_the_next_turns_cause(tmp_path):
+    gate = asyncio.Event()
+    memory = Memory(":memory:")
+    session, _ = make(Gate([gate, gate, "ok"]), memory)
+    join(session, "desktop")
+    await session.say("desktop", say("tell me"))
+    await settle()
+    joined = await session.say("desktop", say("and also"))
+    assert joined.joined is True
+    session.cancel(session._turn_id)  # the turn ends with the joined words unanswered
+    await settle()
+    row = next(r for r in session.events.ready() if r.payload.get("text") == "and also")
+    assert session._turn_cause == row.id
+    gate.set()
+    await idle(session)
+
+
+async def test_a_wake_turn_that_hands_off_is_the_jobs_cause(tmp_path):
+    gate = asyncio.Event()
+    memory = Memory(":memory:")
+    kinds = {"ask_closed": replace(EVENT_KINDS["ask_closed"], batch_seconds=0)}
+    session, _ = make(Gate([gate, "ok"]), memory, kinds=kinds)
+    join(session, "desktop")
+    join(session, "whatsapp")
+    session.body_event("whatsapp", "ask_closed", {"via": "tap"})
+    await settle()
+    [wake_row] = [r for r in session.events.ready() if r.kind == "ask_closed"]
+    job_id = await hand_off(session, tmp_path)
+    assert job_ended_cause(session, memory, job_id) == wake_row.id
     gate.set()
     await idle(session)

@@ -113,7 +113,7 @@ class Dispatcher:
         guards: Guards,
         busy: Callable[[], bool],
         last_body: Callable[[], str | None],
-        start: Callable[[str, list], str],
+        start: Callable[[str, list, str | None], str],
         now: Callable[[], datetime],
         gave_up: Callable[[Item], None] | None = None,
         quiet: Callable[[datetime], bool] | None = None,
@@ -493,7 +493,8 @@ class Dispatcher:
             self._wakes.append((self._now(), group.kind.name))
         text = wake_text(group.kind, group.items, self._notes.get(group.kind.name, ""), self._now())
         try:
-            turn_id = self._start(body_id, [{"type": "text", "text": text}])
+            first = group.items[0].event_id or None  # the event the wake turn took, for hand-offs
+            turn_id = self._start(body_id, [{"type": "text", "text": text}], first)
         except WakeSkipped:  # no key yet: kept, so it is not lost
             self._hold_group(group, "no_key")
             return

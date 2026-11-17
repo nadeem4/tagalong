@@ -92,6 +92,7 @@ class Rig:
         self.interject_gate: asyncio.Event | None = None
         self.bodies = FakeBodies(list(online))
         self.starts: list[tuple[str, list]] = []
+        self.causes: list[str | None] = []
         self.delivered: list[Item] = []
         self.gave_up: list[Item] = []
         self.busy = False
@@ -134,8 +135,9 @@ class Rig:
             raise RuntimeError("body gone")
         self.delivered.append(item)
 
-    def _start(self, body_id: str, content: list) -> str:
+    def _start(self, body_id: str, content: list, cause: str | None = None) -> str:
         self.starts.append((body_id, content))
+        self.causes.append(cause)
         return f"t{len(self.starts)}"
 
     async def _sleep(self, s: float) -> None:
@@ -769,7 +771,7 @@ async def test_away_holds_and_shows_on_return(make):
 async def test_a_failed_start_holds_the_news_and_never_marks_it_told(make, caplog):
     rig = make()
 
-    def boom(body_id, content):
+    def boom(body_id, content, cause=None):
         raise RuntimeError("cannot start")
 
     rig.d._start = boom
@@ -789,7 +791,7 @@ async def test_a_wake_with_no_key_is_held_as_no_key(make):
 
     rig = make()
 
-    def skip(body_id, content):
+    def skip(body_id, content, cause=None):
         raise WakeSkipped
 
     rig.d._start = skip
@@ -862,7 +864,7 @@ async def test_staleness_counts_from_the_post_not_from_when_the_gate_opened(make
 async def test_failed_start_still_rearms_the_timer_for_other_groups(make):
     rig = make()
 
-    def boom(body_id, content):
+    def boom(body_id, content, cause=None):
         raise RuntimeError("cannot start")
 
     rig.d._start = boom
@@ -1007,3 +1009,10 @@ async def test_stop_holds_the_news_of_a_running_interjection(make):
     await settle()
     await rig.d.stop()
     assert [h["why"] for h in rig.held()] == ["stopped"]
+
+
+async def test_a_wake_turn_starts_with_its_first_events_id_as_the_cause(make):
+    rig = make()
+    first = ev("ping", n="1")
+    await rig.emit(first)
+    assert rig.causes == [first.id]

@@ -4,6 +4,7 @@ mind/events.md so code stays free of canned lines. `EventLog` saves every event 
 survive a restart (masked) before anything acts on it.
 """
 
+import logging
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -19,6 +20,8 @@ from brain.masking import Masker
 from brain.protocol import BackData, DownloadData, FocusData, TabData
 from brain.store import events as store
 from brain.store.db import transaction, utc_text
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -209,9 +212,9 @@ class EventLog:
         if isinstance(value, str):
             try:
                 return self._masker.mask(value)
-            except (
-                Exception
-            ):  # fail closed, like the saved chat: a say is not lost, a secret is not kept
+            # Fail closed, like the saved chat: a say is not lost, a secret is not kept.
+            except Exception:
+                _log.exception("masking an event failed; the text is withheld")
                 return "[withheld]"
         if isinstance(value, dict):
             return {k: self._mask(v) for k, v in value.items()}

@@ -211,6 +211,7 @@ class Session:
             self.guards.add(mask_secrets(masker))
         memory.mask = lambda text: mask_json(self.guards, "memory", text)
         # Everything said to Scout and every wake is saved here before anything acts on it.
+        # The fallback is for tests only: main always passes the one log.
         self.events = events or EventLog(memory.db, masker or Masker(lambda: []), now)
         # Long tool results and expert reports reach the model as a capped preview; the full text
         # is stored masked for read_output. At startup finished work goes first (with the reports
@@ -254,7 +255,7 @@ class Session:
         self._later: list[tuple[str | None, str, list, SayParams, str]] = []  # last: event id
         # The owner's words that joined the running turn: it takes them in at its next step.
         self._inbox: list = []
-        self._joined: tuple[str | None, SayParams] | None = None
+        self._joined: tuple[str | None, SayParams, str] | None = None
         # False once the running turn has done its last read of what was said: later words start
         # a turn of their own, because this one would end without answering them.
         self._inbox_open = True
@@ -487,7 +488,12 @@ class Session:
             cut = self.interrupt(params.interrupted.turn, params.interrupted.heard)
             if cut is not None:
                 turn = self._start_turn(
-                    shown_on, content, after=after, cut=cut, said=params.text or ""
+                    shown_on,
+                    content,
+                    after=after,
+                    cut=cut,
+                    said=params.text or "",
+                    cause=say_event.id,
                 )
                 self._speak(turn, shown_on, params)
                 return SayResult(turn=turn, joined=False)
@@ -516,7 +522,8 @@ class Session:
     ) -> None:
         """Every wake source posts here: the event is saved, then the dispatcher decides when,
         batches and caps it. The wake turn is shown on the body the event came from, `origin`
-        (for events a cause chain cannot name), or the body its cause came through."""
+        (for events a cause chain cannot name; a bridge until T1c, it is not saved), or the body
+        its cause came through."""
         self.events.post(event, then=then)
         ended = on_end
         if on_end is not None and retell:
@@ -608,7 +615,7 @@ class Session:
                 await asyncio.sleep(0)  # its done callback runs next and clears the turn
             if self._busy() and self._inbox_open and self._turn_body == shown:
                 self._inbox.append(content)
-                self._joined = (shown, params)  # the newest, if its turn is cut
+                self._joined = (shown, params, item.event_id)  # the newest, if its turn is cut
                 self._speak(self._turn_id, self._turn_body, params)
                 if not result.done():
                     result.set_result(SayResult(turn=self._turn_id or "", joined=True))
@@ -1106,12 +1113,12 @@ class Session:
     def _busy(self) -> bool:
         return self._task is not None and not self._task.done()
 
-    def _start_wake(self, body_id: str | None, content: list) -> str:
+    def _start_wake(self, body_id: str | None, content: list, cause: str | None = None) -> str:
         if not self._ready():
             raise WakeSkipped  # dropped quietly; unreported jobs are told at a later start
         if self._wants_speech(body_id, None):
             content = [*content, {"type": "text", "text": ear_note()}]
-        turn = self._start_turn(body_id, content, "brain")
+        turn = self._start_turn(body_id, content, "brain", cause=cause)
         self._speak(turn, body_id, None)  # remarks and hellos are read aloud like any reply
         return turn
 
@@ -1383,9 +1390,10 @@ class Session:
         # after ended, so the next turn's started comes second
         self.dispatcher.turn_ended(turn_id, reason)
         if pending:
-            shown, params = joined if joined is not None else (body_id, None)
+            shown, params, cause = joined if joined is not None else (body_id, None, "")
             said = (params.text or "") if params is not None else ""
-            self._speak(self._start_turn(shown, pending, said=said), shown, params)
+            turn = self._start_turn(shown, pending, said=said, cause=cause or None)
+            self._speak(turn, shown, params)
         elif self._later and self._task is None:
             shown, turn, content, params, cause = self._later.pop(0)
             self._start_turn(
