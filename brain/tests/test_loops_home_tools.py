@@ -258,7 +258,7 @@ async def test_home_loop_done_and_later_unknown_id_are_invalid_params(rig):
         assert err.value.code == ErrorCode.invalid_params
 
 
-async def test_held_list_shows_news_the_dispatcher_held_with_its_reason(rig):
+async def test_held_list_shows_held_news_with_its_reason(rig):
     rig.items.open("held", "brain", saved_call={"event": "timer", "why": "quiet_hours"})
     rig.items.open("held", "brain", saved_call={"event": "job_ended", "why": "budget_spent"})
     rows = (await rig.call("loops_state"))["open_items"]

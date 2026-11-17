@@ -152,7 +152,7 @@ async def talking(model):
     read_aloud(session)
     await session.say("desktop", spoken_say("tell me a story"))
     await calm()
-    session.dispatcher.set_speech_state("talking")
+    session.presence.mouth("talking")
     session.post_event(Event("work_failed", "scout", {"note": "Sam wrote back"}))
     await settle()
     return session, voice
@@ -160,7 +160,7 @@ async def talking(model):
 
 async def at_the_break(session, heard=HEARD):
     turn = session._turn_id
-    session.dispatcher.set_speech_state("sentence_break", "desktop", turn, heard)
+    session.presence.speech("desktop", "sentence_break", turn, heard)
     await calm()
     return turn
 

@@ -1,5 +1,5 @@
 """ScoutQuestions: an expert's question is offered to Scout first; Scout answers or passes.
-The emit callable is a fake that records the event and its hooks, so no dispatcher runs here.
+The emit callable is a fake that records the event and its end hook, so no runner runs here.
 """
 
 import asyncio
@@ -15,8 +15,8 @@ class _Emit:
     def __init__(self):
         self.calls = []
 
-    def __call__(self, event, *, on_start=None, on_drop=None, on_end=None):
-        self.calls.append((event, on_drop, on_end))
+    def __call__(self, event, *, on_end=None):
+        self.calls.append((event, on_end))
 
     def id(self, n=-1):
         return self.calls[n][0].payload["question"]
@@ -148,12 +148,14 @@ async def test_pass_unknown_id_is_refused():
     assert ScoutQuestions(_Emit(), fresh_work()).pass_to_user("zz") == "no open question zz."
 
 
-async def test_on_end_without_an_answer_resolves_none():
-    emit = _Emit()
-    sq = ScoutQuestions(emit, fresh_work())
-    task = await _ask(sq, emit)
-    emit.calls[0][2]("done")
-    assert await task is None
+async def test_a_job_question_settles_to_none_when_its_event_ends():
+    # Whether Scout was told (handled), it gave up, or the brain stopped: no job hangs.
+    for state in ("handled", "gave_up", "new"):
+        emit = _Emit()
+        sq = ScoutQuestions(emit, fresh_work())
+        task = await _ask(sq, emit)
+        emit.calls[0][1](state)
+        assert await task is None
 
 
 async def test_on_end_after_an_answer_is_harmless():
@@ -161,16 +163,8 @@ async def test_on_end_after_an_answer_is_harmless():
     sq = ScoutQuestions(emit, fresh_work())
     task = await _ask(sq, emit)
     sq.answer(emit.id(), {"way": "a"})
-    emit.calls[0][2]("done")
+    emit.calls[0][1]("handled")
     assert await task == {"way": "a"}
-
-
-async def test_on_drop_resolves_none():
-    emit = _Emit()
-    sq = ScoutQuestions(emit, fresh_work())
-    task = await _ask(sq, emit)
-    emit.calls[0][1]()
-    assert await task is None
 
 
 async def test_cancel_job_resolves_only_that_jobs_questions():
@@ -233,10 +227,10 @@ async def test_passed_question_ends_with_an_event():
     assert "passed" in [e.kind for e in work.events(emit.id())]
 
 
-async def test_dropped_wake_and_cancelled_job_expire_the_question():
+async def test_an_ended_event_and_a_cancelled_job_expire_the_question():
     work, emit, sq = _rig()
     task = await _ask(sq, emit)
-    emit.calls[0][1]()  # on_drop
+    emit.calls[0][1]("gave_up")
     assert await task is None
     assert work.get(emit.id()).state == "expired"
     task = await _ask(sq, emit)

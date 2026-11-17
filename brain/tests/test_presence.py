@@ -117,3 +117,13 @@ def test_latest_keeps_the_newest_fact_of_a_kind_per_source():
     rig.p.record("focus", "desktop", {"title": "c"})
     assert rig.p.latest("focus") == {"desktop": {"title": "c"}, "browser": {"title": "b"}}
     assert rig.p.latest("tab") == {}
+
+
+def test_at_break_follows_the_body_playing_now():
+    rig = Rig()
+    rig.p.mouth("sentence_break")
+    assert rig.p.at_break()
+    rig.p.speech("desktop", "talking")  # a reporting body overrides the mouth
+    assert not rig.p.at_break()
+    rig.p.speech("desktop", "sentence_break", "t1", 1)
+    assert rig.p.at_break()

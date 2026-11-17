@@ -158,14 +158,12 @@ async def _run_turn(
     history: list,
     tools: Callable[[], list[dict]],
     run_tool: Callable[[Call], Awaitable[str | list[dict]]],
-    inbox: list,
     notify: Callable[[str, dict], None],
     budget,
     step_cap: int,
     guards: Guards | None = None,
     turn_timeout: float | None = None,
-    on_owner_input: Callable[[], None] | None = None,
-    on_last_read: Callable[[], None] | None = None,
+    take_more: Callable[[], list[dict]] = lambda: [],
     on_rejected: Callable[[], None] | None = None,
     stop: asyncio.Event | None = None,
     on_detached: Callable[[dict, asyncio.Future], None] | None = None,
@@ -258,18 +256,15 @@ async def _run_turn(
                         )
                         if due is not None:
                             limit.reschedule(due + clock() - began)
-                        history.append(
-                            {"role": "user", "content": results + _drain(inbox, on_owner_input)}
-                        )
+                        history.append({"role": "user", "content": results + take_more()})
                         continue
                     closed = _close_dangling_tool_use(history)
                     if final.stop_reason == "refusal":
                         reason = "error"
                         break
-                    says = _drain(inbox, on_owner_input)
+                    # The last look: words said after it wait as new events for the next turn.
+                    says = take_more()
                     if not says:
-                        if on_last_read is not None:
-                            on_last_read()  # nothing said from here on can reach this turn
                         reason = "done"
                         break
                     if closed:
@@ -346,15 +341,6 @@ def _keep_shown(history: list, shown: list[str]) -> None:
     seen = "".join(shown)
     if seen.strip() and history and history[-1]["role"] == "user":
         history.append({"role": "assistant", "content": [{"type": "text", "text": seen}]})
-
-
-def _drain(inbox: list, on_owner_input: Callable[[], None] | None = None) -> list[dict]:
-    """Move the owner's says into history; `on_owner_input` fires only when there were some."""
-    blocks = [block for say in inbox for block in say]
-    inbox.clear()
-    if blocks and on_owner_input is not None:
-        on_owner_input()
-    return blocks
 
 
 async def _run_tools(

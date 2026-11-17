@@ -54,6 +54,10 @@ class Presence:
         # The body that reported last is the one playing now; with none reporting, the mouth.
         return next(reversed(self._reported.values()), self._mouth) != "idle"
 
+    def at_break(self) -> bool:
+        """Whether the speech playing now sits between two sentences."""
+        return next(reversed(self._reported.values()), self._mouth) == "sentence_break"
+
     def heard(self, body_id: str) -> tuple[str, int]:
         """The turn and how many of its sentences the body last reported finished."""
         return self._heard.get(body_id, ("", 0))

@@ -219,19 +219,19 @@ class _Recorder:
     def __init__(self) -> None:
         self.calls: list[tuple] = []
 
-    def set_speech_state(self, state, body_id, turn=None, n=None):
+    def speech(self, body_id, state, turn=None, n=None):
         self.calls.append(("state", state, body_id))
 
-    def speech_body_gone(self, body_id):
+    def speech_gone(self, body_id):
         self.calls.append(("gone", body_id))
 
 
-async def test_speech_state_frames_feed_the_dispatcher():
+async def test_speech_state_frames_feed_presence():
     rec = _Recorder()
     bodies = Bodies()
     session = make_session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
-    session.dispatcher.set_speech_state = rec.set_speech_state
-    session.dispatcher.speech_body_gone = rec.speech_body_gone
+    session.presence.speech = rec.speech
+    session.presence.speech_gone = rec.speech_gone
     server = await start_server("127.0.0.1", 0, bodies, "s1", session)
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     try:
@@ -275,12 +275,12 @@ async def test_a_reconnect_clears_the_old_connections_speech_state():
                 json.dumps({"jsonrpc": "2.0", "method": "speech_state", "params": frame})
             )
             await call(first, request("tools", {"tools": []}))
-            assert session.dispatcher._state == "talking"
+            assert session.presence.talking()
             async with connect(url) as second:  # replaces the first before any frame
                 await call(second, hello())
-                assert session.dispatcher._state == "idle"
+                assert not session.presence.talking()
             await asyncio.sleep(0.05)
-        assert session.dispatcher._state == "idle"
+        assert not session.presence.talking()
     finally:
         server.close()
         await server.wait_closed()
@@ -444,13 +444,14 @@ async def test_say_during_turn_joins(chat):
         await say_and_collect(ws, "a", "a", 2, frames)
         second = await say_and_collect(ws, "b", "b", 3, frames)
         assert second["result"] == {}
-        while len(frames) < 2:
-            frames.append(json.loads(await ws.recv())["params"])
-        started, joined = frames[:2]
+        gate.set()  # the turn takes the say in at its next step
+        async with asyncio.timeout(5):
+            while len([f for f in frames if "events" in f]) < 2:
+                frames.append(json.loads(await ws.recv())["params"])
+        started, joined = [f for f in frames if "events" in f][:2]
         assert started["state"] == "started"
         assert (joined["state"], joined["events"]) == ("joined", ["b"])
         assert joined["turn"] == started["turn"]
-        gate.set()
 
 
 async def test_say_with_a_known_id_returns_empty_and_starts_nothing(chat):

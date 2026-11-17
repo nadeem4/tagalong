@@ -10,7 +10,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
-from test_sessions import Gate, file_memory, finish_quietly, make, said, say, turns_done
+from test_sessions import Gate, file_memory, finish_quietly, idle, join, make, say
 from test_turn import ok_tool, tool_step
 
 from brain.memory import Memory
@@ -61,6 +61,7 @@ async def test_a_request_the_api_rejects_is_dropped_so_the_next_turn_works(tmp_p
     memory: Memory = file_memory(tmp_path)
     model = Rejects([])
     session, sent = make(model, memory)
+    join(session, "desktop")
     await session.say("desktop", say("a bad picture"))
     await finish_quietly(session)
     assert sent[-1][1]["reason"] == "error"
@@ -99,6 +100,7 @@ async def test_a_400_on_a_text_only_request_keeps_it(tmp_path):
     memory = file_memory(tmp_path)
     model = AlwaysRejects("Your credit balance is too low")
     session, _ = make(model, memory)
+    join(session, "desktop")
     await session.say("desktop", say("long story"))
     await finish_quietly(session)
     await session.say("desktop", say("try again"))
@@ -111,6 +113,7 @@ async def test_a_400_from_older_history_does_not_cut_requests_one_by_one(tmp_pat
     memory = file_memory(tmp_path)
     model = AlwaysRejects("messages.0.content.1: invalid block")
     session, _ = make(model, memory)
+    join(session, "desktop")
     for text in ("one", "two", "three"):
         await session.say("desktop", say(text))
         await finish_quietly(session)
@@ -122,6 +125,7 @@ async def test_a_400_on_a_request_with_an_image_is_dropped_whatever_it_says(tmp_
     memory = file_memory(tmp_path)
     model = AlwaysRejects("invalid_request_error")
     session, _ = make(model, memory)
+    join(session, "desktop")
     model.fail_calls = 1
     await session.say("desktop", SayParams(id="x", text="look", parts=[_image(1)]))
     await finish_quietly(session)
@@ -131,17 +135,18 @@ async def test_a_400_on_a_request_with_an_image_is_dropped_whatever_it_says(tmp_
     assert "look" not in json.dumps(model.seen[1])
 
 
-async def test_a_say_joined_to_a_rejected_turn_gets_its_own_turn(tmp_path):
+async def test_a_say_waiting_on_a_rejected_turn_gets_its_own_turn(tmp_path):
     hold = asyncio.Event()
     memory = file_memory(tmp_path)
     model = AlwaysRejects("Could not process image", hold=hold)
     model.fail_calls = 1
     session, sent = make(model, memory)
+    join(session, "desktop")
     await session.say("desktop", say("a bad picture"))
     await asyncio.sleep(0)
-    assert (await said(session, sent, "desktop", say("and also this"))).joined is True
+    await session.say("desktop", say("and also this"))
     hold.set()
-    await turns_done(session)
+    await idle(session)
     assert "a bad picture" not in json.dumps(model.seen[-1])
     assert "and also this" in json.dumps(model.seen[-1])
     assert session.history[-1]["role"] == "assistant"
@@ -170,7 +175,6 @@ async def test_a_400_after_a_tool_round_is_not_dropped():
         history=history,
         tools=lambda: [],
         run_tool=ok_tool,
-        inbox=[],
         notify=lambda m, p: None,
         budget=SimpleNamespace(spend=lambda u, m: None),
         step_cap=5,

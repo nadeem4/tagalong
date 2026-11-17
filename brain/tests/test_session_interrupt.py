@@ -318,13 +318,13 @@ async def test_a_late_tool_result_waits_for_the_next_turns_speech_then_arrives()
     await asyncio.wait_for(started.wait(), 1)
     await session.say("desktop", over("wait", first.turn, 0))
     await finish_quietly(session)  # the second turn ended; its reply is still being played
-    session.dispatcher.set_speech_state("talking")
+    session.presence.mouth("talking")
     release.set()
     for _ in range(20):
         await settle()
         await finish_quietly(session)
     assert len(model.seen) == 2  # held: no wake turn while the desktop is speaking
-    session.dispatcher.set_speech_state("sentence_break")
+    session.presence.mouth("sentence_break")
     for _ in range(20):
         await settle()
         await finish_quietly(session)

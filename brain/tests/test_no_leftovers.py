@@ -1,15 +1,23 @@
 """The attention framework replaced these paths; none of their names may come back.
 
 A name left behind is a second way to do the same thing. The scan covers the brain's source and
-the bodies' source. `Session._inbox` is deliberately not listed: it is the live way a say joins
-the turn that is still reading (see docs/brain.md), not a leftover of the old design.
+the bodies' source. The dispatcher's queue and the session's say inbox gave way to the runner.
 """
 
 import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-REMOVED = ["PARK_AFTER_S", "CLOSED_LINE", "MANY_LINE", "bargeIn", "WaitingAsks"]
+REMOVED = [
+    "PARK_AFTER_S",
+    "CLOSED_LINE",
+    "MANY_LINE",
+    "bargeIn",
+    "WaitingAsks",
+    "Dispatcher",
+    "_inbox",
+    "_says_waiting",
+]
 SKIP = {"node_modules", "dist", "out", ".venv", "__pycache__"}
 
 

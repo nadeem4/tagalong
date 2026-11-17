@@ -73,7 +73,7 @@ def start(
     *,
     run_tool=ok_tool,
     tools=None,
-    inbox=None,
+    take_more=None,
     budget=None,
     step_cap=10,
     guards=None,
@@ -89,7 +89,7 @@ def start(
         history=history,
         tools=tools or (lambda: []),
         run_tool=run_tool,
-        inbox=inbox if inbox is not None else [],
+        take_more=take_more or (lambda: []),
         notify=lambda m, p: sent.append((m, p)),
         budget=budget or Spend(),
         step_cap=step_cap,
@@ -177,24 +177,36 @@ async def test_raising_tool_gives_error_result():
     assert ("tool", ended) in sent
 
 
+def taker(*says):
+    """A take_more that hands each queued say over once, as the runner's would."""
+    queue = [list(s) for s in says]
+
+    def take() -> list[dict]:
+        out = [b for s in queue for b in s]
+        queue.clear()
+        return out
+
+    return queue, take
+
+
 async def test_say_queued_during_tools_follows_results():
-    inbox = []
+    queue, take = taker()
 
     async def tool(call):
-        inbox.append([{"type": "text", "text": "also this"}])
+        queue.append([{"type": "text", "text": "also this"}])
         return []
 
     _, history, _, _ = await go(
-        [tool_step(("c1", "x")), text_step("ok")], run_tool=tool, inbox=inbox
+        [tool_step(("c1", "x")), text_step("ok")], run_tool=tool, take_more=take
     )
     assert history[2]["content"][0]["type"] == "tool_result"
     assert history[2]["content"][-1] == {"type": "text", "text": "also this"}
-    assert inbox == []
+    assert queue == []
 
 
 async def test_say_queued_after_end_turn_runs_another_step():
-    inbox = [[{"type": "text", "text": "wait"}]]
-    reason, history, sent, model = await go([text_step("a"), text_step("b")], inbox=inbox)
+    _, take = taker([{"type": "text", "text": "wait"}])
+    reason, history, sent, model = await go([text_step("a"), text_step("b")], take_more=take)
     assert reason == "done"
     assert model.calls == 2
     assert history[2] == {"role": "user", "content": [{"type": "text", "text": "wait"}]}

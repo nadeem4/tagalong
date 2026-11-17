@@ -91,9 +91,11 @@ def set_state(
 ) -> None:
     done = at if state in ("handled", "gave_up") else None
     for id in ids:
+        # Back to `new` frees it from its turn, so the next taker's turn id is the only one.
         db.execute(
-            "UPDATE events SET state=?, end_reason=?, handled_at=? WHERE id=?",
-            (state, end_reason, done, id),
+            "UPDATE events SET state=?, end_reason=?, handled_at=?,"
+            " turn_id=CASE WHEN ?='new' THEN NULL ELSE turn_id END WHERE id=?",
+            (state, end_reason, done, state, id),
         )
 
 

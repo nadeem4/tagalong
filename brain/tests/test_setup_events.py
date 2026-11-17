@@ -39,12 +39,11 @@ def test_setup_event_survives_restart(tmp_path):
         event.payload,
         "setup:claude",
     )
-    assert "on_start" not in hooks  # a started turn is not yet a told one
-    hooks["on_end"]("cancelled")  # a cancelled wake did not carry it
+    hooks["on_end"]("new")  # returned at a stop: not told
     again_after = FakeEmit()
     make(mem, again_after).resume()
     assert len(again_after.sent) == 1
-    hooks["on_end"]("done")  # the wake turn finished: the news was told
+    hooks["on_end"]("handled")  # a turn handled the event: the news was told
     third = FakeEmit()
     make(mem, third).resume()
     assert third.sent == []

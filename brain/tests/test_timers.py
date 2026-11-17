@@ -34,7 +34,7 @@ def make(memory=None, clock=None, job_facts=None):
     events = []
     ends = []
 
-    def emit(event, *, on_end=None, retell=False, then=None):
+    def emit(event, *, on_end=None, then=None):
         if then is not None:  # the real door runs it in the event's transaction
             with transaction(memory.db):
                 then(memory.db)
@@ -60,9 +60,9 @@ def test_fire_due_emits_a_timer_event_and_a_one_off_is_done_at_the_fire():
     done = work.get(t.id)
     assert (done.state, done.end_reason) == ("done", "fired")
     assert done.reported_at is None  # the wake has not finished
-    timers.ends[0]("cancelled")
-    assert work.get(t.id).reported_at is None  # a cancelled wake did not carry the news
-    timers.ends[0]("done")
+    timers.ends[0]("new")
+    assert work.get(t.id).reported_at is None  # returned at a stop: not told
+    timers.ends[0]("handled")
     assert work.get(t.id).reported_at is not None
 
 
@@ -127,7 +127,7 @@ def test_a_one_off_already_told_cannot_be_cancelled():
     timers, work, _c, _events = make()
     t = add_timer(work, "x", T0 - timedelta(seconds=1))
     timers.fire_due()
-    timers.ends[0]("done")  # Scout heard it
+    timers.ends[0]("handled")  # Scout heard it
     assert timers.cancel(t.id, "late") is False
     assert timers.cancel("nope", "x") is False
 

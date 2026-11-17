@@ -1,7 +1,7 @@
 """ScoutQuestions: an expert's question goes to Scout first, who answers it or passes it on.
 
 ask() emits a job_question wake and waits; answer() or pass_to_user() settle it. A question
-that Scout never settles (wake dropped, turn ended) resolves to None, which means "ask the
+that Scout never settles (its event ended unanswered) resolves to None, which means "ask the
 owner", so the expert is never left hanging on a silent Scout. Each question is a `question`
 row under its job, so a job that ends takes its open questions with it.
 """
@@ -62,13 +62,12 @@ class ScoutQuestions:
             "message": question.message,
             "fields": "\n".join(_line(f) for f in question.fields),
         }
-        # Resolving twice is harmless: on_end fires after an answer too, so settle() guards.
-        settle = lambda: self._settle(qid, None, "expired", "Scout did not answer")  # noqa: E731
+        # The event ending in any way (told, given up, returned at a stop) settles an unanswered
+        # question, so no job waits forever; after an answer, settle() is a no-op.
         try:
             self._emit(
                 Event("job_question", f"job:{job_id}", facts),
-                on_drop=settle,
-                on_end=lambda reason: settle(),
+                on_end=lambda _state: self._settle(qid, None, "expired", "Scout did not answer"),
             )
             return await future
         finally:
