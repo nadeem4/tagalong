@@ -511,6 +511,19 @@ async def test_a_held_question_is_tried_again_after_the_recheck_with_nothing_new
     await rig.runner.stop()
 
 
+async def test_a_retried_event_that_ends_another_way_is_forgotten():
+    rig = LoopRig()
+    rig.say("s1")
+    await ticks()
+    [(turn, _, _)] = rig.session.started
+    rig.runner.turn_ended(turn, "error")
+    rig.log.finish(["s1"], "handled")  # ended outside a turn, e.g. by id
+    rig.runner.poke()
+    await ticks()
+    assert "s1" not in rig.runner._retried and "s1" not in rig.runner._held
+    await rig.runner.stop()
+
+
 async def test_a_say_saved_after_the_last_step_gets_the_next_turn():
     rig = LoopRig()
     rig.say("s1")

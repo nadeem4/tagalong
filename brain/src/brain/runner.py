@@ -241,8 +241,13 @@ class Runner:
         # Read once: a break latched while no news waited for it is spent here, so it cannot
         # let later news cut a sentence.
         at_break = self._presence.break_seen()
+        ready = self._release_questions(self._events.ready())
+        # Held and retried ids are never taken, so they are all `new`: one that is not ready
+        # was ended some other way (by id, as stale news, by an interjection).
+        waiting = {r.id for r in ready}
+        self._held &= waiting
+        self._retried &= waiting
         out = {*self._held, *(self._interjecting[1] if self._interjecting else [])}
-        ready = self._events.ready()
         got = pick(
             [r for r in ready if r.id not in out], self.target, lambda r: self.gate(r, at_break)
         )
@@ -272,6 +277,20 @@ class Runner:
             # This turn never ran: only rows already in the history from before are a retry.
             self._retried -= taken - retry
             raise
+
+    def _release_questions(self, ready: list[EventRow]) -> list[EventRow]:
+        """No key or a spent budget: Scout cannot answer an expert's question for now, so it
+        gives up and its end hook hands the question to the person. The rest of `ready`."""
+        if self._session.ready():
+            reason = "over_budget" if self.over_budget() else None
+        else:
+            reason = "no_key"
+        if reason is None:
+            return ready
+        ids = [r.id for r in ready if r.kind == "job_question"]
+        if ids:
+            self._events.finish(ids, "gave_up", end_reason=reason)
+        return [r for r in ready if r.kind != "job_question"]
 
     def _interject(self) -> bool:
         """Next-pause news while Scout speaks: one short call may tell it at this break. True

@@ -1834,6 +1834,26 @@ async def test_budget_spent_falls_back_to_the_user_card():
     assert len(user_cards(session)) == 1
 
 
+async def test_a_budget_spent_after_the_question_was_asked_hands_it_to_the_person():
+    gate = asyncio.Event()
+    budget = Flips()
+    bodies = Bodies()
+    bodies.notify = lambda m, p: None
+    model = Gate([gate, "one", "never"])
+    session = make_session(model, budget, bodies, 10, Memory(":memory:"), kinds=QUESTION_KINDS)
+    join(session, "desktop")
+    await session.say("desktop", say("a"))
+    await settle()
+    result = ask_expert(session)  # Scout could answer when it was asked
+    await settle()
+    budget.open = False  # then the day's budget ran out
+    gate.set()
+    await idle(session)
+    assert len(user_cards(session)) == 1
+    assert not result.done()  # the person's card holds the expert, not a silent Scout
+    result.cancel()
+
+
 async def test_question_waits_behind_a_running_user_turn():
     gate = asyncio.Event()
     model = Reactive([gate, "one", answer_step("Red"), "two"])
@@ -2472,6 +2492,17 @@ async def test_no_key_hands_an_experts_question_to_the_person():
     await settle()
     assert len(user_cards(session)) == 1
     assert [r.kind for r in session.events.ready()] == []  # Scout was never asked
+
+
+async def test_a_say_sent_twice_keeps_its_live_params():
+    gate = asyncio.Event()
+    session, _ = make(Gate([gate, "ok"]))
+    first = say("first")
+    await session.say("desktop", first)
+    await session.say("desktop", first.model_copy(update={"text": "again"}))
+    assert session._live_params[first.id] is first
+    gate.set()
+    await idle(session)
 
 
 async def test_a_say_without_key_leaves_no_live_params():

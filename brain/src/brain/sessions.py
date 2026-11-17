@@ -464,12 +464,11 @@ class Session:
             },
             id=params.id,
         )
-        self._live_params[say_event.id] = params
         if not self.events.post(
             say_event, on_end=lambda _state: self._live_params.pop(say_event.id, None)
         ):
-            self._live_params.pop(say_event.id, None)
             return  # a retried say: already one event, already answered or being answered
+        self._live_params[say_event.id] = params
         if not headless:
             self.presence.touch(body_id)
         if params.interrupted is not None and self.ready():
