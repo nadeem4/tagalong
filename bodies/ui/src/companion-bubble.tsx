@@ -207,6 +207,8 @@ export function CompanionBubble({
   const [question, setQuestion] = useState<string | null>(null);
   const conversation = useRef<string | undefined>(undefined);
   const mine = useRef<string | null>(null);
+  // True from submit until the bubble claims its turn; reads fresh, unlike `reply`.
+  const asking = useRef(false);
   // The running question was asked aloud: the brain speaks its answer, and the bubble offers the key to reply.
   const askedSpoken = useRef(false);
   // The last answer was to a spoken question: the bubble offers the key to reply.
@@ -289,7 +291,9 @@ export function CompanionBubble({
         return;
       case 'turn.started':
         // A background turn (Scout's own wake) runs on its own; it never answers here.
-        if (reply.state !== 'running' || event.background === true) return;
+        // `asking` (not `reply`) because the reply can beat the render that shows "running".
+        if (!asking.current || event.background === true) return;
+        asking.current = false;
         mine.current = event.turnId;
         conversation.current = event.conversationId;
         setReply({ state: 'running', turnId: event.turnId, text: '' });
@@ -547,6 +551,7 @@ export function CompanionBubble({
     setSpokenReply(false);
     setAskedAloud(heard);
     mine.current = null;
+    asking.current = true;
     askedSpoken.current = asSpoken;
     bridge
       .ask({
@@ -560,6 +565,7 @@ export function CompanionBubble({
         ...(interrupted !== undefined ? { interrupted } : {}),
       })
       .catch((error: unknown) => {
+        asking.current = false;
         setReply({
           state: 'failed',
           text: error instanceof Error ? error.message : 'Tagalong could not reach its brain.',
@@ -575,6 +581,7 @@ export function CompanionBubble({
   const checkHealth = (text: string, asSpoken: boolean): void => {
     if (mine.current !== null) void bridge.interrupt(mine.current);
     mine.current = null;
+    asking.current = false;
     askedSpoken.current = false;
     setQuestion(text);
     setAskedAloud(asSpoken);
