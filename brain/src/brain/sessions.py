@@ -13,7 +13,7 @@ import logging
 import sqlite3
 import uuid
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -243,6 +243,7 @@ class Session:
             events, self.presence, bodies, self, now, self.guards, quiet=quiet, kinds=self._kinds
         )
         self._interjection_cut = False  # the person talked over Scout during an interjection
+        self._cut: tuple[str, Interruption] | None = None  # a running turn talked over, and how
         self._carried: list[dict] = []  # what an interjection changed, shown to the next turn
         # A say's own params until its event ends: the saved copy is masked, and an errored
         # turn's say is tried again with them.
@@ -361,8 +362,9 @@ class Session:
             approvals,
             self._turn_origin,
             lambda turn: self._turn_cause if turn and turn == self._turn_id else None,
+            finish=self.events.finish,
         )
-        self._asks.on_item_answer = self._post_card_answer
+        self._asks.on_item_answer = self._card_answered
         self.toolbox = Toolbox(
             [BrainSource(tools), *sources],
             modes,
@@ -444,16 +446,12 @@ class Session:
             work.mark_reported(w.id)
 
     async def say(self, body_id: str, params: SayParams) -> None:
-        """Save the say; the runner starts its turn, or the running turn takes it in. Only the
-        person talking over Scout starts a turn here, at once."""
+        """Save the say; the runner starts its turn, or the running turn takes it in. A say
+        that talks over Scout first stops the turn it names, then waits its turn in order."""
         check_part_sizes(params.parts or [])  # over_limit, before anything changes
+        user_content(params)  # may raise ValueError before anything changes
         sender = self._bodies.body(body_id)
         headless = sender is not None and sender.display is False
-        # Its answer must appear where someone can see it.
-        shown_on = self._display_target() if headless else body_id
-        content = user_content(
-            params, read_aloud=self._wants_speech(shown_on, params)
-        )  # may raise ValueError before anything changes
         # Saved first, whatever happens to it next: a say that was heard is never lost.
         say_event = Event(
             "say",
@@ -472,21 +470,9 @@ class Session:
         if not headless:
             self.presence.touch(body_id)
         if params.interrupted is not None and self.ready():
-            after = self._task if self._busy() else None
             cut = self.interrupt(params.interrupted.turn, params.interrupted.heard)
-            if cut is not None:
-                turn = uuid.uuid4().hex
-                self.runner.adopt(turn, shown_on or BRAIN, [say_event.id])
-                self._start_turn(
-                    shown_on,
-                    content,
-                    after=after,
-                    cut=cut,
-                    turn_id=turn,
-                    said=params.text or "",
-                    events=[say_event.id],
-                )
-                self._speak(turn, shown_on, params)
+            if cut is not None:  # its turn is told what was said and what was left
+                self.events.amend(say_event.id, {"cut": asdict(cut)})
 
     def post_event(
         self,
@@ -526,6 +512,7 @@ class Session:
             content.append({"type": "text", "text": text})
         if not params and self._wants_speech(body, None):
             content.append({"type": "text", "text": ear_note()})
+        cut = next((r.payload["cut"] for r, _ in says if "cut" in r.payload), None)
         # Before the turn starts: nothing after it may fail, or the runner would free the one
         # turn while this one still runs.
         self._speak(turn_id, body, params[-1] if params else None)
@@ -533,6 +520,7 @@ class Session:
             body,
             content,
             by_person=bool(params),
+            cut=Interruption(**cut) if cut else None,
             turn_id=turn_id,
             said=" ".join(p.text for p in params if p.text),
             events=[r.id for r in rows],
@@ -561,12 +549,8 @@ class Session:
             return self._turn_body
         return self.events.origin_body(cause, lambda s: not is_internal(s)) or BRAIN
 
-    def _post_card_answer(self, ask_id: str, option: str, body_id: str) -> None:
-        """A card answer is saved, then its saved call runs; it never starts a turn itself."""
-        answer = Event("card_answer", body_id, {"ask": ask_id, "option": option})
-        self.events.post(answer)
-        self.events.finish([answer.id], "handled")
-        self.presence.touch(body_id)
+    def _card_answered(self, ask_id: str, option: str, body_id: str) -> None:
+        self.presence.touch(body_id)  # the person is at the body that answered
         self.ask_runner.answered(ask_id, option, body_id)
 
     async def interject(self, body_id: str, content: list) -> bool:
@@ -606,9 +590,10 @@ class Session:
         """The owner spoke over `turn` after the body played `heard` of its sentences. Stops what
         is still being said and pauses the turn if it is running: generation ends, tools already
         running finish in the background (their results come back through the front door) and
-        nothing else is cancelled, open items included. Returns what was said and what was left,
-        or None when there is nothing to hand over: a turn this session no longer knows, or one
-        the owner heard to the end (then their words are a plain say)."""
+        nothing else is cancelled, open items included. History keeps the heard part once the
+        turn has ended. Returns what was said and what was left, or None when there is nothing
+        to hand over: a turn this session no longer knows, or one the owner heard to the end
+        (then their words are a plain say)."""
         live = turn == self._turn_id
         if self.voice is None or not (live or (turn == self._last_turn and not self._busy())):
             return None
@@ -620,9 +605,13 @@ class Session:
         self._interjection_cut = True
         if self._turn_body is not None:
             self.voice.hush(self._turn_body)  # queued sentences must not keep coming
+        cut = Interruption(" ".join(sentences[:heard]), unsaid)
         if live and self._busy() and self._stop is not None:
+            self._cut = (turn, cut)  # its end writes it, before any later turn adds to history
             self._stop.set()
-        return Interruption(" ".join(sentences[:heard]), unsaid)
+        else:
+            self._record_cut(cut)
+        return cut
 
     async def stop_background(self) -> None:
         """The brain is closing: tools a paused turn left running end with it. (The Stop button
@@ -783,14 +772,6 @@ class Session:
         # Every time: the voice drops a hushed turn, and a later say must re-arm it. It ignores
         # a say for a turn it is already speaking.
         self.voice.spoken(turn, shown_on, speed, ask.system_voice if ask else False)
-
-    def _display_target(self) -> str | None:
-        shown = self._bodies.display_ids()
-        using = self.presence.using_now()
-        # A page's words are not shown on the phone while a screen is online.
-        if using in shown and (using == shown[0] or not self._bodies.is_phone(using)):
-            return using
-        return shown[0] if shown else None
 
     def body_event(self, body_id: str, name: str, data: object) -> None:
         if name == "read_aloud":  # a setting of the body, not something that happened
@@ -1022,15 +1003,13 @@ class Session:
         content: list,
         by_person: bool = True,
         *,
-        after: asyncio.Task | None = None,
         cut: Interruption | None = None,
         turn_id: str,
         said: str = "",
         events: list[str],
     ) -> str:
-        """`after` is a cancelled turn still winding down: this one waits for it, so the history it
-        closes is valid before anything is added. `cut` is what the owner talked over. `events`
-        are the ones the turn took; the first is its cause."""
+        """`cut` is what the owner talked over, told to this turn only. `events` are the ones the
+        turn took; the first is its cause."""
         self._turn_id = turn_id
         self._ear_due = False
         self._turn_job = None
@@ -1044,15 +1023,8 @@ class Session:
         lead = [*self._carried, *lead]  # what an interjection changed, once
         self._carried = []
 
-        def prepare() -> None:
-            if cut is not None:
-                self._record_cut(cut)
-            else:
-                self._drop_unanswered()
-            self._append_user(lead + content)
-
-        if after is None:
-            prepare()
+        self._drop_unanswered()
+        self._append_user(lead + content)
         # Read once per turn so the system prompt stays identical across its steps (cache).
         know = render_know(
             self._memory.always_loaded(), self._memory.asked_topics(), self._memory.shape()
@@ -1068,7 +1040,7 @@ class Session:
 
         def take_more() -> list[dict]:
             """The person's words that arrived on this body since the last step."""
-            if self._turn_id != turn_id:
+            if self._turn_id != turn_id or stop.is_set():  # a stopped turn takes in nothing
                 return []
             blocks = [{"type": "text", "text": ear_note()}] if self._ear_due else []
             self._ear_due = False
@@ -1087,9 +1059,6 @@ class Session:
                 self.voice.reply(turn_id, body_id, params)
 
         async def run() -> str:
-            if after is not None:
-                await asyncio.wait({after})
-                prepare()
             return await run_turn(
                 turn_id=turn_id,
                 body_id=body_id,
@@ -1240,6 +1209,9 @@ class Session:
         self, task: asyncio.Task, turn_id: str, body_id: str, lead: list, body_kind: str
     ) -> None:
         self._drop_lead(lead)
+        if self._cut is not None and self._cut[0] == turn_id:
+            self._record_cut(self._cut[1])
+            self._cut = None
         if task.cancelled():
             reason = "cancelled"
         elif task.exception() is not None:

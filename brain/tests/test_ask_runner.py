@@ -76,7 +76,9 @@ class Rig:
         self.approvals = Approvals(self.memory, self.work, lambda m, p: None, lambda: NOW)
         self.items = OpenItems(self.memory.db, lambda: self.clock[0])
         self.stored: dict[str, str] = {}
-        self.events: list[Event] = []
+        self.events: list[Event] = []  # what Scout is told
+        self.answers: list[Event] = []  # the person's saved card answers
+        self.finished: list[tuple[list[str], str]] = []  # events code ended, and how
         self.source = Source("t", effect=effect)
         self.engine = Engine(
             [StandingRule(stored_auto_rules(lambda: self.stored)), Person()],
@@ -88,10 +90,13 @@ class Rig:
             self.items,
             self.asks,
             lambda: self.box,
-            lambda event, **kw: self.events.append(event),
+            lambda event, **kw: (
+                self.answers if event.kind == "card_answer" else self.events
+            ).append(event),
             lambda: self.clock[0],
             self.approvals,
             cause=lambda turn: "evt-ask-turn" if turn == "t1" else None,
+            finish=lambda ids, state: self.finished.append((ids, state)),
         )
         self.asks.on_item_answer = self.runner.answered
         self.box = Toolbox(
@@ -128,6 +133,18 @@ async def test_ask_returns_open_without_waiting():
     assert item.deadline_at == NOW + timedelta(days=3)
     assert item.id in out and "do not call it again" in out
     assert rig.source.ran == []
+
+
+async def test_a_card_answer_event_is_handled_without_a_turn():
+    rig = Rig()
+    await rig.box.run(call())
+    [card] = rig.opened()
+    rig.asks.answer(card["id"], "allow", "desktop")
+    await rig.settle()
+    [answer] = rig.answers
+    assert (answer.source, answer.payload) == ("desktop", {"ask": card["id"], "option": "allow"})
+    assert rig.finished == [([answer.id], "handled")]  # code handled it: no turn takes it
+    assert rig.source.ran == [("t", {"n": 1})]  # the saved call ran
 
 
 async def test_answer_after_turn_cancel_runs_saved_call():

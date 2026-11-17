@@ -63,7 +63,10 @@ class AskRunner:
         approvals: Approvals,
         origin: Callable[[str], str] = lambda turn: BRAIN,
         cause: Callable[[str], str | None] = lambda turn: None,
+        *,
+        finish: Callable[[list[str], str], None],  # EventLog.finish: ends a card answer's event
     ) -> None:
+        self._finish = finish
         self._cause = cause  # turn id -> the event that turn took, None outside it: the ask's cause
         self._origin = origin  # the body showing a turn: where its asks' answers and news go back
         self._items = items
@@ -117,7 +120,11 @@ class AskRunner:
     # ---- the answer ----
 
     def answered(self, ask_id: str, option: str, body_id: str) -> None:
-        """A card was answered: count it and run the saved call, whatever became of the turn."""
+        """A card was answered: the answer is saved as a `card_answer` event that this code
+        handles, so it starts no turn; the saved call runs, whatever became of the turn."""
+        answer = Event("card_answer", body_id, {"ask": ask_id, "option": option})
+        self._emit(answer)
+        self._finish([answer.id], "handled")  # before the runner looks: its poke waits a tick
         self._spawn(self._answer(ask_id, option, body_id))
 
     async def _answer(self, ask_id: str, option: str, body_id: str) -> None:

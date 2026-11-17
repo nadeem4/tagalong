@@ -24,6 +24,7 @@ from test_sessions import (
     said,
     say,
     settle,
+    until,
     wake_started,
 )
 
@@ -184,7 +185,7 @@ async def test_card_answer_not_held_behind_waiting_say():
     await session.say("whatsapp", say("from the phone"))  # its own turn, queued behind the first
     seen: list[str] = []
     session.ask_runner.answered = lambda ask, option, body: seen.append(ask)
-    session._post_card_answer("a1", "allow", "desktop")
+    session._asks.on_item_answer("a1", "allow", "desktop")  # the card hook the answer frame calls
     await settle()
     assert seen == ["a1"]  # the door was not blocked by the say waiting for the turn
     gate.set()
@@ -325,7 +326,7 @@ async def test_a_barge_in_say_that_hands_off_is_the_jobs_cause(tmp_path):
     await settle()
     barge = over("wait", first.turn, 1)
     await session.say("desktop", barge)
-    await settle()
+    await until(lambda: session._turn_cause == barge.id)  # its turn, once the cut one ended
     job_id = await hand_off(session, tmp_path)
     assert job_ended_cause(session, memory, job_id) == barge.id
     gate.set()

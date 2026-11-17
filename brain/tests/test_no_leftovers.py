@@ -17,6 +17,9 @@ REMOVED = [
     "Dispatcher",
     "_inbox",
     "_says_waiting",
+    "_deliver_say",
+    "_start_wake",
+    "_post_card_answer",
 ]
 SKIP = {"node_modules", "dist", "out", ".venv", "__pycache__"}
 

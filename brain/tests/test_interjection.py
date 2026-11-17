@@ -217,6 +217,22 @@ async def test_continue_no_choice_or_empty_words_resumes_and_leaves_the_news_for
     assert model.plain_turns_with("Event: work_failed")  # not told yet: a plain wake tells it
 
 
+async def test_an_untold_interjection_event_goes_back_to_new():
+    model = Scripted(choice=("speech_continue", {}))
+    model.hold = asyncio.Event()
+    session, _ = await talking(model)
+    [news] = [r for r in session.events.ready() if r.kind == "work_failed"]
+    await at_the_break(session)
+    held = session.events.get(news.id)
+    assert held is not None and held.state == "taken"  # the call has it: no turn takes it too
+    model.hold.set()
+    await calm()
+    back = session.events.get(news.id)
+    assert back is not None and (back.state, back.turn_id) == ("new", None)
+    await finish(session, model)
+    assert model.plain_turns_with("Event: work_failed")
+
+
 async def test_replace_clears_the_player_and_says_the_words_as_a_new_turn():
     model = Scripted(choice=("speech_replace", {"text": SAID}))
     session, voice = await talking(model)

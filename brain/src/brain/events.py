@@ -242,6 +242,14 @@ class EventLog:
     def ready(self) -> list[store.EventRow]:
         return store.list_new(self._db, utc_text(self._now()))
 
+    def amend(self, id: str, fields: dict) -> None:
+        """Add facts learned after the save (what an interrupted say cut off), masked too."""
+        row = self.get(id)
+        if row is None:
+            return
+        with transaction(self._db):
+            store.set_payload(self._db, id, {**row.payload, **self._mask(fields)})
+
     def take(self, ids: list[str], turn_id: str) -> list[str]:
         with transaction(self._db):
             return store.set_taken(self._db, ids, turn_id)

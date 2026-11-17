@@ -3359,7 +3359,8 @@ async def test_answer_after_the_turn_was_cancelled_still_runs_the_call():
     session.answer(card["id"], "allow", "desktop")
     await settle()
     assert ran == ["files__tidy"]
-    assert [(e.kind, e.payload["outcome"], e.payload["result"]) for e in wakes] == [
+    told = [e for e in wakes if e.kind != "card_answer"]  # the answer itself is saved too
+    assert [(e.kind, e.payload["outcome"], e.payload["result"]) for e in told] == [
         ("ask_ended", "approved", "tidied")
     ]
 

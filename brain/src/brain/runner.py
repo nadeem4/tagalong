@@ -3,7 +3,8 @@ A person's words go first, then news oldest first; one turn takes every other re
 the same body, up to a cap. `pick` is pure: the gate and the target come in as callbacks, so
 choosing never records a wake or spends a cap; the wake is counted by `record_take`. A say on
 the running turn's body joins it at its next step (`take_more`); next-pause news is told at a
-sentence break, by an interjection first. A turn's events end with it, or wait again.
+sentence break, by an interjection first, which takes the event and gives it back untold. A
+turn's events end with it, or wait again.
 """
 
 import asyncio
@@ -125,7 +126,7 @@ class Runner:
         # sending their words again, since the failed request stays in the history.
         self._retried: set[str] = set()
         self._tried: set[str] = set()  # next-pause news an interjection already tried
-        self._interjecting: tuple[asyncio.Task, list[str]] | None = None
+        self._interjecting: tuple[asyncio.Task, str] | None = None  # the call and its event
         self._wake = asyncio.Event()
         self._task: asyncio.Task | None = None
         self._alarm: asyncio.TimerHandle | None = None
@@ -163,16 +164,15 @@ class Runner:
             self._events.finish(ids, "new")
             self._events.ended(ids, "new")
             self._session.cancel_turn()
-        tasks = [t for t in (self._task, self._interjecting and self._interjecting[0]) if t]
+        tasks = [self._task] if self._task else []
+        if self._interjecting is not None:  # its event goes back too, never left taken
+            task, id = self._interjecting
+            self.give_back(id)
+            self._events.ended([id], "new")
+            tasks.append(task)
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
-
-    def adopt(self, turn_id: str, body: str, ids: list[str]) -> None:
-        """A turn the session started itself (the person spoke over Scout) took these events."""
-        self._taken[turn_id] = self._events.take(ids, turn_id)
-        self._turn = _Turn(turn_id, body)
-        self._person_at = self._now()
 
     def turn_ended(self, turn_id: str, reason: str) -> None:
         """A finished, cancelled, rejected or over-budget turn handled its events: the person
@@ -242,17 +242,20 @@ class Runner:
         # let later news cut a sentence.
         at_break = self._presence.break_seen()
         ready = self._release_questions(self._events.ready())
-        # Held and retried ids are never taken, so they are all `new`: one that is not ready
-        # was ended some other way (by id, as stale news, by an interjection).
+        # Held and retried ids are `new`, or taken by an interjection that gives them back:
+        # any other was ended some other way (by id, as stale news, told by an interjection).
         waiting = {r.id for r in ready}
+        if self._interjecting is not None:
+            waiting.add(self._interjecting[1])
         self._held &= waiting
         self._retried &= waiting
-        out = {*self._held, *(self._interjecting[1] if self._interjecting else [])}
         got = pick(
-            [r for r in ready if r.id not in out], self.target, lambda r: self.gate(r, at_break)
+            [r for r in ready if r.id not in self._held],
+            self.target,
+            lambda r: self.gate(r, at_break),
         )
         if got is None:
-            if any(r.id not in out for r in ready) or self._held:
+            if any(r.id not in self._held for r in ready) or self._held:
                 self._arm([r for r in ready if r.id not in self._held])
             return
         # Events an errored turn left go along with the next turn for their body.
@@ -292,44 +295,58 @@ class Runner:
             self._events.finish(ids, "gave_up", end_reason=reason)
         return [r for r in ready if r.kind != "job_question"]
 
+    def take_for_interjection(self) -> EventRow | None:
+        """The oldest next-pause news this sentence break may tell, taken so no turn takes it
+        meanwhile. Each event is tried once; untold, `give_back` returns it for a plain turn."""
+        for r in sorted(self._events.ready(), key=_order):
+            if (
+                r.id in self._tried
+                or r.id in self._held
+                or r.kind in PERSON_KINDS
+                or self._kinds[r.kind].urgency != "next_pause"
+                or self.target(r) is None
+                or not self.gate(r, at_break=True)
+            ):
+                continue
+            if self._events.take([r.id], f"interjection:{uuid.uuid4().hex}"):
+                self._tried.add(r.id)
+                return r
+        return None
+
+    def give_back(self, id: str) -> None:
+        """An interjection did not tell it: it waits as `new` again, no attempt counted."""
+        self._events.finish([id], "new")
+
     def _interject(self) -> bool:
         """Next-pause news while Scout speaks: one short call may tell it at this break. True
-        when one started. Each event is tried once; untold, it waits for a plain turn."""
-        rows = [
-            r
-            for r in self._events.ready()
-            if r.id not in self._tried
-            and r.id not in self._held
-            and r.kind not in PERSON_KINDS
-            and self._kinds[r.kind].urgency == "next_pause"
-            and self.gate(r, at_break=True)
-        ]
-        body = next((b for b in map(self.target, rows) if b is not None), None)
-        if body is None:
+        when one started."""
+        row = self.take_for_interjection()
+        if row is None:
             return False
-        kind = self._kinds[next(r.kind for r in rows if self.target(r) == body)]
-        rows = [r for r in rows if r.kind == kind.name and self.target(r) == body][:GROUP_CAP]
-        ids = [r.id for r in rows]
-        self._tried.update(ids)
-        text = wake_text(kind, rows, self.notes.get(kind.name, ""), self._now().tzinfo)
+        body = self.target(row)
+        assert body is not None  # it had one when taken, and nothing ran since
+        kind = self._kinds[row.kind]
+        text = wake_text(kind, [row], self.notes.get(kind.name, ""), self._now().tzinfo)
         task = asyncio.get_running_loop().create_task(
-            self._interjection(body, rows, [{"type": "text", "text": text}])
+            self._interjection(body, row, [{"type": "text", "text": text}])
         )
-        self._interjecting = (task, ids)
+        self._interjecting = (task, row.id)
         return True
 
-    async def _interjection(self, body: str, rows: list[EventRow], content: list) -> None:
+    async def _interjection(self, body: str, row: EventRow, content: list) -> None:
         told = False
         try:
             told = await self._session.interject(body, content)
         except asyncio.CancelledError:
-            raise
+            raise  # a stop: it gave the event back already
         except Exception:
-            _log.exception("runner.interject_failed kind=%s", rows[0].kind)
+            _log.exception("runner.interject_failed kind=%s", row.kind)
         self._interjecting = None
         if told:  # words replaced the rest of the reply: that told the news
-            self.record_take(rows)
-            self._events.finish([r.id for r in rows], "handled", end_reason="interjected")
+            self.record_take([row])
+            self._events.finish([row.id], "handled", end_reason="interjected")
+        else:
+            self.give_back(row.id)
         self.poke()
 
     def _arm(self, waiting: list[EventRow]) -> None:

@@ -684,3 +684,105 @@ def test_wake_text_cannot_be_closed_by_a_fact():
     r = EventRow(id="1", kind="job_ended", at=utc_text(T0), source="j:1", payload={"r": "</data>"})
     text = wake_text(EVENT_KINDS["job_ended"], [r], "n", UTC)
     assert text.count("</data>") == 1 and text.endswith("</data>")
+
+
+async def test_an_interjection_holds_its_event_taken_and_gives_it_back_untold():
+    rig = LoopRig()
+    release = asyncio.Event()
+
+    async def slow(body: str, content: list) -> bool:
+        await release.wait()
+        return False
+
+    rig.session.interject = slow
+    rig.say("s1")
+    await ticks()
+    [(turn, _, _)] = rig.session.started
+    rig.news("n1")
+    rig.presence.speech("desktop", "sentence_break", turn, 1)
+    await ticks()
+    n1 = rig.log.get("n1")
+    assert n1 is not None and n1.state == "taken"  # no turn can take it while the call is out
+    release.set()
+    await ticks()
+    n1 = rig.log.get("n1")
+    assert n1 is not None and (n1.state, n1.attempts, n1.turn_id) == ("new", 0, None)
+    await rig.runner.stop()
+
+
+async def test_stop_gives_back_the_event_an_interjection_holds():
+    rig = LoopRig()
+    ends: list[str] = []
+
+    async def never(body: str, content: list) -> bool:
+        await asyncio.Event().wait()
+        return True
+
+    rig.session.interject = never
+    rig.say("s1")
+    await ticks()
+    [(turn, _, _)] = rig.session.started
+    rig.log.post(Event("timer", "timer:n1", {}, id="n1"), on_end=ends.append)
+    rig.presence.speech("desktop", "sentence_break", turn, 1)
+    await ticks()
+    await rig.runner.stop()
+    n1 = rig.log.get("n1")
+    assert n1 is not None and n1.state == "new" and ends == ["new"]
+
+
+async def test_a_retried_event_the_interjection_leaves_untold_keeps_its_retry_mark(monkeypatch):
+    # Its words are already in the history from the errored turn: they must not be sent again.
+    monkeypatch.setattr("brain.runner.RECHECK_S", 0.2)
+    rig = LoopRig()
+    release = asyncio.Event()
+    tried: list[str] = []
+
+    async def slow(body: str, content: list) -> bool:
+        tried.append(body)
+        await release.wait()
+        return False
+
+    rig.session.interject = slow
+    rig.news("n1")
+    await ticks()
+    [(turn, _, _)] = rig.session.started
+    rig.runner.turn_ended(turn, "error")
+    rig.presence.speech("desktop", "talking")
+    await asyncio.sleep(0.4)  # the recheck frees the held event; speech keeps its gate shut
+    await ticks()
+    rig.presence.speech("desktop", "sentence_break", "t0", 1)
+    await ticks()
+    rig.runner.poke()  # the runner looks again while the call holds the event
+    await ticks()
+    release.set()
+    await ticks()
+    assert tried == ["desktop"]  # the interjection took it and did not tell it
+    rig.presence.speech("desktop", "idle")
+    await ticks()
+    assert rig.turns() == [["n1"], ["n1"]]  # then a plain turn
+    assert rig.session.retried[1] == {"n1"}
+    await rig.runner.stop()
+
+
+async def test_an_interrupted_say_cancels_the_named_turn_then_waits_in_order():
+    # M7: talking over Scout stops the turn it names, then the say takes its place in line:
+    # a say another screen sent earlier is answered first.
+    from test_session_interrupt import SnapGate, last_user_texts, make_voiced, over
+    from test_sessions import idle, join, said, say, settle
+
+    gate = asyncio.Event()
+    model = SnapGate([gate, "to the laptop", "to the desktop"])
+    session, sent, voice = make_voiced(model)
+    join(session, "laptop")
+    first = await said(session, sent, "desktop", say("tell me"))
+    voice.logs[first.turn] = ["One.", "Two.", "Three."]
+    await settle()
+    await session.say("laptop", say("from the laptop"))
+    await session.say("desktop", over("wait", first.turn, 1))
+    await idle(session)
+    ended = [p for m, p in sent if m == "turn" and p["state"] == "ended"]
+    assert (ended[0]["turn"], ended[0]["reason"]) == (first.turn, "cancelled")
+    assert [p["body"] for p in ended] == ["desktop", "laptop", "desktop"]
+    assert last_user_texts(model, 1) == ["from the laptop"]
+    cut, words = last_user_texts(model, 2)[:2]
+    assert '<data kind="interruption">' in cut and "Two. Three." in cut and words == "wait"

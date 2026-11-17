@@ -86,6 +86,10 @@ def set_taken(db: sqlite3.Connection, ids: list[str], turn_id: str) -> list[str]
     return moved
 
 
+def set_payload(db: sqlite3.Connection, id: str, payload: dict) -> None:
+    db.execute("UPDATE events SET payload_json=? WHERE id=?", (json.dumps(payload), id))
+
+
 def set_state(
     db: sqlite3.Connection, ids: list[str], state: str, *, end_reason: str | None, at: str
 ) -> None:

@@ -255,6 +255,15 @@ def test_post_masks_the_payload(log):
     assert "[secret]" in log.get("e1").payload["text"]
 
 
+def test_amend_adds_masked_fields_to_the_payload(log):
+    key = "sk-ant-" + "a" * 30
+    log.post(Event("say", "desktop", {"text": "wait"}, id="e1"))
+    log.amend("e1", {"cut": {"spoken": "One.", "unsaid": f"use {key}"}})
+    payload = log.get("e1").payload
+    assert payload["text"] == "wait" and payload["cut"]["spoken"] == "One."
+    assert key not in payload["cut"]["unsaid"] and "[secret]" in payload["cut"]["unsaid"]
+
+
 def test_duplicate_say_id_is_one_event(log):
     ev = Event("say", "desktop", {"text": "hi"}, id="s1")
     assert log.post(ev) is True

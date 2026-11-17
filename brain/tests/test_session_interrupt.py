@@ -13,7 +13,7 @@ from types import SimpleNamespace
 from test_sessions import (
     Gate,
     RecordingVoice,
-    finish_quietly,
+    idle,
     join,
     make,
     read_aloud,
@@ -83,7 +83,7 @@ async def talk_over_a_running_turn(heard=1, steps=None):
     voice.logs[first.turn] = ["One.", "Two.", "Three."]
     await settle()
     second = await said(session, sent, "desktop", over("wait", first.turn, heard))
-    await finish_quietly(session)
+    await idle(session)
     return session, sent, voice, model, first, second
 
 
@@ -103,7 +103,7 @@ async def test_next_turn_receives_spoken_and_unsaid_once():
     block = last_user_texts(model)[0]
     assert "One." in block and "Two. Three." in block
     await session.say("desktop", say("and now?"))
-    await finish_quietly(session)
+    await idle(session)
     assert "interruption" not in json.dumps(model.seen[-1])
 
 
@@ -115,7 +115,7 @@ async def test_unsaid_is_not_in_saved_history():
     voice.logs[first.turn] = ["One.", "Two.", "Three."]
     await settle()
     await session.say("desktop", over("wait", first.turn, 1))
-    await finish_quietly(session)
+    await idle(session)
     assert "Two. Three." not in json.dumps(memory.load_messages())
     assert "Two. Three." not in json.dumps(session.history)
 
@@ -124,10 +124,10 @@ async def test_saved_history_keeps_only_the_spoken_sentences_and_marks_the_cut()
     memory = Memory(":memory:")
     session, sent, voice = make_voiced(SnapGate(["One. Two. Three.", "ok"]), memory)
     first = await said(session, sent, "desktop", say("tell me"))
-    await finish_quietly(session)
+    await idle(session)
     voice.logs[first.turn] = ["One.", "Two.", "Three."]
     await session.say("desktop", over("wait", first.turn, 1))
-    await finish_quietly(session)
+    await idle(session)
     cut = {"type": "text", "text": f"One.\n\n{MARK}"}
     assert session.history[1] == {"role": "assistant", "content": [cut]}
     assert memory.load_messages()[1] == {"role": "assistant", "content": [cut]}
@@ -148,11 +148,11 @@ async def test_second_interrupt_replaces_the_first_unsaid():
     voice.logs[a.turn] = ["A1.", "A2."]
     await settle()
     b = await said(session, sent, "desktop", over("wait", a.turn, 1))
-    voice.logs[b.turn] = ["B1.", "B2."]
     while len(model.seen) < 2:  # b waits for a to wind down, then asks the model
         await asyncio.sleep(0.005)
+    voice.logs[b.turn] = ["B1.", "B2."]
     await session.say("desktop", over("no, this", b.turn, 0))
-    await finish_quietly(session)
+    await idle(session)
     block = last_user_texts(model)[0]
     assert "B1. B2." in block and "A2." not in block
 
@@ -162,7 +162,7 @@ async def test_stale_turn_in_interrupted_is_a_plain_say():
     session, _, voice = make_voiced(model)
     voice.logs["gone"] = ["Old."]
     await session.say("desktop", over("hello", "gone", 0))
-    await finish_quietly(session)
+    await idle(session)
     assert last_user_texts(model)[0] == "hello"
     assert MARK not in json.dumps(session.history)
 
@@ -170,10 +170,10 @@ async def test_stale_turn_in_interrupted_is_a_plain_say():
 async def test_interrupt_after_all_sentences_has_empty_unsaid():
     session, sent, voice = make_voiced(SnapGate(["One. Two.", "ok"]))
     first = await said(session, sent, "desktop", say("tell me"))
-    await finish_quietly(session)
+    await idle(session)
     voice.logs[first.turn] = ["One.", "Two."]
     await session.say("desktop", over("thanks", first.turn, 2))
-    await finish_quietly(session)
+    await idle(session)
     assert MARK not in json.dumps(session.history)
     assert states(sent) == ["started", "ended", "started", "ended"]
     assert session.history[1]["content"] == [{"type": "text", "text": "One. Two."}]
@@ -188,7 +188,7 @@ async def test_history_stays_valid_after_a_cancel_mid_tool_call():
     for _ in range(20):
         await asyncio.sleep(0.005)
     await session.say("desktop", over("wait", first.turn, 1))
-    await finish_quietly(session)
+    await idle(session)
     roles = [m["role"] for m in session.history]
     assert all(a != b for a, b in zip(roles, roles[1:], strict=False))  # strictly alternating
     uses = [
@@ -236,7 +236,7 @@ async def test_a_cut_after_streamed_words_replaces_them_with_the_heard_part():
     voice.logs[first.turn] = ["One.", "Two.", "Three."]
     await settle()
     await session.say("desktop", over("wait", first.turn, 1))
-    await finish_quietly(session)
+    await idle(session)
     assert [m["role"] for m in session.history] == ["user", "assistant", "user", "assistant"]
     assert session.history[1]["content"] == [{"type": "text", "text": f"One.\n\n{MARK}"}]
     assert "Two. Three." not in json.dumps(session.history)
@@ -257,7 +257,7 @@ async def test_interrupt_keeps_partial_and_unsaid():
     await settle()
     task = session._task
     await session.say("desktop", over("wait", first.turn, 1))
-    await finish_quietly(session)
+    await idle(session)
     assert not task.cancelled() and task.result() == "cancelled"
     assert session.history[1]["content"] == [{"type": "text", "text": f"One.\n\n{MARK}"}]
 
@@ -269,7 +269,7 @@ async def test_interrupt_does_not_close_open_items():
     voice.logs[first.turn] = ["One.", "Two."]
     await settle()
     await session.say("desktop", over("wait", first.turn, 1))
-    await finish_quietly(session)
+    await idle(session)
     assert session.items.get(item.id).state == "open"
 
 
@@ -289,12 +289,12 @@ async def test_inflight_tool_result_returns_via_front_door():
     voice.logs[first.turn] = ["One."]
     await asyncio.wait_for(started.wait(), 1)  # the tool is really running
     await session.say("desktop", over("wait", first.turn, 0))
-    await finish_quietly(session)  # the second turn ends; the tool is still running
+    await idle(session)  # the second turn ends; the tool is still running
     assert len(model.seen) == 2
     release.set()
     for _ in range(20):
         await settle()
-        await finish_quietly(session)
+        await idle(session)
     assert "the late answer" in json.dumps(model.seen[-1])
     assert len(model.seen) == 3  # one wake turn carried it, nothing ran alongside
 
@@ -317,17 +317,17 @@ async def test_a_late_tool_result_waits_for_the_next_turns_speech_then_arrives()
     voice.logs[first.turn] = ["One."]
     await asyncio.wait_for(started.wait(), 1)
     await session.say("desktop", over("wait", first.turn, 0))
-    await finish_quietly(session)  # the second turn ended; its reply is still being played
+    await idle(session)  # the second turn ended; its reply is still being played
     session.presence.mouth("talking")
     release.set()
     for _ in range(20):
         await settle()
-        await finish_quietly(session)
+        await idle(session)
     assert len(model.seen) == 2  # held: no wake turn while the desktop is speaking
     session.presence.mouth("sentence_break")
     for _ in range(20):
         await settle()
-        await finish_quietly(session)
+        await idle(session)
     assert len(model.seen) == 3
     assert "the late answer" in json.dumps(model.seen[-1])
 
@@ -357,7 +357,7 @@ async def test_no_second_turn_alongside():
     await settle()
     first_task.append(session._task)
     await session.say("desktop", over("wait", first.turn, 0))
-    await finish_quietly(session)
+    await idle(session)
     assert ended_when_asked == [False, True]  # the first call was made before the task existed
     release.set()
     await settle()
@@ -385,7 +385,7 @@ async def test_stopping_the_session_cancels_tools_left_running():
     voice.logs[first.turn] = ["One."]
     await asyncio.wait_for(started.wait(), 1)  # the tool is really running
     await session.say("desktop", over("wait", first.turn, 0))
-    await finish_quietly(session)
+    await idle(session)
     await session.stop_background()
     assert cancelled == [True]
     assert not session._background
