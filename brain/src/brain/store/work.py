@@ -937,17 +937,6 @@ class WorkStore:
 
     # ---- what is waiting ----
 
-    def unreported(self, kinds: Sequence[str] | None = None) -> list[WorkRow]:
-        where = "reported_at IS NULL AND state IN ('done','failed','cancelled','expired','blocked')"
-        args: list = []
-        if kinds is not None:
-            where += f" AND kind IN ({','.join('?' * len(kinds))})"
-            args += list(kinds)
-        return self._select(where, args, "updated_at, rowid")
-
-    def mark_reported(self, id: str) -> None:
-        self.db.execute("UPDATE work SET reported_at = ? WHERE id = ?", (self._stamp(), id))
-
     def due(self, kinds: Sequence[str]) -> list[WorkRow]:
         marks = ",".join("?" * len(kinds))
         return self._select(

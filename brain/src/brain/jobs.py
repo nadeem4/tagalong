@@ -187,8 +187,7 @@ class Jobs:
             if outcome == "held a secret":
                 continue  # Scout's own ask: the waiting asks tell him once, when his wake starts
             if row is not None and row.kind in ("ask", "question"):
-                work.mark_reported(work_id)  # nobody is told of an ask that died with the brain
-                continue
+                continue  # nobody is told of an ask that died with the brain
             if row is None or row.kind != "expert_call" or row.parent_id is None:
                 continue
             job_id = row.parent_id
@@ -364,22 +363,15 @@ class Jobs:
     def _supersede(self, earlier: Job, part: JobPart, into: str | None) -> None:
         """Carried on: a part a restart, a shutdown or a stop left behind is done with once its
         continuation runs, so its job stops showing as open instead of lingering beside the new
-        one. A part added to the same job, or another part still open, keeps the job open.
-        Marking a failed or stopped part reported is safe only because the caller passed an
-        explicit continue_job: the person asked to carry on, so nothing is hidden from them."""
+        one. A part added to the same job, or another part still open, keeps the job open."""
         if part.state == "blocked":
-            self._records.update_part(
-                earlier.id, part.id, state="cancelled", reason="carried on", reported=True
-            )
-        else:
-            self._records.update_part(earlier.id, part.id, reported=True)
+            self._records.update_part(earlier.id, part.id, state="cancelled", reason="carried on")
         if into != earlier.id and not any(
             c.state in OPEN for c in self._records.work.children(earlier.id)
         ):
             goal = self._records.work.get(earlier.id)
             if goal is not None and goal.state in OPEN:
                 self._records.work.transition(earlier.id, "cancelled", reason="carried on")
-            self._records.mark_reported(earlier.id)
 
     def _check_apps(self, wanted: Sequence[str]) -> tuple[str, ...]:
         """The offered apps, deduplicated; a plain refusal for one that is unknown or not usable."""

@@ -8,7 +8,7 @@ import logging
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import cache
 from importlib.resources import files
 from typing import Literal
@@ -60,7 +60,6 @@ _KINDS = (
     EventKind("say", urgency="now", wakes=False),
     EventKind("card_answer", urgency="now", wakes=False),
     EventKind("timer", urgency="next_pause", batch_seconds=0, max_per_hour=6),
-    EventKind("watches_paused", urgency="idle", batch_seconds=0, max_per_hour=2),
     EventKind("job_ended", urgency="idle", batch_seconds=30, max_per_hour=10),
     EventKind("ask_notice", urgency="idle", batch_seconds=60, max_per_hour=6),
     EventKind("ask_ended", urgency="next_pause", batch_seconds=30, max_per_hour=10),
@@ -163,6 +162,9 @@ def load_notes() -> dict[str, str]:
 # focus, tab, download and setup_progress are latest-value facts and are never stored.
 SAVED_KINDS = frozenset(k.name for k in _KINDS if k.wakes) | {"say", "card_answer"}
 
+BACKOFF_S = (30, 120, 600)  # the waits before the 1st, 2nd and 3rd retry of a failed turn
+MAX_RETRIES = 3  # the failure after the last retry gives the event up
+
 _INTERNAL_SOURCES = frozenset({"scout"})  # the rest are `kind:id`, internal by the ":" rule
 
 
@@ -263,12 +265,41 @@ class EventLog:
         if state in ("handled", "gave_up"):
             self.ended(ids, state)
 
-    def finish_matching(self, kind: str, source: str, state: str = "handled") -> None:
-        """End the waiting events of this kind and source: stale news is never told."""
+    def backoff(self, ids: list[str], reason: str, *, resume: bool = True) -> None:
+        """A turn that took these failed (`error`, `step_cap`): each waits 30 s, 2 min, then
+        10 min and is tried again; the fourth failure gives it up. `resume=False` when the
+        turn never started, so nothing of it reached the history."""
+        now = self._now()
+        gave_up: list[str] = []
+        with transaction(self._db):
+            for id in ids:
+                row = store.get(self._db, id)
+                if row is None or row.state != "taken":
+                    continue  # ended some other way while the turn ran
+                if row.attempts < MAX_RETRIES:
+                    wait = timedelta(seconds=BACKOFF_S[row.attempts])
+                    store.set_backoff(self._db, [id], utc_text(now + wait), reason, resume=resume)
+                else:
+                    gave_up += store.set_gave_up(self._db, [id], reason, utc_text(now))
+        self.ended(gave_up, "gave_up")
+
+    def gave_up(self) -> list[store.EventRow]:
+        """Events Scout could not finish, not yet told: the next person turn hears of them."""
+        return store.list_state(self._db, "gave_up")
+
+    def next_retry(self) -> datetime | None:
+        """When the soonest backing-off event is ready again; None when none waits."""
+        text = store.next_not_before(self._db, utc_text(self._now()))
+        return None if text is None else datetime.fromisoformat(text)
+
+    def finish_matching(self, kind: str, source: str, state: str = "handled") -> list[str]:
+        """End the waiting events of this kind and source: stale news is never told. Returns
+        the ids it ended."""
         with transaction(self._db):
             ids = store.new_ids(self._db, kind, source)
             store.set_state(self._db, ids, state, end_reason=None, at=utc_text(self._now()))
         self.ended(ids, state)
+        return ids
 
     def ended(self, ids: list[str], state: str) -> None:
         """Call each event's `on_end` once; a raising hook must not stop the others."""

@@ -298,7 +298,8 @@ class Session:
             apps=apps,
             before_start=before_job,
         )
-        self.jobs.startup()  # parts left running by a dead brain: held for a carry-on, or failed
+        # Parts left running by a dead brain: held for a carry-on, or failed. Told below.
+        settled = self.jobs.startup()
         timers = self.timers = Timers(
             self.records.work,
             self.post_event,
@@ -414,36 +415,30 @@ class Session:
         # whether it uses its system voice. Kept across a reconnect; the body also resends it.
         self._read_aloud: dict[str, ReadAloudData] = {}
         bodies.on_connect = self._on_connect
-        for job in self.records.unreported_jobs():  # ended while the brain was down, or never told
-            self._on_job_finished(job)
-        self._tell_paused_watches()
-        # Steps that gave up (or that the restart scan could not vouch for) and were never told.
-        for step in self.records.work.of_kind("tool_call", ["failed"]):
-            if step.reported_at is None:
-                self._tell_given_up(step)
+        # News posted before the stop waits in the event log; what the restart scan settled
+        # is news now. A crash between the scan and these posts loses it (the scan won't redo).
+        self._tell_settled(settled)
         timers.start()
         self.ask_runner.start()
         self.runner.start()  # a no-op until a loop runs; a post starts it then
 
-    def _tell_paused_watches(self) -> None:
-        """Watches a migration paused are mentioned once, then marked told."""
+    def _tell_settled(self, settled: list[tuple[str, str]]) -> None:
+        """A step the restart scan failed is told as given up; a job it left with no part
+        running is told as ended (a held part waits for Scout to carry it on)."""
         work = self.records.work
-        paused = [w for w in work.of_kind("watch", ["paused"]) if w.reported_at is None]
-        if not paused:
-            return
-        entries = [
-            f"{w.id}: {w.title}"
-            + (f" ({(w.input or {})['cadence']})" if (w.input or {}).get("cadence") else "")
-            for w in paused
-        ]
-        told = [entries[0][:1500]]  # whole entries only; one alone may be cut
-        for entry in entries[1:]:
-            if len("; ".join([*told, entry])) > 1500:
-                break
-            told.append(entry)
-        self.post_event(Event("watches_paused", "scout", {"watches": "; ".join(told)}))
-        for w in paused[: len(told)]:  # the rest are told at the next start
-            work.mark_reported(w.id)
+        jobs: list[str] = []
+        for work_id, _ in settled:
+            row = work.get(work_id)
+            if row is None:
+                continue
+            if row.kind == "tool_call" and row.state == "failed":
+                self._tell_given_up(row)
+            elif row.kind == "expert_call" and row.parent_id and row.parent_id not in jobs:
+                jobs.append(row.parent_id)
+        for job_id in jobs:
+            job = self.records.get_job(job_id)
+            if job is not None and job.state != "active":
+                self._on_job_finished(job)
 
     async def say(self, body_id: str, params: SayParams) -> None:
         """Save the say; the runner starts its turn, or the running turn takes it in. A say
@@ -485,30 +480,56 @@ class Session:
         told. `on_end(state)` hears once that it was handled, given up, or returned at a stop."""
         self.events.post(event, then=then, on_end=on_end)
 
-    def start_events(self, turn_id: str, body: str, rows: list[EventRow], retry: set[str]) -> None:
+    def start_events(
+        self, turn_id: str, body: str, rows: list[EventRow], gave_up: list[EventRow]
+    ) -> None:
         """The runner took these events for a turn on `body`: the person's words first, then
-        each kind's news as one fenced block. `retry` rows were sent by a turn that errored;
-        their words are still in the history, so one line says they are being tried again."""
+        each kind's news as one fenced block. A `resume` row was sent by a failed turn and its
+        words are still in the history: after an error one line says it is tried again, after
+        another end (the step cap) a marked fact names it. `gave_up` rows are told once, as
+        marked facts, with only a say's words, never its settings."""
         if not self.ready():
             self._end_unanswered(turn_id, body, [r.id for r in rows])
-            self.runner.turn_ended(turn_id, "done")  # nothing can answer; no use asking again
+            # Nothing can answer and no use asking again; a given-up rider was not told.
+            self.runner.turn_ended(turn_id, "unanswered")
             return
+        tz = self._now().tzinfo
         says = [(r, self._say_params(r)) for r in rows if r.kind == "say"]
         params = [p for _, p in says]
-        content = [{"type": "text", "text": RETRY_NOTE}] if retry else []
+        errored = any(r.resume and r.end_reason == "error" for r in rows)
+        content = [{"type": "text", "text": RETRY_NOTE}] if errored else []
         content += [
             b
             for r, p in says
-            if r.id not in retry
+            if not r.resume
             for b in user_content(p, read_aloud=self._wants_speech(body, p))
         ]
         news: dict[str, list[EventRow]] = {}
+        resumed: dict[tuple[str, str], list[EventRow]] = {}
         for row in rows:
-            if row.kind != "say" and row.id not in retry:
+            if row.resume and row.end_reason != "error":
+                # Its payload is in the history already: only the fact that it goes on.
+                bare = replace(row, payload={})
+                resumed.setdefault((row.kind, row.end_reason or ""), []).append(bare)
+            elif row.kind != "say" and not row.resume:
                 news.setdefault(row.kind, []).append(row)
         for kind, group in news.items():
             note = self.runner.notes.get(kind, "")
-            text = wake_text(self._kinds[kind], group, note, self._now().tzinfo)
+            content.append({"type": "text", "text": wake_text(self._kinds[kind], group, note, tz)})
+        for (kind, reason), group in resumed.items():
+            attrs = {"resume": "true", "reason": reason}
+            text = wake_text(self._kinds[kind], group, "", tz, attrs)
+            content.append({"type": "text", "text": text})
+        told: dict[tuple[str, str], list[EventRow]] = {}
+        for row in gave_up:
+            payload = {"text": row.payload.get("params", {}).get("text", "")}
+            told.setdefault((row.kind, row.end_reason or ""), []).append(
+                replace(row, payload=payload) if row.kind == "say" else row
+            )
+        for (kind, reason), group in told.items():
+            attrs = {"gave_up": "true", "reason": reason}
+            note = self.runner.notes.get(kind, "")
+            text = wake_text(self._kinds[kind], group, note, tz, attrs)
             content.append({"type": "text", "text": text})
         if not params and self._wants_speech(body, None):
             content.append({"type": "text", "text": ear_note()})
@@ -844,7 +865,6 @@ class Session:
     def _on_job_finished(self, job: Job) -> None:
         self._emit_job_event(
             Event("job_ended", f"job:{job.id}", {"report": self.jobs.note(job)}),
-            on_end=_when_told(lambda: self.records.mark_reported(job.id)),
         )
 
     def _emit_job_event(self, event: Event, **hooks) -> None:
@@ -926,9 +946,9 @@ class Session:
             row = work.fail(id, classify(error or RuntimeError()), str(error or "failed"))
         except TransitionRefused:
             # The goal was closed while it ran (handled), or a failed start already ended the
-            # row itself and nobody has been told.
+            # row itself; its news has one id per failure, so a second tell is a no-op.
             row = work.get(id)
-            if row is None or row.state != "failed" or row.reported_at is not None:
+            if row is None or row.state != "failed":
                 return
         if row.state != "failed":
             self.timers.changed()  # the next try is waiting out its backoff
@@ -936,8 +956,8 @@ class Session:
         self._tell_given_up(row)
 
     def _tell_given_up(self, row: WorkRow) -> None:
-        """Scout is told once about a step that ended failed; a turn handling it marks it told."""
-        work = self.records.work
+        """Scout is told once about a step that ended failed: the event's id names this failure,
+        so telling it again is refused by the log."""
         facts = {
             "goal": row.root_id,
             "step": row.id,
@@ -945,8 +965,7 @@ class Session:
             "reason": row.end_reason or "",
         }
         self.post_event(
-            Event("work_failed", "scout", facts),
-            on_end=_when_told(lambda: work.mark_reported(row.id)),
+            Event("work_failed", "scout", facts, id=f"work_failed:{row.id}@{row.ended_at}")
         )
 
     async def _rerun_step(self, row: WorkRow) -> None:
@@ -1290,17 +1309,6 @@ class Session:
                         self._memory.add_summary(text)
         except Exception:
             log.exception("could not save the chat")
-
-
-def _when_told(mark: Callable[[], None]) -> Callable[[str], None]:
-    """Mark news told only when its event was handled: one given up or returned at a stop was
-    not told, so it stays for the next start."""
-
-    def on_end(state: str) -> None:
-        if state == "handled":
-            mark()
-
-    return on_end
 
 
 def _is_in(block: Any, blocks: list) -> bool:

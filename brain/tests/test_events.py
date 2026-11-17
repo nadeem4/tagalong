@@ -2,7 +2,7 @@
 event's facts to Scout is tested with the runner, in test_runner.py.)
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -105,14 +105,6 @@ def test_from_connect_needs_ten_minutes_away():
 def test_timer_defaults():
     kind = EVENT_KINDS["timer"]
     assert kind.wakes and kind.batch_seconds == 0 and kind.max_per_hour == 6
-
-
-def test_watches_paused_defaults_and_has_a_note():
-    kind = EVENT_KINDS["watches_paused"]
-    assert kind.wakes and kind.batch_seconds == 0 and kind.max_per_hour == 2
-    from importlib.resources import files
-
-    assert "## watches_paused" in files("brain.mind").joinpath("events.md").read_text("utf-8")
 
 
 def test_job_question_defaults_never_merge_and_ignore_caps():
@@ -338,3 +330,57 @@ def test_a_failing_masker_withholds_the_text_but_saves_the_event(tmp_path):
     event = Event("say", "desktop", {"text": "hello", "n": 3})
     assert log.post(event) is True
     assert log.get(event.id).payload == {"text": "[withheld]", "n": 3}
+
+
+def _clocked(tmp_path):
+    clock = [NOW]
+    return EventLog(open_db(tmp_path / "b.db"), Masker(lambda: []), lambda: clock[0]), clock
+
+
+def _fail_once(log, id: str, reason: str = "error") -> None:
+    assert log.take([id], "t") == [id]
+    log.backoff([id], reason)
+
+
+def test_backoff_waits_grow_30s_2min_10min(tmp_path):
+    log, clock = _clocked(tmp_path)
+    log.post(Event("say", "desktop", {}, id="e1"))
+    for attempt, wait in enumerate((30, 120, 600), start=1):
+        _fail_once(log, "e1", "step_cap")
+        row = log.get("e1")
+        assert (row.state, row.attempts, row.resume, row.end_reason) == (
+            "new",
+            attempt,
+            True,
+            "step_cap",
+        )
+        assert row.not_before == (clock[0] + timedelta(seconds=wait)).isoformat()
+        clock[0] += timedelta(seconds=wait - 1)
+        assert log.ready() == []  # it gives up its place until the wait is over
+        assert log.next_retry() == clock[0] + timedelta(seconds=1)
+        clock[0] += timedelta(seconds=1)
+        assert [r.id for r in log.ready()] == ["e1"]
+
+
+def test_the_fourth_failure_gives_up(tmp_path):
+    log, clock = _clocked(tmp_path)
+    ended = []
+    log.post(Event("say", "desktop", {}, id="e1"), on_end=ended.append)
+    for _ in range(3):
+        _fail_once(log, "e1")
+        clock[0] += timedelta(minutes=10)
+    assert ended == []  # a retry is not an end: a waiting caller keeps waiting
+    _fail_once(log, "e1")
+    row = log.get("e1")
+    assert (row.state, row.attempts, row.end_reason) == ("gave_up", 3, "error")
+    assert ended == ["gave_up"] and log.ready() == [] and log.next_retry() is None
+    assert [r.id for r in log.gave_up()] == ["e1"]
+
+
+def test_backoff_leaves_an_event_that_ended_meanwhile(tmp_path):
+    log, _ = _clocked(tmp_path)
+    log.post(Event("say", "desktop", {}, id="e1"))
+    log.take(["e1"], "t")
+    log.finish(["e1"], "handled", end_reason="cancelled")  # cancelled by id while it ran
+    log.backoff(["e1"], "error")
+    assert (log.get("e1").state, log.get("e1").attempts) == ("handled", 0)

@@ -44,9 +44,9 @@ class Timers:
         job_facts: Callable[[str], dict] = lambda job_id: {},
         rerun: Callable[[WorkRow], Awaitable[None]] | None = None,
         notify: Callable[[str, dict], None] | None = None,
-        finish_news: Callable[[str, str], None] = lambda kind, source: None,
+        finish_news: Callable[[str, str], list[str]] = lambda kind, source: [],
     ) -> None:
-        self._finish_news = finish_news  # ends a cancelled timer's waiting wake
+        self._finish_news = finish_news  # ends a cancelled timer's waiting wake; returns ids
         self._notify = notify  # tells the bodies the list changed, so Home reads it again
         self._job_facts = job_facts  # a job timer's wake carries that job's watch list and summary
         self._work = work
@@ -121,15 +121,16 @@ class Timers:
         row = self._work.get(tid)
         if row is None:
             return False
-        if row.state == "done" and row.reported_at is None:
-            pass  # fired, not yet told: only its news is left to end
+        if row.state == "done":
+            # Fired: only news still waiting in the log is left to end.
+            if not self._finish_news("timer", f"timer:{tid}"):
+                return False
         else:
             try:
                 self._work.transition(tid, "cancelled", reason=reason)
             except TransitionRefused:
                 return False
-        self._work.mark_reported(tid)  # nobody needs telling about a cancel
-        self._finish_news("timer", f"timer:{tid}")
+            self._finish_news("timer", f"timer:{tid}")
         self.changed()
         return True
 
@@ -151,18 +152,7 @@ class Timers:
         event = Event(
             "timer", f"timer:{row.id}", facts, caused_by=(row.input or {}).get("caused_by")
         )
-        if repeat_s:
-            self._emit(event, then=then)
-        else:
-            # Told only when its event was handled; one returned at a stop stays untold.
-            self._emit(
-                event,
-                then=then,
-                on_end=lambda state: self._told(row.id) if state == "handled" else None,
-            )
-
-    def _told(self, id: str) -> None:
-        self._work.mark_reported(id)
+        self._emit(event, then=then)
 
     def _arm(self) -> None:
         if self._handle is not None:

@@ -101,7 +101,8 @@ class FakeSession:
 
     def __init__(self, tells: bool = False) -> None:
         self.started: list[tuple[str, str, list[str]]] = []
-        self.retried: list[set[str]] = []  # per started turn: the events tried before
+        self.rows: list[list[EventRow]] = []  # per started turn: its rows as taken
+        self.gave_up: list[list[str]] = []  # per started turn: the given-up events it carries
         self.cancelled = 0
         self.tells = tells
         self.told: list[str] = []
@@ -111,9 +112,12 @@ class FakeSession:
     def ready(self) -> bool:
         return self.key
 
-    def start_events(self, turn_id: str, body: str, rows: list[EventRow], retry: set[str]) -> None:
+    def start_events(
+        self, turn_id: str, body: str, rows: list[EventRow], gave_up: list[EventRow]
+    ) -> None:
         self.started.append((turn_id, body, [r.id for r in rows]))
-        self.retried.append(retry)
+        self.rows.append(rows)
+        self.gave_up.append([r.id for r in gave_up])
         if self.fails:
             raise RuntimeError("could not start")
 
@@ -437,7 +441,7 @@ async def test_a_cancelled_turn_marks_its_events_handled():
     await rig.runner.stop()
 
 
-async def test_an_errored_turn_returns_its_events_to_new_without_an_attempt():
+async def test_an_errored_turn_backs_its_events_off_for_30s():
     rig = LoopRig()
     rig.say("s1")
     await ticks()
@@ -445,11 +449,100 @@ async def test_an_errored_turn_returns_its_events_to_new_without_an_attempt():
     rig.runner.turn_ended(turn, "error")
     await ticks()
     s1 = rig.log.get("s1")
-    assert s1 is not None and (s1.state, s1.attempts, s1.turn_id) == ("new", 0, None)
+    assert s1 is not None
+    assert (s1.state, s1.attempts, s1.resume, s1.end_reason) == ("new", 1, True, "error")
+    assert s1.not_before == utc_text(T0 + timedelta(seconds=30))
     assert len(rig.session.started) == 1  # not run again at once: a failing model would spin
-    rig.say("s2")  # something new happened: the waiting say rides with it
+    rig.t += timedelta(seconds=30)
+    rig.runner.poke()
+    await ticks()
+    assert rig.turns()[1:] == [["s1"]]
+    await rig.runner.stop()
+
+
+async def test_over_budget_news_returns_to_new_without_an_attempt():
+    rig = LoopRig()
+    rig.news("n1")
+    await ticks()
+    [(turn, _, _)] = rig.session.started
+    rig.budget.open = False  # the spend that ended the turn also shuts the gate
+    rig.runner.turn_ended(turn, "over_budget")
+    await ticks()
+    n1 = rig.log.get("n1")
+    assert n1 is not None
+    assert (n1.state, n1.attempts, n1.resume, n1.not_before) == ("new", 0, False, None)
+    assert len(rig.session.started) == 1  # it waits for the budget, not for a retry
+    await rig.runner.stop()
+
+
+async def test_a_step_cap_turn_puts_its_merged_says_back_with_resume():
+    rig = LoopRig()
+    rig.say("s1")
+    await ticks()
+    [(turn, _, _)] = rig.session.started
+    rig.say("s2")
+    await ticks()
+    assert [r.id for r in rig.runner.take_more()] == ["s2"]
+    rig.runner.turn_ended(turn, "step_cap")
+    for id in ("s1", "s2"):  # the say that joined is not dropped with the turn (C6)
+        r = rig.log.get(id)
+        assert r is not None
+        assert (r.state, r.attempts, r.resume, r.end_reason) == ("new", 1, True, "step_cap")
+    rig.t += timedelta(seconds=30)
+    rig.runner.poke()
     await ticks()
     assert rig.turns()[1:] == [["s1", "s2"]]
+    assert all(r.resume for r in rig.session.rows[1])
+    await rig.runner.stop()
+
+
+async def test_a_backing_off_event_lets_later_events_run():
+    rig = LoopRig()
+    for i in range(5):
+        rig.news(f"n{i}")
+    await ticks()
+    [(turn, _, ids)] = rig.session.started
+    assert ids == [f"n{i}" for i in range(5)]
+    rig.runner.turn_ended(turn, "error")  # one poison event fails the whole group
+    rig.say("s1")
+    await ticks()
+    assert rig.turns()[1:] == [["s1"]]  # the person is answered at once, alone
+    rig.runner.turn_ended(rig.session.started[-1][0], "done")
+    rig.news("n5")
+    await ticks()
+    assert rig.turns()[2:] == [["n5"]]  # later news is not starved by the retries
+    rig.runner.turn_ended(rig.session.started[-1][0], "done")
+    rig.t += timedelta(seconds=30)
+    rig.runner.poke()
+    await ticks()
+    assert rig.turns()[3:] == [[f"n{i}" for i in range(5)]]  # picked again when the wait ends
+    await rig.runner.stop()
+
+
+async def test_gave_up_events_ride_the_next_done_person_turn_once():
+    rig = LoopRig()
+    rig.log.post(Event("timer", "timer:g", {}, id="g"))
+    rig.log.take(["g"], "old")
+    rig.log.finish(["g"], "gave_up", end_reason="error")
+    rig.news("n1")
+    await ticks()
+    assert rig.session.gave_up == [[]]  # news alone does not carry them
+    rig.runner.turn_ended(rig.session.started[-1][0], "done")
+    rig.say("s1")
+    await ticks()
+    assert rig.session.gave_up[-1] == ["g"]
+    rig.runner.turn_ended(rig.session.started[-1][0], "cancelled")
+    g = rig.log.get("g")
+    assert g is not None and g.state == "gave_up"  # not told: it rides the next one
+    rig.say("s2")
+    await ticks()
+    assert rig.session.gave_up[-1] == ["g"]
+    rig.runner.turn_ended(rig.session.started[-1][0], "done")
+    g = rig.log.get("g")
+    assert g is not None and g.state == "handled"
+    rig.say("s3")
+    await ticks()
+    assert rig.session.gave_up[-1] == []  # once
     await rig.runner.stop()
 
 
@@ -480,22 +573,24 @@ async def test_a_turn_over_budget_handles_its_say_so_it_is_not_answered_again():
     await rig.runner.stop()
 
 
-async def test_an_errored_turns_events_are_named_as_retried_to_the_next_turn():
+async def test_an_errored_turns_events_come_back_marked_resume():
     rig = LoopRig()
     rig.say("s1")
     await ticks()
     [(turn, _, _)] = rig.session.started
     rig.runner.turn_ended(turn, "error")
+    rig.t += timedelta(seconds=30)
     rig.say("s2")
     await ticks()
     assert rig.turns()[1:] == [["s1", "s2"]]
-    assert rig.session.retried == [set(), {"s1"}]  # s1's words are already in the history
+    # s1's words are already in the history: the session names it as a retry instead
+    assert [(r.id, r.resume) for r in rig.session.rows[1]] == [("s1", True), ("s2", False)]
     await rig.runner.stop()
 
 
-async def test_a_held_question_is_tried_again_after_the_recheck_with_nothing_new(monkeypatch):
-    # An expert waits on its question: an error must not leave it waiting for good.
-    monkeypatch.setattr("brain.runner.RECHECK_S", 0.2)
+async def test_a_backing_off_question_is_tried_again_when_its_wait_is_over(monkeypatch):
+    # An expert waits on its question: the alarm wakes the runner when the wait ends.
+    monkeypatch.setattr("brain.events.BACKOFF_S", (1, 1, 1))
     rig = LoopRig()
     rig.log.post(Event("job_question", "job:j1", {}, id="q1"))
     rig.runner.poke()
@@ -504,23 +599,10 @@ async def test_a_held_question_is_tried_again_after_the_recheck_with_nothing_new
     rig.runner.turn_ended(turn, "error")
     await ticks()
     assert rig.turns() == [["q1"]]  # not again at once: a failing model would spin
-    await asyncio.sleep(0.4)
+    rig.t += timedelta(seconds=1)  # the rig's clock; the alarm itself waits in real time
+    await asyncio.sleep(1.2)
     await ticks()
     assert rig.turns() == [["q1"], ["q1"]]
-    assert rig.session.retried[1] == {"q1"}
-    await rig.runner.stop()
-
-
-async def test_a_retried_event_that_ends_another_way_is_forgotten():
-    rig = LoopRig()
-    rig.say("s1")
-    await ticks()
-    [(turn, _, _)] = rig.session.started
-    rig.runner.turn_ended(turn, "error")
-    rig.log.finish(["s1"], "handled")  # ended outside a turn, e.g. by id
-    rig.runner.poke()
-    await ticks()
-    assert "s1" not in rig.runner._retried and "s1" not in rig.runner._held
     await rig.runner.stop()
 
 
@@ -565,7 +647,8 @@ async def test_a_turn_that_cannot_start_puts_its_events_back():
     rig.say("s1")
     await ticks()
     s1 = rig.log.get("s1")
-    assert s1 is not None and (s1.state, s1.attempts) == ("new", 0)
+    # An attempt, so a say that always breaks the start gives up; not a resume: nothing was sent.
+    assert s1 is not None and (s1.state, s1.attempts, s1.resume) == ("new", 1, False)
     assert rig.runner._turn is None  # nothing is left holding the one turn
     await rig.runner.stop()
 
@@ -732,7 +815,7 @@ async def test_stop_gives_back_the_event_an_interjection_holds():
 
 async def test_a_retried_event_the_interjection_leaves_untold_keeps_its_retry_mark(monkeypatch):
     # Its words are already in the history from the errored turn: they must not be sent again.
-    monkeypatch.setattr("brain.runner.RECHECK_S", 0.2)
+    monkeypatch.setattr("brain.events.BACKOFF_S", (1, 1, 1))
     rig = LoopRig()
     release = asyncio.Event()
     tried: list[str] = []
@@ -748,7 +831,7 @@ async def test_a_retried_event_the_interjection_leaves_untold_keeps_its_retry_ma
     [(turn, _, _)] = rig.session.started
     rig.runner.turn_ended(turn, "error")
     rig.presence.speech("desktop", "talking")
-    await asyncio.sleep(0.4)  # the recheck frees the held event; speech keeps its gate shut
+    rig.t += timedelta(seconds=1)  # the wait is over; speech keeps its gate shut
     await ticks()
     rig.presence.speech("desktop", "sentence_break", "t0", 1)
     await ticks()
@@ -760,7 +843,7 @@ async def test_a_retried_event_the_interjection_leaves_untold_keeps_its_retry_ma
     rig.presence.speech("desktop", "idle")
     await ticks()
     assert rig.turns() == [["n1"], ["n1"]]  # then a plain turn
-    assert rig.session.retried[1] == {"n1"}
+    assert rig.session.rows[1][0].resume
     await rig.runner.stop()
 
 

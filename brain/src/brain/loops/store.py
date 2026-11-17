@@ -91,7 +91,6 @@ class LoopStore:
         else:
             state, reason = _ENDED[status]
             self.work.transition(loop_id, state, reason=reason)
-            self.work.mark_reported(loop_id)  # Scout hears loops through the service, not this
         self.work.set_snooze(loop_id, None)
 
     def snooze(self, loop_id: str, until: datetime) -> None:

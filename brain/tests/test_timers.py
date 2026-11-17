@@ -32,19 +32,16 @@ def make(memory=None, clock=None, job_facts=None):
     memory = memory or Memory(":memory:")
     clock = clock or Clock()
     events = []
-    ends = []
 
-    def emit(event, *, on_end=None, then=None):
+    def emit(event, *, then=None):
         if then is not None:  # the real door runs it in the event's transaction
             with transaction(memory.db):
                 then(memory.db)
         events.append(event)
-        ends.append(on_end)
 
     kw = {"job_facts": job_facts} if job_facts else {}
     work = WorkStore(memory.db, clock)
     timers = Timers(work, emit, clock, **kw)
-    timers.ends = ends  # the end hooks, in the order emitted
     return timers, work, clock, events
 
 
@@ -59,11 +56,6 @@ def test_fire_due_emits_a_timer_event_and_a_one_off_is_done_at_the_fire():
     assert e.source == f"timer:{t.id}"
     done = work.get(t.id)
     assert (done.state, done.end_reason) == ("done", "fired")
-    assert done.reported_at is None  # the wake has not finished
-    timers.ends[0]("new")
-    assert work.get(t.id).reported_at is None  # returned at a stop: not told
-    timers.ends[0]("handled")
-    assert work.get(t.id).reported_at is not None
 
 
 def test_one_off_is_not_fired_twice():
@@ -119,15 +111,24 @@ def test_cancelling_a_fired_but_untold_timer_ends_its_news():
     assert len(log.ready()) == 1
     assert timers.cancel(t.id, "cancelled by the person") is True
     assert log.ready() == []  # finished, not told
-    assert work.get(t.id).reported_at is not None
     assert timers.cancel(t.id, "again") is False  # already ended and handled
 
 
 def test_a_one_off_already_told_cannot_be_cancelled():
-    timers, work, _c, _events = make()
+    memory = Memory(":memory:")
+    log = EventLog(memory.db, Masker(lambda: []), Clock())
+    work = WorkStore(memory.db, Clock())
+    timers = Timers(
+        work,
+        lambda event, **kw: log.post(event, then=kw["then"]),
+        Clock(),
+        finish_news=log.finish_matching,
+    )
     t = add_timer(work, "x", T0 - timedelta(seconds=1))
     timers.fire_due()
-    timers.ends[0]("handled")  # Scout heard it
+    [row] = log.ready()
+    log.take([row.id], "turn")
+    log.finish([row.id], "handled")  # Scout heard it
     assert timers.cancel(t.id, "late") is False
     assert timers.cancel("nope", "x") is False
 
@@ -351,13 +352,13 @@ def test_changed_notifies_the_bodies():
     assert notes == [("changed", {"what": "timers"})]
 
 
-def test_cancel_ends_the_row_and_marks_reported():
+def test_cancel_ends_the_row():
     timers, work, _c, events = make()
     t = add_timer(work, "x", T0 + timedelta(hours=1))
     assert timers.cancel(t.id, "cancelled by the person") is True
     row = work.get(t.id)
     assert (row.state, row.end_reason) == ("cancelled", "cancelled by the person")
-    assert row.reported_at is not None and events == []
+    assert events == []
     assert timers.cancel(t.id, "again") is False
 
 

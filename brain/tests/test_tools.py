@@ -1035,7 +1035,6 @@ class _FakeTimers:
             self._work.transition(tid, "cancelled", reason=reason)
         except (TransitionRefused, KeyError):
             return False
-        self._work.mark_reported(tid)
         self.changed()
         return True
 
@@ -1206,7 +1205,6 @@ async def test_cancel_timer_takes_string_id(trun):
     await trun("cancel_timer", {"id": tid})
     gone = trun.work.get(tid)
     assert (gone.state, gone.end_reason) == ("cancelled", "cancelled by Scout")
-    assert gone.reported_at is not None  # Scout did it, so it needs no report
     assert trun.fake.changes == 2
     with pytest.raises(MemoryRefused, match=f"no timer with id {tid}."):
         await trun("cancel_timer", {"id": tid})

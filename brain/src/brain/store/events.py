@@ -103,6 +103,49 @@ def set_state(
         )
 
 
+def set_backoff(
+    db: sqlite3.Connection, ids: list[str], not_before: str, reason: str, *, resume: bool = True
+) -> None:
+    """A failed attempt: back to `new`, one more attempt, waiting until `not_before`. Only a
+    row still `taken` moves, so one that ended meanwhile (cancelled by id) stays ended.
+    `resume=False` keeps the flag as it was: a turn that never started sent nothing."""
+    for id in ids:
+        db.execute(
+            "UPDATE events SET state='new', attempts=attempts+1, not_before=?, end_reason=?,"
+            " resume=CASE WHEN ? THEN 1 ELSE resume END, turn_id=NULL"
+            " WHERE id=? AND state='taken'",
+            (not_before, reason, int(resume), id),
+        )
+
+
+def set_gave_up(db: sqlite3.Connection, ids: list[str], reason: str, at: str) -> list[str]:
+    """The last failure: the row stays for Home and is told once later. Returns what moved."""
+    moved = []
+    for id in ids:
+        cur = db.execute(
+            "UPDATE events SET state='gave_up', end_reason=?, handled_at=?"
+            " WHERE id=? AND state='taken'",
+            (reason, at, id),
+        )
+        if cur.rowcount:
+            moved.append(id)
+    return moved
+
+
+def list_state(db: sqlite3.Connection, state: str) -> list[EventRow]:
+    rows = db.execute(
+        f"SELECT {_COLS} FROM events WHERE state=? ORDER BY at, rowid", (state,)
+    ).fetchall()
+    return [_row(r) for r in rows]
+
+
+def next_not_before(db: sqlite3.Connection, now: str) -> str | None:
+    """When the soonest backing-off event may be taken again; None when none waits."""
+    return db.execute(
+        "SELECT MIN(not_before) FROM events WHERE state='new' AND not_before>?", (now,)
+    ).fetchone()[0]
+
+
 def chain(db: sqlite3.Connection, id: str, limit: int = 20) -> list[EventRow]:
     """This event, then what caused it, and so on; stops at a missing parent or the limit."""
     out: list[EventRow] = []

@@ -23,7 +23,7 @@ JOB_PROGRESS_CAP = 2_000
 JOB_TITLE_CAP = 200
 
 _HOME = {"active": "running", "done": "done", "failed": "error"}
-_PART_FIELDS = {"state", "reason", "progress", "session_id", "report", "reported"}
+_PART_FIELDS = {"state", "reason", "progress", "session_id", "report"}
 
 
 def home_state(state: str) -> str:
@@ -44,7 +44,6 @@ class JobPart:
     progress: str | None
     session_id: str | None
     report: str | None
-    reported: bool
     started_at: str
     ended_at: str | None
     folder: str  # parts of one job may work in different folders
@@ -102,7 +101,6 @@ class JobRecords:
             progress=call.progress,
             session_id=(call.checkpoint or {}).get("session_id"),
             report=None,  # filled by the caller: it may need the output store
-            reported=bool(call.reported_at),
             started_at=call.created_at,
             ended_at=call.ended_at,
             folder=detail.get("folder") or "",
@@ -191,12 +189,6 @@ class JobRecords:
                 return job, part
         return None
 
-    def unreported_jobs(self) -> list[Job]:
-        """Jobs with no part running whose ended or held-up parts Scout has not heard about."""
-        news = self.work.unreported(["expert_call"])
-        found = (self.get_job(i) for i in dict.fromkeys(c.parent_id for c in news if c.parent_id))
-        return [j for j in found if j is not None and j.state != "active"]
-
     # ---- writing ----
 
     def add_job(
@@ -239,7 +231,7 @@ class JobRecords:
 
     def update_part(self, job_id: str, part_id: str, **fields) -> None:
         """Change a part. A `state` is a checked move (it needs a `reason` when it ends the part);
-        `session_id` is the checkpoint; `reported=True` tells Scout it has been heard."""
+        `session_id` is the checkpoint."""
         unknown = set(fields) - _PART_FIELDS
         if unknown:
             raise ValueError(f"Unknown part fields: {', '.join(sorted(unknown))}")
@@ -254,8 +246,6 @@ class JobRecords:
             self.work.update(work_id, checkpoint={"session_id": session} if session else {})
         if isinstance(fields.get("report"), str):
             self._store_text(work_id, fields["report"])
-        if fields.get("reported"):
-            self.work.mark_reported(work_id)
 
     def set_title(self, job_id: str, title: str) -> None:
         """Scout's own title for a job; only a safety cap on storage, never a rewrite."""
@@ -275,10 +265,3 @@ class JobRecords:
         goal = self.work.get(job_id)
         assert goal is not None
         self.work.close_goal(job_id, outcome, goal.summary or "")
-
-    def mark_reported(self, job_id: str) -> None:
-        """Scout has heard about this job: every part, and the job itself."""
-        for call in self.work.children(job_id):
-            if call.kind == "expert_call":
-                self.work.mark_reported(call.id)
-        self.work.mark_reported(job_id)

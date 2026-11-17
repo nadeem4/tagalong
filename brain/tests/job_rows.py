@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 from brain.job_records import JobRecords
 from brain.memory import Memory
+from brain.store import events as event_rows
 from brain.store.work import WorkStore
 
 _WORK = {"done": "done", "error": "failed", "stopped": "cancelled"}
@@ -16,6 +17,14 @@ def fresh_work(now=lambda: datetime.now(UTC)) -> WorkStore:
 
 def records_for(memory: Memory, now=lambda: datetime.now(UTC)) -> JobRecords:
     return JobRecords(WorkStore(memory.db, now), memory.db, now)
+
+
+def job_told(memory: Memory, job_id: str) -> bool:
+    """Whether Scout was told the job ended: its `job_ended` event was handled."""
+    return any(
+        r.kind == "job_ended" and r.source == f"job:{job_id}"
+        for r in event_rows.list_state(memory.db, "handled")
+    )
 
 
 def end_job(records: JobRecords, job_id: str, state: str = "done") -> None:

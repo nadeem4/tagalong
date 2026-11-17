@@ -68,14 +68,14 @@ async def test_work_status_unknown_id_says_so(run):
     assert await run({"id": "nope"}) == {"error": "no work with id nope"}
 
 
-async def test_work_status_no_args_lists_open_and_unreported(work, run):
+async def test_work_status_no_args_lists_open_work(work, run):
     work.create("goal", "Open one", id="open1", state="active")
     work.create("goal", "Stuck one", id="stuck1", state="active")
     work.create("expert_call", "Step", parent_id="stuck1", state="active", id="stuck1.p1")
     work.fail("stuck1.p1", "permanent", "boom")
     out = await run({})
     assert {r["id"] for r in out["open"]} == {"open1", "stuck1"}  # stuck1 is blocked, still open
-    assert {r["id"] for r in out["unreported"]} == {"stuck1", "stuck1.p1"}
+    assert set(out) == {"open"}  # what Scout has not heard waits in the event log
 
 
 async def test_work_status_by_words(work, run):
