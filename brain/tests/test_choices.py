@@ -72,7 +72,7 @@ async def test_an_answer_emits_a_choice_event_with_option_and_text():
     asks.answer(ask_id, "b", "desktop")
     await settle()
     (event,) = events
-    assert event.kind == "choice" and event.key == ask_id
+    assert event.kind == "choice" and event.payload["ask"] == ask_id
     assert event.payload == {"ask": ask_id, "question": "Which?", "option": "b", "text": ""}
 
 

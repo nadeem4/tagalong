@@ -56,7 +56,7 @@ def test_past_due_held_loop_emits_one_loop_event(parts):
     svc(store, clock, events).start()
     assert len(events) == 1
     e = events[0]
-    assert e.kind == "loop" and e.key == f"loop:{lp.id}"
+    assert e.kind == "loop" and e.source == f"loop:{lp.source}"
     assert e.payload["reason"] == "due" and e.payload["id"] == lp.id
     assert e.payload["title"] == "t-a" and e.payload["asks"] == "do it"
 

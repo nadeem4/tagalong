@@ -38,7 +38,7 @@ async def test_ask_emits_a_job_question_event_with_the_facts():
     field = QuestionField("way", "Way", ["a", "b"], "Pick one", multi=True)
     task = await _ask(sq, emit, _q(field))
     event = emit.calls[0][0]
-    assert event.kind == "job_question" and event.key is None
+    assert event.kind == "job_question"
     assert len(event.payload["question"]) == 8
     assert event.payload["job"] == "j1"
     assert event.payload["message"] == "Which way?"

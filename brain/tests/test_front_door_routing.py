@@ -16,6 +16,7 @@ from test_sessions import (
     finish_quietly,
     idle,
     join,
+    join_headless,
     make,
     say,
     settle,
@@ -141,9 +142,7 @@ async def test_whatsapp_event_reply_goes_to_whatsapp():
     join(session, "desktop")
     session._bodies.connect(Body(id="wa", kind="whatsapp", name="WA"), [], QuietPeer(), None)
     session._last_body = "desktop"  # a wake would otherwise go to the screen
-    event = Event(
-        "back", "wa", {"body": "wa", "idle_seconds": 900}, key="back:wa", origin_body="wa"
-    )
+    event = Event("back", "wa", {"body": "wa", "idle_seconds": 900})
     session._from_body(event)
     await idle(session)
     assert wake_started(sent) == ["wa"]
@@ -287,9 +286,7 @@ async def test_news_that_did_not_opt_in_is_not_posted_again():
     session, _ = make(Gate([asyncio.Event(), "never"]))
     join(session, "desktop")
     posted = spy_posts(session)
-    session.post_event(
-        Event("job_ended", "scout", {"report": "r"}, key="q1"), on_end=lambda reason: None
-    )
+    session.post_event(Event("job_ended", "scout", {"report": "r"}), on_end=lambda reason: None)
     await settle()
     session.cancel(session._turn_id)
     await finish_quietly(session)
@@ -364,3 +361,23 @@ async def test_whatsapp_moments_wake_on_the_whatsapp_body():
         assert wake_started(sent) == ["whatsapp"]
         replies = [p["body"] for m, p in sent if m == "reply"]
         assert replies and set(replies) == {"whatsapp"}
+
+
+async def test_job_news_carries_the_say_as_its_cause():
+    gate = asyncio.Event()
+    memory = Memory(":memory:")
+    session, _ = make(Gate([gate, "ok"]), memory)
+    join(session, "desktop")
+    join_headless(session, "browser")
+    await session.say("browser", say("hand this off"))
+    await settle()  # its turn is running, and it took the say
+    [say_row] = [r for r in session.events.ready() if r.kind == "say"]
+
+    # What `Jobs.start` records for the turn that hands a job off.
+    assert session.jobs._turn_cause() == say_row.id
+    session.jobs._causes["j1"] = session.jobs._turn_cause()
+    session.jobs._on_finished(end_job(memory))
+    row = next(r for r in session.events.ready() if r.kind == "job_ended")
+    assert (row.source, row.caused_by) == ("job:j1", say_row.id)
+    gate.set()
+    await idle(session)

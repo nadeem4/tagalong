@@ -18,7 +18,7 @@ from fake_engine import FakeEngine
 from job_rows import add_timer, end_job
 
 from brain.asks import Answer, AskExpired
-from brain.events import Event
+from brain.events import Event, EventLog
 from brain.experts import ExpertHost, ExpertHosts, ExpertRun, Question, QuestionField
 from brain.guards import Guards
 from brain.job_records import Job, JobPart, JobRecords
@@ -182,7 +182,7 @@ class Rig:
         self.now = 0.0
         self.clock = FakeClock()  # the quiet clock of each run, moved by the test
         self.emitted: list = []
-        self.dropped: list = []
+        self.events = EventLog(self.memory.db, Masker(lambda: []), lambda: self.wall)
         self.timers_changed = 0
         self.wall = datetime.now(UTC)
         self.experts = [installed()] if experts is None else experts
@@ -215,14 +215,18 @@ class Rig:
             engine=self.engine,
             guards=guards,
             setup_facts=setup_facts,
-            emit=self.emitted.append,
-            drop=lambda kind, key: self.dropped.append((kind, key, len(self.finished))),
+            emit=self._emit,
+            finish_news=self.events.finish_matching,
             now=lambda: self.wall,
             on_timers_changed=lambda: setattr(self, "timers_changed", self.timers_changed + 1),
             apps=apps,
             items=self.items,
             **({} if before_start is None else {"before_start": before_start}),
         )
+
+    def _emit(self, event) -> None:
+        self.emitted.append(event)
+        self.events.post(event)
 
     def make_run(self, expert, **callbacks) -> ExpertRun:
         self.expert_ids.append(expert.id)
@@ -1168,7 +1172,6 @@ async def test_a_quiet_job_wakes_scout_with_what_it_is_running(make_rig):
                 "running_minutes": 34,
                 "activity": activity,
             },
-            key=f"job:{job_id}",
         )
     ]
     assert rig.records.get_job(job_id).state == "active"  # code never stops a quiet job
@@ -1188,7 +1191,7 @@ async def test_a_quiet_job_with_no_running_step_omits_it(make_rig):
     await until(lambda: rig.records.work.activity_after(job_id, 0, 5) and rig.clock._waiters)
     await rig.clock.advance(1200)
     (event,) = rig.emitted
-    assert event.kind == "job_quiet" and event.key == f"job:{job_id}"
+    assert event.kind == "job_quiet" and event.source == f"job:{job_id}"
     assert "running" not in event.payload and "running_minutes" not in event.payload
 
 
@@ -1875,7 +1878,7 @@ async def test_a_failed_step_emits_job_step_failed_with_command_exit_and_summary
     job_id = await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.emitted)
     (event,) = rig.emitted
-    assert (event.kind, event.key) == ("job_step_failed", f"job:{job_id}")
+    assert (event.kind, event.source) == ("job_step_failed", f"job:{job_id}")
     assert (event.payload["job"], event.payload["step"], event.payload["exit"]) == (
         job_id,
         "npm test",
@@ -1895,13 +1898,17 @@ async def test_the_failed_step_fact_is_one_clipped_line(make_rig):
     assert "\n" not in step and 0 < len(step) <= 200
 
 
-async def test_job_end_drops_held_failed_and_quiet_events_for_that_job(make_rig):
+async def test_news_of_an_ended_job_is_finished_not_told(make_rig):
     rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
     job_id = await rig.jobs.start("go", str(rig.folder))
+    entry = ActivityEntry(1, 1, "2026-01-01T00:00:00+00:00", "command", "make", "failed", "s", 1)
+    rig.jobs._step_failed(job_id, entry)  # news now waiting
+    other = Event("job_quiet", "job:someone-else", {})
+    rig.events.post(other)
     await finish(rig, job_id)
     await until(lambda: rig.finished)
-    assert (("job_step_failed", f"job:{job_id}", 0)) in rig.dropped
-    assert (("job_quiet", f"job:{job_id}", 0)) in rig.dropped  # dropped before on_finished ran
+    # job_ended carries the same facts, so the job's own waiting news is stale; another job's is not
+    assert [r.id for r in rig.events.ready()] == [other.id]
 
 
 async def test_job_quiet_facts_include_the_activity_summary(make_rig):
@@ -2081,14 +2088,15 @@ async def test_closing_a_job_cancels_its_timers_and_rearms(make_rig):
     assert rig.timers_changed == 1
 
 
-async def test_closing_a_job_drops_a_held_timer_event_for_it(make_rig):
+async def test_closing_a_job_finishes_the_waiting_timer_news_for_it(make_rig):
     rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
     job_id = await rig.jobs.start("go", str(rig.folder))
     t = add_timer(rig.records.work, "a", datetime.now(UTC) + timedelta(hours=1), parent_id=job_id)
+    rig.events.post(Event("timer", f"timer:{t.id}", {"id": t.id}))
     await finish(rig, job_id)
     await until(lambda: rig.finished)
     rig.jobs.close(job_id)
-    assert ("timer", f"timer:{t.id}") in [(k, key) for k, key, _n in rig.dropped]
+    assert rig.events.ready() == []
 
 
 async def test_closing_a_job_leaves_other_jobs_and_plain_timers(make_rig):
@@ -2100,9 +2108,10 @@ async def test_closing_a_job_leaves_other_jobs_and_plain_timers(make_rig):
     plain = add_timer(rig.records.work, "p", when)
     await finish(rig, job_id)
     await until(lambda: rig.finished)
+    rig.events.post(Event("timer", f"timer:{other.id}", {"id": other.id}))
     rig.jobs.close(job_id)
     assert {rig.records.work.get(t.id).state for t in (other, plain)} == {"planned"}
-    assert not any(kind == "timer" for kind, _key, _n in rig.dropped)
+    assert [r.source for r in rig.events.ready()] == [f"timer:{other.id}"]
 
 
 async def test_closing_a_job_without_timers_does_not_rearm(make_rig):

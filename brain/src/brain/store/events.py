@@ -65,6 +65,15 @@ def list_new(db: sqlite3.Connection, now: str) -> list[EventRow]:
     return [_row(r) for r in rows]
 
 
+def new_ids(db: sqlite3.Connection, kind: str, source: str) -> list[str]:
+    return [
+        r[0]
+        for r in db.execute(
+            "SELECT id FROM events WHERE state='new' AND kind=? AND source=?", (kind, source)
+        )
+    ]
+
+
 def set_taken(db: sqlite3.Connection, ids: list[str], turn_id: str) -> list[str]:
     """Move only rows still `new`, so two takers never share an event; returns what moved."""
     moved = []

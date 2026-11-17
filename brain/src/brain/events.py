@@ -20,14 +20,12 @@ from brain.protocol import BackData, DownloadData, FocusData, TabData
 from brain.store import events as store
 from brain.store.db import transaction, utc_text
 
-BRAIN = "brain"  # the origin of an item no body started
-
 
 @dataclass(frozen=True)
 class Event:
     kind: str
-    # A body id, `timer`, `setup`, `scout`, or a prefixed source (`job:<id>`, `loop:<app>`,
-    # `tool:<name>`).
+    # A body id, `scout`, or a prefixed source (`timer:<id>`, `setup:<id>`, `job:<id>`,
+    # `loop:<app>`, `tool:<name>`): a source that names one thing is what a later event can finish.
     source: str
     payload: dict
     caused_by: str | None = None
@@ -35,10 +33,6 @@ class Event:
     # Two reports of the same fact are equal even though each has its own id.
     id: str = field(default_factory=lambda: uuid4().hex, compare=False)
     at: datetime | None = None
-    # A newer pending event with the same kind and key replaces the older one (until T1c).
-    key: str | None = None
-    # The body it came from, "brain" when none did: its wake turn is shown there if it can.
-    origin_body: str = BRAIN
 
 
 Urgency = Literal["now", "next_pause", "idle", "hold"]
@@ -103,19 +97,19 @@ def from_body(body_id: str, name: str, data: object) -> Event | None:
         if name == "back":
             back = BackData.model_validate(data)
             facts = {"body": body_id, "idle_seconds": back.idle_seconds}
-            return Event("back", body_id, facts, key=f"back:{body_id}")
+            return Event("back", body_id, facts)
         if name == "focus":
             focus = FocusData.model_validate(data)
             facts = {"body": body_id, "app": focus.app, "title": focus.title[:200]}
-            return Event("focus", body_id, facts, key=body_id)
+            return Event("focus", body_id, facts)
         if name == "tab":
             tab = TabData.model_validate(data)
             facts = {"body": body_id, "title": tab.title[:200], "url": tab.url[:300]}
-            return Event("tab", body_id, facts, key=body_id)
+            return Event("tab", body_id, facts)
         if name == "download":
             dl = DownloadData.model_validate(data)
             facts = {"body": body_id, "name": dl.name[:200], "state": dl.state}
-            return Event("download", body_id, facts, key=body_id)
+            return Event("download", body_id, facts)
         if name == "ask_closed":
             # The answer or tap met a question the brain no longer holds.
             if isinstance(data, dict) and data.get("via") in ("tap", "answer"):
@@ -123,7 +117,6 @@ def from_body(body_id: str, name: str, data: object) -> Event | None:
                     "ask_closed",
                     body_id,
                     {"body": body_id, "via": data["via"]},
-                    key=f"ask_closed:{body_id}",
                 )
         if name == "many_pending":
             asks = data.get("asks") if isinstance(data, dict) else None
@@ -132,7 +125,6 @@ def from_body(body_id: str, name: str, data: object) -> Event | None:
                     "many_pending",
                     body_id,
                     {"body": body_id, "asks": asks},
-                    key=f"many_pending:{body_id}",
                 )
     except ValidationError:
         return None
@@ -150,7 +142,6 @@ def from_connect(body_id: str, away_seconds: float | None, kind: str | None = No
         "body_online",
         body_id,
         {"body": body_id, "offline_seconds": int(away_seconds)},
-        key=f"body_online:{body_id}",
     )
 
 
@@ -216,7 +207,12 @@ class EventLog:
     def _mask(self, value):
         """Mask string leaves only: masking dumped JSON could eat an escaped quote."""
         if isinstance(value, str):
-            return self._masker.mask(value)
+            try:
+                return self._masker.mask(value)
+            except (
+                Exception
+            ):  # fail closed, like the saved chat: a say is not lost, a secret is not kept
+                return "[withheld]"
         if isinstance(value, dict):
             return {k: self._mask(v) for k, v in value.items()}
         if isinstance(value, list):
@@ -236,6 +232,12 @@ class EventLog:
     def finish(self, ids: list[str], state: str, end_reason: str | None = None) -> None:
         with transaction(self._db):
             store.set_state(self._db, ids, state, end_reason=end_reason, at=utc_text(self._now()))
+
+    def finish_matching(self, kind: str, source: str, state: str = "handled") -> None:
+        """End the waiting events of this kind and source: stale news is never told."""
+        with transaction(self._db):
+            ids = store.new_ids(self._db, kind, source)
+            store.set_state(self._db, ids, state, end_reason=None, at=utc_text(self._now()))
 
     def origin_body(self, id: str, is_body: Callable[[str], bool]) -> str | None:
         """The first source on the way back through `caused_by` that is a body."""

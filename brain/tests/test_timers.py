@@ -9,6 +9,8 @@ from datetime import UTC, datetime, timedelta
 
 from job_rows import add_timer
 
+from brain.events import EventLog
+from brain.masking import Masker
 from brain.memory import Memory
 from brain.store.work import TransitionRefused, WorkStore
 from brain.timers import Timers
@@ -51,7 +53,7 @@ def test_fire_due_emits_a_timer_event_with_the_note_and_ends_a_one_off_when_its_
     e = events[0]
     assert e.kind == "timer"
     assert e.payload == {"id": t.id, "note": "stretch", "repeat_minutes": 0}
-    assert e.key == f"timer:{t.id}"
+    assert e.source == f"timer:{t.id}"
     assert work.get(t.id).state == "active"  # fired, wake not started
     starts[0]()
     done = work.get(t.id)
@@ -324,3 +326,18 @@ def test_nothing_due_tells_nobody():
     add_timer(work, "x", T0 + timedelta(hours=1))
     timers.fire_due()
     assert notes == []
+
+
+def test_a_cancelled_timers_new_event_is_finished_not_told():
+    memory = Memory(":memory:")
+    log = EventLog(memory.db, Masker(lambda: []), Clock())
+    work = WorkStore(memory.db, Clock())
+    timers = Timers(
+        work, lambda event, **kw: log.post(event), Clock(), finish_news=log.finish_matching
+    )
+    t = add_timer(work, "stretch", T0 - timedelta(seconds=1))
+    other = add_timer(work, "walk", T0 - timedelta(seconds=1))
+    timers.fire_due()
+    assert len(log.ready()) == 2
+    timers.cancel(t.id, "cancelled by Scout")
+    assert [r.source for r in log.ready()] == [f"timer:{other.id}"]  # only that timer's news ended

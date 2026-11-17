@@ -27,14 +27,18 @@ def make(mem, emit):
 def test_setup_event_survives_restart(tmp_path):
     mem = Memory(tmp_path / "t.db")
     emit = FakeEmit()
-    event = Event("setup_done", "setup", {"expert": "claude", "ok": True}, key="claude")
+    event = Event("setup_done", "setup:claude", {"expert": "claude", "ok": True})
     make(mem, emit).emit(event)
     assert emit.sent[0][0] == event  # passed on at once
 
     after = FakeEmit()  # the brain restarted before Scout spoke
     make(mem, after).resume()
     [(again, hooks)] = after.sent
-    assert (again.kind, again.payload, again.key) == ("setup_done", event.payload, "claude")
+    assert (again.kind, again.payload, again.source) == (
+        "setup_done",
+        event.payload,
+        "setup:claude",
+    )
     assert "on_start" not in hooks  # a started turn is not yet a told one
     hooks["on_end"]("cancelled")  # a cancelled wake did not carry it
     again_after = FakeEmit()
@@ -47,11 +51,11 @@ def test_setup_event_survives_restart(tmp_path):
     mem.close()
 
 
-def test_a_newer_event_with_the_same_key_replaces_the_saved_one(tmp_path):
+def test_a_newer_event_from_the_same_source_replaces_the_saved_one(tmp_path):
     mem = Memory(tmp_path / "t.db")
     events = make(mem, FakeEmit())
-    events.emit(Event("setup_login", "setup", {"expert": "claude", "ok": False}, key="claude"))
-    events.emit(Event("setup_login", "setup", {"expert": "claude", "ok": True}, key="claude"))
+    events.emit(Event("setup_login", "setup:claude", {"expert": "claude", "ok": False}))
+    events.emit(Event("setup_login", "setup:claude", {"expert": "claude", "ok": True}))
     after = FakeEmit()
     make(mem, after).resume()
     [(only, _)] = after.sent
@@ -62,7 +66,7 @@ def test_a_newer_event_with_the_same_key_replaces_the_saved_one(tmp_path):
 def test_progress_is_not_saved(tmp_path):
     mem = Memory(tmp_path / "t.db")
     emit = FakeEmit()
-    make(mem, emit).emit(Event("setup_progress", "setup", {"expert": "claude"}, key="claude"))
+    make(mem, emit).emit(Event("setup_progress", "setup:claude", {"expert": "claude"}))
     assert len(emit.sent) == 1
     after = FakeEmit()
     make(mem, after).resume()

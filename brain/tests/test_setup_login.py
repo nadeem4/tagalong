@@ -169,9 +169,7 @@ async def test_after_the_window_closes_the_login_is_rechecked_and_recorded(tmp_p
     d.start(expert())
     await until(lambda: events)
     assert events == [
-        Event(
-            "setup_login", "setup", {"expert": "claude-acp", "state": "logged_in"}, key="claude-acp"
-        )
+        Event("setup_login", "setup:claude-acp", {"expert": "claude-acp", "state": "logged_in"})
     ]
     assert store.get("claude-acp").logged_in is True
 
@@ -280,9 +278,7 @@ async def test_signin_result_arrives_via_front_door(tmp_path, env):
     await until(lambda: events)
     await asyncio.sleep(0.2)
     assert events == [
-        Event(
-            "setup_login", "setup", {"expert": "claude-acp", "state": "logged_in"}, key="claude-acp"
-        )
+        Event("setup_login", "setup:claude-acp", {"expert": "claude-acp", "state": "logged_in"})
     ]
 
 

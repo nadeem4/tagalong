@@ -88,7 +88,7 @@ class Rig:
             self.items,
             self.asks,
             lambda: self.box,
-            lambda event, on_start=None: self.events.append(event),
+            lambda event, **kw: self.events.append(event),
             lambda: self.clock[0],
             self.approvals,
         )
@@ -364,7 +364,6 @@ async def test_return_wake_names_waiting_asks_and_their_age():
     [row] = json.loads(wake.payload["asks"])
     assert wake.payload["count"] == 1
     assert (row["ask"], row["tool"], row["age_s"]) == (item.id, "t", 18000)
-    assert wake.key == "asks_waiting"  # a later one replaces an unsent earlier one
 
 
 async def test_a_card_that_cannot_be_built_does_not_stop_the_others():

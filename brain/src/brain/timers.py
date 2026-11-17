@@ -1,8 +1,9 @@
 """Timers: runs the due `timer` and `watch` work rows as `timer` events and keeps one wake armed.
 
 Rows live in the work table so they survive a restart; this class only decides when to emit.
-The dispatcher decides when Scout actually hears it. It also hands a due `tool_call` or
-`expert_call` step (a retry that waited out its backoff) to `rerun`.
+The dispatcher decides when Scout actually hears it, and a cancelled timer's waiting wake is
+finished, never told. It also hands a due `tool_call` or `expert_call` step (a retry that waited
+out its backoff) to `rerun`.
 """
 
 import asyncio
@@ -41,7 +42,9 @@ class Timers:
         job_facts: Callable[[str], dict] = lambda job_id: {},
         rerun: Callable[[WorkRow], Awaitable[None]] | None = None,
         notify: Callable[[str, dict], None] | None = None,
+        finish_news: Callable[[str, str], None] = lambda kind, source: None,
     ) -> None:
+        self._finish_news = finish_news  # ends a cancelled timer's waiting wake
         self._notify = notify  # tells the bodies the list changed, so Home reads it again
         self._job_facts = job_facts  # a job timer's wake carries that job's watch list and summary
         self._work = work
@@ -122,6 +125,7 @@ class Timers:
         except (TransitionRefused, KeyError):
             return False
         self._work.mark_reported(tid)  # nobody needs telling about a cancel
+        self._finish_news("timer", f"timer:{tid}")
         self.changed()
         return True
 
@@ -135,7 +139,7 @@ class Timers:
             if parent is not None:
                 facts["state"] = home_state(parent.state)
             facts.update(self._job_facts(row.parent_id))
-        event = Event("timer", "timer", facts, key=f"timer:{row.id}")
+        event = Event("timer", f"timer:{row.id}", facts)
         if repeat_s:
             self._emit(event)
         else:

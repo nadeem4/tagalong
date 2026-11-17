@@ -36,11 +36,11 @@ def svc(store, clock, events, **kw):
 
 
 def focus(app="POWERPNT.EXE", title="Q4 pricing.pptx - PowerPoint"):
-    return Event("focus", "desktop", {"body": "desktop", "app": app, "title": title}, key="desktop")
+    return Event("focus", "desktop", {"body": "desktop", "app": app, "title": title})
 
 
 def tab(title="", url=""):
-    return Event("tab", "desktop", {"body": "browser", "title": title, "url": url}, key="browser")
+    return Event("tab", "desktop", {"body": "browser", "title": title, "url": url})
 
 
 def deck(store, ref="a", anchors=("Q4 pricing deck",), **kw):
@@ -66,7 +66,7 @@ def test_a_matching_focus_emits_one_context_loop_event_with_facts(parts):
     svc(store, clock, events).saw(focus())
     assert len(events) == 1
     e = events[0]
-    assert e.kind == "loop" and e.key == f"loop:{lp.id}"
+    assert e.kind == "loop" and e.source == f"loop:{lp.source}"
     assert e.payload["reason"] == "context" and e.payload["anchor"] == "Q4 pricing deck"
     assert e.payload["title"] == "t-a" and e.payload["people"] == "Priya"
     assert e.payload["asks"] == "send the numbers"
@@ -154,7 +154,7 @@ def test_quiet_emits_once_and_only_for_a_loop_still_waiting(parts):
     service = svc(store, clock, events)
     service.fire_due()
     service.fire_due()
-    assert [(e.key, e.payload["reason"]) for e in events] == [(f"loop:{waiting.id}", "quiet")]
+    assert [(e.payload["id"], e.payload["reason"]) for e in events] == [(waiting.id, "quiet")]
 
 
 async def test_a_future_quiet_time_arms_the_timer(parts):

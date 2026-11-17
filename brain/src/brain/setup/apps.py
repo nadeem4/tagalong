@@ -262,7 +262,7 @@ def app_setup_tools(
             facts["tools"], facts["tools_total"] = ", ".join(names), total
         elif status.error:
             facts["detail"] = status.error
-        emit(Event("setup_done", "setup", facts, key=app_id))
+        emit(Event("setup_done", f"setup:{app_id}", facts))
 
     def watch(app_id: str, name: str) -> None:
         task = asyncio.get_running_loop().create_task(announce(app_id, name))

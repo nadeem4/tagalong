@@ -13,7 +13,7 @@ import pytest
 from job_rows import add_timer, records_for
 
 from brain.bodies import Bodies
-from brain.events import EventKind
+from brain.events import EventKind, EventLog
 from brain.experts import PermissionOption, PermissionRequest, Question, QuestionField, QuietFacts
 from brain.jobs import JobError
 from brain.masking import Masker
@@ -72,15 +72,18 @@ def make(model, memory=None, kinds=NO_WAIT, now=None, bodies=None, masker=None):
     bodies = bodies or Bodies()
     bodies.notify = lambda m, p: sent.append((m, p))
     now = now or (lambda: datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC))
+    memory = memory or Memory(":memory:")
+    events = EventLog(memory.db, masker or Masker(lambda: []), now)
     session = Session(
         model,
         Open(),
         bodies,
         10,
-        memory or Memory(":memory:"),
+        memory,
         now=now,
         kinds=kinds,
         masker=masker,
+        events=events,
     )
     return session, sent
 
@@ -114,6 +117,17 @@ async def test_say_starts_turn():
         {"turn": result.turn, "body": "desktop", "state": "ended", "reason": "done"},
     )
     assert session.history[0] == {"role": "user", "content": [{"type": "text", "text": "hello"}]}
+
+
+async def test_a_say_is_saved_before_say_returns():
+    gate = asyncio.Event()
+    session, _ = make(Gate([gate, "ok"]))
+    join(session, "desktop")
+    await session.say("desktop", say("hi"))
+    [row] = session.events.ready()  # the turn has not finished: it was saved first
+    assert (row.kind, row.source, row.payload["text"]) == ("say", "desktop", "hi")
+    gate.set()
+    await finish(session)
 
 
 async def test_second_say_waits_for_a_turn_of_its_own():
@@ -2299,7 +2313,7 @@ async def test_failures_inside_one_batch_window_wake_scout_once():
     await idle(session)
     assert states(sent) == ["started", "ended"]
     text = model.seen[-1][-1]["content"][-1]["text"]
-    assert "Event: job_step_failed" in text and "cmd9" in text and "cmd8" not in text
+    assert "Event: job_step_failed" in text and "cmd9" in text
 
 
 async def test_after_a_brain_restart_a_stopped_jobs_timers_stay_planned():
@@ -2654,7 +2668,7 @@ async def test_exhausted_retry_emits_work_failed_and_blocks_goal():
     assert row.state == "failed" and row.end_reason.startswith("gave up after 3 tries")
     assert records_for(memory).work.get("j1").state == "blocked"
     [event] = given_up(events)
-    assert (event.kind, event.key) == ("work_failed", f"work_failed:{row.id}")
+    assert (event.kind, event.source) == ("work_failed", "scout")
     assert event.payload["goal"] == "j1" and event.payload["step"] == row.id
     assert event.payload["title"] == "files__list" and "gave up" in event.payload["reason"]
 
@@ -3086,7 +3100,7 @@ async def test_answer_after_the_turn_was_cancelled_still_runs_the_call():
     session, sent = make(Gate([tool_use("files__tidy"), block, "unused"]), Memory(":memory:"))
     session.toolbox.sources.insert(1, Recording())
     wakes = []
-    session.ask_runner._emit = lambda event, on_start=None: wakes.append(event)
+    session.ask_runner._emit = lambda event, **kw: wakes.append(event)
     join(session, "desktop")
     first = await session.say("desktop", say("tidy up"))
     while not open_asks(sent):

@@ -82,7 +82,7 @@ def expert_setup_tools(
 
         def progress(step: dict) -> None:
             facts = {"expert": entry.id, **{k: v for k, v in step.items() if v is not None}}
-            emit(Event("setup_progress", "setup", facts, key=entry.id))
+            emit(Event("setup_progress", f"setup:{entry.id}", facts))
             notify("changed", {"what": "setup"})
 
         try:
@@ -96,11 +96,11 @@ def expert_setup_tools(
             else:
                 log.warning("install of %s failed: %r", entry.id, err)
                 facts = {"expert": entry.id, "ok": False, "error": "failed", "detail": repr(err)}
-            emit(Event("setup_done", "setup", facts, key=entry.id))
+            emit(Event("setup_done", f"setup:{entry.id}", facts))
             notify("changed", {"what": "setup"})
             raise
         facts = {"expert": entry.id, "ok": True, "installed": json.dumps(asdict(expert))}
-        emit(Event("setup_done", "setup", facts, key=entry.id))
+        emit(Event("setup_done", f"setup:{entry.id}", facts))
         notify("changed", {"what": "setup"})
         return expert
 

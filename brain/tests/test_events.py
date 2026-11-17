@@ -87,16 +87,12 @@ def test_body_event_kind_defaults():
 
 def test_from_body_back():
     ev = from_body("desktop", "back", {"idle_seconds": 600})
-    assert ev == Event(
-        "back", "desktop", {"body": "desktop", "idle_seconds": 600}, key="back:desktop"
-    )
+    assert ev == Event("back", "desktop", {"body": "desktop", "idle_seconds": 600})
 
 
 def test_from_body_focus_truncates_the_title_to_200():
     ev = from_body("desktop", "focus", {"app": "Code", "title": "t" * 300})
-    assert ev == Event(
-        "focus", "desktop", {"body": "desktop", "app": "Code", "title": "t" * 200}, key="desktop"
-    )
+    assert ev == Event("focus", "desktop", {"body": "desktop", "app": "Code", "title": "t" * 200})
 
 
 @pytest.mark.parametrize(
@@ -138,7 +134,6 @@ def test_from_connect_needs_ten_minutes_away():
         "body_online",
         "desktop",
         {"body": "desktop", "offline_seconds": 600},
-        key="body_online:desktop",
     )
 
 
@@ -177,22 +172,19 @@ def test_tab_event_is_kept_not_woken():
         "tab",
         "chrome-7k2f",
         {"body": "chrome-7k2f", "title": "Docs", "url": "https://a.example/x"},
-        key="chrome-7k2f",
     )
 
 
-def test_tab_event_replaces_the_older_one_for_the_same_body():
-    # Same key as the body id: the dispatcher keeps only the latest per key.
+def test_tab_event_source_is_the_body_so_the_latest_replaces_the_older_one():
+    # The dispatcher keeps the latest context event per source.
     first = from_body("b", "tab", {"title": "one", "url": "https://a.example"})
     second = from_body("b", "tab", {"title": "two", "url": "https://b.example"})
-    assert first.key == second.key == "b"
+    assert first.source == second.source == "b"
 
 
 def test_download_event_validates_state():
     ok = from_body("b", "download", {"name": "a.pdf", "state": "complete"})
-    assert ok == Event(
-        "download", "b", {"body": "b", "name": "a.pdf", "state": "complete"}, key="b"
-    )
+    assert ok == Event("download", "b", {"body": "b", "name": "a.pdf", "state": "complete"})
     assert from_body("b", "download", {"name": "a.pdf", "state": "started"}) is None
 
 
@@ -254,14 +246,14 @@ def test_event_kinds_have_urgency():
 
 def test_from_body_whatsapp_ask_closed():
     event = from_body("wa", "ask_closed", {"via": "tap"})
-    assert event == Event("ask_closed", "wa", {"body": "wa", "via": "tap"}, key="ask_closed:wa")
+    assert event == Event("ask_closed", "wa", {"body": "wa", "via": "tap"})
     assert from_body("wa", "ask_closed", {"via": "x"}) is None
     assert from_body("wa", "ask_closed", None) is None
 
 
 def test_from_body_whatsapp_many_pending():
     event = from_body("wa", "many_pending", {"asks": 3})
-    assert event == Event("many_pending", "wa", {"body": "wa", "asks": 3}, key="many_pending:wa")
+    assert event == Event("many_pending", "wa", {"body": "wa", "asks": 3})
     assert from_body("wa", "many_pending", {"asks": 0}) is None
     assert from_body("wa", "many_pending", {"asks": "3"}) is None
     assert from_body("wa", "many_pending", {"asks": True}) is None
@@ -348,3 +340,13 @@ def test_a_url_token_next_to_quotes_still_saves_and_is_masked(log):
     assert log.post(Event("say", "desktop", {"text": text}, id="e1")) is True
     saved = log.get("e1").payload["text"]
     assert "abcdef" not in saved and "[secret]" in saved
+
+
+def test_a_failing_masker_withholds_the_text_but_saves_the_event(tmp_path):
+    def broken():
+        raise RuntimeError("no values")
+
+    log = EventLog(open_db(tmp_path / "w.db"), Masker(broken), lambda: NOW)
+    event = Event("say", "desktop", {"text": "hello", "n": 3})
+    assert log.post(event) is True
+    assert log.get(event.id).payload == {"text": "[withheld]", "n": 3}

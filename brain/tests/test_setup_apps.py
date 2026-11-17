@@ -571,7 +571,7 @@ async def test_a_sign_in_that_finishes_later_sends_setup_done_with_the_app_and_t
     r.apps.state = "connected"  # the person finished in the browser
     await until(lambda: r.events)
     (event,) = r.events
-    assert event.kind == "setup_done" and event.key == "cloud"
+    assert event.kind == "setup_done" and event.source == "setup:cloud"
     assert event.payload == {
         "app": "cloud",
         "name": "cloud",

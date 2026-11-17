@@ -15,7 +15,7 @@ import pytest
 from brain.bodies import Bodies
 from brain.builtin_guards import spend_guards, wake_caps
 from brain.dispatcher import MAX_FAILS, RETRY_S, STALE_S, Dispatcher, Item
-from brain.events import EVENT_KINDS, Event, EventKind
+from brain.events import EVENT_KINDS, Event, EventKind, is_internal
 from brain.guards import Guard, Guards, Hook, rewrite, stop
 from brain.open_items import OpenItems
 from brain.store.db import open_db
@@ -98,6 +98,7 @@ class Rig:
         self.last = last
         self.t = T0
         self.fail = fail
+        self.ended: set[str] = set()  # event ids whose news was ended, not told
         self._sleepers: list[tuple[datetime, asyncio.Future]] = []
         self.items = OpenItems(open_db(tmp_path / "t.db"), lambda: self.t)
         if guards is None:
@@ -118,6 +119,7 @@ class Rig:
             notes={k: f"note for {k}" for k in kinds},
             sleep=self._sleep,
             interject=self._interject if interject else None,
+            finished=lambda event_id: event_id in self.ended,
         )
 
     async def _interject(self, body_id: str, content: list) -> bool:
@@ -150,10 +152,10 @@ class Rig:
         await settle()
 
     async def emit(self, event: Event, on_start=None, on_drop=None, on_end=None) -> None:
+        origin = "brain" if is_internal(event.source) else event.source
         item = Item(
-            event.kind, event.origin_body, dict(event.payload), "idle", event.key,
-            on_start, on_drop, on_end,
-        )  # fmt: skip
+            event.kind, origin, dict(event.payload), "idle", event.id, on_start, on_drop, on_end
+        )
         self.d.post(item)
         await settle()
 
@@ -177,8 +179,8 @@ async def make(tmp_path):
         await r.d.stop()
 
 
-def ev(kind="ping", key=None, **facts) -> Event:
-    return Event(kind, "scout", facts, key=key)
+def ev(kind="ping", source="scout", **facts) -> Event:
+    return Event(kind, source, facts)
 
 
 # ---- the gate: urgency from the kind, delivery by speech state ----
@@ -325,21 +327,22 @@ async def test_a_hold_kind_becomes_a_held_open_item(make):
     rig = make()
     await rig.emit(ev("parked", n=1), on_start=lambda: pytest.fail("a held item never starts"))
     assert rig.starts == []
-    assert rig.held() == [{"event": "parked", "key": None, "why": "held_kind", "facts": {"n": 1}}]
+    assert rig.held() == [{"event": "parked", "why": "held_kind", "facts": {"n": 1}}]
     assert rig.items.list_open(kind="held")[0].origin_body == "brain"
 
 
-async def test_a_newer_item_with_the_same_kind_and_key_replaces_a_waiting_one(make):
-    rig = make()
-    rig.d.set_speech_state("talking")
-    await rig.emit(ev("soon", key="k", n="1"))
-    await rig.emit(ev("soon", key="k", n="2"))
-    rig.d.set_speech_state("idle")
-    await settle()
-    assert len(rig.starts) == 1 and "n: 2" in rig.text() and "n: 1" not in rig.text()
-
-
 # ---- a delivery that fails ----
+
+
+async def test_news_whose_event_was_ended_is_never_told(make):
+    rig = make(online=())  # no body: the wake waits in its group
+    stale, fresh = ev("ping", n="1"), ev("ping", n="2")
+    await rig.emit(stale, on_start=lambda: pytest.fail("ended news never starts"))
+    await rig.emit(fresh)
+    rig.ended.add(stale.id)
+    rig.bodies.ids.append("desktop")
+    rig.d.pump()
+    assert len(rig.starts) == 1 and "n: 2" in rig.text() and "n: 1" not in rig.text()
 
 
 async def test_a_failed_delivery_is_tried_again(make):
@@ -378,15 +381,14 @@ async def test_a_held_say_keeps_no_futures_or_words_only_plain_facts(make):
 async def test_stop_holds_what_is_left_and_tells_the_session(make):
     rig = make()
     rig.d.set_speech_state("talking")
-    await rig.emit(ev("ping", key="k1"))
+    await rig.emit(ev("ping", n="1"))
     rig.busy = True
     rig.d.set_speech_state("idle")
     await settle()  # k1 is past the gate, waiting for the turn to end
     rig.d.set_speech_state("talking")
-    await rig.emit(ev("ping", key="k2"))  # still at the gate
+    await rig.emit(ev("ping", n="2"))  # still at the gate
     await rig.d.stop()
-    why = sorted((h["key"], h["why"]) for h in rig.held())
-    assert why == [("k1", "stopped"), ("k2", "stopped")]
+    assert [h["why"] for h in rig.held()] == ["stopped", "stopped"]
     assert len(rig.gave_up) == 2
 
 
@@ -431,7 +433,7 @@ async def test_a_wake_goes_to_a_whatsapp_body_when_it_is_the_only_one_online(mak
 async def test_a_whatsapp_event_wake_runs_on_whatsapp(make):
     rig = make(online=("desktop", "whatsapp"), last="desktop")
     rig.bodies.phones = {"whatsapp"}
-    await rig.emit(Event("ping", "scout", {"body": "whatsapp"}, origin_body="whatsapp"))
+    await rig.emit(Event("ping", "whatsapp", {"body": "whatsapp"}))
     assert [b for b, _ in rig.starts] == ["whatsapp"]
 
 
@@ -457,9 +459,7 @@ async def test_no_body_online_waits_and_a_connect_runs_it(make):
 async def test_a_loop_wake_with_no_display_body_waits_and_is_not_lost(make):
     rig = make(online=("browser",), kinds={"loop": EVENT_KINDS["loop"]}, last="browser")
     rig.bodies.headless = {"browser"}
-    await rig.emit(
-        Event("loop", "scout", {"reason": "due", "title": "Send the deck"}, key="loop:1")
-    )
+    await rig.emit(Event("loop", "scout", {"reason": "due", "title": "Send the deck"}))
     assert rig.starts == []
     rig.bodies.ids.append("desktop")
     rig.d.pump()
@@ -516,18 +516,6 @@ async def test_events_arriving_while_blocked_join_the_waiting_group(make):
     assert "one" in rig.text() and "two" in rig.text()
 
 
-async def test_same_key_replaces_a_waiting_event_and_drops_its_on_start(make):
-    rig = make()
-    rig.busy = True
-    ran: list[str] = []
-    await rig.emit(ev("ping", key="k", fact="old"), on_start=lambda: ran.append("old"))
-    await rig.emit(ev("ping", key="k", fact="new"), on_start=lambda: ran.append("new"))
-    rig.busy = False
-    rig.d.pump()
-    assert "fact: new" in rig.text() and "fact: old" not in rig.text()
-    assert ran == ["new"]
-
-
 async def test_batch_seconds_none_never_merges(make):
     rig = make()
     rig.busy = True
@@ -538,21 +526,6 @@ async def test_batch_seconds_none_never_merges(make):
     assert len(rig.starts) == 1 and "one" in rig.text(0) and "two" not in rig.text(0)
     rig.d.turn_ended("t1")
     assert len(rig.starts) == 2 and "two" in rig.text(1)
-
-
-async def test_a_key_replaces_a_waiting_event_of_a_never_merged_kind(make):
-    rig = make()
-    rig.busy = True
-    ran = []
-    await rig.emit(ev("single", key="k", a="old"), on_start=lambda: ran.append("old"))
-    await rig.emit(ev("single", key="k", a="new"), on_start=lambda: ran.append("new"))
-    await rig.emit(ev("single", key="other", a="third"))
-    rig.busy = False
-    rig.d.pump()
-    assert "a: new" in rig.text(0) and "old" not in rig.text(0)
-    rig.d.turn_ended("t1")
-    assert "third" in rig.text(1)
-    assert ran == ["new"]
 
 
 async def test_on_start_runs_after_the_turn_starts(make):
@@ -573,18 +546,6 @@ async def test_on_end_runs_when_the_wake_turn_ends(make):
     assert ended == ["done"]
     rig.d.turn_ended("t1")
     assert ended == ["done"]
-
-
-async def test_on_end_does_not_run_for_a_replaced_event(make):
-    rig = make()
-    rig.busy = True
-    ended = []
-    await rig.emit(ev("ping", key="k"), on_end=lambda reason: ended.append("old"))
-    await rig.emit(ev("ping", key="k"), on_end=lambda reason: ended.append("new"))
-    rig.busy = False
-    rig.d.pump()
-    rig.d.turn_ended("t1")
-    assert ended == ["new"]
 
 
 async def test_a_raising_hook_does_not_stop_the_other_hooks_or_the_pump(make, caplog):
@@ -616,59 +577,14 @@ async def test_a_raising_hook_does_not_stop_the_other_hooks_or_the_pump(make, ca
 
 async def test_context_only_kind_updates_latest_and_never_wakes(make):
     rig = make()
-    rig.d.record(ev("focus", key="a", title="old"))
-    rig.d.record(ev("focus", key="a", title="new"))
-    rig.d.record(ev("focus", key="b", title="other"))
-    rig.d.record(ev("focus", title="nokey"))
+    rig.d.record(ev("focus", source="a", title="old"))
+    rig.d.record(ev("focus", source="a", title="new"))
+    rig.d.record(ev("focus", source="b", title="other"))
     assert rig.starts == []
     latest = rig.d.latest("focus")
     assert latest["a"].payload["title"] == "new"
     assert latest["b"].payload["title"] == "other"
-    assert latest[""].payload["title"] == "nokey"
     assert rig.d.latest("ping") == {}
-
-
-async def test_drop_removes_a_waiting_event_of_that_kind_and_key(make):
-    rig = make()
-    rig.busy = True
-    await rig.emit(ev("slow", key="job:a", fact="x"))
-    rig.d.drop("slow", "job:a")
-    rig.busy = False
-    rig.t = T0 + timedelta(hours=1)
-    rig.d.pump()
-    assert rig.starts == [] and rig.held() == []
-
-
-async def test_drop_leaves_other_keys_and_kinds_alone(make):
-    rig = make()
-    rig.busy = True
-    await rig.emit(ev("slow", key="job:a", fact="a"))
-    await rig.emit(ev("slow", key="job:b", fact="b"))
-    await rig.emit(ev("ping", key="job:a", fact="p"))
-    rig.d.drop("slow", "job:a")
-    rig.busy = False
-    rig.t = T0 + timedelta(minutes=5)
-    for _ in range(3):  # one waiting group starts per pump
-        rig.d.pump()
-    texts = " ".join(rig.text(i) for i in range(len(rig.starts)))
-    assert "fact: b" in texts and "fact: p" in texts and "fact: a" not in texts
-
-
-async def test_drop_of_an_unknown_key_or_kind_is_a_no_op(make):
-    rig = make()
-    rig.d.drop("slow", "nope")
-    rig.d.drop("never_heard_of", "nope")
-    assert rig.starts == []
-
-
-async def test_a_newer_event_for_the_same_key_in_a_batch_is_the_one_waiting(make):
-    rig = make()
-    await rig.emit(ev("slow", key="job:a", fact="first"))
-    rig.t = T0 + timedelta(seconds=10)
-    await rig.emit(ev("slow", key="job:a", fact="second"))
-    rig.t = T0 + timedelta(seconds=60)
-    rig.d.pump()
-    assert "fact: second" in rig.text() and "fact: first" not in rig.text()
 
 
 async def test_pump_arms_a_timer_for_the_batch(make):
@@ -716,7 +632,7 @@ async def test_job_quiet_wakes_at_most_three_times_an_hour(make):
     rig = make(kinds={"job_quiet": EVENT_KINDS["job_quiet"]})
     for minute in (0, 10, 20, 30):
         rig.t = T0 + timedelta(minutes=minute)
-        await rig.emit(ev("job_quiet", key="job:a", n=str(minute)))
+        await rig.emit(ev("job_quiet", n=str(minute)))
     assert len(rig.starts) == 3  # the fourth waits until the window frees
 
 
@@ -823,7 +739,7 @@ async def test_the_emit_guard_stopping_with_another_code_keeps_the_wake(make):
 async def test_context_only_events_survive_a_spent_budget(make):
     rig = make(budget=Spent())
     rig.d.record(ev("focus", title="x"))
-    assert rig.d.latest("focus")[""].payload["title"] == "x"
+    assert rig.d.latest("focus")["scout"].payload["title"] == "x"
 
 
 async def test_quiet_hours_hold(make):
@@ -886,47 +802,8 @@ async def test_a_secret_in_held_facts_is_saved_masked(make):
     guards = spend_guards(Spent(), 25)
     guards.add(Guard("mask", Hook.save, lambda c: rewrite(c.text.replace("sk-abc123", "[secret]"))))
     rig = make(guards=guards)
-    await rig.emit(ev("ping", key="j", activity="ran with sk-abc123"))
+    await rig.emit(ev("ping", activity="ran with sk-abc123"))
     assert rig.held()[0]["facts"] == {"activity": "ran with [secret]"}
-
-
-async def test_posting_the_same_event_and_key_closes_its_held_row(make):
-    quiet = [True]
-    rig = make(kinds=CAPPED, quiet=lambda now: quiet[0])
-    await rig.emit(ev("a", key="job:1", n="1"))
-    assert len(rig.held()) == 1
-    quiet[0] = False
-    await rig.emit(ev("a", key="job:1", n="2"))  # re-emitted: told now, not also held
-    assert rig.held() == [] and len(rig.starts) == 1
-
-
-async def test_a_failing_close_of_a_held_row_does_not_raise_out_of_post_or_drop(make, caplog):
-    rig = make(kinds=CAPPED)
-
-    def boom(*a, **k):
-        raise RuntimeError("db locked")
-
-    rig.items.find_open = boom
-    with caplog.at_level(logging.ERROR, logger="brain.dispatcher"):
-        await rig.emit(ev("a", key="job:1"))
-        rig.d.drop("a", "job:1")
-    assert len(rig.starts) == 1 and "db locked" in caplog.text
-
-
-async def test_a_held_row_for_a_different_key_stays(make):
-    quiet = [True]
-    rig = make(kinds=CAPPED, quiet=lambda now: quiet[0])
-    await rig.emit(ev("a", key="job:1"))
-    quiet[0] = False
-    await rig.emit(ev("a", key="job:2"))
-    assert [h["key"] for h in rig.held()] == ["job:1"]
-
-
-async def test_drop_closes_the_held_row_of_that_event_and_key(make):
-    rig = make(kinds=CAPPED, quiet=lambda now: True)
-    await rig.emit(ev("a", key="job:1"))
-    rig.d.drop("a", "job:1")
-    assert rig.held() == []
 
 
 async def test_quiet_hours_do_not_hold_a_kind_with_no_hourly_cap(make):
@@ -940,7 +817,7 @@ async def test_quiet_hours_do_not_hold_a_kind_with_no_hourly_cap(make):
 async def test_stop_holds_wake_kinds_only_and_tells_the_session_of_every_item(make):
     rig = make(fail=100)  # the say keeps failing, so it is still waiting at stop
     rig.d.set_speech_state("talking")
-    await rig.emit(ev("ping", key="k"))
+    await rig.emit(ev("ping"))
     rig.d.post(Item("say", "desktop", {"token": "x"}, "now"))
     await settle()
     await rig.d.stop()
@@ -951,7 +828,7 @@ async def test_stop_holds_wake_kinds_only_and_tells_the_session_of_every_item(ma
 async def test_a_post_after_stop_holds_directly_and_starts_nothing(make):
     rig = make()
     await rig.d.stop()
-    await rig.emit(ev("ping", key="late"))
+    await rig.emit(ev("ping"))
     rig.d.post(Item("say", "desktop", {"token": "y"}, "now"))
     await settle()
     assert rig.d._task is None and rig.starts == [] and rig.delivered == []
@@ -1039,17 +916,6 @@ async def test_a_desktop_idle_hands_the_source_back_to_the_mouth(make):
     assert len(rig.starts) == 1
 
 
-async def test_a_latched_break_does_not_outlive_its_dropped_item(make):
-    rig = make()
-    rig.d.set_speech_state("talking")
-    await rig.emit(ev("soon", key="a"))
-    rig.d.set_speech_state("sentence_break")
-    rig.d.drop("soon", "a")  # gone before the loop took the break
-    rig.d.set_speech_state("talking")
-    await rig.emit(ev("soon", key="b"))
-    assert rig.starts == []
-
-
 async def test_a_waiting_say_or_later_turn_keeps_idle_closed_for_next_pause(make):
     rig = make()
     rig.busy = True  # the session's _busy_for_wakes: a turn, a waiting say or a later entry
@@ -1110,7 +976,7 @@ async def test_one_interjection_at_a_time_and_no_wake_alongside(make):
     await rig.emit(ev("soon"))
     rig.d.set_speech_state("sentence_break")
     await settle()
-    await rig.emit(ev("soon", key="two"))
+    await rig.emit(ev("soon"))
     rig.busy = False
     rig.d.turn_ended("t0")
     await settle()

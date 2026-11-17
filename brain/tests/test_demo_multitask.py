@@ -13,7 +13,6 @@ from types import SimpleNamespace
 import pytest
 from fake_clock import FakeClock
 from job_rows import add_timer, records_for
-from test_front_door_routing import spy_posts
 from test_jobs import HANG, FakeAsks, FakeBridge, installed, make_rig  # noqa: F401 (fixture)
 from test_sessions import (
     NO_WAIT,
@@ -351,18 +350,15 @@ async def test_6a_each_reply_goes_to_the_body_that_asked():
     assert replies == [("desktop", "for the desktop"), ("whatsapp", "for the phone")]
 
 
-@pytest.mark.xfail(
-    strict=True, reason="M6: a browser say is posted with the desktop as its origin, source lost"
-)
 async def test_6b_a_browser_says_origin_is_recorded_as_the_browser():
     session, sent = make(Gate(["a"]))
     join(session, "desktop")
     join_headless(session, "browser")
-    posted = spy_posts(session)
     await session.say("browser", say("summarise this page"))
     await idle(session)
-    print(f"\n[6b] browser say recorded origin: {[(i.kind, i.origin_body) for i in posted]}")
-    assert posted[0].origin_body == "browser"
+    [row] = session.events.ready()
+    print(f"\n[6b] browser say recorded source: {row.source}")
+    assert (row.kind, row.source) == ("say", "browser")
 
 
 async def test_6c_two_bodies_answering_one_card_second_gets_not_found():

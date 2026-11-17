@@ -10,6 +10,7 @@ turn cleared even if the task is cancelled before it ever ran.
 import asyncio
 import json
 import logging
+import sqlite3
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
@@ -42,7 +43,15 @@ from brain.config import (
     DEFAULT_WORK_KEEP_DAYS,
 )
 from brain.dispatcher import Dispatcher, Item, WakeSkipped
-from brain.events import BRAIN, EVENT_KINDS, Event, EventKind, from_body, from_connect
+from brain.events import (
+    EVENT_KINDS,
+    Event,
+    EventKind,
+    EventLog,
+    from_body,
+    from_connect,
+    is_internal,
+)
 from brain.expert_apps import ExpertApps
 from brain.experts import ExpertHosts, ExpertRun
 from brain.job_records import Job, JobRecords
@@ -71,7 +80,7 @@ from brain.mind.turn import Call, Model, run_turn
 from brain.models import DEFAULT_MODEL_ID
 from brain.offers import Offers, OfferSettings
 from brain.open_item_runner import AskRunner
-from brain.open_items import OpenItems
+from brain.open_items import BRAIN, OpenItems
 from brain.outputs import OutputStore
 from brain.permission import Engine, Person, SideCheckDecider, StandingRule, stored_auto_rules
 from brain.protocol import (
@@ -176,6 +185,7 @@ class Session:
         work_keep_days: int = DEFAULT_WORK_KEEP_DAYS,
         outputs_keep: int = DEFAULT_OUTPUTS_KEEP,
         know_sources: list | None = None,  # tests pass fakes; None reads GitHub, PDF and the web
+        events: EventLog | None = None,  # None: one over the same db (tests build Session directly)
     ) -> None:
         self._model = model
         self.reading = ReadingStore()  # how the connected body reads the screen, for Home
@@ -200,6 +210,8 @@ class Session:
         if masker is not None:  # what reaches disk (chat, approvals, job results) is masked
             self.guards.add(mask_secrets(masker))
         memory.mask = lambda text: mask_json(self.guards, "memory", text)
+        # Everything said to Scout and every wake is saved here before anything acts on it.
+        self.events = events or EventLog(memory.db, masker or Masker(lambda: []), now)
         # Long tool results and expert reports reach the model as a capped preview; the full text
         # is stored masked for read_output. At startup finished work goes first (with the reports
         # it points at), then the oldest outputs nothing points at.
@@ -233,12 +245,13 @@ class Session:
             quiet=quiet,
             kinds=self._kinds,
             interject=self._interject,
+            finished=self._news_finished,
         )
         self._interjection_cut = False  # the person talked over Scout during an interjection
         self._carried: list[dict] = []  # what an interjection changed, shown to the next turn
         self._says_waiting: set[str] = set()  # says posted, not yet delivered: wakes wait for them
         # Says from another body that arrived mid-turn: each starts a turn when that one ends.
-        self._later: list[tuple[str | None, str, list, SayParams]] = []
+        self._later: list[tuple[str | None, str, list, SayParams, str]] = []  # last: event id
         # The owner's words that joined the running turn: it takes them in at its next step.
         self._inbox: list = []
         self._joined: tuple[str | None, SayParams] | None = None
@@ -286,8 +299,9 @@ class Session:
             steps_max_bytes=job_steps_max_bytes,
             setup_facts=setup_facts,
             emit=self._emit_job_event,
-            origin_body=self._turn_origin,
-            drop=self._drop_news,
+            turn_cause=lambda: self._turn_cause,
+            body_of=self._cause_body,
+            finish_news=self.events.finish_matching,
             on_timers_changed=lambda: timers.changed(),
             outputs=outputs,
             items=items,
@@ -302,6 +316,7 @@ class Session:
             job_facts=self.jobs.wake_facts,
             rerun=self._rerun_step,
             notify=notify,
+            finish_news=self.events.finish_matching,
         )
         choices = Choices(self._asks, self.post_event, items)
         # Scout getting to know the person; its status goes out live to the body that asked.
@@ -399,6 +414,7 @@ class Session:
         )
         self._last_body: str | None = None  # where a wake turn goes first
         self._turn_body: str | None = None  # the body showing the running turn
+        self._turn_cause: str | None = None  # the event the running turn took (a say)
         # The job the running turn works for: a wake about it, or a job tool named it. Tool and
         # app calls in the turn are recorded on that job's timeline. Cleared when the turn ends.
         self._turn_job: str | None = None
@@ -439,7 +455,9 @@ class Session:
         for w in paused[: len(told)]:  # the rest are told at the next start
             work.mark_reported(w.id)
 
-    async def say(self, body_id: str, params: SayParams) -> SayResult:
+    async def say(
+        self, body_id: str, params: SayParams, *, event_id: str | None = None
+    ) -> SayResult:
         check_part_sizes(params.parts or [])  # over_limit, before anything changes
         sender = self._bodies.body(body_id)
         shown_on: str | None = body_id
@@ -450,6 +468,18 @@ class Session:
         content = user_content(
             params, read_aloud=self._wants_speech(shown_on, params)
         )  # may raise ValueError before anything changes
+        # Saved first, whatever happens to it next: a say that was heard is never lost.
+        say_event = Event(
+            "say",
+            body_id,
+            {
+                "text": params.text or "",
+                "content": content,
+                "params": params.model_dump(mode="json", exclude_none=True),
+            },
+            **({"id": event_id} if event_id else {}),
+        )
+        self.events.post(say_event)
         if not (sender is not None and sender.display is False):
             self._last_body = body_id
         if params.interrupted is not None and self._ready():
@@ -469,7 +499,7 @@ class Session:
         token = uuid.uuid4().hex
         self._says_waiting.add(token)
         payload = {"token": token, "result": result, "content": content, "params": params}
-        self.dispatcher.post(Item("say", shown_on or BRAIN, payload, "now"))
+        self.dispatcher.post(Item("say", shown_on or BRAIN, payload, "now", event_id=say_event.id))
         # Shielded: a body that disconnects cancels its caller, but the say is still delivered.
         return await asyncio.shield(result)
 
@@ -481,31 +511,70 @@ class Session:
         on_drop: Callable[[], None] | None = None,
         on_end: Callable[[str], None] | None = None,
         retell: bool = False,
+        then: Callable[[sqlite3.Connection], None] | None = None,
+        origin: str | None = None,
     ) -> None:
-        """Every wake source posts here: the dispatcher decides when, batches and
-        caps it, and the wake turn is shown on the event's origin body when it can."""
+        """Every wake source posts here: the event is saved, then the dispatcher decides when,
+        batches and caps it. The wake turn is shown on the body the event came from, `origin`
+        (for events a cause chain cannot name), or the body its cause came through."""
+        self.events.post(event, then=then)
         ended = on_end
         if on_end is not None and retell:
 
             def ended(reason: str) -> None:
                 on_end(reason)
                 if reason == "cancelled":  # news a cancelled turn did not tell: once more, no more
-                    self.post_event(event, on_start=on_start, on_drop=on_drop, on_end=on_end)
+                    self.post_event(
+                        event, on_start=on_start, on_drop=on_drop, on_end=on_end, origin=origin
+                    )
 
         item = Item(
             event.kind,
-            event.origin_body,
+            origin or self._origin_of(event),
             dict(event.payload),
             "idle",
-            event.key,
+            event.id,
             on_start,
             on_drop,
             ended,
         )
         self.dispatcher.post(item)
 
+    def _turn_origin(self, turn_id: str) -> str:
+        """The body showing that turn while it runs, "brain" when it is over."""
+        return (self._turn_body if turn_id == self._turn_id else None) or BRAIN
+
+    def _news_finished(self, event_id: str) -> bool:
+        """The event was ended without being told (a cancelled timer, an ended job's news)."""
+        row = self.events.get(event_id) if event_id else None
+        return row is not None and row.state != "new"
+
+    def _origin_of(self, event: Event) -> str:
+        """The body an event's wake is shown on: the body it came from; for Scout's own news,
+        the body in use now, else the first body on the way back through its causes."""
+        if not is_internal(event.source):
+            return event.source
+        return self._cause_body(event.caused_by)
+
+    def _cause_body(self, cause: str | None) -> str:
+        if cause is None:
+            return BRAIN
+        if self._busy() and self._turn_body is not None:
+            return self._turn_body
+        return self.events.origin_body(cause, lambda s: not is_internal(s)) or BRAIN
+
     def _post_card_answer(self, ask_id: str, option: str, body_id: str) -> None:
-        self.dispatcher.post(Item("card_answer", body_id, {"ask": ask_id, "option": option}, "now"))
+        answer = Event("card_answer", body_id, {"ask": ask_id, "option": option})
+        self.events.post(answer)
+        self.dispatcher.post(
+            Item(
+                "card_answer",
+                body_id,
+                {"ask": ask_id, "option": option},
+                "now",
+                event_id=answer.id,
+            )
+        )
 
     async def _deliver(self, item: Item) -> None:
         """The dispatcher's hand-over for kinds that never wake: a say becomes a turn, a card
@@ -515,15 +584,7 @@ class Session:
         elif item.kind == "card_answer":
             self.ask_runner.answered(item.payload["ask"], item.payload["option"], item.origin_body)
         else:
-            self.dispatcher.record(
-                Event(
-                    item.kind,
-                    item.origin_body,
-                    item.payload,
-                    key=item.key,
-                    origin_body=item.origin_body,
-                )
-            )
+            self.dispatcher.record(Event(item.kind, item.origin_body, item.payload))
 
     def _say_gave_up(self, item: Item) -> None:
         """The dispatcher gave up on a say (or is stopping): its caller hears it failed, and its
@@ -553,7 +614,7 @@ class Session:
                     result.set_result(SayResult(turn=self._turn_id or "", joined=True))
             elif self._busy():
                 turn = uuid.uuid4().hex
-                self._later.append((shown, turn, content, params))
+                self._later.append((shown, turn, content, params, item.event_id))
                 if not result.done():
                     result.set_result(SayResult(turn=turn, joined=False))
             else:
@@ -568,7 +629,13 @@ class Session:
                 if cut:
                     self._end_cancelled(turn, shown)
                 else:
-                    self._start_turn(shown, content, turn_id=turn, said=params.text or "")
+                    self._start_turn(
+                        shown,
+                        content,
+                        turn_id=turn,
+                        said=params.text or "",
+                        cause=item.event_id or None,
+                    )
                     self._speak(turn, shown, params)
         except BaseException as err:
             if not result.done():
@@ -611,12 +678,6 @@ class Session:
             voice.resume(tell=not cut)  # whatever happened, the queue never stays held
         return words is not None
 
-    def _turn_origin(self, turn_id: str | None = None) -> str:
-        """The body showing the running turn (or the given one), "brain" when none."""
-        if turn_id is not None and turn_id != self._turn_id:
-            return BRAIN
-        return self._turn_body or BRAIN
-
     def _busy_for_wakes(self) -> bool:
         # A say waiting its turn goes before any wake: the dispatcher holds its batch meanwhile.
         return self._busy() or bool(self._says_waiting) or bool(self._later)
@@ -655,6 +716,7 @@ class Session:
         """A tool the paused turn left running: when it ends, its result enters the front door
         like any other news, so a later turn (not this one) tells the owner."""
         self._background.add(task)
+        cause = self._turn_cause  # read now: the turn is gone when the tool ends
 
         def done(t: asyncio.Future) -> None:
             self._background.discard(t)
@@ -673,13 +735,8 @@ class Session:
                 "result": text[:_LATE_RESULT_CAP],
             }
             self.post_event(
-                Event(
-                    "tool_result",
-                    f"tool:{call['name']}",
-                    facts,
-                    key=call["id"],
-                    origin_body=body_id or BRAIN,
-                )
+                Event("tool_result", f"tool:{call['name']}", facts, caused_by=cause),
+                origin=body_id or BRAIN,
             )
 
         task.add_done_callback(done)
@@ -806,10 +863,6 @@ class Session:
         # a say for a turn it is already speaking.
         self.voice.spoken(turn, shown_on, speed, ask.system_voice if ask else False)
 
-    def _drop_news(self, kind: str, key: str) -> None:
-        """A waiting event is superseded: the dispatcher forgets it wherever it waits."""
-        self.dispatcher.drop(kind, key)
-
     def _display_target(self) -> str | None:
         shown = self._bodies.display_ids()
         last = self._last_body
@@ -852,7 +905,7 @@ class Session:
                     self.loops.saw(event)
                 except Exception:  # a store error must not stop the wake path
                     log.exception("loops.saw failed")
-            self._from_body(replace(event, origin_body=body_id))
+            self._from_body(event)
 
     def _from_body(self, event: Event) -> None:
         """A body's event enters the front door when it can wake Scout, so the reply goes back
@@ -877,7 +930,7 @@ class Session:
                     self.loops.saw(event)
                 except Exception:
                     log.exception("loops.saw failed")
-            self._from_body(replace(event, origin_body=body_id))
+            self._from_body(event)
         self.dispatcher.pump()  # also starts a wake that was waiting for a body
         body = self._bodies.body(body_id)
         if body is not None and body.display is not False:
@@ -886,15 +939,14 @@ class Session:
 
     def _on_job_finished(self, job: Job) -> None:
         self._emit_job_event(
-            Event("job_ended", f"job:{job.id}", {"report": self.jobs.note(job)}, key=job.id),
+            Event("job_ended", f"job:{job.id}", {"report": self.jobs.note(job)}),
             on_end=_when_told(lambda: self.records.mark_reported(job.id)),
             retell=True,
         )
 
     def _emit_job_event(self, event: Event, **hooks) -> None:
         """Emit a job's event; the wake turn it starts is bound to that job."""
-        key = event.key or ""
-        job = key[4:] if key.startswith("job:") else (key if event.kind == "job_ended" else "")
+        job = event.source[4:] if event.source.startswith("job:") else ""
         on_start = hooks.pop("on_start", None)
 
         def started() -> None:
@@ -906,8 +958,8 @@ class Session:
             if on_start is not None:
                 on_start()
 
-        origin = self.jobs.origin(job)
-        self.post_event(replace(event, origin_body=origin), on_start=started, **hooks)
+        cause = self.jobs.cause(job) if job else None
+        self.post_event(replace(event, caused_by=cause), on_start=started, **hooks)
 
     def _on_tool_call(
         self,
@@ -1001,7 +1053,7 @@ class Session:
             "reason": row.end_reason or "",
         }
         self.post_event(
-            Event("work_failed", "scout", facts, key=f"work_failed:{row.id}"),
+            Event("work_failed", "scout", facts),
             on_end=_when_told(lambda: work.mark_reported(row.id)),
             retell=True,
         )
@@ -1047,8 +1099,7 @@ class Session:
                 "job_question",
                 f"job:{job_id}",
                 {"job": job_id, "message": what},
-                key=job_id,
-                origin_body=self.jobs.origin(job_id),
+                caused_by=self.jobs.cause(job_id),
             )
         )
 
@@ -1074,10 +1125,11 @@ class Session:
         cut: Interruption | None = None,
         turn_id: str | None = None,
         said: str = "",
+        cause: str | None = None,
     ) -> str:
         """`after` is a cancelled turn still winding down: this one waits for it, so the history it
         closes is valid before anything is added. `cut` is what the owner talked over.
-        `turn_id` is the id a say already told its body."""
+        `turn_id` is the id a say already told its body; `cause` the event the turn took."""
         turn_id = turn_id or uuid.uuid4().hex
         self._turn_id = turn_id
         self._inbox_open = True
@@ -1088,6 +1140,7 @@ class Session:
         # Only the person's typed words count as date evidence, never body context or parts.
         self._said = said if started_by == "user" else ""
         self._turn_body = body_id
+        self._turn_cause = cause
         lead = [interruption_block(cut.spoken, cut.unsaid)] if cut is not None else []
         lead = [*self._carried, *lead]  # what an interjection changed, once
         self._carried = []
@@ -1216,8 +1269,8 @@ class Session:
             self._task.cancel()
         elif turn_id == self._starting:
             self._starting = None
-        elif any(turn == turn_id for _, turn, _, _ in self._later):
-            shown = next(b for b, turn, _, _ in self._later if turn == turn_id)
+        elif any(turn == turn_id for _, turn, *_ in self._later):
+            shown = next(b for b, turn, *_ in self._later if turn == turn_id)
             self._later = [x for x in self._later if x[1] != turn_id]
             self._end_cancelled(turn_id, shown)
             self.dispatcher.pump()
@@ -1334,9 +1387,13 @@ class Session:
             said = (params.text or "") if params is not None else ""
             self._speak(self._start_turn(shown, pending, said=said), shown, params)
         elif self._later and self._task is None:
-            shown, turn, content, params = self._later.pop(0)
+            shown, turn, content, params, cause = self._later.pop(0)
             self._start_turn(
-                shown, content, turn_id=turn, said=(params.text or "") if params else ""
+                shown,
+                content,
+                turn_id=turn,
+                said=(params.text or "") if params else "",
+                cause=cause,
             )
             self._speak(turn, shown, params)
 

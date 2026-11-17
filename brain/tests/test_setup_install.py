@@ -595,10 +595,10 @@ async def test_install_tool_returns_at_once_and_the_install_finishes_in_the_back
     done = await settled(emitted)
     assert done.payload["expert"] == "claude-acp" and done.payload["ok"] is True
     assert json.loads(done.payload["installed"])["id"] == "claude-acp"
-    assert done.key == "claude-acp"
+    assert done.source == "setup:claude-acp"
     assert ExpertStore(tmp_path).get("claude-acp") is not None
     progress = [e for e in emitted if e.kind == "setup_progress"]
-    assert progress and all(e.key == "claude-acp" for e in progress)
+    assert progress and all(e.source == "setup:claude-acp" for e in progress)
     assert progress[0].payload["expert"] == "claude-acp" and "stage" in progress[0].payload
     assert ("changed", {"what": "setup"}) in notes
     await stop()

@@ -101,7 +101,7 @@ the total can run a little low.
 | `brain/src/brain/mind/approvals.md`    | Wording for the side-check (`## decide`) and the offer (`## offer`), as model text, not code                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `brain/src/brain/expert_apps.py`       | `ExpertApps`: the loopback MCP bridge that lets an expert reach chosen connected apps through the brain's gate; one token per job part                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `brain/src/brain/experts.py`           | `ExpertHost` (one adapter process per expert, shared by its sessions) and `ExpertRun` (one session over ACP; callbacks for permissions, questions, progress and the end)                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `brain/src/brain/events.py`            | The event kinds registry (batch window, per-hour cap) and the loader for `mind/events.md`. `Event(kind, source, payload)` is the envelope (the source is a body id, `timer`, `setup`, `scout`, or `job:<id>`, `loop:<app>`, `tool:<name>`; `is_internal` tells them apart). `EventLog` saves each event that must survive a restart (`SAVED_KINDS`: the kinds that wake Scout, plus `say` and `card_answer`) into the `events` table, masked and once per id, before anything acts on it; it is not wired into `Session` yet |
+| `brain/src/brain/events.py`            | The event kinds registry (batch window, per-hour cap) and the loader for `mind/events.md`. `Event(kind, source, payload)` is the envelope (the source is a body id, `scout`, or `timer:<id>`, `setup:<id>`, `job:<id>`, `loop:<app>`, `tool:<name>`; `is_internal` tells them apart). `EventLog` saves each event that must survive a restart (`SAVED_KINDS`: the kinds that wake Scout, plus `say` and `card_answer`) into the `events` table, masked and once per id, before anything acts on it; `Session` saves every say, card answer and wake source through it (`Session.say`, `Session.post_event`) before the dispatcher sees it, and `main.py` builds the one log. The envelope has no `key` or `origin_body`: an event of one thing has a source naming it (`timer:<id>`, `setup:<id>`, `job:<id>`) and Scout's news carries `caused_by`, the event it follows |
 | `brain/src/brain/dispatcher.py`        | `Dispatcher.post`: the one front door; batches wake events, applies caps, budget, quiet hours and staleness, starts one wake turn per batch, and keeps what it cannot tell as `held` open items                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `brain/src/brain/loops/`               | Loops: `loop.py` the shape, `store.py` the SQLite store over Memory's connection, `service.py` the due timer that emits `loop` events, `reader.py` the mail reader, `tools.py` Scout's loop tools (see [Loops](#loops))                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `brain/src/brain/retry.py`             | `classify` (transient or permanent) and `safe_to_retry`: which failures and tools may be tried again                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -412,8 +412,9 @@ the model's tool list.
 Every source enters through the front door (`Dispatcher.post`): a say, a timer, a held-mail loop,
 a job's question or result, an install result and a card answer. An unregistered kind is refused
 (`say` and `card_answer` are `now` kinds in `EVENT_KINDS`). A reply goes to the item's
-`origin_body`: a say or a body's event answers on the body it came from, a job's news on the body
-that started it, a card's follow-up on the body showing the turn that asked. `Bodies.display_ids()`
+origin body: a say or a body's event answers on the body it came from, Scout's own news (a job's,
+a timer's) on the body its cause came through (`Event.caused_by`: the say the turn took; the
+body in use now first, else the first body found walking the causes back), a card's follow-up on the body showing the turn that asked. `Bodies.display_ids()`
 is the one list of bodies that can show a turn, screens first and a phone last, so a phone-only
 setup still hears a job's question. A wake with no origin goes to the last body used, unless that
 is a phone while a screen is online, then to the first screen.
@@ -1578,9 +1579,12 @@ Event kinds (`EVENT_KINDS` in `events.py`):
 | `setup_done`      | none         | none         | An install ended: an expert (expert, ok, installed or error, detail) or an app that connected later (app, name, ok, state, tools and tools_total, or detail); wakes Scout                                         |
 | `setup_login`     | none         | none         | An expert login ended (expert, state, detail, command); wakes Scout to say so                                                                                                                                     |
 
-A kind can also set `wakes` (false: keep only the latest fact, no turn) and `enabled`. An event with
-a `key` replaces an older held event of the same kind and key (also for kinds with no batch window). Held events live in memory only: a
-brain restart loses them, and unreported jobs are emitted again at start.
+A kind can also set `wakes` (false: keep only the latest fact, no turn) and `enabled`. An event has
+no key: a newer one never replaces an older one. Stale news is ended instead: `EventLog.finish_matching(kind,
+source)` finishes the waiting events of that kind and source (a cancelled timer's `timer:<id>`, an
+ended job's `job_quiet` and `job_step_failed`), and the dispatcher lets go of the items of a finished
+event. Items waiting in the dispatcher live in memory only: a brain restart loses them, and unreported
+jobs are emitted again at start.
 
 **Body events.** A body reports what it noticed with the `event` notification (`name`, `data`). The
 brain knows four names: `back {idle_seconds}`, `focus {app, title}`, `tab {title, url}` and
@@ -1624,7 +1628,7 @@ noticed the idle.
 flowchart TD
   A[emit event] --> B{known and enabled kind?}
   B -- no --> X[log and drop]
-  B -- yes --> C[add to the kind's batch, key replaces older]
+  B -- yes --> C[add to the kind's batch]
   C --> D{daily budget spent?}
   D -- yes --> X2[hold as open items]
   D -- no --> E{turn running?}
@@ -1914,8 +1918,8 @@ is not running is refused (`no job with id j9.`, `job j9 is not running (done).`
   the old time. After a long outage it fires once, not once per missed interval.
 - **Known gap.** Timers fire only while the brain runs. One that came due while it was off fires
   once at the next start. There is no heartbeat: Scout wakes only for events and its own timers.
-  Cancelling a timer whose event the dispatcher already holds (busy turn, cap, or no body online)
-  does not recall that event: Scout is still woken with the note of the cancelled timer.
+  Cancelling a timer finishes its waiting event (`finish_matching`, source `timer:<id>`), so the
+  dispatcher lets go of it: Scout is not woken with the note of a cancelled timer.
 
 ### Watches
 
@@ -2535,7 +2539,7 @@ flowchart TD
   L -- "not yet" --> W["keep waiting"]
 ```
 
-A newer waiting item with the same kind and key replaces the older one. An item that had to wait
+An item that had to wait
 for its gate (a sentence break, quiet) goes the moment the gate opens, because a break can end
 before any window would; items that are deliverable on arrival wait out the kind's `batch_seconds`
 from the oldest post so close arrivals share one batch, ordered by urgency then arrival. A `now`
@@ -2543,7 +2547,7 @@ item, or any state change, cuts that wait short. Words and card answers go to `S
 the kinds that wake Scout are grouped per kind, capped per hour (`wake_caps`), started one turn at a
 time on a body that can show them (the body Scout last talked to, else any that displays), and
 fenced as `<data kind="event">`. A delivery that raises is logged and its items go back with their
-original order (a newer same-key item still replaces them); after `MAX_FAILS` failures the item is
+original order; after `MAX_FAILS` failures the item is
 held and `Session` is told through the `gave_up` callback, which fails a `say`'s caller and frees its
 token so wakes can still start. `Dispatcher` requires the `OpenItems` store so news is never lost.
 
