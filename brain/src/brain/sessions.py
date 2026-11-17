@@ -589,7 +589,7 @@ class Session:
     def interrupt(self, turn: str, heard: int) -> Interruption | None:
         """The owner spoke over `turn` after the body played `heard` of its sentences. Stops what
         is still being said and pauses the turn if it is running: generation ends, tools already
-        running finish in the background (their results come back through the front door) and
+        running finish in the background (their results come back as events in the log) and
         nothing else is cancelled, open items included. History keeps the heard part once the
         turn has ended. Returns what was said and what was left, or None when there is nothing
         to hand over: a turn this session no longer knows, or one the owner heard to the end
