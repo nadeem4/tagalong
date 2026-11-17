@@ -357,10 +357,13 @@ def output_tools(outputs: OutputStore) -> list[tuple[ToolSpec, Handler]]:
 
 
 def timer_tools(
-    records: JobRecords, timers: Timers, now: Callable[[], datetime]
+    records: JobRecords,
+    timers: Timers,
+    now: Callable[[], datetime],
+    cause: Callable[[], str | None] = lambda: None,
 ) -> list[tuple[ToolSpec, Handler]]:
     """Scout's timers and watches, kept as work rows. Times are stored in UTC; answers echo the
-    owner's offset."""
+    owner's offset. `cause` is the event the running turn took: the fired timer's `caused_by`."""
     work = records.work
 
     def aware_now() -> datetime:
@@ -387,8 +390,11 @@ def timer_tools(
 
     def create_row(kind: str, note: str, when: datetime, repeat_s: int | None, parent_id=None):
         # The title is capped; a longer note is kept whole in the input.
-        long = {"note": work.mask(note)} if len(note) > TITLE_CAP else None
-        row = work.create(kind, note, parent_id=parent_id, due_at=when, input=long)
+        caused_by = cause()
+        saved: dict = {"caused_by": caused_by} if caused_by else {}
+        if len(note) > TITLE_CAP:
+            saved["note"] = work.mask(note)
+        row = work.create(kind, note, parent_id=parent_id, due_at=when, input=saved or None)
         work.set_repeat(row.id, repeat_s)
         timers.changed()
         return row

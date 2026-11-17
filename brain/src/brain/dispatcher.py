@@ -58,8 +58,8 @@ class Item:
     payload: dict
     # Replaced by the kind's own urgency on post; kept so a delivery can read it.
     urgency: Urgency
-    # A newer waiting item with the same kind and key replaces the older one.
-    key: str | None = None
+    # The saved event this item runs, "" when it is not saved (a latest-value context kind).
+    event_id: str = ""
     # Run in this process only, never saved with a held item.
     on_start: _Cb = field(default=None, compare=False)
     on_drop: _Cb = field(default=None, compare=False)
@@ -100,7 +100,7 @@ def _age(now: datetime, since: datetime) -> float:
 
 
 def _label(item: Item) -> str:
-    return f"{item.kind}:{item.key}"
+    return f"{item.kind}:{item.event_id}"
 
 
 class Dispatcher:
@@ -113,7 +113,7 @@ class Dispatcher:
         guards: Guards,
         busy: Callable[[], bool],
         last_body: Callable[[], str | None],
-        start: Callable[[str, list], str],
+        start: Callable[[str, list, str | None], str],
         now: Callable[[], datetime],
         gave_up: Callable[[Item], None] | None = None,
         quiet: Callable[[datetime], bool] | None = None,
@@ -121,7 +121,9 @@ class Dispatcher:
         notes: dict[str, str] | None = None,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         interject: Callable[[str, list], Awaitable[bool]] | None = None,
+        finished: Callable[[str], bool] = lambda event_id: False,
     ) -> None:
+        self._finished = finished  # event id -> its news was ended (not told): it is let go
         self.deliver = deliver  # for the kinds that never wake: a say, a card answer
         self._open_items = open_items
         self._bodies = bodies
@@ -168,8 +170,6 @@ class Dispatcher:
             _log.warning("dropped item of disabled kind %r", item.kind)
             return
         item = replace(item, urgency=kind.urgency)
-        if item.key is not None:
-            self._close_held(item.kind, item.key)  # a re-emit supersedes its held row
         if self._stopped:  # nothing runs any more: keep the news, tell the session
             if kind.wakes:
                 self._hold(item, "stopped")
@@ -185,23 +185,10 @@ class Dispatcher:
 
     def record(self, event: Event) -> None:
         """Keep the latest context event of a kind that never wakes (focus, tab, download)."""
-        self._latest.setdefault(event.kind, {})[event.key or ""] = event
+        self._latest.setdefault(event.kind, {})[event.source] = event
 
     def latest(self, kind: str) -> dict[str, Event]:
         return dict(self._latest.get(kind, {}))
-
-    def drop(self, kind: str, key: str) -> None:
-        """Forget a waiting item of that kind and key (its news is superseded); no hook runs."""
-        self._intake()
-        self._waiting = [
-            w for w in self._waiting if not (w.item.kind == kind and w.item.key == key)
-        ]
-        self._close_held(kind, key)
-        self._trim_latch()
-        kind_obj = self._kinds.get(kind)
-        if kind_obj is not None:
-            self._replace_held(kind_obj, key)
-            self.pump()
 
     @property
     def _state(self) -> str:
@@ -304,23 +291,13 @@ class Dispatcher:
         # Scalars only: the payload may carry futures or a person's words, never saved here.
         facts = {k: v for k, v in item.payload.items() if isinstance(v, str | int | float | bool)}
         facts = mask_json(self._guards, "held", facts)  # facts come from outside: secrets go
-        saved = {"event": item.kind, "key": item.key, "why": why, "facts": facts}
+        saved = {"event": item.kind, "why": why, "facts": facts}
         try:
             self._open_items.open("held", item.origin_body, saved_call=saved)
         except Exception:
             _log.exception("dispatcher.hold_failed item=%s why=%s", _label(item), why)
             return
         _log.info("dispatcher.held item=%s why=%s", _label(item), why)
-
-    def _close_held(self, kind: str, key: str) -> None:
-        """News with this event and key is being told or forgotten: its held row is stale."""
-        try:  # a store error must never stop the news itself from going on
-            while (
-                row := self._open_items.find_open("held", {"event": kind, "key": key})
-            ) is not None:
-                self._open_items.finish(row.id, "superseded")
-        except Exception:
-            _log.exception("dispatcher.close_held_failed kind=%s key=%s", kind, key)
 
     def _hold_group(self, group: _Group, why: str) -> None:
         for item in group.items:
@@ -388,12 +365,6 @@ class Dispatcher:
     def _intake(self) -> None:
         while not self._queue.empty():
             e = self._queue.get_nowait()
-            if e.item.key is not None:
-                self._waiting = [
-                    w
-                    for w in self._waiting
-                    if not (w.item.kind == e.item.kind and w.item.key == e.item.key)
-                ]
             self._waiting.append(e)
         self._waiting.sort(key=lambda w: (w.rank, w.seq))
 
@@ -441,24 +412,11 @@ class Dispatcher:
         group = None
         if kind.batch_seconds is not None:  # a waiting group of the kind absorbs the item
             group = next((g for g in self._groups if g.kind is kind), None)
-        if item.key is not None:  # a never-merged kind holds each item in its own group
-            self._replace_held(kind, item.key)
         if group is None or group not in self._groups:
             group = _Group(kind, self._now(), posted)
             self._groups.append(group)
         group.posted = min(group.posted, posted)
         group.items.append(item)
-
-    def _replace_held(self, kind: EventKind, key: str) -> None:
-        for group in self._groups:
-            if group.kind is not kind:
-                continue
-            for i, old in enumerate(group.items):
-                if old.key == key:
-                    del group.items[i]
-                    if not group.items:
-                        self._groups.remove(group)
-                    return
 
     def pump(self) -> None:
         """Hold what must not be told, then start the next wake that is due. Run again by the
@@ -468,6 +426,7 @@ class Dispatcher:
         # gate, where `idle` opens next_pause once nothing is busy.
         self._changed.set()
         try:
+            self._let_go_finished()
             self._hold_groups()
             if self._groups and self._interjecting is None:
                 group = next((g for g in self._groups if self._remaining(g) <= 0), None)
@@ -481,6 +440,14 @@ class Dispatcher:
                         self._run_group(group, body_id)
         finally:
             self._arm_timer()
+
+    def _let_go_finished(self) -> None:
+        """News whose event was ended (a cancelled timer, a closed job) is never told."""
+        self._waiting = [w for w in self._waiting if not self._finished(w.item.event_id)]
+        for group in list(self._groups):
+            group.items = [i for i in group.items if not self._finished(i.event_id)]
+            if not group.items:
+                self._groups.remove(group)
 
     def _at_break(self, group: _Group) -> bool:
         # Only news that may speak at the next pause borrows a break; everything else waits for
@@ -526,7 +493,8 @@ class Dispatcher:
             self._wakes.append((self._now(), group.kind.name))
         text = wake_text(group.kind, group.items, self._notes.get(group.kind.name, ""), self._now())
         try:
-            turn_id = self._start(body_id, [{"type": "text", "text": text}])
+            first = group.items[0].event_id or None  # the event the wake turn took, for hand-offs
+            turn_id = self._start(body_id, [{"type": "text", "text": text}], first)
         except WakeSkipped:  # no key yet: kept, so it is not lost
             self._hold_group(group, "no_key")
             return

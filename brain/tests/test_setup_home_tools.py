@@ -232,13 +232,13 @@ async def test_a_card_refusal_token_is_answered_like_the_tool_s_own(tmp_path):
 async def test_progress_is_readable_and_ends_null(tmp_path):
     rig = Rig(tmp_path)
     rig.progress.emit(
-        Event("setup_progress", {"expert": "claude-acp", "stage": "npm"}, "claude-acp")
+        Event("setup_progress", "setup:claude-acp", {"expert": "claude-acp", "stage": "npm"})
     )
     assert (await rig.call("setup_overview"))["progress"] == {
         "expert": "claude-acp",
         "stage": "npm",
     }
-    rig.progress.emit(Event("setup_done", {"expert": "claude-acp", "ok": True}, "claude-acp"))
+    rig.progress.emit(Event("setup_done", "setup:claude-acp", {"expert": "claude-acp", "ok": True}))
     assert (await rig.call("setup_overview"))["progress"] is None
 
 
@@ -256,12 +256,14 @@ async def test_every_tool_is_home_only_and_setup_ones_ask_for_themselves(tmp_pat
 async def test_a_failed_install_is_reported_until_the_next_try(tmp_path):
     rig = Rig(tmp_path)
     done = {"expert": "claude-acp", "ok": False, "error": "npm_failed", "detail": "x"}
-    rig.progress.emit(Event("setup_done", done, "claude-acp"))
+    rig.progress.emit(Event("setup_done", "setup:claude-acp", done))
     assert (await rig.call("setup_overview"))["failed"] == {
         "expert": "claude-acp",
         "error": "npm_failed",
     }
-    rig.progress.emit(Event("setup_progress", {"expert": "claude-acp", "stage": "checking"}))
+    rig.progress.emit(
+        Event("setup_progress", "setup:claude-acp", {"expert": "claude-acp", "stage": "checking"})
+    )
     assert (await rig.call("setup_overview"))["failed"] is None
 
 

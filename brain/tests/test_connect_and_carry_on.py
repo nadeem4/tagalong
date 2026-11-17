@@ -10,13 +10,13 @@ import datetime
 import json
 from types import SimpleNamespace
 
+from event_log import make_session
 from test_sessions import Gate, Open, join, say, settle
 
 from brain.bodies import Bodies
 from brain.events import Event, EventKind
 from brain.memory import Memory
 from brain.mind.turn import Final
-from brain.sessions import Session
 from brain.toolbox import ToolSpec
 
 KINDS = {
@@ -44,14 +44,14 @@ def rig(steps, memory=None):
         session.post_event(
             Event(
                 "setup_done",
+                "setup:gcal",
                 {"app": "gcal", "name": "Google Calendar", "ok": True, "tools": "create_event"},
-                key="gcal",
             )
         )
         return json.dumps({"id": "gcal", "status": "signing_in"})
 
     spec = ToolSpec("install_app", "Add an app.", {"type": "object"}, default_mode="auto")
-    session = Session(
+    session = make_session(
         model,
         Open(),
         bodies,

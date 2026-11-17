@@ -23,6 +23,7 @@ from brain.bodies_tools import bodies_tools
 from brain.bridges import ENTRY, WHATSAPP_SECRETS, BridgeSupervisor, private_node, real_spawn
 from brain.build_info import app_version, build_id
 from brain.config import in_quiet_hours, load_config, load_env_file, session_id
+from brain.events import EventLog
 from brain.experts import ExpertHosts
 from brain.guardrails import Budget
 from brain.lifecycle import clear_pid, real_started, write_pid
@@ -248,6 +249,7 @@ async def _run() -> None:
             "model": model_name(chosen_model(memory.db, config.model)),
         }
 
+    events = EventLog(memory.db, masker, lambda: datetime.now().astimezone())
     session = Session(
         model,
         budget,
@@ -268,6 +270,7 @@ async def _run() -> None:
         work_keep_days=config.work_keep_days,
         outputs_keep=config.outputs_keep,
         masker=masker,
+        events=events,
         keys=keys,
         model_default=config.model,
         stt_default=(config.stt_live, config.stt_final),

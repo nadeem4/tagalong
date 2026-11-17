@@ -15,12 +15,12 @@ from fake_voice import FakeTts
 from test_sessions import join, make, read_aloud, settle, spoken_say
 
 import brain.sessions as sessions_module
-from brain.events import Event, EventKind
+from brain.events import EVENT_KINDS, Event
 from brain.mind.turn import Final
 from brain.voice.mouth import Mouth
 from brain.voice.tts import voice_by_id
 
-KINDS = {"nudge": EventKind("nudge", urgency="next_pause", batch_seconds=0, max_per_hour=10)}
+KINDS = {"work_failed": EVENT_KINDS["work_failed"]}  # a real saved kind that waits for a pause
 # Each is a chunk of its own: the first is a whole sentence, the others are at the chunk target.
 SENTENCES = [
     "The first part of the story is about a quiet harbour town, where the fishing boats "
@@ -153,7 +153,7 @@ async def talking(model):
     await session.say("desktop", spoken_say("tell me a story"))
     await calm()
     session.dispatcher.set_speech_state("talking")
-    session.post_event(Event("nudge", {"note": "Sam wrote back"}))
+    session.post_event(Event("work_failed", "scout", {"note": "Sam wrote back"}))
     await settle()
     return session, voice
 
@@ -214,7 +214,7 @@ async def test_continue_no_choice_or_empty_words_resumes_and_leaves_the_news_for
     assert voice.bodies.controls() == ["pause", "resume"]
     assert voice.bodies.said() == SENTENCES  # nothing was replaced
     await finish(session, model)
-    assert model.plain_turns_with("Event: nudge")  # not told yet: a plain wake tells it
+    assert model.plain_turns_with("Event: work_failed")  # not told yet: a plain wake tells it
 
 
 async def test_replace_clears_the_player_and_says_the_words_as_a_new_turn():
@@ -235,7 +235,7 @@ async def test_a_replace_counts_as_the_told_wake():
     await at_the_break(session)
     await finish(session, model)
     assert len(model.calls) == 2  # the running turn, plus the interjection; no wake after
-    assert not model.plain_turns_with("Event: nudge")
+    assert not model.plain_turns_with("Event: work_failed")
 
 
 async def test_the_next_turn_is_told_what_was_cut_and_said_instead():
@@ -262,7 +262,7 @@ async def test_the_person_talking_over_during_the_call_cancels_the_replace():
     await finish(session, model)
     assert SAID not in voice.bodies.said()  # no restarted turn
     assert voice.bodies.controls().count("resume") == 0  # their pause is left alone
-    assert model.plain_turns_with("Event: nudge")  # the news waits for a plain wake
+    assert model.plain_turns_with("Event: work_failed")  # the news waits for a plain wake
 
 
 async def test_no_live_turn_means_no_replace_and_no_default_voice_restart():
@@ -273,7 +273,7 @@ async def test_no_live_turn_means_no_replace_and_no_default_voice_restart():
     await at_the_break(session)
     assert model.interjections == [] and voice.bodies.said() == []
     await finish(session, model)
-    assert model.plain_turns_with("Event: nudge")
+    assert model.plain_turns_with("Event: work_failed")
 
 
 async def test_a_slow_call_times_out_resumes_and_keeps_the_news(monkeypatch):
@@ -284,7 +284,7 @@ async def test_a_slow_call_times_out_resumes_and_keeps_the_news(monkeypatch):
     await at_the_break(session)
     assert voice.bodies.controls() == ["pause", "resume"] and SAID not in voice.bodies.said()
     await finish(session, model)
-    assert model.plain_turns_with("Event: nudge")
+    assert model.plain_turns_with("Event: work_failed")
 
 
 def test_the_timeout_is_short():

@@ -270,5 +270,5 @@ class LoginDriver:
             facts["detail"] = detail
         if command:
             facts["command"] = command
-        self._emit(Event("setup_login", facts, key=expert_id))
+        self._emit(Event("setup_login", f"setup:{expert_id}", facts))
         self._notify("changed", {"what": "setup"})  # Home's chip and the tour reload

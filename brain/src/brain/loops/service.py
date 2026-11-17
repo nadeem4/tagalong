@@ -107,7 +107,7 @@ class LoopService:
             return
         if event.kind not in ("focus", "tab"):
             return
-        app, title, url = (str(event.facts.get(k) or "") for k in ("app", "title", "url"))
+        app, title, url = (str(event.payload.get(k) or "") for k in ("app", "title", "url"))
         if context.mail_in_front(app, title, url):
             return
         today = self._today()
@@ -124,7 +124,7 @@ class LoopService:
     ) -> None:
         # Marked only once the emit took it: a refused post leaves the loop to surface again.
         facts = {**self._facts(loop, reason), **(extra or {})}
-        self._emit(Event("loop", facts, key=f"loop:{loop.id}"))
+        self._emit(Event("loop", f"loop:{loop.source}", facts))
         self._store.mark_surfaced(loop.id, key, self._today())
         self._notify("changed", {"what": "loops"})
 
@@ -156,7 +156,8 @@ class LoopService:
             self._store.set_status(loop.id, "stale")
         lines = "\n".join(f"{lp.id}: {lp.title} ({lp.asks})" for lp in found)
         facts: dict[str, str | int] = {"reason": "stale", "count": len(found), "loops": lines}
-        self._emit(Event("loop", facts, key=f"loop-stale:{now.isoformat()}"))
+        # no caused_by on purpose: aggregate news, no single cause
+        self._emit(Event("loop", "scout", facts))
         self._notify("changed", {"what": "loops"})
 
     def _digest(self) -> None:
@@ -176,7 +177,8 @@ class LoopService:
             return
         lines = "\n".join(f"{lp.id}: {lp.title} ({lp.asks})" for lp in held)
         facts: dict[str, str | int] = {"reason": "digest", "count": len(held), "loops": lines}
-        self._emit(Event("loop", facts, key=f"loop-digest:{today}"))
+        # no caused_by on purpose: aggregate news, no single cause
+        self._emit(Event("loop", "scout", facts))
 
     def _today(self) -> str:
         return self._now().astimezone().date().isoformat()  # the local day

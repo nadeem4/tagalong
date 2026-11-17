@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 
 import pytest
+from event_log import make_session
 from know_fakes import FakeModel, budget
 from test_server import Open, ScriptedModel, call, hello, request
 from websockets.asyncio.client import connect
@@ -17,7 +18,6 @@ from brain.know.runner import KnowMeRunner
 from brain.memory import Memory
 from brain.protocol import ErrorCode, RpcError
 from brain.server import start_server
-from brain.sessions import Session
 
 
 class _Source:
@@ -98,7 +98,7 @@ async def test_dropped_watcher_gets_no_more_frames():
 @pytest.fixture
 async def know_env():
     bodies = Bodies()
-    session = Session(
+    session = make_session(
         ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"), know_sources=[]
     )
     server = await start_server("127.0.0.1", 0, bodies, "s1", session)

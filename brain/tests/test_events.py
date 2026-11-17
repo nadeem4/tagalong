@@ -2,12 +2,22 @@
 The wake text carries third-party facts, so the fence tests matter most.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
 from brain.dispatcher import Item, wake_text
-from brain.events import EVENT_KINDS, Event, from_body, from_connect, load_notes
+from brain.events import (
+    EVENT_KINDS,
+    Event,
+    EventLog,
+    from_body,
+    from_connect,
+    is_internal,
+    load_notes,
+)
+from brain.masking import Masker
+from brain.store.db import open_db
 
 TZ = timezone(timedelta(hours=1))
 AT = datetime(2026, 10, 28, 9, 0, tzinfo=TZ)
@@ -77,14 +87,12 @@ def test_body_event_kind_defaults():
 
 def test_from_body_back():
     ev = from_body("desktop", "back", {"idle_seconds": 600})
-    assert ev == Event("back", {"body": "desktop", "idle_seconds": 600}, key="back:desktop")
+    assert ev == Event("back", "desktop", {"body": "desktop", "idle_seconds": 600})
 
 
 def test_from_body_focus_truncates_the_title_to_200():
     ev = from_body("desktop", "focus", {"app": "Code", "title": "t" * 300})
-    assert ev == Event(
-        "focus", {"body": "desktop", "app": "Code", "title": "t" * 200}, key="desktop"
-    )
+    assert ev == Event("focus", "desktop", {"body": "desktop", "app": "Code", "title": "t" * 200})
 
 
 @pytest.mark.parametrize(
@@ -123,7 +131,9 @@ def test_from_connect_needs_ten_minutes_away():
     assert from_connect("desktop", None) is None
     ev = from_connect("desktop", 600)
     assert ev == Event(
-        "body_online", {"body": "desktop", "offline_seconds": 600}, key="body_online:desktop"
+        "body_online",
+        "desktop",
+        {"body": "desktop", "offline_seconds": 600},
     )
 
 
@@ -160,21 +170,21 @@ def test_tab_event_is_kept_not_woken():
     ev = from_body("chrome-7k2f", "tab", {"title": "Docs", "url": "https://a.example/x"})
     assert ev == Event(
         "tab",
+        "chrome-7k2f",
         {"body": "chrome-7k2f", "title": "Docs", "url": "https://a.example/x"},
-        key="chrome-7k2f",
     )
 
 
-def test_tab_event_replaces_the_older_one_for_the_same_body():
-    # Same key as the body id: the dispatcher keeps only the latest per key.
+def test_tab_event_source_is_the_body_so_the_latest_replaces_the_older_one():
+    # The dispatcher keeps the latest context event per source.
     first = from_body("b", "tab", {"title": "one", "url": "https://a.example"})
     second = from_body("b", "tab", {"title": "two", "url": "https://b.example"})
-    assert first.key == second.key == "b"
+    assert first.source == second.source == "b"
 
 
 def test_download_event_validates_state():
     ok = from_body("b", "download", {"name": "a.pdf", "state": "complete"})
-    assert ok == Event("download", {"body": "b", "name": "a.pdf", "state": "complete"}, key="b")
+    assert ok == Event("download", "b", {"body": "b", "name": "a.pdf", "state": "complete"})
     assert from_body("b", "download", {"name": "a.pdf", "state": "started"}) is None
 
 
@@ -186,9 +196,9 @@ def test_tab_with_missing_url_is_dropped_without_raising():
 
 def test_long_title_is_capped_at_200():
     ev = from_body("b", "tab", {"title": "t" * 300, "url": "u" * 400})
-    assert len(ev.facts["title"]) == 200 and len(ev.facts["url"]) == 300
+    assert len(ev.payload["title"]) == 200 and len(ev.payload["url"]) == 300
     dl = from_body("b", "download", {"name": "n" * 300, "state": "interrupted"})
-    assert len(dl.facts["name"]) == 200
+    assert len(dl.payload["name"]) == 200
 
 
 def test_job_step_failed_kind_batches_120_s_capped_four_an_hour():
@@ -236,14 +246,14 @@ def test_event_kinds_have_urgency():
 
 def test_from_body_whatsapp_ask_closed():
     event = from_body("wa", "ask_closed", {"via": "tap"})
-    assert event == Event("ask_closed", {"body": "wa", "via": "tap"}, key="ask_closed:wa")
+    assert event == Event("ask_closed", "wa", {"body": "wa", "via": "tap"})
     assert from_body("wa", "ask_closed", {"via": "x"}) is None
     assert from_body("wa", "ask_closed", None) is None
 
 
 def test_from_body_whatsapp_many_pending():
     event = from_body("wa", "many_pending", {"asks": 3})
-    assert event == Event("many_pending", {"body": "wa", "asks": 3}, key="many_pending:wa")
+    assert event == Event("many_pending", "wa", {"body": "wa", "asks": 3})
     assert from_body("wa", "many_pending", {"asks": 0}) is None
     assert from_body("wa", "many_pending", {"asks": "3"}) is None
     assert from_body("wa", "many_pending", {"asks": True}) is None
@@ -258,3 +268,93 @@ def test_urgency_examples():
 
 def test_setup_done_is_next_pause():
     assert EVENT_KINDS["setup_done"].urgency == "next_pause"
+
+
+NOW = datetime(2026, 11, 16, 9, 0, tzinfo=UTC)
+
+
+@pytest.fixture
+def log(tmp_path):
+    return EventLog(open_db(tmp_path / "t.db"), Masker(lambda: []), lambda: NOW)
+
+
+def test_post_refuses_an_unregistered_kind(log):
+    with pytest.raises(ValueError):
+        log.post(Event("nope", "desktop", {}))
+
+
+def test_post_masks_the_payload(log):
+    key = "sk-ant-" + "a" * 30
+    log.post(Event("say", "desktop", {"text": f"my key {key}"}, id="e1"))
+    assert key not in log.get("e1").payload["text"]
+    assert "[secret]" in log.get("e1").payload["text"]
+
+
+def test_duplicate_say_id_is_one_event(log):
+    ev = Event("say", "desktop", {"text": "hi"}, id="s1")
+    assert log.post(ev) is True
+    assert log.post(ev) is False
+    assert len(log.ready()) == 1
+
+
+def test_post_runs_then_in_the_same_transaction(log):
+    def boom(db):
+        raise RuntimeError("no")
+
+    with pytest.raises(RuntimeError):
+        log.post(Event("say", "desktop", {}, id="e1"), then=boom)
+    assert log.get("e1") is None
+
+
+def test_origin_body_walks_to_the_first_body(log):
+    log.post(Event("say", "browser", {}, id="e1"))
+    log.post(Event("job_ended", "job:j1", {}, caused_by="e1", id="e2"))
+    assert log.origin_body("e2", lambda s: not is_internal(s)) == "browser"
+
+
+@pytest.mark.parametrize(
+    "source", ["scout", "timer:t1", "setup:s1", "job:x", "loop:gmail", "tool:x"]
+)
+def test_is_internal(source):
+    assert is_internal(source)
+
+
+@pytest.mark.parametrize("source", ["desktop", "whatsapp"])
+def test_is_not_internal(source):
+    assert not is_internal(source)
+
+
+def test_an_unsaved_kind_is_not_stored(log):
+    assert log.post(Event("focus", "desktop", {"app": "x"})) is True
+    assert log.ready() == []
+
+
+def test_then_with_an_unsaved_kind_is_refused(log):
+    # Nothing would run `then`, so a caller relying on it would silently lose its write.
+    with pytest.raises(ValueError):
+        log.post(Event("focus", "desktop", {}), then=lambda db: None)
+
+
+def test_take_and_finish(log):
+    log.post(Event("say", "desktop", {}, id="e1"))
+    assert log.take(["e1"], "t1") == ["e1"]
+    assert log.ready() == []
+    log.finish(["e1"], "handled")
+    assert log.get("e1").state == "handled"
+
+
+def test_a_url_token_next_to_quotes_still_saves_and_is_masked(log):
+    text = 'see "https://x.com/a?token=abcdef" ok'
+    assert log.post(Event("say", "desktop", {"text": text}, id="e1")) is True
+    saved = log.get("e1").payload["text"]
+    assert "abcdef" not in saved and "[secret]" in saved
+
+
+def test_a_failing_masker_withholds_the_text_but_saves_the_event(tmp_path):
+    def broken():
+        raise RuntimeError("no values")
+
+    log = EventLog(open_db(tmp_path / "w.db"), Masker(broken), lambda: NOW)
+    event = Event("say", "desktop", {"text": "hello", "n": 3})
+    assert log.post(event) is True
+    assert log.get(event.id).payload == {"text": "[withheld]", "n": 3}

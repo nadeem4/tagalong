@@ -68,13 +68,13 @@ class SetupProgress:
 
     def emit(self, event: Event) -> None:
         if event.kind == "setup_progress":
-            self._current, self._failed = dict(event.facts), None
+            self._current, self._failed = dict(event.payload), None
         elif event.kind == "setup_done":
             self._current = None
-            if event.facts.get("ok") is False:
+            if event.payload.get("ok") is False:
                 self._failed = {
-                    "expert": event.facts.get("expert"),
-                    "error": event.facts.get("error"),
+                    "expert": event.payload.get("expert"),
+                    "error": event.payload.get("error"),
                 }
         self._emit(event)
 

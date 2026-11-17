@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from event_log import make_session
 
 from brain import main
 from brain.app_tools import AppSource, app_home_tools
@@ -15,7 +16,6 @@ from brain.bodies import Bodies
 from brain.memory import Memory
 from brain.mind.turn import Call
 from brain.protocol import Body, RpcError, Tool
-from brain.sessions import Session
 
 FAKE = str(Path(__file__).parent / "fake_mcp_server.py")
 
@@ -365,7 +365,7 @@ async def test_sign_in_app_unknown_id(rig, signs_in):
 async def test_session_offers_app_tools_and_home_calls(rig):
     bodies = Bodies()
     bodies.notify = lambda m, p: None
-    session = Session(object(), Open(), bodies, 10, rig.mem, apps=rig.apps, tokens=rig.tokens)
+    session = make_session(object(), Open(), bodies, 10, rig.mem, apps=rig.apps, tokens=rig.tokens)
     home = {t.name for t in session.home_tools()}
     assert {
         "list_apps",
@@ -385,7 +385,7 @@ async def test_session_offers_app_tools_and_home_calls(rig):
 async def test_dropped_app_tool_gets_the_apps_name_not_the_slug(rig):
     bodies = Bodies()
     bodies.notify = lambda m, p: None
-    session = Session(object(), Open(), bodies, 10, rig.mem, apps=rig.apps, tokens=rig.tokens)
+    session = make_session(object(), Open(), bodies, 10, rig.mem, apps=rig.apps, tokens=rig.tokens)
     await session.call_home("add_app", stdio("Fake App", args=["exit"]))
     await until(lambda: rig.apps.status("fake-app").state == "error")
     with pytest.raises(RpcError) as e:
@@ -398,7 +398,7 @@ async def test_dropped_app_tool_gets_the_apps_name_not_the_slug(rig):
 async def test_session_without_apps_has_no_app_calls():
     bodies = Bodies()
     bodies.notify = lambda m, p: None
-    session = Session(object(), Open(), bodies, 10, Memory(":memory:"))
+    session = make_session(object(), Open(), bodies, 10, Memory(":memory:"))
     assert "list_apps" not in {t.name for t in session.home_tools()}
 
 

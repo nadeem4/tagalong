@@ -2,15 +2,15 @@
 
 The item stays open until Scout's wake turn has finished, so a restart or a wake dropped because
 the budget was spent no longer loses the news: `resume` sends the saved ones again at start.
-A cancelled wake turn leaves it open. A newer event for the same expert or app replaces
-the saved one.
+A cancelled wake turn leaves it open. A newer event from the same source (one expert or app)
+replaces the saved one.
 """
 
 from collections.abc import Callable
 from datetime import datetime
 
 from brain.events import Event
-from brain.open_items import OpenItem, OpenItems
+from brain.open_items import BRAIN, OpenItem, OpenItems
 
 SAVED = ("setup_done", "setup_login")  # setup_progress is context only and never woken
 
@@ -28,12 +28,12 @@ class SetupEvents:
             self._emit(event)
             return
         for old in self._saved():
-            if (old.saved_call["kind"], old.saved_call["key"]) == (event.kind, event.key):
+            if (old.saved_call["kind"], old.saved_call["source"]) == (event.kind, event.source):
                 self._items.finish(old.id, "superseded")
         item = self._items.open(
             "setup",
-            "brain",
-            saved_call={"kind": event.kind, "facts": event.facts, "key": event.key},
+            BRAIN,
+            saved_call={"kind": event.kind, "payload": event.payload, "source": event.source},
         )
         self._send(item.id, event)
 
@@ -42,7 +42,7 @@ class SetupEvents:
         self._items.expire_due(self._now(), "setup")
         for item in self._saved():
             call = item.saved_call
-            self._send(item.id, Event(call["kind"], call["facts"], key=call["key"]))
+            self._send(item.id, Event(call["kind"], call["source"], call["payload"]))
 
     def _saved(self) -> list[OpenItem]:
         return self._items.list_open(kind="setup")

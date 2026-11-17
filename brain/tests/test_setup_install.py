@@ -593,13 +593,13 @@ async def test_install_tool_returns_at_once_and_the_install_finishes_in_the_back
     out = json.loads(await tools["install_expert"][1]({"id": "claude-acp"}))
     assert out["started"] == "claude-acp"
     done = await settled(emitted)
-    assert done.facts["expert"] == "claude-acp" and done.facts["ok"] is True
-    assert json.loads(done.facts["installed"])["id"] == "claude-acp"
-    assert done.key == "claude-acp"
+    assert done.payload["expert"] == "claude-acp" and done.payload["ok"] is True
+    assert json.loads(done.payload["installed"])["id"] == "claude-acp"
+    assert done.source == "setup:claude-acp"
     assert ExpertStore(tmp_path).get("claude-acp") is not None
     progress = [e for e in emitted if e.kind == "setup_progress"]
-    assert progress and all(e.key == "claude-acp" for e in progress)
-    assert progress[0].facts["expert"] == "claude-acp" and "stage" in progress[0].facts
+    assert progress and all(e.source == "setup:claude-acp" for e in progress)
+    assert progress[0].payload["expert"] == "claude-acp" and "stage" in progress[0].payload
     assert ("changed", {"what": "setup"}) in notes
     await stop()
 
@@ -618,8 +618,8 @@ async def test_install_failure_arrives_as_setup_done_facts(tmp_path, ensure):
     out = json.loads(await tools["install_expert"][1]({"id": "claude-acp"}))
     assert out["started"] == "claude-acp"
     done = await settled(emitted)
-    assert done.facts["ok"] is False and done.facts["error"] == "npm_failed"
-    assert "detail" in done.facts
+    assert done.payload["ok"] is False and done.payload["error"] == "npm_failed"
+    assert "detail" in done.payload
     assert ExpertStore(tmp_path).list() == []
     await stop()
 
@@ -905,7 +905,7 @@ async def test_an_install_joins_an_update_of_the_same_expert_that_runs(tmp_path,
     expert = await updating
     assert expert.id == "claude-acp"
     done = await settled(emitted)  # the joiner is told the end, as for any install
-    assert done.facts["ok"] is True and done.facts["expert"] == "claude-acp"
+    assert done.payload["ok"] is True and done.payload["expert"] == "claude-acp"
     assert any(e.kind == "setup_progress" for e in emitted)
     await stop()
 
@@ -916,7 +916,7 @@ async def test_a_failing_update_still_raises_and_tells_the_joiner(tmp_path, ensu
     with pytest.raises(InstallError):
         await updaters[0](npx_entry())
     done = await settled(emitted)
-    assert done.facts["ok"] is False
+    assert done.payload["ok"] is False
     await stop()
 
 

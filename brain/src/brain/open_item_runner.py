@@ -17,9 +17,9 @@ from typing import TYPE_CHECKING
 
 from brain.approvals import Approvals
 from brain.asks import Asks
-from brain.events import BRAIN, Event
+from brain.events import Event
 from brain.mind.turn import Call
-from brain.open_items import DEADLINE_S, OpenItem, OpenItemRefused, OpenItems
+from brain.open_items import BRAIN, DEADLINE_S, OpenItem, OpenItemRefused, OpenItems
 from brain.permission import AskRequest, PersonAnswer, Tier, summarise
 from brain.protocol import RpcError
 from brain.store.work import TransitionRefused
@@ -30,6 +30,10 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 KIND = "ask"
+
+
+def _cause_of(item: OpenItem) -> str | None:
+    return (item.saved_call or {}).get("cause")
 
 
 def _call(item: OpenItem) -> Call:
@@ -58,7 +62,9 @@ class AskRunner:
         now: Callable[[], datetime],
         approvals: Approvals,
         origin: Callable[[str], str] = lambda turn: BRAIN,
+        cause: Callable[[str], str | None] = lambda turn: None,
     ) -> None:
+        self._cause = cause  # turn id -> the event that turn took, None outside it: the ask's cause
         self._origin = origin  # the body showing a turn: where its asks' answers and news go back
         self._items = items
         self._asks = asks
@@ -79,7 +85,12 @@ class AskRunner:
         raw = {"name": call.name, "input": call.input, "text": call.text}
         saved = self._approvals.mask(raw)
         # A call with a secret in it is saved masked, so it cannot be run from the copy.
-        saved = {**saved, "source": req.source, "masked": saved != raw}
+        saved = {
+            **saved,
+            "source": req.source,
+            "masked": saved != raw,
+            "cause": self._cause(call.turn),
+        }
         item = self._items.find_open(KIND, {"name": saved["name"], "input": saved["input"]})
         if item is not None:
             return item
@@ -172,7 +183,7 @@ class AskRunner:
             facts["reason"] = reason
         if outcome == "approved":
             facts["result"] = result
-        self._emit(Event("ask_ended", facts, key=f"ask:{item.id}", origin_body=item.origin_body))
+        self._emit(Event("ask_ended", "scout", facts, caused_by=_cause_of(item)))
 
     # ---- deadline and restart ----
 
@@ -222,9 +233,7 @@ class AskRunner:
                     "age_s": int((now - item.created_at).total_seconds()),
                     "left_s": int((item.deadline_at - now).total_seconds()),
                 }
-                self._emit(
-                    Event("ask_notice", facts, key=f"ask:{item.id}", origin_body=item.origin_body)
-                )
+                self._emit(Event("ask_notice", "scout", facts, caused_by=_cause_of(item)))
         self.changed()
 
     def _expired(self, item: OpenItem) -> None:
@@ -242,7 +251,7 @@ class AskRunner:
             "outcome": "expired",
             "reason": "no answer",
         }
-        self._emit(Event("ask_ended", facts, key=f"ask:{item.id}", origin_body=item.origin_body))
+        self._emit(Event("ask_ended", "scout", facts, caused_by=_cause_of(item)))
 
     def _record_ask(self, item: OpenItem, outcome: str, by: str, reason: str) -> None:
         call = _call(item)
@@ -307,7 +316,8 @@ class AskRunner:
                 for i in back
             ]
             facts: dict[str, str | int] = {"count": len(asks), "asks": json.dumps(asks)}
-            self._emit(Event("asks_waiting", facts, key="asks_waiting"))
+            # no caused_by on purpose: aggregate news, no single cause
+            self._emit(Event("asks_waiting", "scout", facts))
 
     async def _show_again(self, item: OpenItem) -> bool:
         call = _call(item)

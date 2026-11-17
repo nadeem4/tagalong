@@ -18,6 +18,7 @@ from brain.store import open_items as store
 from brain.store.db import utc_text
 
 DEADLINE_S = 86400  # the one deadline: a day to answer, unless an item asks for another
+BRAIN = "brain"  # the origin of an item no body started
 
 _log = logging.getLogger("brain.open_items")
 

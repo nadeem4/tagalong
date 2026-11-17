@@ -66,7 +66,7 @@ class ScoutQuestions:
         settle = lambda: self._settle(qid, None, "expired", "Scout did not answer")  # noqa: E731
         try:
             self._emit(
-                Event("job_question", facts, key=None),
+                Event("job_question", f"job:{job_id}", facts),
                 on_drop=settle,
                 on_end=lambda reason: settle(),
             )

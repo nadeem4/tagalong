@@ -20,13 +20,13 @@ from typing import Literal
 
 from brain.asks import Answer, Asks
 from brain.config import DEFAULT_JOB_STEPS_MAX_BYTES, DEFAULT_JOB_STEPS_MAX_ENTRIES
-from brain.events import BRAIN, Event
+from brain.events import Event
 from brain.experts import ExpertHosts, ExpertRun, PermissionRequest, Question, QuietFacts
 from brain.guards import Guards
 from brain.job_activity import PAGE_LIMIT, JobActivity, _clip, activity_line, activity_summary
 from brain.job_records import Job, JobPart, JobRecords, home_state
 from brain.masking import mask_json
-from brain.open_items import OpenItemRefused, OpenItems
+from brain.open_items import BRAIN, OpenItemRefused, OpenItems
 from brain.outputs import OutputStore, preview
 from brain.permission import (
     AskRequest,
@@ -117,11 +117,12 @@ class Jobs:
         engine: Engine | None = None,
         guards: Guards | None = None,
         on_away: Callable[[str, str], None] = lambda job_id, what: None,
-        origin_body: Callable[[str | None], str] = lambda turn: BRAIN,
+        turn_cause: Callable[[], str | None] = lambda: None,
+        body_of: Callable[[str | None], str] = lambda event_id: BRAIN,
         setup_facts: Callable[[], Awaitable[dict]] | None = None,
         emit: Callable[[Event], None] = lambda event: None,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
-        drop: Callable[[str, str], None] = lambda kind, key: None,
+        finish_news: Callable[[str, str], None] = lambda kind, source: None,
         on_timers_changed: Callable[[], None] = lambda: None,
         outputs: OutputStore | None = None,
         items: OpenItems | None = None,
@@ -130,8 +131,9 @@ class Jobs:
         steps_max_entries: int = DEFAULT_JOB_STEPS_MAX_ENTRIES,
         steps_max_bytes: int = DEFAULT_JOB_STEPS_MAX_BYTES,
     ) -> None:
-        self._turn_origin = origin_body  # the body showing a turn: where its job's news goes back
-        self._origins: dict[str, str] = {}  # job -> the body that started it
+        self._turn_cause = turn_cause  # the event the running turn took
+        self._body_of = body_of  # event id -> the body its news goes back to
+        self._causes: dict[str, str] = {}  # job -> the event the turn that handed it off took
         self._items = items  # an expert's permission ask is a live-only item; None: none kept
         self._steps_max_entries = steps_max_entries  # caps of one job's step log (settings)
         self._steps_max_bytes = steps_max_bytes
@@ -141,7 +143,7 @@ class Jobs:
         self._timers_changed = on_timers_changed  # a deleted job timer must re-arm the sleeper
         self._now = now  # wall time for activity stamps and how long a step has run
         self._emit = emit  # the dispatcher's post_event: a quiet job wakes Scout through it
-        self._drop = drop  # the dispatcher's drop: a held job event goes when the job ends
+        self._finish_news = finish_news  # ends the waiting news of a job that is over
         self._records = records  # the jobs themselves: goal and expert-call rows
         self._setup_facts = setup_facts  # machine and registry facts for a setup refusal
         self._asks = asks
@@ -331,8 +333,9 @@ class Jobs:
             found = self._records.last_part_for(chosen.id, str(path))
             earlier, earlier_part = found if found else (None, None)
         job_id = job or uuid.uuid4().hex[:8]
-        if job_id not in self._origins:
-            self._origins[job_id] = self._turn_origin(None)  # the turn that handed it off
+        cause = self._turn_cause()  # the turn that handed it off
+        if cause is not None:
+            self._causes.setdefault(job_id, cause)
         started = await self._start_part(
             job_id,
             chosen,
@@ -643,9 +646,9 @@ class Jobs:
             self._records.close_job(job_id, outcome)
         except TransitionRefused as err:
             raise JobError(f"job {job_id} cannot be closed: {err}") from err
-        # Closing cancelled the job's check-back timers: drop their held wakes, re-arm the sleeper.
+        # Closing cancelled the job's check-back timers: end their wakes, re-arm the sleeper.
         for timer_id in timers:
-            self._drop("timer", f"timer:{timer_id}")
+            self._finish_news("timer", f"timer:{timer_id}")
         if timers:
             self._timers_changed()
         self._changed()
@@ -789,7 +792,7 @@ class Jobs:
                 0, int((self._now() - began).total_seconds() // 60)
             )
         event_facts.update(self.wake_facts(job_id))
-        self._emit(Event("job_quiet", event_facts, key=f"job:{job_id}"))
+        self._emit(Event("job_quiet", f"job:{job_id}", event_facts))
 
     def _step_failed(self, job_id: str, entry: ActivityEntry) -> None:
         """A command failed: tell Scout the facts (batched and capped by the dispatcher)."""
@@ -800,7 +803,7 @@ class Jobs:
             "exit": "" if entry.exit is None else entry.exit,
         }
         facts.update(self.wake_facts(job_id))
-        self._emit(Event("job_step_failed", facts, key=f"job:{job_id}"))
+        self._emit(Event("job_step_failed", f"job:{job_id}", facts))
 
     def wake_facts(self, job_id: str) -> dict[str, str]:
         """Facts every job wake carries: a short summary of what the job did, read from its
@@ -865,9 +868,13 @@ class Jobs:
             raise JobError(f"job {job_id} has several running parts: {names}; {what}")
         return next(iter(runs.values()))
 
+    def cause(self, job_id: str | None) -> str | None:
+        """The event the turn that handed this job off took: its news is caused by it."""
+        return self._causes.get(job_id or "")
+
     def origin(self, job_id: str | None) -> str:
         """The body that started this job; its news and questions go back there."""
-        return self._origins.get(job_id or "", BRAIN)
+        return self._body_of(self.cause(job_id))
 
     def _changed(self) -> None:
         self._notify("changed", {"what": "jobs"})
@@ -1072,8 +1079,8 @@ class Jobs:
         done = self._forget(job_id, part)
         if done:
             # job_ended carries the same facts, so held failure and quiet news is stale now
-            self._drop("job_step_failed", f"job:{job_id}")
-            self._drop("job_quiet", f"job:{job_id}")
+            self._finish_news("job_step_failed", f"job:{job_id}")
+            self._finish_news("job_quiet", f"job:{job_id}")
             if self._scout is not None:
                 self._scout.cancel_job(job_id)
         if activity:

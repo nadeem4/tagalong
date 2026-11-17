@@ -34,6 +34,8 @@ connection from `store.db.open_db`; nothing else opens the file.
 - `store/rules.py`: owns `rules` (modes, preferences, offers).
 - `store/settings.py`: owns `settings` (`get_setting`, `set_setting`), a small key and value table; today it holds the chosen Scout model under `model` and, for updates, `auto_update.{app,expert}.{official,community}` (`"1"` or `"0"`: whether that group updates by itself; absent means Official on, Community off). The last check time and the latest versions seen are a cache file, `<TAGALONG_HOME>/cache/updates.json`, not a table.
 - `store/open_items.py`: owns `open_items` (`insert`, `get`, `close`, `list_open`, `list_answered`, `find_open`, `due`, `live_only_open`, `ids_for_job`) and `StoredItem`.
+- `store/events.py`: owns `events` (`insert`, `get`, `list_new`, `new_ids`, `set_taken`, `set_state`,
+  `chain`) and `EventRow`; `events.py` `EventLog` is the one caller.
 - `store/work.py`: `WorkStore` over `work`, `work_events`, `work_fts` and the detail tables
   `work_job`, `work_timer`, `work_loop`, `work_ask` and `job_steps`: create, the state machine,
   rollup, retry, due queries, search, the resume scan and the sweep. Jobs, asks, timers and loops
@@ -44,7 +46,7 @@ Nothing outside this package runs SQL: `tests/test_store_boundary.py` fails if a
 under `brain/src/brain` calls `.execute`, `.executescript` or `.executemany`.
 
 - `store/migrations/`: `NNNN_name.sql` (or `NNNN_name.py` with a `migrate(db)` function) files,
-  `0001_memories` to `0034_memory_category`. The numbers have no gaps (the loader refuses a gap or a
+  `0001_memories` to `0035_events`. The numbers have no gaps (the loader refuses a gap or a
   duplicate). Each file runs in one transaction together with its `user_version` bump, so a
   failure leaves the file at the last good version. A file is never edited after it has merged;
   a schema change is a new file.
@@ -629,6 +631,38 @@ An expert's question to Scout is a `question` row under its job: `active` while 
 `done` when answered or passed, `expired` when Scout never answered or the job ended. Its
 `title` is the question and its `summary` the answer.
 
+## Events
+
+### events
+
+The one durable queue every input is saved to first: a say, a card answer and every kind that
+wakes Scout (`SAVED_KINDS`). Latest-value facts (`focus`, `tab`, `download`, `setup_progress`) are
+never saved. Nothing acts on an event before its row exists, so a brain kill loses no input.
+
+| Column         | Type             | Meaning                                                                                    |
+| -------------- | ---------------- | ------------------------------------------------------------------------------------------ |
+| `id`           | TEXT PRIMARY KEY | The event id; a say keeps the body's own id, so a retried say is one row                   |
+| `kind`         | TEXT             | An event kind from `EVENT_KINDS`                                                           |
+| `at`           | TEXT             | UTC time text                                                                              |
+| `source`       | TEXT             | A body id, `scout`, or `timer:<id>`, `setup:<id>`, `job:<id>`, `loop:<app>`, `tool:<name>` |
+| `caused_by`    | TEXT             | The event this one follows (Scout's news), or null                                         |
+| `payload_json` | TEXT             | The payload as JSON, masked per string value before it is saved                            |
+| `state`        | TEXT             | `new`, `taken`, `handled` or `gave_up` (CHECK); default `new`                              |
+| `attempts`     | INTEGER          | Tries so far; default 0                                                                    |
+| `not_before`   | TEXT             | Earliest time to try again, or null                                                        |
+| `turn_id`      | TEXT             | The turn that took it, or null                                                             |
+| `end_reason`   | TEXT             | Why it ended, or null                                                                      |
+| `resume`       | INTEGER          | 1 when the turn that took it is to be resumed; default 0                                   |
+| `handled_at`   | TEXT             | When it was handled, or null                                                               |
+
+- Written by: `events.py` `EventLog` (`post`, `take`, `finish`, `finish_matching`) through
+  `store/events.py`; `Session.say` and `Session.post_event` save before the dispatcher sees the event.
+  A timer's event is saved in the same transaction that fires the timer.
+- Read by: `EventLog.get`, `ready` and `origin_body` (the `caused_by` chain back to a body).
+- Known gap: until the runner arrives, a saved event whose turn never started is not delivered
+  again after a restart. Nothing sweeps old rows yet.
+- Index: `events_pick(state, not_before, at)` for "what is ready".
+
 ## Open items
 
 ### open_items
@@ -762,13 +796,13 @@ id).
 
 These are lost when the brain restarts.
 
-| State                | Where                           | What a restart means                                                                                                                                                             |
-| -------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Open asks            | `asks.py` `Asks`                | The waiting is gone. A job's ask or card row is expired ("brain restarted"); a Scout ask is an `ask` open item that stays open and its card returns when a displaying body joins |
-| Expert questions     | `questions.py` `ScoutQuestions` | The waiting is gone; its `question` row is expired ("brain restarted")                                                                                                           |
-| Dispatcher wakes     | `dispatcher.py` `Dispatcher`    | Wake batches still waiting for a body or a turn, and the rolling hour's wake count, start empty. News the dispatcher held is an `open_items` row of kind `held` and survives     |
-| Outboxes             | `bodies.py` `Outbox`            | The replay buffer (500 frames, 24 hours per body) is empty, so a reconnecting body gets a fresh start                                                                            |
-| Running jobs         | `jobs.py`, `experts.py`         | The expert processes end; their rows become `cancelled`                                                                                                                          |
-| Live history         | `sessions.py` `history`         | Rebuilt from `messages`                                                                                                                                                          |
-| App connection state | `apps.py`                       | Each enabled app reconnects; state and tool lists are rebuilt                                                                                                                    |
-| Voice session        | `voice/service.py`              | The listening session ends; the body starts a new `listen`                                                                                                                       |
+| State                | Where                           | What a restart means                                                                                                                                                                                                                                |
+| -------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Open asks            | `asks.py` `Asks`                | The waiting is gone. A job's ask or card row is expired ("brain restarted"); a Scout ask is an `ask` open item that stays open and its card returns when a displaying body joins                                                                    |
+| Expert questions     | `questions.py` `ScoutQuestions` | The waiting is gone; its `question` row is expired ("brain restarted")                                                                                                                                                                              |
+| Dispatcher wakes     | `dispatcher.py` `Dispatcher`    | Wake batches still waiting for a body or a turn (their events are saved in `events`, but nothing re-delivers them yet), and the rolling hour's wake count, start empty. News the dispatcher held is an `open_items` row of kind `held` and survives |
+| Outboxes             | `bodies.py` `Outbox`            | The replay buffer (500 frames, 24 hours per body) is empty, so a reconnecting body gets a fresh start                                                                                                                                               |
+| Running jobs         | `jobs.py`, `experts.py`         | The expert processes end; their rows become `cancelled`                                                                                                                                                                                             |
+| Live history         | `sessions.py` `history`         | Rebuilt from `messages`                                                                                                                                                                                                                             |
+| App connection state | `apps.py`                       | Each enabled app reconnects; state and tool lists are rebuilt                                                                                                                                                                                       |
+| Voice session        | `voice/service.py`              | The listening session ends; the body starts a new `listen`                                                                                                                                                                                          |

@@ -453,7 +453,7 @@ async def test_an_inbound_reply_on_a_they_owe_loop_cancels_its_old_quiet(rig):
     svc.disable("gmail")
     clock.at += timedelta(hours=2)
     svc.fire_due()
-    assert [e for e in events if e.facts.get("reason") == "quiet"] == []
+    assert [e for e in events if e.payload.get("reason") == "quiet"] == []
 
 
 async def test_a_saved_switch_polls_mail_once_the_app_connects_after_start(rig):

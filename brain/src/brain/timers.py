@@ -1,17 +1,20 @@
 """Timers: runs the due `timer` and `watch` work rows as `timer` events and keeps one wake armed.
 
 Rows live in the work table so they survive a restart; this class only decides when to emit.
-The dispatcher decides when Scout actually hears it. It also hands a due `tool_call` or
-`expert_call` step (a retry that waited out its backoff) to `rerun`.
+The dispatcher decides when Scout actually hears it, and a cancelled timer's waiting wake is
+finished, never told. It also hands a due `tool_call` or `expert_call` step (a retry that waited
+out its backoff) to `rerun`.
 """
 
 import asyncio
 import logging
+import sqlite3
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from brain.events import Event
 from brain.job_records import home_state
+from brain.store.db import utc_text
 from brain.store.work import TransitionRefused, WorkRow, WorkStore
 
 log = logging.getLogger("brain")
@@ -41,7 +44,9 @@ class Timers:
         job_facts: Callable[[str], dict] = lambda job_id: {},
         rerun: Callable[[WorkRow], Awaitable[None]] | None = None,
         notify: Callable[[str, dict], None] | None = None,
+        finish_news: Callable[[str, str], None] = lambda kind, source: None,
     ) -> None:
+        self._finish_news = finish_news  # ends a cancelled timer's waiting wake
         self._notify = notify  # tells the bodies the list changed, so Home reads it again
         self._job_facts = job_facts  # a job timer's wake carries that job's watch list and summary
         self._work = work
@@ -52,30 +57,22 @@ class Timers:
         self._runs: set[asyncio.Task] = set()
 
     def start(self) -> None:
-        # A one-off that fired but whose wake never began is re-delivered.
-        for row in self._work.of_kind("timer", ["active"]):
-            self._emit_one(row, self._work.repeat_of(row.id))
         self.fire_due()
 
     def fire_due(self) -> None:
-        now = self._now()
+        at = utc_text(self._now())
         fired = False
         for row in self._work.due(KINDS):
             if is_return_wake(row):
                 continue
             repeat_s = self._work.repeat_of(row.id)
             try:
-                if repeat_s:
-                    current = self._work.get(row.id)
-                    if current is None or current.state != "planned":
-                        raise TransitionRefused(f"{row.id} is no longer planned")
-                    # From now, not from the old time: a long gap fires once.
-                    self._work.update(row.id, due_at=now + timedelta(seconds=repeat_s))
-                else:
-                    self._work.transition(row.id, "active", expect="planned")
+                self._emit_one(row, repeat_s, lambda db, id=row.id: self._work.fire(id, at))
             except TransitionRefused:
-                continue  # cancelled or paused as it came due: already handled
-            self._emit_one(row, repeat_s)
+                continue  # cancelled or paused as it came due: already handled, nothing saved
+            except Exception:
+                log.exception("firing timer %s failed", row.id)  # the others still fire
+                continue
             fired = True
         self._rerun_due()
         self._arm()
@@ -116,16 +113,32 @@ class Timers:
             self._notify("changed", {"what": "timers"})
 
     def cancel(self, tid: str, reason: str) -> bool:
-        """End a timer or watch row; False when it is gone or already ended."""
-        try:
-            self._work.transition(tid, "cancelled", reason=reason)
-        except (TransitionRefused, KeyError):
+        """End a timer or watch row; False when it is gone or already ended and told.
+
+        A one-off that fired but whose news Scout has not heard yet can still be cancelled:
+        its waiting event is finished, so the reminder is not told.
+        """
+        row = self._work.get(tid)
+        if row is None:
             return False
+        if row.state == "done" and row.reported_at is None:
+            pass  # fired, not yet told: only its news is left to end
+        else:
+            try:
+                self._work.transition(tid, "cancelled", reason=reason)
+            except TransitionRefused:
+                return False
         self._work.mark_reported(tid)  # nobody needs telling about a cancel
+        self._finish_news("timer", f"timer:{tid}")
         self.changed()
         return True
 
-    def _emit_one(self, row: WorkRow, repeat_s: int | None) -> None:
+    def _emit_one(
+        self,
+        row: WorkRow,
+        repeat_s: int | None,
+        then: Callable[[sqlite3.Connection], None],
+    ) -> None:
         facts: dict = {"id": row.id, "note": note_of(row), "repeat_minutes": (repeat_s or 0) // 60}
         if row.kind == "watch":
             facts["kind"] = "watch"
@@ -135,25 +148,19 @@ class Timers:
             if parent is not None:
                 facts["state"] = home_state(parent.state)
             facts.update(self._job_facts(row.parent_id))
-        event = Event("timer", facts, key=f"timer:{row.id}")
+        event = Event(
+            "timer", f"timer:{row.id}", facts, caused_by=(row.input or {}).get("caused_by")
+        )
         if repeat_s:
-            self._emit(event)
+            self._emit(event, then=then)
         else:
-            # Ended once Scout's turn starts; told only when that turn finishes, so a cancelled
-            # wake leaves it untold.
+            # Told only when Scout's turn finishes, so a cancelled wake leaves it untold.
             self._emit(
                 event,
-                on_start=lambda: self._fired(row.id),
+                then=then,
                 on_end=lambda reason: self._told(row.id) if reason == "done" else None,
                 retell=True,  # a cancelled wake did not tell it: once more
             )
-
-    def _fired(self, id: str) -> None:
-        try:
-            self._work.transition(id, "done", reason="fired", expect="active")
-        except TransitionRefused:
-            return  # cancelled while the wake waited
-        self._tell()
 
     def _told(self, id: str) -> None:
         self._work.mark_reported(id)

@@ -4,10 +4,10 @@ groups and order of the wording page, and an unknown tool falls back to its own 
 from unittest.mock import MagicMock
 
 import pytest
+from event_log import make_session
 
 from brain.bodies import Bodies
 from brain.memory import Memory
-from brain.sessions import Session
 from brain.setup.tools import setup_tools
 from brain.tool_words import GROUPS, WORDS, fallback, words_for
 
@@ -57,7 +57,7 @@ def _scout_tool_names() -> set[str]:
         + login_tools(MagicMock(), fake)
         + loop_tools(fake)
     )
-    session = Session(_Model(), _Budget(), Bodies(), 10, Memory(":memory:"), extra_tools=extra)
+    session = make_session(_Model(), _Budget(), Bodies(), 10, Memory(":memory:"), extra_tools=extra)
     return {
         s.name
         for s in session.toolbox.known_specs()

@@ -166,7 +166,7 @@ async def test_later_snoozes_and_returns_at_the_new_time(rig):
     assert rig.events == []
     rig.clock.at = T0 + timedelta(hours=3, minutes=1)
     rig.svc.fire_due()
-    assert [e.facts["reason"] for e in rig.events] == ["later"]
+    assert [e.payload["reason"] for e in rig.events] == ["later"]
     assert rig.store.get(lp.id).status == "held"
     rig.svc.fire_due()
     assert len(rig.events) == 1  # said once
@@ -176,7 +176,7 @@ async def test_a_snoozed_loop_does_not_surface_on_context(rig):
     lp = rig.add(anchors=["Q4 pricing deck"])
     await rig.call("loop_later", id=lp.id, until=(T0 + timedelta(hours=3)).isoformat())
     focus = {"body": "d", "app": "POWERPNT.EXE", "title": "Q4 pricing.pptx - PowerPoint"}
-    rig.svc.saw(Event("focus", focus, key="d"))
+    rig.svc.saw(Event("focus", "desktop", focus))
     assert rig.events == []
 
 
@@ -265,22 +265,22 @@ async def test_a_dropped_loop_cannot_be_put_off(rig):
 async def test_the_first_return_of_the_day_emits_one_digest_of_what_was_held(rig):
     rig.add("a", title="Deck for Priya")
     rig.add("b", title="Invoice for Sam")
-    back = Event("back", {"body": "d", "idle_seconds": 900}, key="back:d")
+    back = Event("back", "desktop", {"body": "d", "idle_seconds": 900})
     rig.svc.saw(back)
     rig.svc.saw(back)
     assert len(rig.events) == 1
-    facts = rig.events[0].facts
+    facts = rig.events[0].payload
     assert facts["reason"] == "digest" and facts["count"] == 2
     assert "Deck for Priya" in facts["loops"] and "Invoice for Sam" in facts["loops"]
     rig.clock.at = T0 + timedelta(days=1)
     rig.add("c", title="Next day")
-    rig.svc.saw(Event("body_online", {"body": "d", "offline_seconds": 9000}, key="b"))
-    assert len(rig.events) == 2 and rig.events[1].facts["count"] == 1
+    rig.svc.saw(Event("body_online", "desktop", {"body": "d", "offline_seconds": 9000}))
+    assert len(rig.events) == 2 and rig.events[1].payload["count"] == 1
 
 
 async def test_digest_once_per_local_day(rig):
     rig.add("a")
-    back = Event("back", {"body": "d", "idle_seconds": 900}, key="back:d")
+    back = Event("back", "desktop", {"body": "d", "idle_seconds": 900})
     rig.svc.saw(back)
     rig.svc.saw(back)
     assert len(rig.events) == 1
@@ -294,15 +294,15 @@ async def test_digest_once_per_local_day(rig):
 
 
 async def test_an_empty_day_still_advances_the_digest(rig):
-    rig.svc.saw(Event("back", {"body": "d", "idle_seconds": 900}, key="back:d"))
+    rig.svc.saw(Event("back", "desktop", {"body": "d", "idle_seconds": 900}))
     assert rig.events == []
     rig.add("late")
-    rig.svc.saw(Event("back", {"body": "d", "idle_seconds": 900}, key="back:d"))
+    rig.svc.saw(Event("back", "desktop", {"body": "d", "idle_seconds": 900}))
     assert rig.events == []  # it was spent: the next digest is the next local midnight
 
 
 async def test_nothing_held_today_means_no_digest(rig):
-    rig.svc.saw(Event("back", {"body": "d", "idle_seconds": 900}, key="back:d"))
+    rig.svc.saw(Event("back", "desktop", {"body": "d", "idle_seconds": 900}))
     assert rig.events == []
 
 
@@ -327,9 +327,9 @@ async def test_priya_mail_then_the_deck_opens_then_show_done_and_a_draft(rig):
     await rig.svc._process("gmail", mail)
     assert rig.events == []  # held quietly
     focus = {"body": "d", "app": "POWERPNT.EXE", "title": "Q4 pricing.pptx - PowerPoint"}
-    rig.svc.saw(Event("focus", focus, key="d"))
-    assert [e.facts["reason"] for e in rig.events] == ["context"]
-    loop_id = rig.events[0].facts["id"]
+    rig.svc.saw(Event("focus", "desktop", focus))
+    assert [e.payload["reason"] for e in rig.events] == ["context"]
+    loop_id = rig.events[0].payload["id"]
     shown = await rig.call("loop_show", id=loop_id)
     assert shown["asks"] == "slide 7 needs this year's numbers" and "thread" in shown
     await rig.call("loop_done", id=loop_id)

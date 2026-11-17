@@ -3045,3 +3045,13 @@ Automated: `brain/tests/test_know_extract.py`, `test_know_portrait.py`, `test_kn
 Automated: `brain/tests/test_prompt.py` (the asked-topics line lists tags only, leaks no fact text, is absent with none), `test_memory.py` (`asked_topics`), `bodies/ui/src/home/memory-view.test.tsx` (a tagged fact's chip is its tag; Close only before the result).
 
 **Manual, real brain.** After a run that saved a location fact, ask "where am I based?": Scout calls `recall` with `include_personal` and answers from the saved fact, not the portrait. In Home's Memories list a GitHub fact shows a "Skills" or "Work" chip instead of "Fact". When the result view shows, only "Looks right" or "Done" is offered, no Close.
+
+## Events log: a say survives a kill (T1a)
+
+Automated: `brain/tests/test_events.py`, `test_store_events.py`, `test_sessions.py` and `test_timers.py`.
+
+- A say is saved in the `events` table before its turn starts; the same say id sent twice is one row (still answered twice until T1b). Text in a payload is masked before it is saved.
+- A timer that fires is saved with its event in one transaction; cancelling a fired timer that was not yet told ends its news, so Scout is not woken for it.
+- `ask_ended` carries the `caused_by` of the turn that asked.
+
+**Manual, real brain.** Send a say, end the brain process before Scout answers, then look in `tagalong.db`: the say is in `events` with state `new` or `taken`. Known gap until the runner lands: Scout does not answer it after the restart.
