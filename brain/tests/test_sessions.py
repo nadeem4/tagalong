@@ -2007,17 +2007,21 @@ async def test_an_errored_say_reaches_the_model_once_and_is_named_as_a_retry():
     clock = [datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)]
     model = FailsFirst(["ok"])
     session, sent = make(model, now=lambda: clock[0])
-    await session.say("desktop", say("first words"))
+    await session.say("desktop", say("first words\nand a second line"))
     await idle(session)
     assert states(sent) == ["started", "ended"] and sent[-1][1]["reason"] == "error"
     clock[0] += datetime.timedelta(seconds=30)  # its backoff is over: it rides the next turn
     await session.say("desktop", say("second words"))
     await idle(session)
     sent_texts = [b.get("text", "") for m in model.seen[-1] for b in m["content"]]
-    assert sum("first words" in t for t in sent_texts) == 1  # kept in history, not added again
+    # kept in history, not added again: only the retry fact names it, by its first line
+    assert sum("and a second line" in t for t in sent_texts) == 1
     last = model.seen[-1][-1]["content"]
     assert {"type": "text", "text": "second words"} in last
-    assert any("failed" in b["text"] and "again" in b["text"] for b in last)
+    fact = next(b["text"] for b in last if "resume=" in b.get("text", ""))
+    assert fact.startswith('<data kind="event" resume="true" reason="error">')
+    assert "Event: say" in fact and "text: first words" in fact
+    assert "second line" not in fact and "above" not in fact
     assert session._live_params == {}
 
 
@@ -2041,7 +2045,8 @@ async def test_a_step_cap_turns_say_comes_back_as_a_resume_fact_not_its_words():
     last = model.seen[-1][-1]["content"]
     fact = next(b["text"] for b in last if "resume=" in b.get("text", ""))
     assert fact.startswith('<data kind="event" resume="true" reason="step_cap">')
-    assert "Event: say" in fact and "plan my week" not in fact  # its words are in history
+    assert "Event: say" in fact and "text: plan my week" in fact  # named by its first line
+    assert "How to weigh it" not in fact  # a say has no note; no empty line for one
     blocks = [b.get("text") for m in model.seen[-1] for b in m["content"]]
     assert blocks.count("plan my week") == 1
     assert session.events.get(first.id).state == "handled"

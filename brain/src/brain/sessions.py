@@ -138,9 +138,18 @@ _NOT_STEPS = JOB_TOOLS | {"resolve_step"}
 _SUMMARY_CAP = 300  # characters of a tool result kept on its work row
 _LATE_RESULT_CAP = 2000  # characters of a late tool result put in the news about it
 _STEP_STATUS = {"ok": "done", "failed": "failed", "refused": "refused"}
-# A fact, not a line for Scout to say: the failed request stays in the history above.
-RETRY_NOTE = "The reply to the request above failed before it was finished; it is tried again now."
+# A resumed say is named by this much of its first line; its full words are in the history.
+_GIST_CAP = 80
 INTERJECTION_TIMEOUT_S = 5.0  # the voice is paused meanwhile, so a slow call must not keep it
+
+
+def _named(row: EventRow) -> EventRow:
+    """A resumed row without its payload; a say keeps a short first line to be known by."""
+    if row.kind != "say":
+        return replace(row, payload={})
+    first = row.payload.get("params", {}).get("text", "").split("\n", 1)[0]
+    gist = first if len(first) <= _GIST_CAP else first[: _GIST_CAP - 1] + "…"
+    return replace(row, payload={"text": gist})
 
 
 @dataclass(frozen=True)
@@ -484,10 +493,10 @@ class Session:
         self, turn_id: str, body: str, rows: list[EventRow], gave_up: list[EventRow]
     ) -> None:
         """The runner took these events for a turn on `body`: the person's words first, then
-        each kind's news as one fenced block. A `resume` row was sent by a failed turn and its
-        words are still in the history: after an error one line says it is tried again, after
-        another end (the step cap) a marked fact names it. `gave_up` rows are told once, as
-        marked facts, with only a say's words, never its settings."""
+        each kind's news as one fenced block. A `resume` row was sent by a failed turn (an error
+        or the step cap) and its words are still in the history: a marked fact names it, a say
+        by its first line, since later turns may stand between it and its words. `gave_up` rows
+        are told once, as marked facts, with only a say's words, never its settings."""
         if not self.ready():
             self._end_unanswered(turn_id, body, [r.id for r in rows])
             # Nothing can answer and no use asking again; a given-up rider was not told.
@@ -496,9 +505,7 @@ class Session:
         tz = self._now().tzinfo
         says = [(r, self._say_params(r)) for r in rows if r.kind == "say"]
         params = [p for _, p in says]
-        errored = any(r.resume and r.end_reason == "error" for r in rows)
-        content = [{"type": "text", "text": RETRY_NOTE}] if errored else []
-        content += [
+        content = [
             b
             for r, p in says
             if not r.resume
@@ -507,10 +514,9 @@ class Session:
         news: dict[str, list[EventRow]] = {}
         resumed: dict[tuple[str, str], list[EventRow]] = {}
         for row in rows:
-            if row.resume and row.end_reason != "error":
+            if row.resume:
                 # Its payload is in the history already: only the fact that it goes on.
-                bare = replace(row, payload={})
-                resumed.setdefault((row.kind, row.end_reason or ""), []).append(bare)
+                resumed.setdefault((row.kind, row.end_reason or ""), []).append(_named(row))
             elif row.kind != "say" and not row.resume:
                 news.setdefault(row.kind, []).append(row)
         for kind, group in news.items():
@@ -518,7 +524,8 @@ class Session:
             content.append({"type": "text", "text": wake_text(self._kinds[kind], group, note, tz)})
         for (kind, reason), group in resumed.items():
             attrs = {"resume": "true", "reason": reason}
-            text = wake_text(self._kinds[kind], group, "", tz, attrs)
+            note = self.runner.notes.get(kind, "")
+            text = wake_text(self._kinds[kind], group, note, tz, attrs)
             content.append({"type": "text", "text": text})
         told: dict[tuple[str, str], list[EventRow]] = {}
         for row in gave_up:
