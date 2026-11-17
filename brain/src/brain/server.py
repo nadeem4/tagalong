@@ -323,7 +323,7 @@ async def _know_me_start(
 
 
 async def _say(message: dict, req_id: Any, body_id: str, peer: _Peer, session: Session) -> None:
-    """A say is answered once the front door delivers it, so it runs in its own task and the read
+    """A say is answered once it is saved, so it runs in its own task and the read
     loop keeps going. Says from one body are posted in the order they arrived."""
     try:
         say = SayParams.model_validate(message.get("params"))
