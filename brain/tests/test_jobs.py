@@ -30,6 +30,7 @@ from brain.permission import Decision, Engine, Grant, Person, SideCheckDecider
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.store import InstalledExpert
 from brain.store import rules
+from brain.store.events import list_state
 from brain.store.work import ActivityEntry, WorkStore
 from brain.tools import work_tools
 
@@ -661,12 +662,20 @@ async def test_shutdown_swallows_one_runs_failure_and_stops_the_rest(make_rig):
 
 
 async def test_shutdown_leaves_the_report_for_the_next_start(make_rig):
-    # A job stopped by shutdown must not wake a turn the exiting brain would drop.
+    # The runner is stopped first, so job_ended is only a row: it stays new and the next
+    # start's runner tells it.
     rig = make_rig(FakeAsks(Answer("Plan")))
+
+    def finished(job) -> None:  # what Session._on_job_finished does
+        rig.finished.append(job)
+        rig.events.post(Event("job_ended", f"job:{job.id}", {}))
+
+    rig.jobs._on_finished = finished
     job_id = await rig.jobs.start("one", str(rig.folder))
     await rig.jobs.shutdown()
-    assert rig.finished == []
+    assert [j.id for j in rig.finished] == [job_id]
     assert rig.records.get_job(job_id).state == "cancelled"
+    assert [r.source for r in list_state(rig.memory.db, "new")] == [f"job:{job_id}"]
 
 
 async def test_cancelling_start_while_it_waits_on_the_mode_ask_cleans_up(make_rig):

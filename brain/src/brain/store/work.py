@@ -959,7 +959,7 @@ class WorkStore:
         """Settle every unfinished row once, at start; returns (work_id, outcome) pairs.
 
         Idempotent: each row it touches ends or moves to a state the scan leaves alone, so a
-        second start changes nothing and Scout is woken once per row (reported_at stays null).
+        second start changes nothing and Scout is woken once per row.
         `can_resume(row)` says whether an expert call's saved session can be reopened.
         """
         done: list[tuple[str, str]] = []

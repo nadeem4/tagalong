@@ -389,10 +389,12 @@ async def _run() -> None:
         if bridges is not None:
             await bridges.stop()  # before the brain goes, so no bridge is left running
         await voice.close()
+        # The runner stops first: the running turn's events wait for the next run, and the
+        # job_ended news a stopped job posts stays new instead of starting a turn.
+        await session.runner.stop()
         await session.jobs.shutdown()
         await apps.shutdown()
         await session.stop_background()  # tools a talked-over turn left running end here
-        await session.runner.stop()  # the running turn's events wait for the next run
         memory.close()
         clear_pid(config.data_dir, os.getpid())
 
