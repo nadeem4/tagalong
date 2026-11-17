@@ -61,14 +61,16 @@ class Runner:
         self._guards = guards
 
     def target(self, row: EventRow) -> str | None:
-        """The body a turn for this event runs on, or None when no body can show it (the event
-        then waits). A say answers where it was said if that body displays, else where the
-        person is. News goes where the person is, else back to the body that caused it."""
+        """The body a turn for this event runs on, or None when no body displays (the event
+        then waits). Only a body that displays is ever chosen: a reply sent to one that shows
+        nothing is lost. A say answers where it was said, else where the person is, else the
+        first screen. News goes where the person is, else back to the body that caused it,
+        else the first screen."""
         shown = self._bodies.display_ids()
         using = self._presence.using_now()
         if row.kind in PERSON_KINDS:
-            return row.source if row.source in shown else using
-        if using is not None:
-            return using
-        origin = self._events.origin_body(row.id, lambda s: not is_internal(s))
-        return origin if origin in shown else None
+            wanted = [row.source, using]
+        else:
+            origin = self._events.origin_body(row.id, lambda s: not is_internal(s))
+            wanted = [using, origin]
+        return next((b for b in wanted if b in shown), shown[0] if shown else None)

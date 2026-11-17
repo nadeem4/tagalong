@@ -132,3 +132,23 @@ def test_news_with_no_target_is_skipped_not_dropped():
     kept = rig.log.get(news.id)
     assert kept is not None
     assert (kept.state, kept.attempts) == ("new", 0)
+
+
+def test_a_say_from_a_displayless_body_goes_to_a_displaying_one():
+    rig = Rig(online=("browser", "desktop"), display=("desktop",))
+    rig.presence.touch("browser")  # the browser is in use but shows nothing
+    say = rig.post("say", "browser", "s1")
+    assert rig.runner.target(say) == "desktop"
+
+
+def test_news_skips_a_displayless_body_in_use():
+    rig = Rig(online=("browser", "desktop"), display=("desktop",))
+    rig.presence.touch("browser")
+    assert rig.runner.target(rig.post("timer", "timer:1", "n1")) == "desktop"
+
+
+def test_equal_times_keep_arrival_order():
+    ready = [row("first", at=3), row("second", at=3), row("third", at=3)]
+    got = pick(ready, to("desktop"), always)
+    assert got is not None
+    assert [e.id for e in got.events] == ["first", "second", "third"]
