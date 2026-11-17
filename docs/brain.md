@@ -187,7 +187,8 @@ event's `source`), and a say that joined the running turn gets `turn {state: "jo
 yet done its last read of what was said; the running turn takes it in at its next step. Any other
 say (another body, or one arriving after that last read) gets its own turn after the running one,
 answered on its own body; with no turn running it starts one at once. A say whose `id` is already
-known (a body's retry) is one event: it starts nothing and answers `{}`. The work then runs in the background and streams notifications. There is one
+known (a body's retry) is one event: it starts nothing and answers `{}`. The work then
+runs in the background and streams notifications. There is one
 conversation for all bodies and at most one running turn.
 
 ```mermaid

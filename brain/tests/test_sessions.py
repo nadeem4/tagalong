@@ -15,7 +15,7 @@ from event_log import make_session
 from job_rows import add_timer, records_for
 
 from brain.bodies import Bodies
-from brain.events import EventKind
+from brain.events import Event, EventKind
 from brain.experts import PermissionOption, PermissionRequest, Question, QuestionField, QuietFacts
 from brain.jobs import JobError
 from brain.masking import Masker
@@ -1289,6 +1289,7 @@ async def test_display_less_say_joins_the_turn_on_the_body_that_shows_it():
     await settle()
     second = await said(session, sent, "browser", say("b"))
     assert second.joined is True and second.turn == first.turn
+    assert second.frame["source"] == "browser"  # the sender, not the body showing the turn
     gate.set()
     await idle(session)
 
@@ -1660,13 +1661,24 @@ async def test_body_online_after_a_short_gap_does_not():
     assert states(sent) == []
 
 
-async def test_wake_turn_started_notification_says_brain():
+async def test_wake_turn_started_names_the_waking_event_and_its_source():
     session, sent = make(Gate(["ok"]), kinds=None)
     join(session, "desktop")
     session.body_event("desktop", "back", {"idle_seconds": 600})
     await idle(session)
     started = [p for m, p in sent if m == "turn" and p["state"] == "started"]
     assert [p["source"] for p in started] == ["desktop"]  # the waking event's source
+
+
+async def test_a_non_body_wake_started_frame_names_its_own_source_and_event():
+    session, sent = make(Gate(["ok"]), kinds=NO_WAIT)
+    join(session, "desktop")
+    session.post_event(
+        Event("job_ended", "job:j1", {"report": "done"}, id="e-job"), origin="desktop"
+    )
+    await idle(session)
+    [started] = [p for m, p in sent if m == "turn" and p["state"] == "started"]
+    assert started["source"] == "job:j1" and started["events"] == ["e-job"]  # not the body
 
 
 async def test_say_turn_started_notification_says_user():

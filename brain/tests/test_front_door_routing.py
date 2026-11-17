@@ -164,6 +164,7 @@ async def test_cancelling_a_say_queued_behind_a_turn_ends_it_cancelled():
     await settle()
     await session.say("whatsapp", say("from the phone"))  # waits for its own turn
     await settle()
+    # A queued say has no turn id on the wire until T1c's runner, so this reads _later on purpose.
     [(_, queued, *_)] = session._later  # a body learns a turn id only when its turn starts
     session.cancel(queued)
     gate.set()

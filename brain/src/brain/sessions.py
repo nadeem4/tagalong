@@ -624,7 +624,7 @@ class Session:
                         "body": self._turn_body,
                         "state": "joined",
                         "events": [item.event_id],
-                        "source": item.origin_body,
+                        "source": self._event_source(item.event_id, shown),
                     },
                 )
                 if not result.done():
@@ -835,15 +835,17 @@ class Session:
     def _started_frame(self, turn_id: str, body_id: str | None, cause: str | None) -> dict:
         """The `started` frame: the event the turn took and that event's source (a say's is the
         body, a wake's the waking event's), so a body can tell which of its says it answers."""
-        row = self.events.get(cause) if cause else None
-        source = row.source if row is not None else (body_id or BRAIN)
         return {
             "turn": turn_id,
             "body": body_id,
             "state": "started",
             "events": [cause] if cause else [],
-            "source": source,
+            "source": self._event_source(cause, body_id),
         }
+
+    def _event_source(self, event_id: str | None, body_id: str | None) -> str:
+        row = self.events.get(event_id) if event_id else None
+        return row.source if row is not None else (body_id or BRAIN)
 
     def _end_cancelled(self, turn_id: str, body_id: str | None, event_id: str) -> None:
         """A say cancelled before its turn began: the body still sees it start and end."""
