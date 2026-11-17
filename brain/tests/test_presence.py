@@ -109,10 +109,11 @@ def test_a_sentence_break_is_latched_until_it_is_taken():
     assert not rig.p.break_seen()  # spent by the take
 
 
-def test_latest_keeps_the_newest_fact_of_a_kind():
+def test_latest_keeps_the_newest_fact_of_a_kind_per_source():
     rig = Rig()
-    assert rig.p.latest("focus") is None
-    rig.p.record("focus", {"title": "a"})
-    rig.p.record("focus", {"title": "b"})
-    assert rig.p.latest("focus") == {"title": "b"}
-    assert rig.p.latest("tab") is None
+    assert rig.p.latest("focus") == {}
+    rig.p.record("focus", "desktop", {"title": "a"})
+    rig.p.record("focus", "browser", {"title": "b"})
+    rig.p.record("focus", "desktop", {"title": "c"})
+    assert rig.p.latest("focus") == {"desktop": {"title": "c"}, "browser": {"title": "b"}}
+    assert rig.p.latest("tab") == {}

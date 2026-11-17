@@ -22,7 +22,7 @@ class Presence:
         self._heard: dict[str, tuple[str, int]] = {}  # body id -> (turn, sentences it finished)
         self._break_seen = False
         self._touched: dict[str, datetime] = {}
-        self._latest: dict[str, dict] = {}
+        self._latest: dict[str, dict[str, dict]] = {}  # kind -> source -> payload
 
     def speech(
         self, body_id: str, state: str, turn: str | None = None, n: int | None = None
@@ -64,12 +64,13 @@ class Presence:
         seen, self._break_seen = self._break_seen, False
         return seen
 
-    def record(self, kind: str, payload: dict) -> None:
-        """Keep the newest fact of a kind that never wakes (focus, tab, download)."""
-        self._latest[kind] = payload
+    def record(self, kind: str, source: str, payload: dict) -> None:
+        """Keep the newest fact of a kind that never wakes (focus, tab, download), per source:
+        each body's own focus must not overwrite another's."""
+        self._latest.setdefault(kind, {})[source] = payload
 
-    def latest(self, kind: str) -> dict | None:
-        return self._latest.get(kind)
+    def latest(self, kind: str) -> dict[str, dict]:
+        return dict(self._latest.get(kind, {}))
 
     def touch(self, body_id: str) -> None:
         """The person did something on this body (a say, an answer, back, focus)."""
