@@ -147,6 +147,30 @@ describe('CompanionBubble', () => {
     expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull();
   });
 
+  // The brain can answer before React renders the "running" state the submit set.
+  it('claims its turn even when the whole reply arrives before the render', async () => {
+    const base = createFakeHostBridge();
+    const bridge: FakeHostBridge = {
+      ...base,
+      ask: (input) => {
+        void base.ask(input);
+        base.emit({
+          type: 'turn.started',
+          turnId: 'turn-5',
+          petId: 'scout',
+          conversationId: CONVERSATION,
+        });
+        base.emit({ type: 'turn.delta', turnId: 'turn-5', text: 'Quick ' });
+        base.emit(done('turn-5', 'Quick answer.'));
+        return Promise.resolve();
+      },
+    };
+    renderBubble(bridge);
+    await act(async () => ask('hello'));
+    expect(screen.getByText('Quick answer.')).toBeVisible();
+    expect(screen.queryByText(/thinking/i)).toBeNull();
+  });
+
   it('formats the answer: bullets and bold, not raw Markdown', async () => {
     const bridge = createFakeHostBridge();
     renderBubble(bridge, { snapshot: SNAPSHOT });

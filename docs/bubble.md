@@ -149,7 +149,8 @@ stateDiagram-v2
   either runs the health check (see below) or sets `running` with `turnId: null` and calls
   `bridge.ask` with the current `conversationId`. The ask's `turnId` fills `mine` if
   `turn.started` has not already.
-- `turn.started` is taken only while `running` and only when it is not `background: true` (a
+- `turn.started` is taken only while the bubble is asking (a ref set on submit, read fresh so a
+  reply that beats the render is still claimed) and only when it is not `background: true` (a
   job's turn never answers in the bubble). It sets `mine` and the conversation id
   the next question continues.
 - `turn.delta` and `turn.completed` count only for `mine`. A completed turn with no text and a
