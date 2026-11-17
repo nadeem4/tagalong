@@ -4,7 +4,6 @@ mind/events.md so code stays free of canned lines. `EventLog` saves every event 
 survive a restart (masked) before anything acts on it.
 """
 
-import json
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -32,7 +31,8 @@ class Event:
     source: str
     payload: dict
     caused_by: str | None = None
-    # Not compared: two reports of the same fact are equal even though each has its own id.
+    # Not compared on purpose: equality means the same fact; the log identifies events by id.
+    # Two reports of the same fact are equal even though each has its own id.
     id: str = field(default_factory=lambda: uuid4().hex, compare=False)
     at: datetime | None = None
     # A newer pending event with the same kind and key replaces the older one (until T1c).
@@ -196,7 +196,7 @@ class EventLog:
             raise ValueError(f"unknown event kind {event.kind!r}")
         if event.kind not in SAVED_KINDS:
             return True
-        payload = json.loads(self._masker.mask(json.dumps(event.payload)))
+        payload = self._mask(event.payload)
         at = utc_text(event.at or self._now())
         row = store.EventRow(
             id=event.id,
@@ -212,6 +212,16 @@ class EventLog:
             if then is not None:
                 then(self._db)
         return True
+
+    def _mask(self, value):
+        """Mask string leaves only: masking dumped JSON could eat an escaped quote."""
+        if isinstance(value, str):
+            return self._masker.mask(value)
+        if isinstance(value, dict):
+            return {k: self._mask(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [self._mask(v) for v in value]
+        return value
 
     def get(self, id: str) -> store.EventRow | None:
         return store.get(self._db, id)

@@ -341,3 +341,10 @@ def test_take_and_finish(log):
     assert log.ready() == []
     log.finish(["e1"], "handled")
     assert log.get("e1").state == "handled"
+
+
+def test_a_url_token_next_to_quotes_still_saves_and_is_masked(log):
+    text = 'see "https://x.com/a?token=abcdef" ok'
+    assert log.post(Event("say", "desktop", {"text": text}, id="e1")) is True
+    saved = log.get("e1").payload["text"]
+    assert "abcdef" not in saved and "[secret]" in saved
