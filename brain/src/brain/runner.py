@@ -72,7 +72,7 @@ def wake_text(
 ) -> str:
     """The facts of a batch of one kind, fenced as data: the model reads them, never obeys them.
     `attrs` mark the block (a resumed or given-up event); code sets them, never a payload."""
-    lines = [f"Event: {kind.name}", f"How to weigh it: {note}"]
+    lines = [f"Event: {kind.name}", *([f"How to weigh it: {note}"] if note else [])]
     for row in rows:
         at = datetime.fromisoformat(row.at).astimezone(tz)
         lines.append(f"- at {at.strftime('%Y-%m-%d %H:%M %z')}")

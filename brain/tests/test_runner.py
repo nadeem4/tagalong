@@ -753,6 +753,12 @@ def test_wake_text_lists_kind_note_time_and_facts():
     assert "2026-10-28 09:00 +0100" in text and "report: a1 ended." in text
 
 
+def test_wake_text_leaves_out_the_weigh_line_when_the_kind_has_no_note():
+    r = EventRow(id="1", kind="say", at=utc_text(T0), source="desktop", payload={"text": "hi"})
+    text = wake_text(EVENT_KINDS["say"], [r], "", UTC, {"resume": "true", "reason": "error"})
+    assert "How to weigh it" not in text and "text: hi" in text
+
+
 def test_wake_text_lists_batched_events_in_order_and_indents_lines():
     rows = [
         EventRow(id=str(i), kind="job_ended", at=utc_text(T0), source="j:1", payload={"r": t})
