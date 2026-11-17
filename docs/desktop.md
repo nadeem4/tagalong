@@ -182,9 +182,9 @@ The same call backs **Start brain** on the offline card, so it also runs when th
   returns whether it was sent; a `focus` it dropped (brain offline) is sent again on the next poll.
   A brain that restarts while the window stays the same, after the last send got through, learns
   the front window only at the next change.
-- **Brain-started turns.** A `turn` whose `source` is internal (`isInternalSource`: `scout`, or any
-  source with a `:` such as `job:x`, `timer:t1`, `loop:gmail`) and that took none of this body's
-  says (a wake) shows no thinking state, no
+- **Quiet turns (not my say).** A `turn` that took none of this body's
+  says (a wake, a body's `back`, another body's ask) shows no thinking state, whatever its `source`
+  (which only names the origin for the record), no
   bubble and no tool rows. If it ends `done` with words (not just whitespace), they appear once as a
   pet remark: the quiet line beside Scout when the bubble is closed, or Scout's message in the
   bubble when it is open and no answer is streaming (main keeps the remark from the hidden bubble,

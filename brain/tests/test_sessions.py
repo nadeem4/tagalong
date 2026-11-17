@@ -1681,7 +1681,7 @@ async def test_a_non_body_wake_started_frame_names_its_own_source_and_event():
     assert started["source"] == "job:j1" and started["events"] == ["e-job"]  # not the body
 
 
-async def test_say_turn_started_notification_says_user():
+async def test_say_turn_started_notification_names_the_body_source():
     session, sent = make(Gate(["ok"]))
     await session.say("desktop", say("hi"))
     await finish(session)

@@ -16,7 +16,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -1140,7 +1140,7 @@ class Session:
             raise WakeSkipped  # dropped quietly; unreported jobs are told at a later start
         if self._wants_speech(body_id, None):
             content = [*content, {"type": "text", "text": ear_note()}]
-        turn = self._start_turn(body_id, content, "brain", cause=cause)
+        turn = self._start_turn(body_id, content, by_person=False, cause=cause)
         self._speak(turn, body_id, None)  # remarks and hellos are read aloud like any reply
         return turn
 
@@ -1148,7 +1148,7 @@ class Session:
         self,
         body_id: str | None,
         content: list,
-        started_by: Literal["user", "brain"] = "user",
+        by_person: bool = True,
         *,
         after: asyncio.Task | None = None,
         cut: Interruption | None = None,
@@ -1165,9 +1165,9 @@ class Session:
         self._turn_job = None
         self._wake_jobs = set()
         self._stop = stop = asyncio.Event()
-        self._owner_turn = started_by == "user"
+        self._owner_turn = by_person
         # Only the person's typed words count as date evidence, never body context or parts.
-        self._said = said if started_by == "user" else ""
+        self._said = said if by_person else ""
         self._turn_body = body_id
         self._turn_cause = cause
         lead = [interruption_block(cut.spoken, cut.unsaid)] if cut is not None else []
