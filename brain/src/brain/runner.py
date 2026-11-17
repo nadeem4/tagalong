@@ -193,8 +193,9 @@ class Runner:
         riders = self._riders.pop(turn_id, [])
         if reason in _HANDLED:
             self._events.finish(ids, "handled", end_reason=reason)
-            if reason == "done":
-                self._events.finish(riders, "handled", end_reason="told")
+            if reason == "done":  # told: the state says so, and why it was given up stays
+                for row in filter(None, map(self._events.get, riders)):
+                    self._events.finish([row.id], "handled", end_reason=row.end_reason)
         elif reason == "over_budget":
             rows = [r for r in map(self._events.get, ids) if r is not None]
             says = [r.id for r in rows if r.kind in PERSON_KINDS]

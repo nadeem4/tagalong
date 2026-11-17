@@ -539,7 +539,8 @@ async def test_gave_up_events_ride_the_next_done_person_turn_once():
     assert rig.session.gave_up[-1] == ["g"]
     rig.runner.turn_ended(rig.session.started[-1][0], "done")
     g = rig.log.get("g")
-    assert g is not None and g.state == "handled"
+    # told is recorded by the state; why it was given up stays
+    assert g is not None and (g.state, g.end_reason) == ("handled", "error")
     rig.say("s3")
     await ticks()
     assert rig.session.gave_up[-1] == []  # once
