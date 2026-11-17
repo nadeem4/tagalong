@@ -364,3 +364,16 @@ async def test_a_wake_turn_that_hands_off_is_the_jobs_cause(tmp_path):
     assert job_ended_cause(session, memory, job_id) == wake.id
     gate.set()
     await idle(session)
+
+
+async def test_a_waiting_say_cancelled_with_no_screen_ends_on_its_own_body():
+    # No body displays, so the say has no target; its frames still name the body it came from.
+    session, sent = make(Gate(["unused"]), screen=False)
+    join_headless(session, "browser")
+    waiting = say("hello")
+    await session.say("browser", waiting)
+    await settle()
+    session.cancel(waiting.id)
+    frames = [p for m, p in sent if m == "turn" and waiting.id in (p.get("events") or [])]
+    ended = [p for m, p in sent if m == "turn" and p["state"] == "ended"]
+    assert [p["body"] for p in frames + ended] == ["browser", "browser"]

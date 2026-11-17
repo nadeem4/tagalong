@@ -1151,7 +1151,9 @@ class Session:
         if row is not None and row.kind == "say" and row.state == "new":
             self.events.finish([id], "handled", end_reason="cancelled")
             self._live_params.pop(id, None)
-            self._end_cancelled(uuid.uuid4().hex, self.runner.target(row), id)
+            # With no screen there is no target: the body it came from still hears it end.
+            body = self.runner.target(row) or row.source
+            self._end_cancelled(uuid.uuid4().hex, body, id)
 
     def answer(
         self,
