@@ -13,13 +13,12 @@ SAVED = ("setup_done", "setup_login")  # setup_progress is context only and neve
 
 
 class SetupEvents:
-    def __init__(
-        self, post: Callable[[Event], None], finish_matching: Callable[[str, str], object]
-    ) -> None:
+    def __init__(self, post: Callable[[Event], None], finish_matching: Callable[..., object]):
         self._post = post  # the session's post_event
         self._finish_matching = finish_matching  # the log's: ends waiting events of kind, source
 
     def emit(self, event: Event) -> None:
-        if event.kind in SAVED:
-            self._finish_matching(event.kind, event.source)
+        # Posted first: a crash before the older one ends leaves both, never neither.
         self._post(event)
+        if event.kind in SAVED:
+            self._finish_matching(event.kind, event.source, keep=event.id)

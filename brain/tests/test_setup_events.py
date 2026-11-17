@@ -45,3 +45,20 @@ def test_progress_is_not_saved(tmp_path):
     setup.emit(Event("setup_progress", "setup:claude", {"expert": "claude"}))
     assert log.ready() == []
     mem.close()
+
+
+def test_a_crash_while_ending_the_older_event_loses_no_news(tmp_path):
+    mem = Memory(tmp_path / "t.db")
+    log = EventLog(mem.db, Masker(lambda: []), lambda: NOW)
+
+    def crash(kind, source, **_):
+        raise RuntimeError("killed")
+
+    setup = SetupEvents(log.post, crash)
+    event = Event("setup_done", "setup:claude", {"expert": "claude", "ok": True})
+    try:
+        setup.emit(event)
+    except RuntimeError:
+        pass
+    assert [r.id for r in log.ready()] == [event.id]  # posted before the older one is ended
+    mem.close()

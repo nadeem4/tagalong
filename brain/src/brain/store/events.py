@@ -163,6 +163,12 @@ def recover_taken(db: sqlite3.Connection, at: str) -> list[str]:
     return [r[0] for r in db.execute("SELECT id FROM events WHERE state='taken' ORDER BY rowid")]
 
 
+def set_resume(db: sqlite3.Connection, ids: list[str]) -> None:
+    """Mark waiting rows as sent before: their words are in the history already."""
+    for id in ids:
+        db.execute("UPDATE events SET resume=1 WHERE id=? AND state='new'", (id,))
+
+
 def sweep(db: sqlite3.Connection, before: str) -> int:
     """Delete `handled` rows ended before `before`; waiting, running and given-up rows stay."""
     return db.execute(

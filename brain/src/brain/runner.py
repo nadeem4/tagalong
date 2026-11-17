@@ -159,13 +159,15 @@ class Runner:
             self.start()
         self._wake.set()
 
-    async def stop(self) -> None:
+    async def stop(self) -> list[str]:
         """The brain is closing: the running turn's events go back to `new` (no attempt), so a
-        quit never loses a say, and their hooks hear it; then the turn is cancelled."""
+        quit never loses a say, and their hooks hear it; then the turn is cancelled. Returns
+        the turn's events, which the session marks `resume` if the turn saved any work."""
         self._stopped = True
         if self._alarm is not None:
             self._alarm.cancel()
         turn, self._turn = self._turn, None
+        ids: list[str] = []
         if turn is not None:
             ids = self._taken.pop(turn.id, [])
             self._events.finish(ids, "new")
@@ -180,6 +182,7 @@ class Runner:
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
+        return ids
 
     def turn_ended(self, turn_id: str, reason: str) -> None:
         """Spec 6.5. A done, person-cancelled or rejected turn handled its events. Over budget,

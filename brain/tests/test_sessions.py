@@ -3782,3 +3782,54 @@ async def test_a_step_that_fails_and_its_news_are_saved_together(monkeypatch):
     assert work.get("j1.s").state == "active"
     again, _ = make(Gate([]), memory, screen=False)
     assert [r.kind for r in again.events.ready()].count("work_failed") == 1
+
+
+async def test_a_say_stopped_after_a_saved_step_is_resumed_not_said_again():
+    memory = Memory(":memory:")
+    hold = asyncio.Event()
+    model = Gate([tool_use("recall", query="x"), hold, "never"])
+    session, _ = make(model, memory)
+    join(session, "desktop")
+    said = say("remember the milk" + chr(10) + "and the eggs too")  # a resume names line one
+    await session.say("desktop", said)
+    await until(lambda: len(model.seen) == 2)  # one tool round saved, the next step running
+    await session.stop_turn()
+    assert session.events.get(said.id).state == "new"
+    again = Gate(["ok"])
+    revived, _ = make(again, memory)
+    join(revived, "desktop")
+    revived.runner.poke()
+    await idle(revived)
+    sent = again.seen[0]
+    assert json.dumps(sent).count("and the eggs too") == 1  # its words once: the saved row
+    assert "resume" in json.dumps(sent[-1])  # the restart names it as going on
+
+
+class _Stubborn:
+    """A model whose turn ignores the first cancel: shutdown must not wait on it forever."""
+
+    model_id = "claude-sonnet-5-5"
+
+    def __init__(self):
+        self.started = asyncio.Event()
+
+    async def stream(self, system, messages, tools):
+        self.started.set()
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            await asyncio.sleep(3600)  # swallowed once; a second cancel ends it
+        yield  # pragma: no cover
+
+
+async def test_stopping_a_turn_that_will_not_end_does_not_hang(monkeypatch):
+    monkeypatch.setattr(sessions_module, "STOP_TURN_WAIT_S", 0.05)
+    model = _Stubborn()
+    session, _ = make(model)
+    join(session, "desktop")
+    await session.say("desktop", say("hi"))
+    await asyncio.wait_for(model.started.wait(), 1)
+    task = session._task
+    await asyncio.wait_for(session.stop_turn(), 1)
+    task.cancel()  # the second cancel ends it, so the test leaves nothing running
+    await asyncio.gather(task, return_exceptions=True)

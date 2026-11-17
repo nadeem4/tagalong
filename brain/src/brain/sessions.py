@@ -141,6 +141,7 @@ _LATE_RESULT_CAP = 2000  # characters of a late tool result put in the news abou
 _STEP_STATUS = {"ok": "done", "failed": "failed", "refused": "refused"}
 # A resumed say is named by this much of its first line; its full words are in the history.
 _GIST_CAP = 80
+STOP_TURN_WAIT_S = 5.0  # a turn that ignores its cancel must not keep the brain open
 INTERJECTION_TIMEOUT_S = 5.0  # the voice is paused meanwhile, so a slow call must not keep it
 
 
@@ -668,10 +669,19 @@ class Session:
 
     async def stop_turn(self) -> None:
         """The brain is closing: the runner stops (the turn's events wait as `new`, no attempt)
-        and cancels the running turn, which is awaited so its end saves what it did."""
-        await self.runner.stop()
-        if self._task is not None:
-            await asyncio.gather(self._task, return_exceptions=True)
+        and cancels the running turn, which is awaited so its end saves what it did. A turn
+        that saved any of it leaves its events marked `resume`, so the next run names them
+        instead of sending their words again; a wordless cancel saved nothing to resume."""
+        task = self._task
+        ids = await self.runner.stop()
+        if task is None:
+            return
+        done, _ = await asyncio.wait({task}, timeout=STOP_TURN_WAIT_S)
+        if not done:
+            log.warning("the turn did not end within %.0f s of its cancel", STOP_TURN_WAIT_S)
+            return
+        if ids and not self._wordless_cancel:
+            self.events.set_resume(ids)
 
     async def stop_background(self) -> None:
         """The brain is closing: tools a paused turn left running end with it. (The Stop button

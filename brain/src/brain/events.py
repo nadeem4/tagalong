@@ -265,10 +265,13 @@ class EventLog:
         if state in ("handled", "gave_up"):
             self.ended(ids, state)
 
-    def backoff(self, ids: list[str], reason: str, *, resume: bool = True) -> None:
+    def backoff(
+        self, ids: list[str], reason: str, *, resume: bool = True, wait: bool = True
+    ) -> None:
         """A turn that took these failed (`error`, `step_cap`): each waits 30 s, 2 min, then
         10 min and is tried again; the fourth failure gives it up. `resume=False` when the
-        turn never started, so nothing of it reached the history."""
+        turn never started, so nothing of it reached the history. `wait=False` counts the
+        attempt but runs it again at once (a restart: the crash already cost the time)."""
         now = self._now()
         gave_up: list[str] = []
         with transaction(self._db):
@@ -277,20 +280,27 @@ class EventLog:
                 if row is None or row.state != "taken":
                     continue  # ended some other way while the turn ran
                 if row.attempts < MAX_RETRIES:
-                    wait = timedelta(seconds=BACKOFF_S[row.attempts])
-                    store.set_backoff(self._db, [id], utc_text(now + wait), reason, resume=resume)
+                    delay = timedelta(seconds=BACKOFF_S[row.attempts] if wait else 0)
+                    store.set_backoff(self._db, [id], utc_text(now + delay), reason, resume=resume)
                 else:
                     gave_up += store.set_gave_up(self._db, [id], reason, utc_text(now))
         self.ended(gave_up, "gave_up")
 
     def recover(self) -> int:
         """At start: each event a crashed turn held counts as a failed attempt by the retry
-        rule (a crash loop ends in `gave_up`) and comes back with `resume`. A clean stop already
-        returned its events without an attempt. Returns how many came back as attempts."""
+        rule (a crash loop ends in `gave_up`) and comes back with `resume`, ready at once (spec
+        6.14). A clean stop already returned its events without an attempt. Returns how many
+        came back as attempts."""
         with transaction(self._db):
             ids = store.recover_taken(self._db, utc_text(self._now()))
-            self.backoff(ids, "restart")
+            self.backoff(ids, "restart", wait=False)
         return len(ids)
+
+    def set_resume(self, ids: list[str]) -> None:
+        """A stopped turn had saved some of its work: its events, back as `new`, are named as
+        going on next time instead of told again (their words are in the history)."""
+        with transaction(self._db):
+            store.set_resume(self._db, ids)
 
     def sweep(self, keep_days: int) -> int:
         """Delete handled events older than `keep_days`; the rest are still owed or shown."""
@@ -307,11 +317,13 @@ class EventLog:
         text = store.next_not_before(self._db, utc_text(self._now()))
         return None if text is None else datetime.fromisoformat(text)
 
-    def finish_matching(self, kind: str, source: str, state: str = "handled") -> list[str]:
-        """End the waiting events of this kind and source: stale news is never told. Returns
-        the ids it ended."""
+    def finish_matching(
+        self, kind: str, source: str, state: str = "handled", *, keep: str | None = None
+    ) -> list[str]:
+        """End the waiting events of this kind and source, all but `keep`: stale news is never
+        told. Returns the ids it ended."""
         with transaction(self._db):
-            ids = store.new_ids(self._db, kind, source)
+            ids = [id for id in store.new_ids(self._db, kind, source) if id != keep]
             store.set_state(self._db, ids, state, end_reason=None, at=utc_text(self._now()))
         self.ended(ids, state)
         return ids

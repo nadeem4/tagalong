@@ -370,6 +370,10 @@ async def _run() -> None:
         log.info("brain listening on ws://%s:%d", config.host, port)
         await server.serve_forever()
     finally:
+        # The runner stops first: the running turn's events wait for the next run, and news
+        # posted while the rest stops (an install, a login, a stopped job) stays new instead of
+        # starting a turn. The turn is cancelled and awaited, so its steps are saved.
+        await session.stop_turn()
         # Stop the experts and apps while the cancelled loop can still await them, then close
         # memory.
         for task in (update_loop, lag_watch, perf_dump):
@@ -383,10 +387,6 @@ async def _run() -> None:
         if bridges is not None:
             await bridges.stop()  # before the brain goes, so no bridge is left running
         await voice.close()
-        # The runner stops first: the running turn's events wait for the next run, and the
-        # job_ended news a stopped job posts stays new instead of starting a turn. The turn is
-        # cancelled and awaited, so its steps are saved before memory closes.
-        await session.stop_turn()
         await session.jobs.shutdown()
         await apps.shutdown()
         await session.stop_background()  # tools a talked-over turn left running end here

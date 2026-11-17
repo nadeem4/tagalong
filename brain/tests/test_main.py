@@ -663,3 +663,33 @@ def test_a_say_survives_a_stop_and_restart(monkeypatch, tmp_path):
     assert state == {"first": "new", "last": "handled"}
     [request] = answer.seen
     assert "hello" in json.dumps(request)
+
+
+def test_shutdown_stops_the_turn_before_anything_can_post_news(monkeypatch, tmp_path):
+    """Installs, logins and bridges post setup news as they stop; the runner is stopped
+    first, so none of it starts a turn while the brain closes."""
+    order = []
+
+    async def stop_turn(self):
+        order.append("stop_turn")
+
+    real = main.expert_setup_tools
+
+    def expert_setup_tools(*args, **kwargs):
+        tools, reinstall, _ = real(*args, **kwargs)
+
+        async def stop_installs():
+            order.append("stop_installs")
+
+        return tools, reinstall, stop_installs
+
+    async def start(host, port, bodies, session_id, session, build):
+        raise _Stop
+
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.setattr(main.Session, "stop_turn", stop_turn)
+    monkeypatch.setattr(main, "expert_setup_tools", expert_setup_tools)
+    monkeypatch.setattr(main, "start_server", start)
+    with pytest.raises(_Stop):
+        asyncio.run(_run())
+    assert order == ["stop_turn", "stop_installs"]

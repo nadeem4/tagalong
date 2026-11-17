@@ -400,7 +400,7 @@ def test_recover_returns_taken_events_as_resumed_attempts(tmp_path):
         "restart",
         None,
     )
-    assert row.not_before == (clock[0] + timedelta(seconds=30)).isoformat()  # the retry rule
+    assert row.not_before == clock[0].isoformat()  # an attempt, but no wait (spec 6.14)
     assert (log.get("e2").state, log.get("e2").attempts) == ("new", 0)  # never taken
 
 
@@ -456,3 +456,11 @@ def test_sweep_removes_old_handled_events_only(tmp_path):
         "taken",
         "gave_up",
     ]
+
+
+def test_a_recovered_event_runs_again_at_once(tmp_path):
+    log, _ = _clocked(tmp_path)
+    log.post(Event("say", "desktop", {}, id="e1"))
+    log.take(["e1"], "t1")
+    log.recover()
+    assert [r.id for r in log.ready()] == ["e1"]
