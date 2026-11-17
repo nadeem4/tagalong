@@ -34,7 +34,7 @@ async def _ask(sq, emit, question=None, job="j1"):
 
 async def test_ask_emits_a_job_question_event_with_the_facts():
     emit = _Emit()
-    sq = ScoutQuestions(emit, fresh_work())
+    sq = ScoutQuestions(emit, fresh_work(), lambda: True)
     field = QuestionField("way", "Way", ["a", "b"], "Pick one", multi=True)
     task = await _ask(sq, emit, _q(field))
     event = emit.calls[0][0]
@@ -49,7 +49,7 @@ async def test_ask_emits_a_job_question_event_with_the_facts():
 
 async def test_answer_with_an_option_resolves_ask_with_the_pick():
     emit = _Emit()
-    sq = ScoutQuestions(emit, fresh_work())
+    sq = ScoutQuestions(emit, fresh_work(), lambda: True)
     task = await _ask(sq, emit)
     assert sq.answer(emit.id(), {"way": "a"}) == "answered"
     assert await task == {"way": "a"}
@@ -57,7 +57,7 @@ async def test_answer_with_an_option_resolves_ask_with_the_pick():
 
 async def test_answer_with_other_text_uses_the_custom_key():
     emit = _Emit()
-    sq = ScoutQuestions(emit, fresh_work())
+    sq = ScoutQuestions(emit, fresh_work(), lambda: True)
     task = await _ask(sq, emit)
     sq.answer(emit.id(), {"way": "something else"})
     assert await task == {"way_custom": "something else"}
@@ -65,7 +65,7 @@ async def test_answer_with_other_text_uses_the_custom_key():
 
 async def test_multi_field_takes_a_list():
     emit = _Emit()
-    sq = ScoutQuestions(emit, fresh_work())
+    sq = ScoutQuestions(emit, fresh_work(), lambda: True)
     task = await _ask(sq, emit, _q(QuestionField("ways", "Ways", ["a", "b"], multi=True)))
     sq.answer(emit.id(), {"ways": ["a", "b"]})
     assert await task == {"ways": ["a", "b"]}
@@ -73,7 +73,7 @@ async def test_multi_field_takes_a_list():
 
 async def test_multi_field_with_a_single_option_string_is_a_one_item_list():
     emit = _Emit()
-    sq = ScoutQuestions(emit, fresh_work())
+    sq = ScoutQuestions(emit, fresh_work(), lambda: True)
     task = await _ask(sq, emit, _q(QuestionField("ways", "Ways", ["a", "b"], multi=True)))
     sq.answer(emit.id(), {"ways": "a"})
     assert await task == {"ways": ["a"]}
@@ -81,7 +81,7 @@ async def test_multi_field_with_a_single_option_string_is_a_one_item_list():
 
 async def test_answer_missing_a_field_is_refused_and_leaves_the_question_open():
     emit = _Emit()
-    sq = ScoutQuestions(emit, fresh_work())
+    sq = ScoutQuestions(emit, fresh_work(), lambda: True)
     task = await _ask(sq, emit, _q(QuestionField("x", "X", ["a"]), QuestionField("y", "Y", ["b"])))
     out = sq.answer(emit.id(), {"x": "a"})
     assert "y" in out and "x" not in out.replace("missing", "")
@@ -91,13 +91,13 @@ async def test_answer_missing_a_field_is_refused_and_leaves_the_question_open():
 
 
 async def test_answer_unknown_id_is_refused():
-    sq = ScoutQuestions(_Emit(), fresh_work())
+    sq = ScoutQuestions(_Emit(), fresh_work(), lambda: True)
     assert sq.answer("nope", {}) == "no open question nope."
 
 
 async def test_answer_twice_the_second_is_refused():
     emit = _Emit()
-    sq = ScoutQuestions(emit, fresh_work())
+    sq = ScoutQuestions(emit, fresh_work(), lambda: True)
     task = await _ask(sq, emit)
     qid = emit.id()
     sq.answer(qid, {"way": "a"})
@@ -107,7 +107,7 @@ async def test_answer_twice_the_second_is_refused():
 
 async def test_pass_then_answer_the_answer_is_refused():
     emit = _Emit()
-    sq = ScoutQuestions(emit, fresh_work())
+    sq = ScoutQuestions(emit, fresh_work(), lambda: True)
     task = await _ask(sq, emit)
     qid = emit.id()
     assert sq.pass_to_user(qid) == "passed to the owner"
@@ -118,7 +118,7 @@ async def test_pass_then_answer_the_answer_is_refused():
 
 async def test_cancel_job_then_answer_is_refused():
     emit = _Emit()
-    sq = ScoutQuestions(emit, fresh_work())
+    sq = ScoutQuestions(emit, fresh_work(), lambda: True)
     task = await _ask(sq, emit)
     qid = emit.id()
     sq.cancel_job("j1")
@@ -130,7 +130,7 @@ async def test_emit_failure_does_not_leak_the_open_question():
     def boom(*args, **kwargs):
         raise RuntimeError("emit failed")
 
-    sq = ScoutQuestions(boom, fresh_work())
+    sq = ScoutQuestions(boom, fresh_work(), lambda: True)
     with pytest.raises(RuntimeError):
         await sq.ask("j1", _q())
     assert sq._open == {}
@@ -138,21 +138,22 @@ async def test_emit_failure_does_not_leak_the_open_question():
 
 async def test_pass_resolves_none():
     emit = _Emit()
-    sq = ScoutQuestions(emit, fresh_work())
+    sq = ScoutQuestions(emit, fresh_work(), lambda: True)
     task = await _ask(sq, emit)
     assert sq.pass_to_user(emit.id()) == "passed to the owner"
     assert await task is None
 
 
 async def test_pass_unknown_id_is_refused():
-    assert ScoutQuestions(_Emit(), fresh_work()).pass_to_user("zz") == "no open question zz."
+    sq = ScoutQuestions(_Emit(), fresh_work(), lambda: True)
+    assert sq.pass_to_user("zz") == "no open question zz."
 
 
 async def test_a_job_question_settles_to_none_when_its_event_ends():
     # Whether Scout was told (handled), it gave up, or the brain stopped: no job hangs.
     for state in ("handled", "gave_up", "new"):
         emit = _Emit()
-        sq = ScoutQuestions(emit, fresh_work())
+        sq = ScoutQuestions(emit, fresh_work(), lambda: True)
         task = await _ask(sq, emit)
         emit.calls[0][1](state)
         assert await task is None
@@ -160,7 +161,7 @@ async def test_a_job_question_settles_to_none_when_its_event_ends():
 
 async def test_on_end_after_an_answer_is_harmless():
     emit = _Emit()
-    sq = ScoutQuestions(emit, fresh_work())
+    sq = ScoutQuestions(emit, fresh_work(), lambda: True)
     task = await _ask(sq, emit)
     sq.answer(emit.id(), {"way": "a"})
     emit.calls[0][1]("handled")
@@ -169,7 +170,7 @@ async def test_on_end_after_an_answer_is_harmless():
 
 async def test_cancel_job_resolves_only_that_jobs_questions():
     emit = _Emit()
-    sq = ScoutQuestions(emit, fresh_work())
+    sq = ScoutQuestions(emit, fresh_work(), lambda: True)
     t1 = await _ask(sq, emit, job="j1")
     t2 = await _ask(sq, emit, job="j2")
     sq.cancel_job("j1")
@@ -181,7 +182,7 @@ async def test_cancel_job_resolves_only_that_jobs_questions():
 
 async def test_two_jobs_ask_at_once_get_different_ids():
     emit = _Emit()
-    sq = ScoutQuestions(emit, fresh_work())
+    sq = ScoutQuestions(emit, fresh_work(), lambda: True)
     t1 = await _ask(sq, emit, job="j1")
     t2 = await _ask(sq, emit, job="j2")
     assert emit.id(0) != emit.id(1)
@@ -197,7 +198,7 @@ def _rig():
     work = fresh_work()
     work.create("goal", "a job", id="j1", state="active")
     emit = _Emit()
-    return work, emit, ScoutQuestions(emit, work)
+    return work, emit, ScoutQuestions(emit, work, lambda: True)
 
 
 async def test_question_row_lifecycle():
@@ -258,9 +259,17 @@ async def test_question_of_a_missing_job_is_a_root():
 
 async def test_a_job_question_is_sourced_by_its_job():
     emit = _Emit()
-    sq = ScoutQuestions(emit, fresh_work())
+    sq = ScoutQuestions(emit, fresh_work(), lambda: True)
     task = await _ask(sq, emit)
     event = emit.calls[0][0]
     assert event.source == "job:j1"
     sq.pass_to_user(event.payload["question"])
     await task
+
+
+async def test_a_question_scout_cannot_answer_goes_to_the_owner_at_once():
+    # No key or a spent budget: Scout will not take a turn, so the expert must not wait on it.
+    emit = _Emit()
+    sq = ScoutQuestions(emit, fresh_work(), lambda: False)
+    assert await sq.ask("j1", _q()) is None
+    assert emit.calls == []

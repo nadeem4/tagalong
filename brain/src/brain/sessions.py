@@ -50,7 +50,6 @@ from brain.events import (
     from_body,
     from_connect,
     is_internal,
-    load_notes,
 )
 from brain.expert_apps import ExpertApps
 from brain.experts import ExpertHosts, ExpertRun
@@ -139,6 +138,8 @@ _NOT_STEPS = JOB_TOOLS | {"resolve_step"}
 _SUMMARY_CAP = 300  # characters of a tool result kept on its work row
 _LATE_RESULT_CAP = 2000  # characters of a late tool result put in the news about it
 _STEP_STATUS = {"ok": "done", "failed": "failed", "refused": "refused"}
+# A fact, not a line for Scout to say: the failed request stays in the history above.
+RETRY_NOTE = "The reply to the request above failed before it was finished; it is tried again now."
 INTERJECTION_TIMEOUT_S = 5.0  # the voice is paused meanwhile, so a slow call must not keep it
 
 
@@ -226,7 +227,9 @@ class Session:
         make_run = make_run or ExpertHosts()
         # Built first: the questions and the timers emit through it. It only calls back into the
         # session once an event arrives, by which time the rest of __init__ has run.
-        questions = ScoutQuestions(self.post_event, work)
+        questions = ScoutQuestions(
+            self.post_event, work, lambda: self.ready() and not self.runner.over_budget()
+        )
         approvals = self.approvals = Approvals(memory, work, notify, now, guards=self.guards)
         # Scout's look before an ask reaches the person; shares the session's model and budget.
         side_check = SideCheck(model, budget, memory, work, guards=self.guards)
@@ -235,14 +238,14 @@ class Session:
         # join the real ones, so a say still has its kind. It only calls back into the session
         # from its loop, by which time the rest of __init__ has run.
         self._kinds = {**EVENT_KINDS, **(kinds or {})}
-        self._notes = load_notes()
         self.presence = Presence(bodies, now)
         self.runner = Runner(
             events, self.presence, bodies, self, now, self.guards, quiet=quiet, kinds=self._kinds
         )
         self._interjection_cut = False  # the person talked over Scout during an interjection
         self._carried: list[dict] = []  # what an interjection changed, shown to the next turn
-        # A say's own params until its turn reads them: the saved copy is masked.
+        # A say's own params until its event ends: the saved copy is masked, and an errored
+        # turn's say is tried again with them.
         self._live_params: dict[str, SayParams] = {}
         self._ear_due = False  # read-aloud came on mid-turn: its next step gets the guide
         items.expire_live_only()  # what a last run left tied to a process can no longer run
@@ -461,9 +464,12 @@ class Session:
             },
             id=params.id,
         )
-        if not self.events.post(say_event):
-            return  # a retried say: already one event, already answered or being answered
         self._live_params[say_event.id] = params
+        if not self.events.post(
+            say_event, on_end=lambda _state: self._live_params.pop(say_event.id, None)
+        ):
+            self._live_params.pop(say_event.id, None)
+            return  # a retried say: already one event, already answered or being answered
         if not headless:
             self.presence.touch(body_id)
         if params.interrupted is not None and self.ready():
@@ -472,7 +478,6 @@ class Session:
             if cut is not None:
                 turn = uuid.uuid4().hex
                 self.runner.adopt(turn, shown_on or BRAIN, [say_event.id])
-                self._live_params.pop(say_event.id, None)
                 self._start_turn(
                     shown_on,
                     content,
@@ -495,27 +500,36 @@ class Session:
         told. `on_end(state)` hears once that it was handled, given up, or returned at a stop."""
         self.events.post(event, then=then, on_end=on_end)
 
-    def start_events(self, turn_id: str, body: str, rows: list[EventRow]) -> None:
+    def start_events(self, turn_id: str, body: str, rows: list[EventRow], retry: set[str]) -> None:
         """The runner took these events for a turn on `body`: the person's words first, then
-        each kind's news as one fenced block."""
+        each kind's news as one fenced block. `retry` rows were sent by a turn that errored;
+        their words are still in the history, so one line says they are being tried again."""
         if not self.ready():
             self._end_unanswered(turn_id, body, [r.id for r in rows])
             self.runner.turn_ended(turn_id, "done")  # nothing can answer; no use asking again
             return
-        params = [self._say_params(r) for r in rows if r.kind == "say"]
-        content = [
-            b for p in params for b in user_content(p, read_aloud=self._wants_speech(body, p))
+        says = [(r, self._say_params(r)) for r in rows if r.kind == "say"]
+        params = [p for _, p in says]
+        content = [{"type": "text", "text": RETRY_NOTE}] if retry else []
+        content += [
+            b
+            for r, p in says
+            if r.id not in retry
+            for b in user_content(p, read_aloud=self._wants_speech(body, p))
         ]
         news: dict[str, list[EventRow]] = {}
         for row in rows:
-            if row.kind != "say":
+            if row.kind != "say" and row.id not in retry:
                 news.setdefault(row.kind, []).append(row)
         for kind, group in news.items():
-            note = self._notes.get(kind, "")
+            note = self.runner.notes.get(kind, "")
             text = wake_text(self._kinds[kind], group, note, self._now().tzinfo)
             content.append({"type": "text", "text": text})
         if not params and self._wants_speech(body, None):
             content.append({"type": "text", "text": ear_note()})
+        # Before the turn starts: nothing after it may fail, or the runner would free the one
+        # turn while this one still runs.
+        self._speak(turn_id, body, params[-1] if params else None)
         self._start_turn(
             body,
             content,
@@ -528,10 +542,9 @@ class Session:
         jobs = {r.source[4:] for r in rows if r.source.startswith("job:")}
         if len(jobs) == 1:
             self._turn_job = jobs.pop()
-        self._speak(turn_id, body, params[-1] if params else None)
 
     def _say_params(self, row: EventRow) -> SayParams:
-        live = self._live_params.pop(row.id, None)
+        live = self._live_params.get(row.id)
         return live if live is not None else SayParams.model_validate(row.payload["params"])
 
     def cancel_turn(self) -> None:

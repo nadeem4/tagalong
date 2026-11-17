@@ -37,13 +37,20 @@ def _line(field) -> str:
 
 
 class ScoutQuestions:
-    def __init__(self, emit: Callable[..., None], work: WorkStore) -> None:
+    def __init__(
+        self, emit: Callable[..., None], work: WorkStore, can_answer: Callable[[], bool]
+    ) -> None:
+        """`can_answer`: Scout could take a turn now (a key is set, the budget not spent). When
+        it cannot, the question goes to the owner at once instead of waiting on Scout."""
         self._emit = emit
         self._work = work
+        self._can_answer = can_answer
         self._open: dict[str, _Open] = {}
         work.on_transition(self._row_ended)
 
     async def ask(self, job_id: str, question: Question) -> dict | None:
+        if not self._can_answer():
+            return None
         qid = uuid.uuid4().hex[:8]
         while qid in self._open or self._work.get(qid) is not None:
             qid = uuid.uuid4().hex[:8]

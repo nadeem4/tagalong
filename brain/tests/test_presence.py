@@ -68,7 +68,6 @@ def test_using_now_is_the_last_touched_online_body():
     rig.later()
     rig.p.touch("desktop")
     assert rig.p.using_now() == "desktop"
-    assert rig.p.last_person_at() == rig.t
 
 
 def test_using_now_skips_an_offline_body():

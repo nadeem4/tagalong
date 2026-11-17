@@ -248,8 +248,12 @@ async def test_a_say_waiting_on_a_turn_that_errors_gets_the_next_turn_with_it():
     gate.set()
     await idle(session)
     assert len(model.seen) == 2  # b was not left unanswered behind the failed turn
-    assert {"type": "text", "text": "a"} in model.seen[-1][-1]["content"]  # a rode along
-    assert {"type": "text", "text": "b"} in model.seen[-1][-1]["content"]
+    last = model.seen[-1][-1]["content"]
+    assert {"type": "text", "text": "b"} in last
+    # a rode along: its words are already in the history, so only the retry is named
+    assert {"type": "text", "text": "a"} not in last and "tried again" in last[0]["text"]
+    blocks = [b for m in model.seen[-1] for b in m["content"]]
+    assert blocks.count({"type": "text", "text": "a"}) == 1
 
 
 async def test_whatsapp_moments_wake_on_the_whatsapp_body():

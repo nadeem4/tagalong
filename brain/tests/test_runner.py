@@ -101,6 +101,7 @@ class FakeSession:
 
     def __init__(self, tells: bool = False) -> None:
         self.started: list[tuple[str, str, list[str]]] = []
+        self.retried: list[set[str]] = []  # per started turn: the events tried before
         self.cancelled = 0
         self.tells = tells
         self.told: list[str] = []
@@ -110,8 +111,9 @@ class FakeSession:
     def ready(self) -> bool:
         return self.key
 
-    def start_events(self, turn_id: str, body: str, rows: list[EventRow]) -> None:
+    def start_events(self, turn_id: str, body: str, rows: list[EventRow], retry: set[str]) -> None:
         self.started.append((turn_id, body, [r.id for r in rows]))
+        self.retried.append(retry)
         if self.fails:
             raise RuntimeError("could not start")
 
@@ -464,6 +466,67 @@ async def test_a_turn_the_api_rejected_handles_its_events():
     await rig.runner.stop()
 
 
+async def test_a_turn_over_budget_handles_its_say_so_it_is_not_answered_again():
+    rig = LoopRig()
+    rig.say("s1")
+    await ticks()
+    [(turn, _, _)] = rig.session.started
+    rig.runner.turn_ended(turn, "over_budget")  # the person was told the budget is spent
+    s1 = rig.log.get("s1")
+    assert s1 is not None and (s1.state, s1.end_reason) == ("handled", "over_budget")
+    rig.say("s2")
+    await ticks()
+    assert rig.turns() == [["s1"], ["s2"]]  # s1 does not ride along
+    await rig.runner.stop()
+
+
+async def test_an_errored_turns_events_are_named_as_retried_to_the_next_turn():
+    rig = LoopRig()
+    rig.say("s1")
+    await ticks()
+    [(turn, _, _)] = rig.session.started
+    rig.runner.turn_ended(turn, "error")
+    rig.say("s2")
+    await ticks()
+    assert rig.turns()[1:] == [["s1", "s2"]]
+    assert rig.session.retried == [set(), {"s1"}]  # s1's words are already in the history
+    await rig.runner.stop()
+
+
+async def test_a_held_question_is_tried_again_after_the_recheck_with_nothing_new(monkeypatch):
+    # An expert waits on its question: an error must not leave it waiting for good.
+    monkeypatch.setattr("brain.runner.RECHECK_S", 0.2)
+    rig = LoopRig()
+    rig.log.post(Event("job_question", "job:j1", {}, id="q1"))
+    rig.runner.poke()
+    await ticks()
+    [(turn, _, _)] = rig.session.started
+    rig.runner.turn_ended(turn, "error")
+    await ticks()
+    assert rig.turns() == [["q1"]]  # not again at once: a failing model would spin
+    await asyncio.sleep(0.4)
+    await ticks()
+    assert rig.turns() == [["q1"], ["q1"]]
+    assert rig.session.retried[1] == {"q1"}
+    await rig.runner.stop()
+
+
+async def test_a_say_saved_after_the_last_step_gets_the_next_turn():
+    rig = LoopRig()
+    rig.say("s1")
+    await ticks()
+    [(turn, _, _)] = rig.session.started
+    assert rig.runner.take_more() == []  # the turn's final step found nothing
+    rig.say("s2")  # saved before the turn ends
+    await ticks()
+    rig.runner.turn_ended(turn, "done")
+    s2 = rig.log.get("s2")
+    assert s2 is not None and s2.state != "handled"
+    await ticks()
+    assert rig.turns() == [["s1"], ["s2"]]
+    await rig.runner.stop()
+
+
 async def test_stop_returns_the_running_turns_events_to_new():
     rig = LoopRig()
     ends: list[str] = []
@@ -490,7 +553,7 @@ async def test_a_turn_that_cannot_start_puts_its_events_back():
     await ticks()
     s1 = rig.log.get("s1")
     assert s1 is not None and (s1.state, s1.attempts) == ("new", 0)
-    assert not rig.runner.busy()  # nothing is left holding the one turn
+    assert rig.runner._turn is None  # nothing is left holding the one turn
     await rig.runner.stop()
 
 

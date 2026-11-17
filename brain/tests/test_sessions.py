@@ -1159,7 +1159,7 @@ async def idle(session):
     # The runner starts the next turn when one ends, so wait until no turn is left (none
     # running, none the runner has taken events for) and none starts in the ticks after.
     def running():
-        return session._task is not None or session.runner.busy()
+        return session._task is not None or session.runner._turn is not None
 
     while True:
         await settle()
@@ -1818,11 +1818,6 @@ async def test_pass_question_opens_the_user_card():
     assert len(user_cards(session)) == 1
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="T1d: the runner keeps news behind a spent budget waiting, so the question's event "
-    "never ends and the expert is not handed to the person until T1d decides held news",
-)
 async def test_budget_spent_falls_back_to_the_user_card():
     class Broke(Open):
         def allows(self):
@@ -1950,6 +1945,84 @@ async def test_session_shares_one_guards_with_runner_and_loop():
     ]
     assert brain_started == []
     assert "job_ended" in [r.kind for r in session.events.ready()]  # waits, not lost
+
+
+class Flips(Open):
+    def __init__(self):
+        self.open = True
+
+    def allows(self):
+        return self.open
+
+
+async def test_a_say_ended_over_budget_is_not_answered_again():
+    budget = Flips()
+    bodies = Bodies()
+    sent = []
+    bodies.notify = lambda m, p: sent.append((m, p))
+    model = Gate(["second answer"])
+    session = make_session(model, budget, bodies, 10, Memory(":memory:"))
+    join(session, "desktop")
+    budget.open = False
+    first = say("first")
+    await session.say("desktop", first)
+    await idle(session)
+    assert sent[-1][1]["reason"] == "over_budget"
+    budget.open = True
+    await session.say("desktop", say("second"))
+    await idle(session)
+    started = [p for m, p in sent if m == "turn" and p["state"] == "started"]
+    assert first.id not in started[-1]["events"]  # the person was already told; no second go
+    assert {"type": "text", "text": "first"} not in model.seen[-1][-1]["content"]
+
+
+class FailsFirst(Gate):
+    async def stream(self, system, messages, tools):
+        if not self.seen:
+            self.seen.append(list(messages))
+            raise RuntimeError("the API fell over")
+        async for item in super().stream(system, messages, tools):
+            yield item
+
+
+async def test_an_errored_say_reaches_the_model_once_and_is_named_as_a_retry():
+    model = FailsFirst(["ok"])
+    session, sent = make(model)
+    await session.say("desktop", say("first words"))
+    await idle(session)
+    assert states(sent) == ["started", "ended"] and sent[-1][1]["reason"] == "error"
+    await session.say("desktop", say("second words"))
+    await idle(session)
+    sent_texts = [b.get("text", "") for m in model.seen[-1] for b in m["content"]]
+    assert sum("first words" in t for t in sent_texts) == 1  # kept in history, not added again
+    last = model.seen[-1][-1]["content"]
+    assert {"type": "text", "text": "second words"} in last
+    assert any("failed" in b["text"] and "again" in b["text"] for b in last)
+    assert session._live_params == {}
+
+
+async def test_idle_news_waits_out_the_quiet_after_a_say_on_a_moving_clock():
+    clock = [datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)]
+    kinds = {"job_ended": EventKind("job_ended", batch_seconds=0, max_per_hour=10)}  # idle
+    memory = Memory(":memory:")
+    session, sent = make(Gate(["hi", "told"]), memory, kinds=kinds, now=lambda: clock[0])
+    await session.say("desktop", say("hello"))
+    await idle(session)
+    session.jobs._on_finished(end_job(memory))
+    await settle()
+    assert states(sent) == ["started", "ended"]  # the person just spoke: news waits
+    alarm = session.runner._alarm
+    wait = alarm.when() - asyncio.get_running_loop().time()
+    assert 9 < wait <= 10  # the runner looks again when the quiet window ends
+    clock[0] += datetime.timedelta(seconds=10)
+    alarm._run()  # the alarm rings without a real ten-second wait
+    await idle(session)
+    assert states(sent) == ["started", "ended", "started", "ended"]
+    assert "Event: job_ended" in model_text(session)
+
+
+def model_text(session):
+    return json.dumps(session.history)
 
 
 # --- the person hears what an expert did while they were away (G3) ---
@@ -2102,6 +2175,22 @@ async def test_a_spoken_say_sends_its_reply_to_the_voice_with_its_body():
     assert [p["delta"] for m, p in sent if m == "reply" and "delta" in p] == [
         "hello"
     ]  # still shown
+
+
+async def test_a_turn_that_fails_to_start_leaves_no_turn_running():
+    # Whatever fails while a turn starts fails before its task exists: the runner frees the one
+    # turn on that failure, so a task left running would let a second turn run beside it.
+    class Broken(RecordingVoice):
+        def spoken(self, turn, body_id, speed, system_voice=False):
+            raise RuntimeError("voice gone")
+
+    model = Gate(["never"])
+    session, _ = make(model)
+    session.voice = Broken()
+    await session.say("desktop", spoken_say())
+    await settle()
+    assert session._task is None and session.runner._turn is None
+    assert model.seen == []
 
 
 async def test_a_spoken_say_from_a_display_less_body_speaks_on_the_displaying_body():
@@ -2375,6 +2464,21 @@ async def test_say_without_key_ends_error_without_calling_model():
     assert "reply" not in [m for m, _ in sent]
     assert model.seen == []
     assert session.history == []
+
+
+async def test_no_key_hands_an_experts_question_to_the_person():
+    session, _ = make(NoKeyModel(["never"]), kinds=QUESTION_KINDS)
+    ask_expert(session)
+    await settle()
+    assert len(user_cards(session)) == 1
+    assert [r.kind for r in session.events.ready()] == []  # Scout was never asked
+
+
+async def test_a_say_without_key_leaves_no_live_params():
+    session, sent = make(NoKeyModel(["never"]))
+    await said(session, sent, "desktop", say("hello"))
+    await asyncio.sleep(0.01)
+    assert session._live_params == {}
 
 
 async def test_wake_without_key_does_nothing():

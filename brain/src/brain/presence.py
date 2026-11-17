@@ -84,6 +84,3 @@ class Presence:
     def using_now(self) -> str | None:
         online = [(at, b) for b, at in reversed(self._touched.items()) if self._bodies.is_online(b)]
         return max(online, key=lambda t: t[0])[1] if online else None
-
-    def last_person_at(self) -> datetime | None:
-        return max(self._touched.values(), default=None)
