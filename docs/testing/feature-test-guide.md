@@ -107,12 +107,12 @@ desktop app. You need `uv` and an Anthropic key.
 2. **Action:** in a second terminal run
    `cd brain && uv run python -m websockets ws://127.0.0.1:47321`. Paste this hello and press
    Enter:
-   `{"jsonrpc":"2.0","id":1,"method":"hello","params":{"protocol":1,"body":{"id":"desktop","kind":"desktop","name":"Desktop"},"tools":[]}}`
+   `{"jsonrpc":"2.0","id":1,"method":"hello","params":{"protocol":2,"body":{"id":"desktop","kind":"desktop","name":"Desktop"},"tools":[]}}`
    **Expected:** a result with the session id; the connection stays open.
 3. **Action:** paste
-   `{"jsonrpc":"2.0","id":2,"method":"say","params":{"text":"Say hello in five words."}}`
-   **Expected:** a result `{"turn":"...","joined":false}`, then notifications: `turn` with
-   `state: "started"`, `reply` frames whose `delta` spell out a short greeting, exactly one
+   `{"jsonrpc":"2.0","id":2,"method":"say","params":{"id":"s1","text":"Say hello in five words."}}`
+   **Expected:** a result `{}`, then notifications: `turn` with
+   `state: "started"` (its `events` lists `s1`), `reply` frames whose `delta` spell out a short greeting, exactly one
    `reply` with `done: true`, then `turn` with `state: "ended"` and `reason: "done"`.
 4. **Action:** paste a `say` asking for a long story, then at once
    `{"jsonrpc":"2.0","method":"cancel","params":{"turn":"<the turn id>"}}`
@@ -226,8 +226,9 @@ The desktop talks to the Python brain. Needs `uv` and an Anthropic key (entered 
    **Expected:** Scout appears. No "Scout's brain is not running." mark.
 2. **Action:** click Scout and ask "Say hello in five words."
    **Expected:** the answer streams into the bubble and the turn ends done. A fast brain that
-   finishes before the ask returns still shows the whole answer (automated: the bubble unit tests
-   and the smoke test "talking to Scout").
+   finishes before the ask returns still shows the whole answer, because the bubble follows the
+   turn frames, not the ask's answer (automated: the bubble unit tests and the smoke test
+   "talking to Scout").
 3. **Action:** stop the brain (Ctrl+C in its terminal) while Scout is idle.
    **Expected:** within a few seconds the status mark reads "Scout's brain is not running." An ask
    now fails with that same sentence.
@@ -2807,7 +2808,10 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
    (in `<TAGALONG_HOME>/.env`) and start the brain. `brain.log` gets one plain line saying the bridge is
    not built and to run `pnpm --filter @tagalong/whatsapp build`; no `node` process starts and the brain
    keeps working.
-5. By hand, once the bridge is built (a later slice): set the real values, start the brain and check
+5. `pnpm --filter @tagalong/whatsapp exec vitest run src/bridge.test.ts` and
+   `pnpm --filter @tagalong/browser exec vitest run src/body.test.ts`: each say carries a fresh
+   `id` (distinct per message, valid `SayParams`).
+6. By hand, once the bridge is built (a later slice): set the real values, start the brain and check
    `brain.log` for the bridge's lines; `tagalong stop` leaves no `node` process behind.
 
 ## WhatsApp bridge core (automated, no Meta account)

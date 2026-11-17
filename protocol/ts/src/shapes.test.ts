@@ -8,8 +8,8 @@ import { Body, ErrorCode, ErrorObject, LIMITS, PROTOCOL, Part, Tool } from './sh
 const tool = (name: string) => ({ name, description: 'd', input_schema: {} });
 
 describe('shapes', () => {
-  it('is protocol 1', () => {
-    expect(PROTOCOL).toBe(1);
+  it('is protocol 2', () => {
+    expect(PROTOCOL).toBe(2);
   });
 
   it('exports the limits from the spec', () => {

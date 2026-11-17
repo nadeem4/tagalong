@@ -1,5 +1,12 @@
 {
   "jsonrpc": "2.0",
   "method": "turn",
-  "params": { "seq": 9, "turn": "t3", "body": null, "state": "started" }
+  "params": {
+    "seq": 9,
+    "turn": "t3",
+    "body": null,
+    "state": "started",
+    "events": ["e5"],
+    "source": "timer:t1"
+  }
 }

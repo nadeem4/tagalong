@@ -5,13 +5,12 @@ import type { TurnEvent } from '../shapes';
 import { createFakeHostBridge } from './fake-host-bridge';
 
 describe('createFakeHostBridge', () => {
-  it('records every ask and answers with a fresh turn id', async () => {
+  it('records every ask', async () => {
     const bridge = createFakeHostBridge();
 
-    const first = await bridge.ask({ petId: 'scout', text: 'hello' });
-    const second = await bridge.ask({ petId: 'scout', text: 'again' });
+    await bridge.ask({ petId: 'scout', text: 'hello' });
+    await bridge.ask({ petId: 'scout', text: 'again' });
 
-    expect(first.turnId).not.toBe(second.turnId);
     expect(bridge.asks).toEqual([
       { petId: 'scout', text: 'hello' },
       { petId: 'scout', text: 'again' },

@@ -20,6 +20,7 @@ from test_sessions import (
     join,
     join_headless,
     make,
+    said,
     say,
     settle,
     wake_started,
@@ -67,9 +68,9 @@ async def test_whatsapp_say_during_desktop_turn_replies_to_whatsapp():
     session, sent = make(model)
     join(session, "desktop")
     join(session, "whatsapp")
-    first = await session.say("desktop", say("long question"))
+    first = await said(session, sent, "desktop", say("long question"))
     await settle()
-    second = await session.say("whatsapp", say("quick one"))
+    second = await said(session, sent, "whatsapp", say("quick one"))
     assert second.joined is False and second.turn != first.turn
     gate.set()
     await idle(session)
@@ -161,12 +162,15 @@ async def test_cancelling_a_say_queued_behind_a_turn_ends_it_cancelled():
     join(session, "whatsapp")
     await session.say("desktop", say("first"))
     await settle()
-    queued = await session.say("whatsapp", say("from the phone"))  # waits for its own turn
-    session.cancel(queued.turn)
+    await session.say("whatsapp", say("from the phone"))  # waits for its own turn
+    await settle()
+    # A queued say has no turn id on the wire until T1c's runner, so this reads _later on purpose.
+    [(_, queued, *_)] = session._later  # a body learns a turn id only when its turn starts
+    session.cancel(queued)
     gate.set()
     await idle(session)
     ends = [(p["turn"], p["reason"]) for m, p in sent if m == "turn" and p["state"] == "ended"]
-    assert (queued.turn, "cancelled") in ends
+    assert (queued, "cancelled") in ends
     assert len(model.seen) == 1  # the cancelled say never reached the model
 
 
@@ -190,11 +194,11 @@ async def test_card_answer_not_held_behind_waiting_say():
 async def test_say_during_turn_joins_through_the_dispatcher():
     gate = asyncio.Event()
     model = Gate([gate, "first", "second"])
-    session, _ = make(model)
+    session, sent = make(model)
     join(session, "desktop")
-    first = await session.say("desktop", say("one"))
+    first = await said(session, sent, "desktop", say("one"))
     await settle()
-    second = await session.say("desktop", say("two"))
+    second = await said(session, sent, "desktop", say("two"))
     assert second.joined is True and second.turn == first.turn
     await settle()
     assert len(session._inbox) == 1  # handed to the running turn, which takes it at its next step
@@ -215,7 +219,7 @@ async def test_joined_is_decided_when_the_say_is_delivered():
     model = Gate([gate, "one", "two"])
     session, sent = make(model)
     join(session, "desktop")
-    first = await session.say("desktop", say("a"))
+    first = await said(session, sent, "desktop", say("a"))
     await settle()
     real = session.dispatcher.deliver
 
@@ -229,7 +233,7 @@ async def test_joined_is_decided_when_the_say_is_delivered():
         await real(items)
 
     session.dispatcher.deliver = late
-    second = await session.say("desktop", say("b"))
+    second = await said(session, sent, "desktop", say("b"))
     assert second.joined is False and second.turn != first.turn
     await idle(session)
     assert {"type": "text", "text": "b"} in model.seen[-1][-1]["content"]
@@ -240,12 +244,12 @@ async def test_joined_is_decided_when_the_say_is_delivered():
 async def test_a_say_after_the_turns_last_read_gets_a_turn_of_its_own():
     gate = asyncio.Event()
     model = Gate([gate, "one", "two"])
-    session, _ = make(model)
+    session, sent = make(model)
     join(session, "desktop")
-    first = await session.say("desktop", say("a"))
+    first = await said(session, sent, "desktop", say("a"))
     await settle()
     session._inbox_open = False  # the turn has done its last read of what was said
-    second = await session.say("desktop", say("late"))
+    second = await said(session, sent, "desktop", say("late"))
     assert second.joined is False and second.turn != first.turn
     gate.set()
     await idle(session)
@@ -332,11 +336,11 @@ class BoomLater(Gate):
 async def test_a_say_joined_to_a_turn_that_errors_gets_its_own_turn():
     gate = asyncio.Event()
     model = BoomLater(gate)
-    session, _ = make(model)
+    session, sent = make(model)
     join(session, "desktop")
     await session.say("desktop", say("a"))
     await settle()
-    assert (await session.say("desktop", say("b"))).joined is True
+    assert (await said(session, sent, "desktop", say("b"))).joined is True
     gate.set()
     await idle(session)
     assert len(model.seen) == 2  # b was not left unanswered in the failed turn's history
@@ -405,8 +409,8 @@ async def test_job_news_carries_the_say_as_its_cause(tmp_path):
 async def test_a_barge_in_say_that_hands_off_is_the_jobs_cause(tmp_path):
     gate = asyncio.Event()
     memory = Memory(":memory:")
-    session, _, voice = make_voiced(Gate([gate, gate, "ok"]), memory)
-    first = await session.say("desktop", say("tell me"))
+    session, sent, voice = make_voiced(Gate([gate, gate, "ok"]), memory)
+    first = await said(session, sent, "desktop", say("tell me"))
     voice.logs[first.turn] = ["One.", "Two."]
     await settle()
     await session.say("desktop", over("wait", first.turn, 1))
@@ -421,11 +425,11 @@ async def test_a_barge_in_say_that_hands_off_is_the_jobs_cause(tmp_path):
 async def test_a_say_joined_to_a_cut_turn_is_the_next_turns_cause(tmp_path):
     gate = asyncio.Event()
     memory = Memory(":memory:")
-    session, _ = make(Gate([gate, gate, "ok"]), memory)
+    session, sent = make(Gate([gate, gate, "ok"]), memory)
     join(session, "desktop")
     await session.say("desktop", say("tell me"))
     await settle()
-    joined = await session.say("desktop", say("and also"))
+    joined = await said(session, sent, "desktop", say("and also"))
     assert joined.joined is True
     session.cancel(session._turn_id)  # the turn ends with the joined words unanswered
     await settle()

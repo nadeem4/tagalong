@@ -23,9 +23,30 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
     message,
   });
 
-  // Turns the brain started on its own (a wake). They show nothing while they run: a silent
-  // wake must leave no trace, and one with words arrives as a single pet.remark at the end.
+  // Turns that took none of my says (a wake, another body's ask), whatever their source. They
+  // show nothing while they run: a silent wake must leave no trace, and one with words arrives
+  // as a single pet.remark at the end.
   const quiet = new Set<string>();
+  // The ids of the says this body sent: a turn that took one of them is the person's own.
+  const says = new Set<string>();
+  // My say ids each open turn took, so they are forgotten when it ends and the set stays small.
+  const taken = new Map<string, string[]>();
+  const takesMine = (p: { turn: string; events?: string[] | undefined }): boolean => {
+    const mine = (p.events ?? []).filter((id) => says.has(id));
+    if (mine.length > 0) taken.set(p.turn, [...(taken.get(p.turn) ?? []), ...mine]);
+    return mine.length > 0;
+  };
+
+  /** My say joined this turn: it is shown from now on, with the words so far, then live. */
+  function claim(turnId: string): TurnEvent[] {
+    if (!open.has(turnId)) return [];
+    quiet.delete(turnId);
+    const text = open.get(turnId) ?? '';
+    return [
+      { type: 'turn.started', turnId, petId: petId(), conversationId: session() ?? 'brain' },
+      ...(text === '' ? [] : [{ type: 'turn.delta' as const, turnId, text }]),
+    ];
+  }
 
   function ended(p: TurnParams): TurnEvent[] {
     const text = open.get(p.turn) ?? '';
@@ -148,9 +169,14 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
     map(method: string, params: unknown): TurnEvent[] {
       if (method === 'turn') {
         const p = params as TurnParams;
-        if (p.state === 'ended') return ended(p);
+        if (p.state === 'ended') {
+          for (const id of taken.get(p.turn) ?? []) says.delete(id);
+          taken.delete(p.turn);
+          return ended(p);
+        }
+        if (p.state === 'joined') return takesMine(p) ? claim(p.turn) : [];
         open.set(p.turn, '');
-        if (p.started_by === 'brain') {
+        if (!takesMine(p)) {
           quiet.add(p.turn);
           return [];
         }
@@ -174,17 +200,14 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
       return [];
     },
 
-    /**
-     * The person spoke into a wake turn (their say joined it), so it stops being quiet: the UI
-     * gets the start and the words so far, and the rest streams like any turn.
-     */
-    claim(turnId: string): TurnEvent[] {
-      if (!quiet.delete(turnId)) return [];
-      const text = open.get(turnId) ?? '';
-      return [
-        { type: 'turn.started', turnId, petId: petId(), conversationId: session() ?? 'brain' },
-        ...(text === '' ? [] : [{ type: 'turn.delta' as const, turnId, text }]),
-      ];
+    /** Remembers a say this body is about to send, so the turn that takes it is shown. */
+    trackSay(id: string): void {
+      says.add(id);
+    },
+
+    /** The brain refused the say, so no turn will ever take it. */
+    untrackSay(id: string): void {
+      says.delete(id);
     },
 
     /**
@@ -202,6 +225,8 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
         .map((id) => error(id, 'brain_restarted', LOST_MESSAGE));
       open.clear();
       quiet.clear();
+      for (const ids of taken.values()) for (const id of ids) says.delete(id);
+      taken.clear();
       for (const id of asks.keys()) events.push(dismiss(id));
       asks.clear();
       return events;

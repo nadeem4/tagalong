@@ -1,5 +1,5 @@
 /**
- * The WhatsApp body: a contract v1 client that turns the one allowed sender's texts into
+ * The WhatsApp body: a contract v2 client that turns the one allowed sender's texts into
  * `say`, buffers Scout's `reply` until `done`, and sends the finished text back through the
  * Graph API while the 24-hour window is open. It has no tools and shows no display, so the
  * brain treats it as a plain chat body. Permission asks are shown as reply buttons or a
@@ -143,7 +143,8 @@ export function createBridge(deps: BridgeDeps): {
   });
 
   const say = (text: string): void => {
-    client.say({ text, context: CONTEXT }).catch(() => {
+    // The id lets the brain tell a retried say from a new one; replies are routed by body.
+    client.say({ id: crypto.randomUUID(), text, context: CONTEXT }).catch(() => {
       // Nothing goes to the phone: the person simply sees no answer, as with a brain that is down.
       log('whatsapp: the brain is not reachable, message not delivered');
     });

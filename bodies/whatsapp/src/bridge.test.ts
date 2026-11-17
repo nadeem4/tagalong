@@ -1,10 +1,10 @@
 /**
- * Tests for the bridge as a contract v1 body, on a fake brain socket, a fake Graph fetch,
+ * Tests for the bridge as a contract v2 body, on a fake brain socket, a fake Graph fetch,
  * a movable clock and signed local webhook posts. No Meta, no brain, no network.
  */
 import { createHmac } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
-import type { BrainSocket } from '@tagalong/contract';
+import { SayParams, type BrainSocket } from '@tagalong/contract';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createBridge } from './bridge';
 import type { WhatsAppConfig } from './config';
@@ -37,9 +37,9 @@ class FakeBrain {
       if (msg.method === 'hello') {
         const resync = this.resyncNext;
         this.resyncNext = false;
-        this.respond(msg.id, { protocol: 1, session: 's1', tools: [], seq: this.seq, resync });
+        this.respond(msg.id, { protocol: 2, session: 's1', tools: [], seq: this.seq, resync });
       } else if (msg.method === 'say') {
-        this.respond(msg.id, { turn: 't1', joined: false });
+        this.respond(msg.id, {});
       } else if (msg.method === 'answer') {
         if (this.answerGone) {
           this.onMessage(
@@ -191,7 +191,7 @@ describe('bridge', () => {
     await online(brain);
     const hello = brain.sent.find((m) => m.method === 'hello');
     expect(hello?.params).toEqual({
-      protocol: 1,
+      protocol: 2,
       body: { id: 'whatsapp', kind: 'whatsapp', name: 'WhatsApp' },
       tools: [],
     });
@@ -204,6 +204,7 @@ describe('bridge', () => {
     await inbound('what is on my plate');
     await vi.waitFor(() => expect(brain.says()).toHaveLength(1));
     expect(brain.says()[0]?.params).toEqual({
+      id: expect.any(String),
       text: 'what is on my plate',
       context: {
         channel: 'whatsapp',
@@ -227,6 +228,18 @@ describe('bridge', () => {
       to: CONFIG.allowedNumber,
       text: { body: 'Hello there' },
     });
+  });
+
+  test('every message says with a fresh id', async () => {
+    const { brain, inbound } = await setup();
+    await online(brain);
+    await inbound('one');
+    await vi.waitFor(() => expect(brain.says()).toHaveLength(1));
+    await inbound('two');
+    await vi.waitFor(() => expect(brain.says()).toHaveLength(2));
+    const params = brain.says().map((m) => m.params);
+    expect(params[0]?.['id']).not.toBe(params[1]?.['id']);
+    for (const p of params) expect(SayParams.safeParse(p).success).toBe(true);
   });
 
   test('test_a_huge_reply_sends_four_messages_and_the_note', async () => {

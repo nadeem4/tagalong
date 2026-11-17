@@ -38,6 +38,7 @@ from brain.protocol import (
     MicParams,
     RpcError,
     SayParams,
+    SayResult,
     SpeechStateParams,
     ToolsParams,
 )
@@ -328,7 +329,8 @@ async def _say(message: dict, req_id: Any, body_id: str, peer: _Peer, session: S
     loop keeps going. Says from one body are posted in the order they arrived."""
     try:
         say = SayParams.model_validate(message.get("params"))
-        reply = _result(req_id, await session.say(body_id, say))
+        await session.say(body_id, say)
+        reply = _result(req_id, SayResult())
     except ValueError as exc:  # ValidationError is a ValueError
         reply = _error(req_id, ErrorCode.invalid_params, str(exc))
     except RpcError as exc:  # over_limit

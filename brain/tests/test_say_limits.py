@@ -10,7 +10,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
-from test_sessions import Gate, file_memory, finish_quietly, make, say, turns_done
+from test_sessions import Gate, file_memory, finish_quietly, make, said, say, turns_done
 from test_turn import ok_tool, tool_step
 
 from brain.memory import Memory
@@ -27,7 +27,7 @@ def _image(megabytes):
 async def test_say_with_an_over_limit_part_is_refused_before_anything_changes(tmp_path):
     memory = file_memory(tmp_path)
     session, sent = make(Gate(["never"]), memory)
-    params = SayParams(text="what is this?", parts=[_image(6)])
+    params = SayParams(id="x", text="what is this?", parts=[_image(6)])
     with pytest.raises(RpcError) as err:
         await session.say("desktop", params)
     assert err.value.code == ErrorCode.over_limit
@@ -39,7 +39,7 @@ async def test_say_with_parts_over_the_message_limit_is_refused():
     session, _ = make(Gate(["never"]))
     parts = [_image(4)] * 6  # each under 5 MB, 24 MB together
     with pytest.raises(RpcError) as err:
-        await session.say("desktop", SayParams(parts=parts))
+        await session.say("desktop", SayParams(id="x", parts=parts))
     assert err.value.code == ErrorCode.over_limit
 
 
@@ -123,7 +123,7 @@ async def test_a_400_on_a_request_with_an_image_is_dropped_whatever_it_says(tmp_
     model = AlwaysRejects("invalid_request_error")
     session, _ = make(model, memory)
     model.fail_calls = 1
-    await session.say("desktop", SayParams(text="look", parts=[_image(1)]))
+    await session.say("desktop", SayParams(id="x", text="look", parts=[_image(1)]))
     await finish_quietly(session)
     await session.say("desktop", say("next"))
     await finish_quietly(session)
@@ -136,10 +136,10 @@ async def test_a_say_joined_to_a_rejected_turn_gets_its_own_turn(tmp_path):
     memory = file_memory(tmp_path)
     model = AlwaysRejects("Could not process image", hold=hold)
     model.fail_calls = 1
-    session, _ = make(model, memory)
+    session, sent = make(model, memory)
     await session.say("desktop", say("a bad picture"))
     await asyncio.sleep(0)
-    assert (await session.say("desktop", say("and also this"))).joined is True
+    assert (await said(session, sent, "desktop", say("and also this"))).joined is True
     hold.set()
     await turns_done(session)
     assert "a bad picture" not in json.dumps(model.seen[-1])
@@ -181,4 +181,6 @@ async def test_a_400_after_a_tool_round_is_not_dropped():
 
 async def test_a_part_of_exactly_the_limit_passes():
     exact = base64.b64encode(bytes(5_000_000)).decode()  # padded; 5,000,000 bytes decoded
-    check_part_sizes(SayParams(parts=[{"type": "image", "mime": "image/png", "data": exact}]).parts)
+    check_part_sizes(
+        SayParams(id="x", parts=[{"type": "image", "mime": "image/png", "data": exact}]).parts
+    )

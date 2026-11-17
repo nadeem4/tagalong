@@ -30,7 +30,7 @@ def b64(data: bytes) -> str:
 
 
 def say(**kw) -> SayParams:
-    return SayParams.model_validate(kw)
+    return SayParams.model_validate({"id": "s1", **kw})
 
 
 def test_soul_ships_as_package_data_and_has_no_scripted_lines():

@@ -16,7 +16,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -90,7 +90,6 @@ from brain.protocol import (
     ReadingData,
     RpcError,
     SayParams,
-    SayResult,
     Tool,
 )
 from brain.questions import ScoutQuestions
@@ -457,9 +456,7 @@ class Session:
         for w in paused[: len(told)]:  # the rest are told at the next start
             work.mark_reported(w.id)
 
-    async def say(
-        self, body_id: str, params: SayParams, *, event_id: str | None = None
-    ) -> SayResult:
+    async def say(self, body_id: str, params: SayParams) -> None:
         check_part_sizes(params.parts or [])  # over_limit, before anything changes
         sender = self._bodies.body(body_id)
         shown_on: str | None = body_id
@@ -479,9 +476,10 @@ class Session:
                 "content": content,
                 "params": params.model_dump(mode="json", exclude_none=True),
             },
-            **({"id": event_id} if event_id else {}),
+            id=params.id,
         )
-        self.events.post(say_event)
+        if not self.events.post(say_event):
+            return  # a retried say: already one event, already answered or being answered
         if not (sender is not None and sender.display is False):
             self._last_body = body_id
         if params.interrupted is not None and self._ready():
@@ -497,18 +495,19 @@ class Session:
                     cause=say_event.id,
                 )
                 self._speak(turn, shown_on, params)
-                return SayResult(turn=turn, joined=False)
+                return
         if not self._ready():
-            return SayResult(turn=self._end_unanswered(shown_on), joined=False)
+            self._end_unanswered(shown_on, say_event.id)
+            return
         # Through the front door like every source. Whether it joins the running turn or starts
         # one is decided when the door delivers it, so the answer is never stale.
-        result: asyncio.Future[SayResult] = asyncio.get_running_loop().create_future()
+        result: asyncio.Future[None] = asyncio.get_running_loop().create_future()
         token = uuid.uuid4().hex
         self._says_waiting.add(token)
         payload = {"token": token, "result": result, "content": content, "params": params}
         self.dispatcher.post(Item("say", shown_on or BRAIN, payload, "now", event_id=say_event.id))
         # Shielded: a body that disconnects cancels its caller, but the say is still delivered.
-        return await asyncio.shield(result)
+        await asyncio.shield(result)
 
     def post_event(
         self,
@@ -600,7 +599,7 @@ class Session:
         if item.kind != "say":
             return
         self._says_waiting.discard(item.payload["token"])
-        result: asyncio.Future[SayResult] = item.payload["result"]
+        result: asyncio.Future[None] = item.payload["result"]
         if not result.done():
             result.set_exception(RuntimeError("the say could not be delivered"))
 
@@ -610,7 +609,7 @@ class Session:
         they start one. The say's caller is answered here, with the turn that really has them."""
         shown = None if item.origin_body == BRAIN else item.origin_body
         content, params = item.payload["content"], item.payload["params"]
-        result: asyncio.Future[SayResult] = item.payload["result"]
+        result: asyncio.Future[None] = item.payload["result"]
         try:
             while self._task is not None and self._task.done():
                 await asyncio.sleep(0)  # its done callback runs next and clears the turn
@@ -618,24 +617,33 @@ class Session:
                 self._inbox.append(content)
                 self._joined = (shown, params, item.event_id)  # the newest, if its turn is cut
                 self._speak(self._turn_id, self._turn_body, params)
+                self._bodies.notify(
+                    "turn",
+                    {
+                        "turn": self._turn_id,
+                        "body": self._turn_body,
+                        "state": "joined",
+                        "events": [item.event_id],
+                        "source": self._event_source(item.event_id, shown),
+                    },
+                )
                 if not result.done():
-                    result.set_result(SayResult(turn=self._turn_id or "", joined=True))
+                    result.set_result(None)
             elif self._busy():
                 turn = uuid.uuid4().hex
                 self._later.append((shown, turn, content, params, item.event_id))
                 if not result.done():
-                    result.set_result(SayResult(turn=turn, joined=False))
+                    result.set_result(None)
             else:
                 turn = uuid.uuid4().hex
-                # The caller learns the turn id before its `started` goes out.
                 if not result.done():
-                    result.set_result(SayResult(turn=turn, joined=False))
+                    result.set_result(None)
                 self._starting = turn
                 await asyncio.sleep(0)
                 cut = self._starting != turn  # cancelled in the moment before its turn began
                 self._starting = None
                 if cut:
-                    self._end_cancelled(turn, shown)
+                    self._end_cancelled(turn, shown, item.event_id)
                 else:
                     self._start_turn(
                         shown,
@@ -808,7 +816,7 @@ class Session:
     def _ready(self) -> bool:
         return getattr(self._model, "ready", True)  # fakes and other models need no key
 
-    def _end_unanswered(self, body_id: str | None) -> str:
+    def _end_unanswered(self, body_id: str | None, event_id: str) -> None:
         """No key: the turn starts and ends at once, no reply, no history. The app says why."""
         turn_id = uuid.uuid4().hex
         notify = self._bodies.notify
@@ -816,20 +824,33 @@ class Session:
         loop.call_soon(
             notify,
             "turn",
-            {"turn": turn_id, "body": body_id, "state": "started", "started_by": "user"},
+            self._started_frame(turn_id, body_id, event_id),
         )
         loop.call_soon(
             notify,
             "turn",
             {"turn": turn_id, "body": body_id, "state": "ended", "reason": "error"},
         )
-        return turn_id
 
-    def _end_cancelled(self, turn_id: str, body_id: str | None) -> None:
+    def _started_frame(self, turn_id: str, body_id: str | None, cause: str | None) -> dict:
+        """The `started` frame: the event the turn took and that event's source (a say's is the
+        body, a wake's the waking event's), so a body can tell which of its says it answers."""
+        return {
+            "turn": turn_id,
+            "body": body_id,
+            "state": "started",
+            "events": [cause] if cause else [],
+            "source": self._event_source(cause, body_id),
+        }
+
+    def _event_source(self, event_id: str | None, body_id: str | None) -> str:
+        row = self.events.get(event_id) if event_id else None
+        return row.source if row is not None else (body_id or BRAIN)
+
+    def _end_cancelled(self, turn_id: str, body_id: str | None, event_id: str) -> None:
         """A say cancelled before its turn began: the body still sees it start and end."""
         notify = self._bodies.notify
-        started = {"turn": turn_id, "body": body_id, "state": "started", "started_by": "user"}
-        notify("turn", started)
+        notify("turn", self._started_frame(turn_id, body_id, event_id))
         notify("turn", {"turn": turn_id, "body": body_id, "state": "ended", "reason": "cancelled"})
 
     def _pick_voice(self, voice_id: str) -> None:
@@ -1119,7 +1140,7 @@ class Session:
             raise WakeSkipped  # dropped quietly; unreported jobs are told at a later start
         if self._wants_speech(body_id, None):
             content = [*content, {"type": "text", "text": ear_note()}]
-        turn = self._start_turn(body_id, content, "brain", cause=cause)
+        turn = self._start_turn(body_id, content, by_person=False, cause=cause)
         self._speak(turn, body_id, None)  # remarks and hellos are read aloud like any reply
         return turn
 
@@ -1127,7 +1148,7 @@ class Session:
         self,
         body_id: str | None,
         content: list,
-        started_by: Literal["user", "brain"] = "user",
+        by_person: bool = True,
         *,
         after: asyncio.Task | None = None,
         cut: Interruption | None = None,
@@ -1144,9 +1165,9 @@ class Session:
         self._turn_job = None
         self._wake_jobs = set()
         self._stop = stop = asyncio.Event()
-        self._owner_turn = started_by == "user"
+        self._owner_turn = by_person
         # Only the person's typed words count as date evidence, never body context or parts.
-        self._said = said if started_by == "user" else ""
+        self._said = said if by_person else ""
         self._turn_body = body_id
         self._turn_cause = cause
         lead = [interruption_block(cut.spoken, cut.unsaid)] if cut is not None else []
@@ -1175,7 +1196,7 @@ class Session:
         asyncio.get_running_loop().call_soon(
             notify,
             "turn",
-            {"turn": turn_id, "body": body_id, "state": "started", "started_by": started_by},
+            self._started_frame(turn_id, body_id, cause),
         )
 
         def spoken_notify(method: str, params: dict) -> None:
@@ -1278,9 +1299,9 @@ class Session:
         elif turn_id == self._starting:
             self._starting = None
         elif any(turn == turn_id for _, turn, *_ in self._later):
-            shown = next(b for b, turn, *_ in self._later if turn == turn_id)
+            shown, _, _, _, cause = next(x for x in self._later if x[1] == turn_id)
             self._later = [x for x in self._later if x[1] != turn_id]
-            self._end_cancelled(turn_id, shown)
+            self._end_cancelled(turn_id, shown, cause)
             self.dispatcher.pump()
 
     def answer(

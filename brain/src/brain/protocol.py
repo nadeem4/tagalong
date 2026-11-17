@@ -17,7 +17,7 @@ from pydantic import (
     model_validator,
 )
 
-PROTOCOL = 1
+PROTOCOL = 2
 
 # The kinds of body a turn can be shown on (`Body.kind`), as saved with each message.
 BODY_DESKTOP = "desktop"
@@ -181,6 +181,7 @@ class Interrupted(Model):
 
 
 class SayParams(Model):
+    id: Id  # the event id the body mints; a retry with the same id is one say
     text: str | None = None
     parts: list[Part] | None = None
     context: Any = None
@@ -196,8 +197,8 @@ class SayParams(Model):
 
 
 class SayResult(Model):
-    turn: Id
-    joined: bool
+    # Empty on purpose: the answer arrives as turn frames that name this say's id.
+    pass
 
 
 class EventParams(Model):
@@ -326,9 +327,16 @@ class TurnParams(Model):
     seq: Seq
     turn: Id
     body: str | None
-    state: Literal["started", "ended"]
+    state: Literal["started", "joined", "ended"]
     reason: Literal["done", "cancelled", "error", "over_budget", "step_cap"] | None = None
-    started_by: Literal["user", "brain"] | None = None
+    events: list[Id] | None = None  # the events a started or joined turn took
+    source: str | None = None  # the started turn's event source
+
+    @model_validator(mode="after")
+    def _started_and_joined_name_their_events(self) -> "TurnParams":
+        if self.state != "ended" and (self.events is None or self.source is None):
+            raise ValueError("a started or joined turn needs events and source")
+        return self
 
 
 class ToolParams(Model):

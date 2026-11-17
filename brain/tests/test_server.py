@@ -43,7 +43,7 @@ CLICK = {
 }
 
 
-def hello(last_seq=None, protocol=1, req_id=1):
+def hello(last_seq=None, protocol=2, req_id=1):
     params = {"protocol": protocol, "body": DESKTOP, "tools": [TOOL]}
     if last_seq is not None:
         params["last_seq"] = last_seq
@@ -91,7 +91,7 @@ async def test_hello_ok(env):
         reply = await call(ws, hello())
         result = reply["result"]
         assert {k: v for k, v in result.items() if k != "tools"} == {
-            "protocol": 1,
+            "protocol": 2,
             "session": "s1",
             "seq": 0,
             "resync": False,
@@ -117,7 +117,7 @@ async def test_hello_result_carries_version_and_build(tmp_path):
 async def test_message_before_hello_closes(env):
     _, url = env
     async with connect(url) as ws:
-        reply = await call(ws, request("say", {"text": "hi"}))
+        reply = await call(ws, request("say", {"id": "s1", "text": "hi"}))
         assert reply["error"]["code"] == -32600
         await assert_closed(ws)
 
@@ -125,20 +125,20 @@ async def test_message_before_hello_closes(env):
 async def test_version_mismatch_closes(env):
     _, url = env
     async with connect(url) as ws:
-        reply = await call(ws, hello(protocol=2))
+        reply = await call(ws, hello(protocol=1))
         assert reply["error"]["code"] == -32000
-        assert reply["error"]["data"] == {"protocol": 1}
+        assert reply["error"]["data"] == {"protocol": 2}
         await assert_closed(ws)
 
 
 async def test_version_checked_before_shape(env):
     _, url = env
-    frame = hello(protocol=2)
+    frame = hello(protocol=1)
     frame["params"]["body"] = {"id": "desktop", "kind": "desktop"}  # no name
     async with connect(url) as ws:
         reply = await call(ws, frame)
         assert reply["error"]["code"] == -32000
-        assert reply["error"]["data"] == {"protocol": 1}
+        assert reply["error"]["data"] == {"protocol": 2}
         await assert_closed(ws)
 
 
@@ -407,13 +407,13 @@ async def test_say_reaches_every_body(chat):
     async with connect(url) as a, connect(url) as b:
         await call(a, hello())
         await call(b, ext)
-        reply = await call(a, request("say", {"text": "hi"}))
-        assert reply["result"]["joined"] is False
-        turn = reply["result"]["turn"]
+        reply = await call(a, request("say", {"id": "s1", "text": "hi"}))
+        assert reply["result"] == {}
         gate.set()
         for ws in (a, b):
             got = [json.loads(await ws.recv())["params"] for _ in range(5)]
-            assert got[0]["state"] == "started"
+            assert got[0]["state"] == "started" and got[0]["events"] == ["s1"]
+            turn = got[0]["turn"]
             assert [g.get("delta") for g in got[1:3]] == ["hel", "lo"]
             assert got[3]["done"] is True
             assert got[4] == {
@@ -425,25 +425,55 @@ async def test_say_reaches_every_body(chat):
             }
 
 
+async def say_and_collect(ws, say_id, text, req_id, frames):
+    """Send a say and read until its reply, keeping the turn frames that arrive on the way."""
+    await ws.send(json.dumps(request("say", {"id": say_id, "text": text}, req_id)))
+    async with asyncio.timeout(5):
+        while True:
+            frame = json.loads(await ws.recv())
+            if frame.get("id") == req_id:
+                return frame
+            frames.append(frame["params"])
+
+
 async def test_say_during_turn_joins(chat):
     url, gate = chat
     async with connect(url) as ws:
         await call(ws, hello())
-        first = await call(ws, request("say", {"text": "a"}, req_id=2))
-        started = json.loads(await ws.recv())
-        assert started["params"]["state"] == "started"
-        second = await call(ws, request("say", {"text": "b"}, req_id=3))
-        assert second["result"] == {"turn": first["result"]["turn"], "joined": True}
+        frames: list[dict] = []
+        await say_and_collect(ws, "a", "a", 2, frames)
+        second = await say_and_collect(ws, "b", "b", 3, frames)
+        assert second["result"] == {}
+        while len(frames) < 2:
+            frames.append(json.loads(await ws.recv())["params"])
+        started, joined = frames[:2]
+        assert started["state"] == "started"
+        assert (joined["state"], joined["events"]) == ("joined", ["b"])
+        assert joined["turn"] == started["turn"]
         gate.set()
+
+
+async def test_say_with_a_known_id_returns_empty_and_starts_nothing(chat):
+    url, gate = chat
+    async with connect(url) as ws:
+        await call(ws, hello())
+        frames: list[dict] = []
+        first = await say_and_collect(ws, "s1", "hi", 2, frames)
+        again = await say_and_collect(ws, "s1", "hi", 3, frames)
+        assert first["result"] == again["result"] == {}
+        gate.set()
+        while not frames or frames[-1].get("state") != "ended":
+            frames.append(json.loads(await ws.recv())["params"])
+        assert [f["state"] for f in frames if "events" in f] == ["started"]
 
 
 async def test_cancel_notification_ends_turn(chat):
     url, _ = chat
     async with connect(url) as ws:
         await call(ws, hello())
-        first = await call(ws, request("say", {"text": "a"}, req_id=2))
-        await ws.recv()  # started
-        cancel = {"jsonrpc": "2.0", "method": "cancel", "params": {"turn": first["result"]["turn"]}}
+        await call(ws, request("say", {"id": "a", "text": "a"}, req_id=2))
+        started = json.loads(await ws.recv())["params"]
+        cancel = {"jsonrpc": "2.0", "method": "cancel", "params": {"turn": started["turn"]}}
         await ws.send(json.dumps(cancel))
         ended = json.loads(await ws.recv())
         assert ended["params"]["state"] == "ended"
@@ -462,7 +492,9 @@ async def test_bad_say_params(chat):
     url, _ = chat
     async with connect(url) as ws:
         await call(ws, hello())
-        for req_id, params in enumerate([{}, {"text": 5}, {"parts": []}], start=3):
+        for req_id, params in enumerate(
+            [{}, {"id": "x", "text": 5}, {"id": "y", "parts": []}], start=3
+        ):
             reply = await call(ws, request("say", params, req_id=req_id))
             assert reply["error"]["code"] == -32602
 
@@ -511,8 +543,8 @@ async def next_method(ws, method):
 
 async def start_tool_turn(ws):
     await call(ws, hello())
-    reply = await call(ws, request("say", {"text": "look"}))
-    return reply["result"]["turn"]
+    await call(ws, request("say", {"id": "s1", "text": "look"}))
+    return (await next_method(ws, "turn"))["params"]["turn"]
 
 
 def tool_result(model):
@@ -607,7 +639,7 @@ async def ask_env():
 async def open_ask(ws):
     """Join as desktop, start a turn that clicks, and return the open ask frame."""
     await call(ws, hello_with_click())
-    await call(ws, request("say", {"text": "click"}))
+    await call(ws, request("say", {"id": "s1", "text": "click"}))
     async with asyncio.timeout(5):
         return await next_method(ws, "ask")
 

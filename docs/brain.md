@@ -180,12 +180,15 @@ the total can run a little low.
 
 ## What a turn does
 
-`say` answers `{turn, joined}` once the front door has delivered it (the dispatcher, see below), so
-the answer is never stale: `joined` is true only when a turn is running, on the same body, and has
-not yet done its last read of what was said. A joined say is handed to the running turn, which takes
-it in at its next step. Any other say (another body, or one arriving after that last read) gets a
-fresh turn id and its own turn after the running one, answered on its own body; with no turn running
-it starts one at once. The work then runs in the background and streams notifications. There is one
+`say` carries the body's own `id` and answers `{}` once the front door has delivered it (the
+dispatcher, see below). The answer is the `turn` frames: `started` names the say in `events` (and the
+event's `source`), and a say that joined the running turn gets `turn {state: "joined", events:
+[<say id>], source}` instead. A say joins only when a turn is running, on the same body, and has not
+yet done its last read of what was said; the running turn takes it in at its next step. Any other
+say (another body, or one arriving after that last read) gets its own turn after the running one,
+answered on its own body; with no turn running it starts one at once. A say whose `id` is already
+known (a body's retry) is one event: it starts nothing and answers `{}`. The work then
+runs in the background and streams notifications. There is one
 conversation for all bodies and at most one running turn.
 
 ```mermaid
@@ -631,7 +634,7 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
   `settled`, `AskRunner.settle`). A very long input is cut to 4,000 characters in what the model sees.
   The floor keeps a locked or person-only tool from this look: only a standing rule or you decide it.
 - **Follow-ups under the preference rule.** The session keeps `_owner_turn` (`Session.owner_turn()`):
-  true while the running turn is the owner's, meaning they started it (`started_by: "user"`) or typed
+  true while the running turn is the owner's, meaning they started it (a say) or typed
   into it (a wake turn they start a turn after is not theirs). It ends with the turn, so the next timer wake starts
   as Scout's own. No contract change. `tell_expert` is an `ask`-mode tool marked `follow_up`: on an
   owner turn the gate waves it through (their message was the yes, no ask, no log entry;
@@ -1616,10 +1619,11 @@ note: context only, not a reason to speak, and a URL is never repeated back unas
 since the brain started never wakes, a quick reconnect does not either, and a browser body (kind
 `browser`) never wakes Scout.
 
-**Who started a turn.** The `turn` notification carries `started_by`: `user` for a `say`, `brain`
-for a wake. A body that predates the field reads it as `user`. Bodies use it to show nothing while a
-wake runs (see [desktop.md](desktop.md#the-brain-in-the-main-process)). A person who talks while a
-wake runs joins it (`say` returns `joined: true`) when the wake is shown on the body they used;
+**Who started a turn.** The `turn` notification carries `events` (the event ids the turn took) and
+`source` (the started turn's event source: the body for a say, the waking event's source for a wake).
+Bodies use `source` to show nothing while a wake runs (see
+[desktop.md](desktop.md#the-brain-in-the-main-process)). A person who talks while a wake runs joins
+it (a `joined` frame names their say) when the wake is shown on the body they used;
 from another body they get a turn of their own after it. The body shows it like any turn. A `back`'s `idle_seconds` is the time since the last input, not since the body
 noticed the idle.
 

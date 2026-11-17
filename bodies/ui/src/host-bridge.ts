@@ -267,7 +267,7 @@ export interface AskInput {
  * bridge or a node API themselves.
  */
 export interface HostBridge {
-  ask(input: AskInput): Promise<{ turnId: string }>;
+  ask(input: AskInput): Promise<void>;
   interrupt(turnId: string): Promise<void>;
   /** Returns an unsubscribe function. */
   onTurnEvent(handler: (event: TurnEvent) => void): () => void;

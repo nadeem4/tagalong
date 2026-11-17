@@ -29,6 +29,7 @@ from test_sessions import (
     join_headless,
     make,
     open_asks,
+    said,
     say,
     settle,
     states,
@@ -67,10 +68,10 @@ async def test_1_ten_quick_says_are_all_seen_and_answered_in_order():
     model = Gate([gate, "first answer", "answer to the rest"])
     session, sent = make(model)
     join(session, "desktop")
-    results = [await session.say("desktop", say("task 1"))]
+    results = [await said(session, sent, "desktop", say("task 1"))]
     await settle()  # the turn is running, held inside the model
     for i in range(2, 11):
-        results.append(await session.say("desktop", say(f"task {i}")))
+        results.append(await said(session, sent, "desktop", say(f"task {i}")))
     gate.set()
     await idle(session)
     seen = [t for call in model.seen for m in call if m["role"] == "user" for t in texts(m)]
@@ -131,9 +132,9 @@ async def test_2_stop_while_a_job_finishes_never_runs_two_turns_at_once():
         return turn
 
     session._start_turn = spy
-    first = await session.say("desktop", say("task one"))
+    first = await said(session, sent, "desktop", say("task one"))
     await settle()
-    joined = await session.say("desktop", say("task two"))  # joins the running turn's inbox
+    joined = await said(session, sent, "desktop", say("task two"))  # joins the running turn's inbox
     session.jobs._on_finished(end_job(memory))  # a job's news is due...
     session.cancel(first.turn)  # ...as the person presses Stop
     await asyncio.sleep(0.2)
@@ -307,12 +308,12 @@ async def test_4_control_a_job_whose_wake_errored_is_told_again_after_a_restart(
 async def test_5_says_accepted_before_a_crash_are_not_lost(tmp_path):
     memory = file_memory(tmp_path)
     gate = asyncio.Event()
-    session, _ = make(Gate([gate, "x", "y", "z"]), memory)
+    session, sent = make(Gate([gate, "x", "y", "z"]), memory)
     join(session, "desktop")
     join(session, "whatsapp")
-    a = await session.say("desktop", say("task A: book the flight"))
+    a = await said(session, sent, "desktop", say("task A: book the flight"))
     await settle()
-    b = await session.say("whatsapp", say("task B: email the landlord"))
+    b = await said(session, sent, "whatsapp", say("task B: email the landlord"))
     try:
         # A hard kill: no turn end, nothing saved. A new brain opens the same database.
         saved = json.dumps(memory.load_messages())
@@ -321,7 +322,7 @@ async def test_5_says_accepted_before_a_crash_are_not_lost(tmp_path):
         has_a = "task A" in saved or "task A" in known
         has_b = "task B" in saved or "task B" in known
         print(
-            f"\n[5] both says got turn ids ({a.turn[:6]}, {b.turn[:6]}); "
+            f"\n[5] both says got turn ids ({a.turn[:6]}, {(b.turn or 'queued')[:6]}); "
             f"after the crash task A kept={has_a}, task B kept={has_b}"
         )
         assert has_a and has_b
@@ -342,7 +343,9 @@ async def test_6a_each_reply_goes_to_the_body_that_asked():
     join(session, "whatsapp")
     await session.say("desktop", say("hi from the desk"))
     await settle()
-    later = await session.say("whatsapp", say("hi from the phone"))  # waits for its own turn
+    later = await said(
+        session, sent, "whatsapp", say("hi from the phone")
+    )  # waits for its own turn
     gate.set()
     await idle(session)
     replies = [(p["body"], p["delta"]) for m, p in sent if m == "reply" and "delta" in p]

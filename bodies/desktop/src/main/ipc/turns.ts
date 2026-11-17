@@ -1,5 +1,5 @@
 /**
- * IPC for asking and interrupting: both go to the brain over contract v1. Contains
+ * IPC for asking and interrupting: both go to the brain over contract v2. Contains
  * registerTurnIpc.
  */
 
@@ -13,8 +13,10 @@ import type { IpcHandle } from './handle';
 
 interface TurnIpcDeps {
   brain: Pick<BrainClient, 'say' | 'cancel'>;
-  /** Makes a turn the question joined visible, when the brain started it on its own. */
-  claimTurn: (turnId: string) => void;
+  /** Tells the turn mapper a say id is ours, so the turn that takes it shows. */
+  trackSay: (id: string) => void;
+  /** Forgets a say id the brain never accepted. */
+  untrackSay: (id: string) => void;
   /** The link as last reported; a too-new brain gets the update words, not the offline ones. */
   status: () => BrainStatus;
   /** Stops Scout's speech everywhere: a cancelled turn does not hush its own. */
@@ -65,6 +67,7 @@ export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
       const voice = deps.voice();
       const spoken = input.spoken === true && voice.enabled;
       const say: SayParams = {
+        id: crypto.randomUUID(),
         text: input.text ?? '',
         ...(parts.length > 0 ? { parts } : {}),
         ...(windowTitle !== undefined ? { context: { window: windowTitle } } : {}),
@@ -72,11 +75,11 @@ export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
         ...(input.interrupted !== undefined ? { interrupted: input.interrupted } : {}),
       };
       try {
-        const said = await deps.brain.say(say);
-        // The question joined a running turn; if that was a quiet wake, it shows from now on.
-        if (said.joined) deps.claimTurn(said.turn);
-        return { turnId: said.turn };
+        // Tracked before it is sent: the brain's turn frames can beat its answer.
+        deps.trackSay(say.id);
+        await deps.brain.say(say);
       } catch (error) {
+        deps.untrackSay(say.id);
         // The desktop's own words, never the brain's message.
         if (error instanceof BrainOffline) {
           const words = deps.status() === 'outdated' ? 'brain-outdated' : 'brain-offline';

@@ -1,7 +1,7 @@
 /**
  * Type-level pin: the method maps expose their literal method names, so bodies can
  * type a method argument without repeating the list. Also pins
- * started_by on turns and the back and focus event data.
+ * say ids, turn events and source and the back and focus event data.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -20,6 +20,7 @@ import {
   ReadAloudEventData,
   ReadingEventData,
   SayParams,
+  SayResult,
   SpeechControlParams,
   SpeechParams,
   SpeechStateParams,
@@ -31,6 +32,7 @@ import {
   type BodyToBrainMethod,
   type BrainToBodyMethod,
 } from './messages.js';
+import { isInternalSource } from './shapes.js';
 
 const examples = join(dirname(fileURLToPath(import.meta.url)), '../../examples/valid');
 const eventData = (name: string): unknown =>
@@ -81,11 +83,11 @@ describe('voice messages', () => {
     expect('live' in brainToBody.reply).toBe(false);
   });
   it('bounds say speed and listen mode', () => {
-    expect(SayParams.safeParse({ text: 'a', speed: 0.5 }).success).toBe(true);
-    expect(SayParams.safeParse({ text: 'a', speed: 2 }).success).toBe(true);
-    expect(SayParams.safeParse({ text: 'a', speed: 3 }).success).toBe(false);
+    expect(SayParams.safeParse({ id: 'e1', text: 'a', speed: 0.5 }).success).toBe(true);
+    expect(SayParams.safeParse({ id: 'e1', text: 'a', speed: 2 }).success).toBe(true);
+    expect(SayParams.safeParse({ id: 'e1', text: 'a', speed: 3 }).success).toBe(false);
     // The brain owns the voice choice: an old body's `voice` is ignored, not carried.
-    expect(SayParams.parse({ text: 'a', voice: 'x' })).not.toHaveProperty('voice');
+    expect(SayParams.parse({ id: 'e1', text: 'a', voice: 'x' })).not.toHaveProperty('voice');
     expect(ListenParams.safeParse({ mode: 'held' }).success).toBe(true);
     expect(ListenParams.safeParse({ mode: 'x' }).success).toBe(false);
   });
@@ -203,12 +205,48 @@ describe('read_aloud event data', () => {
   });
 });
 
-describe('turn started_by', () => {
-  const started = { seq: 1, turn: 't', body: 'b', state: 'started' };
-  it('is optional', () => {
+describe('turn events and source', () => {
+  const started = {
+    seq: 1,
+    turn: 't',
+    body: 'b',
+    state: 'started',
+    events: ['e1'],
+    source: 'desktop',
+  };
+  it('a started turn carries its events and source', () => {
     expect(TurnParams.safeParse(started).success).toBe(true);
-    expect(TurnParams.safeParse({ ...started, started_by: 'brain' }).success).toBe(true);
-    expect(TurnParams.safeParse({ ...started, started_by: 'oops' }).success).toBe(false);
+    expect(TurnParams.safeParse({ ...started, events: undefined }).success).toBe(false);
+    expect(TurnParams.safeParse({ ...started, source: undefined }).success).toBe(false);
+  });
+  it('a joined turn carries its events', () => {
+    const joined = { ...started, state: 'joined', events: ['e2', 'e3'] };
+    expect(TurnParams.safeParse(joined).success).toBe(true);
+    expect(TurnParams.safeParse({ ...joined, events: undefined }).success).toBe(false);
+  });
+  it('an ended turn needs neither', () => {
+    const ended = { seq: 2, turn: 't', body: 'b', state: 'ended', reason: 'done' };
+    expect(TurnParams.safeParse(ended).success).toBe(true);
+  });
+});
+
+describe('say ids', () => {
+  it('a say without an id is refused', () => {
+    expect(SayParams.safeParse({ text: 'hi' }).success).toBe(false);
+    expect(SayParams.safeParse({ id: 'e1', text: 'hi' }).success).toBe(true);
+  });
+  it('the say result is empty', () => {
+    expect(SayResult.safeParse({}).success).toBe(true);
+    expect(SayResult.safeParse({ turn: 't1' }).success).toBe(false);
+  });
+});
+
+describe('isInternalSource', () => {
+  it('knows scout, timer, setup, job:x, loop:gmail, tool:x and refuses desktop and whatsapp', () => {
+    for (const s of ['scout', 'timer:t1', 'setup:s1', 'job:x', 'loop:gmail', 'tool:x']) {
+      expect(isInternalSource(s)).toBe(true);
+    }
+    for (const s of ['desktop', 'whatsapp']) expect(isInternalSource(s)).toBe(false);
   });
 });
 
