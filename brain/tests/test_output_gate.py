@@ -140,7 +140,7 @@ async def test_read_output_refuses_plainly(store):
 
 
 def a_part(pid, agent, report):
-    return JobPart("j1", pid, agent, "t", "done", None, None, "s", report, False, "a", "b", "C:/x")
+    return JobPart("j1", pid, agent, "t", "done", None, None, "s", report, "a", "b", "C:/x")
 
 
 def a_job(report, parts=None):
@@ -178,7 +178,6 @@ def test_a_wake_carries_only_the_part_that_just_ended_as_a_report(store):
             None,
             "s",
             chr(64 + n) * 25,
-            False,
             "a",
             f"b{n}",
             f"C:/x{n}",
