@@ -307,3 +307,21 @@ def test_a_reply_with_no_request_before_it_is_dropped_so_history_opens_on_a_user
     history = rebuild([a("orphan"), u("q"), a("r")])
     assert history == [u("q"), a("r")]
     assert rebuild([a("orphan")]) == []
+
+
+def test_a_compaction_summary_at_the_front_is_kept():
+    assert rebuild([compaction(), a("after")]) == [
+        {"role": "assistant", "content": compaction()["content"] + a("after")["content"]}
+    ]
+
+
+def test_an_orphan_reply_with_a_tool_round_leaves_no_orphan_tool_result():
+    history = rebuild([call("1"), result("1"), a("done"), u("q"), a("r")])
+    assert history == [u("q"), a("r")]
+
+
+def test_roles_alternate_after_a_silent_reply_leaves_two_user_rows_together():
+    silent = {"role": "assistant", "content": []}
+    history = rebuild([u("q"), call("1"), result("1"), silent, u("next"), a("r")])
+    assert [m["role"] for m in history] == ["user", "assistant", "user", "assistant"]
+    assert history[2]["content"] == result("1")["content"] + [{"type": "text", "text": "next"}]

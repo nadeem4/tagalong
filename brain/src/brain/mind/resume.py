@@ -31,18 +31,24 @@ def _blocks(content: str | list) -> list:
 
 
 def _joined(history: list[dict]) -> list[dict]:
-    """Joins neighbouring rows of one role into one message, then drops any reply left at the
-    front (its request never reached the chat). A tool_result stays in the user message that
-    follows its tool_use because rows are only ever joined, never reordered."""
+    """Joins neighbouring rows of one role into one message. A tool_result stays in the user
+    message that follows its tool_use because rows are only ever joined, never reordered."""
     out: list[dict] = []
     for m in history:
         if out and out[-1]["role"] == m["role"]:
             out[-1] = {**m, "content": _blocks(out[-1]["content"]) + _blocks(m["content"])}
         else:
             out.append(m)
-    while out and out[0]["role"] == "assistant":
-        out.pop(0)
     return out
+
+
+def _from_first_turn(history: list[dict]) -> list[dict]:
+    """Drops rows ahead of the first turn start: a reply whose request never reached the chat,
+    with any tool round it began. A compaction summary is kept, as the history may open on it."""
+    first = next(
+        (i for i, m in enumerate(history) if _is_turn_start(m) or _has_compaction(m)), None
+    )
+    return [] if first is None else history[first:]
 
 
 def _without_silent_replies(history: list[dict]) -> list[dict]:
@@ -86,8 +92,11 @@ def rebuild_history(messages: list[dict]) -> tuple[list[dict], bool]:
         start = marks[-1]
         while start > 0 and not _is_turn_start(messages[start]):
             start -= 1
-    history = _without_silent_replies(
-        _joined([_without_server_blocks(m) for m in messages[start:]])
+    # Join again after the silent drop: removing a reply can leave two user rows side by side.
+    history = _from_first_turn(
+        _joined(
+            _without_silent_replies(_joined([_without_server_blocks(m) for m in messages[start:]]))
+        )
     )
 
     if len(history) > RESUME_MAX_MESSAGES:
