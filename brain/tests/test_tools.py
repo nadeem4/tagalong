@@ -1210,6 +1210,15 @@ async def test_cancel_timer_takes_string_id(trun):
         await trun("cancel_timer", {"id": tid})
 
 
+async def test_cancel_timer_of_a_fired_one_off_says_it_already_fired(trun):
+    # Its news is told (or being told by this very turn): nothing is left to cancel.
+    await trun("set_timer", {"note": "n", "in_minutes": 5})
+    tid = _timers(trun)[0].id
+    trun.work.fire(tid, "2026-10-28T09:00:00+00:00")
+    with pytest.raises(MemoryRefused, match=f"timer {tid} already fired"):
+        await trun("cancel_timer", {"id": tid})
+
+
 async def test_cancel_timer_refuses_a_watch_id(trun):
     made = json.loads(await trun("watch", {"action": "add", "note": "w", "every_minutes": 10}))
     with pytest.raises(MemoryRefused, match="no timer"):

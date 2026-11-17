@@ -479,6 +479,8 @@ def timer_tools(
         if row is None:
             raise MemoryRefused(f"no timer with id {tid}.")
         if not timers.cancel(tid, "cancelled by Scout"):
+            if row.state == "done":  # its news is told, or being told by a turn already
+                raise MemoryRefused(f"timer {tid} already fired; nothing is left to cancel.")
             raise MemoryRefused(f"no timer with id {tid}.")
         return f"timer {tid} cancelled"
 
