@@ -692,7 +692,7 @@ choice, offer and setup-event waits that lived only in memory are gone.
 | Column            | Type             | Meaning                                                                                        |
 | ----------------- | ---------------- | ---------------------------------------------------------------------------------------------- |
 | `id`              | TEXT PRIMARY KEY | A random hex id                                                                                |
-| `kind`            | TEXT             | `ask`, `choice`, `install`, `signin`, `expert_ask`, `offer`, `setup` or `held` (CHECK)         |
+| `kind`            | TEXT             | `ask`, `choice`, `install`, `signin`, `expert_ask` or `offer` (CHECK)                          |
 | `origin_body`     | TEXT             | The body the item came from, so a reply goes back to it                                        |
 | `state`           | TEXT             | `open`, `answered`, `done` or `expired` (CHECK); default `open`                                |
 | `saved_call_json` | TEXT             | The call to run on a later yes, as JSON, or null. Callers mask it before saving                |

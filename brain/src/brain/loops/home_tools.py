@@ -1,4 +1,4 @@
-"""Home's loops tools: the "Read my mail for loops" switch, the Held list, forget and wipe.
+"""Home's loops tools: the "Read my mail for loops" switch, the open items, forget and wipe.
 
 Home-only (the model never sees them). The switch is the person's consent, so `loops_set` is
 the one place mail reading starts. A row carries what a loop is (title, asks, direction, due,
@@ -19,36 +19,12 @@ _NO_ARGS = {"type": "object", "properties": {}}
 
 
 # What Home calls each kind of open item, and the line for those with no words of their own.
-# Setup news is left out: it waits on Scout, not on the person.
 _KINDS = {
     "ask": ("Permission", ""),
     "choice": ("Question", "Scout is waiting for your choice"),
     "expert_ask": ("Expert request", "An expert wants your OK"),
     "offer": ("Offer", ""),
-    "held": ("Held news", ""),
 }
-# Why news was held instead of told, in plain words, for `held` open items.
-_HELD_WHY = {
-    "budget_spent": "held because the daily budget was spent",
-    "quiet_hours": "held during quiet hours",
-    "stale": "held because nobody was there to hear it",
-    "gave_up": "held because it could not be delivered",
-    "stopped": "held because Scout was stopping",
-    "start_failed": "held because Scout could not start on it",
-    "no_key": "held because there is no Anthropic key yet",
-}
-# Facts worth showing first so the person can tell which news it is; then any text fact.
-_GIST_KEYS = ("title", "task", "report", "name", "app", "activity")
-
-
-def _gist(facts: dict) -> str:
-    """The first line of the first useful text fact, cut short; empty when there is none."""
-    texts = {k: v for k, v in facts.items() if isinstance(v, str) and v.strip()}
-    key = next((k for k in _GIST_KEYS if k in texts), next(iter(texts), None))
-    if key is None:
-        return ""
-    line = texts[key].strip().split("\n")[0]
-    return line if len(line) <= 60 else line[:57] + "..."
 
 
 def _row(item: OpenItem, now: datetime) -> dict:
@@ -58,10 +34,6 @@ def _row(item: OpenItem, now: datetime) -> dict:
         line = summarise(saved.get("text") or "", saved.get("name") or "", saved.get("input") or {})
     elif item.kind == "offer":
         line = saved.get("sentence") or "An offer from Scout"
-    elif item.kind == "held":
-        gist = _gist(saved.get("facts") or {})
-        what = f"{saved.get('event', 'news')} ({gist})" if gist else saved.get("event", "news")
-        line = f"{what}: {_HELD_WHY.get(saved.get('why'), 'held')}"
     return {
         "id": item.id,
         "kind": word,
@@ -73,8 +45,8 @@ def _row(item: OpenItem, now: datetime) -> dict:
 def loop_home_tools(
     service: LoopService, apps: Callable[[], list[tuple[str, str]]], items: OpenItems
 ) -> list[tuple[ToolSpec, Handler]]:
-    """`apps` lists every connected app as (id, name); only the mail ones are offered. The Held
-    list also carries every open item (asks, choices, offers) with its age."""
+    """`apps` lists every connected app as (id, name); only the mail ones are offered. The open
+    items carry every open item (asks, choices, offers) with its age."""
     home = frozenset({"home"})
 
     def refuse(message: str) -> RpcError:

@@ -2651,8 +2651,11 @@ runs there); otherwise the phone is chosen only when no screen is online.
 ### Waiting news
 
 News the gate shuts out is never dropped: it stays `new` in the log until it can be told, or until
-it is ended as stale (`EventLog.finish_matching`). No code creates `held` open items any more; the
-`held` kind and Home's Held row remain until they are removed. Snoozing stays with the loop
+it is ended as stale (`EventLog.finish_matching`). Migration 0037 removed the `held` and `setup`
+open-item kinds. Home's `events_waiting` tool (`events_tools.py`) lists the news still `new` and the
+news given up, oldest first, each as `{id, kind, source, at, age_s, gave_up, gist}`; the `gist` is
+the payload's first fact value cut short, never prose. A say or card answer in flight is not listed.
+Snoozing stays with the loop
 service, which holds a snoozed loop itself, so the runner has no snooze rule of its own.
 
 There is one deadline rule: `DEADLINE_S` in `open_items.py` for what waits on a person. The ask wait
