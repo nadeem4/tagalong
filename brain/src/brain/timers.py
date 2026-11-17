@@ -57,9 +57,6 @@ class Timers:
         self._runs: set[asyncio.Task] = set()
 
     def start(self) -> None:
-        # A one-off that fired but whose wake never began is re-delivered.
-        for row in self._work.of_kind("timer", ["active"]):
-            self._emit_one(row, self._work.repeat_of(row.id))
         self.fire_due()
 
     def fire_due(self) -> None:
@@ -73,6 +70,9 @@ class Timers:
                 self._emit_one(row, repeat_s, lambda db, id=row.id: self._work.fire(id, at))
             except TransitionRefused:
                 continue  # cancelled or paused as it came due: already handled, nothing saved
+            except Exception:
+                log.exception("firing timer %s failed", row.id)  # the others still fire
+                continue
             fired = True
         self._rerun_due()
         self._arm()
@@ -113,11 +113,21 @@ class Timers:
             self._notify("changed", {"what": "timers"})
 
     def cancel(self, tid: str, reason: str) -> bool:
-        """End a timer or watch row; False when it is gone or already ended."""
-        try:
-            self._work.transition(tid, "cancelled", reason=reason)
-        except (TransitionRefused, KeyError):
+        """End a timer or watch row; False when it is gone or already ended and told.
+
+        A one-off that fired but whose news Scout has not heard yet can still be cancelled:
+        its waiting event is finished, so the reminder is not told.
+        """
+        row = self._work.get(tid)
+        if row is None:
             return False
+        if row.state == "done" and row.reported_at is None:
+            pass  # fired, not yet told: only its news is left to end
+        else:
+            try:
+                self._work.transition(tid, "cancelled", reason=reason)
+            except TransitionRefused:
+                return False
         self._work.mark_reported(tid)  # nobody needs telling about a cancel
         self._finish_news("timer", f"timer:{tid}")
         self.changed()
@@ -127,7 +137,7 @@ class Timers:
         self,
         row: WorkRow,
         repeat_s: int | None,
-        then: Callable[[sqlite3.Connection], None] | None = None,
+        then: Callable[[sqlite3.Connection], None],
     ) -> None:
         facts: dict = {"id": row.id, "note": note_of(row), "repeat_minutes": (repeat_s or 0) // 60}
         if row.kind == "watch":

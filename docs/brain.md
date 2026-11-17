@@ -1922,7 +1922,8 @@ is not running is refused (`no job with id j9.`, `job j9 is not running (done).`
 - **Known gap.** Timers fire only while the brain runs. One that came due while it was off fires
   once at the next start. There is no heartbeat: Scout wakes only for events and its own timers.
   Cancelling a timer finishes its waiting event (`finish_matching`, source `timer:<id>`), so the
-  dispatcher lets go of it: Scout is not woken with the note of a cancelled timer.
+  dispatcher lets go of it: Scout is not woken with the note of a cancelled timer. This includes a
+  one-off that has fired (`done`) but not yet been told; one already told cannot be cancelled.
 
 ### Watches
 
@@ -1936,8 +1937,7 @@ not announced. The old `tracking` memories became paused watches when the databa
 on the next start the Session emits `watches_paused` once (0 s batch, 2 an hour) with the facts
 `watches` (whole `id: note (cadence)` entries, up to 1500 characters; any left over are told at
 the next start), and Scout mentions them and offers to switch each on. It does not switch any on
-itself. Timers the migration found already fired but not yet delivered stay `active`, so the next
-start emits them again, as before.
+itself.
 
 ## Loops
 

@@ -7,7 +7,6 @@ second.
 import asyncio
 from datetime import UTC, datetime, timedelta
 
-import pytest
 from job_rows import add_timer
 
 from brain.events import EventLog
@@ -87,6 +86,52 @@ def test_a_fired_one_off_is_done_and_its_event_saved_together():
     assert [(r.kind, r.state, r.source) for r in ready] == [("timer", "new", f"timer:{t.id}")]
 
 
+def test_one_failing_fire_does_not_stop_the_next_row(monkeypatch):
+    timers, work, _c, events = make()
+    first = add_timer(work, "first", T0 - timedelta(minutes=2))
+    second = add_timer(work, "second", T0 - timedelta(minutes=1))
+    real = work.fire
+
+    def flaky(id, at):
+        if id == first.id:
+            raise RuntimeError("disk full")
+        real(id, at)
+
+    monkeypatch.setattr(work, "fire", flaky)
+    timers.fire_due()
+    assert [e.payload["note"] for e in events] == ["second"]
+    assert work.get(first.id).state == "planned"
+    assert work.get(second.id).state == "done"
+
+
+def test_cancelling_a_fired_but_untold_timer_ends_its_news():
+    memory = Memory(":memory:")
+    log = EventLog(memory.db, Masker(lambda: []), Clock())
+    work = WorkStore(memory.db, Clock())
+    timers = Timers(
+        work,
+        lambda event, **kw: log.post(event, then=kw["then"]),
+        Clock(),
+        finish_news=log.finish_matching,
+    )
+    t = add_timer(work, "stretch", T0 - timedelta(seconds=1))
+    timers.fire_due()
+    assert len(log.ready()) == 1
+    assert timers.cancel(t.id, "cancelled by the person") is True
+    assert log.ready() == []  # finished, not told
+    assert work.get(t.id).reported_at is not None
+    assert timers.cancel(t.id, "again") is False  # already ended and handled
+
+
+def test_a_one_off_already_told_cannot_be_cancelled():
+    timers, work, _c, _events = make()
+    t = add_timer(work, "x", T0 - timedelta(seconds=1))
+    timers.fire_due()
+    timers.ends[0]("done")  # Scout heard it
+    assert timers.cancel(t.id, "late") is False
+    assert timers.cancel("nope", "x") is False
+
+
 def test_a_fire_whose_event_insert_fails_leaves_the_timer_planned(monkeypatch):
     memory = Memory(":memory:")
     log = EventLog(memory.db, Masker(lambda: []), Clock())
@@ -98,8 +143,7 @@ def test_a_fire_whose_event_insert_fails_leaves_the_timer_planned(monkeypatch):
         raise RuntimeError("disk full")
 
     monkeypatch.setattr(event_store, "insert", boom)
-    with pytest.raises(RuntimeError):
-        timers.fire_due()
+    timers.fire_due()  # logged, not raised: the other rows still get their turn
     row = work.get(t.id)
     assert (row.state, row.due_at) == ("planned", "2026-10-28T11:59:59+00:00")
     assert log.ready() == []
