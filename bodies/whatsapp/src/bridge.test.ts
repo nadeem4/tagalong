@@ -4,7 +4,7 @@
  */
 import { createHmac } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
-import type { BrainSocket } from '@tagalong/contract';
+import { SayParams, type BrainSocket } from '@tagalong/contract';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createBridge } from './bridge';
 import type { WhatsAppConfig } from './config';
@@ -111,29 +111,6 @@ class FakeBrain {
         jsonrpc: '2.0',
         method: 'reply',
         params: { seq: ++this.seq, turn, body, ...fields },
-      }),
-    );
-  }
-
-  /** A `turn` frame, as the brain sends it when a turn starts, joins or ends. */
-  turn(
-    state: 'started' | 'joined' | 'ended',
-    turn: string,
-    fields: { events?: string[]; reason?: string } = {},
-  ) {
-    const taking = state === 'ended' ? {} : { events: [], source: 'whatsapp', ...fields };
-    this.onMessage(
-      JSON.stringify({
-        jsonrpc: '2.0',
-        method: 'turn',
-        params: {
-          seq: ++this.seq,
-          turn,
-          body: 'whatsapp',
-          state,
-          ...taking,
-          ...(state === 'ended' ? fields : {}),
-        },
       }),
     );
   }
@@ -253,33 +230,16 @@ describe('bridge', () => {
     });
   });
 
-  test('replies on the turn whose events hold the message say id', async () => {
-    const { brain, graph, inbound } = await setup();
+  test('every message says with a fresh id', async () => {
+    const { brain, inbound } = await setup();
     await online(brain);
-    await inbound('hi');
+    await inbound('one');
     await vi.waitFor(() => expect(brain.says()).toHaveLength(1));
-    const id = (brain.says()[0]?.params as { id: string }).id;
-    expect(id).toMatch(/^[0-9a-f-]{36}$/);
-    brain.turn('started', 't9', { events: [id] });
-    brain.reply('whatsapp', { delta: 'cut off' }, 't9');
-    brain.turn('ended', 't9', { reason: 'cancelled' });
-    brain.reply('whatsapp', { done: true }, 't9');
-    await new Promise((r) => setTimeout(r, 30));
-    expect(graph.bodies).toEqual([]);
-  });
-
-  test('a joined turn with my say id is mine too, and its reply is sent', async () => {
-    const { brain, graph, inbound } = await setup();
-    await online(brain);
-    await inbound('hi');
-    await vi.waitFor(() => expect(brain.says()).toHaveLength(1));
-    const id = (brain.says()[0]?.params as { id: string }).id;
-    brain.turn('started', 't9', { events: ['other'] });
-    brain.turn('joined', 't9', { events: [id] });
-    brain.reply('whatsapp', { delta: 'ok' }, 't9');
-    brain.turn('ended', 't9', { reason: 'done' });
-    brain.reply('whatsapp', { done: true }, 't9');
-    await vi.waitFor(() => expect(graph.bodies).toHaveLength(1));
+    await inbound('two');
+    await vi.waitFor(() => expect(brain.says()).toHaveLength(2));
+    const params = brain.says().map((m) => m.params);
+    expect(params[0]?.['id']).not.toBe(params[1]?.['id']);
+    for (const p of params) expect(SayParams.safeParse(p).success).toBe(true);
   });
 
   test('test_a_huge_reply_sends_four_messages_and_the_note', async () => {

@@ -32,8 +32,7 @@ secret filter.
 
 - Hello: `{"protocol":2,"body":{"id":"whatsapp","kind":"whatsapp","name":"WhatsApp"},"tools":[]}`. No
   tools and no `display: false`, so the brain counts it as a body that shows answers.
-- Each text becomes `say` with a fresh `id` (a UUID, recorded before the send so a `turn` frame that beats the reply still matches) and `context: {channel: "whatsapp", note: "text chat on a phone; keep replies short and offer detail on request"}`.
-- A `turn` frame whose `events` hold one of those ids (started or joined) marks that turn as the phone's; the id is then forgotten. If such a turn ends without `done` (cancelled, error), its buffered words are dropped, not sent as a half reply.
+- Each text becomes `say` with a fresh `id` (a UUID, so the brain can tell a retry from a new say) and `context: {channel: "whatsapp", note: "text chat on a phone; keep replies short and offer detail on request"}`.
 - A `reply` is kept only when its `body` is `whatsapp`, buffered per turn and sent at `done`. A reply
   for another body is ignored. If the brain is down when you write, the message is logged and nothing
   is sent to the phone.

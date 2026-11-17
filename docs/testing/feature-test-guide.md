@@ -2810,8 +2810,7 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
    keeps working.
 5. `pnpm --filter @tagalong/whatsapp exec vitest run src/bridge.test.ts` and
    `pnpm --filter @tagalong/browser exec vitest run src/body.test.ts`: each say carries a fresh
-   `id`; the WhatsApp bridge marks the turn whose `events` hold its say id as its own and drops
-   the half reply of such a turn that ends without `done`.
+   `id` (distinct per message, valid `SayParams`).
 6. By hand, once the bridge is built (a later slice): set the real values, start the brain and check
    `brain.log` for the bridge's lines; `tagalong stop` leaves no `node` process behind.
 
