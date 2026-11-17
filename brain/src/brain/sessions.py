@@ -400,10 +400,11 @@ class Session:
         # True when the last turn was cancelled before any word and its request is still last in
         # history: the next turn drops it (see _drop_unanswered).
         self._wordless_cancel = False
-        # How unsaved blocks are saved, by block identity (the blocks live in history meanwhile):
-        # an event's own blocks become its row; turn-only blocks are never saved.
-        self._row_of: dict[int, tuple[str, str]] = {}
-        self._unsaved: set[int] = set()
+        # How unsaved blocks are saved, by block identity: an event's own blocks become its row;
+        # turn-only blocks are never saved. Each entry holds its block, so its id is not reused.
+        # Cleared once everything is saved.
+        self._row_of: dict[int, tuple[dict, str, str]] = {}
+        self._unsaved: dict[int, dict] = {}
         self._last_rows: list[int] = []  # the saved rows of the newest message saved
         self._rejected = False  # the API answered the running turn's request with a 400
         self._turn_id: str | None = None
@@ -548,7 +549,8 @@ class Session:
             text = wake_text(self._kinds[kind], group, note, tz, attrs)
             content.append(self._turn_only({"type": "text", "text": text}))
         if not params and self._wants_speech(body, None):
-            content.append({"type": "text", "text": ear_note()})
+            # How to write for the ear this turn: a note for the model, never a saved row.
+            content.append(self._turn_only({"type": "text", "text": ear_note()}))
         cut = next((r.payload["cut"] for r, _ in says if "cut" in r.payload), None)
         # Before the turn starts: nothing after it may fail, or the runner would free the one
         # turn while this one still runs.
@@ -570,12 +572,12 @@ class Session:
     def _of_event(self, row: EventRow, blocks: list[dict]) -> list[dict]:
         """Blocks that render a taken event: they are saved as that event's own row."""
         for block in blocks:
-            self._row_of[id(block)] = (row.id, row.source)
+            self._row_of[id(block)] = (block, row.id, row.source)
         return blocks
 
     def _turn_only(self, block: dict) -> dict:
         """A block told to the running turn alone, never saved."""
-        self._unsaved.add(id(block))
+        self._unsaved[id(block)] = block
         return block
 
     def _say_params(self, row: EventRow) -> SayParams:
@@ -1069,13 +1071,14 @@ class Session:
         lead = [self._turn_only(b) for b in [*self._carried, *lead]]  # an interjection's, once
         self._carried = []
 
-        self._drop_unanswered()
-        self._append_user(lead + content)
         # Read once per turn so the system prompt stays identical across its steps (cache).
+        # Read before history changes: a failed read leaves no half request for the retry to join.
         know = render_know(
             self._memory.always_loaded(), self._memory.asked_topics(), self._memory.shape()
         )
         prefs = render_preferences(rules.list_preferences(self._memory.db))
+        self._drop_unanswered()
+        self._append_user(lead + content)
         notify = self._bodies.notify
         # Deferred a tick so the say result goes out before the started notification.
         asyncio.get_running_loop().call_soon(
@@ -1141,8 +1144,8 @@ class Session:
         task = asyncio.create_task(run())
         self._task = task
         task.add_done_callback(lambda t: self._ended(t, turn_id, body_id, lead, body_kind))
-        # Saved before the model is asked, after the last thing here that can fail (a failed
-        # start is retried and would save its events twice): a crash keeps the request.
+        # Saved before the model is asked, so a crash keeps the request; the task cannot run
+        # before this returns.
         self._save_new(body_kind)
         return turn_id
 
@@ -1295,9 +1298,6 @@ class Session:
             self._task = None
         self._last_turn = turn_id
         self._save_new(body_kind)  # the closing reply; earlier steps were saved as they ended
-        # Still mapped now: only blocks a failed save left behind. They are saved plainly later.
-        self._row_of.clear()
-        self._unsaved.clear()
         if unanswered and self._saved == len(self.history):
             self._wordless_cancel = True
             self._mark_cut(True)  # the saved chat keeps it; a restart skips it
@@ -1347,6 +1347,9 @@ class Session:
                 # The newest message's rows: what a wordless cancel marks as cut.
                 self._last_rows = ids[len(ids) - len(per[-1]) :]
             self._saved = len(self.history)  # before summaries, so a failure there cannot re-save
+            # All on disk now; a failed save keeps the marks so a later one still splits it.
+            self._row_of.clear()
+            self._unsaved.clear()
             for message in new:
                 if message["role"] != "assistant" or isinstance(message["content"], str):
                     continue
@@ -1366,7 +1369,7 @@ class Session:
         for block in content:
             if id(block) in self._unsaved:
                 continue
-            event, source = self._row_of.get(id(block), (None, None))
+            _, event, source = self._row_of.get(id(block), (None, None, None))
             if rows and rows[-1][1] == event:
                 rows[-1][0]["content"].append(block)
             else:

@@ -644,6 +644,66 @@ async def test_a_retried_say_gains_no_second_row(tmp_path):
     assert "resume=" not in json.dumps(memory.load_messages())  # the mark was for that turn
 
 
+async def test_a_start_that_fails_before_the_model_keeps_no_half_request(tmp_path, monkeypatch):
+    import brain.sessions as sessions_module
+
+    real = sessions_module.render_know
+    calls = []
+
+    def flaky(*args):
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("memory read failed")
+        return real(*args)
+
+    monkeypatch.setattr(sessions_module, "render_know", flaky)
+    memory = file_memory(tmp_path)
+    clock = [datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)]
+    model = Gate(["ok"])
+    session, _ = make(model, memory, now=lambda: clock[0])
+    await session.say("desktop", SayParams(id="s1", text="hello there"))
+    await idle(session)
+    assert model.seen == []  # the start broke before the model was asked
+    clock[0] += datetime.timedelta(seconds=30)  # its backoff is over: it is tried again
+    session.runner.poke()
+    await idle(session)
+    assert saved_rows(memory) == [("user", "s1", "desktop", 0), ("assistant", None, None, 0)]
+    assert json.dumps(model.seen[-1]).count("hello there") == 1
+
+
+async def test_a_failed_save_never_saves_a_turn_only_mark_later(tmp_path):
+    memory = file_memory(tmp_path)
+    clock = [datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)]
+    session, _ = make(FailsFirst(["ok", "fine"]), memory, now=lambda: clock[0])
+    await session.say("desktop", SayParams(id="s1", text="first words"))
+    await idle(session)  # errors: s1 comes back as a resume mark
+    real = memory.save_messages
+    memory.save_messages = lambda *a, **k: (_ for _ in ()).throw(OSError("disk full"))
+    clock[0] += datetime.timedelta(seconds=30)
+    await session.say("desktop", SayParams(id="s2", text="second words"))
+    await idle(session)  # this turn's saves all fail
+    memory.save_messages = real
+    await session.say("desktop", SayParams(id="s3", text="third words"))
+    await idle(session)
+    assert "resume=" not in json.dumps(memory.load_messages())
+    assert [r for r in saved_rows(memory) if r[0] == "user"] == [
+        ("user", "s1", "desktop", 0),
+        ("user", "s2", "desktop", 0),
+        ("user", "s3", "desktop", 0),
+    ]
+
+
+async def test_the_ear_note_of_a_news_turn_is_not_saved(tmp_path):
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate(["ok"]), memory)
+    session.voice = RecordingVoice()
+    join(session, "desktop")
+    read_aloud(session)
+    session.post_event(Event("job_ended", "job:j1", {"report": "Job j1 ended."}, id="n1"))
+    await idle(session)
+    assert saved_rows(memory) == [("user", "n1", "job:j1", 0), ("assistant", None, None, 0)]
+
+
 async def test_a_wordless_cancel_marks_every_row_of_its_request_cut(tmp_path):
     memory = file_memory(tmp_path)
     stuck = asyncio.Event()
