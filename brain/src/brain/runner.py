@@ -12,7 +12,7 @@ import logging
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, tzinfo
+from datetime import datetime, timedelta
 from typing import Protocol
 
 from brain.bodies import Bodies
@@ -63,24 +63,36 @@ def pick(
     return Pick(body, events)
 
 
+def _age(rows: list[EventRow], now: datetime) -> str:
+    """How long the oldest of these has waited, in one unit: Scout weighs old news, code never
+    drops it."""
+    s = int((now - min(datetime.fromisoformat(r.at) for r in rows)).total_seconds())
+    for size, unit in ((86400, "d"), (3600, "h"), (60, "m")):
+        if s >= size:
+            return f"{s // size}{unit}"
+    return f"{max(s, 0)}s"
+
+
 def wake_text(
     kind: EventKind,
     rows: list[EventRow],
     note: str,
-    tz: tzinfo | None,
+    now: datetime,
     attrs: dict[str, str] | None = None,
 ) -> str:
     """The facts of a batch of one kind, fenced as data: the model reads them, never obeys them.
-    `attrs` mark the block (a resumed or given-up event); code sets them, never a payload."""
+    The block carries its `age`; `attrs` mark it (a resumed or given-up event). Code sets both,
+    never a payload."""
     lines = [f"Event: {kind.name}", *([f"How to weigh it: {note}"] if note else [])]
     for row in rows:
-        at = datetime.fromisoformat(row.at).astimezone(tz)
+        at = datetime.fromisoformat(row.at).astimezone(now.tzinfo)
         lines.append(f"- at {at.strftime('%Y-%m-%d %H:%M %z')}")
         for name, value in (row.payload or {}).items():
             first, *rest = str(value).split("\n")
             lines.append(f"  {name}: {first}")
             lines.extend(f"    {r}" for r in rest)
-    marks = "".join(f' {k}="{v}"' for k, v in (attrs or {}).items() if v)  # none empty
+    shown = {"age": _age(rows, now), **(attrs or {})}
+    marks = "".join(f' {k}="{v}"' for k, v in shown.items() if v)  # none empty
     return f'<data kind="event"{marks}>\n{_fence_safe(chr(10).join(lines))}\n</data>'
 
 
@@ -337,7 +349,7 @@ class Runner:
         body = self.target(row)
         assert body is not None  # it had one when taken, and nothing ran since
         kind = self._kinds[row.kind]
-        text = wake_text(kind, [row], self.notes.get(kind.name, ""), self._now().tzinfo)
+        text = wake_text(kind, [row], self.notes.get(kind.name, ""), self._now())
         task = asyncio.get_running_loop().create_task(
             self._interjection(body, row, [{"type": "text", "text": text}])
         )
@@ -361,9 +373,9 @@ class Runner:
         self.poke()
 
     def _arm(self, waiting: list[EventRow]) -> None:
-        """Look again when the soonest closed gate can open (a batch or the idle window) or a
-        backing-off event's wait ends. A cap, quiet hours, no key or no body has no known time,
-        so those are looked at again later."""
+        """Look again when the soonest closed gate can open (a batch, the idle window or the
+        budget's reset at local midnight) or a backing-off event's wait ends. A cap, quiet
+        hours, no key or no body has no known time, so those are looked at again later."""
         now = self._now()
         delay = RECHECK_S
         retry = self._events.next_retry()
@@ -379,6 +391,10 @@ class Runner:
             wait = (opens - now).total_seconds()
             if wait > 0:
                 delay = min(delay, wait)
+        if waiting and self.over_budget():  # held for the budget: the reset opens the gate
+            tomorrow = now + timedelta(days=1)
+            midnight = tomorrow.replace(hour=0, minute=0, second=0, microsecond=0)
+            delay = min(delay, (midnight - now).total_seconds())
         self._alarm = asyncio.get_running_loop().call_later(delay, self._rang)
 
     def _rang(self) -> None:

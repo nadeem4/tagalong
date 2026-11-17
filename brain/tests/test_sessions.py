@@ -1576,7 +1576,7 @@ async def test_a_job_ending_wakes_one_turn_with_the_facts_and_is_told_when_it_en
     await idle(session)
     assert job_told(memory, "j1")
     text = model.seen[-1][-1]["content"][-1]["text"]
-    assert text.startswith('<data kind="event">') and text.endswith("</data>")
+    assert text.startswith('<data kind="event" age=') and text.endswith("</data>")
     assert "Event: job_ended" in text
     for fact in ("j1", "fix the build", "C:/x", "done", "all good"):
         assert fact in text
@@ -2229,7 +2229,7 @@ async def test_an_errored_say_reaches_the_model_once_and_is_named_as_a_retry():
     last = model.seen[-1][-1]["content"]
     assert {"type": "text", "text": "second words"} in last
     fact = next(b["text"] for b in last if "resume=" in b.get("text", ""))
-    assert fact.startswith('<data kind="event" resume="true" reason="error">')
+    assert fact.startswith('<data kind="event" age="') and ' resume="true" reason="error">' in fact
     assert "Event: say" in fact and "text: first words" in fact
     assert "second line" not in fact and "above" not in fact
     assert session._live_params == {}
@@ -2254,7 +2254,8 @@ async def test_a_step_cap_turns_say_comes_back_as_a_resume_fact_not_its_words():
     await idle(session)
     last = model.seen[-1][-1]["content"]
     fact = next(b["text"] for b in last if "resume=" in b.get("text", ""))
-    assert fact.startswith('<data kind="event" resume="true" reason="step_cap">')
+    assert fact.startswith('<data kind="event" age="')
+    assert ' resume="true" reason="step_cap">' in fact
     assert "Event: say" in fact and "text: plan my week" in fact  # named by its first line
     assert "How to weigh it" not in fact  # a say has no note; no empty line for one
     blocks = [b.get("text") for m in model.seen[-1] for b in m["content"]]
@@ -2271,7 +2272,7 @@ async def test_gave_up_events_are_told_as_facts_on_a_person_turn_once():
     await session.say("desktop", say("hi"))
     await idle(session)
     fact = next(b["text"] for b in model.seen[-1][-1]["content"] if "gave_up=" in b["text"])
-    assert fact.startswith('<data kind="event" gave_up="true" reason="error">')
+    assert fact.startswith('<data kind="event" age="') and ' gave_up="true" reason="error">' in fact
     assert "the build broke" in fact
     assert session.events.get("g").state == "handled"
     await session.say("desktop", say("again"))

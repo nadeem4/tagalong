@@ -514,7 +514,7 @@ class Session:
             # Nothing can answer and no use asking again; a given-up rider was not told.
             self.runner.turn_ended(turn_id, "unanswered")
             return
-        tz = self._now().tzinfo
+        now = self._now()
         self._retried = [r.id for r in rows if r.resume]
         says = [(r, self._say_params(r)) for r in rows if r.kind == "say"]
         params = [p for _, p in says]
@@ -535,14 +535,14 @@ class Session:
             # One block per event, so each is saved as its own row; the note once per kind.
             note = self.runner.notes.get(kind, "")
             for n, row in enumerate(group):
-                text = wake_text(self._kinds[kind], [row], note if n == 0 else "", tz)
+                text = wake_text(self._kinds[kind], [row], note if n == 0 else "", now)
                 content += self._of_event(row, [{"type": "text", "text": text}])
         # The marks below are for this turn only: each event got its row from the turn that
         # first took it, so they are never saved (one event, one row).
         for (kind, reason), group in resumed.items():
             attrs = {"resume": "true", "reason": reason}
             note = self.runner.notes.get(kind, "")
-            text = wake_text(self._kinds[kind], group, note, tz, attrs)
+            text = wake_text(self._kinds[kind], group, note, now, attrs)
             content.append(self._turn_only({"type": "text", "text": text}))
         told: dict[tuple[str, str], list[EventRow]] = {}
         for row in gave_up:
@@ -556,7 +556,7 @@ class Session:
         for (kind, reason), group in told.items():
             attrs = {"gave_up": "true", "reason": reason}
             note = self.runner.notes.get(kind, "")
-            text = wake_text(self._kinds[kind], group, note, tz, attrs)
+            text = wake_text(self._kinds[kind], group, note, now, attrs)
             content.append(self._turn_only({"type": "text", "text": text}))
         if not params and self._wants_speech(body, None):
             # How to write for the ear this turn: a note for the model, never a saved row.

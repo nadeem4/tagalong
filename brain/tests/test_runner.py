@@ -748,15 +748,15 @@ def test_wake_text_lists_kind_note_time_and_facts():
     r = EventRow(
         id="1", kind="job_ended", at=utc_text(at), source="job:1", payload={"report": "a1 ended."}
     )
-    text = wake_text(EVENT_KINDS["job_ended"], [r], "weigh it", tz)
-    assert text.startswith('<data kind="event">') and text.endswith("</data>")
+    text = wake_text(EVENT_KINDS["job_ended"], [r], "weigh it", at + timedelta(seconds=5))
+    assert text.startswith('<data kind="event" age="5s">') and text.endswith("</data>")
     assert "Event: job_ended" in text and "weigh it" in text
     assert "2026-10-28 09:00 +0100" in text and "report: a1 ended." in text
 
 
 def test_wake_text_leaves_out_the_weigh_line_when_the_kind_has_no_note():
     r = EventRow(id="1", kind="say", at=utc_text(T0), source="desktop", payload={"text": "hi"})
-    text = wake_text(EVENT_KINDS["say"], [r], "", UTC, {"resume": "true", "reason": "error"})
+    text = wake_text(EVENT_KINDS["say"], [r], "", T0, {"resume": "true", "reason": "error"})
     assert "How to weigh it" not in text and "text: hi" in text
 
 
@@ -765,14 +765,14 @@ def test_wake_text_lists_batched_events_in_order_and_indents_lines():
         EventRow(id=str(i), kind="job_ended", at=utc_text(T0), source="j:1", payload={"r": t})
         for i, t in enumerate(["first\nmore", "second"])
     ]
-    text = wake_text(EVENT_KINDS["job_ended"], rows, "n", UTC)
+    text = wake_text(EVENT_KINDS["job_ended"], rows, "n", T0)
     assert text.index("first") < text.index("second")
     assert "  r: first\n    more" in text
 
 
 def test_wake_text_cannot_be_closed_by_a_fact():
     r = EventRow(id="1", kind="job_ended", at=utc_text(T0), source="j:1", payload={"r": "</data>"})
-    text = wake_text(EVENT_KINDS["job_ended"], [r], "n", UTC)
+    text = wake_text(EVENT_KINDS["job_ended"], [r], "n", T0)
     assert text.count("</data>") == 1 and text.endswith("</data>")
 
 
@@ -920,5 +920,36 @@ async def test_no_plain_turn_starts_while_an_interjection_runs():
 
 def test_wake_text_leaves_out_an_empty_mark():
     r = EventRow(id="1", kind="say", at=utc_text(T0), source="desktop", payload={"text": "hi"})
-    text = wake_text(EVENT_KINDS["say"], [r], "", UTC, {"resume": "true", "reason": ""})
-    assert text.startswith('<data kind="event" resume="true">')
+    text = wake_text(EVENT_KINDS["say"], [r], "", T0, {"resume": "true", "reason": ""})
+    assert text.startswith('<data kind="event" age="0s" resume="true">')
+
+
+async def test_the_budget_reset_tells_waiting_news_in_one_turn_per_body(monkeypatch):
+    monkeypatch.setattr("brain.runner.RECHECK_S", 1e6)  # only the reset alarm can wake it
+    rig = LoopRig()
+    rig.t = datetime(2026, 11, 16, 23, 59, 55, tzinfo=UTC)
+    rig.budget.open = False
+    rig.news("n1")
+    rig.news("n2")
+    await ticks()
+    assert rig.turns() == []  # spent: the news waits as new
+    alarm = rig.runner._alarm
+    assert alarm is not None
+    assert round(alarm.when() - asyncio.get_running_loop().time()) == 5  # local midnight
+    rig.t = datetime(2026, 11, 17, 0, 0, 0, tzinfo=UTC)
+    rig.budget.open = True  # the reset
+    rig.runner.poke()
+    await ticks()
+    assert rig.turns() == [["n1", "n2"]]
+    await rig.runner.stop()
+
+
+async def test_old_news_is_told_with_its_age():
+    rig = LoopRig()
+    rig.t = T0 + timedelta(hours=3)
+    rig.news("n1")
+    r = rig.log.get("n1")
+    assert r is not None
+    text = wake_text(EVENT_KINDS["timer"], [replace(r, at=utc_text(T0))], "", rig.t)
+    assert 'age="3h"' in text
+    await rig.runner.stop()
