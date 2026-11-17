@@ -1,7 +1,7 @@
 /**
  * Home's Tasks page on the fake brain: the Now card shows a waiting ask (answered with Allow), a
  * running job and a timer about to fire; the tabs carry counts; Cancel on the Timers tab reaches
- * the brain.
+ * the brain; the Waiting tab lists the news not yet told and marks a say Scout gave up on.
  */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -93,12 +93,18 @@ test('Now shows a waiting ask, a running job and a timer; the tabs count and Can
 
   await expect(home.getByRole('tab', { name: 'Jobs (2)' })).toBeVisible({ timeout: 15_000 });
   await expect(home.getByRole('tab', { name: 'Timers (2)' })).toBeVisible({ timeout: 15_000 });
+  await expect(home.getByRole('tab', { name: 'Waiting (2)' })).toBeVisible({ timeout: 15_000 });
 
   await now.getByRole('button', { name: 'Allow I will move the Notes window.' }).click();
   await expect
     .poll(() => brain.answers, { timeout: 15_000 })
     .toEqual([{ ask: 'a1', option: 'allow' }]);
   await expect(now).not.toContainText('I will move the Notes window.');
+
+  await home.getByRole('tab', { name: /^Waiting/ }).click();
+  const news = home.getByRole('list', { name: 'Waiting news' });
+  await expect(news).toContainText('Fix the build finished');
+  await expect(news).toContainText('Scout could not finish');
 
   await home.getByRole('tab', { name: /^Timers/ }).click();
   await home.getByRole('button', { name: 'Cancel water the plants' }).click();

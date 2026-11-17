@@ -1,12 +1,12 @@
 /**
  * Tests for TasksView: the page title, the three tabs with counts read from the brain, the job
- * page opening in place of everything, the Held tab holding the loops panel and the Timers tab.
+ * page opening in place of everything, the Waiting tab holding the news and the loops panel and the Timers tab.
  */
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { HostBridgeProvider, type JobRow } from '../host-bridge';
-import type { LoopRow, TimerRow } from '../shapes';
+import type { LoopRow, TimerRow, WaitingEvent } from '../shapes';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
 import { TasksView } from './tasks-view';
 
@@ -35,6 +35,14 @@ const loop = (id: string, status: LoopRow['status'] = 'held'): LoopRow => ({
   people: [],
   status,
 });
+const waiting = (id: string): WaitingEvent => ({
+  id,
+  kind: 'job_done',
+  source: 'job:j1',
+  ageS: 60,
+  gaveUp: false,
+  gist: `News ${id}`,
+});
 const timer = (id: string, extra: Partial<TimerRow> = {}): TimerRow => ({
   id,
   note: `note ${id}`,
@@ -57,17 +65,13 @@ describe('TasksView', () => {
     open(
       createFakeHostBridge({
         jobs: [job('j1', 'Fix it'), job('j2', 'Write docs')],
-        loops: {
-          apps: [{ id: 'gmail', name: 'Gmail', on: true }],
-          loops: [loop('a'), loop('b', 'done')],
-          openItems: [],
-        },
+        waiting: [waiting('e1'), waiting('e2')],
         timers: [timer('t1'), timer('t2'), timer('t3')],
       }),
     );
     expect(await screen.findByRole('heading', { name: 'Tasks', level: 1 })).toBeVisible();
     expect(await screen.findByRole('tab', { name: 'Jobs (2)' })).toBeVisible();
-    expect(await screen.findByRole('tab', { name: 'Held (1)' })).toBeVisible();
+    expect(await screen.findByRole('tab', { name: 'Waiting (2)' })).toBeVisible();
     expect(await screen.findByRole('tab', { name: 'Timers (3)' })).toBeVisible();
   });
 
@@ -85,14 +89,20 @@ describe('TasksView', () => {
     const panel = await screen.findByRole('region', { name: 'Jobs' });
     fireEvent.click(within(panel).getByRole('button', { name: 'Watch Fix it' }));
     expect(await screen.findByRole('tab', { name: 'Overview' })).toBeVisible();
-    expect(screen.queryByRole('tab', { name: /^Held/ })).toBeNull(); // the page takes everything
+    expect(screen.queryByRole('tab', { name: /^Waiting/ })).toBeNull(); // the page takes everything
     expect(screen.queryByRole('heading', { name: 'Tasks', level: 1 })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /back/i }));
     expect(await screen.findByRole('region', { name: 'Jobs' })).toBeVisible();
-    expect(screen.getByRole('tab', { name: /^Held/ })).toBeVisible();
+    expect(screen.getByRole('tab', { name: /^Waiting/ })).toBeVisible();
   });
 
-  it('puts the loops panel inside the Held tab and Forget still works', async () => {
+  it('lists the waiting news when the Waiting tab opens', async () => {
+    open(createFakeHostBridge({ waiting: [waiting('e1')] }));
+    fireEvent.click(await screen.findByRole('tab', { name: /^Waiting/ }));
+    expect(await screen.findByText('News e1')).toBeVisible();
+  });
+
+  it('puts the loops panel inside the Waiting tab and Forget still works', async () => {
     const bridge = createFakeHostBridge({
       loops: {
         apps: [{ id: 'gmail', name: 'Gmail', on: true }],
@@ -102,7 +112,7 @@ describe('TasksView', () => {
     });
     open(bridge);
     expect(screen.queryByText('Read my mail for loops')).toBeNull();
-    fireEvent.click(await screen.findByRole('tab', { name: /^Held/ }));
+    fireEvent.click(await screen.findByRole('tab', { name: /^Waiting/ }));
     expect(await screen.findByText('Read my mail for loops')).toBeVisible();
     fireEvent.click(await screen.findByRole('button', { name: 'Forget Loop a' }));
     await waitFor(() => expect(bridge.loopCalls).toEqual(['forget a']));

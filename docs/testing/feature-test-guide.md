@@ -581,8 +581,8 @@ next section.
    (`test_a_card_comes_back_when_a_body_joins_after_a_restart`, `test_reconnect_reshows_open_cards`).
    Scout is told which asks wait and how old each is (`asks_waiting`,
    `test_return_wake_names_waiting_asks_and_their_age`), and an expert ask whose process ended while you
-   were away is closed on return (`test_live_only_shown_expired_on_return`). Home's Tasks page, Held tab,
-   lists the open ask under "Waiting on you" with its age (`held-tab.test.tsx`). Set the tool to Off before
+   were away is closed on return (`test_live_only_shown_expired_on_return`). Home's Tasks page, Waiting tab,
+   lists the open ask under "Waiting on you" with its age (`loops-panel.test.tsx`). Set the tool to Off before
    answering: the ask is refused and Scout says so
    (`test_a_tool_turned_off_since_refuses_the_late_yes`). Quit the brain right after allowing
    and before the call finishes: on start Scout says it is not known if it ran, and it is not run
@@ -746,7 +746,7 @@ Automated: `pnpm --filter @tagalong/ui test` (`tasks-view`, `now-card`, `timers-
 `e2e/tasks.spec.ts` on the fake brain. By hand, with a real brain:
 
 1. **Action:** open Home and press Tasks.
-   **Expected:** a Now card, then tabs Jobs, Held and Timers, each with a count once loaded.
+   **Expected:** a Now card, then tabs Jobs, Waiting and Timers, each with a count once loaded.
 2. **Action:** ask Scout to "remind me in 10 minutes to stretch", then look at Now and the Timers tab.
    **Expected:** Now lists the note with "in N min"; the Timers tab lists it with its local time.
 3. **Action:** press Cancel on it.
@@ -756,6 +756,8 @@ Automated: `pnpm --filter @tagalong/ui test` (`tasks-view`, `now-card`, `timers-
    returns to the tab; Stop ends it.
 5. **Action:** trigger a permission ask (for example ask Scout to move a window).
    **Expected:** the ask shows at the top of Now; Allow, Always or Not now answers it and it goes.
+6. **Action:** press the Waiting tab (`waiting-tab.test.tsx`, `e2e/tasks.spec.ts`).
+   **Expected:** each piece of news Scout has not told yet shows with its kind, where it came from and how long it has waited; one Scout gave up on carries "Scout could not finish"; with none, "Nothing is waiting to be told."
 
 ## The mail switch and the Held list (fake brain, then real)
 

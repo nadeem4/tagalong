@@ -9,6 +9,7 @@ import type {
   BodiesState,
   LoopsState,
   TimerRow,
+  WaitingEvent,
   UpdateResult,
   UpdatesState,
   Pet,
@@ -101,6 +102,8 @@ export interface FakeHostBridge extends HostBridge {
   readonly updateCalls: readonly string[];
   /** Home's timers; cancelTimer edits it, a test may swap it. */
   timers: TimerRow[];
+  /** Home's waiting news. */
+  waiting: WaitingEvent[];
   /** The id of every cancelTimer call, in order. */
   readonly cancelledTimers: readonly string[];
   /** Home's Bodies state; setWhatsApp edits it, a test may swap it. */
@@ -251,6 +254,8 @@ export function createFakeHostBridge(
     loops?: LoopsState;
     /** Home's timers. */
     timers?: TimerRow[];
+    /** Home's waiting news. */
+    waiting?: WaitingEvent[];
     /** What updatesState answers; defaults to nothing out of date, the default switches. */
     updates?: Partial<UpdatesState>;
     /** What updateItem and updateAll answer; defaults to `{ started: true }`. */
@@ -484,6 +489,7 @@ export function createFakeHostBridge(
     },
     loops: options.loops ?? { apps: [], loops: [], openItems: [] },
     timers: options.timers ?? [],
+    waiting: options.waiting ?? [],
     cancelledTimers,
     loopCalls,
     bodies: options.bodies ?? NO_BODIES,
@@ -584,6 +590,9 @@ export function createFakeHostBridge(
       cancelledTimers.push(id);
       fake.timers = fake.timers.filter((t) => t.id !== id);
       return Promise.resolve();
+    },
+    eventsWaiting() {
+      return Promise.resolve(structuredClone(fake.waiting));
     },
     bodiesState() {
       return Promise.resolve(structuredClone(fake.bodies));

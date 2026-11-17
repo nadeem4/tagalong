@@ -25,6 +25,7 @@ import type {
   SetupOverview,
   SetupResult,
   TimerRow,
+  WaitingEvent,
   UpdateKind,
   UpdateResult,
   UpdatesState,
@@ -403,6 +404,11 @@ export interface HostBridge {
   timersState(): Promise<TimerRow[]>;
   /** Cancels one timer. */
   cancelTimer(id: string): Promise<void>;
+  /**
+   * Home's Waiting tab: news not yet told, and news Scout gave up on, oldest first. Read when the
+   * tab opens. Rejects while the brain is away.
+   */
+  eventsWaiting(): Promise<WaitingEvent[]>;
   /**
    * Home's Bodies section: which bodies are connected and how WhatsApp is set up (which values
    * are saved, never the values). Changes arrive as `changed bodies`. Rejects while the brain is

@@ -218,7 +218,7 @@ sign-in`, `Not working`, `Off`), the on/off switch, and quiet **Restart** and **
 - **Trust at the door**: the desktop's `ipc/setup.ts` honours `approved` for an app only from the Home
   window, and for an expert only from the tour or from Home with `community_ok`; anything else opens
   the Allow card.
-- **Mail loops** sit on the Tasks page (Held tab), not here.
+- **Mail loops** sit on the Tasks page (Waiting tab), not here.
 - **Add an app** (one form): a command on this PC (command, args, `NAME=value` env lines, which may
   be `${NAME}`) or a web address (https only; auth none, the app's own sign-in page, or a pasted
   key in a password field). The key is sent once, as `token`, and the field is cleared as soon as

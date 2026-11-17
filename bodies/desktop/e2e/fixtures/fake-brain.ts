@@ -1327,7 +1327,31 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             port: 47322,
           };
         } else if (params.tool === 'reading_status') value = { rows: readingRows };
-        else if (params.tool === 'timers_state') value = { timers };
+        else if (params.tool === 'events_waiting') {
+          // One news row not yet told and one say Scout gave up on, so the Waiting tab has both.
+          value = {
+            waiting: [
+              {
+                id: 'ev1',
+                kind: 'job_done',
+                source: 'job:j1',
+                at: '2026-11-17T09:00:00+00:00',
+                age_s: 7200,
+                gave_up: false,
+                gist: 'Fix the build finished',
+              },
+              {
+                id: 'ev2',
+                kind: 'say',
+                source: 'desktop',
+                at: '2026-11-17T09:30:00+00:00',
+                age_s: 1800,
+                gave_up: true,
+                gist: 'Can you tidy my notes?',
+              },
+            ],
+          };
+        } else if (params.tool === 'timers_state') value = { timers };
         else if (params.tool === 'timer_cancel') {
           timerCancels.push(String(params.input?.id));
           timers = timers.filter((t) => t.id !== params.input?.id);

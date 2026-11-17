@@ -55,7 +55,7 @@ test('the mail switch, the Held list, forget and Stop and wipe', async () => {
   await avatar.evaluate(() => window.tagalongHost.openSettings());
   const home = await windowFor('home');
   await home.getByRole('button', { name: 'Tasks', exact: true }).click();
-  await home.getByRole('tab', { name: /^Held/ }).click();
+  await home.getByRole('tab', { name: /^Waiting/ }).click();
 
   const card = home.getByRole('region', { name: 'Read my mail for loops' });
   const toggle = card.getByRole('switch', { name: 'Read my mail for loops (Gmail)' });

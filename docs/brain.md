@@ -795,8 +795,8 @@ example one opened while no screen was up), one
 `asks_waiting` event is posted: `count` and `asks`, a JSON list of `ask`, `tool`,
 `summary` and `age_s` (seconds waited), oldest first, so Scout can say how old each is in his own
 words. A card that cannot be built is logged and skipped; the others still show. Nothing is decided without the
-person on return: the rule and side-check ran when the ask opened. The Held tab lists the open
-items too (see `loops_state`).
+person on return: the rule and side-check ran when the ask opened. The Waiting tab lists the open
+items too (see `loops_state`); it also lists the news not yet told (`events_waiting`).
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%

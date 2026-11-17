@@ -231,7 +231,7 @@ or frame of its own.
 **On return.** When the screen comes back, every ask still open shows its card again (same `ask` frame
 as before, no new one) and a card that ended while the body was away is closed with `reason: "timeout"` (the only reason the contract has for it, so a card dropped
 because an expert's process ended reads the same).
-The same open items are listed on Home's Tasks page, Held tab, under "Waiting on you" (see
+The same open items are listed on Home's Tasks page, Waiting tab, under "Waiting on you" (see
 [desktop.md](desktop.md)); no frame or card was added.
 
 **GreetingLine.** The quiet line beside the pet, rendered by the panel instead of the bubble for
@@ -411,14 +411,14 @@ when sight is paused).
 
 The nav lists six pages (`HomePage`), the companion's name filling in where it appears:
 
-| Page (`HomePage`)               | Component                                            | Reads and writes                                                                                                                                 |
-| ------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Overview (`overview`)           | `Overview`                                           | `host.status()`; `WhereThingsRun`; the Spend card (`usageSummary`)                                                                               |
-| Tasks (`tasks`)                 | `TasksView` (Now card, then Jobs, Held, Timers tabs) | `listJobs`, `stopJob`, `loopsState`, `loopDone`, `loopLater`, `timersState`, `cancelTimer`, the open asks; re-reads on `jobs`, `loops`, `timers` |
-| Connections (`connections`)     | `ConnectionsPanel`                                   | `listConnections`, `addConnection`, `setConnectionEnabled`, `restartConnection`, `removeConnection`, `setupOverview`, `setupExpert`, `setupApp`  |
-| Approvals (`approvals`)         | `ApprovalsView`                                      | `listApprovals`, `listPreferences`, `removePreference`, `editPreference`; re-reads on `onBrainChanged('approvals')`                              |
-| What Scout remembers (`memory`) | `MemoryView`                                         | `listMemories`, `deleteMemory`; re-reads on `onBrainChanged('memory')`                                                                           |
-| Settings (`settings`)           | the host's `settings` slot                           | the host's settings form, then `PermissionsPanel`                                                                                                |
+| Page (`HomePage`)               | Component                                               | Reads and writes                                                                                                                                 |
+| ------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Overview (`overview`)           | `Overview`                                              | `host.status()`; `WhereThingsRun`; the Spend card (`usageSummary`)                                                                               |
+| Tasks (`tasks`)                 | `TasksView` (Now card, then Jobs, Waiting, Timers tabs) | `listJobs`, `stopJob`, `loopsState`, `loopDone`, `loopLater`, `timersState`, `cancelTimer`, the open asks; re-reads on `jobs`, `loops`, `timers` |
+| Connections (`connections`)     | `ConnectionsPanel`                                      | `listConnections`, `addConnection`, `setConnectionEnabled`, `restartConnection`, `removeConnection`, `setupOverview`, `setupExpert`, `setupApp`  |
+| Approvals (`approvals`)         | `ApprovalsView`                                         | `listApprovals`, `listPreferences`, `removePreference`, `editPreference`; re-reads on `onBrainChanged('approvals')`                              |
+| What Scout remembers (`memory`) | `MemoryView`                                            | `listMemories`, `deleteMemory`; re-reads on `onBrainChanged('memory')`                                                                           |
+| Settings (`settings`)           | the host's `settings` slot                              | the host's settings form, then `PermissionsPanel`                                                                                                |
 
 - **Navigation.** The `page` prop selects a page when the host names one (main's
   `homePageEvent`, through `homeTarget`, which also splits `settings#<section>` for a Fix it and
