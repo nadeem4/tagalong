@@ -13,8 +13,6 @@ import { WaitingTab } from './waiting-tab';
 
 const row = (over: Partial<WaitingEvent> = {}): WaitingEvent => ({
   id: 'e1',
-  kind: 'job_done',
-  source: 'job:j1',
   ageS: 7200,
   gaveUp: false,
   gist: 'Fix the build finished',
@@ -30,17 +28,15 @@ function show(events: WaitingEvent[]) {
 }
 
 describe('WaitingTab', () => {
-  it('shows each waiting event with its age', () => {
-    show([
-      row(),
-      row({ id: 'e2', kind: 'timer_fired', source: 'timer', ageS: 90, gist: 'Stretch' }),
-    ]);
+  it('shows each waiting event as its gist and age, in plain words', () => {
+    show([row(), row({ id: 'e2', ageS: 90, gist: 'Stretch' })]);
     const list = screen.getByRole('list', { name: 'Waiting news' });
     const rows = within(list).getAllByRole('listitem');
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveTextContent('Fix the build finished');
-    expect(rows[0]).toHaveTextContent('job_done');
-    expect(rows[0]).toHaveTextContent('job:j1');
+    expect(rows[0]).not.toHaveTextContent('job_done');
+    expect(rows[0]).not.toHaveTextContent('job:j1');
+    expect(rows[1]).not.toHaveTextContent('timer');
     expect(rows[0]).toHaveTextContent('2 h');
     expect(rows[1]).toHaveTextContent('1 min');
     expect(within(list).queryByText('Scout could not finish')).toBeNull();

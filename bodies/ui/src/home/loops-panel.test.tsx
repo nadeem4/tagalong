@@ -109,6 +109,16 @@ describe('LoopsPanel', () => {
     expect(await screen.findByText('Nothing is waiting on you.')).toBeInTheDocument();
   });
 
+  it('reads again when a card opens or closes, so a row drops without reopening Home', async () => {
+    const bridge = open({
+      openItems: [{ id: 'a1', kind: 'Permission', title: 'Delete logs', ageS: 60 }],
+    });
+    await screen.findByText('Delete logs');
+    bridge.loops = { ...bridge.loops, openItems: [] };
+    act(() => bridge.emit({ type: 'connector.dismiss', approvalId: 'a1' }));
+    await waitFor(() => expect(screen.queryByText('Delete logs')).toBeNull());
+  });
+
   it('says so when nothing is held', async () => {
     open();
     expect(await screen.findByText('Nothing is held.')).toBeInTheDocument();

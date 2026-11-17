@@ -18,16 +18,7 @@ describe('parseEventsWaiting', () => {
           },
         ],
       }),
-    ).toEqual([
-      {
-        id: 'e1',
-        kind: 'job_done',
-        source: 'job:j1',
-        ageS: 90,
-        gaveUp: true,
-        gist: 'Fix the build',
-      },
-    ]);
+    ).toEqual([{ id: 'e1', ageS: 90, gaveUp: true, gist: 'Fix the build' }]);
   });
 
   it('rejects a row with no id', () => {

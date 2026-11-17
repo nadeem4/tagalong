@@ -1,6 +1,6 @@
 /**
  * What the Waiting tab reads of the brain's events: one row per news event not yet told, or
- * given up on. Contains parseEventsWaiting and WaitingEvent, shaped after events_waiting
+ * given up on. The row is validated whole; the tab keeps only what it shows (gist, age, gave up). Contains parseEventsWaiting and WaitingEvent, shaped after events_waiting
  * (brain/src/brain/events_tools.py).
  */
 import { z } from 'zod';
@@ -17,10 +17,8 @@ const Wire = z.object({
         gave_up: z.boolean(),
         gist: z.string(),
       })
-      .transform(({ id, kind, source, age_s, gave_up, gist }) => ({
+      .transform(({ id, age_s, gave_up, gist }) => ({
         id,
-        kind,
-        source,
         ageS: age_s,
         gaveUp: gave_up,
         gist,

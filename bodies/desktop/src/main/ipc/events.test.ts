@@ -32,7 +32,7 @@ describe('registerEventsIpc', () => {
     };
     registerEventsIpc(ipc.handle, { brain });
     expect(await ipc.invoke(IPC.eventsWaiting)).toEqual([
-      { id: 'e1', kind: 'job_done', source: 'job:j1', ageS: 5, gaveUp: false, gist: 'Done' },
+      { id: 'e1', ageS: 5, gaveUp: false, gist: 'Done' },
     ]);
     expect(calls).toEqual(['events_waiting']);
   });

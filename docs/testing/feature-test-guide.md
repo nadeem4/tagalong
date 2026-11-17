@@ -757,7 +757,7 @@ Automated: `pnpm --filter @tagalong/ui test` (`tasks-view`, `now-card`, `timers-
 5. **Action:** trigger a permission ask (for example ask Scout to move a window).
    **Expected:** the ask shows at the top of Now; Allow, Always or Not now answers it and it goes.
 6. **Action:** press the Waiting tab (`waiting-tab.test.tsx`, `e2e/tasks.spec.ts`).
-   **Expected:** each piece of news Scout has not told yet shows with its kind, where it came from and how long it has waited; one Scout gave up on carries "Scout could not finish"; with none, "Nothing is waiting to be told."
+   **Expected:** each piece of news Scout has not told yet shows as its gist and how long it has waited, and the list and count update by themselves when the brain saves or finishes an event; one Scout gave up on carries "Scout could not finish"; with none, "Nothing is waiting to be told."
 
 ## The mail switch and the Held list (fake brain, then real)
 

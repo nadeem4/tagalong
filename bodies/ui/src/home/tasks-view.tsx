@@ -46,18 +46,14 @@ export function TasksView() {
 
   useEffect(() => {
     readJobs();
+    readWaiting();
     readTimers();
     return bridge.onBrainChanged((what) => {
       if (what === 'jobs') readJobs();
+      else if (what === 'events') readWaiting();
       else if (what === 'timers') readTimers();
     });
-  }, [bridge, readJobs, readTimers]);
-
-  // The brain sends no `changed` for events, so read them when the page opens and each time the
-  // Waiting tab is chosen.
-  useEffect(() => {
-    readWaiting();
-  }, [readWaiting, tab]);
+  }, [bridge, readJobs, readWaiting, readTimers]);
 
   const cancelTimer = (id: string): Promise<void> =>
     bridge

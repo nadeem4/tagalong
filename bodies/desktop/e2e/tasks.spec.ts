@@ -1,7 +1,8 @@
 /**
  * Home's Tasks page on the fake brain: the Now card shows a waiting ask (answered with Allow), a
  * running job and a timer about to fire; the tabs carry counts; Cancel on the Timers tab reaches
- * the brain; the Waiting tab lists the news not yet told and marks a say Scout gave up on.
+ * the brain; the Waiting tab lists the news not yet told and marks a say Scout gave up on
+ * (the brain lists given-up events of every kind, says included).
  */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

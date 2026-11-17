@@ -162,6 +162,7 @@ async def _run() -> None:
     inspect_machine = partial(inspect, config.data_dir)
     setup_items = OpenItems(memory.db, lambda: datetime.now(UTC))  # install and sign-in cards
     events = EventLog(memory.db, masker, lambda: datetime.now().astimezone())
+    events.on_change = lambda: bodies.notify("changed", {"what": "events"})
     # Setup news waits in the event log until a turn tells it; the session exists later.
     emit_event = SetupEvents(lambda event: session.post_event(event), events.finish_matching).emit
     logins = LoginDriver(

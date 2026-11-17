@@ -37,8 +37,6 @@ const loop = (id: string, status: LoopRow['status'] = 'held'): LoopRow => ({
 });
 const waiting = (id: string): WaitingEvent => ({
   id,
-  kind: 'job_done',
-  source: 'job:j1',
   ageS: 60,
   gaveUp: false,
   gist: `News ${id}`,
@@ -82,6 +80,16 @@ describe('TasksView', () => {
     bridge.timers = [timer('t1'), timer('t2')];
     act(() => bridge.emitChanged('timers'));
     expect(await screen.findByRole('tab', { name: 'Timers (2)' })).toBeVisible();
+  });
+
+  it('the Waiting count and list follow a change the brain announces', async () => {
+    const bridge = createFakeHostBridge({ waiting: [waiting('e1')] });
+    open(bridge);
+    fireEvent.click(await screen.findByRole('tab', { name: 'Waiting (1)' }));
+    bridge.waiting = [waiting('e1'), waiting('e2')];
+    act(() => bridge.emitChanged('events'));
+    expect(await screen.findByRole('tab', { name: 'Waiting (2)' })).toBeVisible();
+    expect(await screen.findByText('News e2')).toBeVisible();
   });
 
   it('opens on Jobs and keeps job pages: Watch opens, Back returns', async () => {

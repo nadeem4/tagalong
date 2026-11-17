@@ -502,3 +502,27 @@ def test_recover_brings_back_a_say_whose_only_row_is_cut_in_full(tmp_path):
     log.recover()
     log.set_resume(["e1"])
     assert log.get("e1").resume is False
+
+
+def test_post_announces_a_change(log):
+    seen = []
+    log.on_change = lambda: seen.append(1)
+    log.post(Event("say", "desktop", {"text": "hi"}, id="s1"))
+    assert seen == [1]
+
+
+def test_a_state_change_announces_a_change(log):
+    log.post(Event("say", "desktop", {"text": "hi"}, id="s1"))
+    seen = []
+    log.on_change = lambda: seen.append(1)
+    log.take(["s1"], "t1")
+    log.finish(["s1"], "handled")
+    assert len(seen) == 2
+
+
+def test_a_duplicate_post_announces_nothing(log):
+    log.post(Event("say", "desktop", {"text": "hi"}, id="s1"))
+    seen = []
+    log.on_change = lambda: seen.append(1)
+    log.post(Event("say", "desktop", {"text": "hi"}, id="s1"))
+    assert seen == []

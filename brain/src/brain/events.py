@@ -181,6 +181,8 @@ class EventLog:
         self._masker = masker
         self._now = now
         self.on_post: Callable[[], None] = lambda: None  # the runner's poke
+        # Home's Waiting list: told that an event was saved or changed state, so it reads again.
+        self.on_change: Callable[[], None] = lambda: None
         # In memory on purpose: a hook is a live caller waiting (a job's question); after a
         # restart nobody waits, and the event row alone carries on.
         self._on_end: dict[str, Callable[[str], None]] = {}
@@ -222,6 +224,7 @@ class EventLog:
                 then(self._db)
         if on_end is not None:
             self._on_end[event.id] = on_end
+        self.on_change()
         self.on_post()
         return True
 
@@ -256,12 +259,16 @@ class EventLog:
 
     def take(self, ids: list[str], turn_id: str) -> list[str]:
         with transaction(self._db):
-            return store.set_taken(self._db, ids, turn_id)
+            moved = store.set_taken(self._db, ids, turn_id)
+        if moved:
+            self.on_change()
+        return moved
 
     def finish(self, ids: list[str], state: str, end_reason: str | None = None) -> None:
         """Move events to `state`; `new` puts them back to be taken again."""
         with transaction(self._db):
             store.set_state(self._db, ids, state, end_reason=end_reason, at=utc_text(self._now()))
+        self.on_change()
         if state in ("handled", "gave_up"):
             self.ended(ids, state)
 
@@ -284,6 +291,7 @@ class EventLog:
                     store.set_backoff(self._db, [id], utc_text(now + delay), reason, resume=resume)
                 else:
                     gave_up += store.set_gave_up(self._db, [id], reason, utc_text(now))
+        self.on_change()
         self.ended(gave_up, "gave_up")
 
     def recover(self) -> int:
@@ -329,6 +337,8 @@ class EventLog:
         with transaction(self._db):
             ids = [id for id in store.new_ids(self._db, kind, source) if id != keep]
             store.set_state(self._db, ids, state, end_reason=None, at=utc_text(self._now()))
+        if ids:
+            self.on_change()
         self.ended(ids, state)
         return ids
 
