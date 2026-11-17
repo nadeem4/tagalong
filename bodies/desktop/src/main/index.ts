@@ -194,6 +194,7 @@ const brainSetup = createBrainSetup(
 let brainControl: BrainStatusControl | null = null;
 /** Tells the turn mapper a say id is ours; start() points it at the mapper. */
 let trackSay: (id: string) => void = () => undefined;
+let untrackSay: (id: string) => void = () => undefined;
 /** The confirm cards still open, for a window that opened after their ask arrived. */
 let openConfirms: () => TurnEvent[] = () => [];
 
@@ -293,6 +294,7 @@ async function start(): Promise<void> {
     forwardToRenderers({ method: type, params });
   };
   trackSay = (id) => turnEvents.trackSay(id);
+  untrackSay = (id) => turnEvents.untrackSay(id);
   openConfirms = () => turnEvents.openConfirms();
   // A brain that stays down fails the open turns, so the bubble does not stream forever.
   const watchOffline = offlineWatch(() => turnEvents.resync().forEach(forwardTurn));
@@ -936,6 +938,7 @@ function registerIpc(): void {
   registerTurnIpc(handle, {
     brain: required().brain,
     trackSay: (id) => trackSay(id),
+    untrackSay: (id) => untrackSay(id),
     stopVoice: () => stopVoice(),
     voice: () => required().settings.voice,
     status: () => brainStatus,

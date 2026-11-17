@@ -29,8 +29,13 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
   const quiet = new Set<string>();
   // The ids of the says this body sent: a turn that took one of them is the person's own.
   const says = new Set<string>();
-  const takesMine = (p: { events?: string[] | undefined }): boolean =>
-    (p.events ?? []).some((id) => says.has(id));
+  // My say ids each open turn took, so they are forgotten when it ends and the set stays small.
+  const taken = new Map<string, string[]>();
+  const takesMine = (p: { turn: string; events?: string[] | undefined }): boolean => {
+    const mine = (p.events ?? []).filter((id) => says.has(id));
+    if (mine.length > 0) taken.set(p.turn, [...(taken.get(p.turn) ?? []), ...mine]);
+    return mine.length > 0;
+  };
 
   /** A turn that joined a quiet one with my say in it stops being quiet: words so far, then live. */
   function claim(turnId: string): TurnEvent[] {
@@ -163,7 +168,11 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
     map(method: string, params: unknown): TurnEvent[] {
       if (method === 'turn') {
         const p = params as TurnParams;
-        if (p.state === 'ended') return ended(p);
+        if (p.state === 'ended') {
+          for (const id of taken.get(p.turn) ?? []) says.delete(id);
+          taken.delete(p.turn);
+          return ended(p);
+        }
         if (p.state === 'joined') return takesMine(p) ? claim(p.turn) : [];
         open.set(p.turn, '');
         if (isInternalSource(p.source ?? '') && !takesMine(p)) {
@@ -195,6 +204,11 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
       says.add(id);
     },
 
+    /** The brain refused the say, so no turn will ever take it. */
+    untrackSay(id: string): void {
+      says.delete(id);
+    },
+
     /**
      * The confirm cards still open. A window that opened after the ask arrived (a relaunch, the
      * panel created later) never saw the frame, so it pulls these when it mounts.
@@ -210,6 +224,8 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
         .map((id) => error(id, 'brain_restarted', LOST_MESSAGE));
       open.clear();
       quiet.clear();
+      for (const ids of taken.values()) for (const id of ids) says.delete(id);
+      taken.clear();
       for (const id of asks.keys()) events.push(dismiss(id));
       asks.clear();
       return events;

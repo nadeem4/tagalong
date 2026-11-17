@@ -21,6 +21,7 @@ function setup(
   const said: SayParams[] = [];
   const cancelled: string[] = [];
   const tracked: string[] = [];
+  const untracked: string[] = [];
   const stopped: string[] = [];
   registerTurnIpc(ipc.handle, {
     brain: {
@@ -31,13 +32,14 @@ function setup(
       cancel: (turn) => void cancelled.push(turn),
     },
     trackSay: (id) => void tracked.push(id),
+    untrackSay: (id) => void untracked.push(id),
     stopVoice: () => void stopped.push('voice'),
     voice: () => ({ enabled: options.voiceOn !== false, speed: 0.95 }),
     status: () => (options.outdated === true ? 'outdated' : 'online'),
     pendingSnapshot: () => snapshot as ContextSnapshot | null,
     ...(options.takeDrop ? { takeDrop: options.takeDrop } : {}),
   });
-  return { ...ipc, said, cancelled, tracked, stopped };
+  return { ...ipc, said, cancelled, tracked, untracked, stopped };
 }
 
 const UUID = /^[0-9a-f-]{36}$/;
@@ -102,6 +104,13 @@ describe('registerTurnIpc', () => {
     await expect(invoke(IPC.ask, { petId: 'scout', text: 'hi' })).rejects.toThrow(
       'Update Tagalong to talk to this brain.',
     );
+  });
+
+  it('a say the brain refuses is untracked', async () => {
+    const { invoke, said, tracked, untracked } = setup(null, { offline: true });
+    await expect(invoke(IPC.ask, { petId: 'scout', text: 'hi' })).rejects.toThrow();
+    expect(untracked).toEqual([said[0]!.id]);
+    expect(tracked).toEqual(untracked);
   });
 
   it('ask when brain offline rejects with the offline sentence', async () => {

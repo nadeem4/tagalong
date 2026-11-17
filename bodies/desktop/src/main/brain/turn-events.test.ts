@@ -86,6 +86,23 @@ describe('createTurnEvents brain-started turns', () => {
     ]);
   });
 
+  it('a say is forgotten once its turn ends, so a later turn holding its id is not mine', () => {
+    const m = make();
+    m.trackSay('s1');
+    m.map('turn', { ...turn('started'), events: ['s1'], source: 'scout' });
+    m.map('turn', turn('ended', 'done'));
+    expect(
+      m.map('turn', { ...turn('started', undefined, 'turn-2'), events: ['s1'], source: 'scout' }),
+    ).toEqual([]);
+  });
+
+  it('an untracked say is not mine', () => {
+    const m = make();
+    m.trackSay('s1');
+    m.untrackSay('s1');
+    expect(m.map('turn', { ...turn('started'), events: ['s1'], source: 'scout' })).toEqual([]);
+  });
+
   it('a turn sourced by job:x is quiet', () => {
     const m = make();
     const started = { ...turn('started'), source: 'job:x' };

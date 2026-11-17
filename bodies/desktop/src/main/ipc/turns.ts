@@ -15,6 +15,8 @@ interface TurnIpcDeps {
   brain: Pick<BrainClient, 'say' | 'cancel'>;
   /** Tells the turn mapper a say id is ours, so the turn that takes it shows. */
   trackSay: (id: string) => void;
+  /** Forgets a say id the brain never accepted. */
+  untrackSay: (id: string) => void;
   /** The link as last reported; a too-new brain gets the update words, not the offline ones. */
   status: () => BrainStatus;
   /** Stops Scout's speech everywhere: a cancelled turn does not hush its own. */
@@ -77,6 +79,7 @@ export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
         deps.trackSay(say.id);
         await deps.brain.say(say);
       } catch (error) {
+        deps.untrackSay(say.id);
         // The desktop's own words, never the brain's message.
         if (error instanceof BrainOffline) {
           const words = deps.status() === 'outdated' ? 'brain-outdated' : 'brain-offline';
