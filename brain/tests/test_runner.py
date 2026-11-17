@@ -946,10 +946,11 @@ async def test_the_budget_reset_tells_waiting_news_in_one_turn_per_body(monkeypa
 
 async def test_old_news_is_told_with_its_age():
     rig = LoopRig()
+    rig.presence.speech("desktop", "talking")
+    rig.news("n1")  # posted at T0
     rig.t = T0 + timedelta(hours=3)
-    rig.news("n1")
-    r = rig.log.get("n1")
-    assert r is not None
-    text = wake_text(EVENT_KINDS["timer"], [replace(r, at=utc_text(T0))], "", rig.t)
+    rig.presence.speech("desktop", "sentence_break", "t0", 1)
+    await ticks()
+    [text] = rig.session.told  # the runner picked it and told it at the break
     assert 'age="3h"' in text
     await rig.runner.stop()
