@@ -3,6 +3,7 @@
   "id": 2,
   "method": "say",
   "params": {
+    "id": "e1",
     "text": "wait, not that one",
     "spoken": true,
     "interrupted": { "turn": "t1", "heard": 2 }

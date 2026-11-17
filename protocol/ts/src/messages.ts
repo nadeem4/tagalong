@@ -47,6 +47,7 @@ export type Interrupted = z.infer<typeof Interrupted>;
 
 export const SayParams = z
   .object({
+    id: Id,
     text: z.string().optional(),
     parts: z.array(Part).optional(),
     context: z.unknown().optional(),
@@ -62,7 +63,7 @@ const CONFIRM_OPTIONS = [
   ['allow', 'always', 'deny'],
 ];
 
-export const SayResult = z.object({ turn: Id, joined: z.boolean() });
+export const SayResult = z.object({}).strict();
 export type SayResult = z.infer<typeof SayResult>;
 
 export const EventParams = z.object({ name: z.string(), data: z.unknown().optional() });
@@ -170,14 +171,22 @@ export const ReplyParams = z.union([
 export type ReplyParams = z.infer<typeof ReplyParams>;
 
 // `body` is null when no body is online to show a turn the brain started itself.
-export const TurnParams = z.object({
-  seq: Seq,
-  turn: Id,
-  body: z.string().nullable(),
-  state: z.enum(['started', 'ended']),
-  reason: z.enum(['done', 'cancelled', 'error', 'over_budget', 'step_cap']).optional(),
-  started_by: z.enum(['user', 'brain']).optional(),
-});
+// `events` and `source` ride on started and joined turns: what the turn took, and where the
+// started turn's event came from.
+export const TurnParams = z
+  .object({
+    seq: Seq,
+    turn: Id,
+    body: z.string().nullable(),
+    state: z.enum(['started', 'joined', 'ended']),
+    reason: z.enum(['done', 'cancelled', 'error', 'over_budget', 'step_cap']).optional(),
+    events: z.array(Id).optional(),
+    source: z.string().optional(),
+  })
+  .refine(
+    (t) => t.state === 'ended' || (t.events !== undefined && t.source !== undefined),
+    'a started or joined turn needs events and source',
+  );
 export type TurnParams = z.infer<typeof TurnParams>;
 
 export const ToolParams = z.object({

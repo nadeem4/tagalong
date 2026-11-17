@@ -1,11 +1,11 @@
 /**
- * Shared shapes of contract v1: Tool, Part, Body, the error table and the size limits.
+ * Shared shapes of contract v2: Tool, Part, Body, the error table and the size limits.
  * Mirrors protocol/README.md, which wins on any disagreement. Limits are exported as
  * constants only; enforcing them is the brain's and bodies' job, not the schema's.
  */
 import { z } from 'zod';
 
-export const PROTOCOL = 1;
+export const PROTOCOL = 2;
 
 export const LIMITS = {
   partBytes: 5_000_000,
@@ -13,6 +13,11 @@ export const LIMITS = {
   replayCount: 500,
   replayMs: 86_400_000,
 } as const;
+
+// Same rule as brain.events.is_internal: Scout's own machinery, not a body id.
+export function isInternalSource(source: string): boolean {
+  return source === 'scout' || source.includes(':');
+}
 
 export const ErrorCode = {
   parse_error: -32700,

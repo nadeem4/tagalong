@@ -1,1 +1,6 @@
-{ "jsonrpc": "2.0", "id": 2, "method": "say", "params": { "text": "hey scout", "spoken": true } }
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "say",
+  "params": { "id": "e1", "text": "hey scout", "spoken": true }
+}

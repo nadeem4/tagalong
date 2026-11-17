@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "method": "turn",
+  "params": {
+    "seq": 2,
+    "turn": "t1",
+    "body": "desktop",
+    "state": "joined",
+    "events": ["e2", "e3"],
+    "source": "desktop"
+  }
+}

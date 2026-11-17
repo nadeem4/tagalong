@@ -2,5 +2,5 @@
   "jsonrpc": "2.0",
   "id": 2,
   "method": "say",
-  "params": { "text": "hi", "future_field": { "anything": true } }
+  "params": { "id": "e1", "text": "hi", "future_field": { "anything": true } }
 }

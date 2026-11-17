@@ -3,6 +3,7 @@
   "id": 2,
   "method": "say",
   "params": {
+    "id": "e1",
     "text": "look at these",
     "parts": [
       { "type": "image", "mime": "image/png", "data": "iVBORw0..." },

@@ -54,7 +54,7 @@ const tools: Tool[] = [{ name: 'see_screen', description: 'look', input_schema: 
 const helloOk = (id: string, resync = false) => ({
   jsonrpc: '2.0',
   id,
-  result: { protocol: 1, session: 's1', tools: [], seq: 0, resync },
+  result: { protocol: 2, session: 's1', tools: [], seq: 0, resync },
 });
 
 const desktop = { id: 'desktop', kind: 'desktop', name: 'Desktop' };
@@ -100,14 +100,14 @@ async function online(retryMs?: number, extra: Partial<BrainClientOptions> = {})
 const turn = (seq: number) => ({
   jsonrpc: '2.0',
   method: 'turn',
-  params: { seq, turn: 't1', body: 'desktop', state: 'started' },
+  params: { seq, turn: 't1', body: 'desktop', state: 'started', events: ['e1'], source: 'desktop' },
 });
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
 describe('BrainClient', () => {
-  it('sends hello first with protocol 1, body desktop, tools from options, no last_seq on first connect', () => {
+  it('sends hello first with protocol 2, body desktop, tools from options, no last_seq on first connect', () => {
     const { client, sockets, urls, statuses } = setup();
     client.start();
     expect(urls).toEqual(['ws://127.0.0.1:47321']);
@@ -118,7 +118,7 @@ describe('BrainClient', () => {
         jsonrpc: '2.0',
         id: 'desktop-1',
         method: 'hello',
-        params: { protocol: 1, body: { id: 'desktop', kind: 'desktop', name: 'Desktop' }, tools },
+        params: { protocol: 2, body: { id: 'desktop', kind: 'desktop', name: 'Desktop' }, tools },
       },
     ]);
   });
@@ -134,7 +134,7 @@ describe('BrainClient', () => {
       jsonrpc: '2.0',
       id: s.sent[0]!.id,
       result: {
-        protocol: 1,
+        protocol: 2,
         session: 's1',
         tools: [],
         seq: 0,
@@ -172,23 +172,23 @@ describe('BrainClient', () => {
 
   it('say resolves with the SayResult for its id', async () => {
     const { client, s } = await online();
-    const p = client.say({ text: 'hi' });
+    const p = client.say({ id: 'e1', text: 'hi' });
     const req = s.sent[1]!;
-    expect(req).toMatchObject({ method: 'say', params: { text: 'hi' } });
-    s.receive({ jsonrpc: '2.0', id: req.id, result: { turn: 't1', joined: false } });
-    await expect(p).resolves.toEqual({ turn: 't1', joined: false });
+    expect(req).toMatchObject({ method: 'say', params: { id: 'e1', text: 'hi' } });
+    s.receive({ jsonrpc: '2.0', id: req.id, result: {} });
+    await expect(p).resolves.toEqual({});
   });
 
   it('say rejects BrainOffline before hello resolves', async () => {
     const { client, sockets } = setup();
     client.start();
     sockets[0]!.opens();
-    await expect(client.say({ text: 'hi' })).rejects.toBeInstanceOf(BrainOffline);
+    await expect(client.say({ id: 'e1', text: 'hi' })).rejects.toBeInstanceOf(BrainOffline);
   });
 
   it('say rejects with a plain Error when the brain answers with an error', async () => {
     const { client, s } = await online();
-    const p = client.say({ text: 'hi' });
+    const p = client.say({ id: 'e1', text: 'hi' });
     s.receive({ jsonrpc: '2.0', id: s.sent[1]!.id, error: { code: -32602, message: 'bad' } });
     const e = await p.catch((x: unknown) => x);
     expect(e).toBeInstanceOf(Error);
@@ -229,7 +229,7 @@ describe('BrainClient', () => {
 
   it('say times out after 30 s with a plain Error', async () => {
     const { client } = await online();
-    const p = client.say({ text: 'hi' });
+    const p = client.say({ id: 'e1', text: 'hi' });
     const caught = p.catch((x: unknown) => x);
     await vi.advanceTimersByTimeAsync(30_000);
     const e = await caught;
@@ -282,7 +282,7 @@ describe('BrainClient', () => {
 
   it('socket close: pending say rejects BrainOffline, status offline, retries after retryMs', async () => {
     const { client, s, sockets, statuses } = await online(500);
-    const p = client.say({ text: 'hi' });
+    const p = client.say({ id: 'e1', text: 'hi' });
     s.drop();
     await expect(p).rejects.toBeInstanceOf(BrainOffline);
     expect(statuses.at(-1)).toBe('offline');
@@ -490,12 +490,12 @@ describe('BrainClient', () => {
     const { client, statuses } = await online();
     client.stop();
     expect(statuses.at(-1)).toBe('offline');
-    await expect(client.say({ text: 'hi' })).rejects.toBeInstanceOf(BrainOffline);
+    await expect(client.say({ id: 'e1', text: 'hi' })).rejects.toBeInstanceOf(BrainOffline);
   });
 
   it('stop rejects a pending say with BrainOffline', async () => {
     const { client } = await online();
-    const p = client.say({ text: 'hi' });
+    const p = client.say({ id: 'e1', text: 'hi' });
     client.stop();
     await expect(p).rejects.toBeInstanceOf(BrainOffline);
   });
@@ -521,7 +521,7 @@ describe('BrainClient', () => {
     s2.receive({
       jsonrpc: '2.0',
       id: s2.sent[0]!.id,
-      result: { protocol: 1, session: 's1', tools: [], seq: 1, resync: true },
+      result: { protocol: 2, session: 's1', tools: [], seq: 1, resync: true },
     });
     s2.receive(turn(2));
     expect(resyncs).toHaveLength(1);
@@ -551,7 +551,7 @@ describe('BrainClient', () => {
     sock.receive({
       jsonrpc: '2.0',
       id: sock.sent[0]!.id,
-      result: { protocol: 1, session: 's1', tools: [], seq: 0, resync: true },
+      result: { protocol: 2, session: 's1', tools: [], seq: 0, resync: true },
     });
     sock.receive(turn(1));
     expect(order).toEqual(['resync', 'note']);
@@ -582,7 +582,7 @@ describe('BrainClient', () => {
 
   it('exposes RpcError with the brain code', async () => {
     const { client, s } = await online();
-    const p = client.say({ text: 'hi' });
+    const p = client.say({ id: 'e1', text: 'hi' });
     s.receive({ jsonrpc: '2.0', id: s.sent[1]!.id, error: { code: -32008, message: 'big' } });
     const e = await p.catch((x: unknown) => x);
     expect(e).toBeInstanceOf(RpcError);
@@ -660,7 +660,7 @@ describe('BrainClient as a shared body client', () => {
     s2.receive({
       jsonrpc: '2.0',
       id: s2.sent[0]!.id,
-      result: { protocol: 1, session: 's1', tools: [], seq: 40, resync: true },
+      result: { protocol: 2, session: 's1', tools: [], seq: 40, resync: true },
     });
     expect(saved).toEqual([7, 40]);
   });

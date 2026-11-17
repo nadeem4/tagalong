@@ -92,7 +92,7 @@ def test_every_method_has_examples(origin):
 
 
 def test_constants():
-    assert PROTOCOL == 1
+    assert PROTOCOL == 2
     assert LIMITS == {
         "part_bytes": 5_000_000,
         "message_bytes": 20_000_000,
@@ -162,18 +162,25 @@ def test_null_allowed_only_where_nullable():
     reply = BRAIN_TO_BODY["reply"][0]
     reply.model_validate({"seq": 1, "turn": "t", "body": None, "done": True})
     BRAIN_TO_BODY["turn"][0].model_validate(
-        {"seq": 1, "turn": "t", "body": None, "state": "started"}
+        {
+            "seq": 1,
+            "turn": "t",
+            "body": None,
+            "state": "started",
+            "events": ["e1"],
+            "source": "scout",
+        }
     )
     BODY_TO_BRAIN["event"][0].model_validate({"name": "n", "data": None})
-    BODY_TO_BRAIN["say"][0].model_validate({"text": "hi", "context": None})
+    BODY_TO_BRAIN["say"][0].model_validate({"id": "e1", "text": "hi", "context": None})
     ErrorObject.model_validate({"code": -32007, "message": "m", "data": None})
 
 
 @pytest.mark.parametrize(
     ("origin", "method", "params"),
     [
-        ("body", "say", {"text": None}),
-        ("body", "say", {"text": "hi", "parts": None}),
+        ("body", "say", {"id": "e1", "text": None}),
+        ("body", "say", {"id": "e1", "text": "hi", "parts": None}),
         ("body", "answer", {"ask": "a", "option": "o", "text": None}),
         ("brain", "turn", {"seq": 1, "turn": "t", "body": "b", "state": "ended", "reason": None}),
         (
@@ -272,13 +279,49 @@ def test_negative_idle_seconds_is_rejected():
         BackData.model_validate({"idle_seconds": -1})
 
 
-def test_started_by_is_optional():
+def test_say_params_need_an_id():
+    say = BODY_TO_BRAIN["say"][0]
+    assert say.model_validate({"id": "e1", "text": "hi"}).id == "e1"
+    with pytest.raises(ValidationError):
+        say.model_validate({"text": "hi"})
+
+
+def test_say_result_is_empty():
+    result = BODY_TO_BRAIN["say"][1]
+    result.model_validate({})
+    assert not result.model_fields
+
+
+def test_turn_started_carries_events_and_source():
     turn = BRAIN_TO_BODY["turn"][0]
     started = {"seq": 1, "turn": "t", "body": "b", "state": "started"}
-    assert turn.model_validate(started).started_by is None
-    assert turn.model_validate({**started, "started_by": "brain"}).started_by == "brain"
+    ok = {**started, "events": ["e1"], "source": "desktop"}
+    assert turn.model_validate(ok).source == "desktop"
     with pytest.raises(ValidationError):
-        turn.model_validate({**started, "started_by": None})
+        turn.model_validate(started)
+    with pytest.raises(ValidationError):
+        turn.model_validate({**started, "events": ["e1"]})
+
+
+def test_turn_joined_carries_events():
+    turn = BRAIN_TO_BODY["turn"][0]
+    joined = {
+        "seq": 2,
+        "turn": "t",
+        "body": "b",
+        "state": "joined",
+        "events": ["e2", "e3"],
+        "source": "scout",
+    }
+    assert turn.model_validate(joined).events == ["e2", "e3"]
+    with pytest.raises(ValidationError):
+        turn.model_validate({**joined, "events": None})
+
+
+def test_turn_ended_needs_neither_events_nor_source():
+    turn = BRAIN_TO_BODY["turn"][0]
+    ended = {"seq": 3, "turn": "t", "body": "b", "state": "ended", "reason": "done"}
+    assert turn.model_validate(ended).events is None
 
 
 def test_approved_notification_shape():
@@ -330,8 +373,8 @@ def test_speech_control_takes_three_actions_and_an_optional_turn():
     [
         ("body", "listen", {"mode": "x"}),
         ("body", "mic", {"pcm": ""}),
-        ("body", "say", {"text": "hi", "speed": 3}),
-        ("body", "say", {"text": "hi", "speed": 0.4}),
+        ("body", "say", {"id": "e1", "text": "hi", "speed": 3}),
+        ("body", "say", {"id": "e1", "text": "hi", "speed": 0.4}),
         ("brain", "heard", {"event": "mumble"}),
         ("brain", "voice", {"status": "loading", "progress": 1.5}),
         ("brain", "voice", {"status": "loading", "progress": None}),
@@ -349,8 +392,8 @@ def test_voice_params_rejected(origin, method, params):
 
 def test_say_speed_edges():
     say = BODY_TO_BRAIN["say"][0]
-    assert say.model_validate({"text": "hi", "speed": 0.5}).speed == 0.5
-    assert say.model_validate({"text": "hi", "speed": 2}).speed == 2
+    assert say.model_validate({"id": "e1", "text": "hi", "speed": 0.5}).speed == 0.5
+    assert say.model_validate({"id": "e1", "text": "hi", "speed": 2}).speed == 2
 
 
 def test_answer_carries_an_optional_kept_apps_list():
@@ -376,10 +419,14 @@ def test_ask_open_rejects_recommended_not_in_options():
 
 
 def test_say_interrupted_names_the_turn_and_sentences_heard() -> None:
-    p = SayParams.model_validate({"text": "hi", "interrupted": {"turn": "t1", "heard": 2}})
+    p = SayParams.model_validate(
+        {"id": "e1", "text": "hi", "interrupted": {"turn": "t1", "heard": 2}}
+    )
     assert p.interrupted is not None and p.interrupted.heard == 2
     with pytest.raises(ValidationError):
-        SayParams.model_validate({"text": "hi", "interrupted": {"turn": "t1", "heard": -1}})
+        SayParams.model_validate(
+            {"id": "e1", "text": "hi", "interrupted": {"turn": "t1", "heard": -1}}
+        )
 
 
 def test_speech_n_counts_from_one_and_not_on_done() -> None:
@@ -433,5 +480,5 @@ def test_know_me_status_bounds():
 
 
 def test_say_ignores_a_voice_the_brain_owns_the_choice():
-    params = SayParams.model_validate({"text": "a", "voice": "x"})
+    params = SayParams.model_validate({"id": "e1", "text": "a", "voice": "x"})
     assert not hasattr(params, "voice")
