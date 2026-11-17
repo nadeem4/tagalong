@@ -220,3 +220,15 @@ def test_settings_round_trip(tmp_path):
     set_setting(db, "model", "b")
     assert get_setting(db, "model") == "b"
     db.close()
+
+
+def test_saving_messages_inside_another_transaction_joins_it(tmp_path):
+    from brain.store.conversation import save_messages
+
+    db = open_db(tmp_path / "t.db")
+    with pytest.raises(ValueError, match="outer"):
+        with transaction(db):
+            save_messages(db, [{"role": "user", "content": "hi"}], "t")
+            raise ValueError("outer")
+    assert db.execute("SELECT count(*) FROM messages").fetchone()[0] == 0
+    db.close()

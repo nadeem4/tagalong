@@ -3866,3 +3866,42 @@ async def test_a_say_whose_turn_would_not_stop_is_resumed_not_said_again(monkeyp
     task.cancel()  # the second cancel ends it, so the test leaves nothing running
     await asyncio.gather(task, return_exceptions=True)
     assert json.dumps(again.seen[0]).count("and the eggs too") == 1
+
+
+async def test_a_given_up_say_whose_words_were_saved_is_told_by_its_first_line():
+    clock = [datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)]
+    model = FailsFirst(["ok"])
+    session, _ = make(model, now=lambda: clock[0])
+    first = say("first words\nand a second line")
+    await session.say("desktop", first)
+    await idle(session)
+    assert session.events.get(first.id).resume  # its row was saved before the model failed
+    session.events.finish([first.id], "gave_up", end_reason="error")  # its last try failed
+    await session.say("desktop", say("hi"))
+    await idle(session)
+    assert json.dumps(model.seen[-1]).count("and a second line") == 1  # the saved row only
+    last = model.seen[-1][-1]["content"]
+    fact = next(b["text"] for b in last if "gave_up=" in b.get("text", ""))
+    assert "text: first words" in fact
+
+
+async def test_a_wordless_cancel_of_a_retry_cuts_the_say_it_retried(tmp_path):
+    memory = file_memory(tmp_path)
+    clock = [datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)]
+    stuck = asyncio.Event()
+    model = FailsFirst([stuck, "never", "hello"])
+    session, _ = make(model, memory, now=lambda: clock[0])
+    first = say("book the flight")
+    await session.say("desktop", first)
+    await idle(session)
+    clock[0] += datetime.timedelta(seconds=30)  # its backoff is over: the retry runs
+    session.runner.poke()
+    await until(lambda: session._task is not None)
+    await settle()
+    session.cancel(session._turn_id)  # stopped before a word: the say is done with
+    await finish_quietly(session)
+    assert session.events.get(first.id).state == "handled"
+    assert "book the flight" not in json.dumps(memory.load_messages())  # a restart skips it
+    await session.say("desktop", say("hi"))
+    await idle(session)
+    assert "book the flight" not in json.dumps(model.seen[-1])  # nor does the next turn

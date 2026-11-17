@@ -413,6 +413,8 @@ class Session:
         self._row_of: dict[int, tuple[dict, str, str]] = {}
         self._unsaved: dict[int, dict] = {}
         self._last_rows: list[int] = []  # the saved rows of the newest message saved
+        self._retried: list[str] = []  # the events the running turn took again (`resume`)
+        self._cut_messages = 1  # how many messages a wordless cancel drops from the history
         self._rejected = False  # the API answered the running turn's request with a 400
         self._turn_id: str | None = None
         # True while the running turn is the owner's: they started it, or they typed into it.
@@ -513,6 +515,7 @@ class Session:
             self.runner.turn_ended(turn_id, "unanswered")
             return
         tz = self._now().tzinfo
+        self._retried = [r.id for r in rows if r.resume]
         says = [(r, self._say_params(r)) for r in rows if r.kind == "say"]
         params = [p for _, p in says]
         content: list[dict] = []
@@ -543,10 +546,13 @@ class Session:
             content.append(self._turn_only({"type": "text", "text": text}))
         told: dict[tuple[str, str], list[EventRow]] = {}
         for row in gave_up:
-            payload = {"text": row.payload.get("params", {}).get("text", "")}
-            told.setdefault((row.kind, row.end_reason or ""), []).append(
-                replace(row, payload=payload) if row.kind == "say" else row
-            )
+            if row.resume:  # its words are in the history as its saved row: named only
+                shown = _named(row)
+            elif row.kind == "say":  # every start failed before the save: its words, in full
+                shown = replace(row, payload={"text": row.payload.get("params", {}).get("text")})
+            else:
+                shown = row
+            told.setdefault((row.kind, row.end_reason or ""), []).append(shown)
         for (kind, reason), group in told.items():
             attrs = {"gave_up": "true", "reason": reason}
             note = self.runner.notes.get(kind, "")
@@ -750,8 +756,10 @@ class Session:
         # The flag is set right after the save, so history still ends on that saved request:
         # nothing appends to history between the end of a turn and the next prepare(). The
         # checks guard the pop anyway; the row's `cut` mark then still matches what was dropped.
-        last = self.history[-1] if self.history else None
-        if last is not None and last["role"] == "user" and self._saved == len(self.history):
+        for _ in range(self._cut_messages):  # a cut retry drops the request it retried
+            last = self.history[-1] if self.history else None
+            if last is None or last["role"] != "user" or self._saved != len(self.history):
+                break
             self.history.pop()
             self._saved = len(self.history)
 
@@ -1381,6 +1389,12 @@ class Session:
             if per:
                 # The newest message's rows: what a wordless cancel marks as cut.
                 self._last_rows = ids[len(ids) - len(per[-1]) :]
+                self._cut_messages = 1
+                if not self._last_rows and self._retries_its_request():
+                    # A retry's message is turn-only: its request is the say saved before it,
+                    # which a wordless cancel cuts too, or it is answered again next time.
+                    self._last_rows = self._memory.rows_of_events(self._retried)
+                    self._cut_messages = 2
             self._saved = len(self.history)  # before summaries, so a failure there cannot re-save
             # All on disk now; a failed save keeps the marks so a later one still splits it.
             self._row_of.clear()
@@ -1393,6 +1407,11 @@ class Session:
                         self._memory.add_summary(text)
         except Exception:
             log.exception("could not save the chat")
+
+    def _retries_its_request(self) -> bool:
+        """The newest message only names retried events, right after their saved request (the
+        failed try saved nothing after it)."""
+        return bool(self._retried) and len(self.history) >= 2 and self.history[-2]["role"] == "user"
 
     def _rows_of(self, message: dict) -> list[tuple[dict, str | None, str | None]]:
         """The rows `message` is saved as, each with its event id and source. A run of blocks

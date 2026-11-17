@@ -80,7 +80,7 @@ def wake_text(
             first, *rest = str(value).split("\n")
             lines.append(f"  {name}: {first}")
             lines.extend(f"    {r}" for r in rest)
-    marks = "".join(f' {k}="{v}"' for k, v in (attrs or {}).items())
+    marks = "".join(f' {k}="{v}"' for k, v in (attrs or {}).items() if v)  # none empty
     return f'<data kind="event"{marks}>\n{_fence_safe(chr(10).join(lines))}\n</data>'
 
 

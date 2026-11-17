@@ -16,6 +16,7 @@ from brain.events import (
     load_notes,
 )
 from brain.masking import Masker
+from brain.store.conversation import save_messages
 from brain.store.db import open_db
 
 
@@ -391,6 +392,7 @@ def test_recover_returns_taken_events_as_resumed_attempts(tmp_path):
     log.post(Event("say", "desktop", {}, id="e1"))
     log.post(Event("say", "desktop", {}, id="e2"))
     log.take(["e1"], "t")  # the brain died while a turn held it
+    _saved(log, "e1")
     assert log.recover() == 1
     row = log.get("e1")
     assert (row.state, row.attempts, row.resume, row.end_reason, row.turn_id) == (
@@ -464,3 +466,28 @@ def test_a_recovered_event_runs_again_at_once(tmp_path):
     log.take(["e1"], "t1")
     log.recover()
     assert [r.id for r in log.ready()] == ["e1"]
+
+
+def _saved(log, id):
+    """The say's own row in the chat: the turn that took it saved its words."""
+    save_messages(log._db, [{"role": "user", "content": "words"}], "t", event_ids=[id])
+
+
+def test_recover_brings_back_a_say_never_saved_in_full(tmp_path):
+    log, _ = _clocked(tmp_path)
+    log.post(Event("say", "desktop", {}, id="e1"))
+    log.take(["e1"], "t")  # the brain died before the turn saved its request
+    log.recover()
+    row = log.get("e1")
+    assert (row.state, row.attempts, row.resume) == ("new", 1, False)
+
+
+def test_set_resume_marks_only_saved_events_and_names_the_stop(tmp_path):
+    log, _ = _clocked(tmp_path)
+    log.post(Event("say", "desktop", {}, id="e1"))
+    log.post(Event("say", "desktop", {}, id="e2"))
+    _saved(log, "e1")
+    log.set_resume(["e1", "e2"])
+    one, two = log.get("e1"), log.get("e2")
+    assert (one.resume, one.end_reason) == (True, "stop")
+    assert (two.resume, two.end_reason) == (False, None)  # never saved: told in full again

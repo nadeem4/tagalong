@@ -916,3 +916,9 @@ async def test_no_plain_turn_starts_while_an_interjection_runs():
     release.set()
     await ticks()
     await rig.runner.stop()
+
+
+def test_wake_text_leaves_out_an_empty_mark():
+    r = EventRow(id="1", kind="say", at=utc_text(T0), source="desktop", payload={"text": "hi"})
+    text = wake_text(EVENT_KINDS["say"], [r], "", UTC, {"resume": "true", "reason": ""})
+    assert text.startswith('<data kind="event" resume="true">')

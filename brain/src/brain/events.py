@@ -293,7 +293,11 @@ class EventLog:
         came back as attempts."""
         with transaction(self._db):
             ids = store.recover_taken(self._db, utc_text(self._now()))
-            self.backoff(ids, "restart", wait=False)
+            # One that died before its turn saved its request comes back in full: its words
+            # never reached the history.
+            saved = store.saved(self._db, ids)
+            self.backoff([i for i in ids if i in saved], "restart", wait=False)
+            self.backoff([i for i in ids if i not in saved], "restart", resume=False, wait=False)
         return len(ids)
 
     def set_resume(self, ids: list[str]) -> None:

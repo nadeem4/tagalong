@@ -172,6 +172,9 @@ class Memory:
     def replace_last_message(self, message: dict) -> None:
         conversation.replace_last_message(self._db, message)
 
+    def rows_of_events(self, event_ids: list[str]) -> list[int]:
+        return conversation.rows_of_events(self._db, event_ids)
+
     def set_cut(self, ids: list[int], cut: bool) -> None:
         conversation.set_cut(self._db, ids, cut)
 

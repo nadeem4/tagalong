@@ -7,6 +7,7 @@ import json
 import sqlite3
 
 from brain.protocol import BODY_DESKTOP
+from brain.store.db import transaction
 
 _MARKERS = {"image": "[screenshot]", "document": "[document]"}
 
@@ -64,8 +65,7 @@ def save_messages(
     events = event_ids or [None] * len(msgs)
     froms = sources or [None] * len(msgs)
     ids: list[int] = []
-    db.execute("BEGIN IMMEDIATE")
-    try:
+    with transaction(db):
         for m, event_id, source in zip(msgs, events, froms, strict=True):
             content, text = _encode_message(m)
             cur = db.execute(
@@ -74,11 +74,18 @@ def save_messages(
                 (at, m["role"], content, text, body, event_id, source),
             )
             ids.append(int(cur.lastrowid or 0))
-    except BaseException:
-        db.execute("ROLLBACK")
-        raise
-    db.execute("COMMIT")
     return ids
+
+
+def rows_of_events(db: sqlite3.Connection, event_ids: list[str]) -> list[int]:
+    """The saved rows that render these events, oldest first."""
+    marks = ",".join("?" * len(event_ids))
+    return [
+        r[0]
+        for r in db.execute(
+            f"SELECT id FROM messages WHERE event_id IN ({marks}) ORDER BY id", event_ids
+        )
+    ]
 
 
 def replace_last_message(db: sqlite3.Connection, message: dict) -> None:

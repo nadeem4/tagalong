@@ -164,9 +164,26 @@ def recover_taken(db: sqlite3.Connection, at: str) -> list[str]:
 
 
 def set_resume(db: sqlite3.Connection, ids: list[str]) -> None:
-    """Mark waiting rows as sent before: their words are in the history already."""
+    """Mark waiting rows as sent before, those with a saved chat row only (the rest never
+    reached the history, so they are told in full again). A stop left no reason: `stop`."""
     for id in ids:
-        db.execute("UPDATE events SET resume=1 WHERE id=? AND state='new'", (id,))
+        db.execute(
+            "UPDATE events SET resume=1, end_reason=COALESCE(end_reason, 'stop')"
+            " WHERE id=? AND state='new'"
+            " AND EXISTS (SELECT 1 FROM messages WHERE event_id=events.id)",
+            (id,),
+        )
+
+
+def saved(db: sqlite3.Connection, ids: list[str]) -> set[str]:
+    """Which of these events have a row in the saved chat: their words reached the history."""
+    marks = ",".join("?" * len(ids))
+    return {
+        r[0]
+        for r in db.execute(
+            f"SELECT DISTINCT event_id FROM messages WHERE event_id IN ({marks})", ids
+        )
+    }
 
 
 def sweep(db: sqlite3.Connection, before: str) -> int:
