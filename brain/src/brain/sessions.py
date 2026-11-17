@@ -1067,16 +1067,17 @@ class Session:
         self._said = said if by_person else ""
         self._turn_body = body_id
         self._turn_cause = events[0] if events else None
-        lead = [interruption_block(cut.spoken, cut.unsaid)] if cut is not None else []
-        lead = [self._turn_only(b) for b in [*self._carried, *lead]]  # an interjection's, once
-        self._carried = []
-
         # Read once per turn so the system prompt stays identical across its steps (cache).
-        # Read before history changes: a failed read leaves no half request for the retry to join.
+        # Read before any state changes: a failed read leaves no half request for the retry to
+        # join and keeps what an interjection changed for it.
         know = render_know(
             self._memory.always_loaded(), self._memory.asked_topics(), self._memory.shape()
         )
         prefs = render_preferences(rules.list_preferences(self._memory.db))
+        lead = [interruption_block(cut.spoken, cut.unsaid)] if cut is not None else []
+        lead = [self._turn_only(b) for b in [*self._carried, *lead]]  # an interjection's, once
+        self._carried = []
+
         self._drop_unanswered()
         self._append_user(lead + content)
         notify = self._bodies.notify
@@ -1091,7 +1092,9 @@ class Session:
             """The person's words that arrived on this body since the last step."""
             if self._turn_id != turn_id or stop.is_set():  # a stopped turn takes in nothing
                 return []
-            blocks = [{"type": "text", "text": ear_note()}] if self._ear_due else []
+            blocks = []
+            if self._ear_due:  # the guide is for this turn's model only, never a saved row
+                blocks.append(self._turn_only({"type": "text", "text": ear_note()}))
             self._ear_due = False
             for row in self.runner.take_more():
                 params = self._say_params(row)

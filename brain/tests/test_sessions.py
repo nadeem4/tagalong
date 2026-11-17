@@ -4,6 +4,7 @@ A fake model stands in for the API; an Event step makes it wait so tests can act
 """
 
 import asyncio
+import copy
 import datetime
 import json
 import re
@@ -14,12 +15,14 @@ import pytest
 from event_log import make_session
 from job_rows import add_timer, job_told, records_for
 
+import brain.sessions as sessions_module
 from brain.bodies import Bodies
 from brain.events import Event, EventKind
 from brain.experts import PermissionOption, PermissionRequest, Question, QuestionField, QuietFacts
 from brain.jobs import JobError
 from brain.masking import Masker
 from brain.memory import Memory
+from brain.mind.prompt import ear_note
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Call, Final
 from brain.protocol import Body, ErrorCode, RpcError, SayParams, Tool
@@ -645,8 +648,6 @@ async def test_a_retried_say_gains_no_second_row(tmp_path):
 
 
 async def test_a_start_that_fails_before_the_model_keeps_no_half_request(tmp_path, monkeypatch):
-    import brain.sessions as sessions_module
-
     real = sessions_module.render_know
     calls = []
 
@@ -702,6 +703,59 @@ async def test_the_ear_note_of_a_news_turn_is_not_saved(tmp_path):
     session.post_event(Event("job_ended", "job:j1", {"report": "Job j1 ended."}, id="n1"))
     await idle(session)
     assert saved_rows(memory) == [("user", "n1", "job:j1", 0), ("assistant", None, None, 0)]
+
+
+async def test_a_start_that_fails_once_still_carries_the_interjection(tmp_path, monkeypatch):
+    real = sessions_module.render_know
+    calls = []
+
+    def flaky(*args):
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("memory read failed")
+        return real(*args)
+
+    monkeypatch.setattr(sessions_module, "render_know", flaky)
+    clock = [datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)]
+    shown = []
+
+    class Snap(Gate):  # the lead leaves history when the turn ends, so keep what was shown
+        async def stream(self, system, messages, tools):
+            shown.append(copy.deepcopy(messages))
+            async for item in super().stream(system, messages, tools):
+                yield item
+
+    model = Snap(["ok"])
+    session, _ = make(model, file_memory(tmp_path), now=lambda: clock[0])
+    changed = {"type": "text", "text": "an interjection replaced the rest"}
+    session._carried.append(changed)  # what interject() leaves for the next turn
+    await session.say("desktop", SayParams(id="s1", text="hello there"))
+    await idle(session)
+    assert model.seen == []  # the start broke before the model was asked
+    clock[0] += datetime.timedelta(seconds=30)
+    session.runner.poke()
+    await idle(session)
+    assert changed in shown[-1][-1]["content"]
+
+
+async def test_an_ear_note_taken_mid_turn_is_not_saved(tmp_path):
+    memory = file_memory(tmp_path)
+    gate = asyncio.Event()
+    session, sent = make(Gate([gate, remember_call("tea"), "done"]), memory)
+    session.voice = RecordingVoice()
+    await said(session, sent, "desktop", SayParams(id="s1", text="note tea"))
+    read_aloud(session)  # read-aloud came on mid-turn: the next step gets the guide
+    await settle()
+    gate.set()
+    await finish_quietly(session)
+
+    def texts(messages):
+        return [
+            b.get("text") for m in messages if isinstance(m["content"], list) for b in m["content"]
+        ]
+
+    assert ear_note() in texts(session.history)  # the model was told
+    assert ear_note() not in texts(memory.load_messages())
 
 
 async def test_a_wordless_cancel_marks_every_row_of_its_request_cut(tmp_path):
