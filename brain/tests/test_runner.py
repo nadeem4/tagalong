@@ -15,6 +15,7 @@ from brain.guards import Guards
 from brain.masking import Masker
 from brain.presence import Presence
 from brain.runner import GROUP_CAP, Runner, pick, wake_text
+from brain.store.conversation import save_messages
 from brain.store.db import open_db, utc_text
 from brain.store.events import EventRow
 
@@ -472,6 +473,25 @@ async def test_over_budget_news_returns_to_new_without_an_attempt():
     assert n1 is not None
     assert (n1.state, n1.attempts, n1.resume, n1.not_before) == ("new", 0, False, None)
     assert len(rig.session.started) == 1  # it waits for the budget, not for a retry
+    await rig.runner.stop()
+
+
+async def test_news_cut_by_the_budget_mid_turn_resumes_after_the_reset():
+    rig = LoopRig()
+    rig.news("n1")
+    await ticks()
+    [(turn, _, _)] = rig.session.started
+    # The turn had saved its news and spoken before the budget ran out.
+    save_messages(rig.log._db, [{"role": "user", "content": "n"}], "t", event_ids=["n1"])
+    rig.budget.open = False  # the spend that ended the turn also shuts the gate
+    rig.runner.turn_ended(turn, "over_budget")
+    n1 = rig.log.get("n1")
+    assert n1 is not None and (n1.state, n1.attempts, n1.resume) == ("new", 0, True)
+    rig.budget.open = True  # the midnight reset
+    rig.runner.poke()
+    await ticks()
+    assert rig.turns() == [["n1"], ["n1"]]
+    assert rig.session.rows[1][0].resume is True  # told as going on, not as the full block
     await rig.runner.stop()
 
 

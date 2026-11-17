@@ -268,7 +268,8 @@ class EventLog:
         """Move events to `state`; `new` puts them back to be taken again."""
         with transaction(self._db):
             store.set_state(self._db, ids, state, end_reason=end_reason, at=utc_text(self._now()))
-        self.on_change()
+        if ids:
+            self.on_change()
         if state in ("handled", "gave_up"):
             self.ended(ids, state)
 

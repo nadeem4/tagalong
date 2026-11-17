@@ -215,7 +215,10 @@ class Runner:
             rows = [r for r in map(self._events.get, ids) if r is not None]
             says = [r.id for r in rows if r.kind in PERSON_KINDS]
             self._events.finish(says, "handled", end_reason=reason)
-            self._events.finish([r.id for r in rows if r.id not in says], "new")
+            news = [r.id for r in rows if r.id not in says]
+            self._events.finish(news, "new")
+            # What it said before the cut is in the history: after the reset it goes on, not again.
+            self._events.set_resume(news)
         else:
             self._events.backoff(ids, reason)
         if self._turn is not None and self._turn.id == turn_id:

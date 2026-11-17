@@ -426,7 +426,7 @@ or `cancelled` (the person was answered or the turn was stopped on purpose), `re
 refused the request, which would fail the same way again) or `unanswered` (no key is set, so
 nothing can answer). A
 say that ran over budget is handled too, since the person sees why; news that ran over budget goes
-back to `new` with no attempt counted and waits for the budget. An error, a timeout or the step cap
+back to `new` with no attempt counted, marked to resume when it had spoken (its words are saved), and waits for the budget. An error, a timeout or the step cap
 counts as an attempt: the event waits 30 s, then 2 min, then 10 min (`not_before`) and is tried
 again, and the fourth failure gives it up (`gave_up`). See [When a turn ends](#when-a-turn-ends)
 and [Start-up and shutdown](#start-up-and-shutdown). `on_end` carries the state to the one who
@@ -2504,7 +2504,7 @@ body in use.
 
 **When a turn ends.** `done`, `cancelled` by the person, `rejected` and `unanswered` (no key is
 set, so nothing can answer) mean handled. A say that ends over budget is handled too; news that ends over budget goes
-back to `new` with no attempt counted. An error, a timeout or the step cap counts as an attempt:
+back to `new` with no attempt counted, marked to resume when its words were saved. An error, a timeout or the step cap counts as an attempt:
 the events get `not_before` 30 s, then 2 min, then 10 min ahead (`BACKOFF_S`, `events.py`) and are
 tried again; the fourth failure ends them `gave_up` with the reason. The runner skips an event
 that is not due yet and arms its alarm for the earliest `not_before`, so a backing-off event lets
@@ -2520,9 +2520,8 @@ reason=error|step_cap|restart|stop`, with the kind, `at` and the kind's note (an
 left out). Only an event with a saved chat row (`messages.event_id`) is marked `resume`. A say shows only its first
 line, cut at 80 characters. These marks, the `gave_up` marks, the interruption and interjection
 lead blocks and the ear note are for that turn only and are never saved, so a retried say gains no
-second row. Two cases are accepted: a rider carried by an errored or cancelled turn can be told
-again by the next `done` person turn, and news returned to `new` after going over budget is sent
-again in full.
+second row. One case is accepted: a rider carried by an errored or cancelled turn can be told
+again by the next `done` person turn.
 
 **History is saved each step.** `Session._save_new` runs when the turn starts (after its task
 exists), after every tool round through `on_step`, and at the turn's end. Each taken event gets its
@@ -2658,9 +2657,7 @@ it is ended as stale (`EventLog.finish_matching`). Migration 0037 removed the `h
 open-item kinds. Home's `events_waiting` tool (`events_tools.py`) lists news still `new` and every
 event given up, a say or card answer included, oldest first, each as
 `{id, kind, source, at, age_s, gave_up, gist}`; the `gist` is the payload's first fact value cut
-short (JSON when it is not text), never prose. A new say or card answer is not listed. Snoozing
-stays with the loop
-service, which holds a snoozed loop itself, so the runner has no snooze rule of its own.
+short (JSON when it is not text), never prose. A new say or card answer is not listed.
 
 There is one deadline rule: `DEADLINE_S` in `open_items.py` for what waits on a person. The ask wait
 in `asks.py` (`ASK_TIMEOUT_S`) is a live card tied to one turn, not a stored wait.
