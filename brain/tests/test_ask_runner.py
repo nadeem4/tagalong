@@ -141,7 +141,7 @@ async def test_answer_after_turn_cancel_runs_saved_call():
     assert rig.source.ran == [("t", {"n": 1})]
     assert rig.items.get(card["id"]).state == "done"
     [wake] = rig.events
-    assert (wake.kind, wake.facts["outcome"], wake.facts["result"]) == (
+    assert (wake.kind, wake.payload["outcome"], wake.payload["result"]) == (
         "ask_ended",
         "approved",
         "ran t",
@@ -173,7 +173,7 @@ async def test_denial_still_refuses_and_scout_words_it():
     await rig.settle()
     assert rig.source.ran == []
     [wake] = rig.events
-    assert (wake.facts["outcome"], wake.facts["reason"]) == ("refused", "the person said no")
+    assert (wake.payload["outcome"], wake.payload["reason"]) == ("refused", "the person said no")
     assert rig.work.get(card["id"]).end_reason == "refused"
     assert rig.items.get(card["id"]).state == "done"
 
@@ -193,7 +193,7 @@ async def test_a_tool_turned_off_since_refuses_the_late_yes():
     rig.asks.answer(rig.opened()[0]["id"], "allow", "desktop")
     await rig.settle()
     assert rig.source.ran == []
-    assert rig.events[0].facts["outcome"] == "refused"
+    assert rig.events[0].payload["outcome"] == "refused"
 
 
 async def test_a_call_that_held_a_secret_runs_from_the_raw_copy_in_the_same_process():
@@ -205,7 +205,7 @@ async def test_a_call_that_held_a_secret_runs_from_the_raw_copy_in_the_same_proc
     rig.asks.answer(rig.opened()[0]["id"], "allow", "desktop")
     await rig.settle()
     assert rig.source.ran == [("t", {"n": 1})]
-    assert rig.events[0].facts["outcome"] == "approved"
+    assert rig.events[0].payload["outcome"] == "approved"
 
 
 async def test_a_call_that_held_a_secret_fails_after_a_restart():
@@ -218,7 +218,7 @@ async def test_a_call_that_held_a_secret_fails_after_a_restart():
     again.asks.answer(again.opened()[0]["id"], "allow", "desktop")
     await again.settle()
     assert again.source.ran == []
-    assert again.events[-1].facts["reason"] == "held a secret"
+    assert again.events[-1].payload["reason"] == "held a secret"
 
 
 async def test_deny_wins_even_when_the_tool_became_auto_since():
@@ -231,7 +231,7 @@ async def test_deny_wins_even_when_the_tool_became_auto_since():
     rig.asks.answer(card["id"], "deny", "desktop")
     await rig.settle()
     assert rig.source.ran == []
-    assert rig.events[0].facts["outcome"] == "refused"
+    assert rig.events[0].payload["outcome"] == "refused"
     assert rig.work.get(card["id"]).end_reason == "refused"
 
 
@@ -243,7 +243,7 @@ async def test_a_notice_wakes_scout_at_two_thirds_of_the_wait_once():
     rig.runner.fire_due()
     rig.runner.fire_due()
     [notice] = [e for e in rig.events if e.kind == "ask_notice"]
-    assert notice.facts["ask"] == card["id"] and notice.facts["left_s"] < 86400
+    assert notice.payload["ask"] == card["id"] and notice.payload["left_s"] < 86400
     assert rig.items.get(card["id"]).state == "open"
     rig.asks.answer(card["id"], "allow", "desktop")
     await rig.settle()
@@ -267,7 +267,7 @@ async def test_a_yes_just_after_the_deadline_ends_it_like_the_timer_would():
     rig.asks.answer(card["id"], "allow", "desktop")
     await rig.settle()
     assert rig.source.ran == []
-    assert [(e.kind, e.facts["outcome"]) for e in rig.events] == [("ask_ended", "expired")]
+    assert [(e.kind, e.payload["outcome"]) for e in rig.events] == [("ask_ended", "expired")]
     assert rig.work.get(card["id"]).end_reason == "expired"
     assert card["id"] not in rig.runner._raw and card["id"] not in rig.runner._noticed
     rig.runner.fire_due()
@@ -282,7 +282,7 @@ async def test_no_answer_by_the_deadline_expires_it_and_tells_scout():
     rig.runner.fire_due()
     assert [(c["id"], c["reason"]) for c in rig.closed()] == [(card["id"], "timeout")]
     assert rig.items.get(card["id"]).state == "expired"
-    assert rig.events[0].facts["outcome"] == "expired"
+    assert rig.events[0].payload["outcome"] == "expired"
     assert rig.work.get(card["id"]).end_reason == "expired"
     with pytest.raises(RpcError):
         rig.asks.answer(card["id"], "allow", "desktop")
@@ -297,7 +297,7 @@ async def test_restart_closes_an_answered_item_it_cannot_vouch_for():
     again.runner.start()
     assert again.items.get(item.id).state == "done"
     assert again.source.ran == []
-    assert again.events[0].facts["outcome"] == "failed"
+    assert again.events[0].payload["outcome"] == "failed"
 
 
 async def test_a_card_comes_back_when_a_body_joins_after_a_restart():
@@ -361,8 +361,8 @@ async def test_return_wake_names_waiting_asks_and_their_age():
     again.runner.returned(18000)
     await again.settle()
     [wake] = [e for e in again.events if e.kind == "asks_waiting"]
-    [row] = json.loads(wake.facts["asks"])
-    assert wake.facts["count"] == 1
+    [row] = json.loads(wake.payload["asks"])
+    assert wake.payload["count"] == 1
     assert (row["ask"], row["tool"], row["age_s"]) == (item.id, "t", 18000)
     assert wake.key == "asks_waiting"  # a later one replaces an unsent earlier one
 
@@ -388,7 +388,7 @@ async def test_a_card_that_cannot_be_built_does_not_stop_the_others():
     assert seen == [1, 2]
     [card] = again.opened()
     [wake] = [e for e in again.events if e.kind == "asks_waiting"]
-    assert wake.facts["count"] == 1 and card["input"] == {"n": 2}
+    assert wake.payload["count"] == 1 and card["input"] == {"n": 2}
 
 
 async def test_an_ask_opened_while_no_screen_was_up_is_told_on_return():
@@ -400,7 +400,7 @@ async def test_an_ask_opened_while_no_screen_was_up_is_told_on_return():
     rig.runner.returned(600)  # the card was published already, so it counts as up
     await rig.settle()
     [wake] = [e for e in rig.events if e.kind == "asks_waiting"]
-    [row] = json.loads(wake.facts["asks"])
+    [row] = json.loads(wake.payload["asks"])
     assert (row["ask"], row["age_s"]) == (item.id, 300)
 
 

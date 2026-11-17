@@ -36,11 +36,11 @@ def svc(store, clock, events, **kw):
 
 
 def focus(app="POWERPNT.EXE", title="Q4 pricing.pptx - PowerPoint"):
-    return Event("focus", {"body": "desktop", "app": app, "title": title}, key="desktop")
+    return Event("focus", "desktop", {"body": "desktop", "app": app, "title": title}, key="desktop")
 
 
 def tab(title="", url=""):
-    return Event("tab", {"body": "browser", "title": title, "url": url}, key="browser")
+    return Event("tab", "desktop", {"body": "browser", "title": title, "url": url}, key="browser")
 
 
 def deck(store, ref="a", anchors=("Q4 pricing deck",), **kw):
@@ -67,9 +67,9 @@ def test_a_matching_focus_emits_one_context_loop_event_with_facts(parts):
     assert len(events) == 1
     e = events[0]
     assert e.kind == "loop" and e.key == f"loop:{lp.id}"
-    assert e.facts["reason"] == "context" and e.facts["anchor"] == "Q4 pricing deck"
-    assert e.facts["title"] == "t-a" and e.facts["people"] == "Priya"
-    assert e.facts["asks"] == "send the numbers"
+    assert e.payload["reason"] == "context" and e.payload["anchor"] == "Q4 pricing deck"
+    assert e.payload["title"] == "t-a" and e.payload["people"] == "Priya"
+    assert e.payload["asks"] == "send the numbers"
 
 
 def test_a_second_focus_the_same_day_emits_nothing_and_the_next_day_again(parts):
@@ -89,7 +89,7 @@ def test_a_browser_tab_matches_by_url(parts):
     store, clock, events, _ = parts
     deck(store, anchors=("https://docs.example.com/q4-pricing",))
     svc(store, clock, events).saw(tab("Doc", "https://docs.example.com/q4-pricing/edit?x=1"))
-    assert [e.facts["reason"] for e in events] == ["context"]
+    assert [e.payload["reason"] for e in events] == ["context"]
 
 
 def test_nothing_surfaces_while_the_mail_app_is_in_front(parts):
@@ -114,9 +114,11 @@ def test_other_events_and_odd_facts_are_ignored(parts):
     store, clock, events, _ = parts
     deck(store)
     service = svc(store, clock, events)
-    service.saw(Event("download", {"body": "desktop"}))  # `back` now brings the daily digest
-    service.saw(Event("focus", {}))
-    service.saw(Event("tab", {"title": 5}))
+    service.saw(
+        Event("download", "desktop", {"body": "desktop"})
+    )  # `back` now brings the daily digest
+    service.saw(Event("focus", "desktop", {}))
+    service.saw(Event("tab", "desktop", {"title": 5}))
     assert events == []
 
 
@@ -130,7 +132,7 @@ def test_context_is_throttled_globally_and_a_throttled_match_is_not_used_up(part
     assert len(events) == 1
     clock.at += timedelta(minutes=11)
     service.saw(focus(title="Budget 2027 plan.xlsx"))
-    assert len(events) == 2 and events[1].facts["title"] == "t-b"
+    assert len(events) == 2 and events[1].payload["title"] == "t-b"
 
 
 # --- due, quiet, stale ---
@@ -152,7 +154,7 @@ def test_quiet_emits_once_and_only_for_a_loop_still_waiting(parts):
     service = svc(store, clock, events)
     service.fire_due()
     service.fire_due()
-    assert [(e.key, e.facts["reason"]) for e in events] == [(f"loop:{waiting.id}", "quiet")]
+    assert [(e.key, e.payload["reason"]) for e in events] == [(f"loop:{waiting.id}", "quiet")]
 
 
 async def test_a_future_quiet_time_arms_the_timer(parts):
@@ -175,8 +177,10 @@ def test_a_stale_sweep_marks_untouched_loops_and_sends_one_batched_wake(parts):
     service.fire_due()
     assert len(events) == 1
     e = events[0]
-    assert e.facts["reason"] == "stale" and e.facts["count"] == 2
-    assert a.id in e.facts["loops"] and b.id in e.facts["loops"] and c.id not in e.facts["loops"]
+    assert e.payload["reason"] == "stale" and e.payload["count"] == 2
+    assert (
+        a.id in e.payload["loops"] and b.id in e.payload["loops"] and c.id not in e.payload["loops"]
+    )
     assert store.get(a.id).status == "stale" and store.get(c.id).status == "held"
     service.fire_due()
     assert len(events) == 1  # swept loops are not swept again
@@ -188,7 +192,7 @@ def test_the_stale_age_is_configurable(parts):
     deck(store)
     clock.at = T0
     svc(store, clock, events, stale_days=2).fire_due()
-    assert [e.facts["reason"] for e in events] == ["stale"]
+    assert [e.payload["reason"] for e in events] == ["stale"]
 
 
 def test_a_stale_loop_with_new_mail_is_held_again(parts):
@@ -235,8 +239,8 @@ async def test_an_urgent_new_loop_emits_once_immediately(parts):
     service = reader_service(store, clock, events, Change(**NEW, urgent=True))
     await service._process("gmail", _mail("t1"))
     await service._process("gmail", _mail("t1"))  # the same thread again: already said
-    urgent = [e for e in events if e.facts["reason"] == "urgent"]
-    assert len(urgent) == 1 and urgent[0].facts["title"] == "Priya needs the deck"
+    urgent = [e for e in events if e.payload["reason"] == "urgent"]
+    assert len(urgent) == 1 and urgent[0].payload["title"] == "Priya needs the deck"
 
 
 async def test_a_loop_not_flagged_urgent_is_silent(parts):
@@ -271,5 +275,5 @@ async def test_priya_mail_then_the_deck_opens_surfaces_once(parts):
     service = svc(store, clock, events)
     service.saw(focus())
     service.saw(focus())
-    assert [e.facts["reason"] for e in events] == ["context"]
-    assert events[0].facts["title"] == "Priya needs the deck"
+    assert [e.payload["reason"] for e in events] == ["context"]
+    assert events[0].payload["title"] == "Priya needs the deck"

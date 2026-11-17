@@ -57,8 +57,8 @@ def test_past_due_held_loop_emits_one_loop_event(parts):
     assert len(events) == 1
     e = events[0]
     assert e.kind == "loop" and e.key == f"loop:{lp.id}"
-    assert e.facts["reason"] == "due" and e.facts["id"] == lp.id
-    assert e.facts["title"] == "t-a" and e.facts["asks"] == "do it"
+    assert e.payload["reason"] == "due" and e.payload["id"] == lp.id
+    assert e.payload["title"] == "t-a" and e.payload["asks"] == "do it"
 
 
 def test_due_fires_once_even_after_restart(parts):
@@ -87,7 +87,7 @@ def test_snoozed_fires_but_done_and_dropped_do_not(parts):
     for ref, st in [("d", "done"), ("x", "dropped")]:
         held(store, ref, past, st)
     svc(store, clock, events).start()
-    assert [e.facts["title"] for e in events] == ["t-s"]
+    assert [e.payload["title"] for e in events] == ["t-s"]
 
 
 def test_no_due_never_fires(parts):

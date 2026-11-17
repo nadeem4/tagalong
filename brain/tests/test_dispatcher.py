@@ -151,7 +151,7 @@ class Rig:
 
     async def emit(self, event: Event, on_start=None, on_drop=None, on_end=None) -> None:
         item = Item(
-            event.kind, event.origin_body, dict(event.facts), "idle", event.key,
+            event.kind, event.origin_body, dict(event.payload), "idle", event.key,
             on_start, on_drop, on_end,
         )  # fmt: skip
         self.d.post(item)
@@ -178,7 +178,7 @@ async def make(tmp_path):
 
 
 def ev(kind="ping", key=None, **facts) -> Event:
-    return Event(kind, facts, key)
+    return Event(kind, "scout", facts, key=key)
 
 
 # ---- the gate: urgency from the kind, delivery by speech state ----
@@ -431,7 +431,7 @@ async def test_a_wake_goes_to_a_whatsapp_body_when_it_is_the_only_one_online(mak
 async def test_a_whatsapp_event_wake_runs_on_whatsapp(make):
     rig = make(online=("desktop", "whatsapp"), last="desktop")
     rig.bodies.phones = {"whatsapp"}
-    await rig.emit(Event("ping", {"body": "whatsapp"}, origin_body="whatsapp"))
+    await rig.emit(Event("ping", "scout", {"body": "whatsapp"}, origin_body="whatsapp"))
     assert [b for b, _ in rig.starts] == ["whatsapp"]
 
 
@@ -457,7 +457,9 @@ async def test_no_body_online_waits_and_a_connect_runs_it(make):
 async def test_a_loop_wake_with_no_display_body_waits_and_is_not_lost(make):
     rig = make(online=("browser",), kinds={"loop": EVENT_KINDS["loop"]}, last="browser")
     rig.bodies.headless = {"browser"}
-    await rig.emit(Event("loop", {"reason": "due", "title": "Send the deck"}, key="loop:1"))
+    await rig.emit(
+        Event("loop", "scout", {"reason": "due", "title": "Send the deck"}, key="loop:1")
+    )
     assert rig.starts == []
     rig.bodies.ids.append("desktop")
     rig.d.pump()
@@ -620,9 +622,9 @@ async def test_context_only_kind_updates_latest_and_never_wakes(make):
     rig.d.record(ev("focus", title="nokey"))
     assert rig.starts == []
     latest = rig.d.latest("focus")
-    assert latest["a"].facts["title"] == "new"
-    assert latest["b"].facts["title"] == "other"
-    assert latest[""].facts["title"] == "nokey"
+    assert latest["a"].payload["title"] == "new"
+    assert latest["b"].payload["title"] == "other"
+    assert latest[""].payload["title"] == "nokey"
     assert rig.d.latest("ping") == {}
 
 
@@ -821,7 +823,7 @@ async def test_the_emit_guard_stopping_with_another_code_keeps_the_wake(make):
 async def test_context_only_events_survive_a_spent_budget(make):
     rig = make(budget=Spent())
     rig.d.record(ev("focus", title="x"))
-    assert rig.d.latest("focus")[""].facts["title"] == "x"
+    assert rig.d.latest("focus")[""].payload["title"] == "x"
 
 
 async def test_quiet_hours_hold(make):

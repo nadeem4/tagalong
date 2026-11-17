@@ -19,7 +19,7 @@ class _Emit:
         self.calls.append((event, on_drop, on_end))
 
     def id(self, n=-1):
-        return self.calls[n][0].facts["question"]
+        return self.calls[n][0].payload["question"]
 
 
 def _q(*fields):
@@ -39,11 +39,11 @@ async def test_ask_emits_a_job_question_event_with_the_facts():
     task = await _ask(sq, emit, _q(field))
     event = emit.calls[0][0]
     assert event.kind == "job_question" and event.key is None
-    assert len(event.facts["question"]) == 8
-    assert event.facts["job"] == "j1"
-    assert event.facts["message"] == "Which way?"
-    assert event.facts["fields"] == "way | Way | Pick one | options a/b | multi"
-    sq.pass_to_user(event.facts["question"])
+    assert len(event.payload["question"]) == 8
+    assert event.payload["job"] == "j1"
+    assert event.payload["message"] == "Which way?"
+    assert event.payload["fields"] == "way | Way | Pick one | options a/b | multi"
+    sq.pass_to_user(event.payload["question"])
     await task
 
 

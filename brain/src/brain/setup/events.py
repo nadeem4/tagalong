@@ -33,7 +33,7 @@ class SetupEvents:
         item = self._items.open(
             "setup",
             "brain",
-            saved_call={"kind": event.kind, "facts": event.facts, "key": event.key},
+            saved_call={"kind": event.kind, "payload": event.payload, "key": event.key},
         )
         self._send(item.id, event)
 
@@ -42,7 +42,7 @@ class SetupEvents:
         self._items.expire_due(self._now(), "setup")
         for item in self._saved():
             call = item.saved_call
-            self._send(item.id, Event(call["kind"], call["facts"], key=call["key"]))
+            self._send(item.id, Event(call["kind"], "setup", call["payload"], key=call["key"]))
 
     def _saved(self) -> list[OpenItem]:
         return self._items.list_open(kind="setup")

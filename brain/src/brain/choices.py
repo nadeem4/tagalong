@@ -66,7 +66,11 @@ class Choices:
         except RpcError:
             log.info("choice %s closed without an answer", ask_id)
             self._items.expire(ask_id, "no_answer")  # this item only, whatever closed the ask
-            self._emit(Event("choice", self._facts(ask_id, text, "", "", expired=True), key=ask_id))
+            self._emit(
+                Event(
+                    "choice", "scout", self._facts(ask_id, text, "", "", expired=True), key=ask_id
+                )
+            )
             return
         if answer.option is None:  # everyone went offline before it opened
             self._items.finish(ask_id, "nobody_online")
@@ -75,7 +79,7 @@ class Choices:
         picked = answer.option if answer.option in options else ""
         self._items.answer(ask_id, picked or answer.text or "", "person")
         facts = self._facts(ask_id, text, picked, answer.text or "")
-        self._emit(Event("choice", facts, key=ask_id))
+        self._emit(Event("choice", "scout", facts, key=ask_id))
 
     @staticmethod
     def _facts(ask_id: str, text: str, option: str, typed: str, expired: bool = False) -> dict:

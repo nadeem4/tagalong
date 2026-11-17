@@ -172,7 +172,9 @@ class AskRunner:
             facts["reason"] = reason
         if outcome == "approved":
             facts["result"] = result
-        self._emit(Event("ask_ended", facts, key=f"ask:{item.id}", origin_body=item.origin_body))
+        self._emit(
+            Event("ask_ended", "scout", facts, key=f"ask:{item.id}", origin_body=item.origin_body)
+        )
 
     # ---- deadline and restart ----
 
@@ -223,7 +225,13 @@ class AskRunner:
                     "left_s": int((item.deadline_at - now).total_seconds()),
                 }
                 self._emit(
-                    Event("ask_notice", facts, key=f"ask:{item.id}", origin_body=item.origin_body)
+                    Event(
+                        "ask_notice",
+                        "scout",
+                        facts,
+                        key=f"ask:{item.id}",
+                        origin_body=item.origin_body,
+                    )
                 )
         self.changed()
 
@@ -242,7 +250,9 @@ class AskRunner:
             "outcome": "expired",
             "reason": "no answer",
         }
-        self._emit(Event("ask_ended", facts, key=f"ask:{item.id}", origin_body=item.origin_body))
+        self._emit(
+            Event("ask_ended", "scout", facts, key=f"ask:{item.id}", origin_body=item.origin_body)
+        )
 
     def _record_ask(self, item: OpenItem, outcome: str, by: str, reason: str) -> None:
         call = _call(item)
@@ -307,7 +317,7 @@ class AskRunner:
                 for i in back
             ]
             facts: dict[str, str | int] = {"count": len(asks), "asks": json.dumps(asks)}
-            self._emit(Event("asks_waiting", facts, key="asks_waiting"))
+            self._emit(Event("asks_waiting", "scout", facts, key="asks_waiting"))
 
     async def _show_again(self, item: OpenItem) -> bool:
         call = _call(item)

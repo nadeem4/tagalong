@@ -789,7 +789,7 @@ class Jobs:
                 0, int((self._now() - began).total_seconds() // 60)
             )
         event_facts.update(self.wake_facts(job_id))
-        self._emit(Event("job_quiet", event_facts, key=f"job:{job_id}"))
+        self._emit(Event("job_quiet", f"job:{job_id}", event_facts, key=f"job:{job_id}"))
 
     def _step_failed(self, job_id: str, entry: ActivityEntry) -> None:
         """A command failed: tell Scout the facts (batched and capped by the dispatcher)."""
@@ -800,7 +800,7 @@ class Jobs:
             "exit": "" if entry.exit is None else entry.exit,
         }
         facts.update(self.wake_facts(job_id))
-        self._emit(Event("job_step_failed", facts, key=f"job:{job_id}"))
+        self._emit(Event("job_step_failed", f"job:{job_id}", facts, key=f"job:{job_id}"))
 
     def wake_facts(self, job_id: str) -> dict[str, str]:
         """Facts every job wake carries: a short summary of what the job did, read from its

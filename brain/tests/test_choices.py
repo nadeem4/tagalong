@@ -73,7 +73,7 @@ async def test_an_answer_emits_a_choice_event_with_option_and_text():
     await settle()
     (event,) = events
     assert event.kind == "choice" and event.key == ask_id
-    assert event.facts == {"ask": ask_id, "question": "Which?", "option": "b", "text": ""}
+    assert event.payload == {"ask": ask_id, "question": "Which?", "option": "b", "text": ""}
 
 
 async def test_typed_text_answer_is_carried_as_text():
@@ -83,8 +83,8 @@ async def test_typed_text_answer_is_carried_as_text():
     choices._asks.answer(ask_id, "other", "desktop", text="my own")
     await settle()
     # The body did not pick an option, so none is reported; the text is the answer.
-    assert events[0].facts["option"] == ""
-    assert events[0].facts["text"] == "my own"
+    assert events[0].payload["option"] == ""
+    assert events[0].payload["text"] == "my own"
 
 
 async def test_empty_options_need_free_text():
@@ -103,8 +103,8 @@ async def test_choice_timeout_expires_item_not_silent_drop():
     item = choices._items.get(ask_id)
     assert (item.state, item.reason) == ("expired", "no_answer")
     (event,) = events  # Scout hears that nobody answered
-    assert event.kind == "choice" and event.facts["expired"] == "yes"
-    assert event.facts["option"] == "" and event.facts["question"] == "Which?"
+    assert event.kind == "choice" and event.payload["expired"] == "yes"
+    assert event.payload["option"] == "" and event.payload["question"] == "Which?"
     assert choices._tasks == set()
     assert bodies.sent[-1]["reason"] == "timeout"
 

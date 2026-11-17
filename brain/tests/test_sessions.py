@@ -1460,7 +1460,7 @@ async def test_focus_and_tab_also_reach_the_loops_service_and_stay_non_waking():
     session.body_event("desktop", "focus", {"app": "Code", "title": "Q4 pricing.pptx"})
     session.body_event("browser", "tab", {"title": "Doc", "url": "https://x.test/a"})
     await settle()
-    assert [(e.kind, e.facts["title"]) for e in session.loops.seen] == [
+    assert [(e.kind, e.payload["title"]) for e in session.loops.seen] == [
         ("focus", "Q4 pricing.pptx"),
         ("tab", "Doc"),
     ]
@@ -2655,8 +2655,8 @@ async def test_exhausted_retry_emits_work_failed_and_blocks_goal():
     assert records_for(memory).work.get("j1").state == "blocked"
     [event] = given_up(events)
     assert (event.kind, event.key) == ("work_failed", f"work_failed:{row.id}")
-    assert event.facts["goal"] == "j1" and event.facts["step"] == row.id
-    assert event.facts["title"] == "files__list" and "gave up" in event.facts["reason"]
+    assert event.payload["goal"] == "j1" and event.payload["step"] == row.id
+    assert event.payload["title"] == "files__list" and "gave up" in event.payload["reason"]
 
 
 async def test_unsafe_tool_call_not_retried():
@@ -2776,7 +2776,7 @@ async def test_a_give_up_whose_wake_never_started_is_told_again_at_start_once(mo
     seen = work_failed_emits(monkeypatch)
     await restart(memory)
     await restart(memory)
-    assert [e.facts["step"] for e in seen] == ["j1.s"]
+    assert [e.payload["step"] for e in seen] == ["j1.s"]
     assert records.work.get("j1.s").reported_at is not None
 
 
@@ -2790,8 +2790,8 @@ async def test_a_step_the_resume_scan_failed_as_unsure_is_told_once(monkeypatch)
     seen = work_failed_emits(monkeypatch)
     await restart(memory)  # the brain died mid-call: the scan fails it, unsure it ran
     await restart(memory)
-    assert [e.facts["step"] for e in seen] == ["j1.s"]
-    assert "unsure" in seen[0].facts["reason"]
+    assert [e.payload["step"] for e in seen] == ["j1.s"]
+    assert "unsure" in seen[0].payload["reason"]
 
 
 async def test_bookkeeping_tools_leave_no_work_rows():
@@ -3098,7 +3098,7 @@ async def test_answer_after_the_turn_was_cancelled_still_runs_the_call():
     session.answer(card["id"], "allow", "desktop")
     await settle()
     assert ran == ["files__tidy"]
-    assert [(e.kind, e.facts["outcome"], e.facts["result"]) for e in wakes] == [
+    assert [(e.kind, e.payload["outcome"], e.payload["result"]) for e in wakes] == [
         ("ask_ended", "approved", "tidied")
     ]
 

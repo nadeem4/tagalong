@@ -153,7 +153,7 @@ async def talking(model):
     await session.say("desktop", spoken_say("tell me a story"))
     await calm()
     session.dispatcher.set_speech_state("talking")
-    session.post_event(Event("nudge", {"note": "Sam wrote back"}))
+    session.post_event(Event("nudge", "scout", {"note": "Sam wrote back"}))
     await settle()
     return session, voice
 

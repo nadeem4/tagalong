@@ -109,7 +109,7 @@ async def test_cancelled_wake_news_survives():
 async def test_job_question_reaches_whatsapp_only_setup():
     session, sent = make(Gate(["asked"]), kinds=None)
     session._bodies.connect(Body(id="wa", kind="whatsapp", name="WA"), [], QuietPeer(), None)
-    session.post_event(Event("job_question", {"job": "j1", "message": "Which db?"}))
+    session.post_event(Event("job_question", "scout", {"job": "j1", "message": "Which db?"}))
     await settle()
     assert wake_started(sent) == ["wa"]
 
@@ -141,7 +141,9 @@ async def test_whatsapp_event_reply_goes_to_whatsapp():
     join(session, "desktop")
     session._bodies.connect(Body(id="wa", kind="whatsapp", name="WA"), [], QuietPeer(), None)
     session._last_body = "desktop"  # a wake would otherwise go to the screen
-    event = Event("back", {"body": "wa", "idle_seconds": 900}, "back:wa", origin_body="wa")
+    event = Event(
+        "back", "wa", {"body": "wa", "idle_seconds": 900}, key="back:wa", origin_body="wa"
+    )
     session._from_body(event)
     await idle(session)
     assert wake_started(sent) == ["wa"]
@@ -285,7 +287,9 @@ async def test_news_that_did_not_opt_in_is_not_posted_again():
     session, _ = make(Gate([asyncio.Event(), "never"]))
     join(session, "desktop")
     posted = spy_posts(session)
-    session.post_event(Event("job_ended", {"report": "r"}, key="q1"), on_end=lambda reason: None)
+    session.post_event(
+        Event("job_ended", "scout", {"report": "r"}, key="q1"), on_end=lambda reason: None
+    )
     await settle()
     session.cancel(session._turn_id)
     await finish_quietly(session)

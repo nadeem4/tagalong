@@ -1159,6 +1159,7 @@ async def test_a_quiet_job_wakes_scout_with_what_it_is_running(make_rig):
     assert rig.emitted == [
         Event(
             "job_quiet",
+            f"job:{job_id}",
             {
                 "job": job_id,
                 "quiet_minutes": 20,
@@ -1188,7 +1189,7 @@ async def test_a_quiet_job_with_no_running_step_omits_it(make_rig):
     await rig.clock.advance(1200)
     (event,) = rig.emitted
     assert event.kind == "job_quiet" and event.key == f"job:{job_id}"
-    assert "running" not in event.facts and "running_minutes" not in event.facts
+    assert "running" not in event.payload and "running_minutes" not in event.payload
 
 
 async def test_expert_process_death_ends_failed_and_is_told(make_rig):
@@ -1875,14 +1876,14 @@ async def test_a_failed_step_emits_job_step_failed_with_command_exit_and_summary
     await until(lambda: rig.emitted)
     (event,) = rig.emitted
     assert (event.kind, event.key) == ("job_step_failed", f"job:{job_id}")
-    assert (event.facts["job"], event.facts["step"], event.facts["exit"]) == (
+    assert (event.payload["job"], event.payload["step"], event.payload["exit"]) == (
         job_id,
         "npm test",
         1,
     )
-    assert "failed: npm test (exit 1)" in event.facts["activity"]
-    assert "boom" in event.facts["activity"]
-    assert TOKEN not in str(event.facts)
+    assert "failed: npm test (exit 1)" in event.payload["activity"]
+    assert "boom" in event.payload["activity"]
+    assert TOKEN not in str(event.payload)
 
 
 async def test_the_failed_step_fact_is_one_clipped_line(make_rig):
@@ -1890,7 +1891,7 @@ async def test_the_failed_step_fact_is_one_clipped_line(make_rig):
     text = "a\nb " + "z" * 500
     entry = ActivityEntry(1, 1, "2026-01-01T00:00:00+00:00", "command", text, "failed", "s", 1)
     rig.jobs._step_failed("j1", entry)
-    step = rig.emitted[-1].facts["step"]
+    step = rig.emitted[-1].payload["step"]
     assert "\n" not in step and 0 < len(step) <= 200
 
 
@@ -1909,8 +1910,8 @@ async def test_job_quiet_facts_include_the_activity_summary(make_rig):
     await until(lambda: rig.jobs.running_steps() and rig.clock._waiters)
     await rig.clock.advance(1200)
     (event,) = rig.emitted
-    assert "running: npm install" in event.facts["activity"]
-    assert event.facts["job"] == job_id
+    assert "running: npm install" in event.payload["activity"]
+    assert event.payload["job"] == job_id
 
 
 async def test_job_ended_note_carries_the_activity_summary_beside_the_result(make_rig):

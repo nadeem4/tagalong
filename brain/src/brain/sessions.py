@@ -435,7 +435,7 @@ class Session:
             if len("; ".join([*told, entry])) > 1500:
                 break
             told.append(entry)
-        self.post_event(Event("watches_paused", {"watches": "; ".join(told)}))
+        self.post_event(Event("watches_paused", "scout", {"watches": "; ".join(told)}))
         for w in paused[: len(told)]:  # the rest are told at the next start
             work.mark_reported(w.id)
 
@@ -495,7 +495,7 @@ class Session:
         item = Item(
             event.kind,
             event.origin_body,
-            dict(event.facts),
+            dict(event.payload),
             "idle",
             event.key,
             on_start,
@@ -516,7 +516,13 @@ class Session:
             self.ask_runner.answered(item.payload["ask"], item.payload["option"], item.origin_body)
         else:
             self.dispatcher.record(
-                Event(item.kind, item.payload, key=item.key, origin_body=item.origin_body)
+                Event(
+                    item.kind,
+                    item.origin_body,
+                    item.payload,
+                    key=item.key,
+                    origin_body=item.origin_body,
+                )
             )
 
     def _say_gave_up(self, item: Item) -> None:
@@ -667,7 +673,13 @@ class Session:
                 "result": text[:_LATE_RESULT_CAP],
             }
             self.post_event(
-                Event("tool_result", facts, key=call["id"], origin_body=body_id or BRAIN)
+                Event(
+                    "tool_result",
+                    f"tool:{call['name']}",
+                    facts,
+                    key=call["id"],
+                    origin_body=body_id or BRAIN,
+                )
             )
 
         task.add_done_callback(done)
@@ -874,7 +886,7 @@ class Session:
 
     def _on_job_finished(self, job: Job) -> None:
         self._emit_job_event(
-            Event("job_ended", {"report": self.jobs.note(job)}, key=job.id),
+            Event("job_ended", f"job:{job.id}", {"report": self.jobs.note(job)}, key=job.id),
             on_end=_when_told(lambda: self.records.mark_reported(job.id)),
             retell=True,
         )
@@ -989,7 +1001,7 @@ class Session:
             "reason": row.end_reason or "",
         }
         self.post_event(
-            Event("work_failed", facts, key=f"work_failed:{row.id}"),
+            Event("work_failed", "scout", facts, key=f"work_failed:{row.id}"),
             on_end=_when_told(lambda: work.mark_reported(row.id)),
             retell=True,
         )
@@ -1033,6 +1045,7 @@ class Session:
         self.post_event(
             Event(
                 "job_question",
+                f"job:{job_id}",
                 {"job": job_id, "message": what},
                 key=job_id,
                 origin_body=self.jobs.origin(job_id),
@@ -1243,7 +1256,7 @@ class Session:
         return out if isinstance(out, str) else json.dumps(out)
 
     def _latest(self, kind: str) -> dict:
-        return {key: ev.facts for key, ev in self.dispatcher.latest(kind).items()}
+        return {key: ev.payload for key, ev in self.dispatcher.latest(kind).items()}
 
     def _append_user(self, content: list) -> None:
         # Input arriving while the last user message is still unsaved joins it, so one burst is

@@ -44,6 +44,7 @@ def rig(steps, memory=None):
         session.post_event(
             Event(
                 "setup_done",
+                "setup",
                 {"app": "gcal", "name": "Google Calendar", "ok": True, "tools": "create_event"},
                 key="gcal",
             )

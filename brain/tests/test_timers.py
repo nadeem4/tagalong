@@ -50,7 +50,7 @@ def test_fire_due_emits_a_timer_event_with_the_note_and_ends_a_one_off_when_its_
     assert len(events) == 1
     e = events[0]
     assert e.kind == "timer"
-    assert e.facts == {"id": t.id, "note": "stretch", "repeat_minutes": 0}
+    assert e.payload == {"id": t.id, "note": "stretch", "repeat_minutes": 0}
     assert e.key == f"timer:{t.id}"
     assert work.get(t.id).state == "active"  # fired, wake not started
     starts[0]()
@@ -80,7 +80,7 @@ def test_active_timer_reemitted_on_start():
     # The wake never started: a new Timers on the same database re-emits it.
     again, _w, _c2, events2, starts2 = make(mem)
     again.start()
-    assert [e.facts["id"] for e in events2] == [t.id]
+    assert [e.payload["id"] for e in events2] == [t.id]
     starts2[0]()
     assert work.get(t.id).state == "done"
 
@@ -96,7 +96,7 @@ def test_repeating_timer_fires_and_reschedules_from_now():
     timers, work, _c, events, starts = make()
     t = add_timer(work, "water", T0, repeat_s=600)
     timers.fire_due()
-    assert events[0].facts["repeat_minutes"] == 10
+    assert events[0].payload["repeat_minutes"] == 10
     assert starts[0] is None
     got = work.get(t.id)
     assert got.due_at == "2026-10-28T12:10:00+00:00"
@@ -125,7 +125,7 @@ def test_restart_keeps_timers(tmp_path):
     mem.close()
     timers, _w, _c, events, _s = make(Memory(path))
     timers.start()
-    assert [e.facts["note"] for e in events] == ["persist"]
+    assert [e.payload["note"] for e in events] == ["persist"]
 
 
 def test_two_due_timers_emit_in_due_order():
@@ -133,7 +133,7 @@ def test_two_due_timers_emit_in_due_order():
     add_timer(work, "second", T0 - timedelta(minutes=1))
     add_timer(work, "first", T0 - timedelta(minutes=5))
     timers.fire_due()
-    assert [e.facts["note"] for e in events] == ["first", "second"]
+    assert [e.payload["note"] for e in events] == ["first", "second"]
 
 
 def test_cancel_during_fire_is_quiet():
@@ -169,7 +169,7 @@ def test_planned_watch_fires_like_a_repeating_timer():
     timers, work, _c, events, _s = make()
     w = add_timer(work, "check CI", T0, repeat_s=1800, kind="watch")
     timers.fire_due()
-    assert events[0].facts == {
+    assert events[0].payload == {
         "id": w.id,
         "note": "check CI",
         "repeat_minutes": 30,
@@ -208,7 +208,7 @@ async def test_changed_rearms_for_a_new_sooner_timer():
     add_timer(work, "soon", datetime.now(UTC) + timedelta(seconds=1.2))
     timers.changed()
     await asyncio.sleep(1.7)
-    assert [e.facts["note"] for e in events] == ["soon"]
+    assert [e.payload["note"] for e in events] == ["soon"]
 
 
 def test_a_job_timer_wake_has_job_state_and_wake_facts():
@@ -222,7 +222,7 @@ def test_a_job_timer_wake_has_job_state_and_wake_facts():
     goal = work.create("goal", "a", id="j1", state="active")
     t = add_timer(work, "check back", T0 - timedelta(seconds=1), parent_id=goal.id)
     timers.fire_due()
-    assert events[0].facts == {
+    assert events[0].payload == {
         "id": t.id,
         "note": "check back",
         "repeat_minutes": 0,
@@ -238,14 +238,14 @@ def test_a_plain_timer_wake_facts_are_unchanged():
     timers, work, _c, events, _s = make(job_facts=lambda j: {"activity": "x"})
     t = add_timer(work, "plain", T0 - timedelta(seconds=1))
     timers.fire_due()
-    assert events[0].facts == {"id": t.id, "note": "plain", "repeat_minutes": 0}
+    assert events[0].payload == {"id": t.id, "note": "plain", "repeat_minutes": 0}
 
 
 def test_a_long_note_is_read_from_the_input():
     timers, work, _c, events, _s = make()
     t = work.create("timer", "n" * 400, due_at=T0, input={"note": "n" * 400})
     timers.fire_due()
-    assert events[0].facts["note"] == "n" * 400
+    assert events[0].payload["note"] == "n" * 400
     assert work.get(t.id).state == "active"
 
 

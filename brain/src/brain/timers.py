@@ -135,7 +135,7 @@ class Timers:
             if parent is not None:
                 facts["state"] = home_state(parent.state)
             facts.update(self._job_facts(row.parent_id))
-        event = Event("timer", facts, key=f"timer:{row.id}")
+        event = Event("timer", "timer", facts, key=f"timer:{row.id}")
         if repeat_s:
             self._emit(event)
         else:

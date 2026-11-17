@@ -572,7 +572,7 @@ async def test_a_sign_in_that_finishes_later_sends_setup_done_with_the_app_and_t
     await until(lambda: r.events)
     (event,) = r.events
     assert event.kind == "setup_done" and event.key == "cloud"
-    assert event.facts == {
+    assert event.payload == {
         "app": "cloud",
         "name": "cloud",
         "ok": True,
@@ -588,8 +588,8 @@ async def test_a_sign_in_that_fails_sends_setup_done_with_the_state_and_no_tools
     r.apps.state, r.apps.error = "needs-sign-in", "Sign in to acme/cloud again."
     await until(lambda: r.events)
     (event,) = r.events
-    assert event.facts["ok"] is False and event.facts["state"] == "needs-sign-in"
-    assert "tools" not in event.facts
+    assert event.payload["ok"] is False and event.payload["state"] == "needs-sign-in"
+    assert "tools" not in event.payload
 
 
 async def test_a_long_tool_list_is_capped_with_the_real_total(rig):

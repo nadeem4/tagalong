@@ -357,7 +357,7 @@ async def _login(expert_id: str, home: Path, open_terminal: OpenTerminal, out) -
         raise _Fail("failed: login timeout") from err
     finally:
         await driver.stop()
-    facts = result[0].facts
+    facts = result[0].payload
     if facts.get("detail") == "no_terminal":
         raise _Fail(
             f"no window can open here; run this yourself, then `tagalong doctor`:\n  "

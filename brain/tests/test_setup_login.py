@@ -100,7 +100,7 @@ async def test_already_logged_in_is_detected_without_opening_anything(tmp_path, 
     assert await d.check(expert()) == LoggedIn()
     d.start(expert())
     await until(lambda: events)
-    assert window.calls == [] and events[0].facts["state"] == "logged_in"
+    assert window.calls == [] and events[0].payload["state"] == "logged_in"
     assert store.get("claude-acp").logged_in is True
 
 
@@ -147,7 +147,7 @@ async def test_a_login_tool_for_a_logged_in_expert_ends_in_a_logged_in_event(tmp
     _, handler = login_tools(tmp_path, d)[0]
     assert json.loads(await handler({"id": "claude-acp"}))["state"] == "waiting"
     await until(lambda: events)
-    assert events[0].facts["state"] == "logged_in"
+    assert events[0].payload["state"] == "logged_in"
 
 
 async def test_terminal_method_opens_the_window_with_adapter_command_args_and_env(
@@ -169,7 +169,9 @@ async def test_after_the_window_closes_the_login_is_rechecked_and_recorded(tmp_p
     d.start(expert())
     await until(lambda: events)
     assert events == [
-        Event("setup_login", {"expert": "claude-acp", "state": "logged_in"}, key="claude-acp")
+        Event(
+            "setup_login", "setup", {"expert": "claude-acp", "state": "logged_in"}, key="claude-acp"
+        )
     ]
     assert store.get("claude-acp").logged_in is True
 
@@ -178,7 +180,7 @@ async def test_a_window_closed_before_login_records_not_logged_in_with_failed_fa
     d, events, store = driver(tmp_path, Window(code="1"))
     d.start(expert())
     await until(lambda: events)
-    facts = events[0].facts
+    facts = events[0].payload
     assert facts["state"] == "failed" and "1" in str(facts["detail"])
     assert store.get("claude-acp").logged_in is False
 
@@ -192,7 +194,7 @@ async def test_a_browser_method_calls_authenticate_and_records_the_result(
     d.start(expert())
     await until(lambda: events)
     assert env.read_text() == "chat-gpt"  # the fake's authenticate got the browser method id
-    assert events[0].facts["state"] == "logged_in" and window.calls == []
+    assert events[0].payload["state"] == "logged_in" and window.calls == []
     assert store.get("claude-acp").logged_in is True
 
 
@@ -201,7 +203,7 @@ async def test_an_api_key_method_is_never_picked(tmp_path, env, monkeypatch):
     d, events, _ = driver(tmp_path, Window())
     d.start(expert())
     await until(lambda: events)
-    assert events[0].facts["state"] == "failed"
+    assert events[0].payload["state"] == "failed"
     methods = (await d.check(expert())).methods
     assert pick_method(methods) is None
 
@@ -213,7 +215,7 @@ async def test_no_terminal_ends_in_an_event_with_the_command_for_the_person_to_r
     d, events, _ = driver(tmp_path, nowhere)
     d.start(expert())
     await until(lambda: events)
-    facts = events[0].facts
+    facts = events[0].payload
     assert facts["state"] == "failed" and facts["detail"] == "no_terminal"
     assert FAKE in str(facts["command"]) and "--cli" in str(facts["command"])
 
@@ -249,7 +251,7 @@ async def test_start_does_not_cancel_previous_waiter(tmp_path, env):
     window.calls[0][2].write_text("0")
     await until(lambda: events)
     await asyncio.sleep(0.1)
-    assert len(events) == 1 and events[0].facts["state"] == "logged_in"
+    assert len(events) == 1 and events[0].payload["state"] == "logged_in"
 
 
 async def test_card_opened_before_checks(tmp_path, env, monkeypatch):
@@ -267,7 +269,7 @@ async def test_checks_run_in_background(tmp_path, env):
     item, _ = d.start(expert())  # returns at once, before any check has run
     assert item.kind == "signin" and window.calls == [] and events == []
     await until(lambda: events)
-    assert window.calls != [] and events[0].facts["state"] == "logged_in"
+    assert window.calls != [] and events[0].payload["state"] == "logged_in"
 
 
 async def test_signin_result_arrives_via_front_door(tmp_path, env):
@@ -278,7 +280,9 @@ async def test_signin_result_arrives_via_front_door(tmp_path, env):
     await until(lambda: events)
     await asyncio.sleep(0.2)
     assert events == [
-        Event("setup_login", {"expert": "claude-acp", "state": "logged_in"}, key="claude-acp")
+        Event(
+            "setup_login", "setup", {"expert": "claude-acp", "state": "logged_in"}, key="claude-acp"
+        )
     ]
 
 
@@ -288,7 +292,7 @@ async def test_no_methods_and_a_failing_adapter_reports_unknown(tmp_path):
     assert await d.check(bad) == Unknown()
     d.start(bad)
     await until(lambda: events)
-    assert events[0].facts["state"] == "unknown"
+    assert events[0].payload["state"] == "unknown"
 
 
 async def test_login_required_with_no_methods_is_not_logged_in_without_methods(
@@ -300,7 +304,7 @@ async def test_login_required_with_no_methods_is_not_logged_in_without_methods(
     assert await d.check(expert()) == NotLoggedIn([])
     d.start(expert())
     await until(lambda: events)
-    assert events[0].facts["state"] == "failed"
+    assert events[0].payload["state"] == "failed"
 
 
 async def test_the_done_file_wait_times_out_and_emits_one_event(tmp_path, env):
@@ -308,8 +312,8 @@ async def test_the_done_file_wait_times_out_and_emits_one_event(tmp_path, env):
     d.start(expert())
     await until(lambda: events)
     await asyncio.sleep(0.1)
-    assert len(events) == 1 and events[0].facts["state"] == "failed"
-    assert events[0].facts["detail"] == "timeout"
+    assert len(events) == 1 and events[0].payload["state"] == "failed"
+    assert events[0].payload["detail"] == "timeout"
     assert store.get("claude-acp").logged_in is None
 
 
@@ -419,7 +423,7 @@ async def test_a_closed_window_ends_the_login_as_failed(tmp_path, env):
     d, events, _ = driver(tmp_path, Window(code="closed"))
     d.start(expert())
     await until(lambda: events)
-    assert events[0].facts["state"] == "failed" and "closed" in str(events[0].facts["detail"])
+    assert events[0].payload["state"] == "failed" and "closed" in str(events[0].payload["detail"])
 
 
 async def test_each_flight_gets_a_fresh_done_file(tmp_path, env):
@@ -445,7 +449,9 @@ async def test_a_store_failure_ends_the_login_as_failed(tmp_path, env, monkeypat
     monkeypatch.setattr(store, "set_login", boom)
     d.start(expert())
     await until(lambda: events)
-    assert events[0].facts["state"] == "failed" and "disk full" in str(events[0].facts["detail"])
+    assert events[0].payload["state"] == "failed" and "disk full" in str(
+        events[0].payload["detail"]
+    )
 
 
 async def test_an_empty_done_file_is_waited_on_not_read_as_success(tmp_path):
