@@ -1,4 +1,8 @@
-"""store/events.py: the events table every input is saved to first (the in queue)."""
+"""store/events.py: the events table every input is saved to first (the in queue).
+
+Pins what the runner relies on: a duplicate id is ignored, `not_before` holds an event back,
+the taken guard moves only `new` rows, and `handled_at` is stamped only when an event ends.
+"""
 
 import sqlite3
 
@@ -64,3 +68,16 @@ def test_state_check_refuses_unknown_state(db):
     events.insert(db, row("e1"))
     with pytest.raises(sqlite3.IntegrityError):
         events.set_state(db, ["e1"], "lost", end_reason=None, at=T)
+
+
+def test_set_state_stamps_handled_at_only_when_ended(db):
+    def handled_at(id):
+        return db.execute("SELECT handled_at FROM events WHERE id=?", (id,)).fetchone()[0]
+
+    for id in ("e1", "e2", "e3", "e4"):
+        events.insert(db, row(id))
+    events.set_state(db, ["e1"], "handled", end_reason=None, at=T)
+    events.set_state(db, ["e2"], "gave_up", end_reason="x", at=T)
+    events.set_state(db, ["e3"], "taken", end_reason=None, at=T)
+    events.set_state(db, ["e4"], "new", end_reason=None, at=T)
+    assert [handled_at(i) for i in ("e1", "e2", "e3", "e4")] == [T, T, None, None]
