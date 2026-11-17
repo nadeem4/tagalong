@@ -192,8 +192,8 @@ const brainSetup = createBrainSetup(
 );
 /** Scout's brain card and the version check; set once the brain client exists. */
 let brainControl: BrainStatusControl | null = null;
-/** Makes a wake turn the person spoke into visible; start() points it at the turn mapper. */
-let claimTurn: (turnId: string) => void = () => undefined;
+/** Tells the turn mapper a say id is ours; start() points it at the mapper. */
+let trackSay: (id: string) => void = () => undefined;
 /** The confirm cards still open, for a window that opened after their ask arrived. */
 let openConfirms: () => TurnEvent[] = () => [];
 
@@ -292,7 +292,7 @@ async function start(): Promise<void> {
     const { type, ...params } = event;
     forwardToRenderers({ method: type, params });
   };
-  claimTurn = (turnId) => turnEvents.claim(turnId).forEach(forwardTurn);
+  trackSay = (id) => turnEvents.trackSay(id);
   openConfirms = () => turnEvents.openConfirms();
   // A brain that stays down fails the open turns, so the bubble does not stream forever.
   const watchOffline = offlineWatch(() => turnEvents.resync().forEach(forwardTurn));
@@ -935,7 +935,7 @@ function registerIpc(): void {
 
   registerTurnIpc(handle, {
     brain: required().brain,
-    claimTurn: (turnId) => claimTurn(turnId),
+    trackSay: (id) => trackSay(id),
     stopVoice: () => stopVoice(),
     voice: () => required().settings.voice,
     status: () => brainStatus,

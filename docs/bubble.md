@@ -49,10 +49,12 @@ appears as a short structured answer plus an offer of the rest.
 `HostBridge` (`host-bridge.ts`) is every call and notification a component may use. Four members
 are required:
 
-- `ask(input: AskInput): Promise<{ turnId }>`. `AskInput` is `{ petId, conversationId?, text?,
+- `ask(input: AskInput): Promise<void>`. `AskInput` is `{ petId, conversationId?, text?,
 snapshot?, spoken?, drop? }`. No `conversationId` opens a new conversation; `turn.started`
-  reports its id. The brain may run a whole turn before the ask returns, so the bubble keeps the
-  turn events that arrive while an ask is in flight and replays those of the turn it returns.
+  reports its id. The bubble never waits on the ask's answer: it is already running when the ask
+  is sent, takes the first `turn.started` and follows that turn. The host sends a fresh say id
+  with every ask and shows the turn that takes it (the brain's `turn` frame lists the event ids
+  it took), so no event can arrive too early.
   `spoken: true` marks a question asked by voice. `drop: true` is set only by a
   button on the drop card, and the host then reads the dropped item and attaches it as
   `snapshot.dropped`.

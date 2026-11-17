@@ -182,13 +182,16 @@ The same call backs **Start brain** on the offline card, so it also runs when th
   returns whether it was sent; a `focus` it dropped (brain offline) is sent again on the next poll.
   A brain that restarts while the window stays the same, after the last send got through, learns
   the front window only at the next change.
-- **Brain-started turns.** A `turn` with `started_by: "brain"` (a wake) shows no thinking state, no
+- **Brain-started turns.** A `turn` whose `source` is internal (`isInternalSource`: `scout`, or any
+  source with a `:` such as `job:x`, `timer:t1`, `loop:gmail`) and that took none of this body's
+  says (a wake) shows no thinking state, no
   bubble and no tool rows. If it ends `done` with words (not just whitespace), they appear once as a
   pet remark: the quiet line beside Scout when the bubble is closed, or Scout's message in the
   bubble when it is open and no answer is streaming (main keeps the remark from the hidden bubble,
   so it is never shown twice). A silent, failed, cancelled or over-budget wake shows nothing. If the
-  person asks something while a wake runs, their `say` joins it (`joined: true`) and `ipc/turns.ts`
-  calls `claim(turnId)` on the mapper: the wake stops being quiet, the bubble gets `turn.started`
+  person asks something while a wake runs, their say (sent with a fresh id that `ipc/turns.ts` tells the mapper to track before sending) joins
+  it, and the brain's `turn` frame with `state: "joined"` lists that id in `events`: the wake stops
+  being quiet, the bubble gets `turn.started`
   and the text so far, and the rest streams and ends as a normal turn (no pet remark).
 - **A remark kept in the chat.** A remark seen while the panel is hidden goes to the quiet line only
   (main's `bubbleDeaf` rule is untouched). When the person clicks it, `GreetingLine` calls

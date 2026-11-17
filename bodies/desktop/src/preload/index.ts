@@ -78,7 +78,7 @@ ipcRenderer.on(IPC.homePageEvent, (_event: IpcRendererEvent, page: string) =>
 );
 
 const bridge: PreloadBridge = {
-  ask: (input: AskInput) => ipcRenderer.invoke(IPC.ask, input) as Promise<{ turnId: string }>,
+  ask: (input: AskInput) => ipcRenderer.invoke(IPC.ask, input) as Promise<void>,
   interrupt: (turnId: string) => ipcRenderer.invoke(IPC.interrupt, turnId) as Promise<void>,
   listPets: () => ipcRenderer.invoke(IPC.listPets) as Promise<Pet[]>,
   openConfirms: () => ipcRenderer.invoke(IPC.openConfirms) as Promise<TurnEvent[]>,

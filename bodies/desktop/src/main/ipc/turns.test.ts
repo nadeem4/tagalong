@@ -13,7 +13,6 @@ function setup(
   options: {
     offline?: boolean;
     outdated?: boolean;
-    joined?: boolean;
     takeDrop?: () => Promise<never>;
     voiceOn?: boolean;
   } = {},
@@ -21,27 +20,27 @@ function setup(
   const ipc = fakeIpc();
   const said: SayParams[] = [];
   const cancelled: string[] = [];
-  const claimed: string[] = [];
+  const tracked: string[] = [];
   const stopped: string[] = [];
   registerTurnIpc(ipc.handle, {
     brain: {
       say: (params) => {
         said.push(params);
-        return options.offline === true
-          ? Promise.reject(new BrainOffline())
-          : Promise.resolve({ turn: 't1', joined: options.joined === true });
+        return options.offline === true ? Promise.reject(new BrainOffline()) : Promise.resolve({});
       },
       cancel: (turn) => void cancelled.push(turn),
     },
-    claimTurn: (turn) => void claimed.push(turn),
+    trackSay: (id) => void tracked.push(id),
     stopVoice: () => void stopped.push('voice'),
     voice: () => ({ enabled: options.voiceOn !== false, speed: 0.95 }),
     status: () => (options.outdated === true ? 'outdated' : 'online'),
     pendingSnapshot: () => snapshot as ContextSnapshot | null,
     ...(options.takeDrop ? { takeDrop: options.takeDrop } : {}),
   });
-  return { ...ipc, said, cancelled, claimed, stopped };
+  return { ...ipc, said, cancelled, tracked, stopped };
 }
+
+const UUID = /^[0-9a-f-]{36}$/;
 
 describe('registerTurnIpc', () => {
   it('interrupt cancels the turn and stops its speech', async () => {
@@ -51,12 +50,20 @@ describe('registerTurnIpc', () => {
     expect(stopped).toEqual(['voice']);
   });
 
-  it('ask sends say with text and returns turnId', async () => {
+  it('ask sends say with an id, text and speech, and answers nothing', async () => {
     const { invoke, said } = setup();
-    expect(await invoke(IPC.ask, { petId: 'scout', text: 'hi', spoken: true })).toEqual({
-      turnId: 't1',
-    });
-    expect(said).toEqual([{ text: 'hi', spoken: true, speed: 0.95 }]);
+    expect(await invoke(IPC.ask, { petId: 'scout', text: 'hi', spoken: true })).toBeUndefined();
+    expect(said).toEqual([
+      { id: expect.stringMatching(UUID), text: 'hi', spoken: true, speed: 0.95 },
+    ]);
+  });
+
+  it('sends a fresh id with every say, and tracks it before sending', async () => {
+    const { invoke, said, tracked } = setup();
+    await invoke(IPC.ask, { petId: 'scout', text: 'one' });
+    await invoke(IPC.ask, { petId: 'scout', text: 'two' });
+    expect(said[0]!.id).not.toBe(said[1]!.id);
+    expect(tracked).toEqual([said[0]!.id, said[1]!.id]);
   });
 
   it('an interrupted ask carries it to the brain, and only that ask', async () => {
@@ -75,17 +82,7 @@ describe('registerTurnIpc', () => {
   it('a spoken ask with Scout talks switched off is asked as text', async () => {
     const { invoke, said } = setup(null, { voiceOn: false });
     await invoke(IPC.ask, { petId: 'scout', text: 'hi', spoken: true });
-    expect(said).toEqual([{ text: 'hi' }]);
-  });
-
-  it('ask that joins a running turn claims it, so a quiet wake turn shows', async () => {
-    const joined = setup(null, { joined: true });
-    expect(await joined.invoke(IPC.ask, { petId: 'scout', text: 'hi' })).toEqual({ turnId: 't1' });
-    expect(joined.claimed).toEqual(['t1']);
-
-    const fresh = setup();
-    await fresh.invoke(IPC.ask, { petId: 'scout', text: 'hi' });
-    expect(fresh.claimed).toEqual([]);
+    expect(said).toEqual([{ id: expect.stringMatching(UUID), text: 'hi' }]);
   });
 
   it('ask with a pending snapshot sends the window title as context', async () => {
@@ -93,6 +90,7 @@ describe('registerTurnIpc', () => {
     await invoke(IPC.ask, { petId: 'scout', text: 'what is this?' });
     expect(said).toEqual([
       {
+        id: expect.stringMatching(UUID),
         text: 'what is this?',
         context: { window: 'a.ts' },
       },
@@ -118,7 +116,11 @@ describe('registerTurnIpc', () => {
     const ok = setup(null, { takeDrop: () => Promise.resolve(dropped as never) });
     await ok.invoke(IPC.ask, { petId: 'scout', text: 'Explain this.', drop: true });
     expect(ok.said).toEqual([
-      { text: 'Explain this.', parts: [{ type: 'text', text: 'a.md\n\nabc' }] },
+      {
+        id: expect.stringMatching(UUID),
+        text: 'Explain this.',
+        parts: [{ type: 'text', text: 'a.md\n\nabc' }],
+      },
     ]);
 
     const bad = setup(null, {

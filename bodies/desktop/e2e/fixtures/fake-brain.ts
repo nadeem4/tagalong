@@ -667,6 +667,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           text?: string;
           ask?: string;
           option?: string;
+          id?: string;
           spoken?: boolean;
           mode?: string;
           state?: string;
@@ -733,9 +734,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
       } else if (msg.method === 'say') {
         voice.says.push({ ...msg.params });
         const turn = `t${++turns}`;
-        socket.send(
-          JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { turn, joined: false } }),
-        );
+        socket.send(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: {} }));
         const base = { turn, body: 'desktop' };
         const spoken = msg.params?.spoken === true || readAloud.on === true;
         // A scene that streams its own sentence leaves the default reply out.
@@ -759,7 +758,12 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             live('speech', { turn, done: true });
           }
         };
-        notify('turn', { ...base, state: 'started' });
+        notify('turn', {
+          ...base,
+          state: 'started',
+          events: [msg.params?.id],
+          source: 'desktop',
+        });
         if (msg.params?.text?.includes('windows')) {
           // Runs the body's own list_windows tool; the answer comes back above.
           socket.send(
@@ -1563,7 +1567,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
       const turn = `t${++turns}`;
       const base = { turn, body: 'desktop' };
       const frames: [string, Record<string, unknown>][] = [
-        ['turn', { ...base, state: 'started', started_by: 'brain' }],
+        ['turn', { ...base, state: 'started', events: [`e${turns}`], source: 'timer:remark' }],
         ['reply', { ...base, delta: text }],
         ['reply', { ...base, done: true }],
         ['turn', { ...base, state: 'ended', reason: 'done' }],

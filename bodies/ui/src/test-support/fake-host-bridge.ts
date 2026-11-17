@@ -288,7 +288,6 @@ export function createFakeHostBridge(
   const preferenceEdits: { id: number; sentence: string }[] = [];
   const asks: AskInput[] = [];
   const interrupts: string[] = [];
-  let turnCount = 0;
   const approvals: { approvalId: string; decision: 'once' | 'always' | 'deny' }[] = [];
   const jobAnswers: { approvalId: string; option: string; text?: string; apps?: string[] }[] = [];
   const addedConnections: AppAddParams[] = [];
@@ -323,8 +322,7 @@ export function createFakeHostBridge(
     interrupts,
     ask(input) {
       asks.push(input);
-      turnCount += 1;
-      return Promise.resolve({ turnId: `turn-${turnCount}` });
+      return Promise.resolve();
     },
     interrupt(turnId) {
       interrupts.push(turnId);

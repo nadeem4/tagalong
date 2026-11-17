@@ -819,8 +819,8 @@ describe('voice', () => {
 
   it('say carries speed', async () => {
     const { client, s } = await online();
-    void client.say({ text: 'hi', spoken: true, speed: 1.2 });
-    expect(s.sent[1]!.params).toEqual({ text: 'hi', spoken: true, speed: 1.2 });
+    void client.say({ id: 's1', text: 'hi', spoken: true, speed: 1.2 });
+    expect(s.sent[1]!.params).toEqual({ id: 's1', text: 'hi', spoken: true, speed: 1.2 });
   });
 });
 

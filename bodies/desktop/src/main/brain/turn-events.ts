@@ -3,6 +3,7 @@
  * the UI needs no change when the brain moves to Python. Stateful: `turn.completed` carries
  * the whole reply, but the brain streams it, so the mapper keeps each open turn's text.
  */
+import { isInternalSource } from '@tagalong/contract';
 import type { AskParams, ReplyParams, ToolParams, TurnParams } from '@tagalong/contract';
 import type { TurnEvent } from '@tagalong/ui/shapes';
 
@@ -26,6 +27,20 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
   // Turns the brain started on its own (a wake). They show nothing while they run: a silent
   // wake must leave no trace, and one with words arrives as a single pet.remark at the end.
   const quiet = new Set<string>();
+  // The ids of the says this body sent: a turn that took one of them is the person's own.
+  const says = new Set<string>();
+  const takesMine = (p: { events?: string[] | undefined }): boolean =>
+    (p.events ?? []).some((id) => says.has(id));
+
+  /** A turn that joined a quiet one with my say in it stops being quiet: words so far, then live. */
+  function claim(turnId: string): TurnEvent[] {
+    if (!quiet.delete(turnId)) return [];
+    const text = open.get(turnId) ?? '';
+    return [
+      { type: 'turn.started', turnId, petId: petId(), conversationId: session() ?? 'brain' },
+      ...(text === '' ? [] : [{ type: 'turn.delta' as const, turnId, text }]),
+    ];
+  }
 
   function ended(p: TurnParams): TurnEvent[] {
     const text = open.get(p.turn) ?? '';
@@ -149,8 +164,9 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
       if (method === 'turn') {
         const p = params as TurnParams;
         if (p.state === 'ended') return ended(p);
+        if (p.state === 'joined') return takesMine(p) ? claim(p.turn) : [];
         open.set(p.turn, '');
-        if (p.started_by === 'brain') {
+        if (isInternalSource(p.source ?? '') && !takesMine(p)) {
           quiet.add(p.turn);
           return [];
         }
@@ -174,17 +190,9 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
       return [];
     },
 
-    /**
-     * The person spoke into a wake turn (their say joined it), so it stops being quiet: the UI
-     * gets the start and the words so far, and the rest streams like any turn.
-     */
-    claim(turnId: string): TurnEvent[] {
-      if (!quiet.delete(turnId)) return [];
-      const text = open.get(turnId) ?? '';
-      return [
-        { type: 'turn.started', turnId, petId: petId(), conversationId: session() ?? 'brain' },
-        ...(text === '' ? [] : [{ type: 'turn.delta' as const, turnId, text }]),
-      ];
+    /** Remembers a say this body is about to send, so the turn that takes it is shown. */
+    trackSay(id: string): void {
+      says.add(id);
     },
 
     /**
