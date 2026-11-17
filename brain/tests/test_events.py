@@ -309,6 +309,12 @@ def test_then_with_an_unsaved_kind_is_refused(log):
         log.post(Event("focus", "desktop", {}), then=lambda db: None)
 
 
+def test_on_end_with_an_unsaved_kind_is_refused(log):
+    # Nothing would ever end it, so the hook would never fire.
+    with pytest.raises(ValueError):
+        log.post(Event("focus", "desktop", {}), on_end=lambda state: None)
+
+
 def test_take_and_finish(log):
     log.post(Event("say", "desktop", {}, id="e1"))
     assert log.take(["e1"], "t1") == ["e1"]

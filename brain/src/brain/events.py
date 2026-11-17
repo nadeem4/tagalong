@@ -200,6 +200,8 @@ class EventLog:
         if event.kind not in SAVED_KINDS:
             if then is not None:  # nothing would run it: refuse rather than drop the write
                 raise ValueError(f"event kind {event.kind!r} is not saved, so `then` cannot run")
+            if on_end is not None:  # nothing would end it: the hook would never fire
+                raise ValueError(f"event kind {event.kind!r} is not saved, so it never ends")
             return True
         payload = self._mask(event.payload)
         at = utc_text(event.at or self._now())
