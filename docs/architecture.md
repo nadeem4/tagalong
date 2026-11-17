@@ -185,10 +185,10 @@ the audio (the brain's own mouth only when no body plays).
 Turns are short. A turn that needs the person (a permission card, a choice, a sign-in, an install)
 opens an open item (`open_items.py`, saved in `tagalong.db`) and ends; the person's answer is saved
 as a `card_answer` event, handled at once, and runs the saved call, even after a restart. It starts
-no turn. Talking over Scout is an ordinary say that cancels only the turn it names and then waits its
-place in the order; that turn's heard and unsaid words lead it. A short interjection at a sentence
-break takes one waiting `next_pause` event, works it into speech, then continues or replaces the
-queued sentences; untold, the event goes back to `new`.
+no turn. Talking over Scout is an ordinary say that stops the turn it names (tools already running
+finish) and then waits its place in the order; that turn's heard and unsaid words lead it. A short
+interjection at a sentence break takes one waiting `next_pause` event, works it into speech, then
+continues or replaces the queued sentences; untold, the event goes back to `new`.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
