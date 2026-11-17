@@ -7,6 +7,7 @@ Fakes only: a scripted model and a voice that remembers the sentences it was giv
 import asyncio
 import copy
 import json
+import uuid
 from types import SimpleNamespace
 
 from test_sessions import (
@@ -17,6 +18,7 @@ from test_sessions import (
     make,
     read_aloud,
     remember_call,
+    said,
     say,
     settle,
     states,
@@ -56,7 +58,9 @@ class SentenceVoice(RecordingVoice):
 
 
 def over(text, turn, heard):
-    return SayParams(text=text, spoken=True, interrupted=Interrupted(turn=turn, heard=heard))
+    return SayParams(
+        id=uuid.uuid4().hex, text=text, spoken=True, interrupted=Interrupted(turn=turn, heard=heard)
+    )
 
 
 def last_user_texts(model, call=-1):
@@ -75,10 +79,10 @@ async def talk_over_a_running_turn(heard=1, steps=None):
     gate = asyncio.Event()
     model = SnapGate([gate, *(steps or ["ok"])])
     session, sent, voice = make_voiced(model)
-    first = await session.say("desktop", say("tell me"))
+    first = await said(session, sent, "desktop", say("tell me"))
     voice.logs[first.turn] = ["One.", "Two.", "Three."]
     await settle()
-    second = await session.say("desktop", over("wait", first.turn, heard))
+    second = await said(session, sent, "desktop", over("wait", first.turn, heard))
     await finish_quietly(session)
     return session, sent, voice, model, first, second
 
@@ -106,8 +110,8 @@ async def test_next_turn_receives_spoken_and_unsaid_once():
 async def test_unsaid_is_not_in_saved_history():
     memory = Memory(":memory:")
     gate = asyncio.Event()
-    session, _, voice = make_voiced(SnapGate([gate, "ok"]), memory)
-    first = await session.say("desktop", say("tell me"))
+    session, sent, voice = make_voiced(SnapGate([gate, "ok"]), memory)
+    first = await said(session, sent, "desktop", say("tell me"))
     voice.logs[first.turn] = ["One.", "Two.", "Three."]
     await settle()
     await session.say("desktop", over("wait", first.turn, 1))
@@ -118,8 +122,8 @@ async def test_unsaid_is_not_in_saved_history():
 
 async def test_saved_history_keeps_only_the_spoken_sentences_and_marks_the_cut():
     memory = Memory(":memory:")
-    session, _, voice = make_voiced(SnapGate(["One. Two. Three.", "ok"]), memory)
-    first = await session.say("desktop", say("tell me"))
+    session, sent, voice = make_voiced(SnapGate(["One. Two. Three.", "ok"]), memory)
+    first = await said(session, sent, "desktop", say("tell me"))
     await finish_quietly(session)
     voice.logs[first.turn] = ["One.", "Two.", "Three."]
     await session.say("desktop", over("wait", first.turn, 1))
@@ -139,11 +143,11 @@ async def test_a_cut_mid_stream_adds_the_spoken_part_as_the_assistant_turn():
 async def test_second_interrupt_replaces_the_first_unsaid():
     gate = asyncio.Event()
     model = SnapGate([gate, gate, "done"])
-    session, _, voice = make_voiced(model)
-    a = await session.say("desktop", say("tell me"))
+    session, sent, voice = make_voiced(model)
+    a = await said(session, sent, "desktop", say("tell me"))
     voice.logs[a.turn] = ["A1.", "A2."]
     await settle()
-    b = await session.say("desktop", over("wait", a.turn, 1))
+    b = await said(session, sent, "desktop", over("wait", a.turn, 1))
     voice.logs[b.turn] = ["B1.", "B2."]
     while len(model.seen) < 2:  # b waits for a to wind down, then asks the model
         await asyncio.sleep(0.005)
@@ -165,7 +169,7 @@ async def test_stale_turn_in_interrupted_is_a_plain_say():
 
 async def test_interrupt_after_all_sentences_has_empty_unsaid():
     session, sent, voice = make_voiced(SnapGate(["One. Two.", "ok"]))
-    first = await session.say("desktop", say("tell me"))
+    first = await said(session, sent, "desktop", say("tell me"))
     await finish_quietly(session)
     voice.logs[first.turn] = ["One.", "Two."]
     await session.say("desktop", over("thanks", first.turn, 2))
@@ -178,8 +182,8 @@ async def test_interrupt_after_all_sentences_has_empty_unsaid():
 async def test_history_stays_valid_after_a_cancel_mid_tool_call():
     gate = asyncio.Event()
     model = SnapGate([remember_call("x"), gate, "ok"])
-    session, _, voice = make_voiced(model)
-    first = await session.say("desktop", say("tell me"))
+    session, sent, voice = make_voiced(model)
+    first = await said(session, sent, "desktop", say("tell me"))
     voice.logs[first.turn] = ["One.", "Two."]
     for _ in range(20):
         await asyncio.sleep(0.005)
@@ -227,8 +231,8 @@ async def test_a_cut_after_streamed_words_replaces_them_with_the_heard_part():
             async for item in super().stream(system, messages, tools):
                 yield item
 
-    session, _, voice = make_voiced(Streaming(["ok"]))
-    first = await session.say("desktop", say("tell me"))
+    session, sent, voice = make_voiced(Streaming(["ok"]))
+    first = await said(session, sent, "desktop", say("tell me"))
     voice.logs[first.turn] = ["One.", "Two.", "Three."]
     await settle()
     await session.say("desktop", over("wait", first.turn, 1))
@@ -247,8 +251,8 @@ async def test_interrupt_keeps_partial_and_unsaid():
     # A pause, not a cancel: the turn task ends by itself, the heard part stays in history with
     # its mark, and the next turn is told the sentences it had left.
     gate = asyncio.Event()
-    session, _, voice = make_voiced(SnapGate([gate, "ok"]))
-    first = await session.say("desktop", say("tell me"))
+    session, sent, voice = make_voiced(SnapGate([gate, "ok"]))
+    first = await said(session, sent, "desktop", say("tell me"))
     voice.logs[first.turn] = ["One.", "Two.", "Three."]
     await settle()
     task = session._task
@@ -259,9 +263,9 @@ async def test_interrupt_keeps_partial_and_unsaid():
 
 
 async def test_interrupt_does_not_close_open_items():
-    session, _, voice = make_voiced(SnapGate([asyncio.Event(), "ok"]))
+    session, sent, voice = make_voiced(SnapGate([asyncio.Event(), "ok"]))
     item = session.items.open("expert_ask", "desktop", live_only=True, job_id="j1")
-    first = await session.say("desktop", say("tell me"))
+    first = await said(session, sent, "desktop", say("tell me"))
     voice.logs[first.turn] = ["One.", "Two."]
     await settle()
     await session.say("desktop", over("wait", first.turn, 1))
@@ -281,7 +285,7 @@ async def test_inflight_tool_result_returns_via_front_door():
     model = SnapGate([slow_tool_call(), "ok", "and the tool says so"])
     session, sent, voice = make_voiced(model)
     session.toolbox.run = slow
-    first = await session.say("desktop", say("do it"))
+    first = await said(session, sent, "desktop", say("do it"))
     voice.logs[first.turn] = ["One."]
     await asyncio.wait_for(started.wait(), 1)  # the tool is really running
     await session.say("desktop", over("wait", first.turn, 0))
@@ -309,7 +313,7 @@ async def test_a_late_tool_result_waits_for_the_next_turns_speech_then_arrives()
     model = SnapGate([slow_tool_call(), "ok", "and the tool says so"])
     session, sent, voice = make_voiced(model)
     session.toolbox.run = slow
-    first = await session.say("desktop", say("do it"))
+    first = await said(session, sent, "desktop", say("do it"))
     voice.logs[first.turn] = ["One."]
     await asyncio.wait_for(started.wait(), 1)
     await session.say("desktop", over("wait", first.turn, 0))
@@ -348,7 +352,7 @@ async def test_no_second_turn_alongside():
     model = Watching([slow_tool_call(), "ok"])
     session, sent, voice = make_voiced(model)
     session.toolbox.run = slow
-    first = await session.say("desktop", say("do it"))
+    first = await said(session, sent, "desktop", say("do it"))
     voice.logs[first.turn] = ["One."]
     await settle()
     first_task.append(session._task)
@@ -377,7 +381,7 @@ async def test_stopping_the_session_cancels_tools_left_running():
     model = SnapGate([slow_tool_call(), "ok"])
     session, sent, voice = make_voiced(model)
     session.toolbox.run = slow
-    first = await session.say("desktop", say("do it"))
+    first = await said(session, sent, "desktop", say("do it"))
     voice.logs[first.turn] = ["One."]
     await asyncio.wait_for(started.wait(), 1)  # the tool is really running
     await session.say("desktop", over("wait", first.turn, 0))

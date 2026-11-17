@@ -7,6 +7,7 @@ import asyncio
 import datetime
 import json
 import re
+import uuid
 from types import SimpleNamespace
 
 import pytest
@@ -88,7 +89,40 @@ def make(model, memory=None, kinds=NO_WAIT, now=None, bodies=None, masker=None):
 
 
 def say(text):
-    return SayParams(text=text)
+    return SayParams(id=uuid.uuid4().hex, text=text)
+
+
+class Said:
+    """What a body learns about its say: the turn frame that names the say's id. The turn id is
+    only known once a `started` or `joined` frame for the id has gone out."""
+
+    def __init__(self, sent, say_id):
+        self._sent, self.id = sent, say_id
+
+    @property
+    def frame(self):
+        return next(
+            (p for m, p in self._sent if m == "turn" and self.id in (p.get("events") or [])), None
+        )
+
+    @property
+    def turn(self):
+        return self.frame["turn"] if self.frame else None
+
+    @property
+    def joined(self):
+        return self.frame is not None and self.frame["state"] == "joined"
+
+
+async def said(session, sent, body, params):
+    """Say it, let the front door deliver it, and follow it by its id in the turn frames."""
+    await session.say(body, params)
+    found = Said(sent, params.id)
+    for _ in range(5):  # stop at the first frame: running on would let a quick turn finish
+        if found.frame is not None:
+            break
+        await asyncio.sleep(0)
+    return found
 
 
 def states(sent):
@@ -103,19 +137,52 @@ async def finish(session):
 
 async def test_say_starts_turn():
     session, sent = make(Gate(["hi"]))
-    result = await session.say("desktop", say("hello"))
+    result = await said(session, sent, "desktop", say("hello"))
     assert result.joined is False
     assert re.fullmatch(r"[0-9a-f]{32}", result.turn)
     await finish(session)
     assert sent[0] == (
         "turn",
-        {"turn": result.turn, "body": "desktop", "state": "started", "started_by": "user"},
+        {
+            "turn": result.turn,
+            "body": "desktop",
+            "state": "started",
+            "events": [result.id],
+            "source": "desktop",
+        },
     )
     assert sent[-1] == (
         "turn",
         {"turn": result.turn, "body": "desktop", "state": "ended", "reason": "done"},
     )
     assert session.history[0] == {"role": "user", "content": [{"type": "text", "text": "hello"}]}
+
+
+async def test_started_names_its_events_and_source():
+    session, sent = make(Gate(["hi"]))
+    await session.say("desktop", SayParams(id="s1", text="hello"))
+    await finish(session)
+    [started] = [p for m, p in sent if m == "turn" and p["state"] == "started"]
+    assert started["events"] == ["s1"] and started["source"] == "desktop"
+    assert "started_by" not in started
+
+
+async def test_a_say_merged_mid_turn_sends_joined():
+    gate = asyncio.Event()
+    session, sent = make(Gate([gate, "ok"]))
+    first = await said(session, sent, "desktop", say("a"))
+    await session.say("desktop", SayParams(id="s2", text="b"))
+    await settle()
+    [joined] = [p for m, p in sent if m == "turn" and p["state"] == "joined"]
+    assert joined == {
+        "turn": first.turn,
+        "body": "desktop",
+        "state": "joined",
+        "events": ["s2"],
+        "source": "desktop",
+    }
+    gate.set()
+    await finish(session)
 
 
 async def test_a_say_is_saved_before_say_returns():
@@ -133,9 +200,9 @@ async def test_second_say_waits_for_a_turn_of_its_own():
     gate = asyncio.Event()
     model = Gate([gate, "one", "two"])
     session, sent = make(model)
-    first = await session.say("desktop", say("a"))
+    first = await said(session, sent, "desktop", say("a"))
     await settle()
-    second = await session.say("extension", say("b"))
+    second = await said(session, sent, "extension", say("b"))
     assert second.joined is False and second.turn != first.turn
     gate.set()
     await idle(session)
@@ -157,19 +224,19 @@ async def turns_done(session):
 async def test_a_say_waiting_behind_a_cancelled_turn_is_answered():
     model = Gate([asyncio.Event(), "x"])
     session, sent = make(model)
-    result = await session.say("desktop", say("a"))
+    result = await said(session, sent, "desktop", say("a"))
     await settle()
     await session.say("desktop", say("late"))
     session.cancel(result.turn)
     await idle(session)
     assert [m["role"] for m in model.seen[1]] == ["user"]
     assert model.seen[1][0]["content"] == [{"type": "text", "text": "late"}]
-    assert (await session.say("desktop", say("next"))).joined is False
+    assert (await said(session, sent, "desktop", say("next"))).joined is False
 
 
 async def test_cancel_running_turn():
     session, sent = make(Gate([asyncio.Event(), "never"]))
-    result = await session.say("desktop", say("a"))
+    result = await said(session, sent, "desktop", say("a"))
     await settle()
     session.cancel(result.turn)
     await finish(session)
@@ -186,9 +253,9 @@ async def test_cancel_unknown_is_noop():
 
 async def test_new_say_after_end_starts_new_turn():
     session, sent = make(Gate(["one", "two"]))
-    first = await session.say("desktop", say("a"))
+    first = await said(session, sent, "desktop", say("a"))
     await finish(session)
-    second = await session.say("desktop", say("b"))
+    second = await said(session, sent, "desktop", say("b"))
     await finish(session)
     assert second.joined is False and second.turn != first.turn
     assert states(sent) == ["started", "ended", "started", "ended"]
@@ -197,7 +264,7 @@ async def test_new_say_after_end_starts_new_turn():
 async def test_empty_say_raises():
     session, _ = make(Gate([]))
     with pytest.raises(ValueError):
-        await session.say("desktop", SayParams(text=None, parts=[]))
+        await session.say("desktop", SayParams(id="x", text=None, parts=[]))
 
 
 async def test_say_after_a_cancel_is_read_aloud_on_its_own_body():
@@ -206,12 +273,14 @@ async def test_say_after_a_cancel_is_read_aloud_on_its_own_body():
     session, sent = make(model)
     session.voice = voice = RecordingVoice()
     join(session, "desktop")
-    first = await session.say("desktop", say("tell me"))
+    first = await said(session, sent, "desktop", say("tell me"))
     await settle()
     session.cancel(first.turn)
     # Ending the turn now closes the model stream first, which takes a few loop ticks.
     await until(lambda: not session._busy())
-    joined = await session.say("desktop", SayParams(text="actually X", spoken=True))
+    joined = await said(
+        session, sent, "desktop", SayParams(id="x2", text="actually X", spoken=True)
+    )
     assert joined.joined is False  # the cut turn is over by then: it gets a turn of its own
     await finish_quietly(session)
     await asyncio.sleep(0)
@@ -223,12 +292,12 @@ async def test_say_after_a_cancel_is_read_aloud_on_its_own_body():
 
 async def test_cancel_right_after_say():
     session, sent = make(Gate(["never"]))
-    result = await session.say("desktop", say("a"))
+    result = await said(session, sent, "desktop", say("a"))
     session.cancel(result.turn)
     await finish_quietly(session)
     assert states(sent) == ["started", "ended"]
     assert sent[-1][1]["reason"] == "cancelled"
-    assert (await session.say("desktop", say("b"))).joined is False
+    assert (await said(session, sent, "desktop", say("b"))).joined is False
 
 
 async def finish_quietly(session):
@@ -494,10 +563,10 @@ async def test_cancelled_turn_is_saved_valid(tmp_path):
         running.set()
         await asyncio.Event().wait()
 
-    session, _ = make(Gate([call, "never"]), memory)
+    session, sent = make(Gate([call, "never"]), memory)
     stuck = ToolSpec("recall", "blocks", {"type": "object"}, effect="read")
     session.toolbox.sources[:] = [BrainSource([(stuck, blocked)])]
-    result = await session.say("desktop", say("a"))
+    result = await said(session, sent, "desktop", say("a"))
     await running.wait()  # the cancel lands while the tool is running
     session.cancel(result.turn)
     await finish_quietly(session)
@@ -521,8 +590,8 @@ async def test_cancelled_reply_stays_answered_after_restart(tmp_path):
             yield Final([{"type": "text", "text": "hi"}], "end_turn", SimpleNamespace())
 
     model = Halting([])
-    session, _ = make(model, memory)
-    first = await session.say("desktop", say("long story"))
+    session, sent = make(model, memory)
+    first = await said(session, sent, "desktop", say("long story"))
     await asyncio.sleep(0)
     await settle()
     session.cancel(first.turn)
@@ -537,8 +606,8 @@ async def test_cancelled_reply_stays_answered_after_restart(tmp_path):
 async def _cancel_before_any_word(memory):
     stuck = asyncio.Event()  # the model never gets going, so no delta is ever sent
     model = Gate([stuck, "hi there"])
-    session, _ = make(model, memory)
-    first = await session.say("desktop", say("long story"))
+    session, sent = make(model, memory)
+    first = await said(session, sent, "desktop", say("long story"))
     await settle()
     session.cancel(first.turn)
     await finish_quietly(session)
@@ -629,12 +698,12 @@ async def test_a_say_after_a_cancelled_turn_gets_its_own_answer(tmp_path):
     # "stop ... actually do X": X joined the turn being cancelled and must still be answered.
     memory = file_memory(tmp_path)
     model = Gate([asyncio.Event(), "done X"])
-    session, _ = make(model, memory)
-    first = await session.say("desktop", say("long story"))
+    session, sent = make(model, memory)
+    first = await said(session, sent, "desktop", say("long story"))
     await settle()
     session.cancel(first.turn)
     await until(lambda: not session._busy())  # ending closes the model stream first
-    joined = await session.say("desktop", say("actually do X"))
+    joined = await said(session, sent, "desktop", say("actually do X"))
     assert joined.joined is False  # the cut turn is over by then: it gets a turn of its own
     await finish_quietly(session)
     await turns_done(session)
@@ -660,10 +729,10 @@ async def test_cancel_during_a_tool_step_keeps_the_tool_result_last(tmp_path):
         await asyncio.Event().wait()
 
     model = Gate([call, "next"])
-    session, _ = make(model, memory)
+    session, sent = make(model, memory)
     stuck = ToolSpec("recall", "blocks", {"type": "object"}, effect="read")
     session.toolbox.sources[:] = [BrainSource([(stuck, blocked)])]
-    first = await session.say("desktop", say("a"))
+    first = await said(session, sent, "desktop", say("a"))
     await running.wait()
     session.cancel(first.turn)
     await finish_quietly(session)
@@ -887,8 +956,8 @@ async def test_masking_guard_failure_saves_withheld_not_raw(tmp_path):
 
 async def test_late_says_are_saved(tmp_path):
     memory = file_memory(tmp_path)
-    session, _ = make(Gate([asyncio.Event(), "x"]), memory)
-    result = await session.say("desktop", say("a"))
+    session, sent = make(Gate([asyncio.Event(), "x"]), memory)
+    result = await said(session, sent, "desktop", say("a"))
     await settle()
     await session.say("desktop", say("late"))
     session.cancel(result.turn)
@@ -1213,12 +1282,12 @@ async def test_say_from_a_displaying_body_is_unchanged():
 
 async def test_display_less_say_joins_the_turn_on_the_body_that_shows_it():
     gate = asyncio.Event()
-    session, _ = make(Gate([gate, "one", "two"]))
+    session, sent = make(Gate([gate, "one", "two"]))
     join(session, "desktop")
     join_headless(session)
-    first = await session.say("desktop", say("a"))
+    first = await said(session, sent, "desktop", say("a"))
     await settle()
-    second = await session.say("browser", say("b"))
+    second = await said(session, sent, "browser", say("b"))
     assert second.joined is True and second.turn == first.turn
     gate.set()
     await idle(session)
@@ -1248,7 +1317,7 @@ async def test_say_during_a_wake_turn_joins_it():
     join(session, "desktop")
     session.jobs._on_finished(end_job(memory))
     await settle()
-    result = await session.say("desktop", say("thanks"))
+    result = await said(session, sent, "desktop", say("thanks"))
     assert result.joined is True
     gate.set()
     await idle(session)
@@ -1597,7 +1666,7 @@ async def test_wake_turn_started_notification_says_brain():
     session.body_event("desktop", "back", {"idle_seconds": 600})
     await idle(session)
     started = [p for m, p in sent if m == "turn" and p["state"] == "started"]
-    assert [p["started_by"] for p in started] == ["brain"]
+    assert [p["source"] for p in started] == ["desktop"]  # the waking event's source
 
 
 async def test_say_turn_started_notification_says_user():
@@ -1605,7 +1674,7 @@ async def test_say_turn_started_notification_says_user():
     await session.say("desktop", say("hi"))
     await finish(session)
     started = [p for m, p in sent if m == "turn" and p["state"] == "started"]
-    assert [p["started_by"] for p in started] == ["user"]
+    assert [p["source"] for p in started] == ["desktop"]
 
 
 async def test_set_timer_tool_is_offered_to_the_model():
@@ -1836,7 +1905,9 @@ async def test_session_shares_one_guards_with_dispatcher_and_loop():
     assert model.steps == ["never"]  # the loop never reached the model
     session.jobs._on_finished(end_job(memory))
     await settle()
-    brain_started = [p for m, p in sent if m == "turn" and p.get("started_by") == "brain"]
+    brain_started = [
+        p for m, p in sent if m == "turn" and p["state"] == "started" and p["source"] != "desktop"
+    ]
     assert brain_started == [] and session.dispatcher._groups == []
 
 
@@ -1984,7 +2055,7 @@ class RecordingVoice:
 
 
 def spoken_say(text="hi", **kw):
-    return SayParams(text=text, spoken=True, **kw)
+    return SayParams(id=uuid.uuid4().hex, text=text, spoken=True, **kw)
 
 
 def kinds_of(voice):
@@ -1995,7 +2066,7 @@ async def test_a_spoken_say_sends_its_reply_to_the_voice_with_its_body():
     session, sent = make(Gate(["hello"]))
     session.voice = voice = RecordingVoice()
     join(session, "desktop")
-    result = await session.say("desktop", spoken_say(speed=1.2))
+    result = await said(session, sent, "desktop", spoken_say(speed=1.2))
     await finish_quietly(session)
     assert voice.calls[0] == ("spoken", result.turn, "desktop", 1.2)
     replies = [c[3] for c in voice.calls if c[0] == "reply"]
@@ -2032,10 +2103,10 @@ async def test_a_typed_say_never_reaches_the_voice():
 
 
 async def test_a_cancelled_spoken_turn_still_ends_in_the_voice():
-    session, _ = make(Gate([asyncio.Event(), "never"]))
+    session, sent = make(Gate([asyncio.Event(), "never"]))
     session.voice = voice = RecordingVoice()
     join(session, "desktop")
-    result = await session.say("desktop", spoken_say())
+    result = await said(session, sent, "desktop", spoken_say())
     await settle()
     session.cancel(result.turn)
     await finish_quietly(session)
@@ -2067,11 +2138,11 @@ def read_aloud(session, on=True, body_id="desktop", **kw):
 
 
 async def test_a_typed_say_is_spoken_when_the_body_asked_for_read_aloud():
-    session, _ = make(Gate(["hello"]))
+    session, sent = make(Gate(["hello"]))
     session.voice = voice = RecordingVoice()
     join(session, "desktop")
     read_aloud(session, speed=1.2)
-    result = await session.say("desktop", say("typed"))
+    result = await said(session, sent, "desktop", say("typed"))
     await finish_quietly(session)
     assert voice.calls[0] == ("spoken", result.turn, "desktop", 1.2)
     assert "reply" in kinds_of(voice) and kinds_of(voice)[-1] == "ended"
@@ -2119,7 +2190,7 @@ async def test_a_wake_remark_is_spoken_when_the_body_asked_for_read_aloud():
     session.body_event("desktop", "back", {"idle_seconds": 600})
     await idle(session)
     started = [p for m, p in sent if m == "turn" and p["state"] == "started"]
-    assert started[0]["started_by"] == "brain"
+    assert started[0]["source"] == "desktop"
     assert voice.calls[0] == ("spoken", started[0]["turn"], "desktop", None)
     assert "reply" in kinds_of(voice)
 
@@ -2134,7 +2205,7 @@ async def test_a_wake_remark_is_silent_when_read_aloud_is_off():
 
 
 async def test_read_aloud_survives_the_body_reconnecting():
-    session, _ = make(Gate(["a", "b"]))
+    session, sent = make(Gate(["a", "b"]))
     session.voice = voice = RecordingVoice()
     peer = QuietPeer()
     body = Body(id="desktop", kind="desktop", name="desktop")
@@ -2142,7 +2213,7 @@ async def test_read_aloud_survives_the_body_reconnecting():
     read_aloud(session, speed=1.5)
     session._bodies.disconnect("desktop", peer)
     session._bodies.connect(body, [], QuietPeer(), None)
-    result = await session.say("desktop", say("after the reconnect"))
+    result = await said(session, sent, "desktop", say("after the reconnect"))
     await finish_quietly(session)
     assert voice.calls[0] == ("spoken", result.turn, "desktop", 1.5)
 
@@ -2151,10 +2222,10 @@ async def test_read_aloud_arriving_mid_turn_speaks_the_running_turn():
     """The desktop sends read_aloud after it connects, so a turn a connect wake started may be
     running already; it must be read aloud, once."""
     gate = asyncio.Event()
-    session, _ = make(Gate([gate, "hello"]))
+    session, sent = make(Gate([gate, "hello"]))
     session.voice = voice = RecordingVoice()
     join(session, "desktop")
-    result = await session.say("desktop", say("typed"))
+    result = await said(session, sent, "desktop", say("typed"))
     await settle()
     read_aloud(session, speed=1.1)
     read_aloud(session, speed=1.1)  # a repeat must not speak it again
@@ -2271,7 +2342,7 @@ class NoKeyModel(Gate):
 async def test_say_without_key_ends_error_without_calling_model():
     model = NoKeyModel(["never"])
     session, sent = make(model)
-    result = await session.say("desktop", say("hello"))
+    result = await said(session, sent, "desktop", say("hello"))
     await asyncio.sleep(0.01)
     ended = [p for m, p in sent if m == "turn" and p["state"] == "ended"]
     assert states(sent) == ["started", "ended"]
@@ -3117,7 +3188,7 @@ async def test_answer_after_the_turn_was_cancelled_still_runs_the_call():
     wakes = []
     session.ask_runner._emit = lambda event, **kw: wakes.append(event)
     join(session, "desktop")
-    first = await session.say("desktop", say("tidy up"))
+    first = await said(session, sent, "desktop", say("tidy up"))
     while not open_asks(sent):
         await asyncio.sleep(0)
     await settle()  # the turn has its "waiting" result and is blocked on the model
@@ -3246,7 +3317,7 @@ async def test_year_only_in_body_context_is_not_said_by_the_person():
     steps = [tool_use("remember", kind="about_you", text="Uses Python", start="2019")]
     session, _ = make(Gate([*steps, "ok"]), memory)
     join(session, "desktop")
-    params = SayParams(text="I use Python", context={"page": "Python since 2019"})
+    params = SayParams(id="x3", text="I use Python", context={"page": "Python since 2019"})
     await session.say("desktop", params)
     await idle(session)
     [item] = [i for i in memory.list_items(10) if i.kind == "about_you"]
