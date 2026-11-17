@@ -17,16 +17,21 @@ const turn = (state: string, reason?: string, id = T) => ({
   ...(reason ? { reason } : {}),
 });
 const delta = (d: string, id = T) => ({ seq: ++seq, turn: id, body: 'desktop', delta: d });
-const make = (session: string | null = null) =>
-  createTurnEvents(
+// The helper turns carry say id e1, and the mapper here has sent it: they are my own turns.
+// A wake is built with other event ids.
+const make = (session: string | null = null) => {
+  const m = createTurnEvents(
     () => 'pet-1',
     () => session,
   );
+  m.trackSay('e1');
+  return m;
+};
 
 describe('createTurnEvents brain-started turns', () => {
   const brainTurn = (state: string, reason?: string) => ({
     ...turn(state, reason),
-    ...(state === 'started' ? { source: 'timer:t1' } : {}),
+    ...(state === 'started' ? { source: 'timer:t1', events: ['w1'] } : {}),
   });
   const toolFrame = (state: string) => ({
     seq: ++seq,
@@ -105,13 +110,41 @@ describe('createTurnEvents brain-started turns', () => {
 
   it('a turn sourced by job:x is quiet', () => {
     const m = make();
-    const started = { ...turn('started'), source: 'job:x' };
+    const started = { ...turn('started'), events: ['w1'], source: 'job:x' };
     expect(m.map('turn', started)).toEqual([]);
     expect(m.map('reply', delta('hidden'))).toEqual([]);
   });
 
-  it('a turn from a body is shown', () => {
-    expect(make().map('turn', { ...turn('started'), source: 'browser' })).toHaveLength(1);
+  it("a turn that took none of my says is quiet, whatever its source (a body's wake)", () => {
+    const m = make();
+    const started = { ...turn('started'), events: ['back1'], source: 'desktop' };
+    expect(m.map('turn', started)).toEqual([]);
+    m.map('reply', delta('Welcome back.'));
+    expect(m.map('turn', turn('ended', 'done'))).toEqual([
+      {
+        type: 'pet.remark',
+        remarkId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        petId: 'pet-1',
+        text: 'Welcome back.',
+      },
+    ]);
+  });
+
+  it("another body's say is not mine, so its turn is quiet here", () => {
+    const m = make();
+    expect(m.map('turn', { ...turn('started'), events: ['b1'], source: 'browser' })).toEqual([]);
+  });
+
+  it('my say joining a turn that is not quiet still emits turn.started', () => {
+    const m = make();
+    m.trackSay('s1');
+    m.trackSay('s2');
+    m.map('turn', { ...turn('started'), events: ['s1'], source: 'desktop' });
+    m.map('reply', delta('So far'));
+    expect(m.map('turn', { ...turn('joined'), events: ['s2'], source: 'desktop' })).toEqual([
+      { type: 'turn.started', turnId: T, petId: 'pet-1', conversationId: 'brain' },
+      { type: 'turn.delta', turnId: T, text: 'So far' },
+    ]);
   });
 
   it('my say joining a quiet turn shows it from then on, with the words so far', () => {
@@ -600,7 +633,7 @@ describe('createTurnEvents: asks', () => {
 });
 
 describe('createTurnEvents joined and blank remarks', () => {
-  const brainStart = () => ({ ...turn('started'), source: 'timer:t1' });
+  const brainStart = () => ({ ...turn('started'), events: ['w1'], source: 'timer:t1' });
   const joinedBy = (id: string) => ({ ...turn('joined'), events: [id], source: 'timer:t1' });
 
   it('a joined wake turn continues as a normal turn with the text so far', () => {
@@ -631,11 +664,9 @@ describe('createTurnEvents joined and blank remarks', () => {
     ]);
   });
 
-  it('joining a turn that is already shown, or unknown, sends nothing', () => {
+  it('joining a turn this mapper never saw start sends nothing', () => {
     const m = make();
     m.trackSay('s1');
-    m.map('turn', turn('started'));
-    expect(m.map('turn', joinedBy('s1'))).toEqual([]);
     expect(m.map('turn', { ...joinedBy('s1'), turn: 'unknown' })).toEqual([]);
   });
 
