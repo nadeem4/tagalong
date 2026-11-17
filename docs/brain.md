@@ -1911,9 +1911,12 @@ is not running is refused (`no job with id j9.`, `job j9 is not running (done).`
   job's timers are cancelled, with any held wake dropped and the sleeper re-armed, when Scout
   closes the job (`Jobs.close`). A run that merely ends, or a restart that stops it, leaves them
   planned. This is cleanup, not a decision.
-- **One-offs.** A due one-off moves `planned` to `active` and to `done` ("fired") once Scout's wake
-  turn starts. If the brain stops before that, the `active` row is emitted again at the next start.
-  A race with `cancel_timer` is harmless: the move is refused and nothing is emitted.
+- **One-offs.** A due one-off moves `planned` to `active` to `done` ("fired") in the same
+  transaction that saves its `timer` event (`WorkStore.fire` runs as the `then` of
+  `EventLog.post`), so a failed save leaves it `planned` and a saved event always has a fired
+  timer. The event's `caused_by` is the event of the turn that set the timer (kept in the row's
+  input by `set_timer`). A race with `cancel_timer` is harmless: the fire is refused and nothing
+  is saved.
 - **Repeats.** A repeating row stays `planned` and sets its next time from the moment it fired, not
   the old time. After a long outage it fires once, not once per missed interval.
 - **Known gap.** Timers fire only while the brain runs. One that came due while it was off fires

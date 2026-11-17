@@ -8,11 +8,13 @@ out its backoff) to `rerun`.
 
 import asyncio
 import logging
+import sqlite3
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from brain.events import Event
 from brain.job_records import home_state
+from brain.store.db import utc_text
 from brain.store.work import TransitionRefused, WorkRow, WorkStore
 
 log = logging.getLogger("brain")
@@ -61,24 +63,16 @@ class Timers:
         self.fire_due()
 
     def fire_due(self) -> None:
-        now = self._now()
+        at = utc_text(self._now())
         fired = False
         for row in self._work.due(KINDS):
             if is_return_wake(row):
                 continue
             repeat_s = self._work.repeat_of(row.id)
             try:
-                if repeat_s:
-                    current = self._work.get(row.id)
-                    if current is None or current.state != "planned":
-                        raise TransitionRefused(f"{row.id} is no longer planned")
-                    # From now, not from the old time: a long gap fires once.
-                    self._work.update(row.id, due_at=now + timedelta(seconds=repeat_s))
-                else:
-                    self._work.transition(row.id, "active", expect="planned")
+                self._emit_one(row, repeat_s, lambda db, id=row.id: self._work.fire(id, at))
             except TransitionRefused:
-                continue  # cancelled or paused as it came due: already handled
-            self._emit_one(row, repeat_s)
+                continue  # cancelled or paused as it came due: already handled, nothing saved
             fired = True
         self._rerun_due()
         self._arm()
@@ -129,7 +123,12 @@ class Timers:
         self.changed()
         return True
 
-    def _emit_one(self, row: WorkRow, repeat_s: int | None) -> None:
+    def _emit_one(
+        self,
+        row: WorkRow,
+        repeat_s: int | None,
+        then: Callable[[sqlite3.Connection], None] | None = None,
+    ) -> None:
         facts: dict = {"id": row.id, "note": note_of(row), "repeat_minutes": (repeat_s or 0) // 60}
         if row.kind == "watch":
             facts["kind"] = "watch"
@@ -139,25 +138,19 @@ class Timers:
             if parent is not None:
                 facts["state"] = home_state(parent.state)
             facts.update(self._job_facts(row.parent_id))
-        event = Event("timer", f"timer:{row.id}", facts)
+        event = Event(
+            "timer", f"timer:{row.id}", facts, caused_by=(row.input or {}).get("caused_by")
+        )
         if repeat_s:
-            self._emit(event)
+            self._emit(event, then=then)
         else:
-            # Ended once Scout's turn starts; told only when that turn finishes, so a cancelled
-            # wake leaves it untold.
+            # Told only when Scout's turn finishes, so a cancelled wake leaves it untold.
             self._emit(
                 event,
-                on_start=lambda: self._fired(row.id),
+                then=then,
                 on_end=lambda reason: self._told(row.id) if reason == "done" else None,
                 retell=True,  # a cancelled wake did not tell it: once more
             )
-
-    def _fired(self, id: str) -> None:
-        try:
-            self._work.transition(id, "done", reason="fired", expect="active")
-        except TransitionRefused:
-            return  # cancelled while the wake waited
-        self._tell()
 
     def _told(self, id: str) -> None:
         self._work.mark_reported(id)

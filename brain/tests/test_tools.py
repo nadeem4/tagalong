@@ -1070,6 +1070,15 @@ def _due(row):
     return datetime.datetime.fromisoformat(row.due_at)
 
 
+async def test_set_timer_records_the_event_of_the_turn_that_set_it(mem):
+    records = records_for(mem, lambda: _T0)
+    pairs = timer_tools(records, _FakeTimers(records.work), lambda: _T0, lambda: "ev1")
+    handlers = {spec.name: handler for spec, handler in pairs}
+    await handlers["set_timer"]({"note": "x", "in_minutes": 5})
+    [row] = records.work.of_kind("timer", ["planned"])
+    assert row.input == {"caused_by": "ev1"}
+
+
 async def test_set_timer_in_minutes_adds_a_row_and_rearms(trun):
     out = await trun("set_timer", {"note": "check build", "in_minutes": 30})
     t = _timers(trun)[0]

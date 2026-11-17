@@ -340,7 +340,7 @@ class Session:
             + tts_tools(memory.db, notify, self._pick_voice, voice_dir, self._voice_download)
             + expert_tools(self.jobs, self.owner_turn)
             + work_tools(self.records.work, self.jobs, timers.changed)
-            + timer_tools(self.records, timers, now)
+            + timer_tools(self.records, timers, now, lambda: self._turn_cause)
             + timer_home_tools(self.records.work, timers)
             + output_tools(outputs)
             + question_tools(questions)

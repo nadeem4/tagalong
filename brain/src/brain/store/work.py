@@ -798,6 +798,23 @@ class WorkStore:
         row = self.db.execute("SELECT repeat_s FROM work_timer WHERE work_id = ?", (id,)).fetchone()
         return None if row is None else row[0]
 
+    def fire(self, id: str, at: str) -> None:
+        """A due timer fires: a one-off ends as done, a repeating one is set for its next time.
+
+        Opens no transaction: it runs inside the one that saves the timer's event, so the fire
+        and its event stand or fall together. Raises TransitionRefused if it is no longer planned.
+        """
+        row = self._need(id)
+        if row.state != "planned":
+            raise TransitionRefused(f"{id} is {row.state}, expected planned")
+        repeat_s = self.repeat_of(id)
+        if repeat_s:
+            # From now, not from the old time: a long gap fires once.
+            self.update(id, due_at=datetime.fromisoformat(at) + timedelta(seconds=repeat_s))
+        else:
+            self._move(row, "active", None)
+            self._move(self._need(id), "done", "fired")
+
     # ---- work_loop: what a loop is, beside its row ----
 
     def set_loop_detail(

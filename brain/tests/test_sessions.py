@@ -1391,6 +1391,22 @@ async def test_a_due_timer_wakes_scout_with_its_note():
     assert "look at the deploy" in text
 
 
+async def test_a_fired_timer_still_wakes_through_the_bridge():
+    now = datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC)
+    memory = Memory(":memory:")
+    kinds = {"timer": EventKind("timer", batch_seconds=0, max_per_hour=6)}
+    model = Gate(["ok"])
+    session, _ = make(model, memory, kinds=kinds, now=lambda: now)
+    join(session, "desktop")
+    work = records_for(memory, lambda: now).work
+    t = add_timer(work, "stretch", now - datetime.timedelta(minutes=1))
+    session.timers.fire_due()
+    session.dispatcher.pump()
+    await idle(session)
+    assert "stretch" in model.seen[-1][-1]["content"][-1]["text"]
+    assert work.get(t.id).state == "done"  # done at the fire, with its event saved
+
+
 async def test_session_job_timer_wake_includes_watching_and_activity():
     tz = datetime.timezone(datetime.timedelta(hours=1))
     now = datetime.datetime(2026, 1, 1, 9, 0, tzinfo=tz)
@@ -2351,7 +2367,7 @@ async def test_closing_a_job_cancels_its_timers_and_the_ended_wake_still_comes()
     await session.jobs._end("j1", "done", "finished", "all good")
     assert work.get(later.id).state == "planned"  # ending a run leaves Scout's timers alone
     session.jobs.close("j1")
-    assert work.get(fired.id).state == "cancelled"
+    assert work.get(fired.id).state == "done"
     assert work.get(later.id).state == "cancelled"
     assert session.timers._handle is None  # the sleeper was re-armed for nothing
     join(session, "desktop")
