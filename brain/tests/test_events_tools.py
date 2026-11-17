@@ -64,3 +64,20 @@ async def test_gist_is_the_first_fact_value_truncated(rig):
     assert first["gist"] == "Line one"
     assert second["gist"] == "y" * 57 + "..."
     assert third["gist"] == ""
+
+
+async def test_a_given_up_say_is_listed_and_a_new_say_is_not(rig):
+    new_say = rig.post("say", {"text": "hi"}, source="desktop")
+    lost = rig.post("say", {"text": "help me"}, source="desktop", at=T0 + timedelta(minutes=1))
+    store.set_taken(rig.db, [lost], "turn1")
+    store.set_gave_up(rig.db, [lost], "retries_spent", "2026-11-17T09:02:00+00:00")
+    rows = await rig.rows()
+    assert [(r["id"], r["gave_up"]) for r in rows] == [(lost, True)]
+    assert new_say not in [r["id"] for r in rows]
+
+
+async def test_a_gist_that_is_not_a_string_is_json(rig):
+    rig.post("timer", {"n": 3, "other": "x"})
+    rig.post("loop", {"tags": ["a", "b"]}, at=T0 + timedelta(minutes=1))
+    first, second = await rig.rows()
+    assert (first["gist"], second["gist"]) == ("3", '["a", "b"]')

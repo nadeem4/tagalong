@@ -48,7 +48,7 @@ Nothing outside this package runs SQL: `tests/test_store_boundary.py` fails if a
 under `brain/src/brain` calls `.execute`, `.executescript` or `.executemany`.
 
 - `store/migrations/`: `NNNN_name.sql` (or `NNNN_name.py` with a `migrate(db)` function) files,
-  `0001_memories` to `0036_message_events`. The numbers have no gaps (the loader refuses a gap or a
+  `0001_memories` to `0037_open_items_no_held`. The numbers have no gaps (the loader refuses a gap or a
   duplicate). Each file runs in one transaction together with its `user_version` bump, so a
   failure leaves the file at the last good version. A file is never edited after it has merged;
   a schema change is a new file.
@@ -683,11 +683,11 @@ never saved. Nothing acts on an event before its row exists, so a brain kill los
 
 ### open_items
 
-Everything waiting on the person (a card, choice, install, sign-in, expert question, offer or
-setup step), one row each with one lifecycle. Scout's asks (kind `ask`) write it with the saved
-call; choices (`choice`, live-only), offers (`offer`, the offer as its saved call) and setup events
-(`setup`, the event as its saved call) write it too; installs move onto it in a later slice. The
-choice, offer and setup-event waits that lived only in memory are gone.
+Everything waiting on the person (a card, choice, install, sign-in, expert question or offer),
+one row each with one lifecycle. Scout's asks (kind `ask`) write it with the saved
+call; choices (`choice`, live-only) and offers (`offer`, the offer as its saved call) write it too;
+installs move onto it in a later slice. The choice and offer waits that lived only in memory are
+gone.
 
 | Column            | Type             | Meaning                                                                                        |
 | ----------------- | ---------------- | ---------------------------------------------------------------------------------------------- |
@@ -709,7 +709,7 @@ choice, offer and setup-event waits that lived only in memory are gone.
   while the item is `open`, even if the turn that raised it is gone; after the deadline it is
   refused (`expired`). `live_only` items are expired at start and when their process ends (for `expert_ask`, only that job's: `expire_live_only(job_id=...)`).
 - Written by: `open_items.py` `OpenItems` through `store/open_items.py`, for `ask` by the ask runner, `choice` by
-  `choices.py`, `offer` by `offers.py` and `setup` by `setup/events.py`. The `rules` table keeps the
+  `choices.py`, and `offer` by `offers.py`. The `rules` table keeps the
   offer's outcome word (the keep-asking window); the open item is the pending offer.
 - Read by: `OpenItems.list_open`, `list_answered`, `find_open` (the open item with a given saved call), `get`.
 - Retention: closed rows stay until a later slice sweeps them.

@@ -1,4 +1,4 @@
-"""Home's events_waiting tool: news Scout has not told yet, and news it gave up on.
+"""Home's events_waiting tool: news Scout has not told yet, and any event it gave up on.
 
 Home-only (the model never sees it). A row is facts for the Waiting list: what and when. The
 `gist` is the payload's first fact value, cut short; code never words it as prose.
@@ -21,7 +21,8 @@ def _gist(payload: dict) -> str:
     first = next(iter(payload.values()), None)
     if first is None:
         return ""
-    line = str(first).strip().split("\n")[0]
+    text = first if isinstance(first, str) else json.dumps(first)
+    line = text.strip().split("\n")[0]
     return line if len(line) <= _GIST_MAX else line[: _GIST_MAX - 3] + "..."
 
 
