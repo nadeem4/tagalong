@@ -230,7 +230,7 @@ def test_terminal_needs_reason_and_sets_ended(store, clock):
     clock.at += timedelta(seconds=9)
     got = store.transition(row.id, "done", reason="finished")
     assert got.end_reason == "finished" and got.ended_at == utc_text(clock.at)
-    assert got.progress is None and got.reported_at is None
+    assert got.progress is None
     event = store.events(row.id)[-1]
     assert event.kind == "state"
     assert event.data == {"from": "active", "to": "done", "reason": "finished"}
@@ -353,7 +353,6 @@ def test_retry_transient_safe_backs_off(store, clock):
         store.transition(row.id, "active")
     got = store.fail(row.id, "transient", "timed out")
     assert got.state == "failed" and got.end_reason == "gave up after 3 tries: timed out"
-    assert got.reported_at is None
 
 
 def test_not_safe_fails_at_once(store):

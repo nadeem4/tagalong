@@ -143,7 +143,6 @@ def test_loop_statuses_map(work):
     assert got["stale1"].end_reason == "went quiet"
     for id in ("done1", "drop1", "stale1"):
         assert got[id].ended_at == LATER
-        assert got[id].reported_at is not None  # loops never ask Scout for a report
     assert got["held1"].title == "title held1"
     assert (got["held1"].created_at, got["held1"].updated_at) == (T, LATER)
     assert got["held1"].root_id == "held1"

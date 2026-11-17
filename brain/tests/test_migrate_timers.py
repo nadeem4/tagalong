@@ -66,7 +66,7 @@ def test_timers_become_timer_rows(work):
 def test_fired_one_off_stays_active_so_start_re_emits_it(work):
     row = work.get("t2")  # fired=1 on main: fired, but Scout's turn may never have started
     assert row.state == "active"
-    assert (row.ended_at, row.end_reason, row.reported_at) == (None, None, None)
+    assert (row.ended_at, row.end_reason) == (None, None)
 
 
 def test_timer_job_becomes_parent(work):
@@ -79,11 +79,7 @@ def test_timer_job_becomes_parent(work):
 def test_tracking_becomes_paused_watch(work):
     rows = {r.id: r for r in work.of_kind("watch")}
     assert set(rows) == {"w1", "w2", "w3"}
-    assert (rows["w1"].state, rows["w1"].title, rows["w1"].reported_at) == (
-        "paused",
-        "watch the build",
-        None,
-    )
+    assert (rows["w1"].state, rows["w1"].title) == ("paused", "watch the build")
     assert work.repeat_of("w1") == 86400
     assert work.repeat_of("w2") == 7200
 

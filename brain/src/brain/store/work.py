@@ -38,7 +38,7 @@ _MOVES = {
 _COLUMNS = (
     "id, parent_id, root_id, seq, kind, state, title, input, summary, detail_id, progress,"
     " checkpoint, attempt, max_attempts, safe_to_retry, error_kind, last_error, due_at,"
-    " created_at, updated_at, ended_at, end_reason, reported_at, source_message_id"
+    " created_at, updated_at, ended_at, end_reason, source_message_id"
 )
 _W_COLUMNS = ", ".join(f"w.{c.strip()}" for c in _COLUMNS.split(","))
 
@@ -89,7 +89,6 @@ class WorkRow:
     updated_at: str
     ended_at: str | None
     end_reason: str | None
-    reported_at: str | None
     source_message_id: int | None
 
 
@@ -554,8 +553,6 @@ class WorkStore:
             sets.update(ended_at=now, end_reason=reason, progress=None)
         elif row.state in TERMINAL:
             sets.update(ended_at=None, end_reason=None)
-        if ending or to == "blocked" or row.state in TERMINAL:
-            sets["reported_at"] = None  # Scout has not heard about this change yet
         sets.update(extra or {})
         self.db.execute(
             f"UPDATE work SET {', '.join(f'{k} = ?' for k in sets)} WHERE id = ?",
@@ -581,8 +578,7 @@ class WorkStore:
                 to, why = "expired", f"parent ended: {reason}"
             else:
                 to, why = "cancelled", "goal closed"
-            # Scout already knows the parent ended, so these need no report of their own.
-            self._move(child, to, why, force=True, extra={"reported_at": self._stamp()})
+            self._move(child, to, why, force=True)
 
     def _rollup(self, row: WorkRow, to: str) -> None:
         """The only automatic goal move: a stuck child blocks it, a freed one unblocks it."""
@@ -645,7 +641,7 @@ class WorkStore:
             row = self._need(goal_id)
             if row.kind != "goal":
                 raise TransitionRefused(f"{goal_id} is a {row.kind}, not a goal")
-            extra = {"summary": self.mask(summary), "reported_at": self._stamp()}
+            extra = {"summary": self.mask(summary)}
             self._move(row, outcome, "closed by Scout", via_close=True, extra=extra)
         return self._need(goal_id)
 
@@ -667,7 +663,7 @@ class WorkStore:
             row = self._need(id)
             if row.state not in OPEN:
                 raise TransitionRefused(f"{id} is {row.state}, expected an open row")
-            self._move(row, to, reason, data, extra={"reported_at": self._stamp()})
+            self._move(row, to, reason, data)
         return self._need(id)
 
     def add_ask(
@@ -735,8 +731,7 @@ class WorkStore:
                 raise TransitionRefused(f"{work_id} is not an ask with facts")
             if detail["decided_by"] is not None:
                 raise TransitionRefused(f"{work_id} was already decided")
-            extra = {"reported_at": self._stamp()}
-            self._move(row, to, outcome, force=row.state in TERMINAL, extra=extra)
+            self._move(row, to, outcome, force=row.state in TERMINAL)
             self.db.execute(
                 "UPDATE work_ask SET decided_by = ?, rule_id = ?, rule_sentence = ?"
                 " WHERE work_id = ?",
@@ -972,29 +967,27 @@ class WorkStore:
         return done
 
     def _settle(self, row: WorkRow, can_resume: Callable[[WorkRow], bool | None]) -> str | None:
-        unreported = {"reported_at": None}
         if row.kind in ("ask", "question") and row.state in ("planned", "active", "blocked"):
-            self._move(row, "expired", "brain restarted", extra=unreported)
+            self._move(row, "expired", "brain restarted")
             return "expired"
         if row.state != "active":
             return None
         if row.kind == "expert_call":
             session = (row.checkpoint or {}).get("session_id")
             if session and can_resume(row) is not False:
-                self._move(row, "blocked", "brain restarted", extra=unreported)
+                self._move(row, "blocked", "brain restarted")
                 self.add_event(row.id, "resumed", {"session_id": session})
                 return "blocked"
             reason = "brain restarted, session cannot reload"
-            self._move(row, "failed", reason, extra=unreported)
+            self._move(row, "failed", reason)
             self.add_event(row.id, "failed on restart", {"reason": reason})
             return "failed"
         if row.kind == "tool_call" and row.safe_to_retry:
-            extra = {**unreported, "due_at": self._stamp()}
-            self._move(row, "planned", None, extra=extra)
+            self._move(row, "planned", None, extra={"due_at": self._stamp()})
             self.add_event(row.id, "resumed")
             return "rerun"
         if row.kind == "tool_call":
-            self._move(row, "failed", "brain restarted, unsure if it ran", extra=unreported)
+            self._move(row, "failed", "brain restarted, unsure if it ran")
             self.add_event(row.id, "failed on restart")
             return "failed"
         return None

@@ -51,20 +51,34 @@ def _encode_message(m: dict) -> tuple[str, str]:
 
 
 def save_messages(
-    db: sqlite3.Connection, msgs: list[dict], at: str, body: str = BODY_DESKTOP
-) -> None:
+    db: sqlite3.Connection,
+    msgs: list[dict],
+    at: str,
+    body: str = BODY_DESKTOP,
+    *,
+    event_ids: list[str | None] | None = None,
+    sources: list[str | None] | None = None,
+) -> list[int]:
+    """Save `msgs` in one transaction; the new row ids in order. `event_ids` and `sources` run
+    beside `msgs`: a user row made from a taken event names it and where it came from."""
+    events = event_ids or [None] * len(msgs)
+    froms = sources or [None] * len(msgs)
+    ids: list[int] = []
     db.execute("BEGIN IMMEDIATE")
     try:
-        for m in msgs:
+        for m, event_id, source in zip(msgs, events, froms, strict=True):
             content, text = _encode_message(m)
-            db.execute(
-                "INSERT INTO messages(at, role, content_json, text, body) VALUES (?,?,?,?,?)",
-                (at, m["role"], content, text, body),
+            cur = db.execute(
+                "INSERT INTO messages(at, role, content_json, text, body, event_id, source)"
+                " VALUES (?,?,?,?,?,?,?)",
+                (at, m["role"], content, text, body, event_id, source),
             )
+            ids.append(int(cur.lastrowid or 0))
     except BaseException:
         db.execute("ROLLBACK")
         raise
     db.execute("COMMIT")
+    return ids
 
 
 def replace_last_message(db: sqlite3.Connection, message: dict) -> None:
@@ -76,11 +90,9 @@ def replace_last_message(db: sqlite3.Connection, message: dict) -> None:
     )
 
 
-def set_last_cut(db: sqlite3.Connection, cut: bool) -> None:
-    """Mark (or unmark) the newest saved message as a request cancelled before any reply."""
-    db.execute(
-        "UPDATE messages SET cut=? WHERE id=(SELECT MAX(id) FROM messages)", (1 if cut else 0,)
-    )
+def set_cut(db: sqlite3.Connection, ids: list[int], cut: bool) -> None:
+    """Mark (or unmark) the rows of a request cancelled before any reply."""
+    db.executemany("UPDATE messages SET cut=? WHERE id=?", [(1 if cut else 0, i) for i in ids])
 
 
 def load_messages(db: sqlite3.Connection, include_cut: bool = False) -> list[dict]:

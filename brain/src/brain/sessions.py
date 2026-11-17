@@ -400,6 +400,11 @@ class Session:
         # True when the last turn was cancelled before any word and its request is still last in
         # history: the next turn drops it (see _drop_unanswered).
         self._wordless_cancel = False
+        # How unsaved blocks are saved, by block identity (the blocks live in history meanwhile):
+        # an event's own blocks become its row; turn-only blocks are never saved.
+        self._row_of: dict[int, tuple[str, str]] = {}
+        self._unsaved: set[int] = set()
+        self._last_rows: list[int] = []  # the saved rows of the newest message saved
         self._rejected = False  # the API answered the running turn's request with a 400
         self._turn_id: str | None = None
         # True while the running turn is the owner's: they started it, or they typed into it.
@@ -505,28 +510,32 @@ class Session:
         tz = self._now().tzinfo
         says = [(r, self._say_params(r)) for r in rows if r.kind == "say"]
         params = [p for _, p in says]
-        content = [
-            b
-            for r, p in says
-            if not r.resume
-            for b in user_content(p, read_aloud=self._wants_speech(body, p))
-        ]
+        content: list[dict] = []
+        for r, p in says:
+            if not r.resume:
+                blocks = user_content(p, read_aloud=self._wants_speech(body, p))
+                content += self._of_event(r, blocks)
         news: dict[str, list[EventRow]] = {}
         resumed: dict[tuple[str, str], list[EventRow]] = {}
         for row in rows:
             if row.resume:
                 # Its payload is in the history already: only the fact that it goes on.
                 resumed.setdefault((row.kind, row.end_reason or ""), []).append(_named(row))
-            elif row.kind != "say" and not row.resume:
+            elif row.kind != "say":
                 news.setdefault(row.kind, []).append(row)
         for kind, group in news.items():
+            # One block per event, so each is saved as its own row; the note once per kind.
             note = self.runner.notes.get(kind, "")
-            content.append({"type": "text", "text": wake_text(self._kinds[kind], group, note, tz)})
+            for n, row in enumerate(group):
+                text = wake_text(self._kinds[kind], [row], note if n == 0 else "", tz)
+                content += self._of_event(row, [{"type": "text", "text": text}])
+        # The marks below are for this turn only: each event got its row from the turn that
+        # first took it, so they are never saved (one event, one row).
         for (kind, reason), group in resumed.items():
             attrs = {"resume": "true", "reason": reason}
             note = self.runner.notes.get(kind, "")
             text = wake_text(self._kinds[kind], group, note, tz, attrs)
-            content.append({"type": "text", "text": text})
+            content.append(self._turn_only({"type": "text", "text": text}))
         told: dict[tuple[str, str], list[EventRow]] = {}
         for row in gave_up:
             payload = {"text": row.payload.get("params", {}).get("text", "")}
@@ -537,7 +546,7 @@ class Session:
             attrs = {"gave_up": "true", "reason": reason}
             note = self.runner.notes.get(kind, "")
             text = wake_text(self._kinds[kind], group, note, tz, attrs)
-            content.append({"type": "text", "text": text})
+            content.append(self._turn_only({"type": "text", "text": text}))
         if not params and self._wants_speech(body, None):
             content.append({"type": "text", "text": ear_note()})
         cut = next((r.payload["cut"] for r, _ in says if "cut" in r.payload), None)
@@ -557,6 +566,17 @@ class Session:
         jobs = {r.source[4:] for r in rows if r.source.startswith("job:")}
         if len(jobs) == 1:
             self._turn_job = jobs.pop()
+
+    def _of_event(self, row: EventRow, blocks: list[dict]) -> list[dict]:
+        """Blocks that render a taken event: they are saved as that event's own row."""
+        for block in blocks:
+            self._row_of[id(block)] = (row.id, row.source)
+        return blocks
+
+    def _turn_only(self, block: dict) -> dict:
+        """A block told to the running turn alone, never saved."""
+        self._unsaved.add(id(block))
+        return block
 
     def _say_params(self, row: EventRow) -> SayParams:
         live = self._live_params.get(row.id)
@@ -679,7 +699,7 @@ class Session:
         """History keeps what the owner heard, marked as cut off, never the unsaid rest."""
         if self._wordless_cancel:  # the request gets its (heard) answer below, so it is kept
             self._wordless_cancel = False
-            self._set_last_cut(False)
+            self._mark_cut(False)
         text = (cut.spoken + "\n\n" if cut.spoken else "") + INTERRUPTED_MARK
         block = {"type": "text", "text": text}
         last = self.history[-1] if self.history else None
@@ -713,9 +733,9 @@ class Session:
     def _reject(self) -> None:
         self._rejected = True
 
-    def _set_last_cut(self, cut: bool) -> None:
+    def _mark_cut(self, cut: bool) -> None:
         try:
-            self._memory.set_last_cut(cut)
+            self._memory.set_cut(self._last_rows, cut)
         except Exception:
             log.exception("could not mark the cut-off request")
 
@@ -1046,7 +1066,7 @@ class Session:
         self._turn_body = body_id
         self._turn_cause = events[0] if events else None
         lead = [interruption_block(cut.spoken, cut.unsaid)] if cut is not None else []
-        lead = [*self._carried, *lead]  # what an interjection changed, once
+        lead = [self._turn_only(b) for b in [*self._carried, *lead]]  # an interjection's, once
         self._carried = []
 
         self._drop_unanswered()
@@ -1072,7 +1092,8 @@ class Session:
             self._ear_due = False
             for row in self.runner.take_more():
                 params = self._say_params(row)
-                blocks += user_content(params, read_aloud=self._wants_speech(body_id, params))
+                said = user_content(params, read_aloud=self._wants_speech(body_id, params))
+                blocks += self._of_event(row, said)
                 self._speak(turn_id, body_id, params)
                 # Their words reached the model, so a follow-up from here on is theirs; one
                 # already in flight when they joined still asks.
@@ -1111,14 +1132,18 @@ class Session:
                 on_rejected=self._reject,
                 stop=stop,
                 on_detached=self._detached,
+                on_step=lambda _step: self._save_new(body_kind),
             )
 
-        task = asyncio.create_task(run())
-        self._task = task
         # resolved now: the body may leave before the turn ends, and the saved rows keep its kind
         shown = self._bodies.body(body_id) if body_id is not None else None
         body_kind = shown.kind if shown is not None else BODY_DESKTOP
+        task = asyncio.create_task(run())
+        self._task = task
         task.add_done_callback(lambda t: self._ended(t, turn_id, body_id, lead, body_kind))
+        # Saved before the model is asked, after the last thing here that can fail (a failed
+        # start is retried and would save its events twice): a crash keeps the request.
+        self._save_new(body_kind)
         return turn_id
 
     def _capabilities(self) -> str:
@@ -1269,10 +1294,13 @@ class Session:
             self._owner_turn = False
             self._task = None
         self._last_turn = turn_id
-        self._persist(body_kind)
+        self._save_new(body_kind)  # the closing reply; earlier steps were saved as they ended
+        # Still mapped now: only blocks a failed save left behind. They are saved plainly later.
+        self._row_of.clear()
+        self._unsaved.clear()
         if unanswered and self._saved == len(self.history):
             self._wordless_cancel = True
-            self._set_last_cut(True)  # the saved chat keeps it; a restart skips it
+            self._mark_cut(True)  # the saved chat keeps it; a restart skips it
         if turn_id in self._spoken:
             self._spoken.discard(turn_id)
             if self.voice is not None:
@@ -1301,12 +1329,23 @@ class Session:
             return False
         return mask_json(self.guards, "chat", block.get("thinking", "")) != block.get("thinking")
 
-    def _persist(self, body: str) -> None:
-        # Saving is best effort: a full disk must not stop the ended notification.
+    def _save_new(self, body: str) -> None:
+        """Save the history not on disk yet: at a turn's start, after each tool round and at its
+        end. Each taken event's blocks are their own row; turn-only blocks are left out."""
+        # Saving is best effort: a full disk must not stop the turn or its ended notification.
         try:
-            # A masked copy goes to disk; self.history keeps the real values for the live turn.
-            new = [self._masked(m) for m in self.history[self._saved :]]
-            self._memory.save_messages(new, body)
+            per = [self._rows_of(m) for m in self.history[self._saved :]]
+            rows = [row for message_rows in per for row in message_rows]
+            ids = []
+            new = [self._masked(m) for m, _, _ in rows]
+            if rows:
+                # A masked copy goes to disk; self.history keeps the real values for the turn.
+                ids = self._memory.save_messages(
+                    new, body, event_ids=[e for _, e, _ in rows], sources=[s for _, _, s in rows]
+                )
+            if per:
+                # The newest message's rows: what a wordless cancel marks as cut.
+                self._last_rows = ids[len(ids) - len(per[-1]) :]
             self._saved = len(self.history)  # before summaries, so a failure there cannot re-save
             for message in new:
                 if message["role"] != "assistant" or isinstance(message["content"], str):
@@ -1316,6 +1355,23 @@ class Session:
                         self._memory.add_summary(text)
         except Exception:
             log.exception("could not save the chat")
+
+    def _rows_of(self, message: dict) -> list[tuple[dict, str | None, str | None]]:
+        """The rows `message` is saved as, each with its event id and source. A run of blocks
+        that render one event is that event's row; other blocks share a row of their own."""
+        content = message["content"]
+        if message["role"] != "user" or isinstance(content, str):
+            return [(message, None, None)]
+        rows: list[tuple[dict, str | None, str | None]] = []
+        for block in content:
+            if id(block) in self._unsaved:
+                continue
+            event, source = self._row_of.get(id(block), (None, None))
+            if rows and rows[-1][1] == event:
+                rows[-1][0]["content"].append(block)
+            else:
+                rows.append(({"role": "user", "content": [block]}, event, source))
+        return rows
 
 
 def _is_in(block: Any, blocks: list) -> bool:

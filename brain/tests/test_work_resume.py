@@ -48,7 +48,7 @@ def test_resume_open_ask_expires(tmp_path, state):
     store = restart()
     assert store.resume_scan(_yes) == [(ask.id, "expired")]
     got = store.get(ask.id)
-    assert (got.state, got.end_reason, got.reported_at) == ("expired", "brain restarted", None)
+    assert (got.state, got.end_reason) == ("expired", "brain restarted")
 
 
 def test_resume_open_question_expires(tmp_path):
@@ -69,7 +69,7 @@ def test_resume_expert_call_with_session_blocks(tmp_path):
     out = store.resume_scan(lambda row: asked.append(row.id) or None)  # None is not False
     assert out == [(call.id, "blocked")] and asked == [call.id]
     got = store.get(call.id)
-    assert (got.state, got.reported_at) == ("blocked", None)
+    assert got.state == "blocked"
     assert "resumed" in _kinds(store, call.id)
     assert store.get(goal.id).state == "blocked"  # the rollup tells Scout the goal is stuck
 
@@ -83,7 +83,7 @@ def test_resume_expert_call_cannot_reload_fails(tmp_path):
     out = dict(store.resume_scan(lambda row: False))
     assert out == {with_session.id: "failed", no_session.id: "failed"}
     got = store.get(no_session.id)
-    assert got.end_reason == "brain restarted, session cannot reload" and got.reported_at is None
+    assert got.end_reason == "brain restarted, session cannot reload"
     assert "failed on restart" in _kinds(store, no_session.id)
 
 
@@ -104,7 +104,6 @@ def test_resume_unsafe_tool_call_fails(tmp_path):
     assert store.resume_scan(_yes) == [(call.id, "failed")]
     got = store.get(call.id)
     assert got.state == "failed" and got.end_reason == "brain restarted, unsure if it ran"
-    assert got.reported_at is None
 
 
 def test_resume_timer_watch_loop_untouched(tmp_path):
