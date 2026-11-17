@@ -470,8 +470,8 @@ The repeat of a `timer` or `watch` row. The timer itself is a row in `work`: `ti
   `due_at` forward from now, so a brain that was off fires an overdue repeat once.
 - Migrated: the old `timers` table became `timer` rows (`t<id>`), and each `tracking` memory
   became a `paused` `watch` row (`w<id>`) with its cadence in `repeat_s` when it parsed (daily,
-  every N hours, and so on) or in `input.cadence` when it did not. Scout mentions the paused
-  watches stay paused until the person switches them on.
+  every N hours, and so on) or in `input.cadence` when it did not. The paused watches stay
+  paused until the person switches them on.
 - Masked: yes, the title and a long note, like all work text.
 
 ### work_loop

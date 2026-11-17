@@ -423,7 +423,8 @@ setup still hears a job's question.
 
 **News is told when the turn ends.** An event is handled when the turn that took it ends `done`
 or `cancelled` (the person was answered or the turn was stopped on purpose), `rejected` (the API
-refused the request, which would fail the same way again) or `unanswered` (no body was ready). A
+refused the request, which would fail the same way again) or `unanswered` (no key is set, so
+nothing can answer). A
 say that ran over budget is handled too, since the person sees why; news that ran over budget goes
 back to `new` with no attempt counted and waits for the budget. An error, a timeout or the step cap
 counts as an attempt: the event waits 30 s, then 2 min, then 10 min (`not_before`) and is tried
@@ -1939,8 +1940,7 @@ is not running is refused (`no job with id j9.`, `job j9 is not running (done).`
 state, every_minutes, next_at, cadence_text}]}` for planned and paused watches; `pause` moves a
 planned watch to `paused`; `switch_on` moves a paused one back to `planned` one interval from now
 and needs a repeat (`every_minutes`, or one already saved); a refused `switch_on` changes nothing.
-`cancel` ends it. A paused watch never fires. Scout's own `pause` marks the watch told, so it is
-not announced. The old `tracking` memories became paused watches when the database was migrated;
+`cancel` ends it. A paused watch never fires. The old `tracking` memories became paused watches when the database was migrated;
 they stay paused until switched on, and nothing announces them.
 
 ## Loops
@@ -2499,20 +2499,22 @@ the body that caused it, else the first screen. The phone comes last: it is chos
 screen is online, or when the event came from it. A say from a display-less body is answered on the
 body in use.
 
-**When a turn ends.** `done`, `cancelled` by the person, `rejected` and `unanswered` (no body was
-ready) mean handled. A say that ends over budget is handled too; news that ends over budget goes
+**When a turn ends.** `done`, `cancelled` by the person, `rejected` and `unanswered` (no key is
+set, so nothing can answer) mean handled. A say that ends over budget is handled too; news that ends over budget goes
 back to `new` with no attempt counted. An error, a timeout or the step cap counts as an attempt:
 the events get `not_before` 30 s, then 2 min, then 10 min ahead (`BACKOFF_S`, `events.py`) and are
 tried again; the fourth failure ends them `gave_up` with the reason. The runner skips an event
 that is not due yet and arms its alarm for the earliest `not_before`, so a backing-off event lets
 later ones run and a new say from the person still starts at once. A `gave_up` event rides the
 next `done` turn the person is in (one with a say), once: it keeps its reason, is shown as a
-`gave_up="true"` fact block (a say shows only its words, never its settings) and is then handled.
-`unanswered` is the end reason when no body is ready.
+`gave_up="true"` fact block and is then handled. One whose request was saved (`resume`) is named
+like a retried event, a say by its first line, since its words are in the history already; one
+that never reached a save shows its facts in full, a say only its words, never its settings.
 
 **Retried events.** A row that a failed turn left is a resume: its words are already in the
 history, so the next turn gets a marked fact block instead, `resume="true"
-reason=error|step_cap|restart`, with the kind, `at` and the kind's note. A say shows only its first
+reason=error|step_cap|restart|stop`, with the kind, `at` and the kind's note (an empty mark is
+left out). Only an event with a saved chat row (`messages.event_id`) is marked `resume`. A say shows only its first
 line, cut at 80 characters. These marks, the `gave_up` marks, the interruption and interjection
 lead blocks and the ear note are for that turn only and are never saved, so a retried say gains no
 second row. Two cases are accepted: a rider carried by an errored or cancelled turn can be told
@@ -2522,23 +2524,29 @@ again in full.
 **History is saved each step.** `Session._save_new` runs when the turn starts (after its task
 exists), after every tool round through `on_step`, and at the turn's end. Each taken event gets its
 own `user` row with its `event_id` and `source`; a tool result is a row with neither. A wordless
-cancel marks every row of its request `cut` (`set_cut(ids)`). See
+cancel marks every row of its request `cut` (`set_cut(ids)`). A retry's message is turn-only
+(its resume facts), so when a wordless cancel stops a retry whose failed try saved nothing after
+its request, the cut covers the request's saved rows (found by `event_id`) and the history drops
+that request too; otherwise it would be answered again. See
 [memory.md](memory.md#saved-chat).
 
 ### Start-up and shutdown
 
 - **Start.** In `Session.__init__`, in one transaction: `EventLog.recover()`, the work resume scan
   and the news it settles. A recovered event was `taken` when the brain died, so it counts as a
-  failed attempt (the fourth time gives it up, which ends a crash loop), comes back `new` with
-  `resume` set, `end_reason` `restart` and no wait. Events an interjection held go back to `new`
+  failed attempt (the fourth time gives it up, which ends a crash loop) and comes back `new`
+  with `end_reason` `restart` and no wait; it is marked `resume` only when its request was saved,
+  so one that died before the save comes back in full. Events an interjection held go back to `new`
   with no attempt counted. Orphan `card_answer` rows are handled. Next to the work sweep,
   `EventLog.sweep(keep_days)` deletes handled events older than `TAGALONG_WORK_KEEP_DAYS`; events
   that are not handled are kept.
 - **Shutdown.** `session.stop_turn()` runs first in `main.py`'s `finally`. It stops the runner
   (the turn's events go back to `new`, no attempt), cancels the running turn and waits up to 5 s
-  for it, so its end saves its steps. Unless the turn was a wordless cancel (nothing saved), or it
-  did not end in time, its events are marked `resume`, so the restart names them instead of
-  sending the words again. The existing order follows; `memory.close` comes last. A clean quit
+  for it, so its end saves its steps. Its events are then marked `resume` (reason `stop`), so
+  the restart names them instead of sending the words again, unless the turn was a wordless
+  cancel (its request is saved but marked `cut`, so a restart skips it). A turn that did not end
+  in the 5 s is marked too, since its request was saved when it started. Only events with a saved
+  chat row are marked. The existing order follows; `memory.close` comes last. A clean quit
   still posts `job_ended` for the jobs it stops.
 
 **An expert's question Scout cannot answer.** With no key, or the budget spent, a waiting
