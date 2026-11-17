@@ -2,7 +2,7 @@
  * Home's Tasks page: the work Scout has on its plate. A title, the Now card (what is live), then three tabs with counts read
  * from the brain (Jobs, Waiting news and mail loops, Timers). Opening a job (Watch on a row) shows its page
  * in place of everything, and Back returns to the tab. The brain owns all of it; this reads the
- * counts and timers and reads again when it says `jobs`, `loops` or `timers` changed.
+ * counts and timers and reads again when it says `jobs`, `events` or `timers` changed.
  * Contains TasksView.
  */
 import { useCallback, useEffect, useState } from 'react';

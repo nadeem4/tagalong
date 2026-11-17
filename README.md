@@ -276,7 +276,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   another when the brain starts. A single
   Scout turn is also stopped after 300 seconds unless `TAGALONG_TURN_TIMEOUT_S` sets another;
   The turn then ends with an error (Scout writes nothing of its own). Time spent in tools, or waiting for you to answer, does not count.
-- **Tasks**: the page for what Scout is doing now (waiting asks, running jobs, mail being read, timers about to fire) with three tabs: Jobs, Waiting (news Scout has not told yet, a mark on any it gave up on, then the mail loops) and Timers (with Cancel).
+- **Tasks**: the page for what Scout is doing now (waiting asks, running jobs, mail being read, timers about to fire) with three tabs: Jobs, Waiting (news Scout has not told yet, a mark on any it gave up on, then the mail loops; it updates by itself as news arrives and is told) and Timers (with Cancel).
 - **Jobs**: the jobs Scout has handed to Claude Code, with **Watch** (a read-only log of its steps),
   **Stop** for a running one and **Show result** for a finished one. Claude Code must be installed and signed in on this computer.
   A job has no time limit; if one shows no new step or message for 20 minutes (`TAGALONG_JOB_QUIET_MIN`), Scout is woken to decide whether to wait, check on it or ask you. Scout is also woken
