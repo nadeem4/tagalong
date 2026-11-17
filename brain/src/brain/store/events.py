@@ -1,0 +1,101 @@
+"""The `events` table: the SQL of the durable in queue every input is saved to first.
+
+No function opens its own transaction; callers wrap with `db.transaction` when they need one.
+The payload arrives already masked: this module only stores it.
+"""
+
+import json
+import sqlite3
+from dataclasses import dataclass, field
+
+_COLS = (
+    "id, kind, at, source, caused_by, payload_json, state, attempts, not_before, "
+    "turn_id, end_reason, resume"
+)
+
+
+@dataclass(frozen=True)
+class EventRow:
+    id: str
+    kind: str
+    at: str
+    source: str
+    caused_by: str | None = None
+    payload: dict = field(default_factory=dict)
+    state: str = "new"
+    attempts: int = 0
+    not_before: str | None = None
+    turn_id: str | None = None
+    end_reason: str | None = None
+    resume: bool = False
+
+
+def _row(r: tuple) -> EventRow:
+    return EventRow(
+        id=r[0], kind=r[1], at=r[2], source=r[3], caused_by=r[4], payload=json.loads(r[5]),
+        state=r[6], attempts=r[7], not_before=r[8], turn_id=r[9], end_reason=r[10],
+        resume=bool(r[11]),
+    )  # fmt: skip
+
+
+def insert(db: sqlite3.Connection, row: EventRow) -> bool:
+    """False when the id exists: a retried say is one event, never two."""
+    cur = db.execute(
+        f"INSERT OR IGNORE INTO events({_COLS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        (
+            row.id, row.kind, row.at, row.source, row.caused_by, json.dumps(row.payload),
+            row.state, row.attempts, row.not_before, row.turn_id, row.end_reason,
+            int(row.resume),
+        ),
+    )  # fmt: skip
+    return cur.rowcount == 1
+
+
+def get(db: sqlite3.Connection, id: str) -> EventRow | None:
+    r = db.execute(f"SELECT {_COLS} FROM events WHERE id=?", (id,)).fetchone()
+    return None if r is None else _row(r)
+
+
+def list_new(db: sqlite3.Connection, now: str) -> list[EventRow]:
+    rows = db.execute(
+        f"SELECT {_COLS} FROM events WHERE state='new' AND (not_before IS NULL OR not_before<=?) "
+        "ORDER BY at, rowid",
+        (now,),
+    ).fetchall()
+    return [_row(r) for r in rows]
+
+
+def set_taken(db: sqlite3.Connection, ids: list[str], turn_id: str) -> list[str]:
+    """Move only rows still `new`, so two takers never share an event; returns what moved."""
+    moved = []
+    for id in ids:
+        cur = db.execute(
+            "UPDATE events SET state='taken', turn_id=? WHERE id=? AND state='new'", (turn_id, id)
+        )
+        if cur.rowcount:
+            moved.append(id)
+    return moved
+
+
+def set_state(
+    db: sqlite3.Connection, ids: list[str], state: str, *, end_reason: str | None, at: str
+) -> None:
+    done = at if state in ("handled", "gave_up") else None
+    for id in ids:
+        db.execute(
+            "UPDATE events SET state=?, end_reason=?, handled_at=? WHERE id=?",
+            (state, end_reason, done, id),
+        )
+
+
+def chain(db: sqlite3.Connection, id: str, limit: int = 20) -> list[EventRow]:
+    """This event, then what caused it, and so on; stops at a missing parent or the limit."""
+    out: list[EventRow] = []
+    cur: str | None = id
+    while cur is not None and len(out) < limit:
+        row = get(db, cur)
+        if row is None:
+            break
+        out.append(row)
+        cur = row.caused_by
+    return out
