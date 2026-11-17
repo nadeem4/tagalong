@@ -5,7 +5,9 @@ event with no body to tell it waits instead of being dropped. Pure pieces run on
 from datetime import UTC, datetime, timedelta
 
 from brain.bodies import Bodies
+from brain.builtin_guards import daily_budget_on_emit, wake_caps
 from brain.events import Event, EventLog
+from brain.guards import Guards
 from brain.masking import Masker
 from brain.presence import Presence
 from brain.runner import GROUP_CAP, Runner, pick
@@ -79,16 +81,32 @@ class FakeBodies(Bodies):
         return [b for b in self.online if b in self.display]
 
 
-class Rig:
-    def __init__(self, online=("desktop", "browser"), display=("desktop",)) -> None:
-        self.bodies = FakeBodies(list(online), list(display))
-        self.presence = Presence(self.bodies, lambda: T0)
-        db = open_db(":memory:")
-        self.log = EventLog(db, Masker(lambda: []), lambda: T0)
-        self.runner = Runner(self.log, self.presence, self.bodies, None, lambda: T0, None)
+class Budget:
+    def __init__(self) -> None:
+        self.open = True
 
-    def post(self, kind: str, source: str, id: str) -> EventRow:
-        self.log.post(Event(kind, source, {}, id=id))
+    def allows(self) -> bool:
+        return self.open
+
+
+class Rig:
+    def __init__(self, online=("desktop", "browser"), display=("desktop",), quiet=None) -> None:
+        self.t = T0  # the rig's clock; tests move it
+        self.budget = Budget()
+        guards = Guards()
+        guards.add(daily_budget_on_emit(self.budget))
+        guards.add(wake_caps(100))
+        self.bodies = FakeBodies(list(online), list(display))
+        self.presence = Presence(self.bodies, lambda: self.t)
+        db = open_db(":memory:")
+        self.log = EventLog(db, Masker(lambda: []), lambda: self.t)
+        self.runner = Runner(
+            self.log, self.presence, self.bodies, None, lambda: self.t, guards, quiet
+        )
+
+    def post(self, kind: str, source: str, id: str, at: int | None = None) -> EventRow:
+        when = None if at is None else T0 + timedelta(seconds=at)
+        self.log.post(Event(kind, source, {}, id=id, at=when))
         row = self.log.get(id)
         assert row is not None
         return row
@@ -152,3 +170,90 @@ def test_equal_times_keep_arrival_order():
     got = pick(ready, to("desktop"), always)
     assert got is not None
     assert [e.id for e in got.events] == ["first", "second", "third"]
+
+
+def test_idle_news_waits_10s_after_a_say():
+    rig = Rig()
+    say = rig.post("say", "desktop", "s1")
+    news = rig.post("job_quiet", "job:1", "n1")  # idle, no batching
+    assert rig.runner.gate(news)
+    rig.runner.record_take([say])
+    assert not rig.runner.gate(news)
+    rig.t = T0 + timedelta(seconds=10)
+    assert rig.runner.gate(news)
+
+
+def test_next_pause_news_waits_while_any_speech_is_on():
+    rig = Rig()
+    news = rig.post("timer", "timer:1", "n1")  # next_pause
+    rig.presence.speech("desktop", "talking")
+    assert not rig.runner.gate(news)
+    rig.presence.speech("desktop", "idle")
+    assert rig.runner.gate(news)
+
+
+def test_idle_news_waits_while_speech_is_on():
+    rig = Rig()
+    news = rig.post("job_quiet", "job:1", "n1")
+    rig.presence.speech("desktop", "talking")
+    assert not rig.runner.gate(news)
+
+
+def test_quiet_hours_hold_news_but_not_says():
+    rig = Rig(quiet=lambda _at: True)
+    assert not rig.runner.gate(rig.post("timer", "timer:1", "n1"))
+    assert rig.runner.gate(rig.post("say", "desktop", "s1"))
+    assert rig.runner.gate(rig.post("card_answer", "desktop", "c1"))
+    # a kind with no hourly cap (an expert's question) is never held for quiet hours
+    assert rig.runner.gate(rig.post("job_question", "job:1", "q1"))
+
+
+def test_a_spent_budget_holds_news_but_not_says():
+    rig = Rig()
+    rig.budget.open = False
+    assert not rig.runner.gate(rig.post("timer", "timer:1", "n1"))
+    assert rig.runner.gate(rig.post("say", "desktop", "s1"))
+
+
+def test_a_capped_kind_waits_and_is_not_dropped():
+    rig = Rig()
+    news = rig.post("timer", "timer:1", "n1")  # 6 an hour
+    for i in range(6):
+        rig.runner.record_take([rig.post("timer", f"timer:{i}", f"t{i}")])
+    assert not rig.runner.gate(news)
+    kept = rig.log.get("n1")
+    assert kept is not None
+    assert (kept.state, kept.attempts) == ("new", 0)
+    rig.t = T0 + timedelta(hours=1, seconds=1)
+    assert rig.runner.gate(news)
+
+
+def test_batch_seconds_delays_only_the_oldest_of_a_kind():
+    rig = Rig()
+    first = rig.post("job_ended", "job:1", "a", at=0)  # batches 30 s
+    second = rig.post("job_ended", "job:2", "b", at=20)
+    rig.t = T0 + timedelta(seconds=25)
+    assert not rig.runner.gate(first)
+    assert not rig.runner.gate(second)
+    rig.t = T0 + timedelta(seconds=31)  # the oldest has waited 30 s; the newer rides with it
+    assert rig.runner.gate(first)
+    assert rig.runner.gate(second)
+
+
+def test_a_closed_gate_does_not_use_up_the_cap():
+    rig = Rig()
+    for i in range(5):
+        rig.runner.record_take([rig.post("timer", f"timer:{i}", f"t{i}")])
+    news = rig.post("timer", "timer:9", "n1")
+    for _ in range(10):  # checking is free: the wake is recorded only when a take succeeds
+        assert rig.runner.gate(news)
+    rig.runner.record_take([news])
+    assert not rig.runner.gate(rig.post("timer", "timer:10", "n2"))
+
+
+def test_a_turn_with_many_events_of_a_kind_is_one_wake():
+    rig = Rig()
+    rig.runner.record_take([rig.post("timer", f"timer:{i}", f"t{i}") for i in range(3)])
+    for i in range(2):
+        rig.runner.record_take([rig.post("timer", f"timer:x{i}", f"x{i}")])
+    assert rig.runner.gate(rig.post("timer", "timer:9", "n1"))  # 3 wakes, not 5, cap is 6
