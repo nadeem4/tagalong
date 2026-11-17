@@ -163,7 +163,7 @@ def load_notes() -> dict[str, str]:
 # focus, tab, download and setup_progress are latest-value facts and are never stored.
 SAVED_KINDS = frozenset(k.name for k in _KINDS if k.wakes) | {"say", "card_answer"}
 
-_INTERNAL_SOURCES = frozenset({"timer", "setup", "scout"})
+_INTERNAL_SOURCES = frozenset({"scout"})  # the rest are `kind:id`, internal by the ":" rule
 
 
 def is_internal(source: str) -> bool:
@@ -189,6 +189,8 @@ class EventLog:
         if event.kind not in EVENT_KINDS:
             raise ValueError(f"unknown event kind {event.kind!r}")
         if event.kind not in SAVED_KINDS:
+            if then is not None:  # nothing would run it: refuse rather than drop the write
+                raise ValueError(f"event kind {event.kind!r} is not saved, so `then` cannot run")
             return True
         payload = self._mask(event.payload)
         at = utc_text(event.at or self._now())

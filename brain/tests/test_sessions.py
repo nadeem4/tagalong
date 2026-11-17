@@ -10,10 +10,11 @@ import re
 from types import SimpleNamespace
 
 import pytest
+from event_log import make_session
 from job_rows import add_timer, records_for
 
 from brain.bodies import Bodies
-from brain.events import EventKind, EventLog
+from brain.events import EventKind
 from brain.experts import PermissionOption, PermissionRequest, Question, QuestionField, QuietFacts
 from brain.jobs import JobError
 from brain.masking import Masker
@@ -73,8 +74,7 @@ def make(model, memory=None, kinds=NO_WAIT, now=None, bodies=None, masker=None):
     bodies.notify = lambda m, p: sent.append((m, p))
     now = now or (lambda: datetime.datetime(2026, 1, 1, 9, 0, tzinfo=datetime.UTC))
     memory = memory or Memory(":memory:")
-    events = EventLog(memory.db, masker or Masker(lambda: []), now)
-    session = Session(
+    session = make_session(
         model,
         Open(),
         bodies,
@@ -83,7 +83,6 @@ def make(model, memory=None, kinds=NO_WAIT, now=None, bodies=None, masker=None):
         now=now,
         kinds=kinds,
         masker=masker,
-        events=events,
     )
     return session, sent
 
@@ -312,7 +311,7 @@ async def test_system_prompt_carries_the_capability_picture_of_live_state():
 
     model = Gate(["hi"])
     bodies = Bodies()
-    session = Session(
+    session = make_session(
         model,
         Open(),
         bodies,
@@ -338,7 +337,7 @@ async def test_system_prompt_carries_the_capability_picture_of_live_state():
 async def test_a_tool_set_off_is_absent_from_the_capability_picture():
     model = Gate(["hi"])
     bodies = Bodies()
-    session = Session(
+    session = make_session(
         model,
         Open(),
         bodies,
@@ -1234,7 +1233,7 @@ async def test_spent_budget_starts_no_wake_and_leaves_the_job_unreported():
     sent = []
     bodies.notify = lambda m, p: sent.append((m, p))
     memory = Memory(":memory:")
-    session = Session(Gate(["never"]), Broke(), bodies, 10, memory)
+    session = make_session(Gate(["never"]), Broke(), bodies, 10, memory)
     join(session, "desktop")
     session.jobs._on_finished(end_job(memory))
     await settle()
@@ -1723,7 +1722,7 @@ async def test_budget_spent_falls_back_to_the_user_card():
 
     bodies = Bodies()
     bodies.notify = lambda m, p: None
-    session = Session(
+    session = make_session(
         Gate(["never"]), Broke(), bodies, 10, Memory(":memory:"), kinds=QUESTION_KINDS
     )
     join(session, "desktop")
@@ -1750,7 +1749,7 @@ async def test_question_is_not_counted_against_the_global_cap():
     bodies = Bodies()
     bodies.notify = lambda m, p: None
     model = Reactive(["hi", answer_step(), "ok"])
-    session = Session(model, Open(), bodies, 10, Memory(":memory:"), wakes_per_hour=1)
+    session = make_session(model, Open(), bodies, 10, Memory(":memory:"), wakes_per_hour=1)
     join(session, "desktop")
     session.body_event("desktop", "back", {"idle_seconds": 600})  # uses the only wake
     await idle(session)
@@ -1763,7 +1762,7 @@ async def test_answer_to_an_expired_expert_ask_says_it_expired():
     bodies = Bodies()
     bodies.notify = lambda m, p: None
     memory = Memory(":memory:")
-    session = Session(Reactive(["hi"]), Open(), bodies, 10, memory)
+    session = make_session(Reactive(["hi"]), Open(), bodies, 10, memory)
     item = session.items.open("expert_ask", "brain", live_only=True, job_id="j1")
     session.items.expire_live_only(job_id="j1")  # its expert is gone
     with pytest.raises(RpcError, match="expired") as err:
@@ -1774,7 +1773,7 @@ async def test_answer_to_an_expired_expert_ask_says_it_expired():
 async def test_answer_to_an_expired_scout_ask_keeps_the_plain_not_found():
     bodies = Bodies()
     bodies.notify = lambda m, p: None
-    session = Session(Reactive(["hi"]), Open(), bodies, 10, Memory(":memory:"))
+    session = make_session(Reactive(["hi"]), Open(), bodies, 10, Memory(":memory:"))
     item = session.items.open("ask", "brain")
     session.items.expire(item.id, "deadline")
     with pytest.raises(RpcError, match="no open ask"):
@@ -1792,7 +1791,7 @@ async def test_session_passes_the_turn_timeout():
     bodies = Bodies()
     sent = []
     bodies.notify = lambda m, p: sent.append((m, p))
-    session = Session(Stall(), Open(), bodies, 10, Memory(":memory:"), turn_timeout=0.05)
+    session = make_session(Stall(), Open(), bodies, 10, Memory(":memory:"), turn_timeout=0.05)
     await session.say("desktop", say("hi"))
     await idle(session)
     assert sent[-1][1]["state"] == "ended" and sent[-1][1]["reason"] == "error"
@@ -1828,7 +1827,7 @@ async def test_session_shares_one_guards_with_dispatcher_and_loop():
     bodies.notify = lambda m, p: sent.append((m, p))
     memory = Memory(":memory:")
     model = Gate(["never"])
-    session = Session(model, Broke(), bodies, 10, memory)
+    session = make_session(model, Broke(), bodies, 10, memory)
     join(session, "desktop")
     assert session.guards is session.dispatcher._guards
     await session.say("desktop", say("hi"))

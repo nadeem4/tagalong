@@ -11,6 +11,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
+from event_log import make_session
 from fake_clock import FakeClock
 from job_rows import add_timer, records_for
 from test_jobs import HANG, FakeAsks, FakeBridge, installed, make_rig  # noqa: F401 (fixture)
@@ -42,7 +43,6 @@ from brain.jobs import JobError
 from brain.memory import Memory
 from brain.mind.turn import Final
 from brain.protocol import Body, RpcError
-from brain.sessions import Session
 
 TIMER = {"timer": EventKind("timer", batch_seconds=0, max_per_hour=6)}
 
@@ -196,7 +196,7 @@ async def test_3b_an_open_hand_off_card_does_not_block_new_says_and_news(tmp_pat
     bodies, sent = Bodies(), []
     bodies.notify = lambda m, p: sent.append((m, p))
     memory = Memory(":memory:")
-    session = Session(
+    session = make_session(
         model, Open(), bodies, 10, memory, kinds=NO_WAIT,
         make_run=make_run, experts=lambda: [installed()],
     )  # fmt: skip
@@ -415,7 +415,7 @@ class Chatty:
 )
 async def test_6e_a_body_that_was_away_during_a_long_reply_can_catch_up():
     bodies = Bodies()
-    session = Session(Chatty(), Open(), bodies, 10, Memory(":memory:"), kinds=NO_WAIT)
+    session = make_session(Chatty(), Open(), bodies, 10, Memory(":memory:"), kinds=NO_WAIT)
     peer = RecordingPeer()
     desk = Body(id="desktop", kind="desktop", name="PC")
     bodies.connect(desk, [], peer, None)

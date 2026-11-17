@@ -312,7 +312,9 @@ def test_origin_body_walks_to_the_first_body(log):
     assert log.origin_body("e2", lambda s: not is_internal(s)) == "browser"
 
 
-@pytest.mark.parametrize("source", ["timer", "setup", "scout", "job:x", "loop:gmail", "tool:x"])
+@pytest.mark.parametrize(
+    "source", ["scout", "timer:t1", "setup:s1", "job:x", "loop:gmail", "tool:x"]
+)
 def test_is_internal(source):
     assert is_internal(source)
 
@@ -325,6 +327,12 @@ def test_is_not_internal(source):
 def test_an_unsaved_kind_is_not_stored(log):
     assert log.post(Event("focus", "desktop", {"app": "x"})) is True
     assert log.ready() == []
+
+
+def test_then_with_an_unsaved_kind_is_refused(log):
+    # Nothing would run `then`, so a caller relying on it would silently lose its write.
+    with pytest.raises(ValueError):
+        log.post(Event("focus", "desktop", {}), then=lambda db: None)
 
 
 def test_take_and_finish(log):

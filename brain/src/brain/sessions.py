@@ -161,6 +161,8 @@ class Session:
         bodies: Bodies,
         step_cap: int,
         memory: Memory,
+        *,
+        events: EventLog,
         now: Callable[[], datetime] = lambda: datetime.now().astimezone(),
         make_run: Callable[..., ExpertRun] | None = None,
         experts: Callable[[], list[InstalledExpert]] | None = None,
@@ -185,7 +187,6 @@ class Session:
         work_keep_days: int = DEFAULT_WORK_KEEP_DAYS,
         outputs_keep: int = DEFAULT_OUTPUTS_KEEP,
         know_sources: list | None = None,  # tests pass fakes; None reads GitHub, PDF and the web
-        events: EventLog | None = None,  # None: one over the same db (tests build Session directly)
     ) -> None:
         self._model = model
         self.reading = ReadingStore()  # how the connected body reads the screen, for Home
@@ -211,8 +212,7 @@ class Session:
             self.guards.add(mask_secrets(masker))
         memory.mask = lambda text: mask_json(self.guards, "memory", text)
         # Everything said to Scout and every wake is saved here before anything acts on it.
-        # The fallback is for tests only: main always passes the one log.
-        self.events = events or EventLog(memory.db, masker or Masker(lambda: []), now)
+        self.events = events
         # Long tool results and expert reports reach the model as a capped preview; the full text
         # is stored masked for read_output. At startup finished work goes first (with the reports
         # it points at), then the oldest outputs nothing points at.
@@ -372,7 +372,7 @@ class Session:
             now,
             approvals,
             self._turn_origin,
-            lambda: self._turn_cause,
+            lambda turn: self._turn_cause if turn and turn == self._turn_id else None,
         )
         self._asks.on_item_answer = self._post_card_answer
         self.toolbox = Toolbox(
@@ -1372,6 +1372,7 @@ class Session:
                 self._append_user([b for s in self._inbox for b in s])
                 self._inbox.clear()
             self._turn_id = None
+            self._turn_cause = None  # a later outside-turn ask must not inherit this say's cause
             self._turn_job = None
             self._owner_turn = False
             self._task = None

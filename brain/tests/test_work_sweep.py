@@ -6,10 +6,10 @@ Real temp database, hand-moved clock; no provider is involved.
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from event_log import make_session
 
 from brain.bodies import Bodies
 from brain.memory import Memory
-from brain.sessions import Session
 from brain.store.db import open_db
 from brain.store.outputs import get_output, prune_outputs, put_output
 from brain.store.work import ActivityEntry, WorkStore
@@ -133,7 +133,7 @@ async def test_session_sweeps_and_prunes_at_start(tmp_path, clock):
     clock.days(10)
     bodies = Bodies()
     bodies.notify = lambda m, p: None
-    Session(object(), _Open(), bodies, 10, mem, now=clock, work_keep_days=5, outputs_keep=1)
+    make_session(object(), _Open(), bodies, 10, mem, now=clock, work_keep_days=5, outputs_keep=1)
     assert _count(mem.db, "work") == 0
     assert _count(mem.db, "tool_outputs") == 0
     mem.close()

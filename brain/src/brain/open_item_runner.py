@@ -62,9 +62,9 @@ class AskRunner:
         now: Callable[[], datetime],
         approvals: Approvals,
         origin: Callable[[str], str] = lambda turn: BRAIN,
-        cause: Callable[[], str | None] = lambda: None,
+        cause: Callable[[str], str | None] = lambda turn: None,
     ) -> None:
-        self._cause = cause  # the event the asking turn took: what the ask's news is caused by
+        self._cause = cause  # turn id -> the event that turn took, None outside it: the ask's cause
         self._origin = origin  # the body showing a turn: where its asks' answers and news go back
         self._items = items
         self._asks = asks
@@ -85,7 +85,12 @@ class AskRunner:
         raw = {"name": call.name, "input": call.input, "text": call.text}
         saved = self._approvals.mask(raw)
         # A call with a secret in it is saved masked, so it cannot be run from the copy.
-        saved = {**saved, "source": req.source, "masked": saved != raw, "cause": self._cause()}
+        saved = {
+            **saved,
+            "source": req.source,
+            "masked": saved != raw,
+            "cause": self._cause(call.turn),
+        }
         item = self._items.find_open(KIND, {"name": saved["name"], "input": saved["input"]})
         if item is not None:
             return item
@@ -311,7 +316,6 @@ class AskRunner:
                 for i in back
             ]
             facts: dict[str, str | int] = {"count": len(asks), "asks": json.dumps(asks)}
-            # no caused_by on purpose: aggregate news, no single cause
             # no caused_by on purpose: aggregate news, no single cause
             self._emit(Event("asks_waiting", "scout", facts))
 

@@ -91,7 +91,7 @@ class Rig:
             lambda event, **kw: self.events.append(event),
             lambda: self.clock[0],
             self.approvals,
-            cause=lambda: "evt-ask-turn",
+            cause=lambda turn: "evt-ask-turn" if turn == "t1" else None,
         )
         self.asks.on_item_answer = self.runner.answered
         self.box = Toolbox(
@@ -512,12 +512,23 @@ async def test_ask_ended_is_caused_by_the_asking_turn():
     assert (ended.kind, ended.source, ended.caused_by) == ("ask_ended", "scout", "evt-ask-turn")
 
 
+async def test_an_ask_outside_a_turn_saves_no_cause():
+    # An expert's app call reaches the runner with turn "": it must not borrow a say's cause.
+    rig = Rig()
+    await rig.box.run(call(turn=""))
+    [card] = rig.opened()
+    rig.asks.answer(card["id"], "allow", "desktop")
+    await rig.settle()
+    [ended] = rig.events
+    assert ended.caused_by is None
+
+
 async def test_the_saved_cause_survives_a_restart():
     rig = Rig()
     await rig.box.run(call())
     [card] = rig.opened()
     again = Rig(rig.memory, clock=rig.clock)
-    again.runner._cause = lambda: "other-turn"  # a new process has a different current turn
+    again.runner._cause = lambda turn: "other-turn"  # a new process has a different current turn
     again.runner.start()
     again.runner.answered(card["id"], "allow", "desktop")
     await again.settle()

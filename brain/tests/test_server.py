@@ -11,6 +11,7 @@ import logging
 from types import SimpleNamespace
 
 import pytest
+from event_log import make_session
 from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed
 
@@ -64,7 +65,7 @@ class KeylessModel:
 async def env(tmp_path):
     bodies = Bodies()
     keys = KeySettings(tmp_path, KeylessModel(), bodies.notify, "none", fake_check)
-    session = Session(
+    session = make_session(
         ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"), keys=keys
     )
     server = await start_server("127.0.0.1", 0, bodies, "s1", session)
@@ -100,7 +101,7 @@ async def test_hello_ok(env):
 
 async def test_hello_result_carries_version_and_build(tmp_path):
     bodies = Bodies()
-    session = Session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
+    session = make_session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
     server = await start_server("127.0.0.1", 0, bodies, "s1", session, ("0.1.0", "abc123abc123"))
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     try:
@@ -193,7 +194,7 @@ async def test_unbuilt_request_is_method_not_found(env):
 
 async def event_env():
     bodies = Bodies()
-    session = Session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
+    session = make_session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
     seen = []
     session.body_event = lambda body_id, name, data: seen.append((body_id, name, data))
     server = await start_server("127.0.0.1", 0, bodies, "s1", session)
@@ -228,7 +229,7 @@ class _Recorder:
 async def test_speech_state_frames_feed_the_dispatcher():
     rec = _Recorder()
     bodies = Bodies()
-    session = Session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
+    session = make_session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
     session.dispatcher.set_speech_state = rec.set_speech_state
     session.dispatcher.speech_body_gone = rec.speech_body_gone
     server = await start_server("127.0.0.1", 0, bodies, "s1", session)
@@ -263,7 +264,7 @@ async def test_speech_state_frames_feed_the_dispatcher():
 
 async def test_a_reconnect_clears_the_old_connections_speech_state():
     bodies = Bodies()
-    session = Session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
+    session = make_session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
     server = await start_server("127.0.0.1", 0, bodies, "s1", session)
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     try:
@@ -391,7 +392,7 @@ class Open:
 async def chat():
     gate = asyncio.Event()
     bodies = Bodies()
-    session = Session(ScriptedModel(gate), Open(), bodies, 10, Memory(":memory:"))
+    session = make_session(ScriptedModel(gate), Open(), bodies, 10, Memory(":memory:"))
     server = await start_server("127.0.0.1", 0, bodies, "s1", session)
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     yield url, gate
@@ -493,7 +494,7 @@ class ToolModel:
 async def tool_env():
     model = ToolModel()
     bodies = Bodies()
-    session = Session(model, Open(), bodies, 10, Memory(":memory:"))
+    session = make_session(model, Open(), bodies, 10, Memory(":memory:"))
     server = await start_server("127.0.0.1", 0, bodies, "s1", session)
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     yield url, model
@@ -595,7 +596,7 @@ def hello_with_click(last_seq=None, body=DESKTOP, req_id=1):
 async def ask_env():
     model = ToolModel(tool="desktop__click")
     bodies = Bodies()
-    session = Session(model, Open(), bodies, 10, Memory(":memory:"))
+    session = make_session(model, Open(), bodies, 10, Memory(":memory:"))
     server = await start_server("127.0.0.1", 0, bodies, "s1", session)
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     yield url, model
@@ -939,7 +940,7 @@ async def test_slow_call_does_not_block_a_use_response(tool_env, monkeypatch):
 
 async def test_answer_text_reaches_the_ask():
     bodies = Bodies()
-    session = Session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
+    session = make_session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
     server = await start_server("127.0.0.1", 0, bodies, "s1", session)
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     try:
@@ -988,7 +989,7 @@ def notification(method, params):
 
 async def voice_env(voice=None):
     bodies = Bodies()
-    session = Session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
+    session = make_session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
     session.voice = voice
     server = await start_server("127.0.0.1", 0, bodies, "s1", session)
     return server, f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
@@ -1174,7 +1175,7 @@ async def test_without_a_voice_listen_is_method_not_found_and_notifications_are_
 
 async def test_a_body_disconnect_drops_its_reading():
     bodies = Bodies()
-    session = Session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
+    session = make_session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
     server = await start_server("127.0.0.1", 0, bodies, "s1", session)
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     row = {

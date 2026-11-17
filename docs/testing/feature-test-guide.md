@@ -3050,7 +3050,7 @@ Automated: `brain/tests/test_prompt.py` (the asked-topics line lists tags only, 
 
 Automated: `brain/tests/test_events.py`, `test_store_events.py`, `test_sessions.py` and `test_timers.py`.
 
-- A say is saved in the `events` table before its turn starts; the same say id sent twice is one row. Text in a payload is masked before it is saved.
+- A say is saved in the `events` table before its turn starts; the same say id sent twice is one row (still answered twice until T1b). Text in a payload is masked before it is saved.
 - A timer that fires is saved with its event in one transaction; cancelling a fired timer that was not yet told ends its news, so Scout is not woken for it.
 - `ask_ended` carries the `caused_by` of the turn that asked.
 
