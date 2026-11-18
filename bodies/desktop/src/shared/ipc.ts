@@ -62,6 +62,7 @@ export const IPC = {
   loopsWipe: 'tagalong:loops:wipe',
   timersState: 'tagalong:timers:state',
   timersCancel: 'tagalong:timers:cancel',
+  eventsWaiting: 'tagalong:events:waiting',
   bodiesState: 'tagalong:bodies:state',
   whatsappSet: 'tagalong:bodies:whatsapp-set',
   listJobs: 'tagalong:jobs:list',

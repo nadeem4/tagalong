@@ -24,6 +24,7 @@ from brain.bridges import ENTRY, WHATSAPP_SECRETS, BridgeSupervisor, private_nod
 from brain.build_info import app_version, build_id
 from brain.config import in_quiet_hours, load_config, load_env_file, session_id
 from brain.events import EventLog
+from brain.events_tools import events_tools
 from brain.experts import ExpertHosts
 from brain.guardrails import Budget
 from brain.lifecycle import clear_pid, real_started, write_pid
@@ -161,6 +162,7 @@ async def _run() -> None:
     inspect_machine = partial(inspect, config.data_dir)
     setup_items = OpenItems(memory.db, lambda: datetime.now(UTC))  # install and sign-in cards
     events = EventLog(memory.db, masker, lambda: datetime.now().astimezone())
+    events.on_change = lambda: bodies.notify("changed", {"what": "events"})
     # Setup news waits in the event log until a turn tells it; the session exists later.
     emit_event = SetupEvents(lambda event: session.post_event(event), events.finish_matching).emit
     logins = LoginDriver(
@@ -280,6 +282,7 @@ async def _run() -> None:
             lambda: [(r.id, r.name) for r in memory.list_apps()],
             OpenItems(memory.db, lambda: datetime.now(UTC)),
         )
+        + events_tools(memory.db, lambda: datetime.now(UTC))
         + loop_tools(loops)
         + brain_status_tools(brain_status)
         + home_update_tools(updates)

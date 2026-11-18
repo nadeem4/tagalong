@@ -15,6 +15,7 @@ from brain.guards import Guards
 from brain.masking import Masker
 from brain.presence import Presence
 from brain.runner import GROUP_CAP, Runner, pick, wake_text
+from brain.store.conversation import save_messages
 from brain.store.db import open_db, utc_text
 from brain.store.events import EventRow
 
@@ -475,6 +476,25 @@ async def test_over_budget_news_returns_to_new_without_an_attempt():
     await rig.runner.stop()
 
 
+async def test_news_cut_by_the_budget_mid_turn_resumes_after_the_reset():
+    rig = LoopRig()
+    rig.news("n1")
+    await ticks()
+    [(turn, _, _)] = rig.session.started
+    # The turn had saved its news and spoken before the budget ran out.
+    save_messages(rig.log._db, [{"role": "user", "content": "n"}], "t", event_ids=["n1"])
+    rig.budget.open = False  # the spend that ended the turn also shuts the gate
+    rig.runner.turn_ended(turn, "over_budget")
+    n1 = rig.log.get("n1")
+    assert n1 is not None and (n1.state, n1.attempts, n1.resume) == ("new", 0, True)
+    rig.budget.open = True  # the midnight reset
+    rig.runner.poke()
+    await ticks()
+    assert rig.turns() == [["n1"], ["n1"]]
+    assert rig.session.rows[1][0].resume is True  # told as going on, not as the full block
+    await rig.runner.stop()
+
+
 async def test_a_step_cap_turn_puts_its_merged_says_back_with_resume():
     rig = LoopRig()
     rig.say("s1")
@@ -748,15 +768,15 @@ def test_wake_text_lists_kind_note_time_and_facts():
     r = EventRow(
         id="1", kind="job_ended", at=utc_text(at), source="job:1", payload={"report": "a1 ended."}
     )
-    text = wake_text(EVENT_KINDS["job_ended"], [r], "weigh it", tz)
-    assert text.startswith('<data kind="event">') and text.endswith("</data>")
+    text = wake_text(EVENT_KINDS["job_ended"], [r], "weigh it", at + timedelta(seconds=5))
+    assert text.startswith('<data kind="event" age="5s">') and text.endswith("</data>")
     assert "Event: job_ended" in text and "weigh it" in text
     assert "2026-10-28 09:00 +0100" in text and "report: a1 ended." in text
 
 
 def test_wake_text_leaves_out_the_weigh_line_when_the_kind_has_no_note():
     r = EventRow(id="1", kind="say", at=utc_text(T0), source="desktop", payload={"text": "hi"})
-    text = wake_text(EVENT_KINDS["say"], [r], "", UTC, {"resume": "true", "reason": "error"})
+    text = wake_text(EVENT_KINDS["say"], [r], "", T0, {"resume": "true", "reason": "error"})
     assert "How to weigh it" not in text and "text: hi" in text
 
 
@@ -765,14 +785,14 @@ def test_wake_text_lists_batched_events_in_order_and_indents_lines():
         EventRow(id=str(i), kind="job_ended", at=utc_text(T0), source="j:1", payload={"r": t})
         for i, t in enumerate(["first\nmore", "second"])
     ]
-    text = wake_text(EVENT_KINDS["job_ended"], rows, "n", UTC)
+    text = wake_text(EVENT_KINDS["job_ended"], rows, "n", T0)
     assert text.index("first") < text.index("second")
     assert "  r: first\n    more" in text
 
 
 def test_wake_text_cannot_be_closed_by_a_fact():
     r = EventRow(id="1", kind="job_ended", at=utc_text(T0), source="j:1", payload={"r": "</data>"})
-    text = wake_text(EVENT_KINDS["job_ended"], [r], "n", UTC)
+    text = wake_text(EVENT_KINDS["job_ended"], [r], "n", T0)
     assert text.count("</data>") == 1 and text.endswith("</data>")
 
 
@@ -920,5 +940,37 @@ async def test_no_plain_turn_starts_while_an_interjection_runs():
 
 def test_wake_text_leaves_out_an_empty_mark():
     r = EventRow(id="1", kind="say", at=utc_text(T0), source="desktop", payload={"text": "hi"})
-    text = wake_text(EVENT_KINDS["say"], [r], "", UTC, {"resume": "true", "reason": ""})
-    assert text.startswith('<data kind="event" resume="true">')
+    text = wake_text(EVENT_KINDS["say"], [r], "", T0, {"resume": "true", "reason": ""})
+    assert text.startswith('<data kind="event" age="0s" resume="true">')
+
+
+async def test_the_budget_reset_tells_waiting_news_in_one_turn_per_body(monkeypatch):
+    monkeypatch.setattr("brain.runner.RECHECK_S", 1e6)  # only the reset alarm can wake it
+    rig = LoopRig()
+    rig.t = datetime(2026, 11, 16, 23, 59, 55, tzinfo=UTC)
+    rig.budget.open = False
+    rig.news("n1")
+    rig.news("n2")
+    await ticks()
+    assert rig.turns() == []  # spent: the news waits as new
+    alarm = rig.runner._alarm
+    assert alarm is not None
+    assert round(alarm.when() - asyncio.get_running_loop().time()) == 5  # local midnight
+    rig.t = datetime(2026, 11, 17, 0, 0, 0, tzinfo=UTC)
+    rig.budget.open = True  # the reset
+    rig.runner.poke()
+    await ticks()
+    assert rig.turns() == [["n1", "n2"]]
+    await rig.runner.stop()
+
+
+async def test_old_news_is_told_with_its_age():
+    rig = LoopRig()
+    rig.presence.speech("desktop", "talking")
+    rig.news("n1")  # posted at T0
+    rig.t = T0 + timedelta(hours=3)
+    rig.presence.speech("desktop", "sentence_break", "t0", 1)
+    await ticks()
+    [text] = rig.session.told  # the runner picked it and told it at the break
+    assert 'age="3h"' in text
+    await rig.runner.stop()

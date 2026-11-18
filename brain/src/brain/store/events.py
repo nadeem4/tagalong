@@ -139,6 +139,18 @@ def list_state(db: sqlite3.Connection, state: str) -> list[EventRow]:
     return [_row(r) for r in rows]
 
 
+def list_waiting(db: sqlite3.Connection, news_kinds: list[str]) -> list[EventRow]:
+    """What Home shows as waiting: news still `new`, and anything given up, a say included, so
+    the person sees words Scout could not answer."""
+    marks = ",".join("?" * len(news_kinds))
+    rows = db.execute(
+        f"SELECT {_COLS} FROM events WHERE (state='new' AND kind IN ({marks}))"
+        " OR state='gave_up' ORDER BY at, rowid",
+        news_kinds,
+    ).fetchall()
+    return [_row(r) for r in rows]
+
+
 def next_not_before(db: sqlite3.Connection, now: str) -> str | None:
     """When the soonest backing-off event may be taken again; None when none waits."""
     return db.execute(

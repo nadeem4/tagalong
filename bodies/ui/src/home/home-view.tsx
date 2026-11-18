@@ -59,7 +59,7 @@ export interface HomeViewProps {
 
 /**
  * Home: the one window for everything. The companion in the corner, and seven pages: an
- * overview, its tasks (jobs, held mail, timers), the apps it can use, the places you can talk to it, what it may do alone and
+ * overview, its tasks (jobs, waiting news and mail, timers), the apps it can use, the places you can talk to it, what it may do alone and
  * what you approved, what it remembers, and the app's settings.
  */
 export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps) {

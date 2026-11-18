@@ -502,3 +502,59 @@ def test_recover_brings_back_a_say_whose_only_row_is_cut_in_full(tmp_path):
     log.recover()
     log.set_resume(["e1"])
     assert log.get("e1").resume is False
+
+
+def test_post_announces_a_change(log):
+    seen = []
+    log.on_change = lambda: seen.append(1)
+    log.post(Event("say", "desktop", {"text": "hi"}, id="s1"))
+    assert seen == [1]
+
+
+def test_a_state_change_announces_a_change(log):
+    log.post(Event("say", "desktop", {"text": "hi"}, id="s1"))
+    seen = []
+    log.on_change = lambda: seen.append(1)
+    log.take(["s1"], "t1")
+    log.finish(["s1"], "handled")
+    assert len(seen) == 2
+
+
+def test_an_empty_finish_announces_nothing(log):
+    seen = []
+    log.on_change = lambda: seen.append(1)
+    log.finish([], "handled")
+    assert seen == []
+
+
+def test_backoff_and_give_up_announce_a_change(log):
+    log.post(Event("say", "desktop", {"text": "hi"}, id="s1"))
+    log.take(["s1"], "t1")
+    seen = []
+    log.on_change = lambda: seen.append(1)
+    log.backoff(["s1"], "error")
+    assert seen == [1]
+    for _ in range(3):
+        log.take(["s1"], "t2")
+        log.backoff(["s1"], "error")
+    seen.clear()
+    log.take(["s1"], "t3")
+    seen.clear()
+    log.backoff(["s1"], "error")  # the fourth failure gives it up
+    assert log.get("s1").state == "gave_up" and seen == [1]
+
+
+def test_finish_matching_announces_a_change(log):
+    log.post(Event("timer", "timer:1", {}, id="n1"))
+    seen = []
+    log.on_change = lambda: seen.append(1)
+    log.finish_matching("timer", "timer:1")
+    assert seen == [1]
+
+
+def test_a_duplicate_post_announces_nothing(log):
+    log.post(Event("say", "desktop", {"text": "hi"}, id="s1"))
+    seen = []
+    log.on_change = lambda: seen.append(1)
+    log.post(Event("say", "desktop", {"text": "hi"}, id="s1"))
+    assert seen == []

@@ -5,6 +5,7 @@ through LoopService, so no mail or model is involved."""
 
 import asyncio
 import json
+import sqlite3
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -258,50 +259,12 @@ async def test_home_loop_done_and_later_unknown_id_are_invalid_params(rig):
         assert err.value.code == ErrorCode.invalid_params
 
 
-async def test_held_list_shows_held_news_with_its_reason(rig):
-    rig.items.open("held", "brain", saved_call={"event": "timer", "why": "quiet_hours"})
-    rig.items.open("held", "brain", saved_call={"event": "job_ended", "why": "budget_spent"})
-    rows = (await rig.call("loops_state"))["open_items"]
-    assert [(r["kind"], r["title"]) for r in rows] == [
-        ("Held news", "timer: held during quiet hours"),
-        ("Held news", "job_ended: held because the daily budget was spent"),
-    ]
-
-
-async def test_held_line_says_what_the_news_is_about(rig):
-    rig.items.open(
-        "held",
-        "brain",
-        saved_call={
-            "event": "job_ended",
-            "why": "quiet_hours",
-            "facts": {"report": "Job a1 ended.\nfolder C:/x", "n": 3},
-        },
-    )
-    rig.items.open(
-        "held",
-        "brain",
-        saved_call={"event": "timer", "why": "stale", "facts": {"title": "Stand up " + "x" * 200}},
-    )
-    titles = [r["title"] for r in (await rig.call("loops_state"))["open_items"]]
-    assert titles[0] == "job_ended (Job a1 ended.): held during quiet hours"
-    assert titles[1].startswith("timer (Stand up xxx") and len(titles[1]) < 140
-    assert titles[1].endswith("): held because nobody was there to hear it")
-
-
-async def test_a_held_news_no_key_reason_is_plain(rig):
-    rig.items.open("held", "brain", saved_call={"event": "timer", "why": "no_key"})
-    (row,) = (await rig.call("loops_state"))["open_items"]
-    assert row["title"] == "timer: held because there is no Anthropic key yet"
-
-
-async def test_held_list_names_each_open_item_plainly_and_leaves_out_setup_news(rig):
+async def test_loops_state_has_no_held_open_items_and_loops_can_still_be_held(rig):
     saved = {"name": "delete_files", "input": {}, "text": "I'll delete 3 old logs."}
     rig.items.open("ask", "desktop", saved_call=saved)
     rig.items.open("choice", "desktop", live_only=True)
     rig.items.open("expert_ask", "desktop", live_only=True)
     rig.items.open("offer", "brain", saved_call={"sentence": "Always allow reading files?"})
-    rig.items.open("setup", "brain", saved_call={"kind": "setup_done", "facts": {}, "key": "k"})
     rows = (await rig.call("loops_state"))["open_items"]
     assert [(r["kind"], r["title"], r["age_s"]) for r in rows] == [
         ("Permission", "I'll delete 3 old logs.", 7200),
@@ -310,3 +273,8 @@ async def test_held_list_names_each_open_item_plainly_and_leaves_out_setup_news(
         ("Offer", "Always allow reading files?", 7200),
     ]
     assert all(r["id"] for r in rows)
+    with pytest.raises(sqlite3.IntegrityError):
+        rig.items.open("held", "brain")
+    lp = rig.add()
+    state = await rig.call("loops_state")
+    assert [(x["id"], x["status"]) for x in state["loops"]] == [(lp.id, "held")]

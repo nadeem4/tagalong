@@ -10,6 +10,7 @@ export * from './bodies';
 export * from './context';
 export * from './echo';
 export * from './know-me';
+export * from './events';
 export * from './loops';
 export * from './model';
 export * from './memory';

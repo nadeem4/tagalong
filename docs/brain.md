@@ -90,7 +90,7 @@ the total can run a little low.
 | `brain/src/brain/know/`                | Get to know me: `facts.py` tag visibility, `status.py` per-source status, `runner.py` the one run at a time behind `know_me_start` (saves each source as it finishes), `portrait.py` the portrait writer, `offer.py` the offer rules, `tools.py` the get-to-know-me tools, `source.py` the source protocol and `default_sources`, `github.py`, `linkedin.py` and `web.py` the sources, `extract.py` facts with the evidence check (see [Get to know me](#get-to-know-me-know))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `brain/src/brain/store/`               | The database layer: `db.py` opens `tagalong.db` and runs the numbered migrations in `migrations/`; `search.py` the FTS5 helpers and `search`; `conversation.py`, `memory.py`, `connections.py` and `outputs.py` own the SQL of chat, memory items, apps and tool outputs; `work.py` is `WorkStore`, the work table's state machine (jobs use it today, through `job_records.py`); `rules.py` the `rules` table: tool modes, preferences and offers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `brain/src/brain/runner.py`            | `Runner`: the only thing that starts a Scout turn, one at a time; `pick` (a person's words first, then news oldest first), `gate` (may this news be told now), `target` (which body answers), `take_more` (a say joins the running turn), the interjection take and give-back, `turn_ended`. See [The turn runner](#the-turn-runner-and-urgency)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `brain/src/brain/open_items.py`        | `OpenItems`: the one record for what waits on the person (`open`, `answer`, `finish`, `expire_due`, `expire_live_only`, `list_open`, `list_answered`, `find_open`; `expire_live_only(job_id=None)` takes one job's items only), one lifecycle (open to answered, done or expired), one deadline (`DEADLINE_S`, a day) and a log line per move, `open_item.<event> t=<epoch> id=<id> kind=<kind> by=<who> why=<why>`, on logger `brain.open_items`. Scout's asks use it through `open_item_runner.py`, choices, offers and setup events directly (kinds `choice`, `offer`, `setup`); the table is in [storage.md](storage.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `brain/src/brain/open_items.py`        | `OpenItems`: the one record for what waits on the person (`open`, `answer`, `finish`, `expire_due`, `expire_live_only`, `list_open`, `list_answered`, `find_open`; `expire_live_only(job_id=None)` takes one job's items only), one lifecycle (open to answered, done or expired), one deadline (`DEADLINE_S`, a day) and a log line per move, `open_item.<event> t=<epoch> id=<id> kind=<kind> by=<who> why=<why>`, on logger `brain.open_items`. Scout's asks use it through `open_item_runner.py`, choices and offers directly (kinds `choice`, `offer`); the table is in [storage.md](storage.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `brain/src/brain/toolbox.py`           | `Toolbox`: lists and gates every tool call, from `BrainSource`, `AppSource` and `BodySource`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `brain/src/brain/asks.py`              | `Asks`: shows Scout's permission cards with no waiter, runs a job's permission asks (they wait) and `open` asks (no turn, custom options, typed answers); each is an `ask` work row that ends with its ask or its job                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `brain/src/brain/open_item_runner.py`  | `AskRunner`: Scout's asks as `ask` open items. A call that needs the person is saved and its card shown, and the turn goes on; the answer, however late, runs the saved call through the same gate and emits `ask_ended` (source `scout`, `caused_by` the event the asking turn took, saved with the call). Also the deadline timer, the restart close and the card shown again when a body joins                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
@@ -426,7 +426,7 @@ or `cancelled` (the person was answered or the turn was stopped on purpose), `re
 refused the request, which would fail the same way again) or `unanswered` (no key is set, so
 nothing can answer). A
 say that ran over budget is handled too, since the person sees why; news that ran over budget goes
-back to `new` with no attempt counted and waits for the budget. An error, a timeout or the step cap
+back to `new` with no attempt counted, marked to resume when it had spoken (its words are saved), and waits for the budget. An error, a timeout or the step cap
 counts as an attempt: the event waits 30 s, then 2 min, then 10 min (`not_before`) and is tried
 again, and the fourth failure gives it up (`gave_up`). See [When a turn ends](#when-a-turn-ends)
 and [Start-up and shutdown](#start-up-and-shutdown). `on_end` carries the state to the one who
@@ -795,8 +795,8 @@ example one opened while no screen was up), one
 `asks_waiting` event is posted: `count` and `asks`, a JSON list of `ask`, `tool`,
 `summary` and `age_s` (seconds waited), oldest first, so Scout can say how old each is in his own
 words. A card that cannot be built is logged and skipped; the others still show. Nothing is decided without the
-person on return: the rule and side-check ran when the ask opened. The Held tab lists the open
-items too (see `loops_state`).
+person on return: the rule and side-check ran when the ask opened. The Waiting tab lists the open
+items too (see `loops_state`); it also lists the news not yet told (`events_waiting`), read again on `changed {what: "events"}`, which the event log sends when an event is saved or changes state.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
@@ -1543,7 +1543,10 @@ ready event for the same body, up to `GROUP_CAP` (20). With the daily budget spe
 (`TAGALONG_QUIET_HOURS`), with no key, or with no body that displays, the news is not dropped: it
 stays `new` in the log and the runner looks again when something changes, and at least every
 `RECHECK_S` (60 s). The text is fenced as `<data kind="event">` with the kind's name, its note on how
-to weigh it and the facts, so it is data, not instructions. A start that raises is logged and its
+to weigh it and the facts, so it is data, not instructions. The tag carries `age`, how long the
+oldest event in the batch has waited, in one unit (`age="45s"`, `"3m"`, `"2h"`, `"1d"`), so Scout
+can weigh old news (for example after the budget reset); code sets it, never a payload. A resumed
+or given-up event adds its own mark beside it. A start that raises is logged and its
 events count as an attempt (they wait out the backoff, with no `resume` mark since nothing of the
 turn reached the history), never raised into the caller.
 
@@ -1965,7 +1968,7 @@ creates a loop before that.
   `main.py` beside the session (`session.loops` is the same object). It emits a `loop` event with the
   loop's id, title, asks, direction, people and due, and a `reason` (see Triggers). Each surface is
   recorded in the store before the event goes out, so a restart never repeats it. The event is saved, so a wake the gate holds (the hourly wake cap, no key) waits in the log and
-  is told when the gate opens; a due loop also stays visible in Home's Held list. One `call_later` is
+  is told when the gate opens; a due loop also stays visible in Home's loops list (status `held`). One `call_later` is
   armed for the earliest unfired due or quiet time, re-checked at least hourly (the same pattern as
   `Timers`); `changed()` re-arms after loops are added or edited. `fire_due()` also runs on each poll
   tick, so the quiet and stale checks need no timer of their own.
@@ -2501,7 +2504,7 @@ body in use.
 
 **When a turn ends.** `done`, `cancelled` by the person, `rejected` and `unanswered` (no key is
 set, so nothing can answer) mean handled. A say that ends over budget is handled too; news that ends over budget goes
-back to `new` with no attempt counted. An error, a timeout or the step cap counts as an attempt:
+back to `new` with no attempt counted, marked to resume when its words were saved. An error, a timeout or the step cap counts as an attempt:
 the events get `not_before` 30 s, then 2 min, then 10 min ahead (`BACKOFF_S`, `events.py`) and are
 tried again; the fourth failure ends them `gave_up` with the reason. The runner skips an event
 that is not due yet and arms its alarm for the earliest `not_before`, so a backing-off event lets
@@ -2517,9 +2520,8 @@ reason=error|step_cap|restart|stop`, with the kind, `at` and the kind's note (an
 left out). Only an event with a saved chat row (`messages.event_id`) is marked `resume`. A say shows only its first
 line, cut at 80 characters. These marks, the `gave_up` marks, the interruption and interjection
 lead blocks and the ear note are for that turn only and are never saved, so a retried say gains no
-second row. Two cases are accepted: a rider carried by an errored or cancelled turn can be told
-again by the next `done` person turn, and news returned to `new` after going over budget is sent
-again in full.
+second row. One case is accepted: a rider carried by an errored or cancelled turn can be told
+again by the next `done` person turn.
 
 **History is saved each step.** `Session._save_new` runs when the turn starts (after its task
 exists), after every tool round through `on_step`, and at the turn's end. Each taken event gets its
@@ -2651,9 +2653,11 @@ runs there); otherwise the phone is chosen only when no screen is online.
 ### Waiting news
 
 News the gate shuts out is never dropped: it stays `new` in the log until it can be told, or until
-it is ended as stale (`EventLog.finish_matching`). No code creates `held` open items any more; the
-`held` kind and Home's Held row remain until they are removed. Snoozing stays with the loop
-service, which holds a snoozed loop itself, so the runner has no snooze rule of its own.
+it is ended as stale (`EventLog.finish_matching`). Migration 0037 removed the `held` and `setup`
+open-item kinds. Home's `events_waiting` tool (`events_tools.py`) lists news still `new` and every
+event given up, a say or card answer included, oldest first, each as
+`{id, kind, source, at, age_s, gave_up, gist}`; the `gist` is the payload's first fact value cut
+short (JSON when it is not text), never prose. A new say or card answer is not listed.
 
 There is one deadline rule: `DEADLINE_S` in `open_items.py` for what waits on a person. The ask wait
 in `asks.py` (`ASK_TIMEOUT_S`) is a live card tied to one turn, not a stored wait.

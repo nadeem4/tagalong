@@ -581,8 +581,8 @@ next section.
    (`test_a_card_comes_back_when_a_body_joins_after_a_restart`, `test_reconnect_reshows_open_cards`).
    Scout is told which asks wait and how old each is (`asks_waiting`,
    `test_return_wake_names_waiting_asks_and_their_age`), and an expert ask whose process ended while you
-   were away is closed on return (`test_live_only_shown_expired_on_return`). Home's Tasks page, Held tab,
-   lists the open ask under "Waiting on you" with its age (`held-tab.test.tsx`). Set the tool to Off before
+   were away is closed on return (`test_live_only_shown_expired_on_return`). Home's Tasks page, Waiting tab,
+   lists the open ask under "Waiting on you" with its age (`loops-panel.test.tsx`). Set the tool to Off before
    answering: the ask is refused and Scout says so
    (`test_a_tool_turned_off_since_refuses_the_late_yes`). Quit the brain right after allowing
    and before the call finishes: on start Scout says it is not known if it ran, and it is not run
@@ -746,7 +746,7 @@ Automated: `pnpm --filter @tagalong/ui test` (`tasks-view`, `now-card`, `timers-
 `e2e/tasks.spec.ts` on the fake brain. By hand, with a real brain:
 
 1. **Action:** open Home and press Tasks.
-   **Expected:** a Now card, then tabs Jobs, Held and Timers, each with a count once loaded.
+   **Expected:** a Now card, then tabs Jobs, Waiting and Timers, each with a count once loaded.
 2. **Action:** ask Scout to "remind me in 10 minutes to stretch", then look at Now and the Timers tab.
    **Expected:** Now lists the note with "in N min"; the Timers tab lists it with its local time.
 3. **Action:** press Cancel on it.
@@ -756,8 +756,10 @@ Automated: `pnpm --filter @tagalong/ui test` (`tasks-view`, `now-card`, `timers-
    returns to the tab; Stop ends it.
 5. **Action:** trigger a permission ask (for example ask Scout to move a window).
    **Expected:** the ask shows at the top of Now; Allow, Always or Not now answers it and it goes.
+6. **Action:** press the Waiting tab (`waiting-tab.test.tsx`, `e2e/tasks.spec.ts`).
+   **Expected:** each piece of news Scout has not told yet shows as its gist and how long it has waited, and the list and count update by themselves when the brain saves or finishes an event; one Scout gave up on carries "Scout could not finish"; with none, "Nothing is waiting to be told."
 
-## The mail switch and the Held list (fake brain, then real)
+## The mail switch and the loops list (fake brain, then real)
 
 Automated: `pnpm --filter @tagalong/ui test` (`loops-panel.test.tsx`), the desktop ipc test
 (`ipc/loops.test.ts`), `cd brain && uv run pytest tests/test_loops_home_tools.py -q`, and the e2e
@@ -814,7 +816,7 @@ Nothing feeds the reader mail yet, so there is nothing to click. It is covered b
 
 ## Gmail becomes loops (automated only)
 
-The click-through is in "The mail switch and the Held list" below. This part is covered by
+The click-through is in "The mail switch and the loops list" below. This part is covered by
 `cd brain && uv run pytest tests/test_loops_poll.py tests/test_loops_gmail.py tests/test_config.py -q`
 on a fake mail server and a scripted reader; no real mail or model is touched:
 
@@ -854,9 +856,9 @@ on fakes. To see it by hand, add a loop with an anchor to a test store and open 
 
 ## Open items (automated only)
 
-Permission cards, choices, installs and sign-ins are open items, and Home's Held list shows the held
-ones, so there is little to click here beyond the live checks under "Attention framework: live
-checks" below. Choices, offers and setup events also use it: `tests/test_choices.py` (a timed-out choice expires its item and tells Scout),
+Permission cards, choices, installs and sign-ins are open items, and Home's Tasks page shows them
+(Now card and Waiting tab), so there is little to click here beyond the live checks under "Attention framework: live
+checks" below. Choices and offers also use it: `tests/test_choices.py` (a timed-out choice expires its item and tells Scout),
 `tests/test_offers.py` and `tests/test_setup_events.py` (an offer and an install's news survive a
 restart). It is covered by
 `cd brain && uv run pytest tests/test_open_items_store.py tests/test_open_items.py -q` on a temporary database:
@@ -2895,7 +2897,7 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 ## Waiting news: one runner, one set of rules
 
 1. Automated: `cd brain && uv run pytest tests/test_runner.py tests/test_presence.py tests/test_open_items.py tests/test_loops_home_tools.py tests/test_config.py -q`, then `tests/test_sessions.py -q -k "give_up"`. It covers the order (a person's words first, then news oldest first), the gate (key, quiet hours, budget, speech, idle window, caps), the target body, the group cap of 20, the 60 s recheck, and the ends: done, cancelled, rejected and unanswered are handled (a say over budget too), news over budget goes back to new with no attempt, and any other end backs off and is tried again (see "Retries, per-step history and restart (T1d)").
-2. Budget spent: set `TAGALONG_DAILY_BUDGET_USD=0.01`, spend it, then let a job end. Scout stays silent and the report waits as a new event in the log; it is told once the budget is open again. Nothing is logged as dropped.
+2. Budget spent: set `TAGALONG_DAILY_BUDGET_USD=0.01`, spend it, then let a job end. Scout stays silent and the report waits as a new event in the log. Open Home, Tasks, Waiting: the news shows there with its gist and how long it has waited, and it appears without reopening the page. After the midnight reset (or raise the limit and wait up to a minute) Scout tells it once, the row leaves the Waiting tab, and the wake's `<data kind="event">` tag carries `age="..."`. Nothing is logged as dropped.
 3. Quiet hours: set `TAGALONG_QUIET_HOURS` to a window around the current time (for example `14:00-15:00`, or `22:00-07:00` across midnight) and let a timer fire. Scout does not speak, and the timer waits in the log. When the window ends (within a minute) Scout is woken with it.
 4. No body: close every body, let a job end, then open the desktop. The report waits until a body that displays is online, then Scout tells it once.
 5. Stop: with a job report waiting (no body online), run `uv run tagalong stop`. After the next start Scout tells the report once a body is online.

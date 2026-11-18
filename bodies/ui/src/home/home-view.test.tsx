@@ -271,13 +271,13 @@ describe('HomeView', () => {
     expect(pages).toEqual(['connections', 'settings']);
   });
 
-  it('keeps the mail loops card off Connections and under Held on Tasks', async () => {
+  it('keeps the mail loops card off Connections and under Waiting on Tasks', async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     fireEvent.click(await screen.findByRole('button', { name: 'Connections' }));
     expect(screen.queryByText(/read my mail for loops/i)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Tasks' }));
     expect(screen.queryByText(/read my mail for loops/i)).toBeNull(); // Jobs is the first tab
-    fireEvent.click(await screen.findByRole('tab', { name: /^Held/ }));
+    fireEvent.click(await screen.findByRole('tab', { name: /^Waiting/ }));
     expect(await screen.findByText(/read my mail for loops/i)).toBeInTheDocument();
   });
 

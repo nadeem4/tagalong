@@ -1,27 +1,27 @@
 /**
  * Home's Tasks page: the work Scout has on its plate. A title, the Now card (what is live), then three tabs with counts read
- * from the brain (Jobs, Held mail loops, Timers). Opening a job (Watch on a row) shows its page
+ * from the brain (Jobs, Waiting news and mail loops, Timers). Opening a job (Watch on a row) shows its page
  * in place of everything, and Back returns to the tab. The brain owns all of it; this reads the
- * counts and timers and reads again when it says `jobs`, `loops` or `timers` changed.
+ * counts and timers and reads again when it says `jobs`, `events` or `timers` changed.
  * Contains TasksView.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useHostBridge } from '../host-bridge';
-import { HeldTab } from './held-tab';
 import { JobsPanel } from './jobs-panel';
 import { JobTabs, panelId, tabId } from './job-tabs';
 import { NowCard } from './now-card';
 import { TimersTab } from './timers-tab';
-import type { TimerRow } from '../shapes';
+import { WaitingTab } from './waiting-tab';
+import type { TimerRow, WaitingEvent } from '../shapes';
 
-type Tab = 'jobs' | 'held' | 'timers';
+type Tab = 'jobs' | 'waiting' | 'timers';
 
 export function TasksView() {
   const bridge = useHostBridge();
   const [tab, setTab] = useState<Tab>('jobs');
   const [openJob, setOpenJob] = useState<string | null>(null);
   const [jobCount, setJobCount] = useState<number | null>(null);
-  const [heldCount, setHeldCount] = useState<number | null>(null);
+  const [waiting, setWaiting] = useState<WaitingEvent[] | null>(null);
   const [timers, setTimers] = useState<TimerRow[] | null>(null);
 
   // Each source is read on its own: one that fails leaves the others, and its count blank.
@@ -31,15 +31,11 @@ export function TasksView() {
       .then((jobs) => setJobCount(jobs.length))
       .catch((error: unknown) => console.error('could not count jobs', error));
   }, [bridge]);
-  const readHeld = useCallback(() => {
+  const readWaiting = useCallback(() => {
     bridge
-      .loopsState()
-      .then((state) =>
-        setHeldCount(
-          state.loops.filter((loop) => loop.status !== 'done' && loop.status !== 'dropped').length,
-        ),
-      )
-      .catch((error: unknown) => console.error('could not count held loops', error));
+      .eventsWaiting()
+      .then(setWaiting)
+      .catch((error: unknown) => console.error('could not read waiting news', error));
   }, [bridge]);
   const readTimers = useCallback(() => {
     bridge
@@ -50,14 +46,14 @@ export function TasksView() {
 
   useEffect(() => {
     readJobs();
-    readHeld();
+    readWaiting();
     readTimers();
     return bridge.onBrainChanged((what) => {
       if (what === 'jobs') readJobs();
-      else if (what === 'loops') readHeld();
+      else if (what === 'events') readWaiting();
       else if (what === 'timers') readTimers();
     });
-  }, [bridge, readJobs, readHeld, readTimers]);
+  }, [bridge, readJobs, readWaiting, readTimers]);
 
   const cancelTimer = (id: string): Promise<void> =>
     bridge
@@ -69,7 +65,7 @@ export function TasksView() {
     count === null ? name : `${name} (${count})`;
   const tabs = [
     { id: 'jobs', label: label('Jobs', jobCount) },
-    { id: 'held', label: label('Held', heldCount) },
+    { id: 'waiting', label: label('Waiting', waiting === null ? null : waiting.length) },
     { id: 'timers', label: label('Timers', timers === null ? null : timers.length) },
   ];
 
@@ -99,7 +95,7 @@ export function TasksView() {
         {(tab === 'jobs' || !viewing) && (
           <JobsPanel embedded openJob={openJob} onOpenJob={setOpenJob} />
         )}
-        {viewing && tab === 'held' && <HeldTab />}
+        {viewing && tab === 'waiting' && <WaitingTab events={waiting ?? []} />}
         {viewing && tab === 'timers' && <TimersTab timers={timers ?? []} onCancel={cancelTimer} />}
       </div>
     </>
