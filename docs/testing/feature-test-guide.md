@@ -195,8 +195,8 @@ desktop app. You need `uv` and an Anthropic key.
     - **Held expert cards (T2c-2b):** an expert's permission request or question stays on a card with
       no timeout, and the job keeps its slot while it waits. Answer it any time later and the expert
       carries on. On a card of a task, **Not now** moves the check-back and the card stays open; **Stop
-      the task** ends the task and closes its cards (also when pressed on a Scout ask card); the job keeps running
-      after it until T2d, but opens no new card. Stopping the job cancels its cards too.
+      the task** ends the task and closes its cards (also when pressed on a Scout ask card); its jobs stop and no new card opens
+      for it. Stopping the job cancels its cards too.
       Automated: `test_holds.py`, and in `test_jobs.py` the permission-does-not-block, not-now, stop-the-job
       and stop-the-task tests, and `test_questions.py` (the card answer releases the expert).
 15. **Action:** make a body tool return more than 5 MB of text (for example a page read of a very
@@ -334,8 +334,9 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
    Manual mode; it never says it cannot set the mode.
    **F11 (LT1-6, by design):** after a job ends, its `claude` process stays up until
    `TAGALONG_EXPERT_IDLE_S` (300 s) after the last job, or `tagalong stop`; nothing to fix.
-7. **Action:** start two long jobs, then ask for a third.
-   **Expected:** Scout says 2 jobs are already running and names them.
+7. **Action:** start two long jobs, then ask for a third and allow its card.
+   **Expected:** two jobs run and the third waits: Scout says it is next in line, and Home's Jobs list shows it as Waiting, "1st in line". When one of the two ends, the third starts by itself. Press Stop on a waiting row and its task ends; it never starts. Quit the brain with a job waiting and start it again: the waiting job starts when a slot is free. A job that waits over an hour is not started: Scout asks (a card, **Allow** keeps it first in line, **Deny** ends the task). While it waits for that answer Home shows it as "Needs your OK" with a Stop button, and after a brain restart or an expired card Scout asks again.
+   Automated: `test_jobs.py` (the queue and recheck tests), `test_tools.py` (`requeue_job`, queued rows in `list_jobs`), `test_ask_runner.py`, `test_main.py`, and the Tasks page e2e.
 8. **Action:** start a long job, then stop the brain and start it again; ask Scout to list jobs.
    **Expected:** the job step shows as stopped with reason "brain restarted" (Scout shows it as
    blocked and offers to carry on if the expert had saved its session, else failed). Nothing

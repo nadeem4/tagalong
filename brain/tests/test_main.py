@@ -12,6 +12,8 @@ import pytest
 from test_sessions import Gate, idle, join, say
 
 from brain import main
+from brain.apps import Apps
+from brain.jobs import Jobs
 from brain.main import _run
 from brain.masking import Masker, SecretLogFilter
 from brain.permission import resolve_mode
@@ -83,6 +85,48 @@ def test_main_sets_up_voice_without_loading_any_model(monkeypatch, tmp_path):
     assert isinstance(seen["voice"], VoiceService)
     for name in ("moonshine_voice", "onnxruntime", "kokoro_onnx"):
         assert name not in sys.modules
+
+
+def test_start_fills_the_job_slots_after_the_resume_scan(monkeypatch, tmp_path):
+    class Stop(Exception):
+        pass
+
+    class Server:
+        sockets = [type("Sock", (), {"getsockname": lambda self: ("127.0.0.1", 1)})()]
+
+        async def serve_forever(self):
+            raise Stop
+
+    async def serve(*args):
+        return Server()
+
+    seen = []
+    real_startup, real_fill = Jobs.startup, Jobs.fill_slots
+
+    def startup(self):
+        seen.append("startup")
+        return real_startup(self)
+
+    def fill(self, **kw):
+        seen.append(("fill", kw))
+        return real_fill(self, **kw)
+
+    real_apps_start = Apps.start
+
+    async def apps_start(self):
+        seen.append("apps")
+        return await real_apps_start(self)
+
+    monkeypatch.setattr(Jobs, "startup", startup)
+    monkeypatch.setattr(Jobs, "fill_slots", fill)
+    monkeypatch.setattr(Apps, "start", apps_start)
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake")
+    monkeypatch.setattr(main, "start_server", serve)
+    with pytest.raises(Stop):
+        asyncio.run(_run())
+    # the fill comes after the apps start, and says an app may still be connecting
+    assert seen == ["startup", "apps", ("fill", {"settling": True})]
 
 
 def test_memory_open_failure_exits(monkeypatch, tmp_path):

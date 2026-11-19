@@ -170,8 +170,12 @@ def _allowed(kind: str, frm: str, to: str, via_close: bool) -> bool:
         return False  # a goal Scout closed as failed stays failed
     if to in _MOVES.get(frm, ()):
         return True
-    if kind == "goal" and (frm, to) == ("blocked", "active"):
-        return True
+    if kind == "goal" and (frm, to) in (
+        ("blocked", "active"),
+        ("planned", "blocked"),
+        ("blocked", "planned"),
+    ):
+        return True  # a queued goal waits on the person (blocked) when it grows stale
     if kind != "loop":
         return False
     # A loop is settled from waiting or after going quiet, and reopens by new mail.
@@ -273,6 +277,16 @@ class WorkStore:
     def newest(self, kind: str, limit: int) -> list[WorkRow]:
         """The most recently created rows of one kind, newest first."""
         return self._select("kind = ?", [kind], f"rowid DESC LIMIT {int(limit)}")
+
+    def queued_goals(self, state: str = "planned") -> list[WorkRow]:
+        """The approved goals in a state (planned: waiting for a job slot; blocked: held for a
+        recheck), oldest approval first."""
+        sql = (
+            f"SELECT {_W_COLUMNS} FROM work w JOIN work_job j ON j.work_id = w.id"
+            " WHERE w.kind = 'goal' AND w.state = ? AND j.approved_at IS NOT NULL"
+            " ORDER BY j.approved_at, w.rowid"
+        )
+        return [_row(r) for r in self.db.execute(sql, (state,))]
 
     def expert_calls_with_session(self, agent: str, limit: int = 50) -> list[WorkRow]:
         """The expert's newest calls that are not running and saved a session, newest first."""
@@ -388,14 +402,19 @@ class WorkStore:
         folder: str | None = None,
         mode: str | None = None,
         task: str | None = None,
+        approved_at: str | None = None,
+        rechecked_at: str | None = None,
     ) -> None:
         """Save the detail row; an argument left at None keeps what was saved."""
         self.db.execute(
-            "INSERT INTO work_job(work_id, agent, folder, mode, task) VALUES (?, ?, ?, ?, ?)"
+            "INSERT INTO work_job(work_id, agent, folder, mode, task, approved_at, rechecked_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)"
             " ON CONFLICT(work_id) DO UPDATE SET agent = COALESCE(excluded.agent, agent),"
             " folder = COALESCE(excluded.folder, folder), mode = COALESCE(excluded.mode, mode),"
-            " task = COALESCE(excluded.task, task)",
-            (work_id, agent, folder, mode, task),
+            " task = COALESCE(excluded.task, task),"
+            " approved_at = COALESCE(excluded.approved_at, approved_at),"
+            " rechecked_at = COALESCE(excluded.rechecked_at, rechecked_at)",
+            (work_id, agent, folder, mode, task, approved_at, rechecked_at),
         )
 
     def set_text(self, id: str, summary: str | None, detail_id: str | None) -> None:
@@ -411,10 +430,14 @@ class WorkStore:
     def job_details(self, ids: Sequence[str]) -> dict[str, dict]:
         marks = ",".join("?" * len(ids))
         rows = self.db.execute(
-            f"SELECT work_id, agent, folder, mode, task FROM work_job WHERE work_id IN ({marks})",
+            "SELECT work_id, agent, folder, mode, task, approved_at, rechecked_at FROM work_job"
+            f" WHERE work_id IN ({marks})",
             list(ids),
         )
-        return {w: {"agent": a, "folder": f, "mode": m, "task": t} for w, a, f, m, t in rows}
+        return {
+            w: {"agent": a, "folder": f, "mode": m, "task": t, "approved_at": p, "rechecked_at": r}
+            for w, a, f, m, t, p, r in rows
+        }
 
     def add_event(self, id: str, kind: str, data: dict | None = None) -> None:
         self.db.execute(

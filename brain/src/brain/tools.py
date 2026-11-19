@@ -903,6 +903,8 @@ def expert_tools(
         }
         if mode := getattr(job_id, "mode", None):
             result["mode"] = mode
+        if queued := getattr(job_id, "queued", None):
+            result["queued"] = queued  # no slot was free: its place in line, 1 is next
         return json.dumps(result)
 
     async def close_job(args: dict) -> str:
@@ -915,6 +917,14 @@ def expert_tools(
         except JobError as err:
             return str(err)
         return f"job {args['job']} closed"
+
+    async def requeue_job(args: dict) -> str:
+        _need_text("requeue_job", args, "job")
+        try:
+            jobs.requeue(args["job"])
+        except JobError as err:
+            return str(err)
+        return f"job {args['job']} is back in line, first"
 
     async def set_job_result(args: dict) -> str:
         _need_text("set_job_result", args, "job", "text")
@@ -946,9 +956,18 @@ def expert_tools(
     async def list_jobs(args: dict) -> str:
         rows = []
         watched = jobs.with_activity()  # one query, not one per row
+        line = [j.id for j in jobs.queue()]  # approved, waiting for a slot
+        held = [j.id for j in jobs.held()]  # approved, held until the person says it stands
         for job in jobs.list():
             row = asdict(job)
             row["state"] = home_state(job.state)
+            if job.id in line:
+                row["state"] = "queued"
+                row["place"] = line.index(job.id) + 1
+                row["task_id"] = jobs.task_of(job.id)  # Home's Stop ends the task, not a job
+            elif job.id in held:
+                row["state"] = "held"
+                row["task_id"] = jobs.task_of(job.id)
             row["activity"] = job.id in watched
             row["summary"] = jobs.activity_line(job.id)
             row["title"] = job_title(job)
@@ -1102,6 +1121,20 @@ def expert_tools(
         ),
         (
             ToolSpec(
+                "requeue_job",
+                "Ask the owner whether a job that waited over an hour for a free slot should "
+                "still run (job_recheck tells you which). Their card is the question: yes puts "
+                "the job first in line, no ends the task. Call it right after the event, once.",
+                {"type": "object", "properties": {"job": job_id}, "required": ["job"]},
+                scout,
+                effect="change",
+                tier=Tier.ask,
+                deny_stops_task=True,
+            ),
+            requeue_job,
+        ),
+        (
+            ToolSpec(
                 "set_job_result",
                 "Write the result of a whole job in your own words: what got done, what needs "
                 "the owner, and the key files or links. It is what the owner sees first on the "
@@ -1192,7 +1225,9 @@ def expert_tools(
                 "closed, and its parts, one per "
                 "expert hand-off, with expert, state, latest progress, result and "
                 "session_id_known; plus a one-line summary of its steps, your watch list for "
-                "it and parent_job (the job a follow-up continued).",
+                "it and parent_job (the job a follow-up continued). A queued job (approved, "
+                "waiting for a free slot) has its place in line and its task_id; a held job "
+                "(approved over an hour ago) waits for the person's OK and has its task_id.",
                 {"type": "object", "properties": {}},
                 frozenset({"home"}),
                 effect="read",

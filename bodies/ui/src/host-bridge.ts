@@ -108,6 +108,10 @@ export interface JobRow {
   parts: JobPartRow[];
   /** True when the brain kept steps for this job, so Home can offer to watch it. */
   activity: boolean;
+  /** Only for `queued` (approved, waiting for a slot): 1 is next in line. */
+  place?: number;
+  /** Only for `queued`: the task a Stop ends, since no job is running yet. */
+  taskId?: string;
 }
 
 /** One expert hand-off inside a job. */

@@ -212,12 +212,17 @@ class AskRunner:
                 self._expired(self._items.get(ask_id))  # this answer found it past its deadline
             return  # otherwise it ended first; its card is already closed
         try:
-            if option == "stop_task" and item.task_id is not None:
+            stops = option == "stop_task" or (option == "deny" and self._deny_stops_task(item))
+            if stops and item.task_id is not None:
                 await self._stop_task(item, body_id)
             else:
                 await self._carry_out(item, option)
         except Exception:
             log.exception("an answered ask could not be carried out: %s", item.id)
+
+    def _deny_stops_task(self, item: OpenItem) -> bool:
+        found = self._toolbox().spec_named(_call(item).name)
+        return found is not None and found[0].deny_stops_task
 
     async def _stop_task(self, item: OpenItem, body_id: str) -> None:
         """The person ended the task from this card: nothing runs, its other cards go, and

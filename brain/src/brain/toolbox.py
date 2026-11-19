@@ -104,6 +104,9 @@ class ToolSpec:
     # `task_id`, else a new one for the turn, claimed at the gate. The call then carries it, so a
     # card belongs to it and an approved call runs for it; a task no person began always asks.
     task_kind: str | None = None
+    # A "no" on this tool's card ends its task (the recheck of a job that waited too long): the
+    # answer is about the whole task, not just this one call.
+    deny_stops_task: bool = False
     # A tool Anthropic runs (web search): its typed declaration goes to the model as it is, and the
     # brain never runs it.
     server_tool: dict | None = None

@@ -42,6 +42,9 @@ function toRow(raw: Record<string, unknown>): JobRow {
     scoutResult: raw.scout_result ?? null,
     parts: parts.map((part) => toPart(part as Record<string, unknown>)),
     activity: raw.activity === true,
+    // Present only for a queued job; left off the others so their rows are unchanged.
+    ...(typeof raw.place === 'number' ? { place: raw.place } : {}),
+    ...(typeof raw.task_id === 'string' ? { taskId: raw.task_id } : {}),
   } as JobRow;
 }
 

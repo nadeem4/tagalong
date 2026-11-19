@@ -258,6 +258,18 @@ def test_last_part_for_matches_windows_folder_spellings(records):
     assert records.last_part_for("claude-acp", "c:\\proj") is not None
 
 
+def test_queue_orders_by_approved_at(records, clock):
+    late = clock.at
+    early = clock.at - timedelta(minutes=5)
+    records.plan_job("late", "claude-acp", "b", "C:/p", "", "t1", None, late)
+    records.plan_job("early", "claude-acp", "a", "C:/p", "", "t2", None, early)
+    assert [j.id for j in records.queue()] == ["early", "late"]
+    assert records.get_job("early").state == "planned"
+    records.add_job("early", "claude-acp", "a", "C:/p", "default")
+    assert [j.id for j in records.queue()] == ["late"]
+    assert records.get_job("early").state == "active"
+
+
 def test_a_failed_part_keeps_its_reason(records):
     records.add_job("a", "claude-acp", "t", "C:/a", "ask")
     records.update_part("a", "p1", state="failed", reason="connection lost")

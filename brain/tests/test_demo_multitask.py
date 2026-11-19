@@ -147,19 +147,13 @@ async def test_2_stop_while_a_job_finishes_never_runs_two_turns_at_once():
 # 3. Three hand-offs, one card left open (C2, C3) ------------------------------------------
 
 
-@pytest.mark.xfail(
-    strict=True, reason="C3: a third hand-off is refused ('2 jobs are already running'), no queue"
-)
 async def test_3a_a_third_handoff_is_queued_not_refused(make_rig):  # noqa: F811
     rig = make_rig(FakeAsks())
-    await rig.jobs.start("one", str(rig.folder))
-    await rig.jobs.start("two", str(rig.folder))
-    try:
-        third = await rig.jobs.start("three", str(rig.folder))
-    except JobError as err:
-        print(f"\n[3a] third hand-off REFUSED, nothing queued: {err}")
-        raise
-    print(f"\n[3a] third hand-off accepted: {third}")
+    await rig.jobs.start("one", str(rig.folder), mode="Plan")
+    await rig.jobs.start("two", str(rig.folder), mode="Plan")
+    third = await rig.jobs.start("three", str(rig.folder), mode="Plan")
+    assert third.queued == 1
+    assert [j.id for j in rig.records.queue()] == [str(third)]
 
 
 async def test_3b_an_open_hand_off_card_does_not_block_new_says_and_news(tmp_path, monkeypatch):

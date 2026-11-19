@@ -321,6 +321,9 @@ class FakeJobs:
         self.fresh = None
         self.error = None
         self.rows = []
+        self.queued = []
+        self.held_rows = []
+        self.task_ids: dict[str, str] = {}
         self.activity_jobs = set()
         self.steps = []
         self.experts = []
@@ -364,6 +367,20 @@ class FakeJobs:
 
     def close(self, job_id, outcome="done"):
         self.calls.append(("close", job_id) + (() if outcome == "done" else (outcome,)))
+        if self.error:
+            raise self.error
+
+    def queue(self):
+        return self.queued
+
+    def held(self):
+        return self.held_rows
+
+    def task_of(self, job_id):
+        return self.task_ids.get(job_id)
+
+    def requeue(self, job_id):
+        self.calls.append(("requeue", job_id))
         if self.error:
             raise self.error
 
@@ -794,6 +811,32 @@ async def test_list_jobs_is_json_with_the_row_fields(home, mem, records):
     assert not {"expert", "progress", "result", "reason", "session_id"} & set(out["jobs"][0])
 
 
+async def test_list_jobs_shows_queued_goals_with_their_place(home, records):
+    records.add_job("run", "claude-acp", "t", "C:/x", "default")
+    at = datetime.datetime(2026, 10, 27, tzinfo=datetime.UTC)
+    for n in (1, 2):
+        records.plan_job(f"q{n}", "claude-acp", f"wait {n}", "C:/x", "", None, None, at)
+    home.jobs.rows = records.list_jobs(20)
+    home.jobs.queued = records.queue()
+    home.jobs.task_ids = {"q1": "k1"}
+    rows = {j["id"]: j for j in json.loads(await home.run("list_jobs"))["jobs"]}
+    assert (rows["q1"]["state"], rows["q1"]["place"]) == ("queued", 1)
+    assert (rows["q2"]["state"], rows["q2"]["place"]) == ("queued", 2)
+    assert rows["q1"]["task"] == "wait 1" and rows["q1"]["task_id"] == "k1"  # Stop needs it
+    assert "place" not in rows["run"] and rows["run"]["state"] == "running"
+
+
+async def test_list_jobs_shows_a_held_goal_as_waiting_for_an_ok(home, records):
+    at = datetime.datetime(2026, 10, 27, tzinfo=datetime.UTC)
+    records.plan_job("h1", "claude-acp", "old ask", "C:/x", "", "k9", None, at)
+    records.work.transition("h1", "blocked", reason="approved over an hour ago")
+    home.jobs.rows = records.list_jobs(20)
+    home.jobs.held_rows = records.held()
+    home.jobs.task_ids = {"h1": "k9"}
+    (row,) = json.loads(await home.run("list_jobs"))["jobs"]
+    assert (row["state"], row["task_id"]) == ("held", "k9")  # Home shows Stop, not Stopped
+
+
 async def test_home_list_jobs_shape_unchanged(home, records):
     """Jobs live in work rows now, but Home and Scout still read running/done/error/stopped."""
     records.add_job("run", "claude-acp", "t", "C:/x", "default")
@@ -1180,6 +1223,7 @@ def test_home_tools_are_not_in_model_tools(home):
         "tell_expert",
         "watch_job",
         "close_job",
+        "requeue_job",
         "set_job_result",
         "list_experts",
         "stop_job",
@@ -1834,6 +1878,16 @@ async def test_hand_off_result_has_part_and_title(home):
     home.jobs.started = JobId("j1", part="p3")  # attaching: Jobs sets no title
     out = json.loads(await home.run("hand_off", {"task": "t", "folder": "C:/p", "job": "j1"}))
     assert out["title"] is None  # attaching to a job names nothing
+
+
+async def test_requeue_job_puts_the_goal_first_in_line(home):
+    spec = expert_specs(home)["requeue_job"]
+    assert spec.audience == frozenset({"scout"}) and spec.tier is Tier.ask
+    assert spec.deny_stops_task  # a no on its card ends the task
+    assert "j1" in await home.run("requeue_job", {"job": "j1"})
+    assert home.jobs.calls[-1] == ("requeue", "j1")
+    home.jobs.error = JobError("job j1 is not waiting for a recheck")
+    assert await home.run("requeue_job", {"job": "j1"}) == "job j1 is not waiting for a recheck"
 
 
 async def test_close_job_tool_closes_and_refuses_with_a_plain_line(home):

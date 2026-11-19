@@ -162,6 +162,15 @@ class JobRecords:
         active = self.work.of_kind("expert_call", ["active"])
         return [j for i in self._parents_of(active) if (j := self.get_job(i)) is not None]
 
+    def queue(self) -> list[Job]:
+        """The approved hand-offs waiting for a slot, the one to start first at the head."""
+        return [self._job(g) for g in self.work.queued_goals()]
+
+    def held(self) -> list[Job]:
+        """Approved hand-offs held for a recheck: blocked before they ever ran a part."""
+        jobs = (self._job(g) for g in self.work.queued_goals("blocked"))
+        return [j for j in jobs if not j.parts]
+
     def next_part_id(self, job_id: str) -> str:
         """The id the job's next part will get (p1, p2, ...), known before the part exists."""
         taken = [
@@ -191,6 +200,41 @@ class JobRecords:
 
     # ---- writing ----
 
+    def plan_job(
+        self,
+        id: str,
+        agent: str,
+        task: str,
+        folder: str,
+        mode: str,
+        task_id: str | None,
+        caused_by: str | None,
+        approved_at: datetime,
+        wants: dict | None = None,
+    ) -> Job:
+        """An approved hand-off waiting for a slot: a planned goal that keeps what the start
+        needs (`wants`: apps and the session to carry on) and when it was approved. `mode` is
+        what was asked, by name; the job's real mode id is saved when it starts."""
+        self.work.create(
+            "goal",
+            "",
+            id=id,
+            state="planned",
+            task_id=task_id,
+            input={k: v for k, v in {"caused_by": caused_by, **(wants or {})}.items() if v},
+        )
+        self.work.set_job_detail(
+            id,
+            agent=agent,
+            folder=folder,
+            mode=mode or None,
+            task=task,
+            approved_at=utc_text(approved_at),
+        )
+        job = self.get_job(id)
+        assert job is not None
+        return job
+
     def add_job(
         self,
         id: str,
@@ -203,16 +247,20 @@ class JobRecords:
         task_id: str | None = None,
         caused_by: str | None = None,
     ) -> Job:
-        """A new running job with its first part, p1. It belongs to `task_id`; its news says
-        which event the hand-off came from."""
-        self.work.create(
-            "goal",
-            "",
-            id=id,
-            state="active",
-            task_id=task_id,
-            input={"caused_by": caused_by} if caused_by else None,
-        )
+        """A running job with its first part, p1: a new goal, or the planned goal of a queued
+        hand-off, which starts now. It belongs to `task_id`; its news says which event the
+        hand-off came from."""
+        if self.work.get(id) is not None:
+            self.work.transition(id, "active", expect="planned")
+        else:
+            self.work.create(
+                "goal",
+                "",
+                id=id,
+                state="active",
+                task_id=task_id,
+                input={"caused_by": caused_by} if caused_by else None,
+            )
         self.work.set_job_detail(id, folder=folder, mode=mode, task=task)
         if parent_job:
             self.work.add_event(id, "continued", {"from": parent_job})

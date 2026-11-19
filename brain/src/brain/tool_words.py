@@ -169,6 +169,12 @@ WORDS: dict[str, Words] = {
         "Scout stops a running job, or one part of it. Work already done stays where it is.",
         "jobs",
     ),
+    "requeue_job": Words(
+        "Keep a waiting job",
+        "Asks whether a job that waited too long should still run.",
+        "A job you approved can wait for a free slot. If it waits over an hour, Scout asks again before starting it. Yes puts it first in line; No ends the task.",
+        "jobs",
+    ),
     "close_job": Words(
         "Close a job",
         "Marks a job finished, or failed.",

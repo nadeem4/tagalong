@@ -212,8 +212,8 @@ async def _run() -> None:
         experts,
         apps,
         reinstall,
-        # session exists by the first tick; a hand-off waiting on its card counts too
-        lambda: bool(session.records.running_jobs()) or session.jobs.starting > 0,
+        # session exists by the first tick; a job being started or waiting in line counts too
+        lambda: session.jobs.busy(),
         bodies.notify,
         lambda: datetime.now(UTC),
     )
@@ -366,6 +366,7 @@ async def _run() -> None:
             sweep_staging, config.data_dir
         )  # an install a killed brain left half-staged
         await apps.start()  # connects in the background, so a slow app never delays boot
+        session.jobs.fill_slots(settling=True)  # approved jobs a restart left waiting
         port = server.sockets[0].getsockname()[1]
         bridges = BridgeSupervisor(  # the WhatsApp bridge; runs only when on and set up
             env=os.environ,

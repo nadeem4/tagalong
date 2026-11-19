@@ -320,6 +320,7 @@ class Session:
             setup_facts=setup_facts,
             emit=self._emit_job_event,
             finish_news=self.events.finish_matching,
+            news_waiting=self.events.has_new,
             on_timers_changed=lambda: timers.changed(),
             outputs=outputs,
             items=items,

@@ -76,6 +76,8 @@ export interface FakeBrain {
   setTimers(rows: Record<string, unknown>[]): void;
   /** Every timer id Home sent to `timer_cancel`, in order. */
   timerCancels: string[];
+  /** Add a queued job (approved, waiting for a slot) to `list_jobs` and tell the bodies `changed: jobs`. */
+  queueJob(row: { id: string; task: string; place: number; taskId: string }): void;
   /** Every task id Home sent to `task_stop`, in order. */
   taskStops: string[];
   /** Every updates call Home made, in order: `check`, `item app files`, `all app`, `auto app community on`. */
@@ -1463,6 +1465,32 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             jsonrpc: '2.0',
             method: 'changed',
             params: { seq: ++seq, what: 'updates' },
+          }),
+        );
+      }
+    },
+    queueJob: (row) => {
+      jobs.push({
+        id: row.id,
+        task: row.task,
+        folder: 'C:/work/app',
+        mode: 'plan',
+        state: 'queued',
+        title: null,
+        started_at: '2026-10-27T10:00:00Z',
+        ended_at: null,
+        closed_at: null,
+        parts: [],
+        activity: false,
+        place: row.place,
+        task_id: row.taskId,
+      });
+      for (const socket of sockets) {
+        socket.send(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'changed',
+            params: { seq: ++seq, what: 'jobs' },
           }),
         );
       }

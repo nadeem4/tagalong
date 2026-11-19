@@ -77,6 +77,35 @@ describe('JobsPanel', () => {
     expect(done).toHaveTextContent('2m 5s');
   });
 
+  it('shows a queued job as waiting with its place in line', async () => {
+    const bridge = createFakeHostBridge({
+      jobs: [
+        { ...RUNNING, id: 'q3', task: 'Third', state: 'queued', place: 3, taskId: 'k3', parts: [] },
+        { ...RUNNING, id: 'q1', task: 'First', state: 'queued', place: 1, taskId: 'k1', parts: [] },
+      ],
+    });
+    renderPanel(bridge);
+    const [third, first] = (await rows()) as [HTMLElement, HTMLElement];
+    expect(third).toHaveTextContent('Waiting');
+    expect(third).toHaveTextContent('3rd in line');
+    expect(first).toHaveTextContent('1st in line');
+    fireEvent.click(within(third).getByRole('button', { name: 'Stop Third' }));
+    await waitFor(() => expect(bridge.taskStops).toEqual(['k3']));
+    expect(bridge.jobStops).toEqual([]); // the task ends, not a job that never started
+  });
+
+  it('shows a held job as needing an OK, with a Stop that ends its task', async () => {
+    const bridge = createFakeHostBridge({
+      jobs: [{ ...RUNNING, id: 'h1', task: 'Old ask', state: 'held', taskId: 'k9', parts: [] }],
+    });
+    renderPanel(bridge);
+    const [held] = (await rows()) as [HTMLElement];
+    expect(held).toHaveTextContent('Needs your OK');
+    expect(held).not.toHaveTextContent('Stopped');
+    fireEvent.click(within(held).getByRole('button', { name: 'Stop Old ask' }));
+    await waitFor(() => expect(bridge.taskStops).toEqual(['k9']));
+  });
+
   it('names every state in words, not only by colour', async () => {
     renderPanel(createFakeHostBridge({ jobs: [FAILED, STOPPED] }));
     const [failed, stopped] = await rows();

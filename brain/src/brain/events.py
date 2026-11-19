@@ -67,6 +67,8 @@ _KINDS = (
     EventKind("task_stop", urgency="now", wakes=False),
     EventKind("timer", urgency="next_pause", batch_seconds=0, max_per_hour=6),
     EventKind("job_ended", urgency="idle", batch_seconds=30, max_per_hour=10),
+    # An approved job waited over an hour for a slot: Scout asks whether it still stands.
+    EventKind("job_recheck", urgency="next_pause", batch_seconds=0, max_per_hour=6),
     # A card's check-back came (quiet hours hold it unless urgent) or its wait ran out.
     EventKind("card_due", urgency="next_pause", batch_seconds=30, max_per_hour=6),
     EventKind("card_expired", urgency="next_pause", batch_seconds=30, max_per_hour=10),
@@ -339,6 +341,10 @@ class EventLog:
         """When the soonest backing-off event is ready again; None when none waits."""
         text = store.next_not_before(self._db, utc_text(self._now()))
         return None if text is None else datetime.fromisoformat(text)
+
+    def has_new(self, kind: str, source: str) -> bool:
+        """Is news of this kind and source still waiting to be told?"""
+        return bool(store.new_ids(self._db, kind, source))
 
     def finish_matching(
         self, kind: str, source: str, state: str = "handled", *, keep: str | None = None

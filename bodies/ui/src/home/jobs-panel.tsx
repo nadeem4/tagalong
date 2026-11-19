@@ -12,11 +12,23 @@ import { JobPage } from './job-page';
 import { SafeMarkdown } from './safe-markdown';
 
 const STATE_LABEL: Record<string, string> = {
+  queued: 'Waiting',
+  held: 'Needs your OK',
   running: 'Running',
   done: 'Done',
   error: 'Error',
   stopped: 'Stopped',
 };
+
+/** Approved but not running: in line for a slot, or held until the person says it stands. */
+const waiting = (job: JobRow): boolean => job.state === 'queued' || job.state === 'held';
+
+/** 1 -> "1st", 3 -> "3rd", 12 -> "12th". */
+function ordinal(n: number): string {
+  const rest = n % 100;
+  if (rest >= 11 && rest <= 13) return `${n}th`;
+  return `${n}${({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th'}`;
+}
 
 /** "2m 5s" for a finished job; the start time for one still running. */
 function when(job: JobRow): string {
@@ -76,8 +88,12 @@ export function JobsPanel({ embedded = false, openJob = null, onOpenJob }: JobsP
   }, [bridge, refresh]);
 
   const stop = (job: JobRow): void => {
-    void bridge
-      .stopJob(job.id)
+    // A queued or held job has nothing running: Stop ends its task, which takes the job out.
+    const ending =
+      waiting(job) && job.taskId !== undefined
+        ? bridge.stopTask(job.taskId)
+        : bridge.stopJob(job.id);
+    void ending
       // Read again either way: a refusal usually means the job had just ended.
       .catch((error: unknown) => console.error('could not stop job', error))
       .then(refresh);
@@ -165,7 +181,20 @@ export function JobsPanel({ embedded = false, openJob = null, onOpenJob }: JobsP
                         {STATE_LABEL[job.state] ?? job.state}
                       </span>
                       <span className="job-row__where">
-                        {job.folder} · {job.mode} · <span className="home-time">{when(job)}</span>
+                        {job.state === 'queued' ? (
+                          <>
+                            {ordinal(job.place ?? 1)} in line · {job.folder} · {job.mode}
+                          </>
+                        ) : job.state === 'held' ? (
+                          <>
+                            {job.folder} · {job.mode}
+                          </>
+                        ) : (
+                          <>
+                            {job.folder} · {job.mode} ·{' '}
+                            <span className="home-time">{when(job)}</span>
+                          </>
+                        )}
                       </span>
                     </span>
                     {job.state === 'running' && progress !== null && (
@@ -186,7 +215,7 @@ export function JobsPanel({ embedded = false, openJob = null, onOpenJob }: JobsP
                         Watch
                       </Button>
                     )}
-                    {job.state === 'running' && (
+                    {(job.state === 'running' || (waiting(job) && job.taskId)) && (
                       <Button
                         variant="secondary"
                         aria-label={`Stop ${job.task}`}
