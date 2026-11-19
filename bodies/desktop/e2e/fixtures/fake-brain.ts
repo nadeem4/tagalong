@@ -58,7 +58,8 @@ export interface FakeBrainOptions {
   brainStatus?: Record<string, unknown>;
   /**
    * What `bodies_status` and `whatsapp_status` answer, for Places: which bodies are connected and
-   * which WhatsApp values are saved (default: only the desktop, nothing saved, WhatsApp off).
+   * which WhatsApp values are saved (default: only the desktop, nothing saved, WhatsApp off). A
+   * kind named twice in `connected` is two bodies.
    */
   bodies?: { connected?: string[]; whatsappSet?: string[]; whatsappState?: string };
 }
@@ -1340,13 +1341,20 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           value = options.brainStatus;
         } else if (params.tool === 'bodies_status') {
           const on = options.bodies?.connected ?? ['desktop'];
-          value = {
-            bodies: [
-              { kind: 'desktop', name: 'Desktop', connected: on.includes('desktop') },
-              { kind: 'browser', name: 'Browser', connected: on.includes('browser') },
-              { kind: 'whatsapp', name: 'WhatsApp', connected: on.includes('whatsapp') },
-            ],
-          };
+          // One row per online body (a kind listed twice is two bodies); none online: one row.
+          const rows = (['desktop', 'browser', 'whatsapp'] as const).flatMap((kind) => {
+            const name = kind[0]!.toUpperCase() + kind.slice(1);
+            const count = on.filter((k) => k === kind).length;
+            return count === 0
+              ? [{ id: kind, kind, name, connected: false }]
+              : Array.from({ length: count }, (_, i) => ({
+                  id: i === 0 ? kind : `${kind}-${i + 1}`,
+                  kind,
+                  name: i === 0 ? name : `${name} ${i + 1}`,
+                  connected: true,
+                }));
+          });
+          value = { bodies: rows };
         } else if (params.tool === 'whatsapp_status') {
           const saved = options.bodies?.whatsappSet ?? [];
           const set = Object.fromEntries(

@@ -82,6 +82,11 @@ const walkthroughWindows = () =>
 const settingsFile = () => readFileSync(join(dataDir!, 'settings.json'), 'utf8');
 const tourDone = () =>
   (JSON.parse(settingsFile()) as { walkthrough?: { done?: boolean } }).walkthrough?.done;
+/**
+ * Whether the tour was marked seen. The file itself proves nothing: main saves the install id
+ * there at start, before any window opens; only `walkthrough.done` means "seen".
+ */
+const tourSeen = () => existsSync(join(dataDir!, 'settings.json')) && tourDone() === true;
 
 async function nextTo(tour: Page, step: number): Promise<void> {
   for (let at = 1; at < step; at += 1) {
@@ -116,7 +121,7 @@ test('fresh start shows the walkthrough and hides the pet, bubble and dock', asy
   ).toBeVisible();
   expect(await visible('avatar')).toBe(false);
   expect(await visible('panel')).toBe(false);
-  expect(existsSync(join(dataDir!, 'settings.json'))).toBe(false);
+  expect(tourSeen()).toBe(false);
 });
 
 test('existing user with a key sees it once, can skip the key step, then never again', async () => {
@@ -146,7 +151,7 @@ test('Skip without a key lands on step 9 and cannot finish', async () => {
   await tour.getByRole('button', { name: 'Skip' }).click();
   await expect(tour.getByRole('heading', { name: 'Add your Anthropic API key' })).toBeVisible();
   await expect(tour.getByRole('button', { name: 'Next' })).toBeDisabled();
-  expect(existsSync(join(dataDir!, 'settings.json'))).toBe(false);
+  expect(tourSeen()).toBe(false);
 });
 
 test('Skip with a key closes the window and marks it seen', async () => {
@@ -166,7 +171,7 @@ test('closing mid-way brings the pet back and the tour returns next launch', asy
       ?.close(),
   );
   await expect.poll(() => visible('avatar')).toBe(true);
-  expect(existsSync(join(dataDir!, 'settings.json')) && tourDone() === true).toBe(false);
+  expect(tourSeen()).toBe(false);
 
   await closeApp(app);
   await launch(brain!.addr, [], dataDir);

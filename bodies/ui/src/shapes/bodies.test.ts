@@ -4,9 +4,9 @@ import { parseBodiesState } from './bodies';
 
 const WIRE = {
   bodies: [
-    { kind: 'desktop', name: 'Desktop', connected: true },
-    { kind: 'browser', name: 'Browser', connected: false },
-    { kind: 'whatsapp', name: 'WhatsApp', connected: false },
+    { id: 'desktop-a1b2c3', kind: 'desktop', name: 'Desk', connected: true },
+    { id: 'browser', kind: 'browser', name: 'Browser', connected: false },
+    { id: 'whatsapp', kind: 'whatsapp', name: 'WhatsApp', connected: false },
   ],
   whatsapp: {
     enabled: false,
@@ -37,11 +37,19 @@ describe('parseBodiesState', () => {
     expect(state.whatsapp).toMatchObject({ enabled: false, complete: false, port: 47322 });
   });
 
+  it('keeps the id of a body row', () => {
+    expect(parseBodiesState(WIRE).bodies.map((b) => b.id)).toEqual([
+      'desktop-a1b2c3',
+      'browser',
+      'whatsapp',
+    ]);
+  });
+
   it('rejects a state with a missing field', () => {
     const { port: _port, ...rest } = WIRE.whatsapp;
     expect(() => parseBodiesState({ ...WIRE, whatsapp: rest })).toThrow();
     expect(() =>
-      parseBodiesState({ ...WIRE, bodies: [{ kind: 'tv', name: 'x', connected: true }] }),
+      parseBodiesState({ ...WIRE, bodies: [{ id: 'tv', kind: 'tv', name: 'x', connected: true }] }),
     ).toThrow();
   });
 });

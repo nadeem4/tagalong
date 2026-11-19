@@ -1307,7 +1307,7 @@ supervisor as a getter, because it is built once the brain's port is known):
 | Tool              | Input                                                          | Result text (JSON)                                                                                                                                                                                                                                                                    |
 | ----------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `brain_status`    | `{}`                                                           | `{"version", "build", "pid", "started_at", "started_by", "addr", "data_dir", "log_path", "places": [{"id", "kind", "name"}], "work_running", "model"}` (`model` is the chosen model's name): the facts on Home's "Scout's brain" card (Home only; `brain_status_tools` in `tools.py`) |
-| `bodies_status`   | `{}`                                                           | `{"bodies": [{"kind", "name", "connected"}]}`, always `desktop`, `browser` and `whatsapp`                                                                                                                                                                                             |
+| `bodies_status`   | `{}`                                                           | `{"bodies": [{"id", "kind", "name", "connected"}]}`, one row per online body (two desktops are two rows); a kind with none online keeps one row (`connected` false, `id` the kind), so `desktop`, `browser` and `whatsapp` always appear                                              |
 | `whatsapp_status` | `{}`                                                           | `{"enabled", "set": {access_token, app_secret, verify_token, phone_number_id, allowed_number: bool}, "complete", "state", "port"}`; never a value                                                                                                                                     |
 | `whatsapp_set`    | any of `enabled` (bool), the five strings, `port` (1024-65535) | the same JSON as `whatsapp_status`                                                                                                                                                                                                                                                    |
 
@@ -2679,8 +2679,9 @@ task and Scout hears `task_stop`.
 
 Speech state comes from the bodies that play audio. `server.py` maps a body's `speech_state`
 frames (`started` to `talking`, `ended` to `sentence_break`, `paused`, `idle`) onto
-`Presence.speech(body_id, state, turn, n)`. Presence keeps the last state per body: the body that
-reported last is the one playing, and `idle` ends that body's claim. With no claim,
+`Presence.speech(body_id, state, turn, n)`. Presence keeps the last state per body, and `idle` ends that body's claim. Scout is
+talking while any body plays (`talking()`), and is at a sentence break only when every body that
+reports is at one (`at_break()`: at least one body at `sentence_break` and every other at `sentence_break` or `paused`, so a paused body does not block the rest but alone is never a break), so one body's break never releases another still talking. The latched break (`break_seen`) is set only when every body is at a break, so `next_pause` news cannot cut across a body still talking. With no claim,
 `Mouth.on_state` is the source (wired in `main.py` through `VoiceService.follow_speech` to
 `Presence.mouth`), which covers a turn another body plays. A body's claim is cleared on its `hello`
 (a reconnect) and when its current connection closes (`speech_gone(body_id)`), so a dead

@@ -375,17 +375,21 @@ class RecordingPeer(QuietPeer):
         self.closed = True
 
 
-@pytest.mark.xfail(
-    strict=True, reason="M1: two desktops share the id 'desktop'; the second knocks off the first"
-)
-async def test_6d_two_desktops_with_the_same_id_can_both_stay_connected():
+async def test_6d_two_desktops_with_distinct_ids_both_stay_connected():
     bodies = Bodies()
+    session = make_session(
+        Gate(["hello there"]), Open(), bodies, 10, Memory(":memory:"), kinds=NO_WAIT
+    )
     one, two = RecordingPeer(), RecordingPeer()
-    desk = Body(id="desktop", kind="desktop", name="PC")
-    bodies.connect(desk, [], one, None)
-    bodies.connect(desk, [], two, None)
-    print(f"\n[6d] first desktop closed: {one.closed}; online: {bodies.online_ids()}")
-    assert not one.closed
+    bodies.connect(Body(id="desktop-aaaaaa", kind="desktop", name="PC one"), [], one, None)
+    bodies.connect(Body(id="desktop-bbbbbb", kind="desktop", name="PC two"), [], two, None)
+    await session.say("desktop-aaaaaa", say("hi"))
+    await idle(session)
+    got = [sum('"turn"' in f for f in p.frames) for p in (one, two)]
+    print(f"\n[6d] closed: {one.closed}, {two.closed}; turn frames: {got}")
+    assert not one.closed and not two.closed
+    assert set(bodies.online_ids()) == {"desktop-aaaaaa", "desktop-bbbbbb"}
+    assert all(n > 0 for n in got)
 
 
 class Chatty:

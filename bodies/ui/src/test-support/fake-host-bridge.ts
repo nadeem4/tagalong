@@ -182,9 +182,9 @@ interface SetupCall {
 
 const NO_BODIES: BodiesState = {
   bodies: [
-    { kind: 'desktop', name: 'Desktop', connected: true },
-    { kind: 'browser', name: 'Browser', connected: false },
-    { kind: 'whatsapp', name: 'WhatsApp', connected: false },
+    { id: 'desktop', kind: 'desktop', name: 'Desktop', connected: true },
+    { id: 'browser', kind: 'browser', name: 'Browser', connected: false },
+    { id: 'whatsapp', kind: 'whatsapp', name: 'WhatsApp', connected: false },
   ],
   whatsapp: {
     enabled: false,

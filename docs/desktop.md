@@ -525,7 +525,7 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
 `resync`, and `call(tool, input)` runs a brain tool for Home (see below).
 
 - **Dial address:** `ws://<addr>`, with `addr` as `host:port`. The first frame is `hello` with
-  the protocol version, the body (`desktop`), the body's tools and, after a reconnect, `last_seq`.
+  the protocol version, the body (`desktop-<6 hex>` and the PC's name), the body's tools and, after a reconnect, `last_seq`.
 - **Status** (`onStatus`): `connecting`, `online`, `offline`, `outdated`. `outdated` means the brain
   refused the protocol version; the client stops retrying. A closed socket is `offline` and is
   redialled every `retryMs` (2 s).
@@ -953,7 +953,9 @@ The host writes:
 - `<userData>/logs/tagalong.log` and `tagalong.1.log` (warnings and errors only).
 - Settings through `SettingsStore`
   (`settings.json` in `userData`): the avatar position, hotkeys, voice, `walkthrough: { done }`
-  (false until Finish or Skip on the first-run tour) and the other settings in the schema. See [settings-and-secrets.md](settings-and-secrets.md).
+  (false until Finish or Skip on the first-run tour), `bodyId` (this install's body id, `desktop-` and
+  six hex digits, made by `readOrMakeBodyId` the first time it is read and kept, written only by main through `SettingsStore.setBodyId` and not part of `SettingsPatch`; a saved id that
+  breaks the contract's pattern is replaced) and the other settings in the schema. See [settings-and-secrets.md](settings-and-secrets.md).
 
 Everything else main holds (`pendingSnapshot`, the dropped item, status marks) is
 in memory and gone on quit. `before-quit` disposes the hotkeys, the talk key hook, the

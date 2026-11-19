@@ -23,7 +23,7 @@ import {
 import { ContextSnapshot } from '@tagalong/ui/shapes';
 import { TALK_KEY_LABELS, TALK_KEY_RIGHT_CTRL } from '../shared/settings';
 import type { Settings } from '../shared/settings';
-import { SettingsStore } from './settings-store';
+import { SettingsStore, readOrMakeBodyId } from './settings-store';
 import {
   AlwaysListening,
   listeningPaused,
@@ -317,6 +317,7 @@ async function start(): Promise<void> {
     }
   };
   const brain = startBrain({
+    bodyId: readOrMakeBodyId(settingsStore),
     platform,
     exclusions: () => desktop?.settings.captureExclusions ?? settings.captureExclusions,
     onCapture: announceCapture,

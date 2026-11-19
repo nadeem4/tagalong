@@ -12,7 +12,9 @@ import { fakeIpc } from './fake-ipc';
 const TOKEN = 'EAAG-fake-access-token-value';
 const text = (value: unknown) => [{ type: 'text' as const, text: JSON.stringify(value) }];
 
-const BODIES = { bodies: [{ kind: 'desktop', name: 'Desktop', connected: true }] };
+const BODIES = {
+  bodies: [{ id: 'desktop-a1b2c3', kind: 'desktop', name: 'Desktop', connected: true }],
+};
 const WHATSAPP = {
   enabled: false,
   set: {

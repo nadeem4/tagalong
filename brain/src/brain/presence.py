@@ -35,7 +35,10 @@ class Presence:
         if state == "sentence_break":
             if turn is not None and n is not None:
                 self._heard[body_id] = (turn, n)
-            self._break_seen = True
+            # Latched only when every body is between sentences: one body's break must not let
+            # news cut across another still talking.
+            if self.at_break():
+                self._break_seen = True
         self.on_change()
 
     def mouth(self, state: str) -> None:
@@ -51,12 +54,21 @@ class Presence:
         self.on_change()
 
     def talking(self) -> bool:
-        # The body that reported last is the one playing now; with none reporting, the mouth.
-        return next(reversed(self._reported.values()), self._mouth) != "idle"
+        # Talking while any body plays; with none reporting, the mouth speaks for them all.
+        if self._reported:
+            return True  # a body that is idle is not kept
+        return self._mouth != "idle"
 
     def at_break(self) -> bool:
-        """Whether the speech playing now sits between two sentences."""
-        return next(reversed(self._reported.values()), self._mouth) == "sentence_break"
+        """Whether the speech playing now sits between two sentences: every body that reports
+        is at a break and at least one is at a `sentence_break`. A paused body (the person talking
+        over Scout, maybe mid-sentence) does not hold the others back, but alone is no break."""
+        if self._reported:
+            states = self._reported.values()
+            return "sentence_break" in states and all(
+                s in ("sentence_break", "paused") for s in states
+            )
+        return self._mouth == "sentence_break"
 
     def heard(self, body_id: str) -> tuple[str, int]:
         """The turn and how many of its sentences the body last reported finished."""

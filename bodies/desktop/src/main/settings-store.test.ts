@@ -3,8 +3,9 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { SETTINGS_DEFAULTS } from '../shared/settings';
-import { SETTINGS_FILENAME, SettingsStore } from './settings-store';
+import { SETTINGS_DEFAULTS, SettingsPatch } from '../shared/settings';
+import { shouldOpenWalkthrough } from './walkthrough-gate';
+import { SETTINGS_FILENAME, SettingsStore, readOrMakeBodyId } from './settings-store';
 
 let dataDir: string;
 let file: string;
@@ -28,6 +29,42 @@ describe('SettingsStore walkthrough', () => {
     const store = new SettingsStore(dataDir);
     store.set({ walkthrough: { done: true } });
     expect(new SettingsStore(dataDir).get().walkthrough.done).toBe(true);
+  });
+});
+
+describe('readOrMakeBodyId', () => {
+  it('keeps the same install id across restarts', () => {
+    const first = readOrMakeBodyId(new SettingsStore(dataDir));
+    expect(first).toMatch(/^desktop-[0-9a-f]{6}$/);
+    expect(readOrMakeBodyId(new SettingsStore(dataDir))).toBe(first);
+  });
+
+  it('replaces a saved id that does not match the pattern, keeping the other settings', () => {
+    writeFileSync(file, JSON.stringify({ bodyId: 'BAD ID!', walkthrough: { done: true } }), 'utf8');
+    const id = readOrMakeBodyId(new SettingsStore(dataDir));
+    expect(id).toMatch(/^desktop-[0-9a-f]{6}$/);
+    const saved = new SettingsStore(dataDir).get();
+    expect(saved.bodyId).toBe(id);
+    expect(saved.walkthrough.done).toBe(true);
+  });
+});
+
+describe('a settings file holding only the install id', () => {
+  it('still opens the first-run tour: seen means walkthrough.done, not a settings file', () => {
+    const store = new SettingsStore(dataDir);
+    readOrMakeBodyId(store);
+    expect(existsSync(file)).toBe(true);
+    expect(shouldOpenWalkthrough(new SettingsStore(dataDir).get())).toBe(true);
+  });
+});
+
+describe('bodyId is main-only', () => {
+  it('a settings patch cannot set it', () => {
+    const store = new SettingsStore(dataDir);
+    const id = readOrMakeBodyId(store);
+    expect(SettingsPatch.parse({ bodyId: 'desktop-aaaaaa' })).toEqual({});
+    store.set({ bodyId: 'desktop-aaaaaa' } as SettingsPatch);
+    expect(store.get().bodyId).toBe(id);
   });
 });
 

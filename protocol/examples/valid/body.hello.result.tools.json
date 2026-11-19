@@ -2,7 +2,7 @@
   "jsonrpc": "2.0",
   "id": 1,
   "result": {
-    "protocol": 1,
+    "protocol": 2,
     "session": "s1",
     "tools": [
       {
