@@ -178,7 +178,7 @@ and listed in `.env.example`. The brain builds the WhatsApp bridge's environment
 nothing else. Only the access token, app secret and verify token are masked (in logs,
 including the bridge's own output, and in saved text); the numbers are the person's own and are
 not. See
-[the brain](../brain/README.md#whatsapp-bridge).
+[the brain](../brain/setup.md#whatsapp-bridge).
 
 Home sets them: Connections > Bodies sends each value once to the Home tool `whatsapp_set`, which writes it to `<TAGALONG_HOME>/.env`. It is never returned (`whatsapp_status` says only which values are set), kept in the renderer after Save, or put in an IPC error. See [WhatsApp](../bodies/whatsapp.md).
 

@@ -530,48 +530,4 @@ the card ("this expert can't take connected apps"). The grant's `sent` flag is s
 
 ## Retries and give-ups
 
-A tool call Scout makes while working for a job (a wake about it, or a job tool that named it)
-is also a `tool_call` row under that job's goal: `done` with the first 300 characters of the
-result, or failed. The job tools and `resolve_step` themselves leave no row. `retry.py` decides
-what happens to a failure:
-
-- `classify(err)`: `TimeoutError`, `ConnectionError`, Anthropic rate-limit, connection and
-  timeout errors and an `RpcError` with the timeout code are `transient`; everything else is
-  `permanent`.
-- `safe_to_retry(spec)`: only a read-effect tool whose name holds none of `pay`, `purchase`, `buy`,
-  `send_money`, `delete`, `remove`, `trash`, `wipe`, `forget`. Anything else is never repeated on
-  a guess. A call whose saved input was changed by masking (a secret became `[secret]`) is not
-  safe either, because replaying it would send the placeholder.
-
-A transient failure on a safe step goes back to `planned` with `due_at` after a backoff of 30 s,
-2 min, then 10 min: three retries, so four runs in total. `Timers` finds due `tool_call` and `expert_call` rows, moves
-them to `active` and calls the session's rerun: a tool call runs again through the toolbox as
-Scout, an `expert_call` runs again with `Jobs.run_planned` (the same row, the saved session and
-the job's mode, no card). Any other failure, or the last try, ends the step as `failed`, which
-blocks its goal and emits `work_failed` (goal, step, title, reason) so Scout is woken once. The
-person (or Scout for them) answers with `resolve_step`: retry, skip or stop. It takes only a
-`tool_call` or `expert_call` row; retry and skip need it `failed` or `blocked`. Stop stops the
-job's running experts, then closes the job as failed through `Jobs.close`. A step that ended while
-the brain was down is not repeated unless it was safe (see the resume scan in
-[storage.md](../data/storage.md)). A failed step nobody was told about (the wake never started, or the
-scan failed it as "unsure if it ran") is told at the next start, once: the `work_failed` event's
-id is `work_failed:{step}@{ended_at}`, so a second telling is refused by the log. A step that gives
-up and its news are saved in one transaction.
-
-```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
-flowchart TD
-    A[tool call fails] --> B{transient and safe to retry?}
-    B -- no --> F[step failed, goal blocked]
-    B -- yes --> C{tries left?}
-    C -- no --> F
-    C -- yes --> D[planned, due after backoff]
-    D --> E[Timers reruns it]
-    E -->|fails| B
-    E -->|works| G[step done]
-    F --> H[work_failed wakes Scout]
-    H --> I{resolve_step}
-    I -- retry --> D
-    I -- skip --> J[step cancelled, goal goes on]
-    I -- stop --> K[goal closed as failed]
-```
+How a failed step is retried, given up and told to Scout is in [safety.md](safety.md#retries-and-give-ups).
