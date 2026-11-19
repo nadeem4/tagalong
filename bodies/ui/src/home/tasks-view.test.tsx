@@ -6,7 +6,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { HostBridgeProvider, type JobRow } from '../host-bridge';
-import type { LoopRow, TimerRow, WaitingEvent } from '../shapes';
+import type { LoopRow, TaskRow, TimerRow, WaitingEvent } from '../shapes';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
 import { TasksView } from './tasks-view';
 
@@ -136,5 +136,35 @@ describe('TasksView', () => {
     await waitFor(() => expect(screen.queryByText('note t1')).toBeNull());
     expect(screen.getByText('note t2')).toBeVisible();
     expect(screen.getByRole('tab', { name: 'Timers (1)' })).toBeVisible();
+  });
+});
+
+describe('TasksView task list', () => {
+  const task = (id: string, extra: Partial<TaskRow> = {}): TaskRow => ({
+    id,
+    kind: 'watch',
+    state: 'open',
+    title: `Task ${id}`,
+    source: 'timer:w1',
+    chain: [],
+    createdAt: '2026-11-17T08:00:00+00:00',
+    endedAt: null,
+    ...extra,
+  });
+
+  it('lists the tasks on its own tab and stops one, then reads again', async () => {
+    const bridge = createFakeHostBridge({ tasks: [task('a')] });
+    open(bridge);
+    fireEvent.click(await screen.findByRole('tab', { name: 'All tasks (1)' }));
+    bridge.tasks = [];
+    fireEvent.click(await screen.findByRole('button', { name: 'Stop Task a' }));
+    await waitFor(() => expect(bridge.taskStops).toEqual(['a']));
+    expect(await screen.findByRole('tab', { name: 'All tasks (0)' })).toBeVisible();
+  });
+
+  it('shows no Ask task', async () => {
+    open(createFakeHostBridge({ tasks: [task('a'), task('k', { kind: 'ask', title: 'Hello' })] }));
+    fireEvent.click(await screen.findByRole('tab', { name: 'All tasks (1)' }));
+    expect(screen.queryByText('Hello')).toBeNull();
   });
 });

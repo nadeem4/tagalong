@@ -2,7 +2,8 @@
  * Home's Tasks page on the fake brain: the Now card shows a waiting ask (answered with Allow), a
  * running job and a timer about to fire; the tabs carry counts; Cancel on the Timers tab reaches
  * the brain; the Waiting tab lists the news not yet told and marks a say Scout gave up on
- * (the brain lists given-up events of every kind, says included).
+ * (the brain lists given-up events of every kind, says included); the All tasks tab lists a watch
+ * task and an ended one, and Stop on the live one reaches the brain.
  */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -122,4 +123,18 @@ test('a queued job shows its place in line and Stop ends its task', async () => 
   await expect(row).toContainText('2nd in line');
   await row.getByRole('button', { name: 'Stop Tidy the docs' }).click();
   await expect.poll(() => brain.taskStops, { timeout: 15_000 }).toContain('kq');
+});
+
+test('Tasks page lists a watch task and stops it', async () => {
+  const home = await windowFor('home');
+  await home.getByRole('tab', { name: /^All tasks/ }).click();
+  const list = home.getByRole('list', { name: 'Task list' });
+  const watch = list.getByRole('listitem').filter({ hasText: 'Watching Gmail' });
+  await expect(watch).toContainText('Watch');
+  await expect(watch).toContainText('from timer:w1');
+  const ended = list.getByRole('listitem').filter({ hasText: 'Check for updates' });
+  await expect(ended).toContainText('Done');
+  await expect(ended.getByRole('button', { name: /^Stop/ })).toHaveCount(0);
+  await watch.getByRole('button', { name: 'Stop Watching Gmail' }).click();
+  await expect.poll(() => brain.taskStops, { timeout: 15_000 }).toContain('kw1');
 });
