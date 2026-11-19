@@ -10,7 +10,6 @@ import logging
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
-from datetime import timedelta
 from typing import TYPE_CHECKING, Literal, Protocol
 
 from pydantic import ValidationError
@@ -23,13 +22,16 @@ from brain.open_items import OpenItemRefused
 from brain.outputs import OutputStore, preview
 from brain.permission import (
     ASK_WAIT_ARG,
+    CHECK_BACK_ARG,
+    URGENT_ARG,
     AskOpen,
     AskRequest,
     Decision,
     Engine,
+    Hold,
     Tier,
-    ask_wait,
     gate_tier,
+    hold_from,
     resolve_mode,
     summarise,
     tier,
@@ -53,6 +55,27 @@ _WAIT_PROPERTY = {
     "type": "number",
     "description": "Hours this may wait for the person's yes if they are away: 1 to 168, "
     "default 72.",
+}
+_CHECK_BACK_PROPERTY = {
+    "type": "number",
+    "description": "Minutes until you want to be told this still waits (default: two-thirds "
+    "of the wait).",
+}
+_URGENT_PROPERTY = {
+    "type": "boolean",
+    "description": "True only when waiting costs the person something: the check-back may then "
+    "reach them in quiet hours.",
+}
+
+
+def _kw(hold: Hold) -> dict:
+    return {"check_back": hold.check_back, "urgent": hold.urgent}
+
+
+_ASK_ARGS = {
+    ASK_WAIT_ARG: _WAIT_PROPERTY,
+    CHECK_BACK_ARG: _CHECK_BACK_PROPERTY,
+    URGENT_ARG: _URGENT_PROPERTY,
 }
 
 
@@ -288,7 +311,7 @@ class Toolbox:
             if self.mode(spec) == "ask":  # only a tool that can ask has a wait to name
                 schema = {
                     **schema,
-                    "properties": {**schema.get("properties", {}), ASK_WAIT_ARG: _WAIT_PROPERTY},
+                    "properties": {**schema.get("properties", {}), **_ASK_ARGS},
                 }
             out.append({"name": spec.name, "description": spec.description, "input_schema": schema})
         return out
@@ -299,7 +322,7 @@ class Toolbox:
         spec: ToolSpec,
         source_kind: str,
         job_id: str | None,
-        wait: timedelta | None,
+        wait: Hold | None,
     ) -> None:
         """Gate step 3: the engine decides; return only if the call may run. `job_id` names the
         expert job a call comes from, so its approval rows say so. Scout's own ask that needs the
@@ -315,7 +338,7 @@ class Toolbox:
             opened: list = []
 
             def show_card() -> None:  # up before the side-check looks, never after
-                opened.append(runner.open(call, req, wait))
+                opened.append(runner.open(call, req, wait.wait, **_kw(wait)))
 
             def settled(by: str) -> None:
                 try:
@@ -329,7 +352,7 @@ class Toolbox:
             return
         if later and decision.code == "no_decider":  # only the person is left to say
             assert wait is not None and self._runner is not None
-            raise AskOpen(self._runner.open(call, req, wait).id)
+            raise AskOpen(self._runner.open(call, req, wait.wait, **_kw(wait)).id)
         # Plain words the model reads; logged reasons never carry tool text.
         name = spec.name
         match decision.code:
@@ -400,10 +423,10 @@ class Toolbox:
     ) -> str | list[dict]:
         found: list = []  # [spec, source kind, ran?] once a servable tool is matched
         # The wait is the model's to name for its own asks only; no tool, card or log sees it.
-        hours = call.input.get(ASK_WAIT_ARG)
-        if ASK_WAIT_ARG in call.input:
-            call = replace(call, input={k: v for k, v in call.input.items() if k != ASK_WAIT_ARG})
-        wait = ask_wait(hours) if caller == "scout" and job_id is None else None
+        args = call.input
+        if any(k in args for k in _ASK_ARGS):
+            call = replace(call, input={k: v for k, v in args.items() if k not in _ASK_ARGS})
+        wait = hold_from(args) if caller == "scout" and job_id is None else None
         try:
             out = await self._run(call, caller, found, job_id, wait)
         except AskOpen as opened:
@@ -471,7 +494,7 @@ class Toolbox:
             log.exception("on_call hook failed")
 
     async def _gate(
-        self, call: Call, spec: ToolSpec, kind: str, job_id: str | None, wait: timedelta | None
+        self, call: Call, spec: ToolSpec, kind: str, job_id: str | None, wait: Hold | None
     ) -> None:
         stored = self._modes().get(spec.name)
         gate = gate_tier(spec, stored)
@@ -487,7 +510,7 @@ class Toolbox:
         await self._ask(call, spec, kind, job_id, wait)
 
     async def _run(
-        self, call: Call, caller: str, found: list, job_id: str | None, wait: timedelta | None
+        self, call: Call, caller: str, found: list, job_id: str | None, wait: Hold | None
     ) -> str | list[dict]:
         for source in self.sources:
             for spec in source.specs():

@@ -56,16 +56,20 @@ class EventKind:
     max_per_hour: int | None = None
 
 
-# A person's words and card answers: what makes a turn, and the tasks it opens, a person's.
-PERSON_KINDS = frozenset({"say", "card_answer"})
+# A person's words, card answers and task stops: what makes a turn, and its tasks, a person's.
+PERSON_KINDS = frozenset({"say", "card_answer", "task_stop"})
 
 _KINDS = (
     # A person's words and card answers: never a wake (see PERSON_KINDS).
     EventKind("say", urgency="now", wakes=False),
     EventKind("card_answer", urgency="now", wakes=False),
+    # The person ended a task from its card: told like a say, so Scout never works on after it.
+    EventKind("task_stop", urgency="now", wakes=False),
     EventKind("timer", urgency="next_pause", batch_seconds=0, max_per_hour=6),
     EventKind("job_ended", urgency="idle", batch_seconds=30, max_per_hour=10),
-    EventKind("ask_notice", urgency="idle", batch_seconds=60, max_per_hour=6),
+    # A card's check-back came (quiet hours hold it unless urgent) or its wait ran out.
+    EventKind("card_due", urgency="next_pause", batch_seconds=30, max_per_hour=6),
+    EventKind("card_expired", urgency="next_pause", batch_seconds=30, max_per_hour=10),
     EventKind("ask_ended", urgency="next_pause", batch_seconds=30, max_per_hour=10),
     EventKind("asks_waiting", urgency="next_pause", batch_seconds=None, max_per_hour=None),
     EventKind("job_quiet", urgency="idle", batch_seconds=0, max_per_hour=3),
@@ -162,9 +166,10 @@ def load_notes() -> dict[str, str]:
     return notes
 
 
-# Kinds that survive a restart: every one that wakes Scout, plus a person's say and card answer.
+# Kinds that survive a restart: every one that wakes Scout, plus a person's say, card answer and
+# task stop.
 # focus, tab, download and setup_progress are latest-value facts and are never stored.
-SAVED_KINDS = frozenset(k.name for k in _KINDS if k.wakes) | {"say", "card_answer"}
+SAVED_KINDS = frozenset(k.name for k in _KINDS if k.wakes) | {"say", "card_answer", "task_stop"}
 
 BACKOFF_S = (30, 120, 600)  # the waits before the 1st, 2nd and 3rd retry of a failed turn
 MAX_RETRIES = 3  # the failure after the last retry gives the event up

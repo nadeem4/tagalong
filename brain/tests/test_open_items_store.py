@@ -10,12 +10,12 @@ from brain.store.db import open_db
 def _put(db, id="i1", **kw):
     row = {
         "kind": "ask",
-        "origin_body": "desktop",
         "saved_call": {"tool": "x"},
         "live_only": False,
         "job_id": None,
         "created_at": "2026-11-11T09:00:00+00:00",
         "deadline_at": "2026-11-12T09:00:00+00:00",
+        "window_s": 86400,
     }
     row.update(kw)
     store.insert(db, id, **row)
@@ -26,14 +26,10 @@ def test_insert_get_roundtrip_and_survives_reopen(tmp_path):
     _put(db, job_id="j1")
     db.close()
     item = store.get(open_db(tmp_path / "t.db"), "i1")
-    assert (item.kind, item.state, item.origin_body, item.job_id) == (
-        "ask",
-        "open",
-        "desktop",
-        "j1",
-    )
+    assert (item.kind, item.state, item.job_id) == ("ask", "open", "j1")
     assert item.saved_call == {"tool": "x"} and item.live_only is False
     assert item.closed_at is None and item.closed_by is None
+    assert item.window_s == 86400
 
 
 def test_close_only_moves_an_open_item(tmp_path):
@@ -49,9 +45,20 @@ def test_close_only_moves_an_open_item(tmp_path):
 
 def test_queries_for_open_due_and_live_only(tmp_path):
     db = open_db(tmp_path / "t.db")
-    _put(db, "a", origin_body="desktop", created_at="2026-11-11T09:00:01+00:00")
-    _put(db, "b", origin_body="whatsapp", deadline_at="2026-11-11T09:30:00+00:00", live_only=True)
+    _put(db, "a", created_at="2026-11-11T09:00:01+00:00")
+    _put(db, "b", deadline_at="2026-11-11T09:30:00+00:00", live_only=True)
     assert [i.id for i in store.list_open(db)] == ["b", "a"]
-    assert [i.id for i in store.list_open(db, "desktop")] == ["a"]
     assert [i.id for i in store.due(db, "2026-11-11T09:30:00+00:00")] == ["b"]
     assert [i.id for i in store.live_only_open(db)] == ["b"]
+
+
+def test_due_checks_lists_open_items_past_check_back(tmp_path):
+    db = open_db(tmp_path / "t.db")
+    _put(db, "a", check_back_at="2026-11-11T10:00:00+00:00", check_back_by="scout")
+    _put(db, "b", check_back_at="2026-11-11T12:00:00+00:00", check_back_by="scout")
+    _put(db, "c")  # no check-back
+    assert [i.id for i in store.due_checks(db, "2026-11-11T11:00:00+00:00")] == ["a"]
+    store.close(db, "a", "done", "2026-11-11T10:30:00+00:00", "brain", "x")
+    assert store.due_checks(db, "2026-11-11T11:00:00+00:00") == []
+    _put(db, "t", task_id="t1")
+    assert [i.id for i in store.for_task(db, "t1")] == ["t"]

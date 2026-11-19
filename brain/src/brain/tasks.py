@@ -10,7 +10,8 @@ import sqlite3
 from collections.abc import Callable
 from datetime import datetime, timedelta
 
-from brain.events import PERSON_KINDS
+from brain.events import PERSON_KINDS, Event
+from brain.open_items import OpenItems
 from brain.store import tasks as store
 from brain.store.db import transaction, utc_text
 from brain.store.memory import MemoryRefused
@@ -30,11 +31,19 @@ def age_text(seconds: int) -> str:
 
 class Tasks:
     def __init__(
-        self, db: sqlite3.Connection, mask: Callable[[str], str], now: Callable[[], datetime]
+        self,
+        db: sqlite3.Connection,
+        mask: Callable[[str], str],
+        now: Callable[[], datetime],
+        *,
+        items: OpenItems | None = None,  # what waits on the person; `stop` closes the task's
+        post: Callable[[Event], None] | None = None,  # the session's post_event
     ) -> None:
         self._db = db
         self._mask = mask
         self._now = now
+        self._items = items
+        self._post = post
 
     def new_id(self) -> str:
         while True:
@@ -120,6 +129,18 @@ class Tasks:
             return store.set_state(
                 self._db, id, state, at=utc_text(self._now()), result=result, end_reason=reason
             )
+
+    def stop(self, id: str, by: str) -> list[str]:
+        """The person ended the task: it ends as stopped, what waited on them for it is closed,
+        and Scout is told. Returns the closed item ids (their cards go too); [] when it was over."""
+        if not self.end(id, "stopped", reason="the person stopped it"):
+            return []
+        closed = [i.id for i in self._items.for_task(id)] if self._items else []
+        for item_id in closed:
+            self._items.finish(item_id, "cancelled")
+        if self._post:
+            self._post(Event("task_stop", by, {"task": id, "by": by}, task=id))
+        return closed
 
     def settle(self) -> list[str]:
         """End every Ask whose say is over and every Later with nothing left to run."""

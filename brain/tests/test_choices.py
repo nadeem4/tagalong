@@ -112,8 +112,8 @@ async def test_choice_timeout_expires_item_not_silent_drop():
 async def test_a_choice_timeout_leaves_other_kinds_of_open_items_alone():
     _, _, choices = rig(timeout=0.01)
     items = choices._items
-    other_ask = items.open("ask", "desktop", ttl_s=0)  # already past its deadline
-    offer = items.open("offer", "brain", ttl_s=0)
+    other_ask = items.open("ask", ttl_s=0)  # already past its deadline
+    offer = items.open("offer", ttl_s=0)
     choices.ask("Which?", ["a"], None, True)
     await asyncio.sleep(0.05)
     assert items.get(other_ask.id).state == "open"

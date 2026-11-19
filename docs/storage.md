@@ -50,7 +50,7 @@ Nothing outside this package runs SQL: `tests/test_store_boundary.py` fails if a
 under `brain/src/brain` calls `.execute`, `.executescript` or `.executemany`.
 
 - `store/migrations/`: `NNNN_name.sql` (or `NNNN_name.py` with a `migrate(db)` function) files,
-  `0001_memories` to `0037_open_items_no_held`. The numbers have no gaps (the loader refuses a gap or a
+  `0001_memories` to `0039_open_items_tasks`. The numbers have no gaps (the loader refuses a gap or a
   duplicate). Each file runs in one transaction together with its `user_version` bump, so a
   failure leaves the file at the last good version. A file is never edited after it has merged;
   a schema change is a new file.
@@ -728,13 +728,18 @@ gone.
 | ----------------- | ---------------- | ---------------------------------------------------------------------------------------------- |
 | `id`              | TEXT PRIMARY KEY | A random hex id                                                                                |
 | `kind`            | TEXT             | `ask`, `choice`, `install`, `signin`, `expert_ask` or `offer` (CHECK)                          |
-| `origin_body`     | TEXT             | The body the item came from, so a reply goes back to it                                        |
+| `task_id`         | TEXT             | The task of the turn that opened it, or null; an expert's ask takes its job's task             |
+| `caused_by`       | TEXT             | The event the asking turn took (an expert's ask: its job's), or null                           |
 | `state`           | TEXT             | `open`, `answered`, `done` or `expired` (CHECK); default `open`                                |
 | `saved_call_json` | TEXT             | The call to run on a later yes, as JSON, or null. Callers mask it before saving                |
 | `live_only`       | INTEGER          | 1 when the item is tied to a running process (an expert's permission ask) and cannot run later |
 | `job_id`          | TEXT             | The job it belongs to, or null; `Job.open_items` lists a job's ids                             |
 | `created_at`      | TEXT             | UTC time text                                                                                  |
 | `deadline_at`     | TEXT             | UTC time text: `created_at` plus `DEADLINE_S` (one day) unless the item asked for another      |
+| `window_s`        | REAL             | The answer window in seconds, set at open; Not now moves the deadline by it, never growing it  |
+| `check_back_at`   | TEXT             | UTC time text: when to look at the card again, or null once it was told                        |
+| `check_back_by`   | TEXT             | Who set the check-back: `scout` or `person` (CHECK); a person's is not moved by Scout          |
+| `urgent`          | INTEGER          | 1 when Scout called the ask urgent: its check-back is told even in quiet hours                 |
 | `closed_at`       | TEXT             | When it left `open`, or null                                                                   |
 | `closed_by`       | TEXT             | Who closed it: the answering body, or `brain`                                                  |
 | `answer`          | TEXT             | The person's answer, set when it is `answered` and kept when the item is later `done`          |
@@ -748,7 +753,8 @@ gone.
   offer's outcome word (the keep-asking window); the open item is the pending offer.
 - Read by: `OpenItems.list_open`, `list_answered`, `find_open` (the open item with a given saved call), `get`.
 - Retention: closed rows stay until a later slice sweeps them.
-- Index: `open_items_open(state, deadline_at)` for the deadline scan.
+- Without a check-back time, `OpenItems.open` sets one two-thirds of the way to the deadline, by `scout`. `not_now(id, at, by)` moves it (30 minutes on by default) and the deadline past it; `due_checks`, `checked` and `for_task` read and clear.
+- Indexes: `open_items_open(state, deadline_at)` for the deadline scan; `open_items_check(state, check_back_at)` for the check-back scan.
 
 ## Apps
 

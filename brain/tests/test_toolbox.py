@@ -1392,9 +1392,11 @@ class FakeRunner:
 
     def __init__(self):
         self.opened = []
+        self.kw = []
 
-    def open(self, call, req, wait):
+    def open(self, call, req, wait, **kw):
         self.opened.append((call, req, wait))
+        self.kw.append(kw)
         return types.SimpleNamespace(id="item1")
 
 
@@ -1549,6 +1551,17 @@ async def test_ask_wait_hours_is_clamped_and_stripped(given, hours):
     assert call.input == {"a": 1} and seen == [{"a": 1}] and source.inputs == []
 
 
+async def test_check_back_and_urgent_are_stripped_and_passed_to_the_runner():
+    spec_ = ToolSpec("t", "t tool", {"type": "object"})
+    box, source, engine = _engine_box(Decision("deny", "no_decider"), spec_)
+    runner = box._runner = FakeRunner()
+    args = {"a": 1, "check_back_minutes": 10, "urgent": True}
+    await box.run(Call("c1", "t", args, "t1", "Doing it."))
+    [(call, req, wait)] = runner.opened
+    assert call.input == {"a": 1} and source.inputs == []
+    assert runner.kw == [{"check_back": timedelta(minutes=10), "urgent": True}]
+
+
 async def test_ask_wait_hours_is_stripped_on_an_auto_tool_too():
     box, source, engine = _engine_box(
         Decision("allow_once"), ToolSpec("t", "t tool", {"type": "object"}, tier=Tier.auto)
@@ -1563,7 +1576,12 @@ def test_ask_wait_hours_only_on_ask_mode_schemas():
     reading = ToolSpec("reads", "x", schema, effect="read")
     box = Toolbox([FakeSource([asking, reading])])
     by_name = {t["name"]: t["input_schema"] for t in box.model_tools()}
-    assert set(by_name["asks"]["properties"]) == {"a", "ask_wait_hours"}
+    assert set(by_name["asks"]["properties"]) == {
+        "a",
+        "ask_wait_hours",
+        "check_back_minutes",
+        "urgent",
+    }
     assert by_name["asks"]["properties"]["ask_wait_hours"]["type"] == "number"
     assert set(by_name["reads"]["properties"]) == {"a"}
     assert set(schema["properties"]) == {"a"}  # the tool's own schema is never edited

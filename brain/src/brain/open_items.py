@@ -18,7 +18,7 @@ from brain.store import open_items as store
 from brain.store.db import utc_text
 
 DEADLINE_S = 86400  # the one deadline: a day to answer, unless an item asks for another
-BRAIN = "brain"  # the origin of an item no body started
+NOT_NOW_DEFAULT_S = 1800  # Not now with no time on the card: look again in half an hour
 
 _log = logging.getLogger("brain.open_items")
 
@@ -27,21 +27,27 @@ _log = logging.getLogger("brain.open_items")
 class OpenItem:
     id: str
     kind: str
-    origin_body: str
     state: str
+    task_id: str | None
+    caused_by: str | None
     saved_call: dict | None
     live_only: bool
     job_id: str | None
     created_at: datetime
     deadline_at: datetime
+    check_back_at: datetime | None
+    check_back_by: str | None
+    urgent: bool
     closed_at: datetime | None
     closed_by: str | None
     answer: str | None
     reason: str | None
+    window_s: float
 
 
 class OpenItemRefused(Exception):
-    """An answer that cannot count; `reason` says why: `not_found`, `expired` or `closed`."""
+    """An answer that cannot count; `reason` says why: `not_found`, `expired`, `closed` or
+    `person_set` (Scout tried to move a check-back the person chose)."""
 
     def __init__(self, reason: str) -> None:
         super().__init__(reason)
@@ -63,20 +69,26 @@ def _event(event: str, item: OpenItem, by: str, why: str) -> None:
 
 def _item(s: store.StoredItem) -> OpenItem:
     closed = None if s.closed_at is None else datetime.fromisoformat(s.closed_at)
+    check = None if s.check_back_at is None else datetime.fromisoformat(s.check_back_at)
     return OpenItem(
         s.id,
         s.kind,
-        s.origin_body,
         s.state,
+        s.task_id,
+        s.caused_by,
         s.saved_call,
         s.live_only,
         s.job_id,
         datetime.fromisoformat(s.created_at),
         datetime.fromisoformat(s.deadline_at),
+        check,
+        s.check_back_by,
+        s.urgent,
         closed,
         s.closed_by,
         s.answer,
         s.reason,
+        s.window_s,
     )
 
 
@@ -88,7 +100,11 @@ class OpenItems:
     def open(
         self,
         kind: str,
-        origin_body: str,
+        *,
+        task_id: str | None = None,
+        caused_by: str | None = None,
+        check_back_at: datetime | None = None,
+        urgent: bool = False,
         saved_call: dict | None = None,
         live_only: bool = False,
         job_id: str | None = None,
@@ -101,15 +117,21 @@ class OpenItems:
             self.db,
             id,
             kind=kind,
-            origin_body=origin_body,
+            task_id=task_id,
+            caused_by=caused_by,
             saved_call=saved_call,
             live_only=live_only,
             job_id=job_id,
             created_at=utc_text(now),
             deadline_at=utc_text(now + timedelta(seconds=ttl_s)),
+            window_s=ttl_s,
+            # With no check-back given, look again two-thirds of the way to the deadline.
+            check_back_at=utc_text(check_back_at or now + timedelta(seconds=ttl_s * 2 / 3)),
+            check_back_by="scout",
+            urgent=urgent,
         )
         item = self.get(id)
-        _event("opened", item, origin_body, kind)
+        _event("opened", item, "brain", kind)
         return item
 
     def get(self, id: str) -> OpenItem | None:
@@ -159,8 +181,39 @@ class OpenItems:
             for s in store.live_only_open(self.db, job_id)
         ]
 
-    def list_open(self, origin_body: str | None = None, kind: str | None = None) -> list[OpenItem]:
-        return [_item(s) for s in store.list_open(self.db, origin_body, kind)]
+    def list_open(self, kind: str | None = None) -> list[OpenItem]:
+        return [_item(s) for s in store.list_open(self.db, kind)]
+
+    def for_task(self, task_id: str) -> list[OpenItem]:
+        return [_item(s) for s in store.for_task(self.db, task_id)]
+
+    def not_now(self, id: str, at: datetime | None, by: str) -> OpenItem:
+        """Look at this card again at `at` (half an hour on when None). A time the person set
+        stays theirs: Scout's try is refused. The deadline moves with it, keeping its window."""
+        item = self.get(id)
+        if item is None:
+            raise OpenItemRefused("not_found")
+        if item.state != "open":
+            raise OpenItemRefused("expired" if item.state == "expired" else "closed")
+        if by == "scout" and item.check_back_by == "person":
+            raise OpenItemRefused("person_set")
+        at = at or self._now() + timedelta(seconds=NOT_NOW_DEFAULT_S)
+        deadline = at + timedelta(seconds=item.window_s)
+        store.set_check_back(self.db, id, utc_text(at), by, utc_text(deadline))
+        moved = self.get(id)
+        _event("not_now", moved, by, utc_text(at))
+        return moved
+
+    def due_checks(self, now: datetime) -> list[OpenItem]:
+        return [_item(s) for s in store.due_checks(self.db, utc_text(now))]
+
+    def checked(self, id: str, next_at: datetime | None) -> None:
+        """The check-back was acted on (`card_due` posted): clear it, or move it to `next_at`."""
+        item = self.get(id)
+        if item is not None:
+            store.set_check_back(
+                self.db, id, None if next_at is None else utc_text(next_at), item.check_back_by
+            )
 
     def list_answered(self, kind: str) -> list[OpenItem]:
         """Answered but not done: after a restart these are closed or run again, never lost."""

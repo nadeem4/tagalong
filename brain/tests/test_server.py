@@ -661,7 +661,9 @@ async def test_answer_always_replies_empty_closes_ask_and_runs_the_tool(ask_env)
     url, _ = ask_env
     async with connect(url) as ws:
         ask = (await open_ask(ws))["params"]
+        # A card from the person's own say belongs to its hidden Ask task, so it stays plain.
         assert ask["state"] == "open" and ask["options"] == ["allow", "always", "deny"]
+        assert ask.get("task") is None
         frames = await answer(ws, ask["id"], "always")
         assert frames[-1]["result"] == {}
         closed = [f["params"] for f in frames if f.get("method") == "ask"][0]

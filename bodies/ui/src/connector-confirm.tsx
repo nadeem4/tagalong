@@ -19,7 +19,7 @@ const toolLabel = (tool: string): string =>
 const factLabel = (key: string): string =>
   key === 'body' ? 'Says' : key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
 
-const GATE_OPTIONS = new Set(['allow', 'always', 'deny']);
+const GATE_OPTIONS = new Set(['allow', 'always', 'deny', 'not_now', 'stop_task']);
 
 /**
  * Built like the hand-off card: what will happen, then Not now, Always allow and Allow.
@@ -51,6 +51,8 @@ export function ConnectorConfirmCard({
   const what = isAsk ? confirm.summary : (first ?? '');
   const filled = isAsk ? [] : rest;
   const canAlways = confirm.options?.includes('always') ?? false;
+  // A task's card also lets the person put it off or end the task; the brain moves the check-back.
+  const ofTask = confirm.options?.includes('not_now') ?? false;
 
   if (isJob) {
     const text = typed.trim();
@@ -193,8 +195,26 @@ export function ConnectorConfirmCard({
         )}
       </dl>
       <div className="card-actions" role="group" aria-label="Options">
+        {ofTask && (
+          <button
+            type="button"
+            className="bubble-quiet"
+            onClick={() => onReply({ option: 'stop_task' })}
+          >
+            Stop task
+          </button>
+        )}
+        {ofTask && (
+          <button
+            type="button"
+            className="bubble-quiet"
+            onClick={() => onReply({ option: 'not_now' })}
+          >
+            Not now
+          </button>
+        )}
         <button type="button" className="bubble-quiet" onClick={() => onAnswer('deny')}>
-          Not now
+          {ofTask ? 'No' : 'Not now'}
         </button>
         {canAlways && (
           <button type="button" className="bubble-quiet" onClick={() => onAnswer('always')}>

@@ -523,6 +523,26 @@ describe('the connector confirm card', () => {
     );
   });
 
+  it('a task card reads No, and Not now and Stop task answer by option name', async () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    const card = () =>
+      bridge.emit({ ...confirm(), options: ['allow', 'deny', 'not_now', 'stop_task'] as string[] });
+    act(() => card());
+    expect(screen.getByRole('button', { name: 'No' })).toBeInTheDocument();
+    for (const name of ['Not now', 'Stop task']) {
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name }));
+        await Promise.resolve();
+      });
+      act(() => card());
+    }
+    expect(bridge.jobAnswers).toEqual([
+      { approvalId: APPROVAL, option: 'not_now' },
+      { approvalId: APPROVAL, option: 'stop_task' },
+    ]);
+  });
+
   it('goes away when the turn ends', () => {
     const bridge = createFakeHostBridge();
     renderBubble(bridge);

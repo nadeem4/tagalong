@@ -78,7 +78,7 @@ from brain.mind.turn import Call, Model, run_turn
 from brain.models import DEFAULT_MODEL_ID
 from brain.offers import Offers, OfferSettings
 from brain.open_item_runner import AskRunner
-from brain.open_items import BRAIN, OpenItems
+from brain.open_items import OpenItems
 from brain.outputs import OutputStore
 from brain.permission import Engine, Person, SideCheckDecider, StandingRule, stored_auto_rules
 from brain.presence import Presence
@@ -252,7 +252,13 @@ class Session:
         # from its loop, by which time the rest of __init__ has run.
         self._kinds = {**EVENT_KINDS, **(kinds or {})}
         self.presence = Presence(bodies, now)
-        self.tasks = Tasks(memory.db, lambda text: mask_json(self.guards, "tasks", text), now)
+        self.tasks = Tasks(
+            memory.db,
+            lambda text: mask_json(self.guards, "tasks", text),
+            now,
+            items=items,
+            post=self.post_event,
+        )
         self.runner = Runner(
             events, self.presence, bodies, self, now, self.guards, self.tasks,
             quiet=quiet, kinds=self._kinds,
@@ -304,7 +310,6 @@ class Session:
             steps_max_bytes=job_steps_max_bytes,
             setup_facts=setup_facts,
             emit=self._emit_job_event,
-            task_source=self.tasks.source_of,
             person_task=self.tasks.is_person,
             finish_news=self.events.finish_matching,
             on_timers_changed=lambda: timers.changed(),
@@ -379,13 +384,14 @@ class Session:
             notify("changed", {"what": "permissions"})
 
         self.ask_runner = AskRunner(
-            OpenItems(memory.db, now),
+            items,
             self._asks,
             lambda: self.toolbox,
             self.post_event,
             now,
             approvals,
-            self._turn_origin,
+            self.tasks,
+            self._turn_task,
             lambda turn: self._turn_cause if turn and turn == self._turn_id else None,
             finish=self.events.finish,
         )
@@ -610,13 +616,20 @@ class Session:
         if self._task is not None:
             self._task.cancel()
 
-    def _turn_origin(self, turn_id: str) -> str:
-        """The body showing that turn while it runs, "brain" when it is over."""
-        return (self._turn_body if turn_id == self._turn_id else None) or BRAIN
+    def _turn_task(self, turn_id: str) -> str | None:
+        """The task the running turn works on (its first event's), None once it is over."""
+        row = (
+            self.events.get(self._turn_cause)
+            if turn_id == self._turn_id and self._turn_cause
+            else None
+        )
+        return None if row is None else row.task
 
-    def _card_answered(self, ask_id: str, option: str, body_id: str) -> None:
+    def _card_answered(
+        self, ask_id: str, option: str, body_id: str, check_back_at: str | None = None
+    ) -> None:
         self.presence.touch(body_id)  # the person is at the body that answered
-        self.ask_runner.answered(ask_id, option, body_id)
+        self.ask_runner.answered(ask_id, option, body_id, check_back_at)
 
     async def interject(self, body_id: str, content: list) -> bool:
         """News due at a sentence break while Scout speaks: the voice pauses, one short call sees
@@ -822,7 +835,7 @@ class Session:
 
     def _event_source(self, event_id: str | None, body_id: str | None) -> str:
         row = self.events.get(event_id) if event_id else None
-        return row.source if row is not None else (body_id or BRAIN)
+        return row.source if row is not None else (body_id or "brain")
 
     def _end_cancelled(self, turn_id: str, body_id: str | None, event_id: str) -> None:
         """A say cancelled before its turn began: the body still sees it start and end."""

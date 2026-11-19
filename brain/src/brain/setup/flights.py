@@ -73,7 +73,7 @@ class Flights:
             item = self._items.get(item_id)
             assert item is not None  # an open item is only closed when its task ends
             return Flight(item, task, True)
-        item = self._items.open(self._kind, "brain", saved_call={"id": key}, live_only=True)
+        item = self._items.open(self._kind, saved_call={"id": key}, live_only=True)
         task = asyncio.ensure_future(run())
         self._running[key] = (item.id, task)
         task.add_done_callback(lambda t: self._ended(key, item.id, t))

@@ -20,7 +20,7 @@ def test_a_held_row_is_refused_after_0037(tmp_path):
     db = sqlite3.connect(tmp_path / "t.db", isolation_level=None)
     migrate(db, upto=BEFORE)
     _insert(db, "held")  # still allowed before
-    migrate(db)
+    migrate(db, upto=37)  # 0039 later drops origin_body
     for kind in ("held", "setup"):
         with pytest.raises(sqlite3.IntegrityError):
             _insert(db, kind)

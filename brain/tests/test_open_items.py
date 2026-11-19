@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from brain.open_items import DEADLINE_S, OpenItemRefused, OpenItems
+from brain.open_items import DEADLINE_S, NOT_NOW_DEFAULT_S, OpenItemRefused, OpenItems
 from brain.store.db import open_db
 
 T0 = datetime(2026, 11, 11, 9, 0, 0, tzinfo=UTC)
@@ -25,7 +25,7 @@ def make(tmp_path, clock=None):
 
 def test_answer_while_open_counts(tmp_path):
     items, clock = make(tmp_path)
-    item = items.open("ask", "desktop", saved_call={"tool": "x"})
+    item = items.open("ask", saved_call={"tool": "x"})
     clock.at = T0 + timedelta(seconds=DEADLINE_S - 1)
     done = items.answer(item.id, "yes", "desktop")
     assert (done.state, done.closed_by, done.answer) == ("answered", "desktop", "yes")
@@ -35,7 +35,7 @@ def test_answer_while_open_counts(tmp_path):
 
 def test_answer_after_expiry_is_refused_with_clear_reason(tmp_path):
     items, clock = make(tmp_path)
-    item = items.open("ask", "desktop")
+    item = items.open("ask")
     clock.at = T0 + timedelta(seconds=DEADLINE_S)
     with pytest.raises(OpenItemRefused) as e:
         items.answer(item.id, "yes", "desktop")
@@ -47,17 +47,17 @@ def test_answer_after_expiry_is_refused_with_clear_reason(tmp_path):
 
 def test_survives_restart(tmp_path):
     items, _ = make(tmp_path)
-    item = items.open("install", "desktop", saved_call={"tool": "i"}, job_id="j1")
+    item = items.open("install", saved_call={"tool": "i"}, job_id="j1")
     items.db.close()
     again, _ = make(tmp_path)
-    [back] = again.list_open("desktop")
+    [back] = again.list_open()
     assert (back.id, back.saved_call, back.job_id) == (item.id, {"tool": "i"}, "j1")
 
 
 def test_live_only_items_expire_on_restart(tmp_path):
     items, _ = make(tmp_path)
-    live = items.open("expert_ask", "desktop", live_only=True)
-    kept = items.open("ask", "desktop", saved_call={"tool": "x"})
+    live = items.open("expert_ask", live_only=True)
+    kept = items.open("ask", saved_call={"tool": "x"})
     expired = items.expire_live_only()
     assert [i.id for i in expired] == [live.id]
     assert [i.id for i in items.list_open()] == [kept.id]
@@ -67,9 +67,9 @@ def test_live_only_items_expire_on_restart(tmp_path):
 def test_every_transition_is_logged(tmp_path, caplog):
     caplog.set_level("INFO", logger="brain.open_items")
     items, clock = make(tmp_path)
-    a = items.open("ask", "desktop")
-    b = items.open("choice", "desktop")
-    c = items.open("install", "desktop", ttl_s=10)
+    a = items.open("ask")
+    b = items.open("choice")
+    c = items.open("install", ttl_s=10)
     items.answer(a.id, "yes", "desktop")
     items.finish(b.id, "ran")
     clock.at = T0 + timedelta(seconds=10)
@@ -89,15 +89,15 @@ def test_every_transition_is_logged(tmp_path, caplog):
 
 def test_one_deadline_rule(tmp_path):
     items, _ = make(tmp_path)
-    default = items.open("ask", "desktop")
-    short = items.open("ask", "desktop", ttl_s=60)
+    default = items.open("ask")
+    short = items.open("ask", ttl_s=60)
     assert default.deadline_at == T0 + timedelta(seconds=DEADLINE_S)
     assert short.deadline_at == T0 + timedelta(seconds=60)
 
 
 def test_finish_keeps_the_answer(tmp_path):
     items, _ = make(tmp_path)
-    item = items.open("ask", "desktop")
+    item = items.open("ask")
     items.answer(item.id, "yes please", "desktop")
     done = items.finish(item.id, "ran")
     assert (done.state, done.answer, done.reason) == ("done", "yes please", "ran")
@@ -105,7 +105,7 @@ def test_finish_keeps_the_answer(tmp_path):
 
 def test_answer_in_a_closed_state_is_refused(tmp_path):
     items, _ = make(tmp_path)
-    item = items.open("ask", "desktop")
+    item = items.open("ask")
     items.finish(item.id, "ran")
     with pytest.raises(OpenItemRefused) as e:
         items.answer(item.id, "yes", "desktop")
@@ -114,9 +114,9 @@ def test_answer_in_a_closed_state_is_refused(tmp_path):
 
 def test_list_answered_holds_answered_but_not_done_items(tmp_path):
     items, _ = make(tmp_path)
-    a = items.open("ask", "desktop", saved_call={"n": 1})
-    b = items.open("ask", "desktop", saved_call={"n": 2})
-    items.open("ask", "desktop", saved_call={"n": 3})
+    a = items.open("ask", saved_call={"n": 1})
+    b = items.open("ask", saved_call={"n": 2})
+    items.open("ask", saved_call={"n": 3})
     items.answer(a.id, "allow", "desktop")
     items.answer(b.id, "allow", "desktop")
     items.finish(b.id, "ran")
@@ -126,8 +126,8 @@ def test_list_answered_holds_answered_but_not_done_items(tmp_path):
 def test_find_open_by_saved_call_ignores_closed_and_other_kinds(tmp_path):
     items, _ = make(tmp_path)
     call = {"name": "t", "input": {"b": 1, "a": 2}}
-    first = items.open("ask", "desktop", saved_call={**call, "text": "Doing it."})
-    items.open("offer", "desktop", saved_call={"name": "u"})
+    first = items.open("ask", saved_call={**call, "text": "Doing it."})
+    items.open("offer", saved_call={"name": "u"})
     assert items.find_open("ask", {"input": {"a": 2, "b": 1}, "name": "t"}).id == first.id
     assert items.find_open("ask", {"name": "t", "input": {"a": 9}}) is None
     assert items.find_open("ask", {"name": "other"}) is None
@@ -137,8 +137,8 @@ def test_find_open_by_saved_call_ignores_closed_and_other_kinds(tmp_path):
 
 def test_expire_due_and_list_open_can_take_one_kind(tmp_path):
     items, clock = make(tmp_path)
-    items.open("ask", "desktop")
-    items.open("offer", "desktop")
+    items.open("ask")
+    items.open("offer")
     clock.at = T0 + timedelta(seconds=DEADLINE_S)
     assert [i.kind for i in items.list_open(kind="offer")] == ["offer"]
     assert [i.kind for i in items.expire_due(clock.at, kind="ask")] == ["ask"]
@@ -147,11 +147,63 @@ def test_expire_due_and_list_open_can_take_one_kind(tmp_path):
 
 def test_expired_since_lists_what_ended_while_away(tmp_path):
     items, clock = make(tmp_path)
-    items.open("expert_ask", "desktop", live_only=True)
+    items.open("expert_ask", live_only=True)
     items.expire_live_only()
     clock.at = T0 + timedelta(hours=1)
-    new = items.open("expert_ask", "desktop", live_only=True)
+    new = items.open("expert_ask", live_only=True)
     clock.at = T0 + timedelta(hours=2)
     items.expire_live_only()
-    items.open("ask", "desktop", saved_call={"tool": "x"})
+    items.open("ask", saved_call={"tool": "x"})
     assert [i.id for i in items.expired_since(T0 + timedelta(minutes=30))] == [new.id]
+
+
+def test_a_card_with_no_check_back_gets_one_at_two_thirds(tmp_path):
+    items, _ = make(tmp_path)
+    item = items.open("ask", ttl_s=900, task_id="t1")
+    assert item.check_back_at == T0 + timedelta(seconds=600)
+    assert (item.check_back_by, item.task_id, item.urgent) == ("scout", "t1", False)
+
+
+def test_not_now_without_a_time_checks_back_in_30_minutes(tmp_path):
+    items, _ = make(tmp_path)
+    item = items.open("ask")
+    moved = items.not_now(item.id, None, "person")
+    assert moved.check_back_at == T0 + timedelta(seconds=NOT_NOW_DEFAULT_S)
+    assert moved.check_back_by == "person"
+
+
+def test_a_person_set_check_back_is_not_moved_by_scout(tmp_path):
+    items, _ = make(tmp_path)
+    item = items.open("ask")
+    items.not_now(item.id, T0 + timedelta(hours=2), "person")
+    with pytest.raises(OpenItemRefused) as e:
+        items.not_now(item.id, T0 + timedelta(hours=1), "scout")
+    assert e.value.reason == "person_set"
+    assert items.get(item.id).check_back_at == T0 + timedelta(hours=2)
+
+
+def test_not_now_moves_the_deadline_past_the_check_back(tmp_path):
+    items, _ = make(tmp_path)
+    item = items.open("ask", ttl_s=3600)
+    at = T0 + timedelta(hours=5)
+    moved = items.not_now(item.id, at, "person")
+    assert moved.deadline_at == at + timedelta(seconds=3600)
+
+
+def test_not_now_twice_keeps_the_original_window(tmp_path):
+    items, _ = make(tmp_path)
+    item = items.open("ask", ttl_s=3600)
+    items.not_now(item.id, T0 + timedelta(hours=5), "person")
+    at = T0 + timedelta(hours=9)
+    moved = items.not_now(item.id, at, "person")
+    assert moved.deadline_at == at + timedelta(seconds=3600)
+
+
+def test_checked_clears_the_check_back(tmp_path):
+    items, clock = make(tmp_path)
+    item = items.open("ask", ttl_s=900)
+    clock.at = T0 + timedelta(seconds=700)
+    assert [i.id for i in items.due_checks(clock.at)] == [item.id]
+    items.checked(item.id, None)
+    assert items.due_checks(clock.at) == []
+    assert items.get(item.id).state == "open"

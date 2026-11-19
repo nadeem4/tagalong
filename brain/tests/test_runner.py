@@ -149,9 +149,11 @@ class Rig:
             quiet,
         )  # fmt: skip
 
-    def post(self, kind: str, source: str, id: str, at: int | None = None) -> EventRow:
+    def post(
+        self, kind: str, source: str, id: str, at: int | None = None, payload: dict | None = None
+    ) -> EventRow:
         when = None if at is None else T0 + timedelta(seconds=at)
-        self.log.post(Event(kind, source, {}, id=id, at=when))
+        self.log.post(Event(kind, source, payload or {}, id=id, at=when))
         row = self.log.get(id)
         assert row is not None
         return row
@@ -298,6 +300,23 @@ def test_quiet_hours_hold_news_but_not_says():
     assert rig.runner.gate(rig.post("card_answer", "desktop", "c1"))
     # a kind with no hourly cap (an expert's question) is never held for quiet hours
     assert rig.runner.gate(rig.post("job_question", "job:1", "q1"))
+
+
+def test_quiet_hours_hold_a_card_due_unless_urgent():
+    rig = Rig(quiet=lambda _at: True)
+    quiet = rig.post("card_due", "scout", "d1", payload={"urgent": False})
+    urgent = rig.post("card_due", "scout", "d2", payload={"urgent": True})
+    rig.t = T0 + timedelta(seconds=60)  # past the batch window: only quiet hours hold d1
+    assert not rig.runner.gate(quiet, at_break=True)
+    assert rig.runner.gate(urgent, at_break=True)
+    assert not rig.runner.gate(rig.post("card_expired", "scout", "x1"))
+
+
+def test_task_stop_is_a_person_event():
+    rig = Rig(quiet=lambda _at: True)
+    stop = rig.post("task_stop", "desktop", "t1")
+    assert rig.runner.gate(stop)  # like a say: held by nothing
+    assert rig.runner.target(stop) == "desktop"
 
 
 def test_a_spent_budget_holds_news_but_not_says():

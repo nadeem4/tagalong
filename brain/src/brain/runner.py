@@ -442,8 +442,11 @@ class Runner:
         if not self._session.ready():  # no key: news waits for one, it is not lost
             return False
         # A kind with no hourly cap (an expert's question) is never held for quiet hours.
+        # An urgent card check-back is the one news that gets through them.
+        urgent = row.kind == "card_due" and bool(row.payload.get("urgent"))
         if kind.max_per_hour is not None and self._quiet is not None and self._quiet(now):
-            return False
+            if not urgent:
+                return False
         if self.over_budget():
             return False
         if kind.urgency == "hold":

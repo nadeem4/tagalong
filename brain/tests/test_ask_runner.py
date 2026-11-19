@@ -30,6 +30,7 @@ from brain.permission import (
 from brain.protocol import RpcError
 from brain.store import rules
 from brain.store.work import WorkStore
+from brain.tasks import Tasks
 from brain.toolbox import Toolbox, ToolSpec
 
 NOW = datetime(2026, 11, 11, 9, 0, 0, tzinfo=UTC)
@@ -79,6 +80,15 @@ class Rig:
         self.events: list[Event] = []  # what Scout is told
         self.answers: list[Event] = []  # the person's saved card answers
         self.finished: list[tuple[list[str], str]] = []  # events code ended, and how
+        self.tasks = Tasks(
+            self.memory.db,
+            lambda text: text,
+            lambda: self.clock[0],
+            items=self.items,
+            post=self.events.append,
+        )
+        if self.tasks.get("k1") is None:  # the task turn t1 works on
+            self.tasks.open("do", "desktop", id="k1", title="Fix it")
         self.source = Source("t", effect=effect)
         self.engine = Engine(
             [StandingRule(stored_auto_rules(lambda: self.stored)), Person()],
@@ -95,6 +105,8 @@ class Rig:
             ).append(event),
             lambda: self.clock[0],
             self.approvals,
+            tasks=self.tasks,
+            task=lambda turn: "k1" if turn == "t1" else None,
             cause=lambda turn: "evt-ask-turn" if turn == "t1" else None,
             finish=lambda ids, state: self.finished.append((ids, state)),
         )
@@ -253,28 +265,132 @@ async def test_deny_wins_even_when_the_tool_became_auto_since():
     assert rig.work.get(card["id"]).end_reason == "refused"
 
 
-async def test_a_notice_wakes_scout_at_two_thirds_of_the_wait_once():
+async def test_a_card_due_wakes_scout_at_two_thirds_of_the_wait_once():
     rig = Rig()
     await rig.box.run(call())
     [card] = rig.opened()
     rig.clock[0] = NOW + timedelta(days=2, minutes=1)  # past 2/3 of 3 days
     rig.runner.fire_due()
     rig.runner.fire_due()
-    [notice] = [e for e in rig.events if e.kind == "ask_notice"]
-    assert notice.payload["ask"] == card["id"] and notice.payload["left_s"] < 86400
+    [due] = [e for e in rig.events if e.kind == "card_due"]
+    assert due.payload["ask"] == card["id"] and due.payload["left_s"] < 86400
+    assert (due.payload["urgent"], due.task, due.caused_by) == (False, "k1", "evt-ask-turn")
     assert rig.items.get(card["id"]).state == "open"
     rig.asks.answer(card["id"], "allow", "desktop")
     await rig.settle()
-    assert [e.kind for e in rig.events] == ["ask_notice", "ask_ended"]
+    assert [e.kind for e in rig.events] == ["card_due", "ask_ended"]
 
 
-async def test_a_restart_does_not_repeat_a_notice_already_due():
+async def test_a_restart_does_not_repeat_a_card_due_already_told():
     rig = Rig()
     await rig.box.run(call())
     rig.clock[0] = NOW + timedelta(days=2, minutes=1)
+    rig.runner.fire_due()
     again = Rig(rig.memory, clock=rig.clock)
     again.runner.start()
     assert [e.kind for e in again.events] == []
+
+
+async def test_not_now_without_a_time_checks_back_in_30_minutes():
+    rig = Rig()
+    await rig.box.run(call())
+    [card] = rig.opened()
+    rig.asks.answer(card["id"], "not_now", "desktop")
+    await rig.settle()
+    assert rig.items.get(card["id"]).state == "open" and rig.closed() == []
+    assert not rig.finished or rig.finished == [([rig.answers[0].id], "handled")]
+    assert rig.events == []  # no turn, no ask_ended
+    rig.clock[0] = NOW + timedelta(minutes=29)
+    rig.runner.fire_due()
+    assert rig.events == []
+    rig.clock[0] = NOW + timedelta(minutes=30)
+    rig.runner.fire_due()
+    [due] = rig.events
+    assert (due.kind, due.payload["ask"]) == ("card_due", card["id"])
+
+
+async def test_a_person_set_check_back_is_not_moved_by_scout():
+    rig = Rig()
+    await rig.box.run(call())
+    [card] = rig.opened()
+    at = NOW + timedelta(hours=5)
+    rig.runner.answered(card["id"], "not_now", "desktop", at)
+    await rig.settle()
+    again = Call(id="c2", name="t", input={"n": 1, "check_back_minutes": 60}, turn="t1", text="")
+    await rig.box.run(again)  # Scout opens the same call again, with its own idea of when
+    assert rig.items.get(card["id"]).check_back_at == at
+    assert rig.items.get(card["id"]).check_back_by == "person"
+
+
+async def test_check_back_minutes_and_urgent_come_from_the_call_arguments():
+    rig = Rig()
+    c = Call(
+        id="c1",
+        name="t",
+        input={"n": 1, "check_back_minutes": 10, "urgent": True},
+        turn="t1",
+        text="",
+    )
+    await rig.box.run(c)
+    [card] = rig.opened()
+    assert (card["check_back_by"], card["urgent"]) == ("scout", True)
+    item = rig.items.get(card["id"])
+    assert item.check_back_at == NOW + timedelta(minutes=10)
+    assert item.saved_call["input"] == {"n": 1}  # the arguments are the gate's, not the tool's
+    rig.clock[0] = NOW + timedelta(minutes=11)
+    rig.runner.fire_due()
+    assert rig.events[0].payload["urgent"] is True
+
+
+async def test_a_card_answered_after_restart_runs_once_under_its_task():
+    rig = Rig()
+    await rig.box.run(call())
+    [card] = rig.opened()
+    again = Rig(rig.memory, clock=rig.clock)
+    again.runner.start()
+    again.runner.answered(card["id"], "allow", "desktop")
+    again.runner.answered(card["id"], "allow", "desktop")  # a second tap changes nothing
+    await again.settle()
+    assert again.source.ran == [("t", {"n": 1})]
+    [ended] = [e for e in again.events if e.kind == "ask_ended"]
+    assert (ended.task, ended.payload["outcome"]) == ("k1", "approved")
+
+
+async def test_stop_task_closes_the_card_and_posts_task_stop():
+    rig = Rig()
+    await rig.box.run(call())
+    [card] = rig.opened()
+    rig.asks.answer(card["id"], "stop_task", "desktop")
+    await rig.settle()
+    assert rig.items.get(card["id"]).state == "done"
+    assert rig.items.for_task("k1") == []
+    assert rig.tasks.get("k1").state == "stopped"
+    [stop] = [e for e in rig.events if e.kind == "task_stop"]
+    assert (stop.payload, stop.source) == ({"task": "k1", "by": "desktop"}, "desktop")
+    assert rig.source.ran == []
+    assert [e.kind for e in rig.events] == ["task_stop"]  # no ask_ended: the task is over
+
+
+async def test_stop_task_on_a_card_whose_task_already_ended_still_tells_scout():
+    rig = Rig()
+    await rig.box.run(call())
+    [card] = rig.opened()
+    rig.tasks.end("k1", "done")
+    rig.asks.answer(card["id"], "stop_task", "desktop")
+    await rig.settle()
+    [ended] = [e for e in rig.events if e.kind == "ask_ended"]
+    assert (ended.payload["ask"], ended.payload["outcome"]) == (card["id"], "refused")
+    assert rig.source.ran == []
+
+
+async def test_an_ask_task_card_shows_no_task_and_no_stop_option():
+    rig = Rig()
+    rig.tasks.open("ask", "desktop", id="k2", title="Say")
+    rig.runner._task = lambda turn: "k2"
+    await rig.box.run(call())
+    [card] = rig.opened()
+    assert "task" not in card and "check_back_at" not in card
+    assert card["options"] == ["allow", "always", "deny"]
 
 
 async def test_a_yes_just_after_the_deadline_ends_it_like_the_timer_would():
@@ -285,14 +401,14 @@ async def test_a_yes_just_after_the_deadline_ends_it_like_the_timer_would():
     rig.asks.answer(card["id"], "allow", "desktop")
     await rig.settle()
     assert rig.source.ran == []
-    assert [(e.kind, e.payload["outcome"]) for e in rig.events] == [("ask_ended", "expired")]
+    assert [e.kind for e in rig.events] == ["card_expired"]
     assert rig.work.get(card["id"]).end_reason == "expired"
-    assert card["id"] not in rig.runner._raw and card["id"] not in rig.runner._noticed
+    assert card["id"] not in rig.runner._raw
     rig.runner.fire_due()
     assert len(rig.events) == 1  # not told twice
 
 
-async def test_no_answer_by_the_deadline_expires_it_and_tells_scout():
+async def test_an_expired_card_posts_card_expired():
     rig = Rig()
     await rig.box.run(call())
     [card] = rig.opened()
@@ -300,7 +416,8 @@ async def test_no_answer_by_the_deadline_expires_it_and_tells_scout():
     rig.runner.fire_due()
     assert [(c["id"], c["reason"]) for c in rig.closed()] == [(card["id"], "timeout")]
     assert rig.items.get(card["id"]).state == "expired"
-    assert rig.events[0].payload["outcome"] == "expired"
+    assert rig.events[0].kind == "card_expired"
+    assert rig.events[0].payload["reason"] == "no answer"
     assert rig.work.get(card["id"]).end_reason == "expired"
     with pytest.raises(RpcError):
         rig.asks.answer(card["id"], "allow", "desktop")
@@ -361,7 +478,7 @@ async def test_reconnect_reshows_open_cards():
 
 async def test_live_only_shown_expired_on_return():
     rig = Rig()
-    gone = rig.items.open("expert_ask", "desktop", live_only=True)
+    gone = rig.items.open("expert_ask", live_only=True)
     rig.clock[0] = NOW + timedelta(minutes=5)
     rig.items.expire_live_only()  # its expert ended while the person was away
     rig.clock[0] = NOW + timedelta(minutes=10)
