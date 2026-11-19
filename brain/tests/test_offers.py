@@ -479,3 +479,24 @@ async def test_a_second_look_opens_no_second_task_while_one_waits(mem):
     assert task.state == "open" and rig.model.calls == 1
     [item] = rig.items.list_open(kind="offer")
     assert item.task_id == task.id
+
+
+async def test_an_offer_past_its_deadline_ends_stopped_on_resume(mem):
+    rig = Rig(mem, asks=FakeAsks(hang=True))
+    rig.approve(n=3)
+    await rig.consider()
+    rig.clock = NOW + timedelta(days=2)
+    rig.offers.resume()
+    [task] = own_tasks(rig)
+    assert (task.state, task.end_reason) == ("stopped", "no answer")
+
+
+async def test_a_late_tap_on_an_expired_offer_ends_stopped_not_done(mem):
+    rig = Rig(mem, asks=FakeAsks(hang=True))
+    rig.approve(n=3)
+    await rig.consider()
+    [item] = rig.items.list_open(kind="offer")
+    rig.items.expire(item.id, "gone")
+    rig.offers.answered(item.id, YES, "desktop", None, None)
+    [task] = own_tasks(rig)
+    assert (task.state, task.end_reason) == ("stopped", "no answer")

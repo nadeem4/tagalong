@@ -709,9 +709,11 @@ columns and drops `work.source_message_id` (never written).
   `store/tasks.py`. The first end of a task stands; a second `end` changes nothing.
 - Ended by one sweep, not by hooks: `Tasks.settle()` ends an open Ask `done` when its say is
   `handled` and `failed` when it is `gave_up`, a Later with no live work row and no `new` or
-  `taken` event `done`, and an Own with at least one event, all `handled`, and no open item
-  `done` (an offer's Own ends on its answer: `done`, `declined` or `stopped`). The runner calls it after every turn ends, and the session at start after
-  `EventLog.recover()`, so a crash cannot leave one open.
+  `taken` event `done`, and an Own with no open item: `stopped` (reason `no answer`) when no
+  event names it, else `done` once every event is `handled` or `gave_up`, `failed` if one gave
+  up. An offer's Own ends on its answer first: `done`, `declined` or `stopped`. The runner
+  calls it after every turn ends, and the session at start after `EventLog.recover()`, so a
+  crash cannot leave one open.
 - Read by: `Tasks.open_block()`, the open-tasks block in Scout's system prompt (newest first, at
   most 15 lines then `and N more`, Asks left out, titles made safe for the data fence).
 - Retention: `Tasks.sweep(TAGALONG_WORK_KEEP_DAYS)` deletes ended tasks older than the setting at

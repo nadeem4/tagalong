@@ -107,17 +107,23 @@ def laters_to_settle(db: sqlite3.Connection) -> list[str]:
     return [r[0] for r in rows]
 
 
-def owns_to_settle(db: sqlite3.Connection) -> list[str]:
-    """Open or waiting Owns that were told: at least one event, all `handled`, and no open item
-    still waiting on the person (an offer's card)."""
+def owns_to_settle(db: sqlite3.Connection) -> list[tuple[str, str, str | None]]:
+    """Open or waiting Owns that are over, as (id, state, reason): with no open item waiting on
+    the person, `stopped` ("no answer") when no event ever named it (an offer that lapsed or
+    never got its card), else, once every event is `handled` or `gave_up`, `done` (`failed` if
+    any gave up, as an Ask)."""
     rows = db.execute(
-        "SELECT t.id FROM tasks t WHERE t.kind='own' AND t.state IN ('open','waiting')"
-        " AND EXISTS (SELECT 1 FROM events e WHERE e.task=t.id)"
-        " AND NOT EXISTS (SELECT 1 FROM events e WHERE e.task=t.id AND e.state<>'handled')"
+        "SELECT t.id,"
+        " CASE WHEN NOT EXISTS (SELECT 1 FROM events e WHERE e.task=t.id) THEN 'stopped'"
+        "   WHEN EXISTS (SELECT 1 FROM events e WHERE e.task=t.id AND e.state='gave_up')"
+        "   THEN 'failed' ELSE 'done' END FROM tasks t"
+        " WHERE t.kind='own' AND t.state IN ('open','waiting')"
+        " AND NOT EXISTS (SELECT 1 FROM events e WHERE e.task=t.id"
+        "   AND e.state NOT IN ('handled','gave_up'))"
         " AND NOT EXISTS (SELECT 1 FROM open_items i WHERE i.task_id=t.id AND i.state='open')"
         " ORDER BY t.created_at, t.rowid"
     ).fetchall()
-    return [r[0] for r in rows]
+    return [(r[0], r[1], "no answer" if r[1] == "stopped" else None) for r in rows]
 
 
 def last_event_at(db: sqlite3.Connection, task_id: str) -> str | None:

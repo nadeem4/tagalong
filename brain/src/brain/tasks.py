@@ -223,15 +223,18 @@ class Tasks:
 
     def settle(self) -> list[str]:
         """End every Ask whose say is over, every Later with nothing left to run and every Own
-        that was told (an offer ends on its answer instead, and has no event)."""
+        whose news is told (or that has none and no open item)."""
         ended = []
         with transaction(self._db):
             at = utc_text(self._now())
             for id, state in store.asks_to_settle(self._db):
                 if store.set_state(self._db, id, state, at=at):
                     ended.append(id)
-            for id in store.laters_to_settle(self._db) + store.owns_to_settle(self._db):
+            for id in store.laters_to_settle(self._db):
                 if store.set_state(self._db, id, "done", at=at):
+                    ended.append(id)
+            for id, state, reason in store.owns_to_settle(self._db):
+                if store.set_state(self._db, id, state, at=at, end_reason=reason):
                     ended.append(id)
         return ended
 
