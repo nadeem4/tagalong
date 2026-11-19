@@ -329,6 +329,12 @@ class ReplyParams(Model):
         return self
 
 
+class TurnTask(Model):
+    id: Id
+    kind: str
+    title: str | None
+
+
 class TurnParams(Model):
     seq: Seq
     turn: Id
@@ -337,6 +343,7 @@ class TurnParams(Model):
     reason: Literal["done", "cancelled", "error", "over_budget", "step_cap"] | None = None
     events: list[Id] | None = None  # the events a started or joined turn took
     source: str | None = None  # the started turn's event source
+    tasks: list[TurnTask] | None = None  # the non-Ask tasks those events belong to
 
     @model_validator(mode="after")
     def _started_and_joined_name_their_events(self) -> "TurnParams":

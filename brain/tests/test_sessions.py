@@ -3974,6 +3974,20 @@ async def test_a_say_opens_an_ask_that_ends_done_with_its_turn():
     assert session.tasks.get(ask).state == "done"
 
 
+async def test_a_wake_turn_names_its_tasks_and_a_say_turn_names_none():
+    session, sent = make(Gate(["ok", "ok"]))
+    watch = session.tasks.open("watch", "loop:gmail", title="Watching Gmail")
+    session.post_event(Event("job_ended", "job:j1", {"report": "x"}, id="n1", task=watch))
+    await idle(session)
+    [woke] = [p for m, p in sent if m == "turn" and p["state"] == "started"]
+    assert woke["tasks"] == [{"id": watch, "kind": "watch", "title": "Watching Gmail"}]
+    sent.clear()
+    await session.say("desktop", say("hi"))  # its Ask is never named
+    await idle(session)
+    [started] = [p for m, p in sent if m == "turn" and p["state"] == "started"]
+    assert "tasks" not in started
+
+
 async def test_a_duplicate_say_id_opens_one_ask():
     session, _ = make(Gate(["ok"]))
     first = say("hi")

@@ -186,7 +186,10 @@ export type ReplyParams = z.infer<typeof ReplyParams>;
 
 // `body` is null when no body is online to show a turn the brain started itself.
 // `events` and `source` ride on started and joined turns: what the turn took, and where the
-// started turn's event came from.
+// started turn's event came from. `tasks` names the non-Ask tasks those events belong to.
+export const TurnTask = z.object({ id: Id, kind: z.string(), title: z.string().nullable() });
+export type TurnTask = z.infer<typeof TurnTask>;
+
 export const TurnParams = z
   .object({
     seq: Seq,
@@ -196,6 +199,7 @@ export const TurnParams = z
     reason: z.enum(['done', 'cancelled', 'error', 'over_budget', 'step_cap']).optional(),
     events: z.array(Id).optional(),
     source: z.string().optional(),
+    tasks: z.array(TurnTask).optional(),
   })
   .refine(
     (t) => t.state === 'ended' || (t.events !== undefined && t.source !== undefined),

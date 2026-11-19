@@ -864,13 +864,16 @@ class Session:
     def _started_frame(self, turn_id: str, body_id: str | None, events: list[str]) -> dict:
         """The `started` frame: the events the turn took and the first one's source (a say's is
         the body, news's its source), so a body can tell which of its says it answers."""
-        return {
+        frame = {
             "turn": turn_id,
             "body": body_id,
             "state": "started",
             "events": events,
             "source": self._event_source(events[0] if events else None, body_id),
         }
+        if tasks := self.tasks.named_by(events):
+            frame["tasks"] = tasks
+        return frame
 
     def _event_source(self, event_id: str | None, body_id: str | None) -> str:
         row = self.events.get(event_id) if event_id else None

@@ -120,6 +120,12 @@ class Tasks:
     def open_watch(self, source: str) -> str | None:
         return store.open_of_source(self._db, "watch", source)
 
+    def named_by(self, event_ids: list[str]) -> list[dict]:
+        """What a turn's frame names of its tasks: id, kind and title of each non-Ask task the
+        events belong to. Empty for a say alone."""
+        rows = store.of_events(self._db, event_ids) if event_ids else []
+        return [{"id": r.id, "kind": r.kind, "title": r.title} for r in rows]
+
     def timers_of(self, id: str) -> list[str]:
         return store.timers_of(self._db, id)
 

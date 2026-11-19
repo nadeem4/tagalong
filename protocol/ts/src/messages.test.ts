@@ -226,6 +226,11 @@ describe('turn events and source', () => {
     expect(TurnParams.safeParse(joined).success).toBe(true);
     expect(TurnParams.safeParse({ ...joined, events: undefined }).success).toBe(false);
   });
+  it('a started turn may carry its tasks', () => {
+    const task = { id: 'a1b2c3', kind: 'watch', title: 'Watching Gmail' };
+    expect(TurnParams.safeParse({ ...started, tasks: [task] }).success).toBe(true);
+    expect(TurnParams.safeParse({ ...started, tasks: [{ id: 'a1b2c3' }] }).success).toBe(false);
+  });
   it('an ended turn needs neither', () => {
     const ended = { seq: 2, turn: 't', body: 'b', state: 'ended', reason: 'done' };
     expect(TurnParams.safeParse(ended).success).toBe(true);
