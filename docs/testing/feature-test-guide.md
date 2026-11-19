@@ -814,10 +814,13 @@ Automated: `pnpm --filter @tagalong/ui test` (`loops-panel.test.tsx`), the deskt
 and every loop news it brings is posted under that task; switching it off ends the task. Stopping
 that task (the `task_stop` tool Home calls) switches the app's reading off, keeps the loops held,
 and reading is still off after a restart. The daily update check is one Watch task too, "Checking for
-updates"; stopping it turns the daily check off for good (also after a restart) until you turn on an auto-update switch or press check now, while an update already queued or
-running finishes. The check posts no news, so nothing names that task. Automated:
-`test_loops_service.py` (the four watch-task tests, `test_stopping_a_mail_watch_switches_the_app_off_for_good`,
-`test_stop_leaves_held_loops_alone`), `test_setup_updates.py` (the three watch-task tests),
+updates"; stopping it turns the daily check off for good (also after a restart) until you turn on
+an auto-update switch or press check now, while an update already queued or running finishes. The
+check posts no news, so nothing names that task. Automated: the watch-task tests in
+`test_loops_service.py` (among them `test_stopping_a_mail_watch_switches_the_app_off_for_good`,
+`test_stop_leaves_held_loops_alone`, `test_switching_back_on_opens_a_new_watch_task`,
+`test_restart_reuses_the_open_watch_task`), in `test_loops_home_tools.py`, in `test_setup_updates.py`
+(among them `test_a_restart_keeps_the_update_checks_off`), and
 `test_tools.py::test_a_watch_added_in_a_task_belongs_to_it`.
 
 ## A due loop wakes Scout (real brain)
