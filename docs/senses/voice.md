@@ -5,7 +5,7 @@
 How Scout hears and speaks. This covers the talk key, the mic button, Always listening, the
 follow-up window, talking over Scout (it pauses), and the system voice. **The brain does the hearing and the speaking**:
 it runs the speech models (Silero, Moonshine, Smart Turn and Kokoro; see
-[Brain ears](brain.md#brain-ears) and [Brain mouth](brain.md#brain-mouth)). The desktop only
+[Brain ears](../brain/README.md#brain-ears) and [Brain mouth](../brain/README.md#brain-mouth)). The desktop only
 streams the microphone to the brain and plays what the brain sends back, so no speech model, ONNX
 runtime or extra process ships with it. A heard question goes to the brain as an ordinary `say`
 with `spoken: true`, and the brain speaks the answer.
@@ -25,7 +25,7 @@ leaves it.
 | Renderer, speaking      | `bodies/desktop/src/renderer/src/voice-player.ts` (`SpeechPlayer`, `playVoiceSample`, `playWav`, `speakWithSystem`, `pickSystemVoice`)                                                                                                                                                                                                                                                                                                |
 | UI package              | `bodies/ui/src/voice/listen-controller.ts`, `push-to-talk.ts`                                                                                                                                                                                                                                                                                                                                                                         |
 | Wiring                  | `bodies/desktop/src/renderer/src/panel.tsx` (the panel's `SpeechPlayer` and `useTalk`), `bodies/ui/src/companion-bubble.tsx` (asks a heard question as spoken)                                                                                                                                                                                                                                                                        |
-| Brain side              | The brain's ears and mouth: [brain.md](brain.md)                                                                                                                                                                                                                                                                                                                                                                                      |
+| Brain side              | The brain's ears and mouth: [brain.md](../brain/README.md)                                                                                                                                                                                                                                                                                                                                                                                      |
 
 ## How it works
 
@@ -105,7 +105,7 @@ flowchart LR
 `sentence_break` (a reply is still open but nothing is queued), `paused` or `idle`; `on_state` is
 called on each change (the brain wires it to presence as the fallback when no body reports
 what it plays; the desktop's `speech_state` wins). `pause()` and `resume()` also send
-`speech_control` to the body playing the turn; an interjection calls them (docs/brain.md,
+`speech_control` to the body playing the turn; an interjection calls them (docs/brain/README.md,
 Interjections). `speaking(turn, body_id)` says the turn is still live and owns the queue, and
 `replace(turn, body_id, text)` sends the body a `clear` for the turn, mutes the turn's later words
 and says `text` in the same voice as a new turn (its id is returned; `None` when the turn is gone).
@@ -114,7 +114,7 @@ every turn spoken on that body.
 
 ### What crosses to the brain
 
-Contract v1 (see [protocol/README.md](../protocol/README.md)):
+Contract v1 (see [protocol/README.md](../../protocol/README.md)):
 
 | Frame                                            | Direction     | Meaning                                                                                                                                                                                                                                                                                                                            |
 | ------------------------------------------------ | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -374,7 +374,7 @@ stateDiagram-v2
 - **Changing the key.** `setKey(key)` comes from `applyHotkeys`, so Settings changes apply live.
   Changing the key while the old one is held drops that hold.
 - **No hook.** If the hook will not load or start, there is one `[talk-key]` warning and a `talk`
-  outcome with the error on the hotkey-problem path (see `desktop.md`). There is no fallback key,
+  outcome with the error on the hotkey-problem path (see `../bodies/desktop.md`). There is no fallback key,
   the mic button still works, and nothing crashes. The hook stops on quit.
 
 The stop key (`hotkeys.stopVoice`, default `CommandOrControl+Shift+Alt+M`) is a normal global
@@ -507,7 +507,7 @@ flowchart TD
   marked `[interrupted: the owner spoke over this]`, and gives the model the unsaid chunks
   once, in a `<data kind="interruption">` block with the owner's words. A tool still running
   finishes in the background and its result comes back through the event log as a
-  `tool_result` event. See [Brain](brain.md).
+  `tool_result` event. See [Brain](../brain/README.md).
 
 ### Say and show
 
@@ -525,7 +525,7 @@ A short lead-in said before a tool round is held by the chunker until more text 
 wait through the round; this is accepted.
 
 The model is told the rule by the ear guide (`mind/ear.md`), which every read-aloud turn carries
-(see [brain.md](brain.md#brain-mouth)): write the spoken part for the ear, put
+(see [brain.md](../brain/README.md#brain-mouth)): write the spoken part for the ear, put
 lists, links, code, tables and long numbers after the divider, use it once and only in the last
 message of the turn (so a lead-in before tool rounds is still spoken), and never repeat the
 on-screen part aloud. Why a divider and not a tool call or tags: a tool call cannot stream the
@@ -537,7 +537,7 @@ needs no schema and degrades to today's behaviour.
 The brain speaks; the panel plays. What Scout says aloud about a long result is its own call: the
 soul tells it to say the short version and offer the rest (a long list is never read in full
 unasked), and a long tool result reaches it as a capped preview (see
-[brain.md](brain.md#long-tool-output)).
+[brain.md](../brain/README.md#long-tool-output)).
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
@@ -708,7 +708,7 @@ downloads Kokoro.
 
 **The voice is fetched early.** While the first-run tour is open the brain downloads Kokoro and the
 listening models' files in the background (download only: nothing is loaded into memory until you listen; the desktop calls `fetch_voice` when the brain comes online and
-the tour is not finished; see [brain.md](brain.md)). Until Kokoro is ready the computer's own voice
+the tour is not finished; see [brain.md](../brain/README.md)). Until Kokoro is ready the computer's own voice
 speaks (the brain sends text-only `speech` frames); once it is ready Scout switches to Kokoro from
 the next sentence, not the current one. Settings' Voice page shows one status line under the Voice
 select while it downloads ("Downloading Scout's voice… N%. Using the computer's voice until
@@ -728,7 +728,7 @@ service worker forwards them as `mic` frames; **Done talking** (or closing the p
 with `spoken: true` and no `voice` or `speed`. Only one body listens at a time, as everywhere.
 Chrome's prompt cannot show from an offscreen page, so the first use opens a small page to allow
 the microphone. If the link drops, listening ends with an error and is not restarted. The full
-description is [browser-body.md](browser-body.md#voice).
+description is [browser-body.md](../bodies/browser.md#voice).
 
 ## Speech models
 
@@ -754,7 +754,7 @@ The words come from a list of models kept as data, not from one hard-wired model
   graphics card is found (`detect_hardware`: CTranslate2 sees an NVIDIA device and the NVIDIA libraries
   are found: a device plus cuBLAS and cuDNN, on the system or in `<TAGALONG_HOME>/voice/cuda`) and no final pass otherwise. Only `off` means no final pass; any other
   unknown word (an old `same` included) reads as Auto. The numbers behind
-  this are in [voice-stt-results.md](voice-stt-results.md). The saved choice is the text settings
+  this are in [voice-stt-results.md](stt-results.md). The saved choice is the text settings
   `stt_live` and `stt_final` (`voice/stt_choice.py`; `auto` and `off` are words, a stored id the list no longer has
   reads as Auto). Home reads and writes it with two tools, `stt_state` (the list with each model's role, size and
   `gpu` need, the effective choice, and the card name) and `set_stt {live?, final?}`, which saves and
@@ -831,7 +831,7 @@ often "Scout" survives as the first word (the same sound-alike rule as `addressi
 cores and peak GPU while decoding, seconds per clip (the delay after the end of a turn, for final
 models), and Silero's idle CPU. `MODES` in `__main__.py` is where a later wake-word mode plugs in.
 The results of the last run, the decision and the exact commands are in
-[voice-stt-results.md](voice-stt-results.md).
+[voice-stt-results.md](stt-results.md).
 
 ## Interfaces
 
@@ -888,8 +888,8 @@ each spoken `say`. Which voice speaks is the brain's (`tts_state`), not a deskto
 | `hotkeys.talk`       | `'RightControl'`                 | One of `TALK_KEYS`.                                                                            |
 | `hotkeys.stopVoice`  | `'CommandOrControl+Shift+Alt+M'` | The stop key.                                                                                  |
 
-See `settings-and-secrets.md` for the whole schema. The brain's side (model files, checksums,
-thresholds, the sentence rules) is in [brain.md](brain.md#brain-ears).
+See `../data/settings-and-secrets.md` for the whole schema. The brain's side (model files, checksums,
+thresholds, the sentence rules) is in [brain.md](../brain/README.md#brain-ears).
 
 ## Constants and limits
 
@@ -913,12 +913,12 @@ thresholds, the sentence rules) is in [brain.md](brain.md#brain-ears).
 - **Models.** None on the desktop. The brain keeps them in its own data folder; which speech
   model is used is chosen from `stt_models.json` (see Speech models).
 - **Settings.** `voice.*`, `listening.always` and `hotkeys.talk` are in the settings store. See
-  `settings-and-secrets.md`.
+  `../data/settings-and-secrets.md`.
 - **Nothing heard.** Audio, transcripts and key events are not stored or logged anywhere by the
   desktop. Frames live only in memory: in the mic `Pushable`, and in flight to the brain. In the
   brain the ears keep the turn's audio (at most 60 s) in memory for the final pass and drop it
   when the turn ends; it is never written to disk. The text
-  of a heard question is stored only as the ask it becomes, like a typed one (see `memory.md`).
+  of a heard question is stored only as the ask it becomes, like a typed one (see `../data/memory.md`).
 
 ## Failure handling
 
@@ -947,7 +947,7 @@ a percent.
 
 - **Audio goes only to your own brain and is never stored; with the brain on this computer it never
   leaves it.** Frames go from the panel through main to the brain, in memory only. See
-  [privacy.md](privacy.md).
+  [privacy.md](../data/privacy.md).
 - **What a heard question sends.** Its text goes on to the brain as a `say`. The ask carries the
   name of the window you are on (`noteActiveWindow`), never the selection, because copying the
   selection would press keys while the talk key is held.
@@ -956,7 +956,7 @@ a percent.
   A mark on Scout always shows while it is on. An unaddressed turn is dropped, and its words are
   never passed on (`onUnaddressed` gets none).
 
-The full statement is in `privacy.md`.
+The full statement is in `../data/privacy.md`.
 
 ## Tests that pin it
 

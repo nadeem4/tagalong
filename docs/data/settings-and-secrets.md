@@ -73,7 +73,7 @@ The desktop's save path (`registerSettingsIpc` `save`) does the fan-out after `s
 Because `SettingsStore.get()` reads the file each time, every read is live. Hotkeys and screen
 memory are applied on save (above), and Always listening has its own on and off path
 (`AlwaysListening`). The brain's own tunables (budget, step cap, turn timeout) are environment
-variables, not settings: see [brain.md](brain.md#run-it).
+variables, not settings: see [brain.md](../brain/README.md#run-it).
 
 ## Secrets
 
@@ -88,7 +88,7 @@ directory, never in the `apps` table:
 | `app-oauth/<id>.json` | An app's OAuth client and tokens                                                                    |
 
 `${VAR}` references stay in the row and are filled from the brain's environment at connect. The
-rules and the missing-key error are in [connected apps](connected-apps.md).
+rules and the missing-key error are in [connected apps](../bodies/connected-apps.md).
 Text saved to disk (chat, approvals, job results, logs) has these values, and key shapes, replaced
 by `[secret]`; see [privacy](privacy.md#what-is-masked-on-disk-what-is-not).
 
@@ -100,9 +100,9 @@ and listed in `.env.example`. The brain builds the WhatsApp bridge's environment
 nothing else. Only the access token, app secret and verify token are masked (in logs,
 including the bridge's own output, and in saved text); the numbers are the person's own and are
 not. See
-[the brain](brain.md#whatsapp-bridge).
+[the brain](../brain/README.md#whatsapp-bridge).
 
-Home sets them: Connections > Bodies sends each value once to the Home tool `whatsapp_set`, which writes it to `<TAGALONG_HOME>/.env`. It is never returned (`whatsapp_status` says only which values are set), kept in the renderer after Save, or put in an IPC error. See [WhatsApp](whatsapp.md).
+Home sets them: Connections > Bodies sends each value once to the Home tool `whatsapp_set`, which writes it to `<TAGALONG_HOME>/.env`. It is never returned (`whatsapp_status` says only which values are set), kept in the renderer after Save, or put in an IPC error. See [WhatsApp](../bodies/whatsapp.md).
 
 ### Secrets on the way out
 
@@ -146,11 +146,11 @@ has its own masking for what it saves (see [privacy](privacy.md#what-is-masked-o
 
 `settings.json` (with `.tmp`, `.bak`, `.corrupt`) sits in the desktop's data
 directory, `%APPDATA%\Tagalong` on Windows. The brain keeps its own data directory (see
-[brain.md](brain.md#run-it)). Every store of the brain is mapped in [storage.md](storage.md).
+[brain.md](../brain/README.md#run-it)). Every store of the brain is mapped in [storage.md](storage.md).
 
 Tool permissions (Off, Ask or Auto per tool, shown in Home → Settings → Permissions) are not settings
 here: they are brain state in the `rules` table of `tagalong.db`, read and set through the
-brain's `list_permissions` and `set_permission` (see [brain.md](brain.md#permissions-and-asks)).
+brain's `list_permissions` and `set_permission` (see [brain.md](../brain/README.md#permissions-and-asks)).
 Home shows them in groups the brain names, collapsed until opened, in plain words, with a search box.
 
 **Scout's model** (Settings, right after the key) is not in `settings.json`: the brain owns it. The
@@ -172,8 +172,8 @@ saved with the form's Save): off, push-to-talk shows no words until the talk key
 The daily limit is the one guard limit you can change in the app: **Settings → Anthropic key → Daily limit** (the amount and **Set** in one row, with "$1.20 of $5.00 used today" and a meter under it; the meter turns amber at the limit) calls the brain's `set_daily_limit` (a finite amount above 0). Other guard limits are not settings here. The brain's spend guards take `TAGALONG_DAILY_BUDGET_USD`
 and `TAGALONG_STEP_CAP`: `config.py` reads and checks them at start, and they are passed in when
 `sessions.py` registers the guards (a guard never imports `config`). They live in the brain's
-environment or its `.env` (see [brain.md](brain.md#run-it) and
-[Guardrails](brain.md#guardrails)). The step log caps of a job (`TAGALONG_JOB_STEPS_MAX_ENTRIES`, `TAGALONG_JOB_STEPS_MAX_BYTES`) are the same kind of setting, passed from `main.py` through `Session` to `Jobs`. The retention settings (`TAGALONG_WORK_KEEP_DAYS`, `TAGALONG_OUTPUTS_KEEP`) are passed the same way to the session, which sweeps at start. The turn timeout is the same kind of setting:
+environment or its `.env` (see [brain.md](../brain/README.md#run-it) and
+[Guardrails](../brain/README.md#guardrails)). The step log caps of a job (`TAGALONG_JOB_STEPS_MAX_ENTRIES`, `TAGALONG_JOB_STEPS_MAX_BYTES`) are the same kind of setting, passed from `main.py` through `Session` to `Jobs`. The retention settings (`TAGALONG_WORK_KEEP_DAYS`, `TAGALONG_OUTPUTS_KEEP`) are passed the same way to the session, which sweeps at start. The turn timeout is the same kind of setting:
 `TAGALONG_TURN_TIMEOUT_S` (default 300 seconds, a positive number) is read by `config.py`, passed
 to the session, and ends a Scout turn that runs too long.
 
@@ -181,7 +181,7 @@ The loops mail reader has its own allowance and model, apart from Scout's: `TAGA
 (default 0.5, a positive number of US dollars a day; a bad value stops the brain at start, like the
 daily limit) and `TAGALONG_READER_MODEL` (default `claude-haiku-5-5`). Both are read by `config.py`
 from the environment or `.env`; there is no Home control for them yet. See
-[Loops](brain.md#loops).
+[Loops](../brain/README.md#loops).
 
 `TAGALONG_LOOP_POLL_S` (default 300) is how many seconds pass between reads of a mail app that is
 switched on for loops. A zero, negative or non-numeric value stops the brain at start. The 14-day
@@ -201,8 +201,8 @@ Setup keeps its own files under the same data folder, never anywhere else: `runt
 exist only while it downloads), `tools/<expert>/` (an installed expert's packages; staged in `tools/<expert>.part/` and swapped
 in only on success, so a failed install removes only what it staged), `cache/` (registry lists) and `experts.json` (the installed experts and their
 start commands).
-`TAGALONG_EXPERT_CMD` (in `.env` or the environment) names one custom expert; it holds a command, never a secret, and each expert's own key variables are stripped from its process (see brain.md).
-None holds a secret. See [brain.md](brain.md#setting-things-up-setup).
+`TAGALONG_EXPERT_CMD` (in `.env` or the environment) names one custom expert; it holds a command, never a secret, and each expert's own key variables are stripped from its process (see ../brain/README.md).
+None holds a secret. See [brain.md](../brain/README.md#setting-things-up-setup).
 
 `tagalong key set` (the CLI, for a machine with no screen) writes the same `ANTHROPIC_API_KEY`
 line into `<TAGALONG_HOME>/.env` that the app does, owner-only; the key comes from a hidden

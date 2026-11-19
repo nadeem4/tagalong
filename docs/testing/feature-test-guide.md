@@ -47,7 +47,7 @@ Home opens from the tray (**Open Tagalong**); Settings is a page in Home. A save
 used from the next question, with no restart.
 
 **The default for this guide: the Python brain.** `pnpm dev:desktop` starts it if none is running, or run `cd brain && uv run brain` yourself; it holds the
-model and its keys (see [brain.md](../brain.md)). The desktop has no provider, model or sign-in settings.
+model and its keys (see [brain.md](../brain/README.md)). The desktop has no provider, model or sign-in settings.
 
 **Fake brain (no key).** Steps marked _fake provider_ need no key: run the e2e fake brain
 (`bodies/desktop/e2e/fixtures/fake-brain.ts`) and point the desktop at it. Scout streams a
@@ -98,7 +98,7 @@ time), or quit Tagalong and rename `%APPDATA%\Tagalong` (rename it back afterwar
 
 ## Python brain: talk to Scout
 
-The Python brain in `brain/` (see [docs/brain.md](../brain.md)). It runs on its own, with no
+The Python brain in `brain/` (see [docs/brain/README.md](../brain/README.md)). It runs on its own, with no
 desktop app. You need `uv` and an Anthropic key.
 
 1. **Setup:** developer path: set `ANTHROPIC_API_KEY=sk-ant-...` in your environment. In one
@@ -1034,7 +1034,7 @@ desktop to talk to Scout. The page's own checks are in [Connections](#connection
    **Expected:** `{"id": "files"}`; the app shows `connecting`, then `connected` with its tools,
    each with an effect (`read` or `change`) and `locked`.
 2. **Action:** ask Scout "what files are in the test folder?"
-   **Expected:** a connected app's read tool asks first by default (`ask`, see Permissions in docs/brain.md); allow it and Scout answers from the folder. Set the tool to Auto in Home to skip the ask.
+   **Expected:** a connected app's read tool asks first by default (`ask`, see Permissions in docs/brain/README.md); allow it and Scout answers from the folder. Set the tool to Auto in Home to skip the ask.
 3. **Action:** ask Scout to write a new file in the folder.
    **Expected:** an ask card (allow, always, deny). Allow runs it; deny leaves the folder alone.
 4. **Action:** ask Scout to move or delete a file (a tool whose name has a risky word such as
@@ -1097,7 +1097,7 @@ desktop to talk to Scout. The page's own checks are in [Connections](#connection
 
 1. **Action:** press each ⓘ in turn.
 2. **Expected:** each opens its note inline below, the button shows pressed (`aria-expanded`), and
-   opening another closes the first. The blind spot chips match the list in [privacy](../privacy.md).
+   opening another closes the first. The blind spot chips match the list in [privacy](../data/privacy.md).
 
 ### S.9. A broken settings file does not stop the app
 
@@ -1311,7 +1311,7 @@ popup); the answer is text only.
    a sentence.
 3. **Expected:** after the first listen downloads the model (the loading progress shows), the
    words appear as you talk, as before. Repeat with the variable unset or set to `auto`:
-   Moonshine small is used (the measured Auto default; see docs/voice-stt-results.md). With an id
+   Moonshine small is used (the measured Auto default; see docs/senses/stt-results.md). With an id
    that is not listed (`TAGALONG_STT_LIVE=nope`) the brain still listens, with small. With no
    usable graphics card, no final pass runs unless `TAGALONG_STT_FINAL` names a model.
    **Automated (V3):** from `brain/`, run `uv run pytest tests/test_voice_stt.py` (the Auto rule
@@ -2901,7 +2901,7 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 
 1. Automated: `cd brain && uv run pytest tests/test_bodies_tools.py -q` (status never holds a secret, absent keys are unchanged, a bad value is refused unquoted, a failed write applies nothing); `pnpm --filter @tagalong/desktop exec vitest run src/main/ipc/bodies.test.ts`; `pnpm --filter @tagalong/ui exec vitest run src/home/places-view.test.tsx`.
 2. By hand, Home > Places (marked New): the page lists each connected desktop by its PC name (Connected; with a second desktop on the same brain, both rows show and neither disconnects the other), each connected browser by its name (Connected; none connected shows the Chrome add-on row, Not set up, with **Get the add-on**, which opens tour step 7) and WhatsApp (Offline). WhatsApp shows `WhatsApp is off.`, the switch is disabled with `Save all five values to switch WhatsApp on.`
-3. Type the five values (use the setup in [whatsapp.md](../whatsapp.md)) and press Save. The fields clear and each shows Saved; no value is shown again. The switch becomes usable.
+3. Type the five values (use the setup in [whatsapp.md](../bodies/whatsapp.md)) and press Save. The fields clear and each shows Saved; no value is shown again. The switch becomes usable.
 4. Switch WhatsApp on. The line reads `WhatsApp is starting.` then `WhatsApp is running.` (`The WhatsApp bridge is not built yet.` if the bridge was not built). Send `hello` from the phone: Scout answers there.
 5. Answer a permission ask by its button on the phone; ask for something long and check it arrives in a few messages; quit the desktop and message again: the brain is still running and answers.
 6. Switch it off: the line reads `WhatsApp is off.` and the bridge process is gone. Stop the brain with `cd brain && uv run tagalong stop`: no `node` bridge is left.

@@ -3,16 +3,16 @@
 ## Purpose
 
 `bodies/desktop` is the Electron body. Its main process dials the Python brain over the websocket
-(contract v1, [protocol/README.md](../protocol/README.md)) and owns every window, the tray, the
+(contract v1, [protocol/README.md](../../protocol/README.md)) and owns every window, the tray, the
 global hotkeys and the IPC that connects the windows to the brain. The renderers never talk to the
 brain directly. In development the desktop starts the brain itself when none is running (see
 [The brain in the main process](#the-brain-in-the-main-process)); or run it yourself
-with `cd brain && uv run brain` (see [brain.md](brain.md#the-desktop-body)).
+with `cd brain && uv run brain` (see [brain.md](../brain/README.md#the-desktop-body)).
 
 Sight internals (the platform adapter's captures, the window inventory, OCR, exclusions) are in
-[sight.md](sight.md). Hearing, speaking, the talk key and Always listening are in
-[voice.md](voice.md). The components the windows render come from `@tagalong/ui`, described in
-[bubble.md](bubble.md).
+[sight.md](../senses/sight.md). Hearing, speaking, the talk key and Always listening are in
+[voice.md](../senses/voice.md). The components the windows render come from `@tagalong/ui`, described in
+[bubble.md](../senses/bubble.md).
 
 ## Where it lives
 
@@ -27,12 +27,12 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 | `src/main/brain/body-tools.ts`                   | `bodyTools(platform, exclusions, onCapture)`: the body tools declared in `hello` and their `run`                                                                            |
 | `src/main/brain/body-events.ts`                  | `createBackSender`, `frontWindow`, `startFocusWatch`, `readAloudEvent`, `readingEvent`: the `back`, `focus`, `read_aloud` and `reading` events sent to the brain            |
 | `src/main/hotkeys.ts`                            | `HotkeyManager`, `registerHotkey`, `describeHotkeyProblems`, default accelerators                                                                                           |
-| `src/main/talk-key.ts`                           | `TalkKeyWatch`, `startTalkKey`, `loadKeyHook` (see [voice.md](voice.md))                                                                                                    |
+| `src/main/talk-key.ts`                           | `TalkKeyWatch`, `startTalkKey`, `loadKeyHook` (see [voice.md](../senses/voice.md))                                                                                                    |
 | `src/main/tray-menu.ts`, `tray-icon.ts`          | `trayMenuTemplate`, `createTrayIcon`                                                                                                                                        |
 | `src/main/windows/`                              | One module per window: `avatar.ts`, `panel.ts`, `home.ts`; placement in `position.ts`, `move.ts`; `bubble-focus.ts`; `page.ts` (loading a page)                             |
 | `src/main/ipc/`                                  | One `register…Ipc(handle, deps)` per area (`file-folders.ts`: the folders Scout's file tools may use); `handle.ts` (types), `fake-ipc.ts` (test double)                     |
 | `src/main/drop.ts`, `drop-io.ts`                 | Drop it on Scout: `dropDesk`, `readDrop`, `registerDropIpc`, `guardNavigation`                                                                                              |
-| `src/main/status-marks.ts`                       | `StatusMarks` and the marks main sets (see [bubble.md](bubble.md#status-marks))                                                                                             |
+| `src/main/status-marks.ts`                       | `StatusMarks` and the marks main sets (see [bubble.md](../senses/bubble.md#status-marks))                                                                                             |
 | `src/main/settings-store.ts`                     | `SettingsStore`: settings.json with atomic saves, a .bak and a .corrupt copy                                                                                                |
 | `src/main/hide-secrets.ts`                       | `hideSecrets`: keys, tokens, passwords and card numbers become `[hidden: kind]` before the log file is written                                                              |
 | `src/main/front-window.ts`                       | `isMeeting`, `callOrFullScreenInFront`: Scout keeps out of the way of a call or a full-screen window                                                                        |
@@ -70,7 +70,7 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 `start()` then:
 
 1. Builds the platform as `gateSight(createPlatform(), () => sightPause.paused)`: nothing downstream
-   is ever handed the ungated adapter (see [sight.md](sight.md)).
+   is ever handed the ungated adapter (see [sight.md](../senses/sight.md)).
 2. Opens `SettingsStore(userData)`,
    so settings are read from the file before anything else needs them.
 3. Creates `AlwaysListening` from `settings.listening.always`, `StatusMarks` (broadcasting the top
@@ -78,7 +78,7 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 4. `startBrain(...)` builds the `BrainClient` (kept as `desktop.brain`) and starts it. It never
    throws and never blocks boot: if the brain is not running, the client retries every 2 s.
 5. Creates the voice bridge (`createVoiceBridge`; hearing and speaking happen in the brain, see
-   [voice.md](voice.md)) and the `Desktop` record, including the tray, the `HotkeyManager` and the
+   [voice.md](../senses/voice.md)) and the `Desktop` record, including the tray, the `HotkeyManager` and the
    `TalkKeyWatch`.
 6. Wires the sight pause, Always listening, the listening guard and the voice bridge's notifications, then
    `registerIpc()`.
@@ -168,10 +168,10 @@ The same call backs **Start brain** on the offline card, so it also runs when th
   The body tool `install_ocr_language {language}` (`platform/ocr-install.ts`) is `confirm: "always"`, so it always
   asks the person; Windows then shows its own administrator prompt. It gives up after 10 minutes with
   "still installing" (the brain waits a little longer), then re-detects and sends the fresh status.
-  See [sight.md](sight.md).
+  See [sight.md](../senses/sight.md).
 
 - **Body events.** `brain/body-events.ts` sends facts with `event` (`back`, `focus`, and the `read_aloud` setting from `readAloudEvent`); the brain decides whether
-  they matter (see [brain.md](brain.md)). `back {idle_seconds}` goes out when the person
+  they matter (see [brain.md](../brain/README.md)). `back {idle_seconds}` goes out when the person
   returns after being away at least 5 minutes (`AWAY_AFTER_MS`, a screen lock counts), with whole
   seconds; the away starts when the idle did (the system idle time at the `away` is subtracted), so
   `idle_seconds` is the real time away. The sight pause does not stop it, since it carries no screen
@@ -213,7 +213,7 @@ The same call backs **Start brain** on the offline card, so it also runs when th
   image part, dropped items as parts and the active window title as `context.window`, and returns
   `{ turnId }`. While the brain is offline it throws "Scout's brain is not running." Interrupt sends
   `cancel`: the explicit Stop only. Talking over Scout pauses its voice and sends the words as
-  a `say` with `interrupted` (see [voice.md](voice.md#talking-over-scout)).
+  a `say` with `interrupted` (see [voice.md](../senses/voice.md#talking-over-scout)).
 - **Turn events.** The brain's `reply` and `turn` notifications are mapped to the UI's turn events
   and go to `forwardToRenderers`, which keeps `activeTurns` for the bubble's blur rule and sends the
   events to every window on `IPC.turnEvent`. After a reconnect the client reports `resync`, and
@@ -282,7 +282,7 @@ Rules each module enforces:
   `moments.ts`) and asking (the ask and pause keys as keycaps, a static bubble preview, what Scout
   never looks at). The side panel carries the `on-navy` class so shared controls draw a gold focus
   ring there. Steps 5 to 9 sit on the shared controls: voice (a `Select` for the talk key, who
-  speaks and microphone, the shared `VoiceField` ("Pick Scout's voice") that saves its own pick at once, a `Toggle` for Scout talks, a `Slider` for speed, and a "Test your microphone" `MicTest` under the microphone that shows its level through the host's `watchMicLevel`; see [voice.md](voice.md#the-level-meter)), everyday jobs (a list from `bodies/ui/src/jobs-kinds.ts` that only explains, with no buttons: connecting happens on step 11), browser (a numbered list; copy `chrome://extensions` or `edge://extensions`, Show
+  speaks and microphone, the shared `VoiceField` ("Pick Scout's voice") that saves its own pick at once, a `Toggle` for Scout talks, a `Slider` for speed, and a "Test your microphone" `MicTest` under the microphone that shows its level through the host's `watchMicLevel`; see [voice.md](../senses/voice.md#the-level-meter)), everyday jobs (a list from `bodies/ui/src/jobs-kinds.ts` that only explains, with no buttons: connecting happens on step 11), browser (a numbered list; copy `chrome://extensions` or `edge://extensions`, Show
   folder and Copy folder path for the add-on), "Scout asks first, and you set the limit" (a static
   approval card, the daily limit in the shared `MoneyField` stepper, saved with `set_daily_limit`
   only on Next, and only if it changed; an amount of 0 or less blocks Next; Settings' `LimitField`
@@ -394,7 +394,7 @@ capture. The tray carries Pause sight because that is the one hotkey whose loss 
 | Stop speaking | `hotkeys.stopVoice`  | `CommandOrControl+Shift+Alt+M` (`DEFAULT_STOP_VOICE_HOTKEY`)  | `IPC.stopVoiceEvent` to every window |
 
 The talk key (`hotkeys.talk`, default Right Ctrl) is not a global shortcut. A key hook watches it
-(`talk-key.ts`); see [voice.md](voice.md). Its outcome is reported here alongside the three.
+(`talk-key.ts`); see [voice.md](../senses/voice.md). Its outcome is reported here alongside the three.
 
 `openPanelWithContext` reads the selection and the active window (`captureAskSnapshot`) before the
 bubble takes focus, keeps the result as `pendingSnapshot` (sent with the next ask), announces the
@@ -438,8 +438,8 @@ the bubble's settings card. After `SettingsStore` saves, it:
 - broadcasts the saved settings on `IPC.settingsChangedEvent`, which open windows apply at once
   (the panel reads its talk key and microphone from it).
 
-The exclusions are read when used rather than at boot and are covered in [sight.md](sight.md); the settings store itself, the chat allowlist
-and the settings card's checks are in [settings-and-secrets.md](settings-and-secrets.md).
+The exclusions are read when used rather than at boot and are covered in [sight.md](../senses/sight.md); the settings store itself, the chat allowlist
+and the settings card's checks are in [settings-and-secrets.md](../data/settings-and-secrets.md).
 
 ### The IPC modules
 
@@ -464,7 +464,7 @@ the preload, so a dead channel cannot linger.
 | `timers.ts`      | `timersState` (`timers:state`), `cancelTimer` (`timers:cancel`)                                                                                                                                                                                                                                                                                                                                                         | brain tools `timers_state`, `timer_cancel`; the id is checked before the brain                                                                                                                                                                                                                                                                       |
 | `jobs.ts`        | `listJobs` (`jobs:list`), `stopJob` (`jobs:stop`), `jobActivity` (`jobs:activity`), `runningSteps` (`jobs:running-steps`), `jobReport` (`jobs:report`)                                                                                                                                                                                                                                                                  | brain tools `list_jobs`, `stop_job`, `job_activity`, `job_report`; `runningSteps` answers an empty list while the brain is offline (the bubble polls it during startup), so it is not logged as an error                                                                                                                                             |
 | `settings.ts`    | `hostView` (`host:view`), `saveSettings` (`settings:save`)                                                                                                                                                                                                                                                                                                                                                              | Works from `SettingsStore`, with no brain                                                                                                                                                                                                                                                                                                            |
-| `voice.ts`       | `earsListen`, `micFrame` (`ipcMain.on`, no answer), `earsStop`, `hush`, `speakSample`, `getListening`, `setListening`, `setFollowUp`, `voiceModels`; `createVoiceBridge` sends `earsEvent`, `earsStatusEvent`, `speechChunk`, `speechDone`                                                                                                                                                                              | The brain's `listen`, `mic`, `unlisten`, `hush` and its `speak_sample` tool. See [voice.md](voice.md)                                                                                                                                                                                                                                                |
+| `voice.ts`       | `earsListen`, `micFrame` (`ipcMain.on`, no answer), `earsStop`, `hush`, `speakSample`, `getListening`, `setListening`, `setFollowUp`, `voiceModels`; `createVoiceBridge` sends `earsEvent`, `earsStatusEvent`, `speechChunk`, `speechDone`                                                                                                                                                                              | The brain's `listen`, `mic`, `unlisten`, `hush` and its `speak_sample` tool. See [voice.md](../senses/voice.md)                                                                                                                                                                                                                                                |
 | `setup.ts`       | `setupOverview(query?, cursor?)` (`tagalong:setup:overview`), `setupExpert(id, approved, communityOk?)` (`tagalong:setup:expert`), `setupApp(id, approved, query?, communityOk?)` (`tagalong:setup:app`)                                                                                                                                                                                                                | `callJson` to the brain's `setup_overview`, `setup_expert` and `setup_app`; the overview is zod-parsed into camelCase, and a failed call rejects with `brain offline`                                                                                                                                                                                |
 | `key.ts`         | `keyStatus` (`tagalong:key:status`), `keySet` (`tagalong:key:set`), `limitSet` (`tagalong:limit:set`), `keyOpenPage` (`tagalong:key:open-page`, opens the fixed Console key page)                                                                                                                                                                                                                                       | Brain tools `key_status`, `set_api_key`, `set_daily_limit`; the key is forwarded once and never kept or returned                                                                                                                                                                                                                                     |
 | `walkthrough.ts` | `walkthroughOpen` (`tagalong:walkthrough:open`, `{ step? }`), `walkthroughFinish` (`tagalong:walkthrough:finish`, `{ close? }`)                                                                                                                                                                                                                                                                                         | No brain call. Open sets `walkthrough.done` false and opens the window; finish sets it true and closes it unless `close` is false; closing the window alone never does                                                                                                                                                                               |
@@ -512,7 +512,7 @@ Events main sends to renderers (no answer): `turnEvent`, `contextEvent`, `captur
 alone `speechChunk`, `speechDone` and `speechControl` (the brain's `speech_control`: pause, resume or
 clear what is being said). The panel sends `speechState` the other way (one-way, no answer): each
 sentence started or ended, paused, or idle, which main checks and sends on as `speech_state`. See
-[voice.md](voice.md).
+[voice.md](../senses/voice.md).
 
 `dropOnPet` checks the sender with `fromWindow(window)` (in `handle.ts`), which compares
 `event.sender` (set by Electron in main, so a page cannot forge it) with that window's
@@ -520,7 +520,7 @@ sentence started or ended, paused, or idle, which main checks and sends on as `s
 
 ### Talking to the brain
 
-`BrainClient` (`protocol/ts/src/brain-client.ts`, exported by `@tagalong/contract` and shared with the browser body) is the desktop's end of contract v1 ([protocol/README.md](../protocol/README.md)).
+`BrainClient` (`protocol/ts/src/brain-client.ts`, exported by `@tagalong/contract` and shared with the browser body) is the desktop's end of contract v1 ([protocol/README.md](../../protocol/README.md)).
 The app uses it for turns and for Home: `onNotification` feeds the mapper's `map`, `onResync` its
 `resync`, and `call(tool, input)` runs a brain tool for Home (see below).
 
@@ -532,7 +532,7 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
 - **Options the desktop leaves at their defaults:** `body` (who the body is; the desktop sends its
   own), `seqStore` (where `last_seq` is kept; the desktop keeps it in memory) and `keepalive`
   (`{ everyMs, tool }`, a timed call to a brain tool; only the browser body uses it). See
-  [protocol/README.md](../protocol/README.md#the-typescript-client).
+  [protocol/README.md](../../protocol/README.md#the-typescript-client).
 - **say / cancel:** `say(params)` is a request and resolves with the brain's `SayResult`. `cancel(turn)`
   is a notification. Both need `online`; `say` otherwise rejects with `BrainOffline`, as does a
   `say` still waiting when the socket drops. Requests time out after 30 s.
@@ -740,7 +740,7 @@ data over the channels in `shared/ipc.ts`:
 - `window.tagalong`: a `HostBridge` (`@tagalong/ui`), every call an `ipcRenderer.invoke` on its
   channel and `onTurnEvent` a listener on `IPC.turnEvent`. A shared component that compiles against
   `HostBridge` runs in both hosts. The panel page wraps it with three more bridge calls
-  (`checkHealth`, `openFix`, `openLogs`; see [bubble.md](bubble.md#the-health-check)).
+  (`checkHealth`, `openFix`, `openLogs`; see [bubble.md](../senses/bubble.md#the-health-check)).
 - `window.tagalongHost`: `TagalongHostApi` (`shared/ipc.ts`), everything specific to this host:
   the captured snapshot, the sight pause, `getHostView`, `saveSettings`, keys,
   Home, the panel's placement and fit, the avatar's drag, remark lines,
@@ -755,7 +755,7 @@ sandboxed preload) and drops an empty path.
 
 The renderer adds a third global itself, `window.tagalongVoice` (`renderer/src/voice-seam.ts`,
 installed by the panel): the ears, the microphone and the ears' model download, built
-on `tagalongHost`. See [voice.md](voice.md).
+on `tagalongHost`. See [voice.md](../senses/voice.md).
 
 ### The platform adapter
 
@@ -771,7 +771,7 @@ Each capability is a free function taking its Electron dependencies (`desktopCap
 `nativeImage`) as ports, and `Win32Platform` only wires the real ones in, so the perception layer
 is tested in plain Node with no display. `nut-js` and `get-windows` are imported lazily inside
 `win32.ts` because both load native code. The adapter's internals (PowerShell over
-`-EncodedCommand`, the inventory, OCR) are in [sight.md](sight.md).
+`-EncodedCommand`, the inventory, OCR) are in [sight.md](../senses/sight.md).
 
 ### The log file
 
@@ -940,7 +940,7 @@ app on a new temporary `--user-data-dir`, so a run never touches real data.
 ## What it stores
 
 The desktop keeps three things on disk, all in `<userData>` (`%APPDATA%\Tagalong`), apart from the
-brain's data (see [storage.md](storage.md)). No capture, screenshot or audio is written to disk.
+brain's data (see [storage.md](../data/storage.md)). No capture, screenshot or audio is written to disk.
 
 | Item                                              | Location                 | Purpose                                                             | Retention                           |
 | ------------------------------------------------- | ------------------------ | ------------------------------------------------------------------- | ----------------------------------- |
@@ -955,7 +955,7 @@ The host writes:
   (`settings.json` in `userData`): the avatar position, hotkeys, voice, `walkthrough: { done }`
   (false until Finish or Skip on the first-run tour), `bodyId` (this install's body id, `desktop-` and
   six hex digits, made by `readOrMakeBodyId` the first time it is read and kept, written only by main through `SettingsStore.setBodyId` and not part of `SettingsPatch`; a saved id that
-  breaks the contract's pattern is replaced) and the other settings in the schema. See [settings-and-secrets.md](settings-and-secrets.md).
+  breaks the contract's pattern is replaced) and the other settings in the schema. See [settings-and-secrets.md](../data/settings-and-secrets.md).
 
 Everything else main holds (`pendingSnapshot`, the dropped item, status marks) is
 in memory and gone on quit. `before-quit` disposes the hotkeys, the talk key hook, the
@@ -991,7 +991,7 @@ the clean close and stops the brain client.
 Main holds the one brain connection, so the brain's address never needs to reach a window. Every capture
 is announced on the avatar and in the tray tooltip. The log file keeps only kept text with secrets
 hidden. Main never reads the clipboard for its content; the selection copy saves and restores it; Settings' Copy buttons write a path or address to it. A dropped item is named on drop and read only
-when a button on its card asks. See [privacy.md](privacy.md).
+when a button on its card asks. See [privacy.md](../data/privacy.md).
 
 ## Tests that pin it
 

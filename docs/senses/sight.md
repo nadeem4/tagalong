@@ -35,7 +35,7 @@ The desktop host does the reading. Windows is the only platform.
 
 On the desktop, `Platform` is the one door to the screen: every read goes through `gateSight(Platform)`, which applies the sight pause, and the exclusion check runs before any pixel or text is read. The ask hotkey and the talk key call it from `context.ts`; the brain calls it through the body tools.
 
-The brain asks for reads with three body tools (`body-tools.ts`): `list_windows`, `read_window_text` and `look_at_window`. `read_window_text` and `look_at_window` take a window id minted by the list (`read_window_text` defaults to the foreground window). The brain sends a `use` frame, the desktop's `BrainClient` hands it to `run`, and every run is bounded at `RUN_TIMEOUT_MS` = 15,000; anything that is not already an `RpcError` (the sight pause, a helper failing) becomes a `tool_failed` error carrying its own words. The browser body offers its own tools instead (`tabs`, `page_parts` and others; see [browser-body.md](browser-body.md)).
+The brain asks for reads with three body tools (`body-tools.ts`): `list_windows`, `read_window_text` and `look_at_window`. `read_window_text` and `look_at_window` take a window id minted by the list (`read_window_text` defaults to the foreground window). The brain sends a `use` frame, the desktop's `BrainClient` hands it to `run`, and every run is bounded at `RUN_TIMEOUT_MS` = 15,000; anything that is not already an `RpcError` (the sight pause, a helper failing) becomes a `tool_failed` error carrying its own words. The browser body offers its own tools instead (`tabs`, `page_parts` and others; see [browser-body.md](../bodies/browser.md)).
 
 The path of one `read_window_text`, end to end:
 
@@ -310,7 +310,7 @@ not confused with "no text": when a read fell back to the picture and there was 
 anything and nothing leaves the machine. Never rejects.
 
 **Reading status and the language pack.** Home shows it in "Where things run" under "How Scout
-reads your screen" (see [desktop.md](desktop.md)); "Ask Scout to fix it" asks Scout as the person. `detectReading` (`reading-status.ts`) runs `READING_SCRIPT` with
+reads your screen" (see [desktop.md](../bodies/desktop.md)); "Ask Scout to fix it" asks Scout as the person. `detectReading` (`reading-status.ts`) runs `READING_SCRIPT` with
 `DETECT_TIMEOUT_MS` = 20,000: UI Automation's root element for window text, `TryCreateFromUserProfileLanguages()` for
 text from pictures, and the display language (`Get-WinUILanguageOverride`, else `Get-UICulture`). It never calls
 `Get-WindowsCapability`, which needs administrator rights. Empty output, a blocked script or a thrown runner reads
@@ -355,8 +355,8 @@ name nor title is allowed: refusing everything unnamed would leave Scout blind.
 
 The person's list has no editor in Settings and Scout cannot change it; Settings → Privacy shows
 the blind spots read-only under **Scout never looks at**. An entry is added or removed by editing
-`captureExclusions` in `settings.json` by hand. See [privacy.md](privacy.md) and
-[settings-and-secrets.md](settings-and-secrets.md).
+`captureExclusions` in `settings.json` by hand. See [privacy.md](../data/privacy.md) and
+[settings-and-secrets.md](../data/settings-and-secrets.md).
 
 Enforcement points, all before any pixel or text is read:
 
@@ -432,7 +432,7 @@ queue, where they never wake Scout on their own (`wakes=False`) and only the lat
 for the prompt. The title is cut to 200 characters and the URL to 300 (`events.py`). If one matches
 an anchor of a loop Scout is holding (the deck a mail asked about, the page it linked), Scout may
 speak up. No new screen read is made: only titles and addresses already sent. See
-[brain.md](brain.md#loops).
+[brain.md](../brain/README.md#loops).
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
@@ -527,7 +527,7 @@ not block a drop.
 
 ## Privacy notes
 
-The privacy reference for everything above is [privacy.md](privacy.md): what is captured and when, the blind spots, the window list's contents, OCR, pausing sight and drops. Points that follow from this design:
+The privacy reference for everything above is [privacy.md](../data/privacy.md): what is captured and when, the blind spots, the window list's contents, OCR, pausing sight and drops. Points that follow from this design:
 
 - The exclusion check always runs before the read, never as a filter afterwards.
 - A blocked window's title never leaves the host; only its app name and the rule.

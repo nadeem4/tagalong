@@ -5,7 +5,7 @@
 `bodies/browser` is a Chromium Manifest V3 extension that makes your browser a body for the Python
 brain. Scout can list your open tabs and read a page when you ask, after you say yes. It holds no
 brain of its own: it dials the brain over the websocket contract in
-[protocol/README.md](../protocol/README.md) and offers four tools: `tabs`, `page_parts`,
+[protocol/README.md](../../protocol/README.md) and offers four tools: `tabs`, `page_parts`,
 `browser_search` and `tab_actions`. It also tells Scout, as plain facts, which tab you are on and
 which download just finished, and lets you ask Scout from a right-click or the address bar. The
 browser shows no answers itself (it says `display: false`), so Scout's reply appears in the desktop
@@ -13,8 +13,8 @@ bubble. It works in Chrome, Edge, Brave, Opera, Vivaldi, Arc and any other Chrom
 version 116.
 
 The store listing, permission justifications and the public privacy policy are in
-[chrome-web-store/listing.md](chrome-web-store/listing.md) and
-[chrome-web-store/privacy-policy.md](chrome-web-store/privacy-policy.md).
+[chrome-web-store/listing.md](../chrome-web-store/listing.md) and
+[chrome-web-store/privacy-policy.md](../chrome-web-store/privacy-policy.md).
 
 ## Where it lives
 
@@ -74,7 +74,7 @@ flowchart LR
    stopped worker and restarts the body, because Chrome stops idle workers.
 
 The `BrainClient` options this body sets (see
-[protocol/README.md](../protocol/README.md#the-typescript-client)):
+[protocol/README.md](../../protocol/README.md#the-typescript-client)):
 
 - `body`: the kind `browser`, plus the id and name, and `display: false`.
 - `seqStore`: keeps the last sequence number in `chrome.storage.session` under `lastSeq`, so a
@@ -163,7 +163,7 @@ prefer `read` and use `picture` only when the layout matters. Two more rules:
 
 Chrome documents `captureVisibleTab` as needing `<all_urls>` or `activeTab`. Whether a grant for one
 site is enough is not covered by a test; it is a manual check in the
-[feature test guide](testing/feature-test-guide.md#the-browser-body).
+[feature test guide](../testing/feature-test-guide.md#the-browser-body).
 
 ### `page_parts`
 
@@ -512,7 +512,7 @@ connected, a tool that needs your approval is not run yet: the ask is saved as a
 the call is waiting for your answer, and the card shows when the desktop joins (the call then runs by
 itself if you allow it). `tab_actions` is such a tool unless you set it to auto in Home, so it waits too. A wake (Scout speaking first) is never labelled with the
 browser either. Tools that need no approval, like `tabs` `list`, still work. The rule is in
-"Permissions and asks" and "Wake and finish a turn" in [brain.md](brain.md).
+"Permissions and asks" and "Wake and finish a turn" in [brain.md](../brain/README.md).
 
 ## What it stores
 
@@ -549,7 +549,7 @@ The offscreen page holds the microphone stream only while listening and stores n
 
 The body tells the brain two things without being asked, as `event` notifications. Both are
 context, not a reason to speak: the brain keeps the latest of each per body and never starts a turn
-for them (see "Body events" in [brain.md](brain.md)). They flow only while the body is online;
+for them (see "Body events" in [brain.md](../brain/README.md)). They flow only while the body is online;
 offline, a fact is dropped, not queued.
 
 | Name       | Data                                        | When                                                      |
@@ -605,4 +605,4 @@ offline, a fact is dropped, not queued.
 | `source-guard.test.ts`                  | Only the permission window requests permissions (the popup only removes them and asks for `contextMenus`); no ui import                                                                                       |
 
 Run them with `pnpm --filter @tagalong/browser test`. Manual steps are in
-[testing/feature-test-guide.md](testing/feature-test-guide.md#the-browser-body).
+[testing/feature-test-guide.md](../testing/feature-test-guide.md#the-browser-body).

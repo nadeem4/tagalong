@@ -9,7 +9,7 @@ from brain.voice import tts
 from brain.voice.ear_text import for_the_ear
 from brain.voice.tts import AUTO, auto_voice, load_voices, voice_by_id
 
-# The weights licences recorded in docs/voice.md ("Voice licences").
+# The weights licences recorded in docs/senses/voice.md ("Voice licences").
 LICENCES = {"Mycroft AI dataset (see docs)", "CC-BY-SA-4.0", "Apache-2.0", "OpenRAIL-M"}
 SHA256 = re.compile(r"[0-9a-f]{64}")
 
