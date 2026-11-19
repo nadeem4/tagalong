@@ -107,3 +107,18 @@ def sweep(db: sqlite3.Connection, before: str) -> int:
         "DELETE FROM tasks WHERE state IN ('done','failed','stopped','declined') AND ended_at<?",
         (before,),
     ).rowcount
+
+
+def event_source(db: sqlite3.Connection, event_id: str) -> str | None:
+    r = db.execute("SELECT source FROM events WHERE id=?", (event_id,)).fetchone()
+    return None if r is None else r[0]
+
+
+def timers_of(db: sqlite3.Connection, task_id: str) -> list[str]:
+    """The timer and watch rows of a task that have not run out: planned or paused."""
+    rows = db.execute(
+        "SELECT id FROM work WHERE task_id=? AND kind IN ('timer','watch')"
+        " AND state IN ('planned','paused') ORDER BY created_at, rowid",
+        (task_id,),
+    ).fetchall()
+    return [r[0] for r in rows]

@@ -61,6 +61,15 @@ class Tasks:
             store.insert(self._db, row)
         return id
 
+    def for_turn(self, cause: str | None, kind: str, title: str | None = None) -> str:
+        """A new task for the turn that took `cause`: it comes from that event's source and is
+        caused by it. With no cause (Scout on its own) the source is `scout`."""
+        source = (None if cause is None else store.event_source(self._db, cause)) or "scout"
+        return self.open(kind, source, caused_by=cause, title=title)
+
+    def timers_of(self, id: str) -> list[str]:
+        return store.timers_of(self._db, id)
+
     def get(self, id: str) -> store.TaskRow | None:
         return store.get(self._db, id)
 

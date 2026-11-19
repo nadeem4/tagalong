@@ -105,6 +105,7 @@ from brain.store.conversation import compaction_text
 from brain.store.db import transaction
 from brain.store.events import EventRow
 from brain.store.work import TransitionRefused, WorkRow, WorkStore
+from brain.task_tools import task_tools
 from brain.tasks import Tasks
 from brain.timers import Timers
 from brain.timers_home import timer_home_tools
@@ -354,6 +355,7 @@ class Session:
             + expert_tools(self.jobs, self.owner_turn)
             + work_tools(self.records.work, self.jobs, timers.changed)
             + timer_tools(self.records, timers, now, lambda: self._turn_cause)
+            + task_tools(self.tasks, timers, self.jobs.running_for, lambda: self._turn_cause)
             + timer_home_tools(self.records.work, timers)
             + output_tools(outputs)
             + question_tools(questions)

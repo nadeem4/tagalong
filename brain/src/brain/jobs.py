@@ -859,6 +859,15 @@ class Jobs:
             raise JobError(f"job {job_id} has several running parts: {names}; {what}")
         return next(iter(runs.values()))
 
+    def task_of(self, job_id: str | None) -> str | None:
+        """The task this job belongs to; its news is told under it."""
+        goal = self._records.work.get(job_id) if job_id else None
+        return None if goal is None else goal.task_id
+
+    def running_for(self, task: str) -> Sequence[str]:
+        """The jobs with a part running under this task."""
+        return [j.id for j in self._records.running_jobs() if self.task_of(j.id) == task]
+
     def cause(self, job_id: str | None) -> str | None:
         """The event the turn that handed this job off took: its news is caused by it."""
         return self._causes.get(job_id or "")
