@@ -289,6 +289,7 @@ class Session:
             memory,
             self._asks,
             items,
+            self.tasks,
             approvals,
             offers,
             now,

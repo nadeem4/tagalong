@@ -17,6 +17,7 @@ from brain.offers import Offers, OfferSettings
 from brain.open_items import OpenItems
 from brain.store import rules
 from brain.store.db import utc_text
+from brain.tasks import Tasks
 
 NOW = datetime(2026, 10, 28, 9, 0, 0, tzinfo=UTC)
 YES, KEEP = "Yes, auto-approve", "Keep asking"
@@ -116,8 +117,9 @@ class Rig:
         self.clock = NOW
         approvals = approvals_on(mem, lambda m, p: self.sent.append((m, p)), lambda: self.clock)
         self.items = OpenItems(mem.db, lambda: self.clock)
+        self.tasks = Tasks(mem.db, lambda text: text, lambda: self.clock)
         self.offers = Offers(
-            self.model, self.budget, mem, self.asks, self.items, approvals, settings,
+            self.model, self.budget, mem, self.asks, self.items, self.tasks, approvals, settings,
             lambda: self.clock,
         )  # fmt: skip
 
@@ -315,7 +317,7 @@ async def test_consider_skips_look_when_the_guards_stop(mem):
 
     r = Rig(mem)
     r.offers = Offers(
-        r.model, r.budget, mem, r.asks, r.items,
+        r.model, r.budget, mem, r.asks, r.items, r.tasks,
         approvals_on(mem, lambda m, p: None, lambda: NOW), SETTINGS, lambda: NOW,
         guards=StopGuards(),
     )  # fmt: skip
@@ -434,3 +436,46 @@ async def test_resume_closes_the_card_of_an_offer_past_its_deadline(mem):
     rig.clock = NOW + timedelta(days=2)
     rig.offers.resume()
     assert rig.asks.expired == [(item.id, "timeout")]
+
+
+# ---- an offer is an Own task (spec 6.3) ----
+
+
+def own_tasks(rig):
+    ids = [r[0] for r in rig.mem.db.execute("SELECT id FROM tasks WHERE kind='own'")]
+    return [rig.tasks.get(i) for i in ids]
+
+
+async def test_an_offer_is_an_own_task_declined_on_no(mem):
+    rig = Rig(mem, asks=FakeAsks(KEEP))
+    rig.approve(n=3)
+    await rig.consider()
+    [task] = own_tasks(rig)
+    assert (task.state, task.source, task.title) == ("declined", "scout", "Fine to read files")
+
+
+async def test_an_offer_answered_yes_ends_its_task_done(rig):
+    rig.approve(n=3)
+    await rig.consider()
+    [task] = own_tasks(rig)
+    assert task.state == "done"
+
+
+async def test_an_unanswered_offer_ends_stopped_not_done(mem):
+    rig = Rig(mem, asks=FakeAsks("something else"))
+    rig.approve(n=3)
+    await rig.consider()
+    [task] = own_tasks(rig)
+    assert (task.state, task.end_reason) == ("stopped", "no answer")
+
+
+async def test_a_second_look_opens_no_second_task_while_one_waits(mem):
+    rig = Rig(mem, asks=FakeAsks(hang=True))
+    rig.approve(n=3)
+    await rig.consider()
+    rig.clock = NOW + timedelta(days=2)  # the one-look-a-day gap is over; the card still waits
+    await rig.consider()
+    [task] = own_tasks(rig)
+    assert task.state == "open" and rig.model.calls == 1
+    [item] = rig.items.list_open(kind="offer")
+    assert item.task_id == task.id
