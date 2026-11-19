@@ -41,6 +41,7 @@ function view(bridge: FakeHostBridge, refresh: number, busy: ReadonlySet<string>
         busy={busy}
         apps={[]}
         refresh={n}
+        answered={0}
         offline={false}
         onAdd={onAdd}
         onAddAnyway={onAddAnyway}
