@@ -79,7 +79,7 @@ A message from the phone is a `say` saved in the brain's event log, so Scout ans
 even while a desktop turn runs (the phone's say does not join the desktop's turn: it waits and then gets its own). A body
 `event` from the phone is answered there too. News the phone did not cause still prefers a screen: the
 phone gets it only when no screen is online. A job's question reaches a phone-only
-setup. See [brain.md](../brain/README.md#what-a-turn-does).
+setup. See [brain.md](../brain/turns.md#a-turn).
 
 ## Asks from the phone
 
@@ -113,7 +113,7 @@ rule is per body.
 - **Closed or unknown.** A tap on an ask the brain closed, or one the bridge never held, sends the
   brain `ask_closed {via: "tap"}`; an answer the brain refuses as not found sends
   `ask_closed {via: "answer"}`. The brain wakes Scout (urgency `next_pause`, see
-  [brain.md](../brain/README.md#the-turn-runner-and-urgency)) and Scout says in its own words that the question is
+  [brain.md](../brain/turns.md#the-runner)) and Scout says in its own words that the question is
   closed. If the brain is down the event is dropped and logged.
 - **Late taps.** An ask that is still open on the brain (for example one whose turn is long over) can
   be answered however long after, as the tap itself reopens the 24-hour window.

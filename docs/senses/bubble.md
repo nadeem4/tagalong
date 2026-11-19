@@ -451,7 +451,7 @@ The nav lists six pages (`HomePage`), the companion's name filling in where it a
   re-read (a new filter, a change notice) is dropped. Until a read succeeds nothing is claimed; a failed read shows an alert.
   `e2e/approvals.spec.ts` covers it on the fake brain.
 - **Jobs.** `JobsPanel` (`home/jobs-panel.tsx`) lists the jobs Scout handed to Claude Code, each with
-  Stop while it runs; see [brain.md](../brain/README.md#experts).
+  Stop while it runs; see [brain.md](../brain/experts.md).
 
 ## Interfaces
 
