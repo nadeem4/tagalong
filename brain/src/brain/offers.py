@@ -1,8 +1,9 @@
 """Offers: after the person has allowed one kind of ask by hand several times, Scout may offer
 to approve that kind from now on. Code decides when to look and caps how often; the model only
 writes the sentence. Nothing is saved unless the person answers "Yes, auto-approve".
-An offer is an `offer` open item: no timer drops it, and one not answered when the brain stops
-is shown again when a body comes online (`resume`, which a connect calls).
+An offer is an `offer` open item with a card: nothing waits on it and no timer drops it. The
+answer is a card answer this code takes (`answered`), and one not answered when the brain stops is
+shown again when a body comes online (`resume`, which a connect calls).
 """
 
 import asyncio
@@ -80,7 +81,8 @@ class Offers:
         self._settings = settings
         self._now = now
         self._tasks: set[asyncio.Task] = set()  # a bare task can be collected mid-flight
-        self._busy: set[str] = set()  # groups with a look or an offer in flight
+        self._busy: set[str] = set()  # groups with a look in flight
+        asks.register("offer", self.answered)
 
     def consider(self, group_key: str, source: str, tool: str) -> None:
         """Called after a person's approval. Returns at once; the look runs in the background."""
@@ -103,6 +105,8 @@ class Offers:
         # Cheap checks first: most approvals end here without a model call.
         if not self._asks.anyone_online() or rules.has_preference_for(self._memory.db, group_key):
             return
+        if any(i.saved_call["group"] == group_key for i in self._items.list_open(kind="offer")):
+            return  # its offer is still waiting on the person
         now = self._now()
         offers = rules.offers_for(self._memory.db, group_key)
         if offers and offers[0][0] > utc_text(now - LOOK_GAP):
@@ -130,28 +134,18 @@ class Offers:
                 "sentence": sentence,
             },
         )
-        await self._present(item)
+        self._present(item)
 
     def resume(self) -> None:
         """Show again the offers the last run left unanswered. Called when a body connects, since
         at start nobody is there to see a card; with nobody online the items just stay open."""
-        self._items.expire_due(self._now(), "offer")
+        for item in self._items.expire_due(self._now(), "offer"):
+            self._asks.expire(item.id, "timeout")  # the card of a lapsed offer leaves the screen
         if not self._asks.anyone_online():
             return
         for item in self._items.list_open(kind="offer"):
-            if item.saved_call["group"] not in self._busy:
-                self._busy.add(item.saved_call["group"])
-                task = asyncio.get_running_loop().create_task(self._resume_one(item))
-                self._tasks.add(task)
-                task.add_done_callback(self._tasks.discard)
-
-    async def _resume_one(self, item: OpenItem) -> None:
-        try:
-            await self._present(item)
-        except Exception:
-            log.exception("offer failed")
-        finally:
-            self._busy.discard(item.saved_call["group"])
+            if not self._asks.is_open(item.id):
+                self._present(item)
 
     async def _look(self, group_key: str, count: int) -> str | None:
         """The model's one-sentence offer, or None for no offer (errors included)."""
@@ -195,26 +189,34 @@ class Offers:
                 final = item
         return final
 
-    async def _present(self, item: OpenItem) -> None:
-        """Ask the person and record how it ended; the preference is saved only on an explicit
-        yes. The card is the model's sentence alone: the code adds no words."""
+    def _present(self, item: OpenItem) -> None:
+        """Put the card on screen and go on. The card is the model's sentence alone: the code adds
+        no words."""
+        call = item.saved_call
+        self._asks.card(
+            item.id,
+            kind="offer",
+            text=call["sentence"],
+            options=[YES, KEEP],
+            tool="approval_offer",
+            input={"sentence": call["sentence"], "group": call["group"]},
+        )
+
+    def answered(
+        self, ask_id: str, option: str, _body: str, _text: str | None, _at: str | None
+    ) -> None:
+        """The person answered the card: the preference is saved only on an explicit yes."""
+        item = self._items.get(ask_id)
+        if item is None:
+            return
+        if item.state != "open":  # it ended first: the tap still counts as a look with no answer
+            rules.add_offer(
+                self._memory.db, item.saved_call["group"], utc_text(self._now()), "no_answer"
+            )
+            return
         call = item.saved_call
         group_key = call["group"]
         outcome = "no_answer"
-        try:
-            answer = await self._asks.open(
-                text=call["sentence"],
-                options=[YES, KEEP],
-                tool="approval_offer",
-                input={"sentence": call["sentence"], "group": group_key},
-                timeout=None,  # the item's deadline is the one rule; nothing drops it silently
-            )
-            option = answer.option
-            answer_missing = option is None  # Asks answers None when no body displays
-        except Exception:  # cancel or a broken transport: no answer
-            option, answer_missing = None, False
-        if option is None and answer_missing:
-            return  # nobody was online: the item stays open and is shown at the next connect
         if option in (YES, KEEP):
             try:
                 self._items.answer(item.id, option, "person")

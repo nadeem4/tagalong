@@ -503,6 +503,8 @@ Needs the real brain and the desktop, and an Anthropic key. The `choose` and `sa
 tools are Scout's own, so ask for a choice in words, for example "Ask me, with choices, whether I want
 tea or coffee, and recommend one."
 
+Answer a `choose` card and an offer card: each is saved as a handled `card_answer` that starts no turn (the choice still wakes Scout through its `choice` event).
+
 1. **Action:** send that request.
    **Expected:** a card with the question and the options as buttons, the recommended one first and
    stacked as full-width rows, the recommended one marked with a "Recommended" tag on the right, and a text field "Your answer". Scout's turn ends without waiting.

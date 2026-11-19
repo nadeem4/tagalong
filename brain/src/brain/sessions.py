@@ -392,9 +392,11 @@ class Session:
             self.tasks,
             self._turn_task,
             lambda turn: self._turn_cause if turn and turn == self._turn_id else None,
-            finish=self.events.finish,
         )
         self._asks.on_item_answer = self._card_answered
+        self._asks.register(
+            "ask", lambda ask, opt, body, _text, at: self.ask_runner.answered(ask, opt, body, at)
+        )
         self.toolbox = Toolbox(
             [BrainSource(tools), *sources],
             modes,
@@ -626,11 +628,13 @@ class Session:
         )
         return None if row is None else row.task
 
-    def _card_answered(
-        self, ask_id: str, option: str, body_id: str, check_back_at: str | None = None
-    ) -> None:
+    def _card_answered(self, ask_id: str, option: str, body_id: str) -> None:
+        """Every card answer is saved as a `card_answer` event that code handles, so it starts no
+        turn; the handler of the card's kind then does what the answer means."""
         self.presence.touch(body_id)  # the person is at the body that answered
-        self.ask_runner.answered(ask_id, option, body_id, check_back_at)
+        answer = Event("card_answer", body_id, {"ask": ask_id, "option": option})
+        self.post_event(answer)
+        self.events.finish([answer.id], "handled")  # before the runner looks: its poke waits a tick
 
     async def interject(self, body_id: str, content: list) -> bool:
         """News due at a sentence break while Scout speaks: the voice pauses, one short call sees

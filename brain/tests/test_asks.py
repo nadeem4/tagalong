@@ -608,10 +608,10 @@ def test_not_now_keeps_the_card_open_and_shows_the_new_time():
     bodies = FakeBodies()
     asks = Asks(bodies, fresh_work())
     told = []
-    asks.on_item_answer = lambda *a: told.append(a)
+    asks.register("ask", lambda *a: told.append(a))
     asks.show("a1", call(), "desktop__x", True, {"task": {"id": "k1", "title": None}})
     asks.answer("a1", "not_now", "desktop", check_back_at="2026-11-11T11:00:00+00:00")
-    assert told == [("a1", "not_now", "desktop", "2026-11-11T11:00:00+00:00")]
+    assert told == [("a1", "not_now", "desktop", None, "2026-11-11T11:00:00+00:00")]
     assert asks.is_open("a1")
     asks.reschedule("a1", "2026-11-11T11:00:00+00:00", "person")
     last = bodies.sent[-1][1]
@@ -620,3 +620,35 @@ def test_not_now_keeps_the_card_open_and_shows_the_new_time():
         "2026-11-11T11:00:00+00:00",
         "person",
     )
+
+
+def test_card_publishes_and_returns_at_once():
+    bodies = FakeBodies()
+    asks = Asks(bodies, fresh_work())
+    asks.card(
+        "c1", kind="choice", text="Which?", options=["a", "b"], free_text=True,
+        recommended="a", tool="choose",
+    )  # fmt: skip
+    [(_, params)] = bodies.sent
+    assert params == {
+        "id": "c1", "state": "open", "text": "Which?", "options": ["a", "b"],
+        "free_text": True, "recommended": "a", "tool": "choose",
+    }  # fmt: skip
+    assert asks.is_open("c1")
+
+
+def test_a_card_answer_goes_to_its_kinds_handler_with_the_typed_text():
+    bodies = FakeBodies()
+    asks = Asks(bodies, fresh_work())
+    told, common = [], []
+    asks.register("choice", lambda *a: told.append(("choice", *a)))
+    asks.register("offer", lambda *a: told.append(("offer", *a)))
+    asks.on_item_answer = lambda *a: common.append(a)
+    asks.card("c1", kind="choice", text="Which?", options=["a"], free_text=True)
+    asks.answer("c1", "other", "desktop", text="mine")
+    assert told == [("choice", "c1", "other", "desktop", "mine", None)]
+    assert common == [("c1", "other", "desktop")]  # the session saves the card_answer event
+    assert not asks.is_open("c1")
+    assert bodies.sent[-1][1] == {
+        "id": "c1", "state": "closed", "reason": "answered", "option": "other", "by": "desktop",
+    }  # fmt: skip
