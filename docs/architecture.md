@@ -1,266 +1,235 @@
 # Architecture
 
-Tagalong is a desktop companion. One on-screen character, Scout, sits beside the person's work,
-reads what is on screen when asked, answers small things itself, and hands real work to an
-expert such as Claude Code. Everything runs on the person's machine except the model calls.
+The map of the whole system: which processes run, how they start and talk, how the code is split into packages, what is inside the brain, and one request followed end to end. Read it first; every other doc goes deeper on one part and is linked from [Where to read next](#where-to-read-next).
 
-This page is the map: the processes, the packages, how a body talks to the brain, and the life of
-one turn. Each subsystem has its own page, linked from [the subsystem map](#subsystem-map).
+## Contents
 
-## One brain, thin bodies
+- [What Tagalong is](#what-tagalong-is)
+- [Tagalong at a glance](#tagalong-at-a-glance)
+- [Processes and how they start](#processes-and-how-they-start)
+- [Packages](#packages)
+- [Inside the brain](#inside-the-brain)
+- [One request end to end](#one-request-end-to-end)
+- [Where to read next](#where-to-read-next)
 
-The brain is the Python program in `brain/`: the conversation, Scout's mind, memory, experts,
-connected apps and asks. It never knows which operating system or which body it is serving. See
-[brain.md](brain/README.md). Everything it keeps is in one SQLite file behind the `store/` package, the
-only code that runs SQL ([storage.md](data/storage.md)).
+## What Tagalong is
 
-A body is a thin shell around it. It perceives (selection, windows, screenshots, page text),
-offers tools and presents (the figure, the bubble, the voice). A body reaches the brain only
-through contract v1 ([protocol/README.md](../protocol/README.md)), over a loopback WebSocket. The
-desktop app (`bodies/desktop`) dials it from its main process (`bodies/desktop/src/main/brain/start.ts`,
-`startBrain`; in dev it starts the brain if none is running, or run `cd brain && uv run brain` yourself). So does the browser body
-(`bodies/browser`), a tools-only body that gives Scout the `tabs`, `page_parts`, `browser_search`
-and `tab_actions` tools and lets you ask Scout from a right-click or the address bar; see
-[browser-body.md](bodies/browser.md).
+Tagalong is a desktop companion for Windows. One on-screen character, Scout, sits beside the person's work, reads what is on screen when asked, answers small things itself and hands real work to an expert such as Claude Code. Everything runs on the person's machine except the model calls. Product intent is in [bodies/PRODUCT.md](../bodies/PRODUCT.md).
 
-Speech is the one capability that lives in the desktop body rather than the brain: the
-speech-to-text and text-to-speech models are native ONNX runtimes. The brain only learns that an
-ask was spoken.
+The design is one Python brain and thin TypeScript bodies. The brain thinks, remembers, hears and speaks. A body perceives (selection, windows, page text), offers tools and presents (the figure, the bubble, the sound). Bodies talk only to the brain, over contract v1 ([protocol/README.md](../protocol/README.md)).
 
-## Processes
+## Tagalong at a glance
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
-flowchart LR
-  subgraph Electron["Tagalong desktop app"]
-    R["Renderer windows<br>avatar, panel, home"]
-    M["Electron main<br>BrainClient, platform,<br>tray, hotkeys, talk key"]
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
+flowchart TB
+  subgraph Bodies["Bodies (TypeScript)"]
+    direction LR
+    DESK["Desktop (Electron)<br/>windows: avatar, panel,<br/>home, walkthrough"]
+    BRW["Browser add-on<br/>MV3 service worker"]
+    WA["WhatsApp bridge<br/>Node, started by bridges.py"]
   end
-  subgraph Chrome["Chrome or Edge"]
-    SW["Browser body service worker<br>BrainClient"]
-    PU["Popup and permission window"]
-    CS["Page reader<br>injected on demand"]
+  subgraph Brain["Python brain (brain/src/brain)"]
+    SRV["server.py, bodies.py<br/>connections, outboxes"]
+    VOX["voice/<br/>ears (hearing), mouth (speaking)"]
+    EV["events.py EventLog<br/>every input saved first"]
+    RUN["runner.py<br/>pick, gate, target"]
+    SES["sessions.py Session<br/>one turn at a time"]
+    TB["toolbox.py, permission.py<br/>tool gate and asks"]
+    TASK["tasks.py, store/work.py<br/>tasks and work rows"]
+    JOB["jobs.py, experts.py<br/>hand-offs to experts"]
+    STORE["store/ and memory.py<br/>the only code that runs SQL"]
+    SETUP["setup/<br/>installs experts and apps"]
   end
-  P["Python brain<br>brain/, started by hand"]
-  X["Model providers,<br>Claude Code, MCP servers"]
-  R -- "IPC via preload" --> M
-  M -- "ws://127.0.0.1:47321" --> P
-  SW -- "ws://127.0.0.1:47321" --> P
-  PU -- "runtime messages" --> SW
-  CS -- "page text" --> SW
-  P --> X
+  subgraph Outside["Outside the brain"]
+    direction LR
+    API["Anthropic API<br/>model and web tools"]
+    MCP["MCP apps<br/>Gmail, GitHub and others"]
+    EXP["Experts<br/>Claude Code and others"]
+    DB[("tagalong.db")]
+    FILES["TAGALONG_HOME files<br/>.env, brain.log, brain.pid, models"]
+  end
+  DESK -- "websocket, contract v1, 127.0.0.1:47321" --> SRV
+  BRW --> SRV
+  WA --> SRV
+  SRV <--> |"mic, heard, speech"| VOX
+  SRV --> EV
+  EV --> RUN
+  RUN --> SES
+  SES --> TB
+  SES --> TASK
+  SES --> JOB
+  EV --> STORE
+  SES --> STORE
+  SES -- "HTTPS" --> API
+  TB -- "MCP" --> MCP
+  JOB -- "ACP over stdio" --> EXP
+  STORE --> DB
+  SETUP -- "installs" --> EXP
+  SETUP --> FILES
 ```
 
-| Process                | Entry point                                 | What runs there                                                                                                                                                                                   |
-| ---------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Electron main          | `bodies/desktop/src/main/index.ts`          | The desktop `BrainClient` (to the Python brain), the platform adapter (window list, captures, OCR, selection), tray, global shortcuts, the talk key hook, IPC handlers                            |
-| Renderer windows       | `bodies/desktop/src/renderer/*.html`        | One page per window: `avatar`, `panel` (the bubble), `home` (`RendererPage` in `main/windows/page.ts`). Sandboxed, context-isolated, no Node                                                      |
-| Browser service worker | `bodies/browser/src/service-worker.ts`      | The browser body's one `BrainClient` socket to the brain; runs the `tabs`, `page_parts`, `browser_search` and `tab_actions` tools, the right-click and address-bar asks, and asks for permissions |
-| Browser popup          | `bodies/browser/src/popup/popup.html`       | Link status, brain address, browser name, what has been allowed (talks to the worker by runtime message)                                                                                          |
-| Browser page reader    | `bodies/browser/src/content/page-reader.ts` | Injected on demand to read a page's readable text (Readability)                                                                                                                                   |
+A body connects to the brain and nothing else. Everything a person says or that happens (a timer, a finished job) is saved in the event log first, and the runner starts one turn at a time from it. A turn talks to the model over HTTPS, runs tools through the toolbox (body tools over the same websocket, apps over MCP), and hands real work to an expert over ACP. Memory, tasks and events live in `tagalong.db`; keys, logs and downloaded models live in the files under `TAGALONG_HOME`.
 
-How they connect:
+## Processes and how they start
 
-- **Renderer to main.** Electron IPC only. The preload (`bodies/desktop/src/preload/index.ts`)
-  exposes `window.tagalong` and `window.tagalongHost` through `contextBridge`; channel names live in
-  `bodies/desktop/src/shared/ipc.ts`. Handlers live in `bodies/desktop/src/main/ipc/` and in
-  `main/index.ts` for the ones that need Electron itself. No renderer opens the socket.
-- **Main to brain.** `BrainClient` dials `ws://${TAGALONG_BRAIN_ADDR}` (default 127.0.0.1:47321) and
-  retries every 2 s. There is no pairing token. Brain notifications are mapped to turn events and
-  forwarded to every window as `IPC.turnEvent` by `forwardToRenderers` in `main/index.ts`.
-- **Voice.** Also through the brain. Main forwards the microphone to it as `mic` frames and
-  relays its `heard`, `voice` and `speech` frames to the windows; the panel plays the audio. There
-  is nothing voice-specific running in Electron. Details in [voice.md](senses/voice.md).
-- **Browser to brain.** The service worker owns a `BrainClient` socket (default
-  `127.0.0.1:47321`, the same address as the desktop), with a keepalive call every 20 s so the
-  worker stays awake. See [browser-body.md](bodies/browser.md).
-
-There is one desktop instance per user: `app.requestSingleInstanceLock()` runs before anything
-else, because two desktops would fight over the global shortcuts and the settings file.
-
-## Packages and import rules
+Three kinds of process can run: the desktop app, the brain, and optional helpers (the browser add-on inside Chrome or Edge, the WhatsApp bridge, and the experts the brain launches).
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
+sequenceDiagram
+  participant P as Person
+  participant D as Desktop (Electron main)
+  participant B as Brain (uv run brain)
+  participant W as WhatsApp bridge
+  P->>D: start the app (one instance per user)
+  D->>B: is anything listening on TAGALONG_BRAIN_ADDR?
+  alt address is local and nothing answers
+    D->>B: spawn uv run brain, detached (brain/launch.ts)
+    Note over B: writes brain.pid, logs to brain.log
+  end
+  loop every 2 s until connected
+    D->>B: websocket connect, then hello
+  end
+  B-->>D: hello result (version, build)
+  Note over D,B: an older brain build is restarted quietly
+  B->>W: start the bridge on its own Node, if set up
+  W->>B: hello (body kind whatsapp)
+  P->>D: quit the app
+  Note over B: the brain keeps running
+  P->>B: tagalong stop (reads brain.pid)
+```
+
+The desktop dials the brain itself and starts it when none is running (`bodies/desktop/src/main/brain/launch.ts`, started by `start.ts`); the brain output goes to `<TAGALONG_HOME>/brain.log`. It never stops the brain on quit, so the brain outlives the desktop; `tagalong stop` ends it, and a brain started by hand is used as is. Packaged, the desktop runs `uv sync` first. Set `TAGALONG_START_BRAIN=0` to stop the desktop starting one.
+
+| Process                | Entry point                            | What runs there                                                                                         |
+| ---------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Brain                  | `brain/src/brain/main.py`              | The websocket server, the event log, the runner, Scout's turns, memory, hearing and speaking, the setup |
+| Electron main          | `bodies/desktop/src/main/index.ts`     | The desktop `BrainClient`, the platform adapter (windows, captures, OCR), tray, hotkeys, the talk key   |
+| Renderer windows       | `bodies/desktop/src/renderer/*.html`   | `avatar`, `panel` (the bubble), `home` and `walkthrough`. Sandboxed, no Node; they reach main by IPC    |
+| Browser service worker | `bodies/browser/src/service-worker.ts` | The browser body's own socket; the `tabs`, `page_parts`, `browser_search` and `tab_actions` tools       |
+| WhatsApp bridge        | `bodies/whatsapp/dist/index.js`        | Meta's signed webhook in, Graph send out; started and watched by the brain (`bridges.py`)               |
+| Experts                | ACP adapters installed by `setup/`     | Claude Code and others, one process per expert, launched by `experts.py`                                |
+
+## Packages
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
 flowchart BT
-  U["bodies/ui<br>(incl. @tagalong/ui/shapes)"]
-  D["bodies/desktop"]
-  X["bodies/browser"]
+  K["protocol/ts<br/>@tagalong/contract (zod only)"]
+  M["bodies/mascot<br/>@tagalong/mascot"]
+  U["bodies/ui<br/>@tagalong/ui, and its shapes"]
+  D["bodies/desktop<br/>@tagalong/desktop"]
+  X["bodies/browser<br/>@tagalong/browser"]
+  W["bodies/whatsapp<br/>@tagalong/whatsapp"]
+  PY["brain/ (Python)<br/>protocol.py"]
+  U --> M
   D --> U
   D --> K
-  K["protocol/ts<br>@tagalong/contract"]
   X --> K
+  W --> K
+  PY -. "same wire, shared protocol/examples" .-> K
 ```
 
-Arrows point at what a package depends on. The edges are the TypeScript project references
-(`tsconfig.json` at the root and in each package) and the workspace dependencies in each
-`package.json`.
+Arrows point at what a package depends on. The desktop is the only one that uses `@tagalong/ui`; the UI draws everything against `HostBridge` and uses the mascot engine to draw Scout. The browser body and the WhatsApp bridge use only the contract. The Python brain does not import TypeScript: `brain/src/brain/protocol.py` mirrors the contract, and both sides test against `protocol/examples`.
 
-| Package           | Responsibility                                                                                                                                                                                                      | Must never import                                | Enforced by                                                                                                                                       |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `protocol/ts`     | `@tagalong/contract`: zod schemas for contract v1, the brain-body wire                                                                                                                                              | `node:*`, `electron`, `react`, any `@tagalong/*` | `eslint.config.js` (block for `protocol/ts/**`); its only dependency is `zod`                                                                     |
-| `bodies/ui`       | React components the desktop renders: the bubble, dock pet, chat panel, Home, the Settings sheet, cards, the `HostBridge` contract and a fake bridge. Its `shapes` export holds the React-free shared shapes        | `electron`, `ws`, `node:*`                       | `shapes/**` may not import React or `../*` (ESLint block and `bodies/ui/src/source-guard.test.ts`); no lint rule bans electron, ws or node:* here |
-| `bodies/desktop`  | Electron body: windows, tray, hotkeys, talk key, platform adapter, perception, voice, the settings store                                                                                                            |                                                  |                                                                                                                                                   |
-| `bodies/browser`  | Browser body (Chromium MV3): the `tabs`, `page_parts`, `browser_search` and `tab_actions` tools, right-click and address-bar asks, permission window, popup; speaks the brain contract through `@tagalong/contract` | `@tagalong/ui`                                   | Not a dependency and not a project reference                                                                                                      |
-| `bodies/whatsapp` | WhatsApp body: signed webhook in, Graph send out, contract v1 body of kind `whatsapp`; bundled to `dist/index.js`, started by the brain                                                                             | `@tagalong/ui`                                   | Not a dependency and not a project reference                                                                                                      |
+The rules, each enforced in `eslint.config.js` or a test:
 
-`@tagalong/ui/shapes` (`bodies/ui/src/shapes`) holds the shapes the desktop main process and the
-UI share: addressing, apps, context, memory, pet, status marks, turn events
-and voice ids. It has no React, so main can import it. The desktop's own files are
-`bodies/desktop/src/shared/{settings,blind-spots,voice}.ts`.
+- The contract package stays pure: `protocol/ts` depends on `zod` only and never imports `node:*`, `electron`, `react` or any `@tagalong/*`.
+- `@tagalong/ui/shapes` (`bodies/ui/src/shapes`) holds the React-free shapes shared with the desktop main process. It may not import React or files outside `shapes/`.
+- The browser body and the WhatsApp bridge never import `@tagalong/ui`.
+- Bodies reach the brain only through the contract; no body imports another body.
 
-The contract package's ESLint block replaces the shared purity options for its own files rather
-than adding to them, so for `protocol/ts` the lint list is exactly `electron`, `react`, `node:*`
-and `@tagalong/*`.
+The desktop bundles the workspace packages into its main, preload and renderer builds with electron-vite; only the native dependencies stay external. See [bodies/desktop.md](bodies/desktop.md).
 
-The desktop bundles the workspace packages into its main, preload and renderer builds with
-electron-vite; only the native dependencies stay external (`get-windows` and
-`uiohook-napi`; `bodies/desktop/electron.vite.config.ts`). See [desktop.md](bodies/desktop.md).
+## Inside the brain
 
-## Body contracts
+The brain is the Python program in `brain/`. It never knows which operating system or which body it is serving. The full tour is [brain/README.md](brain/README.md).
 
-A body implements two things.
+| Part              | Files in `brain/src/brain`                                     | Job                                                                | Doc                                                                              |
+| ----------------- | -------------------------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| Server and bodies | `server.py`, `bodies.py`, `protocol.py`, `bridges.py`          | Contract v1 over a websocket, who is online, outboxes and replay   | [protocol/README.md](../protocol/README.md)                                      |
+| Event log         | `events.py`, `store/events.py`                                 | Every input is saved first; retries, give-up, sweep                | [brain/turns.md](brain/turns.md)                                                 |
+| Runner and turns  | `runner.py`, `sessions.py`, `presence.py`, `mind/`             | One turn at a time: `pick`, `gate`, `target`; prompt, model, tools | [brain/turns.md](brain/turns.md)                                                 |
+| Tasks and work    | `tasks.py`, `store/tasks.py`, `store/work.py`, `open_items.py` | What Scout started and what waits on the person                    | [brain/tasks.md](brain/tasks.md)                                                 |
+| Tools and asks    | `toolbox.py`, `permission.py`, `asks.py`, `approvals.py`       | The tool gate, the one permission engine, how each ask ended       | [brain/permissions.md](brain/permissions.md)                                     |
+| Jobs and experts  | `jobs.py`, `job_records.py`, `experts.py`, `expert_apps.py`    | Hand-offs to Claude Code and others over ACP                       | [brain/experts.md](brain/experts.md)                                             |
+| Connected apps    | `apps.py`, `app_oauth.py`, `app_tools.py`                      | MCP apps, their sign-in and their tools                            | [bodies/connected-apps.md](bodies/connected-apps.md)                             |
+| Memory and store  | `memory.py`, `store/`, `masking.py`                            | Facts, the saved chat, every SQL statement                         | [data/memory.md](data/memory.md)                                                 |
+| Loops             | `loops/`, `timers.py`                                          | Things left open (mail) and Scout's timers                         | [brain/loops.md](brain/loops.md)                                                 |
+| Voice             | `voice/`, `speech_tools.py`                                    | Ears (speech to text) and mouth (text to speech)                   | [senses/hearing.md](senses/hearing.md), [senses/speaking.md](senses/speaking.md) |
+| Setup             | `setup/`, `cli.py`                                             | Installing experts and apps, the `tagalong` command                | [brain/setup.md](brain/setup.md)                                                 |
+| Safety            | `guardrails.py`, `guards.py`, `masking.py`, `retry.py`         | Budget, guards, secrets hidden, which failures retry               | [brain/safety.md](brain/safety.md)                                               |
 
-**Perception.** The desktop reads the screen itself: the window list, captures, OCR and the
-selection (`bodies/desktop/src/main/platform`). Exclusions and the built-in blind spots are checked before
-anything is read; the details are in [sight.md](senses/sight.md). The Python brain asks for reads through
-the desktop's body tools (`list_windows`, `read_window_text`, `look_at_window`).
+Every input reaches Scout the same way. A say, a timer, a finished job, a loop, a card answer or setup news is saved as an event. The runner (`runner.py`) is the only thing that starts a Scout turn. `pick` takes the person's words first, then news oldest first; `gate` decides whether news may be told now (key set, not quiet hours, budget left, speech and idle windows); `target` picks the body the turn runs on: the body that sent the message, else where the person is. Code sets how urgent each event kind is; the model decides what to say. The details, with the diagram of the runner, are in [brain/turns.md](brain/turns.md).
 
-**Presentation.** The desktop renders Scout and its bubble, shows the cards (the drop card, the
-settings card) and speaks. The UI package draws all of it against `HostBridge`
-(`bodies/ui/src/host-bridge.ts`), which the desktop implements over IPC. The browser body has no
-presentation: it only offers tools. See [bubble.md](senses/bubble.md).
+## One request end to end
 
-## The brain connection
-
-The contract, its envelope, every message, sessions, replay and errors are in
-[protocol/README.md](../protocol/README.md). The Python side is in [brain.md](brain/README.md). The
-desktop's client is `BrainClient`, started by `startBrain` (`main/brain/start.ts`); the browser
-body has its own socket in its service worker. The brain binds `127.0.0.1` only; there is no
-pairing or TLS yet (single user).
-
-## The life of one turn
-
-1. **Ask.** The ask hotkey (`openPanelWithContext` in `main/index.ts`) captures a snapshot first
-   (`captureAskSnapshot` in `main/context.ts`: the front window and the selection, no pixels) and
-   opens the bubble; a click on the figure opens it with nothing captured. Typing or the talk key
-   produces the text: the talk key is watched by a key hook in main (`main/talk-key.ts`), the
-   microphone runs in the renderer, and the brain transcribes it ([voice.md](senses/voice.md)). The
-   bubble sends `IPC.ask`; `registerTurnIpc` (`main/ipc/turns.ts`) adds the pending snapshot, or a
-   dropped item when a drop card's button sent it, and sends the ask to the brain.
-2. **Turn.** The brain runs the turn: prompt, model, tools, asks. It answers only with
-   notifications ([brain.md](brain/README.md), [connected-apps.md](bodies/connected-apps.md)).
-3. **Bubble.** Main maps the brain's notifications to turn events (`main/brain/turn-events.ts`)
-   and forwards each to every window as `IPC.turnEvent` (`forwardToRenderers` in `main/index.ts`).
-   See [bubble.md](senses/bubble.md).
-4. **Voice.** A question asked by voice carries `spoken: true`, so the brain speaks the answer with
-   Kokoro and sends `speech` frames. Main relays them as `IPC.speechChunk` and the panel's
-   `SpeechPlayer` (`renderer/src/voice-player.ts`) plays them, or speaks a text-only frame with the
-   system voice. Stop sends `hush`; the player reports `speech_state` and obeys `speech_control`. See [voice.md](senses/voice.md).
-
-## Boot and shutdown
-
-The desktop's `start()` (`bodies/desktop/src/main/index.ts`) gates the platform adapter behind the
-sight pause, opens the settings, records the launch, then
-calls `startBrain` (`brain/start.ts`), which dials the Python brain over contract v1 and keeps
-retrying while it is down. The panel and the avatar are created next.
-
-On `before-quit` the desktop disposes the hotkeys, the talk key hook, presence,
-records a clean close and closes the brain client.
-
-## What wakes Scout
-
-Everything that wants Scout's attention (the person's own words, a timer, a finished job, a loop, a
-card answer, setup news) is saved first as an event in the log (`brain/src/brain/events.py`). One
-runner (`brain/src/brain/runner.py`) is the only thing that starts a Scout turn, and it runs one at a
-time. `pick` takes the person's words first, then news oldest first. `gate` decides whether news may
-be told now: a key is set, not quiet hours, budget left, the batch window and idle window are over,
-the cap is not spent, and Scout is not mid-speech unless a sentence break gives a pause. `target`
-picks the body that answers: the one that sent the message, else where the person is. Each event kind
-carries an urgency set by code (`now`, `next_pause`, `idle`, `hold`); neither the model nor the
-payload can raise it. News the gate holds back stays `new` in the log, so nothing is lost. What the
-person hears and the sentence break come from `presence.py`, which the desktop feeds because it plays
-the audio (the brain's own mouth only when no body plays).
-
-Turns are short. A turn that needs the person (a permission card, a choice, a sign-in, an install)
-opens an open item (`open_items.py`, saved in `tagalong.db`) and ends; the person's answer is saved
-as a `card_answer` event, handled at once, and runs the saved call, even after a restart. It starts
-no turn. Talking over Scout is an ordinary say that stops the turn it names (tools already running
-finish) and then waits its place in the order; that turn's heard and unsaid words lead it. A short
-interjection at a sentence break takes one waiting `next_pause` event, works it into speech, then
-continues or replaces the queued sentences; untold, the event goes back to `new`.
+The person holds the talk key and asks a question by voice. The model reads the window, then answers aloud.
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
-flowchart LR
-  SRC["Sources: say, timers, loops,<br/>jobs, setup news"] --> LOG["Event log<br/>events.py: saved first, state new"]
-  LOG --> RUN["Runner<br/>runner.py: pick, gate, target"]
-  PRES["Presence<br/>presence.py: who is here,<br/>what they hear, sentence break"] --> RUN
-  RUN -->|"gate open"| TURN["Scout's turn (short)"]
-  RUN -->|"next_pause at a break"| INT["Interjection: one event"]
-  RUN -->|"gate shut: stays new"| LOG
-  TURN -->|"done, cancelled, rejected, over budget: handled"| LOG
-  TURN -->|"other end: back to new"| LOG
-  TURN -->|"needs the person"| OI["Open items<br/>saved, one lifecycle"]
-  OI -->|"answer: card_answer event, handled, runs the saved call"| LOG
-  TURN -->|"reply sentences"| SQ["Speech queue<br/>mouth.py: one worker"]
-  INT -->|"continue or replace"| SQ
-  INT -->|"untold: back to new"| LOG
-  SQ -->|"speech frames"| BODY["Body plays the audio"]
-  BODY -->|"speech_state"| PRES
-  SQ -->|"speech_control: pause, resume, clear"| BODY
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
+sequenceDiagram
+  participant P as Person
+  participant D as Desktop (main and panel)
+  participant E as Brain ears (voice/ears.py)
+  participant L as EventLog and runner
+  participant S as Session turn
+  participant M as Model (Anthropic API)
+  participant O as Brain mouth (voice/mouth.py)
+  P->>D: holds the talk key
+  D->>E: listen {mode: held}, then mic {pcm} frames
+  E-->>D: heard {partial, text}
+  E-->>D: heard {turn_end}
+  D->>L: say {id, text, spoken: true, context}
+  L->>L: save the event (state new), pick, gate, target
+  L->>S: start the turn on the desktop
+  S-->>D: turn {started, events}
+  S->>M: prompt, history and tools
+  M-->>S: tool_use list_windows
+  S->>D: use {call, tool, input}
+  D-->>S: result {output}
+  S->>M: tool result
+  M-->>S: reply text, streamed
+  S-->>D: reply {delta}, shown in the bubble
+  S->>O: reply sentences
+  O-->>D: speech {turn, n, pcm, sample_rate}
+  D->>D: the panel plays the audio
+  D->>O: speech_state {started, ended}
+  S-->>D: reply {done}, turn {ended, done}
+  O-->>D: speech {turn, done: true}
 ```
 
-Words go into the log; the runner starts every turn from it; replies go out through the one speech
-queue; open items sit beside the turn and hand their answers back through the log. See
-[brain.md](brain/README.md#the-turn-runner-and-urgency), [voice.md](senses/voice.md#the-mouths-queue) and
-[storage.md](data/storage.md#open-items).
+Notice that the desktop turns heard words into a spoken `say`, and that the same `say` frame is used for typed words. The brain saves the say before anything else, so a crash cannot lose it. The reply goes out twice: as `reply` text for the bubble, and as `speech` chunks the desktop plays and reports back with `speech_state`.
 
-## Subsystem map
+## Where to read next
 
-```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
-flowchart LR
-  subgraph Bodies
-    DK["bodies/desktop.md"]
-    BU["senses/bubble.md"]
-    VO["senses/voice.md"]
-    SI["senses/sight.md"]
-    BX["bodies/browser.md"]
-  end
-  subgraph Brain
-    BR["brain/README.md"]
-    ME["data/memory.md"]
-    CA["bodies/connected-apps.md"]
-  end
-  subgraph Foundations
-    PR["protocol/README.md"]
-    SS["data/settings-and-secrets.md"]
-    ST["data/storage.md"]
-    WA["bodies/whatsapp.md"]
-  end
-  DK --> BU
-  DK --> VO
-  DK --> SI
-  BR --> ME
-  BR --> CA
-  Bodies --> PR
-  DK --> SS
-  BR --> ST
-  Bodies --> WA
-```
-
-| Doc                                                     | Covers                                                                              | Main code                                                                                                                            |
-| ------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| [protocol/README.md](../protocol/README.md)             | Contract v1 between the brain and the bodies                                        | `protocol/ts/src`, `brain/src/brain/protocol.py`                                                                                     |
-| [brain.md](brain/README.md)                             | The Python brain: files, tools, asks, experts, memory, the mind                     | `brain/src/brain`                                                                                                                    |
-| [desktop.md](bodies/desktop.md)                         | Windows, tray, hotkeys, IPC modules, platform adapter, packaging, log file          | `bodies/desktop/src/main`, `bodies/desktop/src/preload`, `bodies/desktop/src/renderer`                                               |
-| [bubble.md](senses/bubble.md)                           | The companion bubble, status marks, drops                                           | `bodies/ui/src`                                                                                                                      |
-| [voice.md](senses/voice.md)                             | Hearing, speaking, talk key, always listening, talking over Scout, the system voice | `main/ipc/voice.ts`, `renderer/src/voice-player.ts`, `main/talk-key.ts`, `main/always-listening.ts`, `bodies/ui/src/shapes/voice.ts` |
-| [sight.md](senses/sight.md)                             | Window list, captures, OCR, exclusions, pausing sight                               | `bodies/desktop/src/main/platform`                                                                                                   |
-| [memory.md](data/memory.md)                             | The memory store                                                                    | `brain/src/brain/memory.py`                                                                                                          |
-| [connected-apps.md](bodies/connected-apps.md)           | MCP connections, tool calls, approvals for writes                                   | `brain/src/brain/apps.py`, `app_tools.py`                                                                                            |
-| [browser-body.md](bodies/browser.md)                    | The browser body: identity, the `tabs` tool, permissions, popup, install            | `bodies/browser/src`                                                                                                                 |
-| [whatsapp.md](bodies/whatsapp.md)                       | The WhatsApp body: webhook, Graph send, 24-hour window                              | `bodies/whatsapp/src`                                                                                                                |
-| [settings-and-secrets.md](data/settings-and-secrets.md) | Settings store, hiding secrets in logs                                              | `bodies/desktop/src/main/settings-store.ts`, `hide-secrets.ts`                                                                       |
-| [privacy.md](data/privacy.md)                           | What is captured, sent, kept and deleted                                            | across the above                                                                                                                     |
+| Doc                                                            | Covers                                                  |
+| -------------------------------------------------------------- | ------------------------------------------------------- |
+| [README.md](README.md)                                         | The index and reading paths                             |
+| [principles.md](principles.md)                                 | The rules: one brain and many bodies, code versus model |
+| [development.md](development.md)                               | Build, run, test, package and the conventions           |
+| [../protocol/README.md](../protocol/README.md)                 | Contract v1, with a typical session                     |
+| [brain/README.md](brain/README.md)                             | The brain: files, run, hello, Home tools                |
+| [brain/turns.md](brain/turns.md)                               | The event log, the runner and a turn                    |
+| [brain/tasks.md](brain/tasks.md)                               | Tasks, work rows and open items                         |
+| [brain/experts.md](brain/experts.md)                           | Hand-offs to Claude Code and others over ACP            |
+| [brain/permissions.md](brain/permissions.md)                   | Tool modes, asks and the one permission engine          |
+| [brain/setup.md](brain/setup.md)                               | Installing experts and apps, the `tagalong` command     |
+| [brain/safety.md](brain/safety.md)                             | Budget, guards, masking, retries                        |
+| [brain/loops.md](brain/loops.md)                               | Loops, mail and timers                                  |
+| [senses/sight.md](senses/sight.md)                             | Windows, captures, OCR, exclusions                      |
+| [senses/hearing.md](senses/hearing.md)                         | The talk key, the brain's ears, always listening        |
+| [senses/speaking.md](senses/speaking.md)                       | The brain's mouth, chunks, playback, the system voice   |
+| [senses/bubble.md](senses/bubble.md)                           | The companion bubble and its cards                      |
+| [senses/stt-results.md](senses/stt-results.md)                 | Speech-model measurements                               |
+| [bodies/desktop.md](bodies/desktop.md)                         | The Electron body                                       |
+| [bodies/browser.md](bodies/browser.md)                         | The browser body                                        |
+| [bodies/whatsapp.md](bodies/whatsapp.md)                       | The WhatsApp body                                       |
+| [bodies/mascot.md](bodies/mascot.md)                           | The mascot engine                                       |
+| [bodies/connected-apps.md](bodies/connected-apps.md)           | MCP apps                                                |
+| [data/storage.md](data/storage.md)                             | Every store by kind                                     |
+| [data/memory.md](data/memory.md)                               | Memory, recall and forgetting                           |
+| [data/privacy.md](data/privacy.md)                             | What is captured, sent, kept and deleted                |
+| [data/settings-and-secrets.md](data/settings-and-secrets.md)   | Settings and secrets                                    |
+| [testing/feature-test-guide.md](testing/feature-test-guide.md) | Manual test steps per feature                           |

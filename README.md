@@ -14,6 +14,32 @@ There are three ways in:
 
 The [user guide](#using-tagalong) follows.
 
+## How it fits together
+
+One Python brain does the thinking, remembering, hearing and speaking. Thin bodies (the desktop app, a browser add-on, WhatsApp) show Scout and give it senses and tools. Bodies talk only to the brain, over a local websocket.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
+flowchart LR
+  DESK["Desktop app"]
+  BRW["Browser add-on"]
+  WA["WhatsApp bridge"]
+  BRAIN["Python brain<br/>events, turns, memory,<br/>voice, setup"]
+  API["Anthropic API"]
+  EXP["Experts (Claude Code)"]
+  MCP["MCP apps"]
+  DB[("tagalong.db")]
+  DESK -- "websocket" --> BRAIN
+  BRW -- "websocket" --> BRAIN
+  WA -- "websocket" --> BRAIN
+  BRAIN -- "HTTPS" --> API
+  BRAIN -- "ACP" --> EXP
+  BRAIN -- "MCP" --> MCP
+  BRAIN --> DB
+```
+
+The full picture, the start-up order and one request followed end to end are in [docs/architecture.md](docs/architecture.md).
+
 ## Download and run it
 
 Download `Tagalong-Setup-<version>-x64.exe` from the

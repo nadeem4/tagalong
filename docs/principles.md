@@ -14,9 +14,9 @@ The rules the Python brain and its bodies follow: who does what, and what code d
 
 1. Bodies only talk to the brain, never to each other. The brain routes everything.
 2. The body you are talking to answers. Other bodies work behind the scenes as internal experts.
-3. A turn the brain starts itself (a timer, an expert finishing) is shown on the body you last talked to if it is online, otherwise any online body; every body still gets the notifications.
+3. Every turn goes to `target()` in `brain/src/brain/runner.py`. A turn for a message a body sent answers on that body. Any other turn (a timer, an expert finishing) goes where the person is, else to the body its task came from, else to the first body that shows anything; a body that shows nothing is never chosen. Every body still gets the notifications.
 4. One session across bodies. Start on the phone, carry on at the desk; a second body joins the same conversation.
-5. Scout's tool list is what is connected now: brain tools, tools of the bodies online, and MCP apps. The model sees body tools as `<body id>__<name>` (`desktop__see_screen`) so two bodies never collide.
+5. Scout's tool list is what is connected now: brain tools, tools of the bodies online, and MCP apps. The model sees body tools as `<body id>__<name>` (`desktop-a1b2c3__list_windows`) so two bodies never collide.
 6. Model decides, code guards.
 
 ## Code versus model

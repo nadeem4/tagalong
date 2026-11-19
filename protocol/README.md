@@ -1,6 +1,6 @@
 # Tagalong contract v1
 
-The wire contract between the brain (Python) and its bodies (desktop, extension, later phone).
+The wire contract between the brain (Python) and its bodies (the desktop app, the browser add-on, WhatsApp).
 This file is the source of truth: the TypeScript package in `ts/` (`@tagalong/contract`), the Python types in `brain/src/brain/protocol.py`
 and the samples in `examples/` follow it, and a change here comes first. The sample file convention is in [examples/README.md](examples/README.md).
 
@@ -35,9 +35,9 @@ Body  { id, kind, name, display? }
 ```
 
 - **Tool.** `name` is unique within the body that declares it: lowercase letters, digits, `_` and `-`, never `__`, at most 48 characters. `input_schema` is a JSON Schema object. `confirm: true` means the brain asks the user before running it, until the person unlocks the tool on Home or a preference names it (see Asks). `confirm: "always"` (for delete and overwrite) asks every time and is for the person alone: the brain never lets it be set to Auto and no preference approves it. `effect` is `"read"` or `"change"` and is omitted when the body does not say (never null): `read` means the tool only looks and changes nothing, `change` means it alters something. The brain uses it to decide how to ask.
-- **Tool names across bodies.** Bodies declare plain names (`see_screen`). The brain exposes them to the model as `<body id>__<name>` (`desktop__see_screen`) so two bodies never collide and the name stays within the model API's allowed characters. The brain calls the body with the plain name. Brain tools have no prefix and never contain `__`.
+- **Tool names across bodies.** Bodies declare plain names (`list_windows`). The brain exposes them to the model as `<body id>__<name>` (`desktop-a1b2c3__list_windows`) so two bodies never collide and the name stays within the model API's allowed characters. The brain calls the body with the plain name. Brain tools have no prefix and never contain `__`.
 - **Part.** `data` is base64. A future source, `ref` (an uploaded file id instead of `data`), is reserved: v1 senders always send `data`, and v1 receivers reject a part with `ref` and no `data` with `invalid_params`. Adding `ref` later needs no message change.
-- **Body.** `id` is unique per install and stable across restarts: made once and kept, never a fixed word (the desktop uses `desktop-` and six hex digits, `desktop-a1b2c3`); lowercase letters, digits and `-`, at most 32 characters. Two bodies with one id are one body, and the second knocks off the first; `kind` is the body type (`desktop`, `browser`, `whatsapp`; a new kind needs no contract change), `name` is shown to the person to tell bodies apart (the desktop sends the PC's name, the browser `Chrome`). A browser body makes its id `<browser>-<4 random chars>` (`chrome-7k2f`) once per install, so two browsers or profiles are two bodies. `display` is optional (omitted or `true` by default, never null): `display: false` says the body shows nothing. Replies, asks and broadcasts are still sent to it and it ignores them; the brain never counts it when it picks where to show a turn or whether anyone can be asked.
+- **Body.** `id` is unique per install and stable across restarts: made once and kept for the desktop and the browser, never a fixed word for them (the desktop uses `desktop-` and six hex digits, `desktop-a1b2c3`); lowercase letters, digits and `-`, at most 32 characters. Two bodies with one id are one body, and the second knocks off the first; `kind` is the body type (`desktop`, `browser`, `whatsapp`; a new kind needs no contract change), `name` is shown to the person to tell bodies apart (the desktop sends the PC's name, the browser `Chrome`). The WhatsApp bridge is the exception: it sends the fixed id `whatsapp`, because there is only ever one bridge per brain. A browser body makes its id `<browser>-<4 random chars>` (`chrome-7k2f`) once per install, so two browsers or profiles are two bodies. `display` is optional (omitted or `true` by default, never null): `display: false` says the body shows nothing. Replies, asks and broadcasts are still sent to it and it ignores them; the brain never counts it when it picks where to show a turn or whether anyone can be asked.
 
 ## Limits
 
@@ -181,38 +181,85 @@ JSON-RPC error objects: `{ code, message, data? }`. `message` is a plain sentenc
 - **Voice calls.** `listen(mode)` resolves when the brain accepts and rejects with its error (`method_not_found` when it has no voice). `mic(pcm: Int16Array)` returns whether the frame was sent, `unlisten()`, `hush()` and `speechState(params)` are fire and forget; all are dropped while offline. `heard`, `voice`, `speech` and `speech_control` reach `onNotification` without touching `last_seq`. `knowMeStart(params)` resolves `{ joined }` (rejects `BrainOffline` unless online); subscribe with `onKnowMeStatus` before calling it, because the first status arrives before the reply; `onKnowMeStatus(listener)` returns an unsubscribe function, and `know_me_status` also reaches `onNotification`, with no `last_seq`.
 - **`keepalive`** (`{ everyMs, tool }`): while online, the client calls one of the brain's own tools every `everyMs` so a sleepy host (a Chrome service worker) stays awake. The browser uses `{ everyMs: 20_000, tool: 'spend_today' }`.
 
+## A typical session
+
+One body from connect to a spoken answer. Each arrow is a frame named in the tables above. Frames in the conversation part go through the outbox with a `seq`; the voice frames are live only.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
+sequenceDiagram
+  participant B as Body (desktop-a1b2c3)
+  participant R as Brain
+  B->>R: hello {protocol, body, tools, last_seq?}
+  R-->>B: result {protocol, session, tools, seq, resync, version, build}
+  alt resync is false
+    R->>B: every notification after last_seq, in order
+  else resync is true
+    R->>B: ask (open) for each open ask, turn (started) for each live turn
+    B->>R: call chat_since {after_id}
+    R-->>B: result {messages, more}
+  end
+  B->>R: say {id, text, context}
+  R-->>B: result {}
+  R->>B: turn {state: started, events: [id]}
+  R->>B: tool {state: started, call, name}
+  R->>B: use {call, tool, input}
+  B-->>R: result {output: Part[]}
+  R->>B: tool {state: ended, ok}
+  R->>B: ask {state: open, confirm, tool, input, options}
+  B->>R: answer {ask, option}
+  R-->>B: result {}
+  R->>B: ask {state: closed, reason: answered, by}
+  R->>B: reply {delta}, then reply {done: true}
+  R->>B: turn {state: ended, reason: done}
+  Note over B,R: Voice. These frames carry no seq and are never replayed.
+  B->>R: listen {mode: held}
+  B->>R: mic {pcm}, many times
+  R->>B: heard {event: partial, text}
+  R->>B: heard {event: turn_end}
+  B->>R: say {id, text, spoken: true}
+  R->>B: speech {turn, n, text, pcm, sample_rate}
+  B->>R: speech_state {turn, n, state: started}
+  B->>R: speech_state {turn, n, state: ended}
+  R->>B: speech {turn, done: true}
+  R->>B: changed {what: memory}
+  B->>R: call (refetch what changed)
+```
+
+Read it top to bottom: `hello` first, then a replay or a resync, then a `say` that the brain answers as a turn (a body tool arrives as `use`, a permission as `ask`), and last the voice frames beside a turn. A `changed` notice only says something moved; the body refetches it with `call`.
+
 ## Examples
 
-A desktop connects, the user asks for something on screen, Scout looks and answers.
+A desktop connects, the user asks for something on screen, Scout looks and answers. The desktop's body id is a per-install one such as `desktop-a1b2c3`.
 
 ```json
-→ {"jsonrpc":"2.0","id":1,"method":"hello","params":{"protocol":2,"body":{"id":"desktop","kind":"desktop","name":"Desktop"},"tools":[{"name":"see_screen","description":"Capture the screen","input_schema":{"type":"object","properties":{}}}]}}
+→ {"jsonrpc":"2.0","id":1,"method":"hello","params":{"protocol":2,"body":{"id":"desktop-a1b2c3","kind":"desktop","name":"My PC"},"tools":[{"name":"read_window_text","description":"Read the text of one window","input_schema":{"type":"object","properties":{}}}]}}
 ← {"jsonrpc":"2.0","id":1,"result":{"protocol":2,"session":"s1","tools":[],"seq":0,"resync":false}}
 → {"jsonrpc":"2.0","id":2,"method":"say","params":{"id":"e1","text":"what's this error?","context":{"window":"VS Code"}}}
 ← {"jsonrpc":"2.0","id":2,"result":{}}
-← {"jsonrpc":"2.0","method":"turn","params":{"seq":1,"turn":"t1","body":"desktop","state":"started","events":["e1"],"source":"desktop"}}
-← {"jsonrpc":"2.0","method":"tool","params":{"seq":2,"turn":"t1","call":"c1","name":"desktop__see_screen","state":"started"}}
-← {"jsonrpc":"2.0","id":"b1","method":"use","params":{"call":"c1","tool":"see_screen","input":{}}}
-→ {"jsonrpc":"2.0","id":"b1","result":{"output":[{"type":"image","mime":"image/png","data":"iVBORw0..."}]}}
-← {"jsonrpc":"2.0","method":"tool","params":{"seq":3,"turn":"t1","call":"c1","name":"desktop__see_screen","state":"ended","ok":true}}
-← {"jsonrpc":"2.0","method":"reply","params":{"seq":4,"turn":"t1","body":"desktop","delta":"That's a missing import"}}
-← {"jsonrpc":"2.0","method":"reply","params":{"seq":5,"turn":"t1","body":"desktop","done":true}}
-← {"jsonrpc":"2.0","method":"turn","params":{"seq":6,"turn":"t1","body":"desktop","state":"ended","reason":"done"}}
+← {"jsonrpc":"2.0","method":"turn","params":{"seq":1,"turn":"t1","body":"desktop-a1b2c3","state":"started","events":["e1"],"source":"desktop-a1b2c3"}}
+← {"jsonrpc":"2.0","method":"tool","params":{"seq":2,"turn":"t1","call":"c1","name":"desktop-a1b2c3__read_window_text","state":"started"}}
+← {"jsonrpc":"2.0","id":"b1","method":"use","params":{"call":"c1","tool":"read_window_text","input":{}}}
+→ {"jsonrpc":"2.0","id":"b1","result":{"output":[{"type":"text","text":"ImportError: No module named requests"}]}}
+← {"jsonrpc":"2.0","method":"tool","params":{"seq":3,"turn":"t1","call":"c1","name":"desktop-a1b2c3__read_window_text","state":"ended","ok":true}}
+← {"jsonrpc":"2.0","method":"reply","params":{"seq":4,"turn":"t1","body":"desktop-a1b2c3","delta":"That's a missing import"}}
+← {"jsonrpc":"2.0","method":"reply","params":{"seq":5,"turn":"t1","body":"desktop-a1b2c3","done":true}}
+← {"jsonrpc":"2.0","method":"turn","params":{"seq":6,"turn":"t1","body":"desktop-a1b2c3","state":"ended","reason":"done"}}
 ```
 
 A confirm answered on one body closes on all of them.
 
 ```json
-← {"jsonrpc":"2.0","method":"ask","params":{"seq":7,"id":"a1","state":"open","turn":"t2","text":"I'll delete these 3 old logs.","options":["allow","deny"],"confirm":true,"tool":"desktop__delete_files","input":{"paths":["a","b","c"]}}}
+← {"jsonrpc":"2.0","method":"ask","params":{"seq":7,"id":"a1","state":"open","turn":"t2","text":"I'll delete old.log.","options":["allow","deny"],"confirm":true,"tool":"desktop-a1b2c3__delete_file","input":{"path":"C:/Users/me/old.log"}}}
 → {"jsonrpc":"2.0","id":3,"method":"answer","params":{"ask":"a1","option":"deny"}}
 ← {"jsonrpc":"2.0","id":3,"result":{}}
-← {"jsonrpc":"2.0","method":"ask","params":{"seq":8,"id":"a1","state":"closed","reason":"answered","option":"deny","by":"desktop"}}
+← {"jsonrpc":"2.0","method":"ask","params":{"seq":8,"id":"a1","state":"closed","reason":"answered","option":"deny","by":"desktop-a1b2c3"}}
 ```
 
 With `always` on offer, answering it allows the call and saves `auto` for that tool:
 
 ```json
-← {"jsonrpc":"2.0","method":"ask","params":{"seq":9,"id":"a2","state":"open","turn":"t3","text":"I'll open the project folder.","options":["allow","always","deny"],"confirm":true,"tool":"desktop__open_folder","input":{"path":"."}}}
+← {"jsonrpc":"2.0","method":"ask","params":{"seq":9,"id":"a2","state":"open","turn":"t3","text":"I'll move a.txt into Archive.","options":["allow","always","deny"],"confirm":true,"tool":"desktop-a1b2c3__move_file","input":{"from":"C:/Users/me/a.txt","to":"C:/Users/me/Archive"}}}
 ```
 
 A body that is too far behind.
