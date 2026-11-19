@@ -192,6 +192,12 @@ desktop app. You need `uv` and an Anthropic key.
     an expert that asks a question or for permission while the desktop is closed: when you reopen,
     Scout tells you what it asked. If the same expert asked twice while you were away, only the
     latest ask is told.
+    - **Held expert cards (T2c-2b):** an expert's permission request or question stays on a card with
+      no timeout, and the job keeps its slot while it waits. Answer it any time later and the expert
+      carries on. On a card of a task, **Not now** moves the check-back and the card stays open; **Stop
+      the task** ends the task and cancels its cards. Stopping the job cancels its cards too.
+      Automated: `test_holds.py`, and in `test_jobs.py` the permission-does-not-block, not-now, stop-the-job
+      and stop-the-task tests, and `test_questions.py` (the card answer releases the expert).
 15. **Action:** make a body tool return more than 5 MB of text (for example a page read of a very
     large page).
     **Expected:** the call ends as an error result `<tool> sent more data than allowed.`
