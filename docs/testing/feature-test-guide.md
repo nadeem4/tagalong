@@ -565,13 +565,19 @@ next section.
    `test_answer_after_the_turn_was_cancelled_still_runs_the_call`). A Deny after the tool was set to
    Auto still refuses (`test_deny_wins_even_when_the_tool_became_auto_since`).
    5b. **Action:** ask Scout for a change tool and say it may wait 1 hour for you; leave the card
-   unanswered. After 40 minutes Scout may remind you once (`ask_notice`,
-   `test_a_notice_wakes_scout_at_two_thirds_of_the_wait_once`). After the hour, open
-   Home, Approvals.
+   unanswered. The card shows **Not now** and **Stop task**. After 40 minutes Scout may
+   remind you once (`card_due`). After the hour, open Home, Approvals.
    **Expected:** the card is gone on every open body, the call never ran, Scout says it expired,
    and the history shows an **Expired** row with `decided_by: "none"` and reason `no answer`
    (`test_no_answer_by_the_deadline_expires_it_and_tells_scout`). With no wait given,
    the deadline is 3 days.
+   5b2. **Action:** on a task's open card press **Not now**.
+   **Expected:** the card stays open and no turn starts; Scout checks back in 30 minutes
+   (`card_due`, once; held in quiet hours unless the ask was urgent). A time you set is not moved
+   when Scout asks again with `check_back_minutes`.
+   5b3. **Action:** on a task's open card press **Stop task**.
+   **Expected:** the task ends and its cards close on every body; nothing runs, and Scout hears
+   `task_stop` and does not carry on with the task.
    5a. **Action:** set a change tool to **Auto** on Home, then let Scout run it.
    **Expected:** it runs with no ask, and `list_approvals` has an `approved` row with
    `decided_by: "rule"` (`test_stored_auto_run_is_logged_as_rule`). A Claude Code permission ask
