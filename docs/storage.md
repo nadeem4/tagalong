@@ -39,7 +39,7 @@ connection from `store.db.open_db`; nothing else opens the file.
 - `store/events.py`: owns `events` (`insert`, `get`, `list_new`, `new_ids`, `set_taken`, `set_state`,
   `chain`) and `EventRow`; `events.py` `EventLog` is the one caller.
 - `store/tasks.py`: owns `tasks` (`insert`, `get`, `set_state`, `list_open`, `asks_to_settle`,
-  `laters_to_settle`, `last_event_at`) and `TaskRow`; `tasks.py` `Tasks` is the one caller.
+  `laters_to_settle`, `last_event_at`, `open_of_source`) and `TaskRow`; `tasks.py` `Tasks` is the one caller.
 - `store/work.py`: `WorkStore` over `work`, `work_events`, `work_fts` and the detail tables
   `work_job`, `work_timer`, `work_loop`, `work_ask` and `job_steps`: create, the state machine,
   rollup, retry, due queries, search, the resume scan and the sweep. Jobs, asks, timers and loops
@@ -704,7 +704,7 @@ columns and drops `work.source_message_id` (never written).
 | `created_at`, `updated_at`, `ended_at` | TEXT             | UTC time text                                                            |
 | `end_reason`                           | TEXT             | Why it ended, or null                                                    |
 
-- Written by: `tasks.py` `Tasks` (`open`, `wait`, `resume`, `end`, `settle`) through
+- Written by: `tasks.py` `Tasks` (`open`, `watching`, `wait`, `resume`, `end`, `settle`) through
   `store/tasks.py`. The first end of a task stands; a second `end` changes nothing.
 - Ended by one sweep, not by hooks: `Tasks.settle()` ends an open Ask `done` when its say is
   `handled` and `failed` when it is `gave_up`, and a Later with no live work row and no `new` or
