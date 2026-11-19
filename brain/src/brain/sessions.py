@@ -365,7 +365,7 @@ class Session:
             + output_tools(outputs)
             + question_tools(questions)
             + choice_tools(choices)
-            + preference_tools(approvals, self._asks)
+            + preference_tools(approvals)
             + approval_home_tools(approvals)
             + reading_home_tools(self.reading)
             + (extra_tools or [])

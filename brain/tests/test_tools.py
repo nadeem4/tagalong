@@ -1603,49 +1603,18 @@ def test_the_voice_tools_are_home_only():
 # --- save_preference ----------------------------------------------------------
 
 
-def _preference_rig(mem, online=("desktop",), timeout=300.0):
-    from brain.asks import Asks
-
-    class _Bodies:
-        def __init__(self):
-            self.sent = []
-
-        def display_ids(self):
-            return list(online)
-
-        def notify(self, method, params):
-            self.sent.append((method, params))
-
-    bodies = _Bodies()
-    asks = Asks(bodies, fresh_work())
-    approvals = approvals_on(mem, bodies.notify, lambda: datetime.datetime(2026, 11, 1))
-    handler = {s.name: (s, h) for s, h in preference_tools(approvals, asks, timeout)}
-    return bodies, asks, handler["save_preference"]
+def _save_preference(mem):
+    approvals = approvals_on(mem, lambda *_: None, lambda: datetime.datetime(2026, 11, 1))
+    handler = {s.name: (s, h) for s, h in preference_tools(approvals)}
+    return handler["save_preference"]
 
 
-async def _open_ask(bodies):
-    import asyncio
-
-    for _ in range(20):
-        asks = [p for m, p in bodies.sent if m == "ask" and p["state"] == "open"]
-        if asks:
-            return asks[0]
-        await asyncio.sleep(0)
-    raise AssertionError("no ask opened")
-
-
-async def test_save_preference_saves_on_save_it(mem):
-    import asyncio
-
-    bodies, asks, (spec, handler) = _preference_rig(mem)
-    assert spec.tier is Tier.auto and spec.effect == "change"
-    task = asyncio.create_task(handler({"sentence": "Prefer Claude Code", "question": "Keep it?"}))
-    params = await _open_ask(bodies)
-    assert params["text"] == "Keep it?" and params["options"] == ["Save it", "Not now"]
-    assert params["tool"] == "save_preference"  # so a body labels it Scout's, not an expert's
-    assert params["tool"] == "save_preference"  # so a body labels it Scout's, not an expert's
-    asks.answer(params["id"], "Save it", "desktop")
-    assert json.loads(await task) == {"saved": True}
+async def test_save_preference_is_person_only_and_returns_without_waiting(mem):
+    # The gate shows its card and the person's allow runs it later: the handler never asks.
+    spec, handler = _save_preference(mem)
+    assert spec.tier is Tier.person_only and spec.effect == "change"
+    out = await handler({"sentence": "Prefer Claude Code", "question": "Keep it?"})
+    assert json.loads(out) == {"saved": True}
     (saved,) = [p for p in rules.list_preferences(mem.db) if not p.builtin]
     assert (saved.sentence, saved.source, saved.tool, saved.group_key) == (
         "Prefer Claude Code",
@@ -1655,29 +1624,17 @@ async def test_save_preference_saves_on_save_it(mem):
     )
 
 
-async def test_save_preference_saves_nothing_on_not_now(mem):
-    import asyncio
-
-    bodies, asks, (_, handler) = _preference_rig(mem)
-    task = asyncio.create_task(handler({"sentence": "s", "question": "q"}))
-    params = await _open_ask(bodies)
-    asks.answer(params["id"], "Not now", "desktop")
-    assert json.loads(await task) == {"saved": False}
-    assert [p for p in rules.list_preferences(mem.db) if not p.builtin] == []
-
-
-async def test_save_preference_saves_nothing_on_timeout_or_nobody_online(mem):
-    _, _, (_, handler) = _preference_rig(mem, timeout=0.01)
-    assert json.loads(await handler({"sentence": "s", "question": "q"})) == {"saved": False}
-    _, _, (_, handler) = _preference_rig(mem, online=())
-    assert json.loads(await handler({"sentence": "s", "question": "q"})) == {"saved": False}
-    assert [p for p in rules.list_preferences(mem.db) if not p.builtin] == []
-
-
 async def test_save_preference_needs_both_arguments(mem):
-    _, _, (_, handler) = _preference_rig(mem)
+    spec, handler = _save_preference(mem)
     with pytest.raises(MemoryRefused):
         await handler({"sentence": "s"})
+    with pytest.raises(MemoryRefused):  # no card is opened for a call that cannot run
+        await spec.card({"question": "q"})
+    assert await spec.card({"sentence": "s", "question": "q"}) == {
+        "sentence": "s",
+        "question": "q",
+    }
+
 
 
 async def test_job_activity_returns_the_jobs_page_from_the_cursor(home):
