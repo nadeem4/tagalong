@@ -33,6 +33,22 @@ describe('AskDesk', () => {
     });
   });
 
+  test('test_task_card_offers_all_four_options_in_plain_words', () => {
+    const out = new AskDesk().open(ask({ options: ['allow', 'deny', 'not_now', 'stop_task'] }));
+    expect(out).toEqual({
+      kind: 'text',
+      body: 'Run the build?\n\n1. allow\n2. deny\n3. Not now\n4. Stop the task',
+    });
+  });
+
+  test('test_typed_not_now_and_stop_answer_a_task_card', () => {
+    const desk = new AskDesk();
+    desk.open(ask({ options: ['allow', 'deny', 'not_now', 'stop_task'] }));
+    expect(desk.fromText('not now')).toEqual({ ask: 'a1', option: 'not_now' });
+    expect(desk.fromText('Stop')).toEqual({ ask: 'a1', option: 'stop_task' });
+    expect(desk.fromText('4')).toEqual({ ask: 'a1', option: 'stop_task' });
+  });
+
   test('test_a_long_option_falls_back_to_text', () => {
     const long = 'x'.repeat(21);
     const out = new AskDesk().open(ask({ options: ['allow', long] }));
