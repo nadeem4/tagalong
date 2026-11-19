@@ -1050,3 +1050,30 @@ def test_wake_text_marks_the_task():
     r = EventRow(id="1", kind="timer", at=utc_text(T0), source="timer:1", task="abc123")
     text = wake_text(EVENT_KINDS["timer"], [r], "", T0)
     assert "task=abc123" in text
+
+
+async def test_cancel_if_only_cancels_a_turn_holding_only_those_tasks_events():
+    rig = LoopRig()
+    rig.log.post(Event("say", "desktop", {}, id="s1", task="k1"))
+    rig.runner.poke()
+    await ticks()
+    assert rig.runner.cancel_if_only({"k1", "k2"}) is True
+    assert rig.session.cancelled == 1
+    await rig.runner.stop()
+
+
+async def test_cancel_if_only_leaves_a_turn_that_also_holds_another_tasks_events():
+    rig = LoopRig()
+    rig.log.post(Event("say", "desktop", {}, id="s1", task="k1"))
+    rig.log.post(Event("say", "desktop", {}, id="s2", task="k2"))
+    rig.runner.poke()
+    await ticks()
+    assert rig.turns() == [["s1", "s2"]]
+    assert rig.runner.cancel_if_only({"k1"}) is False
+    assert rig.session.cancelled == 0
+    await rig.runner.stop()
+
+
+def test_cancel_if_only_does_nothing_with_no_turn():
+    rig = LoopRig()
+    assert rig.runner.cancel_if_only({"k1"}) is False

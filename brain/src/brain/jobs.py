@@ -156,6 +156,7 @@ class Jobs:
         self._scout_steps: dict[str, JobActivity] = {}  # job -> writer of Scout's own steps
         self._reserved: dict[str, set[str]] = {}  # job -> part ids promised to starts in flight
         self._starting = 0  # hand-offs waiting on their ask also hold a slot
+        self._stopped: set[str] = set()  # tasks stopped: a start still in flight for one is refused
         self._progress_sent: dict[str, float] = {}
         self._activity_sent: dict[str, float] = {}
         self._activity_trailing: dict[str, asyncio.Task] = {}
@@ -449,6 +450,8 @@ class Jobs:
                 modes = await run.start(path, resume=resume)
             except Exception as exc:  # ExpertError, or the adapter refusing (e.g. auth required)
                 raise JobError(str(exc) or type(exc).__name__) from exc
+            if (task_id or self.task_of(job_id)) in self._stopped:
+                raise JobError("the task was stopped, so nothing was started")
             if apps and not run.has_grant:
                 # No bridge or no http MCP: the card would promise apps the expert can't reach.
                 raise JobError("this expert can't take connected apps")
@@ -618,6 +621,18 @@ class Jobs:
             if activity := self._activity.get(job_id, {}).get(stopped_part):
                 activity.stopping()  # the cancelled ask's rejection must not read as a failure
             await run.stop()
+
+    async def stop_task(self, task_id: str) -> None:
+        """The task was stopped: every running part of its jobs is stopped and its goals are
+        cancelled. A start still waiting on its expert is refused when the expert is up, so
+        nothing starts after this returns."""
+        self._stopped.add(task_id)
+        work = self._records.work
+        for goal in work.of_task(task_id, ("goal",)):
+            if self._runs.get(goal.id):
+                await self.stop(goal.id)
+            with suppress(TransitionRefused):  # stopping the parts may already have ended it
+                work.transition(goal.id, "cancelled", reason="task stopped")
 
     async def shutdown(self) -> None:
         """Stop every running job before the brain exits; one stuck run must not block the rest."""

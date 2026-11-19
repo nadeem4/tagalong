@@ -3,15 +3,18 @@
 A say opens an Ask, which no one sees and which ends with its turn; later slices open Do, Later,
 Watch and Own tasks. `settle` ends Asks and Laters by looking at the rows, not by hooks, so a
 crash cannot leave one open. `open_block` is the facts line Scout reads about what is open.
+`stop` is the one place a task is stopped (spec 6.13): the session passes it what to call.
 """
 
 import secrets
 import sqlite3
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from brain.events import PERSON_KINDS, Event
 from brain.open_items import OpenItem, OpenItems
+from brain.store import events as events_store
 from brain.store import tasks as store
 from brain.store.db import transaction, utc_text
 from brain.store.memory import MemoryRefused
@@ -29,6 +32,17 @@ def age_text(seconds: int) -> str:
     return f"{max(seconds, 0)}s"
 
 
+@dataclass(frozen=True)
+class TaskStopHooks:
+    """What stopping a task asks of the rest of the brain, built by the session. Each is
+    optional so a part with nothing to stop (a test, a rig) leaves its hook out."""
+
+    stop_jobs: Callable[[str], Awaitable[None]] | None = None  # kill its jobs, cancel planned ones
+    cancel_rows: Callable[[str], None] | None = None  # cancel its timers and watches
+    close_cards: Callable[[list[str]], None] | None = None  # take its cards down on the bodies
+    cancel_turn_if_only: Callable[[set[str]], None] | None = None  # the turn that held only them
+
+
 class Tasks:
     def __init__(
         self,
@@ -38,12 +52,14 @@ class Tasks:
         *,
         items: OpenItems | None = None,  # what waits on the person; `stop` closes the task's
         post: Callable[[Event], None] | None = None,  # the session's post_event
+        hooks: TaskStopHooks | None = None,
     ) -> None:
         self._db = db
         self._mask = mask
         self._now = now
         self._items = items
         self._post = post
+        self.hooks = hooks or TaskStopHooks()  # the session sets it once what it needs exists
 
     def new_id(self) -> str:
         while True:
@@ -143,17 +159,37 @@ class Tasks:
                 self._db, id, state, at=utc_text(self._now()), result=result, end_reason=reason
             )
 
-    def stop(self, id: str, by: str) -> list[str]:
-        """The person ended the task: it ends as stopped, what waited on them for it is closed,
-        and Scout is told. Returns the closed item ids (their cards go too); [] when it was over."""
+    async def stop(self, id: str, by: str) -> list[str]:
+        """The person ended the task (spec 6.13): it and every task it started end as stopped,
+        and for each its jobs are killed, its timers cancelled, its cards closed and its waiting
+        news handled. A turn that held only their events is cancelled, and Scout hears one
+        `task_stop`. Returns the task ids stopped, the task first; [] when it was already over."""
         if not self.end(id, "stopped", reason="the person stopped it"):
             return []
-        closed = [i.id for i in self._items.for_task(id)] if self._items else []
-        for item_id in closed:
-            self._items.finish(item_id, "cancelled")
+        stopped, queue = [id], [id]
+        while queue:  # all ended first, so nothing started meanwhile can claim one
+            for child in store.caused_by_tasks(self._db, queue.pop(0)):
+                if self.end(child, "stopped", reason="the task that started it was stopped"):
+                    stopped.append(child)
+                    queue.append(child)
+        hooks = self.hooks
+        for task in stopped:
+            if hooks.stop_jobs:
+                await hooks.stop_jobs(task)
+            if hooks.cancel_rows:
+                hooks.cancel_rows(task)
+            closed = [i.id for i in self._items.for_task(task)] if self._items else []
+            for item_id in closed:
+                self._items.finish(item_id, "cancelled")
+            if closed and hooks.close_cards:
+                hooks.close_cards(closed)
+            with transaction(self._db):
+                events_store.finish_task(self._db, task, "stopped", utc_text(self._now()))
+        if hooks.cancel_turn_if_only:
+            hooks.cancel_turn_if_only(set(stopped))
         if self._post:
             self._post(Event("task_stop", by, {"task": id, "by": by}, task=id))
-        return closed
+        return stopped
 
     def settle(self) -> list[str]:
         """End every Ask whose say is over and every Later with nothing left to run."""

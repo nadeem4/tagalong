@@ -232,6 +232,18 @@ class Runner:
             self._turn = None
         self.poke()
 
+    def cancel_if_only(self, task_ids: set[str]) -> bool:
+        """Stop the task: cancel the running turn when every event it took belongs to these
+        tasks. A turn that also holds other work goes on; its end handles its events."""
+        turn = self._turn
+        if turn is None:
+            return False
+        rows = [self._events.get(i) for i in self._taken.get(turn.id, [])]
+        if not rows or any(r is None or r.task not in task_ids for r in rows):
+            return False
+        self._session.cancel_turn()
+        return True
+
     def take_more(self) -> list[EventRow]:
         """The person's new words for the running turn's body, taken into it at its next step."""
         turn = self._turn

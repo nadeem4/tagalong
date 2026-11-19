@@ -213,27 +213,30 @@ class AskRunner:
             return  # otherwise it ended first; its card is already closed
         try:
             if option == "stop_task" and item.task_id is not None:
-                self._stop_task(item, body_id)
+                await self._stop_task(item, body_id)
             else:
                 await self._carry_out(item, option)
         except Exception:
             log.exception("an answered ask could not be carried out: %s", item.id)
 
-    def _stop_task(self, item: OpenItem, body_id: str) -> None:
+    async def _stop_task(self, item: OpenItem, body_id: str) -> None:
         """The person ended the task from this card: nothing runs, its other cards go, and
         Scout hears one `task_stop` (not an `ask_ended` for each)."""
         self._record_ask(item, "refused", "person", "the person stopped the task")
         self._items.finish(item.id, "cancelled")
         self._raw.pop(item.id, None)
         row = self._tasks_of.get(item.task_id)
-        closed = self._tasks_of.stop(item.task_id, body_id)
+        await self._tasks_of.stop(item.task_id, body_id)
         if row is None or row.state not in ("open", "waiting"):
             # No task_stop goes out for a task already over, so Scout hears of it this way.
             self._end(item, "refused", "the person stopped the task, but it was already over")
-        for other in closed:
-            self._raw.pop(other, None)
-        self._close_cards(closed)
         self.changed()
+
+    def close_cards(self, ids: list[str]) -> None:
+        """Cards of a stopped task: their saved calls are dropped and they come down."""
+        for one in ids:
+            self._raw.pop(one, None)
+        self._close_cards(ids)
 
     def _close_on_bodies(self, ids: list[str]) -> None:
         for one in ids:

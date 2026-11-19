@@ -16,7 +16,7 @@ from brain.mind.turn import Call
 from brain.open_items import OpenItems
 from brain.protocol import AskParams, ErrorCode, RpcError
 from brain.store.work import WorkStore
-from brain.tasks import Tasks
+from brain.tasks import Tasks, TaskStopHooks
 
 NOW = datetime(2026, 11, 18, 9, 0, tzinfo=UTC)
 
@@ -43,6 +43,7 @@ class Rig:
         self.tasks = Tasks(self.memory.db, lambda text: text, lambda: NOW, items=self.items)
         self.asks = Asks(self.bodies)
         self.holds = Holds(self.asks, self.work, self.items, self.tasks)
+        self.tasks.hooks = TaskStopHooks(close_cards=self.holds.close)
         self.saved: list[tuple] = []  # what the session saves as a card_answer event
         self.asks.on_item_answer = lambda *a: self.saved.append(a)
 
@@ -264,7 +265,7 @@ async def test_stop_the_task_ends_it_and_cancels_every_card_it_holds():
 async def test_a_stopped_task_opens_no_new_card():
     rig = Rig()
     job = rig.job(task_id=rig.task())
-    rig.tasks.stop("k1", "desktop")
+    await rig.tasks.stop("k1", "desktop")
     with pytest.raises(RpcError) as err:
         await rig.holds.ask(kind="question", text="Which?", options=["A"], job_id=job)
     assert err.value.code == ErrorCode.cancelled

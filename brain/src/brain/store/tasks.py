@@ -127,3 +127,14 @@ def timers_of(db: sqlite3.Connection, task_id: str) -> list[str]:
         (task_id,),
     ).fetchall()
     return [r[0] for r in rows]
+
+
+def caused_by_tasks(db: sqlite3.Connection, task_id: str) -> list[str]:
+    """The open or waiting tasks whose cause is an event of this task (its turn started them)."""
+    rows = db.execute(
+        "SELECT t.id FROM tasks t JOIN events e ON e.id=t.caused_by"
+        " WHERE e.task=? AND t.id<>? AND t.state IN ('open','waiting')"
+        " ORDER BY t.created_at, t.rowid",
+        (task_id, task_id),
+    ).fetchall()
+    return [r[0] for r in rows]

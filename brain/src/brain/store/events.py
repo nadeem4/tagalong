@@ -204,3 +204,13 @@ def sweep(db: sqlite3.Connection, before: str) -> int:
     return db.execute(
         "DELETE FROM events WHERE state='handled' AND handled_at<?", (before,)
     ).rowcount
+
+
+def finish_task(db: sqlite3.Connection, task_id: str, end_reason: str, at: str) -> None:
+    """A task was stopped: the news still waiting for it is handled, never told. Events a turn
+    holds (`taken`) are left to that turn's end."""
+    db.execute(
+        "UPDATE events SET state='handled', end_reason=?, handled_at=?"
+        " WHERE task=? AND state='new'",
+        (end_reason, at, task_id),
+    )
