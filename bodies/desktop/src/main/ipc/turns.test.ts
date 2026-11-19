@@ -6,7 +6,7 @@ import type { ContextSnapshot } from '@tagalong/ui/shapes';
 import { IPC } from '../../shared/ipc';
 import { BrainOffline } from '@tagalong/contract';
 import { fakeIpc } from './fake-ipc';
-import { registerTurnIpc } from './turns';
+import { ASK_SELECTION_MAX_CHARS, registerTurnIpc } from './turns';
 
 function setup(
   snapshot: Partial<ContextSnapshot> | null = null,
@@ -18,6 +18,7 @@ function setup(
   } = {},
 ) {
   const ipc = fakeIpc();
+  let current = snapshot;
   const said: SayParams[] = [];
   const cancelled: string[] = [];
   const tracked: string[] = [];
@@ -36,7 +37,10 @@ function setup(
     stopVoice: () => void stopped.push('voice'),
     voice: () => ({ enabled: options.voiceOn !== false, speed: 0.95 }),
     status: () => (options.outdated === true ? 'outdated' : 'online'),
-    pendingSnapshot: () => snapshot as ContextSnapshot | null,
+    pendingSnapshot: () => current as ContextSnapshot | null,
+    clearSelection: () => {
+      if (current !== null) current = { ...current, selection: undefined };
+    },
     ...(options.takeDrop ? { takeDrop: options.takeDrop } : {}),
   });
   return { ...ipc, said, cancelled, tracked, untracked, stopped };
@@ -97,6 +101,61 @@ describe('registerTurnIpc', () => {
         context: { window: 'a.ts' },
       },
     ]);
+  });
+
+  it('ask with a selection sends it beside the window', async () => {
+    const { invoke, said } = setup({
+      app: { name: 'Code', windowTitle: 'a.ts' },
+      selection: 'the highlighted words',
+    });
+    await invoke(IPC.ask, { petId: 'scout', text: 'what does this say?' });
+    expect(said[0]!.context).toEqual({ window: 'a.ts', selection: 'the highlighted words' });
+  });
+
+  it('ask with no selection sends only the window', async () => {
+    const { invoke, said } = setup({ app: { name: 'Code', windowTitle: 'a.ts' } });
+    await invoke(IPC.ask, { petId: 'scout', text: 'hi' });
+    expect(said[0]!.context).toEqual({ window: 'a.ts' });
+  });
+
+  it('ask with no snapshot sends no context', async () => {
+    const { invoke, said } = setup(null);
+    await invoke(IPC.ask, { petId: 'scout', text: 'hi' });
+    expect(said[0]).not.toHaveProperty('context');
+  });
+
+  it('a selection over the cap is cut and marked', async () => {
+    const { invoke, said } = setup({ selection: 'x'.repeat(ASK_SELECTION_MAX_CHARS + 50) });
+    await invoke(IPC.ask, { petId: 'scout', text: 'hi' });
+    expect(said[0]!.context).toEqual({
+      selection: 'x'.repeat(ASK_SELECTION_MAX_CHARS) + '…[cut]',
+    });
+  });
+
+  it('the selection goes with one ask only; a follow-up carries the window alone', async () => {
+    const { invoke, said } = setup({
+      app: { name: 'Code', windowTitle: 'a.ts' },
+      selection: 'abc',
+    });
+    await invoke(IPC.ask, { petId: 'scout', text: 'one' });
+    await invoke(IPC.ask, { petId: 'scout', text: 'two' });
+    expect(said[0]!.context).toEqual({ window: 'a.ts', selection: 'abc' });
+    expect(said[1]!.context).toEqual({ window: 'a.ts' });
+  });
+
+  it('a selection of exactly the cap is not cut', async () => {
+    const { invoke, said } = setup({ selection: 'x'.repeat(ASK_SELECTION_MAX_CHARS) });
+    await invoke(IPC.ask, { petId: 'scout', text: 'hi' });
+    expect(said[0]!.context).toEqual({ selection: 'x'.repeat(ASK_SELECTION_MAX_CHARS) });
+  });
+
+  it('a cut never leaves half an emoji', async () => {
+    const selection = 'x'.repeat(ASK_SELECTION_MAX_CHARS - 1) + '😀tail';
+    const { invoke, said } = setup({ selection });
+    await invoke(IPC.ask, { petId: 'scout', text: 'hi' });
+    expect(said[0]!.context).toEqual({
+      selection: 'x'.repeat(ASK_SELECTION_MAX_CHARS - 1) + '…[cut]',
+    });
   });
 
   it('ask when the brain is too new rejects with the update sentence', async () => {
