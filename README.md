@@ -288,6 +288,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   A job is Scout's piece of work: Scout gives it a title in its own words (the brief's first line
   when it has none), can add further expert hand-offs to it as parts (`hand_off` with `job`), and
   closes it with `close_job` when it judges the work done. A job Scout never closes stays open.
+  Two jobs run at once; an approved third waits in line (Home shows "2nd in line"), starts when a slot frees, and is checked again with you if it waited over an hour.
   Scout writes the result of the whole job in its own words with `set_job_result` (what got done,
   what needs you, the key files; no template, it can rewrite it later); a job with none shows no
   summary. While Scout works on a job (it was woken about it, or it handed work to it), the

@@ -367,16 +367,18 @@ own. Home and Scout's tools see the same words as before (`running`, `done`, `er
 
 What a job row needs that `work` has no column for. One row per goal and per expert call.
 
-| Column    | Type             | Meaning                                   |
-| --------- | ---------------- | ----------------------------------------- |
-| `work_id` | TEXT PRIMARY KEY | The goal or expert_call row it describes  |
-| `agent`   | TEXT             | Which expert ran it (expert calls)        |
-| `folder`  | TEXT             | The folder the expert works in            |
-| `mode`    | TEXT             | The expert's mode the person chose (goal) |
-| `task`    | TEXT             | What was asked first (goal)               |
+| Column         | Type             | Meaning                                                                                                         |
+| -------------- | ---------------- | --------------------------------------------------------------------------------------------------------------- |
+| `work_id`      | TEXT PRIMARY KEY | The goal or expert_call row it describes                                                                        |
+| `agent`        | TEXT             | Which expert ran it (expert calls)                                                                              |
+| `folder`       | TEXT             | The folder the expert works in                                                                                  |
+| `mode`         | TEXT             | The expert's mode the person chose (goal)                                                                       |
+| `task`         | TEXT             | What was asked first (goal)                                                                                     |
+| `approved_at`  | TEXT NULL        | When an approved hand-off joined the queue (goal); orders the line, null for a job that started at once         |
+| `rechecked_at` | TEXT NULL        | When the person last said a held job still stands; the one-hour recheck counts from it, else from `approved_at` |
 
 - Written by: `job_records.py` through `WorkStore.set_job_detail`.
-- Read by: `job_records.py` through `WorkStore.job_details`.
+- Read by: `job_records.py` through `WorkStore.job_details`; the queue by `WorkStore.queued_goals` (`planned` goals with an `approved_at`, oldest first).
 - Retention: kept with its work row. Not masked: `task` and `folder` never were.
 
 ### The goal row (a job)
