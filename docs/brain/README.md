@@ -936,7 +936,7 @@ The first-run setup adds six more Home tools (never offered to Scout):
 | `model_state`     | `{}`                            | `{"provider": "anthropic", "model", "default", "models": [{"id", "name", "line"}]}`; `model` is the choice in force, `default` the one used when none is chosen                                                                                                                             |
 | `set_model`       | `{"model": str}`                | `{"model": str}`; `invalid_params` for an id not in `models`; saves it and sends `changed {what: "model"}`; it applies from the next reply, the one running keeps its model                                                                                                                 |
 | `stt_state`       | `{}`                            | `{"live", "final", "models": [{"id", "label", "role", "size_mb", "gpu", "languages", "note"}], "gpu_name"}`; `live` and `final` are the choice in force (an id, `auto` or, for final, `off`); `gpu_name` is the first NVIDIA card or null, asked once per brain run (`voice/stt_choice.py`) |
-| `set_stt`         | `{"live"?: str, "final"?: str}` | `{"live", "final"}`; `invalid_params` for none given or an id not listed for that role; saves it, calls `VoiceService.reload()` and sends `changed {what: "stt"}`; it applies from the next listen, never under a running session (see [voice.md](../senses/voice.md))                      |
+| `set_stt`         | `{"live"?: str, "final"?: str}` | `{"live", "final"}`; `invalid_params` for none given or an id not listed for that role; saves it, calls `VoiceService.reload()` and sends `changed {what: "stt"}`; it applies from the next listen, never under a running session (see [hearing.md](../senses/hearing.md))                  |
 
 Updates add five Home tools (`setup/home_tools.py` `home_update_tools`, never offered to Scout):
 `updates_state` (read; `{checkedAt, auto: {apps: {official, community}, experts: {...}}, items:
@@ -2406,7 +2406,7 @@ listen first loads the ears.
   and `moonshine/` (about 120 MB for small, the Auto live model; tiny is about 45 MB and medium bigger; fetched by
   `moonshine-voice` into that folder). The first `listen` on a new computer downloads about
   130 MB (and about 1.5 GB more for turbo when a card is found). The live model is the row `voice/stt.py` resolves (`TAGALONG_STT_LIVE`, else Auto), loaded
-  through `voice/engines`; see docs/senses/voice.md, Speech models.
+  through `voice/engines`; see [Speech models](../senses/hearing.md#speech-models).
 - **Python** is pinned to `>=3.12,<3.14` (`kokoro-onnx` supports 3.10 to 3.13). Dependencies:
   `moonshine-voice`, `onnxruntime`, `numpy`, `kokoro-onnx`. Linux wheels exist for all of them, so
   the CI brain job resolves them from `uv.lock`.
@@ -2449,16 +2449,16 @@ brain sends and falls back to the system voice for a text-only `speech` frame.
 - **Sentences and chunks.** `voice/speakable.py` turns the streamed reply into sentences: fenced
   code, table rows, `>` quotes and bare URLs are left out, list markers and Markdown dropped,
   nothing is added or cut. Nothing after a line of exactly `---` is said (the divider, see
-  [Say and show](../senses/voice.md#say-and-show)). `find_sentence_end` ends a sentence at `.`, `!` or `?`
+  [speaking.md](../senses/speaking.md#say-and-show)). `find_sentence_end` ends a sentence at `.`, `!` or `?`
   followed by a capital, digit or quote, not after an abbreviation (`e.g.`, `Dr.`, `etc.`, an
   initial), a decimal, a version or a list number; a single line break is a space and a blank line
   ends the sentence and the paragraph. `voice/chunker.py` groups the sentences into chunks: the
   first complete sentence of at least 4 words goes out at once, later chunks grow to about 30
   words (45 at most), a sentence over 45 words is cut at its last comma or space, and a 1-3 word
-  paragraph joins its neighbour. See [Voice](../senses/voice.md#the-mouths-queue). Each sentence is first
+  paragraph joins its neighbour. See [speaking.md](../senses/speaking.md#the-mouths-queue). Each sentence is first
   rewritten for the ear (`voice/ear_text.py`: times, money, dates, numbers and symbols as words)
   and each chunk's audio is trimmed, faded and followed by a set gap (`voice/shape.py`); see
-  [Read for the ear](../senses/voice.md#read-for-the-ear).
+  [speaking.md](../senses/speaking.md#read-for-the-ear).
 - **`Mouth`** (`voice/mouth.py`) keeps one queue of chunks for all turns and one worker task
   that says them in order. It synthesises each chunk with `asyncio.to_thread` and awaits it, so
   a slow voice never stalls the websocket or the ears, and sends
@@ -2487,7 +2487,7 @@ brain sends and falls back to the system voice for a text-only `speech` frame.
   clear speaks again (from the next delta). `unlisten` does not hush (a held-mode reply goes on
   being spoken) and `cancel` does not hush, so a body sends `hush` on Stop.
 - **Spoken over.** A `say` with `interrupted {turn, heard}` means the owner spoke over Scout (see
-  [Voice](../senses/voice.md#talking-over-scout)). `Session.say` asks `Session.voice.sentences(turn)`;
+  [speaking.md](../senses/speaking.md#talking-over-scout)). `Session.say` asks `Session.voice.sentences(turn)`;
   the first `heard` sentences were said, the rest are the unsaid. The running turn is paused, not
   cancelled (`Session.interrupt` sets the turn's `stop` event: generation stops where it is, the
   partial reply is kept, and the mouth is hushed; it keeps the turn's sentence log through the
@@ -2517,7 +2517,7 @@ this]` (`Memory.replace_last_message` rewrites the cut turn's message), never th
   is carried by the turn's next step. Code never says the opening sentence, there
   is no canned line and no earcon. It sits in the user content rather than the system prompt so
   the cached system prompt is the same for typed and spoken turns. It is an instruction to the
-  model and not guaranteed. See [Say and show](../senses/voice.md#say-and-show).
+  model and not guaranteed. See [speaking.md](../senses/speaking.md#say-and-show).
 - **Early fetch and the status line.** The voice is not fetched only at the first spoken turn:
   while the first-run tour is open the desktop calls the Home tool `fetch_voice` (each time the brain
   comes online, until the tour is finished), and `VoiceService.prefetch()` starts `Mouth.prefetch()`
@@ -2554,7 +2554,7 @@ this]` (`Memory.replace_last_message` rewrites the cut turn's message), never th
 - **Voice roster.** `voice/tts_models.json` lists the voices (Piper, Kokoro, Supertonic), loaded by
   `voice/tts.py` (which also holds the `Tts` protocol); `voice/tts_engines.py` maps each engine to
   its adapter (`kokoro.py`, `piper.py`, `supertonic.py`). The mouth loads the one Home chose (see
-  above). See [voice.md](../senses/voice.md#voices).
+  above). See [speaking.md](../senses/speaking.md#voices).
 - **Hand check.** `cd brain && uv run python tests/voice_smoke.py [DATA_DIR] [OUT_DIR]` runs every
   roster voice once and prints load time, time per sentence and the real-time factor (not part of
   `pytest`); `tools/voice_samples.py` makes the sample clips.
