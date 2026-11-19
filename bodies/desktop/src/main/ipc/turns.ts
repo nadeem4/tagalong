@@ -25,6 +25,8 @@ interface TurnIpcDeps {
   voice: () => { enabled: boolean; speed: number };
   /** The snapshot the last hotkey captured, sent with the ask. */
   pendingSnapshot: () => ContextSnapshot | null;
+  /** Drops the snapshot's selection once an ask has sent it: it goes with one ask only. */
+  clearSelection: () => void;
   /**
    * Reads the item last dropped on Scout, once, for an ask from a drop card's button.
    * Rejects with the sentence to show when it cannot be read.
@@ -36,18 +38,22 @@ interface TurnIpcDeps {
 export const ASK_SELECTION_MAX_CHARS = 4000;
 const CUT_MARK = '…[cut]';
 
+/** Cut to the cap without leaving half a surrogate pair, and say so. */
+function capSelection(text: string): string {
+  if (text.length <= ASK_SELECTION_MAX_CHARS) return text;
+  const last = text.charCodeAt(ASK_SELECTION_MAX_CHARS - 1);
+  const end =
+    last >= 0xd800 && last <= 0xdbff ? ASK_SELECTION_MAX_CHARS - 1 : ASK_SELECTION_MAX_CHARS;
+  return text.slice(0, end) + CUT_MARK;
+}
+
 /** The context an ask sends: each key only when present, nothing when neither is. */
 function askContext(snapshot: ContextSnapshot | null): SayParams['context'] | undefined {
   const window = snapshot?.app?.windowTitle;
   const selection = snapshot?.selection;
   const context: Record<string, string> = {};
   if (window !== undefined) context.window = window;
-  if (selection !== undefined && selection !== '') {
-    context.selection =
-      selection.length > ASK_SELECTION_MAX_CHARS
-        ? selection.slice(0, ASK_SELECTION_MAX_CHARS) + CUT_MARK
-        : selection;
-  }
+  if (selection !== undefined) context.selection = capSelection(selection);
   return Object.keys(context).length > 0 ? context : undefined;
 }
 
@@ -93,6 +99,7 @@ export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
         ...(spoken ? { spoken: true, speed: voice.speed } : {}),
         ...(input.interrupted !== undefined ? { interrupted: input.interrupted } : {}),
       };
+      deps.clearSelection();
       try {
         // Tracked before it is sent: the brain's turn frames can beat its answer.
         deps.trackSay(say.id);

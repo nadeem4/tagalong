@@ -926,7 +926,11 @@ async function noteActiveWindow(current: Desktop): Promise<ContextSnapshot | nul
   announceCapture(captureNotice({ at: new Date(), screenshot: false, blocked, paused }));
   // Null is how the panel learns to say why it is blind. Paused and blocked are different
   // sentences, and the notice above carries which one it was.
-  if (blocked !== null || paused) return null;
+  // The earlier hotkey's snapshot must not ride on this ask either.
+  if (blocked !== null || paused) {
+    current.pendingSnapshot = null;
+    return null;
+  }
 
   const snapshot = ContextSnapshot.parse({
     id: randomUUID(),
@@ -962,6 +966,10 @@ function registerIpc(): void {
     voice: () => required().settings.voice,
     status: () => brainStatus,
     pendingSnapshot: () => required().pendingSnapshot,
+    clearSelection: () => {
+      const d = required();
+      if (d.pendingSnapshot) d.pendingSnapshot = { ...d.pendingSnapshot, selection: undefined };
+    },
     takeDrop: () => drops.take(),
   });
   registerScoutIpc(handle, () => openConfirms());

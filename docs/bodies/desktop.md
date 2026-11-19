@@ -328,7 +328,7 @@ The same call backs **Start brain** on the offline card, so it also runs when th
 - **Asking.** The `ask` IPC (`ipc/turns.ts`) sends `say` with the text, the pending screenshot as an
   image part, dropped items as parts, and the active window title and the selected text as
   `context.window` and `context.selection` (each only when present; no `context` when neither is; a
-  selection over `ASK_SELECTION_MAX_CHARS`, 4000, is cut to that and ends with `…[cut]`), and returns
+  selection over `ASK_SELECTION_MAX_CHARS`, 4000, is cut to that and ends with `…[cut]`, never splitting an emoji). The selection goes with one ask only: `clearSelection` drops it from `pendingSnapshot` once sent. A blocked or paused talk-key note clears `pendingSnapshot`. It returns
   `{ turnId }`. While the brain is offline it throws "Scout's brain is not running." Interrupt sends
   `cancel`: the explicit Stop only. Talking over Scout pauses its voice and sends the words as
   a `say` with `interrupted` (see [speaking.md](../senses/speaking.md)).
