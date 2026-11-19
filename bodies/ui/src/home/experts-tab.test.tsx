@@ -189,6 +189,13 @@ describe('Experts tab: add an expert', () => {
     expect(screen.getByRole('button', { name: 'Add Codex' })).toBeVisible();
   });
 
+  it('an open card says to answer it, and the row is not marked added', async () => {
+    await open({ browseExperts: [CODEX], showMoreFrom: 1 }, { card: 'ask1' });
+    await click(screen.getByRole('button', { name: 'Add Codex' }));
+    expect(within(rowOf('Codex')).getByText('Answer the card to add it.')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Add Codex' })).toBeVisible();
+  });
+
   it('an install in progress shows its percent, a bar and what it is doing, instead of the button', async () => {
     await open({
       browseExperts: [CODEX],

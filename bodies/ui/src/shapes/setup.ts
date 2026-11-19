@@ -133,6 +133,8 @@ export interface SetupResult {
   error?: string;
   /** A login's answer: `waiting`; how it ends arrives later as a setup_login event. */
   state?: string;
+  /** Set instead of waiting: the Allow card is up and its answer runs the install by event. */
+  card?: string;
   /** The open item standing for the sign-in or install, and whether it joined one running. */
   item?: string;
   joined?: boolean;

@@ -51,6 +51,7 @@ const SETUP_REFUSALS: Record<string, Words> = {
   },
 };
 const LOGIN_WAITING = 'Checking the sign-in…';
+const CARD_OPEN = 'Answer the card to add it.';
 const SETUP_FAILED: Words = { text: 'Setting that up didn’t work.', error: true };
 
 /**
@@ -147,7 +148,7 @@ export function ConnectionsPanel() {
     }
   };
 
-  // The call returns once the person has answered the Allow card; until then the row waits. How it
+  // The call returns as soon as the Allow card is up (its answer installs later). How it
   // ended goes back to the row that was pressed, not to the top of the page.
   const setUp = async (
     id: string,
@@ -158,9 +159,11 @@ export function ConnectionsPanel() {
     let outcome: Outcome | null = null;
     await act(async () => {
       try {
-        const { error, state } = await call();
+        const { error, state, card } = await call();
         if (error !== undefined) {
           outcome = { ...(SETUP_REFUSALS[error] ?? SETUP_FAILED), added: false };
+        } else if (card !== undefined) {
+          outcome = { text: CARD_OPEN, error: false, added: false };
         } else if (state === 'waiting') {
           outcome = { text: LOGIN_WAITING, error: false, added: false };
         } else if (added !== undefined) {
