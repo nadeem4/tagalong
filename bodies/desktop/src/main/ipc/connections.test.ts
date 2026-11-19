@@ -35,15 +35,17 @@ function setup(answer: (tool: string, input?: object) => Promise<unknown> | unkn
     },
   };
   const answers: [string, string][] = [];
-  const replies: [string, string, string | undefined][] = [];
+  const replies: (readonly unknown[])[] = [];
   registerConnectionIpc(ipc.handle, {
     brain,
     answer: (ask, decision) => {
       answers.push([ask, decision]);
       return Promise.resolve();
     },
-    reply: (ask, option, text) => {
-      replies.push([ask, option, text]);
+    reply: (ask, option, text, checkBackAt) => {
+      replies.push(
+        checkBackAt === undefined ? [ask, option, text] : [ask, option, text, checkBackAt],
+      );
       return Promise.resolve();
     },
   });
@@ -65,6 +67,15 @@ describe('registerConnectionIpc', () => {
     const { invoke, replies } = setup();
     await invoke(IPC.answerJobAsk, 'a1', { option: 'not_now' });
     expect(replies).toEqual([['a1', 'not_now', undefined]]);
+  });
+
+  it('passes a Not now with a chosen check-back time on', async () => {
+    const { invoke, replies } = setup();
+    await invoke(IPC.answerJobAsk, 'a1', {
+      option: 'not_now',
+      checkBackAt: '2030-01-05T18:45:00Z',
+    });
+    expect(replies).toEqual([['a1', 'not_now', undefined, '2030-01-05T18:45:00Z']]);
   });
 
   it("answers Scout's ask on the brain", async () => {

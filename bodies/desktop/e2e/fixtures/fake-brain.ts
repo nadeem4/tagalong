@@ -888,6 +888,9 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
               text: 'Hand the build fix to Claude Code?',
               options: ['allow', 'deny', 'not_now', 'stop_task'],
               confirm: true,
+              task: { id: 'k1', title: 'Fix the build' },
+              check_back_at: '2030-01-05T15:30:00+00:00',
+              check_back_by: 'scout',
               tool: 'hand_off',
               input: {
                 task: 'Fix the build',
@@ -952,6 +955,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             until?: string;
             kind?: string;
             official?: boolean;
+            task?: string;
           };
         };
         let value: unknown = {};

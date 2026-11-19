@@ -28,6 +28,9 @@ export const CARD_CSS = `
 }
 .card-brief { font-size: 12px; line-height: 16px; font-weight: 400; color: ${t.color.textSoft}; }
 .connector-details { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 160px; overflow-y: auto; }
+.card-task { margin: 0; ${typeCss('small')}; color: ${t.color.textMuted}; overflow-wrap: anywhere; }
+.card-checkback { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.card-checkback input { height: 28px; padding: 0 8px; border: 1px solid ${t.color.fieldLine}; border-radius: ${t.radius.sm}px; background: transparent; color: ${t.color.text}; ${typeCss('small')}; font-variant-numeric: tabular-nums; }
 .card-head { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
 .card-head p { flex: 1 1 200px; margin: 0; font-weight: 600; }
 .card-chip {

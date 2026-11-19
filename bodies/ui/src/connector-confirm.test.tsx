@@ -294,12 +294,12 @@ describe('the connector confirm card', () => {
         expect(bridge.jobAnswers).toEqual([{ approvalId: APPROVAL, option: 'not_now' }]);
       });
 
-      it('Stop task ends the task, and No still denies', async () => {
+      it('Stop the task ends the task, and No still denies', async () => {
         const bridge = createFakeHostBridge();
         renderBubble(bridge);
         act(() => bridge.emit(handOff()));
         await act(async () => {
-          fireEvent.click(screen.getByRole('button', { name: 'Stop task' }));
+          fireEvent.click(screen.getByRole('button', { name: 'Stop the task' }));
           await Promise.resolve();
         });
         expect(bridge.jobAnswers).toEqual([{ approvalId: APPROVAL, option: 'stop_task' }]);
@@ -517,7 +517,7 @@ describe('the connector confirm card', () => {
       bridge.emit({ ...confirm(), options: ['allow', 'deny', 'not_now', 'stop_task'] as string[] });
     act(() => card());
     expect(screen.getByRole('button', { name: 'No' })).toBeInTheDocument();
-    for (const name of ['Not now', 'Stop task']) {
+    for (const name of ['Not now', 'Stop the task']) {
       await act(async () => {
         fireEvent.click(screen.getByRole('button', { name }));
         await Promise.resolve();
@@ -539,5 +539,66 @@ describe('the connector confirm card', () => {
       bridge.emit({ type: 'turn.error', turnId: TURN, code: 'aborted', message: 'Stopped.' }),
     );
     expect(screen.queryByRole('button', { name: 'Allow' })).toBeNull();
+  });
+});
+
+describe('a task card', () => {
+  const OPTIONS = ['allow', 'deny', 'not_now', 'stop_task'];
+  const taskCard = (extra: object = {}) =>
+    ({
+      ...confirm(),
+      options: OPTIONS,
+      task: { id: 'k1', title: 'Fix the build' },
+      ...extra,
+    }) as never;
+
+  it('shows the task title above the card text', () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    act(() => bridge.emit(taskCard()));
+    const card = screen.getByRole('region', { name: 'Allow create-pages?' });
+    const title = within(card).getByText('Fix the build');
+    const text = within(card).getByText(/Create a page/);
+    expect(title.compareDocumentPosition(text) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('labels not_now and stop_task, also on an expert ask', () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    act(() =>
+      bridge.emit(
+        taskCard({ question: true, summary: 'Which branch?', options: ['main', ...OPTIONS] }),
+      ),
+    );
+    expect(screen.getByRole('button', { name: 'Not now' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Stop the task' })).toBeInTheDocument();
+    expect(screen.queryByText('stop_task')).toBeNull();
+  });
+
+  it('shows the check-back time and lets the person change it', async () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    const at = new Date(2030, 0, 5, 15, 30);
+    act(() => bridge.emit(taskCard({ checkBackAt: at.toISOString(), checkBackBy: 'scout' })));
+    expect(screen.getByText('Checking back at 15:30')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Change time' }));
+    fireEvent.change(screen.getByLabelText('Check back at'), { target: { value: '18:45' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Set time' }));
+      await Promise.resolve();
+    });
+    expect(bridge.jobAnswers).toHaveLength(1);
+    const [answer] = bridge.jobAnswers;
+    expect(answer).toMatchObject({ approvalId: APPROVAL, option: 'not_now' });
+    const sent = new Date((answer as { checkBackAt: string }).checkBackAt);
+    expect([sent.getHours(), sent.getMinutes()]).toEqual([18, 45]);
+  });
+
+  it('marks a time the person set', () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    const at = new Date(2030, 0, 5, 15, 30);
+    act(() => bridge.emit(taskCard({ checkBackAt: at.toISOString(), checkBackBy: 'person' })));
+    expect(screen.getByText('Set by you')).toBeInTheDocument();
   });
 });

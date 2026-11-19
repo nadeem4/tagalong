@@ -533,6 +533,25 @@ describe('createTurnEvents: asks', () => {
       expect(e).not.toHaveProperty('question');
     });
 
+    it('a task card carries the task, its check-back time and who chose it', () => {
+      const [e] = make().map(
+        'ask',
+        jobAsk({
+          text: 'Send it?',
+          options: ['allow', 'deny', 'not_now', 'stop_task'],
+          tool: 'send_message',
+          task: { id: 'k1', title: 'Fix the build' },
+          check_back_at: '2030-01-05T15:30:00+00:00',
+          check_back_by: 'person',
+        }),
+      );
+      expect(e).toMatchObject({
+        task: { id: 'k1', title: 'Fix the build' },
+        checkBackAt: '2030-01-05T15:30:00+00:00',
+        checkBackBy: 'person',
+      });
+    });
+
     it("Scout's save_preference ask (a tool, no free_text) is Scout's, not a question", () => {
       const [e] = make().map(
         'ask',

@@ -85,8 +85,10 @@ const bridge: PreloadBridge = {
   openConfirms: () => ipcRenderer.invoke(IPC.openConfirms) as Promise<TurnEvent[]>,
   approveTool: (approvalId: string, decision: 'once' | 'always' | 'deny') =>
     ipcRenderer.invoke(IPC.approveTool, approvalId, decision) as Promise<void>,
-  answerJobAsk: (approvalId: string, answer: { option: string; text?: string }) =>
-    ipcRenderer.invoke(IPC.answerJobAsk, approvalId, answer) as Promise<void>,
+  answerJobAsk: (
+    approvalId: string,
+    answer: { option: string; text?: string; checkBackAt?: string },
+  ) => ipcRenderer.invoke(IPC.answerJobAsk, approvalId, answer) as Promise<void>,
   listConnections: () => ipcRenderer.invoke(IPC.listConnections) as Promise<AppsList>,
   setupOverview: (query?: string, cursor?: string) =>
     ipcRenderer.invoke(IPC.setupOverview, query, cursor) as Promise<SetupOverview>,

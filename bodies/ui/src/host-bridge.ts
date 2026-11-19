@@ -285,7 +285,10 @@ export interface HostBridge {
    * question. Separate from approveTool because these options are not allow/always/deny; a
    * task card's `not_now` and `stop_task` go this way too.
    */
-  answerJobAsk(approvalId: string, answer: { option: string; text?: string }): Promise<void>;
+  answerJobAsk(
+    approvalId: string,
+    answer: { option: string; text?: string; checkBackAt?: string },
+  ): Promise<void>;
   /**
    * Home's Connections page: the apps the brain keeps (MCP). They reject with "brain offline"
    * while the brain is away.
