@@ -322,6 +322,7 @@ class FakeJobs:
         self.error = None
         self.rows = []
         self.queued = []
+        self.held_rows = []
         self.task_ids: dict[str, str] = {}
         self.activity_jobs = set()
         self.steps = []
@@ -371,6 +372,9 @@ class FakeJobs:
 
     def queue(self):
         return self.queued
+
+    def held(self):
+        return self.held_rows
 
     def task_of(self, job_id):
         return self.task_ids.get(job_id)
@@ -820,6 +824,17 @@ async def test_list_jobs_shows_queued_goals_with_their_place(home, records):
     assert (rows["q2"]["state"], rows["q2"]["place"]) == ("queued", 2)
     assert rows["q1"]["task"] == "wait 1" and rows["q1"]["task_id"] == "k1"  # Stop needs it
     assert "place" not in rows["run"] and rows["run"]["state"] == "running"
+
+
+async def test_list_jobs_shows_a_held_goal_as_waiting_for_an_ok(home, records):
+    at = datetime.datetime(2026, 10, 27, tzinfo=datetime.UTC)
+    records.plan_job("h1", "claude-acp", "old ask", "C:/x", "", "k9", None, at)
+    records.work.transition("h1", "blocked", reason="approved over an hour ago")
+    home.jobs.rows = records.list_jobs(20)
+    home.jobs.held_rows = records.held()
+    home.jobs.task_ids = {"h1": "k9"}
+    (row,) = json.loads(await home.run("list_jobs"))["jobs"]
+    assert (row["state"], row["task_id"]) == ("held", "k9")  # Home shows Stop, not Stopped
 
 
 async def test_home_list_jobs_shape_unchanged(home, records):

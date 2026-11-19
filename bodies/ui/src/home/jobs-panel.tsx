@@ -13,11 +13,15 @@ import { SafeMarkdown } from './safe-markdown';
 
 const STATE_LABEL: Record<string, string> = {
   queued: 'Waiting',
+  held: 'Needs your OK',
   running: 'Running',
   done: 'Done',
   error: 'Error',
   stopped: 'Stopped',
 };
+
+/** Approved but not running: in line for a slot, or held until the person says it stands. */
+const waiting = (job: JobRow): boolean => job.state === 'queued' || job.state === 'held';
 
 /** 1 -> "1st", 3 -> "3rd", 12 -> "12th". */
 function ordinal(n: number): string {
@@ -84,9 +88,9 @@ export function JobsPanel({ embedded = false, openJob = null, onOpenJob }: JobsP
   }, [bridge, refresh]);
 
   const stop = (job: JobRow): void => {
-    // A queued job has nothing running: Stop ends its task, which takes the job out of line.
+    // A queued or held job has nothing running: Stop ends its task, which takes the job out.
     const ending =
-      job.state === 'queued' && job.taskId !== undefined
+      waiting(job) && job.taskId !== undefined
         ? bridge.stopTask(job.taskId)
         : bridge.stopJob(job.id);
     void ending
@@ -181,6 +185,10 @@ export function JobsPanel({ embedded = false, openJob = null, onOpenJob }: JobsP
                           <>
                             {ordinal(job.place ?? 1)} in line · {job.folder} · {job.mode}
                           </>
+                        ) : job.state === 'held' ? (
+                          <>
+                            {job.folder} · {job.mode}
+                          </>
                         ) : (
                           <>
                             {job.folder} · {job.mode} ·{' '}
@@ -207,7 +215,7 @@ export function JobsPanel({ embedded = false, openJob = null, onOpenJob }: JobsP
                         Watch
                       </Button>
                     )}
-                    {(job.state === 'running' || (job.state === 'queued' && job.taskId)) && (
+                    {(job.state === 'running' || (waiting(job) && job.taskId)) && (
                       <Button
                         variant="secondary"
                         aria-label={`Stop ${job.task}`}

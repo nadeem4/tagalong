@@ -957,6 +957,7 @@ def expert_tools(
         rows = []
         watched = jobs.with_activity()  # one query, not one per row
         line = [j.id for j in jobs.queue()]  # approved, waiting for a slot
+        held = [j.id for j in jobs.held()]  # approved, held until the person says it stands
         for job in jobs.list():
             row = asdict(job)
             row["state"] = home_state(job.state)
@@ -964,6 +965,9 @@ def expert_tools(
                 row["state"] = "queued"
                 row["place"] = line.index(job.id) + 1
                 row["task_id"] = jobs.task_of(job.id)  # Home's Stop ends the task, not a job
+            elif job.id in held:
+                row["state"] = "held"
+                row["task_id"] = jobs.task_of(job.id)
             row["activity"] = job.id in watched
             row["summary"] = jobs.activity_line(job.id)
             row["title"] = job_title(job)
@@ -1222,7 +1226,8 @@ def expert_tools(
                 "expert hand-off, with expert, state, latest progress, result and "
                 "session_id_known; plus a one-line summary of its steps, your watch list for "
                 "it and parent_job (the job a follow-up continued). A queued job (approved, "
-                "waiting for a free slot) has its place in line and its task_id.",
+                "waiting for a free slot) has its place in line and its task_id; a held job "
+                "(approved over an hour ago) waits for the person's OK and has its task_id.",
                 {"type": "object", "properties": {}},
                 frozenset({"home"}),
                 effect="read",

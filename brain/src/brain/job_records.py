@@ -166,6 +166,11 @@ class JobRecords:
         """The approved hand-offs waiting for a slot, the one to start first at the head."""
         return [self._job(g) for g in self.work.queued_goals()]
 
+    def held(self) -> list[Job]:
+        """Approved hand-offs held for a recheck: blocked before they ever ran a part."""
+        jobs = (self._job(g) for g in self.work.queued_goals("blocked"))
+        return [j for j in jobs if not j.parts]
+
     def next_part_id(self, job_id: str) -> str:
         """The id the job's next part will get (p1, p2, ...), known before the part exists."""
         taken = [

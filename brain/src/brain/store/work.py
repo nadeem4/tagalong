@@ -278,14 +278,15 @@ class WorkStore:
         """The most recently created rows of one kind, newest first."""
         return self._select("kind = ?", [kind], f"rowid DESC LIMIT {int(limit)}")
 
-    def queued_goals(self) -> list[WorkRow]:
-        """The goals waiting for a job slot, oldest approval first."""
+    def queued_goals(self, state: str = "planned") -> list[WorkRow]:
+        """The approved goals in a state (planned: waiting for a job slot; blocked: held for a
+        recheck), oldest approval first."""
         sql = (
             f"SELECT {_W_COLUMNS} FROM work w JOIN work_job j ON j.work_id = w.id"
-            " WHERE w.kind = 'goal' AND w.state = 'planned' AND j.approved_at IS NOT NULL"
+            " WHERE w.kind = 'goal' AND w.state = ? AND j.approved_at IS NOT NULL"
             " ORDER BY j.approved_at, w.rowid"
         )
-        return [_row(r) for r in self.db.execute(sql)]
+        return [_row(r) for r in self.db.execute(sql, (state,))]
 
     def expert_calls_with_session(self, agent: str, limit: int = 50) -> list[WorkRow]:
         """The expert's newest calls that are not running and saved a session, newest first."""

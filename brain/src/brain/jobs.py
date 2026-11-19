@@ -160,6 +160,8 @@ class Jobs:
         self._scout_steps: dict[str, JobActivity] = {}  # job -> writer of Scout's own steps
         self._reserved: dict[str, set[str]] = {}  # job -> part ids promised to starts in flight
         self._claimed: set[str] = set()  # starts in flight: each holds a slot until its row exists
+        self._in_flight = 0  # every start under way, with a slot claim or without (a redo)
+        self._rechecked: dict[str, datetime] = {}  # held goal -> when its recheck was last posted
         self._background: set[asyncio.Task] = set()  # queued starts running on their own
         self._closing = False  # the brain is going down: no queued job starts any more
         self._stopped: set[str] = (
@@ -423,15 +425,16 @@ class Jobs:
             if goal is not None and goal.state in OPEN:
                 self._records.work.transition(earlier.id, "cancelled", reason="carried on")
 
-    def _check_apps(self, wanted: Sequence[str]) -> tuple[str, ...]:
-        """The offered apps, deduplicated; a plain refusal for one that is unknown or not usable."""
+    def _check_apps(self, wanted: Sequence[str], settling: bool = False) -> tuple[str, ...]:
+        """The offered apps, deduplicated; a plain refusal for one that is unknown or not usable.
+        `settling`: the brain just started, so an app still connecting is given the time."""
         offered = tuple(dict.fromkeys(wanted))
         known = self._apps.ids() if self._apps is not None else []
         for app_id in offered:
             if app_id not in known:
                 raise JobError(f"no app {app_id}; connected apps: {', '.join(known) or 'none'}")
             state = self._apps.status(app_id).state
-            if state != "connected":
+            if state != "connected" and not (settling and state == "connecting"):
                 raise JobError(
                     f"{app_id} is not connected (it is {state}); it cannot be handed over"
                 )
@@ -445,11 +448,14 @@ class Jobs:
         """The one seam that starts an expert run (see `_begin_part`). `claim` is the slot the
         start holds until its row exists, taken by the caller so no start can slip in while this
         one awaits; it is given back however this ends."""
+        self._in_flight += 1
         try:
             return await self._begin_part(job_id, *args, claim=claim, **kw)
         finally:
+            self._in_flight -= 1
             self._claimed.discard(claim or "")
             self._prune_stopped()
+            self.fill_slots()  # a start that failed gives its slot to the next in line
 
     async def _begin_part(
         self,
@@ -578,6 +584,14 @@ class Jobs:
         chosen = next((e for e in self._experts() if part and e.id == part.agent), None)
         if part is None or chosen is None:
             raise JobError("the expert that ran this part is not installed any more")
+        others = sum(
+            1
+            for j in self._records.running_jobs()
+            for p in j.parts
+            if p.state == "active" and (j.id, p.id) != (job.id, part.id)
+        )
+        if others + len(self._claimed) >= self._max_running:
+            raise JobError(f"both job slots are busy; try again when one ends: {job.id}")
         return await self._start_part(
             job.id,
             chosen,
@@ -610,7 +624,7 @@ class Jobs:
         self._changed()
         self.fill_slots()  # a slot that freed, or an approval gone stale, is dealt with now
         queued = JobId(job_id)
-        place = [j.id for j in self._records.queue()]
+        place = [j.id for j in self._records.queue() if j.id not in self._claimed]
         queued.queued = place.index(job_id) + 1 if job_id in place else None
         queued.title = title or None
         return queued
@@ -624,12 +638,13 @@ class Jobs:
         over an hour ago is not started: it is asked about first (job_recheck)."""
         if self._closing:
             return []
+        self._repeat_rechecks()
         started = []
         for goal in self._records.work.queued_goals():
             if self._free_slots() <= 0:
                 break
-            if goal.id in self._claimed:
-                continue  # already starting
+            if goal.id in self._claimed or goal.task_id in self._stopped:
+                continue  # already starting, or its task was stopped while a start was in flight
             if self._stale(goal):
                 self._recheck(goal)
                 continue
@@ -662,6 +677,33 @@ class Jobs:
         """The approval is old: hold the goal and ask the person (through Scout) if it still
         stands. The slot goes to the next in line."""
         self._records.work.transition(goal.id, "blocked", reason="approved over an hour ago")
+        self._post_recheck(goal)
+        self._changed()
+
+    def held(self) -> list[Job]:
+        """Approved jobs held for a recheck: waiting for the person's OK, not stopped."""
+        return self._records.held()
+
+    def _repeat_rechecks(self) -> None:
+        """A held goal whose question was lost (a restart, a card that ran out, a silent Scout) is
+        asked about again: not while its card is open, and at most once an hour."""
+        open_cards = {
+            (c.get("input") or {}).get("job")
+            for item in (self._items.list_open("ask") if self._items is not None else [])
+            if (c := item.saved_call or {}).get("name") == "requeue_job"
+        }
+        for job in self.held():
+            asked = self._rechecked.get(job.id)
+            if job.id in open_cards or (
+                asked is not None and (self._now() - asked).total_seconds() <= RECHECK_AFTER_S
+            ):
+                continue
+            goal = self._records.work.get(job.id)
+            if goal is not None:
+                self._post_recheck(goal)
+
+    def _post_recheck(self, goal: WorkRow) -> None:
+        self._rechecked[goal.id] = self._now()
         detail = self._records.work.job_detail(goal.id) or {}
         self._news(
             "job_recheck",
@@ -673,7 +715,6 @@ class Jobs:
                 "folder": detail.get("folder") or "",
             },
         )
-        self._changed()
 
     async def _start_queued(self, goal: WorkRow) -> None:
         """Start one queued goal. If it cannot start, it ends failed and Scout is told why;
@@ -688,6 +729,7 @@ class Jobs:
             earlier = self._records.get_job(resume.get("job", ""))
             parts = earlier.parts if earlier else []
             earlier_part = next((p for p in parts if p.id == resume.get("part")), None)
+            self._check_apps(wants.get("apps") or (), settling=True)  # one may be gone by now
             await self._start_part(
                 goal.id,
                 chosen,
@@ -817,14 +859,16 @@ class Jobs:
     def _prune_stopped(self) -> None:
         """The stopped set only guards starts still in flight; with none, a new start for a
         stopped task is refused by its task state, so the ids can go."""
-        if not self._claimed:
+        if not self._claimed and not self._in_flight:
             self._stopped.clear()
 
     async def shutdown(self) -> None:
         """Stop every running job before the brain exits; one stuck run must not block the rest."""
         self._closing = True  # a job that ends now must not hand its slot to a queued one
-        for task in list(self._background):
+        waiting = list(self._background)
+        for task in waiting:
             task.cancel()
+        await asyncio.gather(*waiting, return_exceptions=True)  # none starts while hosts go down
         # Each stopped job still posts job_ended: the runner is stopped first, so the event
         # stays new in the log and the next start tells it.
         for job_id, runs in list(self._runs.items()):

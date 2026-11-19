@@ -94,6 +94,18 @@ describe('JobsPanel', () => {
     expect(bridge.jobStops).toEqual([]); // the task ends, not a job that never started
   });
 
+  it('shows a held job as needing an OK, with a Stop that ends its task', async () => {
+    const bridge = createFakeHostBridge({
+      jobs: [{ ...RUNNING, id: 'h1', task: 'Old ask', state: 'held', taskId: 'k9', parts: [] }],
+    });
+    renderPanel(bridge);
+    const [held] = (await rows()) as [HTMLElement];
+    expect(held).toHaveTextContent('Needs your OK');
+    expect(held).not.toHaveTextContent('Stopped');
+    fireEvent.click(within(held).getByRole('button', { name: 'Stop Old ask' }));
+    await waitFor(() => expect(bridge.taskStops).toEqual(['k9']));
+  });
+
   it('names every state in words, not only by colour', async () => {
     renderPanel(createFakeHostBridge({ jobs: [FAILED, STOPPED] }));
     const [failed, stopped] = await rows();

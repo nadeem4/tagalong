@@ -34,7 +34,7 @@ from brain.setup.store import InstalledExpert
 from brain.store import rules
 from brain.store.events import list_state
 from brain.store.work import ActivityEntry, WorkStore
-from brain.tasks import Tasks, TaskStopHooks
+from brain.tasks import Tasks
 from brain.tools import work_tools
 
 AGENT = Path(__file__).parent / "fake_acp_agent.py"
@@ -502,6 +502,147 @@ async def test_a_stopped_task_is_never_started_by_fill_slots(make_rig):
     await rig.tasks.stop("k1", "desktop")
     assert rig.jobs.fill_slots() == []
     assert rig.runs == []
+
+
+def gated_start(monkeypatch, fail_first=False):
+    """ExpertRun.start waits for the gate; the first call can then fail instead of starting."""
+    gate, calls, real = asyncio.Event(), [], ExpertRun.start
+
+    async def slow(self, *args, **kw):
+        calls.append(1)
+        await gate.wait()
+        if fail_first and len(calls) == 1:
+            raise RuntimeError("the expert would not start")
+        return await real(self, *args, **kw)
+
+    monkeypatch.setattr(ExpertRun, "start", slow)
+    return gate
+
+
+def due_redo(rig, task_id=None):
+    """A held part of an old job, sent back to planned and then marked active by the due runner."""
+    rig.records.add_job("old", "claude-acp", "do it", str(rig.folder), "plan", task_id=task_id)
+    rig.records.update_part("old", "p1", session_id="s1")
+    rig.jobs.startup()
+    rig.records.work.retry_step("old.p1")
+
+
+async def test_a_stop_during_a_slow_redo_never_starts_it(make_rig, monkeypatch):
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], load=True)
+    due_redo(rig, "k1")
+    row = rig.records.work.transition("old.p1", "active", expect="planned")
+    gate = gated_start(monkeypatch)
+    redo = asyncio.ensure_future(rig.jobs.run_planned(row))
+    await asyncio.sleep(0.05)
+    await rig.jobs.stop_task("k1")  # the redo holds no slot claim, yet the stop must stick
+    gate.set()
+    with pytest.raises(JobError, match="stopped"):
+        await redo
+    await until(lambda: not any(alive(run) for run in rig.runs))
+
+
+async def test_a_due_redo_never_makes_a_third_running_job(make_rig):
+    rig = make_rig(FakeAsks(), ASK_STEPS, load=True)
+    due_redo(rig)
+    await rig.jobs.start("one", str(rig.folder))
+    await rig.jobs.start("two", str(rig.folder))
+    row = rig.records.work.transition("old.p1", "active", expect="planned")
+    with pytest.raises(JobError, match="slots are busy"):
+        await rig.jobs.run_planned(row)
+    assert len([run for run in rig.runs if alive(run)]) == 2
+
+
+async def test_a_failed_start_hands_its_slot_to_the_queued_job(make_rig, monkeypatch):
+    rig = make_rig(FakeAsks(), max_running=1)
+    gate = gated_start(monkeypatch, fail_first=True)
+    starting = asyncio.ensure_future(rig.jobs.start("go", str(rig.folder)))
+    await until(rig.jobs.busy)
+    plan(rig, 1)
+    gate.set()
+    with pytest.raises(JobError):
+        await starting
+    await until(lambda: [j.id for j in rig.records.running_jobs()] == ["q1"])
+    assert rig.records.queue() == []
+
+
+def rechecks(rig):
+    return [e for e in rig.emitted if e.kind == "job_recheck"]
+
+
+async def test_a_blocked_goal_nobody_is_asking_about_is_asked_about_again(make_rig):
+    rig = make_rig(FakeAsks())
+    held = plan(rig, 1, rig.wall - timedelta(hours=2))
+    rig.records.work.transition(held.id, "blocked", reason="approved over an hour ago")
+    rig.jobs.fill_slots()  # a restart lost the first ask: it is posted again
+    assert [e.payload["job"] for e in rechecks(rig)] == ["q1"]
+    rig.jobs.fill_slots()
+    assert len(rechecks(rig)) == 1  # not again while the ask may still be answered
+    rig.wall += timedelta(seconds=RECHECK_AFTER_S + 1)
+    rig.jobs.fill_slots()  # the card ran out and Scout stayed silent: ask once more
+    assert len(rechecks(rig)) == 2
+    assert [j.id for j in rig.jobs.held()] == ["q1"]
+    rig.jobs.requeue("q1")  # answered: it is a queued job again, not held
+    assert rig.jobs.held() == []
+
+
+async def test_an_open_requeue_card_means_no_new_ask(make_rig):
+    rig = make_rig(FakeAsks())
+    held = plan(rig, 1, rig.wall - timedelta(hours=2))
+    rig.records.work.transition(held.id, "blocked", reason="approved over an hour ago")
+    rig.items.open("ask", saved_call={"name": "requeue_job", "input": {"job": "q1"}})
+    rig.jobs.fill_slots()
+    assert rechecks(rig) == []
+
+
+async def test_a_shutdown_waits_for_the_queued_starts_it_cancels(make_rig, monkeypatch):
+    rig = make_rig(FakeAsks())
+    gated_start(monkeypatch)
+    plan(rig, 1)
+    rig.jobs.fill_slots()
+    background = list(rig.jobs._background)
+    assert background
+    await rig.jobs.shutdown()
+    assert all(task.done() for task in background)
+
+
+async def test_fill_slots_skips_a_goal_whose_task_was_stopped(make_rig):
+    rig = make_rig(FakeAsks())
+    plan(rig, 1, task_id="k1")
+    rig.jobs._stopped.add("k1")  # stopped while a start was in flight
+    assert rig.jobs.fill_slots() == []
+
+
+async def test_a_goal_fill_slots_already_started_is_not_reported_in_line(make_rig):
+    rig = make_rig(FakeAsks())
+    plan(rig, 1)  # an approval nobody started yet: a new hand-off must queue behind it
+    job = await rig.jobs.start("two", str(rig.folder))
+    assert job.queued is None  # both fit in the two slots: fill_slots started it
+    await until(lambda: len(rig.records.running_jobs()) == 2)
+
+
+async def test_a_queued_job_whose_app_was_removed_waiting_is_not_started(make_rig):
+    rig = apps_rig(make_rig)
+    rig.records.plan_job(
+        "q1", rig.experts[0].id, "t", str(rig.folder), "", None, None, rig.wall, {"apps": ["gone"]}
+    )
+    rig.jobs.fill_slots()
+    await until(lambda: rig.records.work.get("q1").state == "failed")
+    assert rig.runs == [] and rig.bridge.grants == []
+
+
+async def test_a_stop_during_a_queued_start_never_starts_it(make_rig, monkeypatch):
+    rig = make_rig(FakeAsks())
+    rig.tasks.open("do", "desktop", id="k1", title="Fix it")
+    plan(rig, 1, task_id="k1")
+    gate = gated_start(monkeypatch)
+    assert rig.jobs.fill_slots() == ["q1"]
+    await asyncio.sleep(0.05)
+    await rig.jobs.stop_task("k1")
+    gate.set()
+    await asyncio.gather(*rig.jobs._background)
+    assert rig.records.running_jobs() == []
+    assert rig.records.work.get("q1").state == "cancelled"
+    await until(lambda: not any(alive(run) for run in rig.runs))
 
 
 async def test_a_job_waiting_on_a_card_keeps_its_slot(make_rig):

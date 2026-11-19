@@ -1480,10 +1480,16 @@ with its `task_id` and `work_job.approved_at` (`JobRecords.plan_job`), and `hand
 instead, because the job it joins is already running. A job counts for its slot from the moment
 it is claimed until its row exists (`Jobs._claimed`), and a job waiting on an expert's card keeps
 its slot. When a job ends, `fill_slots()` starts the oldest approved goal (oldest `approved_at`);
-it also runs once at start-up, after the resume scan, so a restart loses no approved job. Each
+it also runs when a start fails (its slot goes on to the next in line) and once at start-up,
+after the resume scan and `apps.start()`, so a restart loses no approved job. Each
 start runs in a background task, so nothing waits for an expert to come up; one that cannot start
-ends `failed` and Scout hears it as `job_ended`. A new hand-off never jumps ahead of one already
-in line. Stopping a task cancels its planned goals, so they leave the line.
+ends `failed` and Scout hears it as `job_ended`; its apps are checked again first, because one may
+have been removed while it waited. A new hand-off never jumps ahead of one already in line.
+Stopping a task cancels its planned goals, so they leave the line, and `fill_slots` never starts a
+goal of a stopped task; `shutdown` cancels the waiting starts and awaits them. Every start counts
+in `_in_flight` (a due redo of a held part, `run_planned`, takes no slot claim), and a stop's mark on a
+task is only forgotten when none is in flight or claimed. A redo refuses (`both job slots are busy`)
+when the other running parts and claims already fill the two slots.
 
 A goal whose approval (or last recheck) is over `RECHECK_AFTER_S` (one hour) old is not started:
 it moves to `blocked`, posts `job_recheck` and the slot goes to the next in line. Scout answers
@@ -1492,6 +1498,10 @@ Allow (`Jobs.requeue`) sets `work_job.rechecked_at` and moves the goal back to `
 `approved_at`, so it is first in line with a fresh hour. **Deny** ends the task:
 `ToolSpec.deny_stops_task` makes `AskRunner` treat a no on that card like Stop the task. Home's
 Jobs list shows a queued row as `queued` with `place` and `task_id`; its Stop calls `task_stop`.
+A held goal (blocked, never ran) shows as `held`, "Needs your OK", with its `task_id` and the
+same Stop (`Jobs.held`). `fill_slots` posts `job_recheck` again for a held goal whose question was
+lost (a restart, a card that ran out, a silent Scout): not while its `requeue_job` card is open, and
+at most once an hour.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "edgeLabelBackground": "#ffffff", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%

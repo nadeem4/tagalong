@@ -33,7 +33,7 @@ from brain.protocol import ErrorCode, RpcError
 from brain.setup.flights import not_for_home
 from brain.store import rules
 from brain.store.work import WorkStore
-from brain.tasks import Tasks, TaskStopHooks
+from brain.tasks import Tasks
 from brain.toolbox import Toolbox, ToolSpec
 from brain.tools import preference_tools
 
