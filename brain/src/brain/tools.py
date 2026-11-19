@@ -1221,8 +1221,8 @@ def expert_tools(
                 "closed, and its parts, one per "
                 "expert hand-off, with expert, state, latest progress, result and "
                 "session_id_known; plus a one-line summary of its steps, your watch list for "
-                "it and parent_job (the job a follow-up continued). A queued job (approved, waiting "
-                "for a free slot) has its place in line and its task_id.",
+                "it and parent_job (the job a follow-up continued). A queued job (approved, "
+                "waiting for a free slot) has its place in line and its task_id.",
                 {"type": "object", "properties": {}},
                 frozenset({"home"}),
                 effect="read",
