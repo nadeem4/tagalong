@@ -11,6 +11,8 @@ the reader into the store; the person's own sent mail closes an "I owe" loop in 
 Scout acts on a surfaced loop through `done`, `later`, `keep`, `drop` and `draft`: all but the
 draft stay inside the store, and the draft reaches only the source's draft tool. On the first
 return of the local day one `digest` event lists what was held that day.
+Each app Scout reads mail for has one Watch task ("Watching <app> mail"); its news names it, and
+stopping it (or the switch) ends polling for good. Held loops stay.
 Read-only: nothing here changes a mailbox.
 """
 
@@ -18,6 +20,7 @@ import asyncio
 import logging
 from collections.abc import Callable
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
 from brain.events import Event
 from brain.loops.loop import Loop
@@ -26,6 +29,9 @@ from brain.loops.source import Source
 from brain.loops.sources.gmail import GmailSource
 from brain.loops.store import LoopStore
 from brain.loops.triggers import context, due, quiet, snooze, stale, urgent
+
+if TYPE_CHECKING:
+    from brain.tasks import Tasks
 
 log = logging.getLogger(__name__)
 
@@ -69,6 +75,8 @@ class LoopService:
         self._tasks: dict[str, asyncio.Task] = {}
         self._fails: dict[str, int] = {}
         self._unread: dict[str, datetime] = {}
+        # Set by main once the session has built it (it is built after this service).
+        self.tasks: Tasks | None = None
 
     def start(self) -> None:
         # The switch outlives a restart. Apps connect after this runs, so no can_read check: a
@@ -124,7 +132,8 @@ class LoopService:
     ) -> None:
         # Marked only once the emit took it: a refused post leaves the loop to surface again.
         facts = {**self._facts(loop, reason), **(extra or {})}
-        self._emit(Event("loop", f"loop:{loop.source}", facts))
+        watch = self.tasks.open_watch(f"loop:{loop.source}") if self.tasks else None
+        self._emit(Event("loop", f"loop:{loop.source}", facts, task=watch))
         self._store.mark_surfaced(loop.id, key, self._today())
         self._notify("changed", {"what": "loops"})
 
@@ -233,15 +242,29 @@ class LoopService:
             if not self.can_read(app_id):
                 raise ValueError(f"{app_id} is not a mail app Scout can read.")
             source = GmailSource(app_id, self._apps.call)  # direct: the switch is the consent
-        self.disable(app_id)
+        self._stop_polling(app_id)
         self._sources[app_id] = source
         self._store.set_on(app_id, True)
+        if self.tasks:
+            self.tasks.watching(f"loop:{app_id}", f"Watching {app_id} mail")
         self._schedule(app_id, 0)
         self._notify("changed", {"what": "loops"})
 
     def disable(self, app_id: str) -> None:
-        """Switch off: polling stops; loops already held stay."""
+        """Switch off: polling stops and the Watch task ends; loops already held stay."""
+        self._stop_polling(app_id)
         self._store.set_on(app_id, False)
+        if self.tasks and (watch := self.tasks.open_watch(f"loop:{app_id}")):
+            self.tasks.end(watch, "stopped", reason="switched off")
+        self._notify("changed", {"what": "loops"})
+
+    def task_stopped(self, task_id: str) -> None:
+        """The person stopped a Watch task: if it was an app's mail reading, switch it off."""
+        row = self.tasks.get(task_id) if self.tasks else None
+        if row and row.kind == "watch" and row.source.startswith("loop:"):
+            self.disable(row.source.removeprefix("loop:"))
+
+    def _stop_polling(self, app_id: str) -> None:
         self._sources.pop(app_id, None)
         handle = self._polls.pop(app_id, None)
         if handle:
@@ -249,7 +272,6 @@ class LoopService:
         task = self._tasks.pop(app_id, None)
         if task:
             task.cancel()
-        self._notify("changed", {"what": "loops"})
 
     def can_read(self, app_id: str) -> bool:
         """Whether this connected app is a mail app Scout can read (the switch is offered)."""

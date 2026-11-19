@@ -73,6 +73,16 @@ def list_open(db: sqlite3.Connection, exclude_kind: str = "ask") -> list[TaskRow
     return [TaskRow(*r) for r in rows]
 
 
+def open_of_source(db: sqlite3.Connection, kind: str, source: str) -> str | None:
+    """The id of the open or waiting task of this kind from this source, if there is one."""
+    r = db.execute(
+        "SELECT id FROM tasks WHERE kind=? AND source=? AND state IN ('open','waiting')"
+        " ORDER BY created_at, rowid LIMIT 1",
+        (kind, source),
+    ).fetchone()
+    return None if r is None else r[0]
+
+
 def asks_to_settle(db: sqlite3.Connection) -> list[tuple[str, str]]:
     """Open Asks whose say is over: `done` when it was handled, `failed` when given up."""
     rows = db.execute(

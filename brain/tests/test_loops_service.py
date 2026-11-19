@@ -201,3 +201,99 @@ def test_a_loop_is_not_marked_surfaced_when_its_emit_fails(parts):
     with pytest.raises(RuntimeError):
         LoopService(store, broken, clock).start()
     assert not store.get(lp.id).surfaced  # the next start tries again
+
+
+# --- watch tasks: one per mail app (T3c) ---
+
+
+class IdleSource:
+    """A mail source with nothing to read: these tests are about the task, not the poll."""
+
+    async def new_items(self, since, unanswered_only=False):
+        return []
+
+    async def sent_items(self, since):
+        return []
+
+
+def watched(parts):
+    from brain.tasks import Tasks
+
+    store, clock, events, mem = parts
+    s = svc(store, clock, events)
+    s.tasks = Tasks(mem.db, lambda t: t, clock)
+    return s
+
+
+def open_watches(s):
+    return [t for t in s.tasks.open_block().splitlines() if " watch " in t]
+
+
+async def test_a_mail_loop_posts_under_one_watch_task(parts):
+    store, clock, events, _ = parts
+    s = watched(parts)
+    s.enable("app1", IdleSource())
+    held(store, due=T0 - timedelta(hours=1))
+    s.fire_due()
+    watch = s.tasks.open_watch("loop:app1")
+    assert watch and events[-1].task == watch
+    assert s.tasks.get(watch).title == "Watching app1 mail"
+
+
+async def test_enable_twice_keeps_one_watch_task(parts):
+    s = watched(parts)
+    s.enable("app1", IdleSource())
+    first = s.tasks.open_watch("loop:app1")
+    s.enable("app1", IdleSource())
+    assert s.tasks.open_watch("loop:app1") == first
+    assert len(open_watches(s)) == 1
+    s.disable("app1")
+
+
+async def test_disable_ends_the_watch_task(parts):
+    s = watched(parts)
+    s.enable("app1", IdleSource())
+    watch = s.tasks.open_watch("loop:app1")
+    s.disable("app1")
+    row = s.tasks.get(watch)
+    assert (row.state, row.end_reason) == ("stopped", "switched off")
+    assert s.tasks.open_watch("loop:app1") is None
+
+
+async def test_start_gives_an_app_reading_mail_a_watch_task(parts):
+    store, clock, events, mem = parts
+    store.set_on("app1", True)
+    s = watched(parts)
+    s._apps = type("A", (), {"call": None, "tools": lambda self, a: []})()
+    s.start()
+    assert s.tasks.open_watch("loop:app1")
+    s.disable("app1")
+
+
+async def stop_through_tasks(s, task):
+    """Tasks.stop with every hook a no-op but the watch one, as the session wires it."""
+    from job_rows import no_hooks
+
+    s.tasks.hooks = no_hooks(stop_watch=s.task_stopped)
+    return await s.tasks.stop(task, "desktop")
+
+
+async def test_stopping_a_mail_watch_switches_the_app_off_for_good(parts):
+    store, clock, events, mem = parts
+    s = watched(parts)
+    s.enable("app1", IdleSource())
+    task = s.tasks.open_watch("loop:app1")
+    assert await stop_through_tasks(s, task) == [task]
+    assert not s.is_on("app1") and "app1" not in store.on_apps()
+    again = watched(parts)  # a restart: reading stays off, and no Watch task comes back
+    again.start()
+    assert not again.is_on("app1") and again.tasks.open_watch("loop:app1") is None
+
+
+async def test_stop_leaves_held_loops_alone(parts):
+    store, _, _, _ = parts
+    s = watched(parts)
+    s.enable("app1", IdleSource())
+    lp = held(store)
+    await stop_through_tasks(s, s.tasks.open_watch("loop:app1"))
+    assert store.get(lp.id).status == "held"

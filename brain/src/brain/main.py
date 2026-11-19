@@ -339,6 +339,8 @@ async def _run() -> None:
     voice.follow_speech(session.presence.mouth)
     voice.follow_download(lambda: bodies.notify("changed", {"what": "voice_download"}))
     session.loops = loops  # focus and tab events also surface loops
+    loops.tasks = updates.tasks = session.tasks  # the Watch tasks of mail and update checks
+    session.watch_stops += [loops.task_stopped, updates.task_stopped]
     loops.start()  # wakes Scout for a loop already due, and arms the next one
     try:
         try:
