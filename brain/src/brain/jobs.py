@@ -156,7 +156,9 @@ class Jobs:
         self._scout_steps: dict[str, JobActivity] = {}  # job -> writer of Scout's own steps
         self._reserved: dict[str, set[str]] = {}  # job -> part ids promised to starts in flight
         self._starting = 0  # hand-offs waiting on their ask also hold a slot
-        self._stopped: set[str] = set()  # tasks stopped: a start still in flight for one is refused
+        self._stopped: set[str] = (
+            set()
+        )  # tasks stopped while a start is in flight; pruned when none is
         self._progress_sent: dict[str, float] = {}
         self._activity_sent: dict[str, float] = {}
         self._activity_trailing: dict[str, asyncio.Task] = {}
@@ -450,8 +452,6 @@ class Jobs:
                 modes = await run.start(path, resume=resume)
             except Exception as exc:  # ExpertError, or the adapter refusing (e.g. auth required)
                 raise JobError(str(exc) or type(exc).__name__) from exc
-            if (task_id or self.task_of(job_id)) in self._stopped:
-                raise JobError("the task was stopped, so nothing was started")
             if apps and not run.has_grant:
                 # No bridge or no http MCP: the card would promise apps the expert can't reach.
                 raise JobError("this expert can't take connected apps")
@@ -461,6 +461,10 @@ class Jobs:
             else:
                 mode_id = self._pick_mode(mode, modes, run.default_mode)
                 await run.keep_apps(apps)
+            # After the last await before the row exists, so a stop that landed meanwhile (no
+            # row yet to cancel) still refuses the start.
+            if (task_id or self.task_of(job_id)) in self._stopped:
+                raise JobError("the task was stopped, so nothing was started")
             if redo is not None:
                 pass  # the row exists and is active; the run attaches to it
             elif new_job:
@@ -519,6 +523,7 @@ class Jobs:
                 self._reserved.get(job_id, set()).discard(part)
             if slot_held:
                 self._starting -= 1
+            self._prune_stopped()
             if not handed_off:
                 await run.close()
 
@@ -633,6 +638,13 @@ class Jobs:
                 await self.stop(goal.id)
             with suppress(TransitionRefused):  # stopping the parts may already have ended it
                 work.transition(goal.id, "cancelled", reason="task stopped")
+        self._prune_stopped()
+
+    def _prune_stopped(self) -> None:
+        """The stopped set only guards starts still in flight; with none, a new start for a
+        stopped task is refused by its task state, so the ids can go."""
+        if self._starting == 0:
+            self._stopped.clear()
 
     async def shutdown(self) -> None:
         """Stop every running job before the brain exits; one stuck run must not block the rest."""

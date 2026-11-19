@@ -692,6 +692,57 @@ async def test_stop_of_a_queued_job_cancels_it_and_it_never_starts(make_rig, mon
     assert not any(alive(run) for run in rig.runs)
 
 
+async def test_stop_while_the_apps_are_kept_means_it_never_starts(make_rig, monkeypatch):
+    # No goal row exists yet while the expert's apps are narrowed, so only the flag can catch it.
+    rig = make_rig(FakeAsks())
+    gate, entered = asyncio.Event(), asyncio.Event()
+    real = ExpertRun.keep_apps
+
+    async def slow(self, kept):
+        entered.set()
+        await gate.wait()
+        return await real(self, kept)
+
+    monkeypatch.setattr(ExpertRun, "keep_apps", slow)
+    starting = asyncio.ensure_future(rig.jobs.start("go", str(rig.folder), task_id="k1"))
+    await asyncio.wait_for(entered.wait(), 10)
+    await rig.jobs.stop_task("k1")
+    gate.set()
+    with pytest.raises(JobError, match="stopped"):
+        await starting
+    assert rig.records.list_jobs() == [] and rig.jobs.starting == 0
+    await until(lambda: not any(alive(run) for run in rig.runs))
+
+
+async def test_stop_while_the_mode_is_set_means_nothing_is_driven(make_rig, monkeypatch):
+    # The row and run exist, the expert is being told its mode: the stop must not be lost.
+    rig = make_rig(FakeAsks(), shared=True)  # a warm host: release leaves its connection up
+    gate, entered = asyncio.Event(), asyncio.Event()
+    real = ExpertRun.begin
+
+    async def slow(self, mode_id, task):
+        conn = self._host.conn
+        set_mode = conn.set_session_mode
+
+        async def gated(**kw):  # the stop lands while the expert is told its mode
+            entered.set()
+            await gate.wait()
+            return await set_mode(**kw)
+
+        conn.set_session_mode = gated
+        return await real(self, mode_id, task)
+
+    monkeypatch.setattr(ExpertRun, "begin", slow)
+    starting = asyncio.ensure_future(rig.jobs.start("go", str(rig.folder), task_id="k1"))
+    await asyncio.wait_for(entered.wait(), 10)
+    await rig.jobs.stop_task("k1")
+    gate.set()
+    with pytest.raises(JobError, match="stopped"):
+        await starting
+    assert rig.records.running_jobs() == [] and rig.jobs._runs == {}
+    await until(lambda: not any(alive(run) for run in rig.runs))
+
+
 async def test_list_returns_the_last_twenty_newest_first_with_progress(make_rig):
     rig = make_rig(FakeAsks())
     for i in range(22):

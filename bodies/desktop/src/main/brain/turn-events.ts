@@ -160,6 +160,7 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
       ...(p.task !== undefined ? { task: p.task } : {}),
       ...(p.check_back_at !== undefined ? { checkBackAt: p.check_back_at } : {}),
       ...(p.check_back_by !== undefined ? { checkBackBy: p.check_back_by } : {}),
+      ...(p.urgent !== undefined ? { urgent: p.urgent } : {}),
       // The install card draws itself from these; every other card is built from the summary.
       ...(tool === 'install_app' || tool === 'install_expert' ? { facts: p.input ?? {} } : {}),
       // A gate ask's input becomes the card's rows (To, Says), since its words are Scout's own.
