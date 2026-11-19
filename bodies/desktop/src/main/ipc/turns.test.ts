@@ -6,7 +6,7 @@ import type { ContextSnapshot } from '@tagalong/ui/shapes';
 import { IPC } from '../../shared/ipc';
 import { BrainOffline } from '@tagalong/contract';
 import { fakeIpc } from './fake-ipc';
-import { registerTurnIpc } from './turns';
+import { ASK_SELECTION_MAX_CHARS, registerTurnIpc } from './turns';
 
 function setup(
   snapshot: Partial<ContextSnapshot> | null = null,
@@ -97,6 +97,35 @@ describe('registerTurnIpc', () => {
         context: { window: 'a.ts' },
       },
     ]);
+  });
+
+  it('ask with a selection sends it beside the window', async () => {
+    const { invoke, said } = setup({
+      app: { name: 'Code', windowTitle: 'a.ts' },
+      selection: 'the highlighted words',
+    });
+    await invoke(IPC.ask, { petId: 'scout', text: 'what does this say?' });
+    expect(said[0]!.context).toEqual({ window: 'a.ts', selection: 'the highlighted words' });
+  });
+
+  it('ask with no selection sends only the window', async () => {
+    const { invoke, said } = setup({ app: { name: 'Code', windowTitle: 'a.ts' } });
+    await invoke(IPC.ask, { petId: 'scout', text: 'hi' });
+    expect(said[0]!.context).toEqual({ window: 'a.ts' });
+  });
+
+  it('ask with no snapshot sends no context', async () => {
+    const { invoke, said } = setup(null);
+    await invoke(IPC.ask, { petId: 'scout', text: 'hi' });
+    expect(said[0]).not.toHaveProperty('context');
+  });
+
+  it('a selection over the cap is cut and marked', async () => {
+    const { invoke, said } = setup({ selection: 'x'.repeat(ASK_SELECTION_MAX_CHARS + 50) });
+    await invoke(IPC.ask, { petId: 'scout', text: 'hi' });
+    expect(said[0]!.context).toEqual({
+      selection: 'x'.repeat(ASK_SELECTION_MAX_CHARS) + '…[cut]',
+    });
   });
 
   it('ask when the brain is too new rejects with the update sentence', async () => {

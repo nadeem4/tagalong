@@ -1,6 +1,6 @@
 /**
- * IPC for asking and interrupting: both go to the brain over contract v2. Contains
- * registerTurnIpc.
+ * IPC for asking and interrupting: both go to the brain over contract v2. An ask carries the
+ * window title and the selected text (capped) as its context. Contains registerTurnIpc.
  */
 
 import type { Part, SayParams } from '@tagalong/contract';
@@ -30,6 +30,25 @@ interface TurnIpcDeps {
    * Rejects with the sentence to show when it cannot be read.
    */
   takeDrop?: () => Promise<Dropped>;
+}
+
+/** The most selected text an ask carries; a longer one is cut and ends with CUT_MARK. */
+export const ASK_SELECTION_MAX_CHARS = 4000;
+const CUT_MARK = '…[cut]';
+
+/** The context an ask sends: each key only when present, nothing when neither is. */
+function askContext(snapshot: ContextSnapshot | null): SayParams['context'] | undefined {
+  const window = snapshot?.app?.windowTitle;
+  const selection = snapshot?.selection;
+  const context: Record<string, string> = {};
+  if (window !== undefined) context.window = window;
+  if (selection !== undefined && selection !== '') {
+    context.selection =
+      selection.length > ASK_SELECTION_MAX_CHARS
+        ? selection.slice(0, ASK_SELECTION_MAX_CHARS) + CUT_MARK
+        : selection;
+  }
+  return Object.keys(context).length > 0 ? context : undefined;
 }
 
 /** What a dropped item adds to the ask, as parts. */
@@ -63,14 +82,14 @@ export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
       const dropped = input.drop === true && deps.takeDrop ? await deps.takeDrop() : null;
       const parts: Part[] = [];
       if (dropped !== null) parts.push(...droppedParts(dropped));
-      const windowTitle = snapshot?.app?.windowTitle;
+      const context = askContext(snapshot);
       const voice = deps.voice();
       const spoken = input.spoken === true && voice.enabled;
       const say: SayParams = {
         id: crypto.randomUUID(),
         text: input.text ?? '',
         ...(parts.length > 0 ? { parts } : {}),
-        ...(windowTitle !== undefined ? { context: { window: windowTitle } } : {}),
+        ...(context !== undefined ? { context } : {}),
         ...(spoken ? { spoken: true, speed: voice.speed } : {}),
         ...(input.interrupted !== undefined ? { interrupted: input.interrupted } : {}),
       };

@@ -2261,6 +2261,13 @@ prompt need a real browser.
 2. **Expected:** The bubble names Notepad and shows the selection: the active-window binding
    (`get-windows`) and the selection helper (`libnut`) loaded.
 
+### I.3a. The selected text reaches Scout
+
+1. **Action:** In Notepad, type a sentence, select it and press `Ctrl+Shift+Space`, then ask
+   "what does this say?".
+2. **Expected:** Scout quotes the selected sentence. With nothing selected, Scout answers from the
+   window alone. A selection over 4000 characters is read up to that point and marked as cut.
+
 ### I.4. Uninstall keeps your data; reinstall picks it up
 
 1. **Action:** quit Tagalong, uninstall it from Windows **Settings → Apps**, then install it again.
