@@ -1077,3 +1077,17 @@ async def test_cancel_if_only_leaves_a_turn_that_also_holds_another_tasks_events
 def test_cancel_if_only_does_nothing_with_no_turn():
     rig = LoopRig()
     assert rig.runner.cancel_if_only({"k1"}) is False
+
+
+async def test_next_pause_news_is_held_while_another_body_still_talks():
+    rig = LoopRig()
+    rig.presence.speech("desktop", "talking")
+    rig.presence.speech("browser", "talking")
+    rig.news("n1")
+    rig.presence.speech("desktop", "sentence_break", "t0", 1)
+    await ticks()
+    assert rig.session.started == [] and rig.session.told == []
+    rig.presence.speech("browser", "sentence_break", "t0", 1)
+    await ticks()
+    assert rig.turns() == [["n1"]]
+    await rig.runner.stop()

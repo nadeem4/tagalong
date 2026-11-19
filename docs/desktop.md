@@ -953,7 +953,7 @@ The host writes:
 - Settings through `SettingsStore`
   (`settings.json` in `userData`): the avatar position, hotkeys, voice, `walkthrough: { done }`
   (false until Finish or Skip on the first-run tour), `bodyId` (this install's body id, `desktop-` and
-  six hex digits, made by `readOrMakeBodyId` the first time it is read and kept; a saved id that
+  six hex digits, made by `readOrMakeBodyId` the first time it is read and kept, written only by main through `SettingsStore.setBodyId` and not part of `SettingsPatch`; a saved id that
   breaks the contract's pattern is replaced) and the other settings in the schema. See [settings-and-secrets.md](settings-and-secrets.md).
 
 Everything else main holds (`pendingSnapshot`, the dropped item, status marks) is

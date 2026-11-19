@@ -2681,7 +2681,7 @@ Speech state comes from the bodies that play audio. `server.py` maps a body's `s
 frames (`started` to `talking`, `ended` to `sentence_break`, `paused`, `idle`) onto
 `Presence.speech(body_id, state, turn, n)`. Presence keeps the last state per body, and `idle` ends that body's claim. Scout is
 talking while any body plays (`talking()`), and is at a sentence break only when every body that
-reports is at one (`at_break()`), so one body's break never releases another still talking. With no claim,
+reports is at one, `paused` counting as one (`at_break()`; a paused body is silent between sentences, so one left paused cannot block the rest), so one body's break never releases another still talking. The latched break (`break_seen`) is set only when every body is at a break, so `next_pause` news cannot cut across a body still talking. With no claim,
 `Mouth.on_state` is the source (wired in `main.py` through `VoiceService.follow_speech` to
 `Presence.mouth`), which covers a turn another body plays. A body's claim is cleared on its `hello`
 (a reconnect) and when its current connection closes (`speech_gone(body_id)`), so a dead

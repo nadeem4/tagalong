@@ -27,7 +27,7 @@ function stateWith(
     bodies: (['desktop', 'browser', 'whatsapp'] as const).map((kind) => ({
       id: kind,
       kind,
-      name: kind === 'whatsapp' ? 'WhatsApp' : kind === 'desktop' ? 'This PC' : 'Browser',
+      name: kind === 'whatsapp' ? 'WhatsApp' : kind === 'desktop' ? 'This PC' : 'Chrome add-on',
       connected: connected.includes(kind),
     })),
     whatsapp: {
@@ -139,6 +139,20 @@ describe('PlacesView', () => {
     expect(row('Office PC')).toHaveTextContent('Connected');
     expect(row('Laptop')).toHaveTextContent('Connected');
     expect(screen.queryByText('This PC')).not.toBeInTheDocument();
+  });
+
+  it('lists two browsers by name and offers no add-on button', async () => {
+    const state = stateWith({}, ['desktop']);
+    state.bodies = [
+      ...state.bodies.filter((b) => b.kind !== 'browser'),
+      { id: 'chrome-aaaa', kind: 'browser', name: 'Chrome', connected: true },
+      { id: 'edge-bbbb', kind: 'browser', name: 'Edge', connected: true },
+    ];
+    open(state);
+    await screen.findByText('Chrome');
+    expect(row('Chrome')).toHaveTextContent('Connected');
+    expect(row('Edge')).toHaveTextContent('Connected');
+    expect(screen.queryByRole('button', { name: 'Get the add-on' })).not.toBeInTheDocument();
   });
 
   it('Get the add-on opens the tour at its Browser step', async () => {

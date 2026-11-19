@@ -144,14 +144,17 @@ const settingsFields = {
   listening: z.object({ always: z.boolean() }),
   /** Set by Finish or Skip (with a key) only. */
   walkthrough: z.object({ done: z.boolean() }),
-  /**
-   * This install's body id, made once and kept. A saved id that breaks the contract's pattern
-   * reads as absent (the rest of the file stays), so `readOrMakeBodyId` makes a new one.
-   */
-  bodyId: z.string().regex(BODY_ID_PATTERN).optional().catch(undefined),
   /** Folders Scout may list, read and change. Empty means the file tools refuse. */
   fileFolders: z.array(folderEntry),
 };
+
+/**
+ * This install's body id, made once and kept. Not in `settingsFields`, so no patch (and so no
+ * renderer) can rewrite it: only main sets it, through `SettingsStore.setBodyId`. A saved id
+ * that breaks the contract's pattern reads as absent (the rest of the file stays), so
+ * `readOrMakeBodyId` makes a new one.
+ */
+const bodyIdField = z.string().regex(BODY_ID_PATTERN).optional().catch(undefined);
 
 /** Unknown keys in settings.json are dropped on parse. */
 export const Settings = z.object({
@@ -164,7 +167,7 @@ export const Settings = z.object({
   voice: settingsFields.voice.prefault({ ...SETTINGS_DEFAULTS.voice }),
   listening: settingsFields.listening.prefault({ ...SETTINGS_DEFAULTS.listening }),
   walkthrough: settingsFields.walkthrough.prefault({ ...SETTINGS_DEFAULTS.walkthrough }),
-  bodyId: settingsFields.bodyId,
+  bodyId: bodyIdField,
   fileFolders: settingsFields.fileFolders.prefault([]),
 });
 export type Settings = z.infer<typeof Settings>;

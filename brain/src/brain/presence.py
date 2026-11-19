@@ -35,7 +35,10 @@ class Presence:
         if state == "sentence_break":
             if turn is not None and n is not None:
                 self._heard[body_id] = (turn, n)
-            self._break_seen = True
+            # Latched only when every body is between sentences: one body's break must not let
+            # news cut across another still talking.
+            if self.at_break():
+                self._break_seen = True
         self.on_change()
 
     def mouth(self, state: str) -> None:
@@ -58,9 +61,10 @@ class Presence:
 
     def at_break(self) -> bool:
         """Whether the speech playing now sits between two sentences: every body that reports
-        is at a break, so one body's break never cuts across another still talking."""
+        is at a break (a paused body is silent between sentences too, so one left paused cannot
+        block the rest), so one body's break never cuts across another still talking."""
         if self._reported:
-            return all(s == "sentence_break" for s in self._reported.values())
+            return all(s in ("sentence_break", "paused") for s in self._reported.values())
         return self._mouth == "sentence_break"
 
     def heard(self, body_id: str) -> tuple[str, int]:

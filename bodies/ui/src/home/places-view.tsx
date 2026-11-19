@@ -192,9 +192,12 @@ export function PlacesView() {
   const connected = (kind: 'desktop' | 'browser' | 'whatsapp'): boolean =>
     state.bodies.find((body) => body.kind === kind)?.connected === true;
   const wa = state.whatsapp;
-  // Every online desktop is its own row by its own name; with none online, one offline row.
-  const desktops = state.bodies.filter((body) => body.kind === 'desktop' && body.connected);
-  const browser: Standing = connected('browser') ? 'connected' : 'not-set-up';
+  // Every online desktop and browser is its own row by its own name; with none online, one
+  // offline row.
+  const online = (kind: 'desktop' | 'browser') =>
+    state.bodies.filter((body) => body.kind === kind && body.connected);
+  const desktops = online('desktop');
+  const browsers = online('browser');
   const whatsapp: Standing = connected('whatsapp')
     ? 'connected'
     : wa.complete
@@ -228,23 +231,25 @@ export function PlacesView() {
               </Place>
             </li>
           ))}
-          <li className="cx-item">
-            <Place
-              tile="C"
-              name="Chrome add-on"
-              purpose="Scout reads the page you are on, and you can talk to it from the toolbar."
-            >
-              <StandingLabel standing={browser} />
-              {browser !== 'connected' && (
-                <Button
-                  variant="secondary"
-                  onClick={() => void bridge.openWalkthrough(BROWSER_STEP)}
-                >
-                  Get the add-on
-                </Button>
-              )}
-            </Place>
-          </li>
+          {(browsers.length > 0 ? browsers : [null]).map((browser) => (
+            <li className="cx-item" key={browser?.id ?? 'not-set-up'}>
+              <Place
+                tile="C"
+                name={browser?.name ?? 'Chrome add-on'}
+                purpose="Scout reads the page you are on, and you can talk to it from the toolbar."
+              >
+                <StandingLabel standing={browser !== null ? 'connected' : 'not-set-up'} />
+                {browser === null && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => void bridge.openWalkthrough(BROWSER_STEP)}
+                  >
+                    Get the add-on
+                  </Button>
+                )}
+              </Place>
+            </li>
+          ))}
           <li className="cx-item">
             <Place
               tile="W"

@@ -156,3 +156,21 @@ def test_a_body_that_leaves_no_longer_holds_the_break():
     rig.p.speech("b", "talking")
     rig.p.speech_gone("b")
     assert rig.p.at_break()
+
+
+def test_one_body_at_a_break_while_another_talks_latches_no_break():
+    rig = Rig()
+    rig.p.speech("b", "talking")
+    rig.p.speech("a", "sentence_break", "t1", 1)
+    assert not rig.p.break_seen()
+    rig.p.speech("b", "sentence_break", "t1", 1)  # now every body is at one
+    assert rig.p.break_seen()
+
+
+def test_a_paused_body_counts_as_at_a_break():
+    rig = Rig()
+    rig.p.speech("a", "paused")
+    rig.p.speech("b", "sentence_break", "t1", 1)
+    assert rig.p.at_break()
+    rig.p.speech("b", "talking")
+    assert not rig.p.at_break()

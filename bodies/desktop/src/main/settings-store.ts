@@ -51,7 +51,15 @@ export class SettingsStore {
       throw new Error(`Invalid settings patch:\n${describeIssues(parsedPatch.error.issues)}`);
     }
 
-    const merged = Settings.parse({ ...this.get(), ...parsedPatch.data });
+    return this.#save(Settings.parse({ ...this.get(), ...parsedPatch.data }));
+  }
+
+  /** The one way to write the install id: main only, never through a settings patch. */
+  setBodyId(bodyId: string): Settings {
+    return this.#save(Settings.parse({ ...this.get(), bodyId }));
+  }
+
+  #save(merged: Settings): Settings {
     mkdirSync(this.#dataDir, { recursive: true });
     const temp = `${this.#file}.tmp`;
     writeFileSync(temp, `${JSON.stringify(merged, null, 2)}\n`, 'utf8');
@@ -102,6 +110,6 @@ export function readOrMakeBodyId(store: SettingsStore): string {
   const saved = store.get().bodyId;
   if (saved !== undefined) return saved;
   const id = `desktop-${randomBytes(3).toString('hex')}`;
-  store.set({ bodyId: id });
+  store.setBodyId(id);
   return id;
 }

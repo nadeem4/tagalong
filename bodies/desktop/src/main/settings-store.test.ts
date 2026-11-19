@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { SETTINGS_DEFAULTS } from '../shared/settings';
+import { SETTINGS_DEFAULTS, SettingsPatch } from '../shared/settings';
 import { SETTINGS_FILENAME, SettingsStore, readOrMakeBodyId } from './settings-store';
 
 let dataDir: string;
@@ -45,6 +45,16 @@ describe('readOrMakeBodyId', () => {
     const saved = new SettingsStore(dataDir).get();
     expect(saved.bodyId).toBe(id);
     expect(saved.walkthrough.done).toBe(true);
+  });
+});
+
+describe('bodyId is main-only', () => {
+  it('a settings patch cannot set it', () => {
+    const store = new SettingsStore(dataDir);
+    const id = readOrMakeBodyId(store);
+    expect(SettingsPatch.parse({ bodyId: 'desktop-aaaaaa' })).toEqual({});
+    store.set({ bodyId: 'desktop-aaaaaa' } as SettingsPatch);
+    expect(store.get().bodyId).toBe(id);
   });
 });
 
