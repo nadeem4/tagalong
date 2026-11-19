@@ -1464,6 +1464,16 @@ async def test_watch_list_leaves_out_the_loops_daily_digest(trun):
     assert [w["id"] for w in listed] == [made["id"]]
 
 
+async def test_a_watch_added_in_a_task_belongs_to_it(trun):
+    tid = trun.tasks.open("do", "desktop-1")
+    made = json.loads(
+        await trun("watch", {"action": "add", "note": "w", "every_minutes": 10, "task_id": tid})
+    )
+    assert trun.work.get(made["id"]).task_id == tid
+    with pytest.raises(MemoryRefused, match="no open task"):
+        await trun("watch", {"action": "add", "note": "w", "every_minutes": 10, "task_id": "x"})
+
+
 async def test_cancel_timer_takes_string_id(trun):
     await trun("set_timer", {"note": "n", "in_minutes": 5})
     tid = _timers(trun)[0].id

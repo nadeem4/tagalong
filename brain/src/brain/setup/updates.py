@@ -7,6 +7,8 @@ itself only for a group the person left on (Official on, Community off at first)
 changed while a job runs: a due update waits in a queue and `tick` applies it once the job ends.
 Last-checked time and the latest versions seen live in `cache/updates.json`, so a restart keeps
 them. Failures are logged and shown on the row; the old version stays.
+The daily check is one Watch task ("Checking for updates"): stopping it pauses the check until the
+next start, never an update already queued or running. A check posts no news, so nothing names it.
 """
 
 import asyncio
@@ -18,7 +20,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from brain.apps import AppRow
 from brain.memory import Memory
@@ -28,7 +30,11 @@ from brain.setup.store import ExpertStore, InstalledExpert
 from brain.setup.trust import is_official_expert
 from brain.store.settings import get_setting, set_setting
 
+if TYPE_CHECKING:
+    from brain.tasks import Tasks
+
 log = logging.getLogger("brain")
+WATCH_SOURCE = "updates"
 Kind = Literal["app", "expert"]
 Key = tuple[str, str]
 DAILY = timedelta(hours=24)
@@ -180,6 +186,8 @@ class Updates:
         self._queue: list[Key] = []
         self._drain_task: asyncio.Task | None = None
         self._applying = asyncio.Lock()  # held while one update is swapped in
+        self.tasks: Tasks | None = None  # set by main once the session has built it
+        self._paused = False  # the person stopped the Watch task: no more daily checks
 
     # ---- the saved check ----
 
@@ -279,12 +287,23 @@ class Updates:
     async def tick(self) -> None:
         """The brain's heartbeat: the daily check when due (read afresh, a cached answer would
         hide the update), else any update that was waiting for a job to end."""
-        if self._due():
+        if self._due() and not self._paused:
             await self.check(refresh=True)
         else:
             self._kick()
 
+    def watch(self) -> None:
+        """Open the Watch task the daily check runs under (one, however often this is called)."""
+        if self.tasks:
+            self.tasks.watching(WATCH_SOURCE, "Checking for updates")
+
+    def task_stopped(self, task_id: str) -> None:
+        row = self.tasks.get(task_id) if self.tasks else None
+        if row and row.kind == "watch" and row.source == WATCH_SOURCE:
+            self._paused = True
+
     async def run(self) -> None:
+        self.watch()
         while True:
             try:
                 await self.tick()

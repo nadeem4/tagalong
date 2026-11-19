@@ -515,3 +515,50 @@ async def test_quiet_waits_while_an_update_is_being_applied(rig):
 async def test_quiet_returns_at_once_when_nothing_is_applying(rig):
     r = rig()
     await asyncio.wait_for(r.updates.quiet(), 1)
+
+
+# --- the daily check is one Watch task (T3c) ---
+
+
+def watched(r):
+    from brain.tasks import Tasks
+
+    r.updates.tasks = Tasks(r.memory.db, lambda t: t, lambda: r.clock.now)
+    return r.updates
+
+
+async def test_the_daily_check_runs_under_one_watch_task(rig):
+    r = rig()
+    u = watched(r)
+    u.watch()
+    u.watch()  # armed again: still one
+    task = u.tasks.open_watch("updates")
+    assert task and u.tasks.get(task).title == "Checking for updates"
+    assert len([t for t in u.tasks.open_block().splitlines() if " watch " in t]) == 1
+
+
+async def test_run_arms_the_watch_task(rig):
+    r = rig()
+    u = watched(r)
+    loop = asyncio.ensure_future(u.run())
+    await asyncio.sleep(0.05)
+    loop.cancel()
+    await asyncio.gather(loop, return_exceptions=True)
+    assert u.tasks.open_watch("updates")
+
+
+async def test_stopping_the_update_watch_pauses_checks_not_installs(rig):
+    r = rig()
+    r.store.add(expert("1.2.0"))
+    u = watched(r)
+    u.watch()
+    r.running = True
+    await u.check(refresh=False)  # an update is queued and waiting for the job
+    u.task_stopped(u.tasks.open_watch("updates"))
+    r.running = False
+    r.clock.now += timedelta(days=2)  # the daily check is due
+    last = u._last
+    await u.tick()
+    await u.wait()
+    assert r.reinstalled == ["claude-acp"]  # the queued install still ran
+    assert u._last == last  # but no new check was made
