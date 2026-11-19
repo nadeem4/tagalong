@@ -658,12 +658,16 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
   the open task the call names by `task_id`, else a new Do task for the turn titled from `task`,
   put in the waiting state. The card belongs to that task and the approved call carries its
   `task_id`, so the job runs under the same task. A task the gate made ends `stopped` when the card
-  is refused, expires, is refused in the turn, or the handler fails to start. A task no person
+  is refused, expires, is refused in the turn, ends in any way but approved before the handler
+  runs (a restart, a secret held, the tool gone, a failed start), or the handler fails to start. A task no person
   began (see the one person-task rule above) raises the gate to `person_only`: no standing rule and
   no side-check approves it, only the person's yes starts the work. A person's task asks at the
   usual tier. The card's facts are task, folder, expert, mode and apps; its options are Allow,
-  Deny, Not now and Stop task. Two identical `hand_off` calls in one turn each claim a task and so
-  open two cards.
+  Deny, Not now and Stop task. The same `hand_off` again is the same card: `AskRunner.find` compares
+  the saved calls with `task_id` and `new_task` left out, and the gate reuses the open card's task
+  instead of making another, so two identical calls make one card and one task; a repeat with
+  `check_back_minutes` moves that card's check-back. An unknown `mode` is found only after the
+  person approves, so Scout names a mode only from an earlier result's offered list.
 - **Claude Code's permission asks.** `Jobs._permission` builds an `expert_request` ask (tier
   `ask`, group `<expert>:<folder>`) with the expert's own option names on the card and gives it
   to the engine. A standing rule or Scout's grant answers with the expert's allow-once option (an

@@ -34,6 +34,11 @@ log = logging.getLogger(__name__)
 KIND = "ask"
 
 
+def _bare(input: dict) -> dict:
+    """A call's own arguments: the task the gate gave it is not part of what it asks."""
+    return {k: v for k, v in input.items() if k not in ("task_id", NEW_TASK_ARG)}
+
+
 def _call(item: OpenItem) -> Call:
     saved = item.saved_call or {}
     return Call(
@@ -109,7 +114,7 @@ class AskRunner:
             "masked": saved != raw,
         }
         at = None if check_back is None else self._now() + check_back
-        item = self._items.find_open(KIND, {"name": saved["name"], "input": saved["input"]})
+        item = self.find(call.name, call.input)
         if item is not None:
             if at is not None:
                 try:
@@ -137,6 +142,17 @@ class AskRunner:
         )  # fmt: skip
         self.changed()
         return item
+
+    def find(self, name: str, input: dict) -> OpenItem | None:
+        """The open card for this same call, whatever task the gate gave each try: the call's
+        own arguments are compared, not its task_id or new_task."""
+        saved = self._approvals.mask({"name": name, "input": input, "text": ""})
+        want = _bare(saved["input"])
+        for item in self._items.list_open(KIND):
+            c = item.saved_call or {}
+            if c.get("name") == saved["name"] and _bare(c.get("input") or {}) == want:
+                return item
+        return None
 
     def _card_task(self, item: OpenItem) -> dict | None:
         """The fields a task's card carries: the task, and when it will be looked at again."""
@@ -262,7 +278,7 @@ class AskRunner:
         """Close the item and wake Scout with what happened; he words it."""
         self._items.finish(item.id, outcome)
         self._raw.pop(item.id, None)
-        if outcome == "refused":
+        if outcome != "approved":  # refused or failed before the call ran: the task has no work
             self._drop_new_task(item, reason)
         call = _call(item)
         facts: dict[str, str | int] = {

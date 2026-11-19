@@ -49,8 +49,12 @@ class Bodies:
 
 
 class Source:
-    def __init__(self, *names, effect="change"):
-        self._specs = [ToolSpec(n, f"{n} tool", {"type": "object"}, effect=effect) for n in names]
+    def __init__(self, *names, effect="change", task_kinds=None):
+        kinds = task_kinds or {}
+        self._specs = [
+            ToolSpec(n, f"{n} tool", {"type": "object"}, effect=effect, task_kind=kinds.get(n))
+            for n in names
+        ]
         self.ran: list[tuple[str, dict]] = []
 
     def specs(self):
@@ -89,7 +93,7 @@ class Rig:
         )
         if self.tasks.get("k1") is None:  # the task turn t1 works on
             self.tasks.open("do", "desktop", id="k1", title="Fix it")
-        self.source = Source("t", effect=effect)
+        self.source = Source("t", "h", effect=effect, task_kinds={"h": "do"})
         self.engine = Engine(
             [StandingRule(stored_auto_rules(lambda: self.stored)), Person()],
             self.approvals,
@@ -118,6 +122,7 @@ class Rig:
             self.asks,
             self.engine,
             runner=self.runner,
+            tasks=self.tasks,
         )
 
     def opened(self):
@@ -214,6 +219,50 @@ async def test_the_same_call_again_is_the_same_open_item():
     again = await rig.box.run(call(text="Again."))
     assert first == again
     assert len(rig.items.list_open(kind="ask")) == 1 and len(rig.opened()) == 1
+
+
+def hand(extra=None, id="h1"):
+    return Call(id=id, name="h", input={"n": 1, **(extra or {})}, turn="t1", text="Handing off.")
+
+
+def do_tasks(rig):
+    return rig.memory.db.execute("SELECT COUNT(*) FROM tasks WHERE kind='do'").fetchone()[0]
+
+
+async def test_two_identical_hand_offs_in_a_turn_are_one_card_and_one_task():
+    rig = Rig()
+    before = do_tasks(rig)
+    first = await rig.box.run(hand())
+    again = await rig.box.run(hand(id="h2"))
+    assert first == again
+    assert len(rig.items.list_open(kind="ask")) == 1 and len(rig.opened()) == 1
+    assert do_tasks(rig) == before + 1
+
+
+async def test_a_repeat_hand_off_after_card_due_moves_the_check_back_on_the_same_card():
+    rig = Rig()
+    await rig.box.run(hand())
+    [card] = rig.opened()
+    rig.clock[0] = NOW + timedelta(days=2, minutes=1)
+    rig.runner.fire_due()
+    assert rig.items.get(card["id"]).check_back_at is None
+    await rig.box.run(hand({"check_back_minutes": 30}, id="h2"))
+    assert len(rig.items.list_open(kind="ask")) == 1
+    assert rig.items.get(card["id"]).check_back_at == rig.clock[0] + timedelta(minutes=30)
+
+
+async def test_a_restart_that_closes_an_answered_hand_off_drops_its_new_task():
+    rig = Rig()
+    before = do_tasks(rig)
+    await rig.box.run(hand())
+    [card] = rig.opened()
+    item = rig.items.get(card["id"])
+    assert rig.tasks.get(item.task_id).state == "waiting"
+    rig.items.answer(card["id"], "allow", "desktop")  # answered, then the brain restarts
+    again = Rig(rig.memory, clock=rig.clock)
+    again.runner.start()
+    assert again.tasks.get(item.task_id).state == "stopped"
+    assert do_tasks(again) == before + 1
 
 
 async def test_a_tool_turned_off_since_refuses_the_late_yes():

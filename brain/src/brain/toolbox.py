@@ -535,6 +535,10 @@ class Toolbox:
         `kind` task for the turn (marked, so a call that never runs ends it)."""
         assert self._tasks is not None
         given = call.input.get("task_id")
+        if given is None and self._runner is not None:
+            # The same call is already a card: it belongs to that card's task, not a new one.
+            card = self._runner.find(call.name, call.input)
+            given = None if card is None else card.task_id
         title = call.input.get("task")
         try:
             tid = self._tasks.claim(

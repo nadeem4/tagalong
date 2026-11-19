@@ -466,6 +466,7 @@ def test_expert_model_tool_schemas(home):
     assert "list_jobs" not in tools  # Home only; Scout reads work_status instead
     described = {t["name"]: t["description"] for t in home.box.model_tools()}
     assert "never guess" in described["hand_off"]
+    assert "only from an earlier result" in described["hand_off"]
     assert "fresh" in described["hand_off"] and "same folder" in described["hand_off"]
 
 
@@ -498,6 +499,9 @@ class _Cards:
 
     def __init__(self):
         self.calls = []
+
+    def find(self, name, input):
+        return None
 
     def open(self, call, req, wait, **kw):
         self.calls.append(call)
