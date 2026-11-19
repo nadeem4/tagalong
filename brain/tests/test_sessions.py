@@ -3988,6 +3988,21 @@ async def test_a_wake_turn_names_its_tasks_and_a_say_turn_names_none():
     assert "tasks" not in started
 
 
+async def test_a_joined_frame_names_the_task_not_the_ask():
+    gate = asyncio.Event()
+    session, sent = make(Gate([gate, "ok", "ok"]))
+    first = await said(session, sent, "desktop", say("a"))
+    await session.say("desktop", SayParams(id="s2", text="b"))  # its Ask is never named
+    do = session.tasks.open("do", "desktop", title="tidy")
+    session.events.post(Event("say", "desktop", {"text": "c"}, id="s3", task=do))
+    gate.set()
+    await finish(session)
+    joined = {p["events"][0]: p for m, p in sent if m == "turn" and p["state"] == "joined"}
+    assert first.turn == joined["s2"]["turn"]
+    assert joined["s2"] is joined["s3"]  # one frame took both: the Ask is left out
+    assert joined["s3"]["tasks"] == [{"id": do, "kind": "do", "title": "tidy"}]
+
+
 async def test_a_duplicate_say_id_opens_one_ask():
     session, _ = make(Gate(["ok"]))
     first = say("hi")

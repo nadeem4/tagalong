@@ -56,6 +56,12 @@ async def test_tasks_list_chain_stops_at_the_depth_cap(rig):
     assert len(row["chain"]) == 5
 
 
+async def test_tasks_list_chain_is_empty_when_the_cause_was_swept(rig):
+    rig.tasks.open("do", "job:j1", caused_by="gone", title="orphan")
+    [row] = await rig.rows()
+    assert row["caused_by"] == "gone" and row["chain"] == []
+
+
 async def test_tasks_list_leaves_out_ask_tasks(rig):
     rig.tasks.open("ask", "desktop")
     watch = rig.tasks.open("watch", "loop:gmail", title="Watching Gmail")
