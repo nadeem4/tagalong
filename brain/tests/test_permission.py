@@ -6,8 +6,9 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from ask_log import approvals_on, list_approvals
 
-from brain.asks import Answer, AskExpired
+from brain.asks import AskExpired
 from brain.experts import PermissionOption
+from brain.holds import Reply
 from brain.memory import Memory
 from brain.mind.turn import Call
 from brain.permission import (
@@ -21,7 +22,6 @@ from brain.permission import (
     Decision,
     Engine,
     Grant,
-    NoOneThere,
     Person,
     PersonAnswer,
     Refusal,
@@ -146,7 +146,6 @@ def answering(choice, option_id=None, raises=None):
         (answering("allow", "o1"), Grant("person", option_id="o1")),
         (answering("always"), Grant("person", always=True)),
         (answering("deny", "o2"), Refusal("denied", "the person said no", "o2")),
-        (answering("allow", raises=NoOneThere()), Refusal("no_one", "nobody online")),
         (
             answering("allow", raises=AskExpired("job ended: done")),
             Refusal("expired", "job ended: done"),
@@ -219,7 +218,7 @@ async def test_expert_asker_maps_option_kinds():
 
     async def open_ask(**kw):
         chosen["kw"] = kw
-        return Answer(chosen["pick"])
+        return Reply(chosen["pick"])
 
     how = expert_asker(open_ask, "edit", {"f": 1}, OPTIONS, "a1")
     for pick, expected in [
@@ -236,9 +235,6 @@ async def test_expert_asker_maps_option_kinds():
         "input": {"f": 1},
         "options": ["Allow once", "Allow always", "Reject"],
     }
-    chosen["pick"] = None
-    with pytest.raises(NoOneThere):
-        await how()
 
 
 # --- Engine.decide -------------------------------------------------------------

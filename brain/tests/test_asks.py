@@ -41,104 +41,8 @@ async def opened(bodies: FakeBodies) -> dict:
     raise AssertionError("no ask was opened")
 
 
-async def test_open_ask_shape_and_allow():
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
-    params = await opened(bodies)
-    assert bodies.sent[0][0] == "ask"
-    assert params == {
-        "id": params["id"],
-        "state": "open",
-        "turn": "t1",
-        "text": "Opening it.",
-        "options": ["allow", "always", "deny"],
-        "confirm": True,
-        "tool": "desktop__x",
-        "input": {"a": 1},
-    }
-    asks.answer(params["id"], "allow", "desktop")
-    assert await task == "allow"
-
-
-async def test_locked_tool_offers_two_options():
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.permission(call(), "desktop__x", True))
-    params = await opened(bodies)
-    assert params["options"] == ["allow", "deny"]
-    asks.answer(params["id"], "deny", "desktop")
-    assert await task == "deny"
-
-
-async def test_always_returns_always():
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
-    params = await opened(bodies)
-    asks.answer(params["id"], "always", "desktop")
-    assert await task == "always"
-
-
-async def test_second_answer_gets_not_found():
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
-    params = await opened(bodies)
-    asks.answer(params["id"], "allow", "desktop")
-    with pytest.raises(RpcError) as err:
-        asks.answer(params["id"], "deny", "extension")
-    assert err.value.code == ErrorCode.not_found
-    assert await task == "allow"
-
-
-async def test_answer_with_unoffered_option_is_invalid_params():
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.permission(call(), "desktop__x", True))
-    params = await opened(bodies)
-    with pytest.raises(RpcError) as err:
-        asks.answer(params["id"], "always", "desktop")
-    assert err.value.code == ErrorCode.invalid_params
-    asks.answer(params["id"], "allow", "desktop")  # still open after the bad answer
-    assert await task == "allow"
-
-
-async def test_ask_with_nobody_online_stays_open_without_a_frame_to_anyone():
-    bodies = FakeBodies(online=[])
-    work = fresh_work()
-    asks = Asks(bodies, work)
-    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
-    await asyncio.sleep(0)
-    assert asks.anyone_online() is False
-    assert [a["tool"] for a in asks.open_asks()] == ["desktop__x"]  # kept for a body that joins
-    assert not task.done()
-    task.cancel()
-
-
 def test_anyone_online_follows_bodies():
     assert Asks(FakeBodies(["desktop"]), fresh_work()).anyone_online() is True
-
-
-async def test_ask_with_only_a_display_less_body_online_stays_open_too():
-    bodies = FakeBodies(online=["browser"])
-    bodies.headless = {"browser"}
-    asks = Asks(bodies, fresh_work())
-    assert asks.anyone_online() is False
-    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
-    await asyncio.sleep(0)
-    assert len(asks.open_asks()) == 1
-    task.cancel()
-
-
-async def test_ask_opens_when_a_displaying_body_is_online():
-    bodies = FakeBodies(online=["browser", "desktop"])
-    bodies.headless = {"browser"}
-    asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
-    params = await opened(bodies)
-    asks.answer(params["id"], "allow", "desktop")
-    assert await task == "allow"
 
 
 async def test_timeout_closes_ask_and_raises_timeout():
@@ -152,29 +56,12 @@ async def test_timeout_closes_ask_and_raises_timeout():
     assert asks.open_asks() == []
 
 
-async def test_cancel_closes_ask_with_cancelled_and_forgets_it():
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
-    params = await opened(bodies)
-    task.cancel()
-    with pytest.raises(asyncio.CancelledError):
-        await task
-    closed = bodies.sent[-1][1]
-    assert closed == {"id": params["id"], "state": "closed", "reason": "cancelled"}
-    assert asks.open_asks() == []
-    with pytest.raises(RpcError) as err:
-        asks.answer(params["id"], "allow", "desktop")
-    assert err.value.code == ErrorCode.not_found
-
-
 async def test_closed_frame_names_the_answering_body():
     bodies = FakeBodies()
     asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
+    asks.show("a1", call(), "desktop__x", False)
     params = await opened(bodies)
     asks.answer(params["id"], "allow", "extension")
-    await task
     assert bodies.sent[-1][1] == {
         "id": params["id"],
         "state": "closed",
@@ -187,23 +74,21 @@ async def test_closed_frame_names_the_answering_body():
 async def test_open_asks_lists_only_open():
     bodies = FakeBodies()
     asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
+    asks.show("a1", call(), "desktop__x", False)
     params = await opened(bodies)
     assert asks.open_asks() == [params]
     asks.answer(params["id"], "deny", "desktop")
-    await task
     assert asks.open_asks() == []
 
 
 async def test_open_asks_returns_copies():
     bodies = FakeBodies()
     asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
+    asks.show("a1", call(), "desktop__x", False)
     params = await opened(bodies)
     asks.open_asks()[0]["options"] = ["tampered"]
     assert asks.open_asks()[0]["options"] == ["allow", "always", "deny"]
     asks.answer(params["id"], "deny", "desktop")
-    await task
 
 
 async def test_answer_after_timeout_is_not_found():
@@ -481,20 +366,6 @@ async def test_ask_of_a_missing_or_ended_job_is_a_root():
     await task
 
 
-async def test_answered_ask_done_with_the_option_in_its_event():
-    bodies = FakeBodies()
-    work = fresh_work()
-    asks = Asks(bodies, work)
-    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
-    params = await opened(bodies)
-    asks.answer(params["id"], "always", "desktop")
-    await task
-    row = work.get(params["id"])
-    assert (row.state, row.end_reason) == ("done", "answered")
-    assert work.events(params["id"])[-1].data["option"] == "always"
-    assert work.ask_detail(params["id"])["decided_by"] is None  # the log is written by Approvals
-
-
 async def test_timed_out_and_cancelled_asks_expire():
     bodies = FakeBodies()
     work = fresh_work()
@@ -559,27 +430,13 @@ async def test_ask_logs_open_show_answer(caplog):
     caplog.set_level("INFO", logger="brain.asks")
     bodies = FakeBodies()
     asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
+    asks.show("a1", call(), "desktop__x", False)
     params = await opened(bodies)
     asks.answer(params["id"], "allow", "desktop")
-    await task
     lines = _ask_lines(caplog)
     assert [ln.split()[0] for ln in lines] == ["ask.opened", "ask.shown", "ask.answered"]
     assert all(f"id={params['id']}" in ln for ln in lines)
     assert "by=desktop" in lines[2] and "why=allow" in lines[2]
-
-
-async def test_cancel_close_is_logged_with_reason_cancelled(caplog):
-    caplog.set_level("INFO", logger="brain.asks")
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
-    params = await opened(bodies)
-    task.cancel()
-    with pytest.raises(asyncio.CancelledError):
-        await task
-    [closed] = [ln for ln in _ask_lines(caplog) if ln.startswith("ask.closed")]
-    assert f"id={params['id']}" in closed and "why=cancelled" in closed
 
 
 def test_a_task_card_adds_not_now_and_stop_task_after_its_own_options():

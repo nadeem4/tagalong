@@ -10,6 +10,7 @@ import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
+from typing import NamedTuple
 
 import pytest
 from ask_log import approvals_on, list_approvals
@@ -17,10 +18,11 @@ from fake_clock import FakeClock
 from fake_engine import FakeEngine
 from job_rows import add_timer, end_job, tasks_for
 
-from brain.asks import Answer, AskExpired
+from brain.asks import AskExpired, Asks
 from brain.events import Event, EventLog
 from brain.experts import ExpertHost, ExpertHosts, ExpertRun, Question, QuestionField
 from brain.guards import Guards
+from brain.holds import Holds
 from brain.job_records import Job, JobPart, JobRecords
 from brain.jobs import JobError, Jobs, job_note
 from brain.masking import Masker, mask_secrets
@@ -32,6 +34,7 @@ from brain.setup.store import InstalledExpert
 from brain.store import rules
 from brain.store.events import list_state
 from brain.store.work import ActivityEntry, WorkStore
+from brain.tasks import Tasks
 from brain.tools import work_tools
 
 AGENT = Path(__file__).parent / "fake_acp_agent.py"
@@ -45,41 +48,55 @@ def installed(id="claude-acp", **kw) -> InstalledExpert:
     return InstalledExpert(**{**base, "logged_in": True, **kw})
 
 
+class Answer(NamedTuple):
+    """A scripted answer to a card: the option picked and any typed text."""
+
+    option: str | None
+    text: str | None = None
+
+
 class FakeAsks:
-    """open() pops the next scripted answer; None in the script blocks until cancelled."""
+    """The bodies behind the real Asks and Holds: shows each card and answers it from the script.
+
+    Each card shown takes the next entry: an Answer is answered through `Asks.answer` like a
+    body would, an AskExpired ends the ask's row as its job closing does, an RpcError cancels
+    the hold, and None (or an empty script) leaves the card open until something ends it.
+    """
 
     def __init__(self, *answers) -> None:
         self.script = list(answers)
         self.opened: list[dict] = []
         self.open_ids: set[str] = set()
         self.closed_by_cancel: list[str] = []
-        self.cancel_all_calls: list[list[str]] = []
         self.online = True
+        self.rig: Rig | None = None  # set by the Rig that builds the Asks and Holds over this
 
-    def anyone_online(self) -> bool:
-        return self.online
+    def display_ids(self) -> list[str]:
+        return ["desktop"] if self.online else []
 
-    async def open(self, **kw):
-        self.opened.append(kw)
-        if not kw.get("stay_open") and not self.online:
-            return Answer(None)  # a question finds nobody; a permission ask stays open
-        ask_id = kw["ask_id"]
-        self.open_ids.add(ask_id)
-        try:
-            answer = self.script.pop(0) if self.script else None
-            if answer is None:
-                await asyncio.Event().wait()
-            if isinstance(answer, Exception):
-                raise answer
-            return answer
-        except asyncio.CancelledError:
-            self.closed_by_cancel.append(ask_id)
-            raise
-        finally:
-            self.open_ids.discard(ask_id)
+    def notify(self, method: str, params: dict) -> None:
+        if method != "ask":
+            return
+        if params["state"] == "closed":
+            self.open_ids.discard(params["id"])
+            if params.get("reason") == "cancelled":
+                self.closed_by_cancel.append(params["id"])
+            return
+        if params["id"] in self.open_ids:
+            return  # the same card shown again (a new check-back time)
+        self.opened.append({**params, "ask_id": params["id"]})
+        self.open_ids.add(params["id"])
+        entry = self.script.pop(0) if self.script else None
+        self._respond(params["id"], entry)  # at once, as a person already at the screen would
 
-    def cancel_all(self, ask_ids) -> None:
-        self.cancel_all_calls.append(list(ask_ids))
+    def _respond(self, ask_id: str, entry) -> None:
+        rig = self.rig
+        if isinstance(entry, Answer):
+            rig.asks_real.answer(ask_id, entry.option or "", "desktop", entry.text)
+        elif isinstance(entry, AskExpired):
+            rig.records.work.settle(ask_id, "expired", entry.reason)
+        elif isinstance(entry, Exception):
+            rig.holds._cancel(ask_id)
 
 
 class FakeScout:
@@ -203,9 +220,13 @@ class Rig:
         self.records = JobRecords(
             WorkStore(self.memory.db, lambda: self.wall), self.memory.db, lambda: self.wall
         )
+        asks.rig = self
+        self.asks_real = Asks(asks, self.records.work)
+        self.tasks = Tasks(self.memory.db, lambda text: text, lambda: self.wall, items=self.items)
+        self.holds = Holds(self.asks_real, self.records.work, self.items, self.tasks)
         self.jobs = Jobs(
             self.records,
-            asks,
+            self.holds,
             lambda method, params: self.notes.append((method, params)),
             lambda: self.experts,
             self.hosts if shared else self.make_run,
@@ -435,9 +456,9 @@ async def test_a_job_counts_once_so_a_second_hand_off_fits_under_the_cap(make_ri
     assert second and await first
 
 
-async def test_unanswered_permission_is_cancelled(make_rig):
+async def test_a_cancelled_permission_cancels_the_experts_request(make_rig):
     steps = [{"permission": {"title": "rm x"}}]
-    rig = make_rig(FakeAsks(Answer(None)), steps)
+    rig = make_rig(FakeAsks(RpcError(ErrorCode.cancelled, "cancelled")), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))
@@ -468,9 +489,9 @@ async def test_typed_text_wins_over_the_option(make_rig):
     assert reply["result"]["content"] == {"question_0_custom": "teal"}
 
 
-async def test_unanswered_question_cancels(make_rig):
+async def test_a_cancelled_question_cancels_the_experts_question(make_rig):
     steps = [{"question": {"message": "?", "options": ["A"]}}]
-    rig = make_rig(FakeAsks(Answer(None)), steps)
+    rig = make_rig(FakeAsks(RpcError(ErrorCode.cancelled, "cancelled")), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     reply = next(f for f in rig.frames() if f.get("result", {}).get("action"))
@@ -618,7 +639,7 @@ async def test_stop_closes_open_asks_and_marks_stopped(make_rig):
     await rig.jobs.stop(job_id)
     job = rig.records.get_job(job_id)
     assert job.state == "cancelled" and job.ended_at
-    assert open_id in rig.asks.closed_by_cancel or [open_id] in rig.asks.cancel_all_calls
+    assert open_id in rig.asks.closed_by_cancel
     assert rig.changed() > before
     assert rig.finished[0].state == "cancelled"
     with pytest.raises(JobError, match="not running"):
@@ -815,7 +836,7 @@ async def test_scout_pass_opens_the_users_question_card_as_before(make_rig):
 
 async def test_ask_with_nobody_online_skips_scout_and_cancels(make_rig):
     scout = FakeScout({"question_0": "Blue"})
-    asks = FakeAsks(Answer(None))
+    asks = FakeAsks()
     rig = make_rig(asks, ASK_COLOUR, scout=scout)
     await rig.jobs.start("go", str(rig.folder))
     asks.online = False
@@ -2284,15 +2305,17 @@ async def test_two_parts_running_keep_separate_asks_and_sessions(make_rig):
     p1, p2 = rig.records.get_job(job).parts
     assert p1.session_id and p2.session_id
     assert rig.jobs._runs[job]["p1"] is not rig.jobs._runs[job]["p2"]  # one expert process each
-    a1 = asyncio.create_task(rig.jobs._open_ask(job_id=job, part="p1", text="a"))
-    a2 = asyncio.create_task(rig.jobs._open_ask(job_id=job, part="p2", text="b"))
+    hold = rig.holds.ask
+    a1 = asyncio.create_task(hold(kind="question", job_id=job, part="p1", text="a", options=["x"]))
+    a2 = asyncio.create_task(hold(kind="question", job_id=job, part="p2", text="b", options=["x"]))
     await until(lambda: len(rig.asks.open_ids) == 2)
+    p1_card, p2_card = (c["ask_id"] for c in rig.asks.opened)
     await rig.jobs.stop(job, "p1")
     await until(lambda: rig.records.get_job(job).parts[0].state == "cancelled")
     got = rig.records.get_job(job)
     assert (got.state, got.parts[1].state) == ("active", "active")  # the job still runs
-    assert len(rig.asks.cancel_all_calls[-1]) == 1  # only p1's ask was cancelled
-    assert len(rig.jobs._ask_ids[(job, "p2")]) == 1
+    assert rig.asks.closed_by_cancel == [p1_card]  # only p1's ask was cancelled
+    assert rig.asks.open_ids == {p2_card}
     for task in (a1, a2):
         task.cancel()
 
@@ -2843,14 +2866,3 @@ async def test_a_rule_granted_expert_ask_writes_no_item(make_rig):
     job = await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     assert rig.records.get_job(str(job)).open_items == []
-
-
-async def test_an_expert_ask_nobody_answers_expires_with_no_answer(make_rig):
-    rig = make_rig(FakeAsks(Answer(None)), ASK_STEPS)
-    await rig.jobs.start("go", str(rig.folder))
-    await until(lambda: [i for i in rig.items.list_open() if i.id in rig.asks.open_ids] == [])
-    await until(lambda: rig.asks.opened)
-    item_id = rig.asks.opened[0]["ask_id"]
-    await until(lambda: rig.items.get(item_id).state == "expired")
-    assert rig.items.get(item_id).reason == "no_answer"
-    assert rig.items.get(item_id).task_id is None  # a job with no task shows on no body

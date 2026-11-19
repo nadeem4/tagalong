@@ -15,6 +15,7 @@ from brain import permission
 from brain.approvals import Approvals
 from brain.asks import Asks
 from brain.events import Event
+from brain.holds import Holds
 from brain.memory import Memory
 from brain.mind.turn import Call
 from brain.open_item_runner import AskRunner
@@ -126,7 +127,7 @@ class Rig:
             [self.source],
             lambda: self.stored,
             self.stored.__setitem__,
-            self.asks,
+            Holds(self.asks, self.work, self.items, self.tasks),
             self.engine,
             runner=self.runner,
             tasks=self.tasks,
@@ -660,7 +661,7 @@ def with_side_check(rig, look):
         [rig.source],
         lambda: rig.stored,
         rig.stored.__setitem__,
-        rig.asks,
+        Holds(rig.asks, rig.work, rig.items),
         rig.engine,
         runner=rig.runner,
     )

@@ -52,6 +52,7 @@ from brain.events import (
 )
 from brain.expert_apps import ExpertApps
 from brain.experts import ExpertHosts, ExpertRun
+from brain.holds import Holds
 from brain.job_records import Job, JobRecords
 from brain.jobs import Jobs
 from brain.know import offer
@@ -295,9 +296,10 @@ class Session:
             set_auto=lambda name: self.toolbox.set_mode(name, "auto"),
         )
         self.records = JobRecords(work, memory.db, now)
+        self.holds = Holds(self._asks, work, items, self.tasks)
         self.jobs = Jobs(
             self.records,
-            self._asks,
+            self.holds,
             notify,
             experts or (lambda: []),
             make_run,

@@ -12,14 +12,16 @@ import asyncio
 import uuid
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
 from brain.asks import AskExpired, Asks
 from brain.mind.turn import Call
 from brain.open_items import OpenItemRefused, OpenItems, at_time
 from brain.protocol import ErrorCode, RpcError
 from brain.store.work import State, TransitionRefused, WorkStore
-from brain.tasks import Tasks
+
+if TYPE_CHECKING:  # tasks imports tools, which imports jobs, which holds this
+    from brain.tasks import Tasks
 
 
 class Reply(NamedTuple):
@@ -35,7 +37,9 @@ class _Held:
 
 
 class Holds:
-    def __init__(self, asks: Asks, work: WorkStore, items: OpenItems, tasks: Tasks) -> None:
+    def __init__(
+        self, asks: Asks, work: WorkStore, items: OpenItems, tasks: "Tasks | None" = None
+    ) -> None:
         self.asks = asks
         self._work = work
         self._items = items
@@ -111,7 +115,7 @@ class Holds:
             input=input,
             free_text=free_text,
             confirm=confirm,
-            task=self._tasks.card_fields(item),
+            task=self._tasks.card_fields(item) if self._tasks else None,
         )
         try:
             return await held.future

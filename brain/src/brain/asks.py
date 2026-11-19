@@ -67,22 +67,6 @@ class Asks:
     def anyone_online(self) -> bool:
         return bool(self._bodies.display_ids())  # a body that shows nothing cannot be asked
 
-    async def permission(
-        self,
-        call: Call,
-        spec_name: str,
-        locked: bool,
-        *,
-        ask_id: str | None = None,
-        parent_id: str | None = None,
-    ) -> str:
-        params = self._card(call, spec_name, locked, ask_id or uuid.uuid4().hex)
-        # An expert's call belongs to no turn of Scout's.
-        if call.turn:
-            params["turn"] = call.turn
-        entry = _Open(params, asyncio.get_running_loop().create_future())
-        return (await self._wait(entry, None, parent_id)).option or "deny"
-
     def show(
         self, ask_id: str, call: Call, spec_name: str, locked: bool, task: dict | None = None
     ) -> None:
@@ -92,8 +76,8 @@ class Asks:
         Stop task after its own options."""
         params = self._card(call, spec_name, locked, ask_id)
         self._with_task(params, task)
-        self._publish(_Open(params, None, kind="ask"))
         ask_event("opened", ask_id, "brain", spec_name)
+        self._publish(_Open(params, None, kind="ask"))
 
     @staticmethod
     def _with_task(params: dict, task: dict | None) -> None:

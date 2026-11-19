@@ -14,8 +14,8 @@ from typing import TYPE_CHECKING, Literal, Protocol
 
 from pydantic import ValidationError
 
-from brain.asks import Asks
 from brain.bodies import Bodies
+from brain.holds import Holds
 from brain.mind.prompt import part_blocks
 from brain.mind.turn import Call
 from brain.open_items import OpenItemRefused
@@ -226,7 +226,7 @@ class Toolbox:
         sources: list[Source],
         modes: Callable[[], dict[str, str]],
         save_mode: Callable[[str, str], None],
-        asks: Asks | None = None,
+        holds: Holds | None = None,
         engine: Engine | None = None,
         person_task: Callable[[str | None], bool] = lambda turn_id: False,
         on_call: Callable[[Call, ToolSpec, str, str, str | None, BaseException | None], None]
@@ -250,7 +250,7 @@ class Toolbox:
         self.sources = sources  # brain source first, then the body and app sources
         self._modes = modes  # stored per-tool choices, read on every call
         self._save_mode = save_mode
-        self._asks = asks  # None skips gate step 3 (the ask)
+        self._holds = holds  # None skips gate step 3 (the ask)
         self._engine = engine  # None skips it too
         self._person_task = person_task
 
@@ -338,7 +338,7 @@ class Toolbox:
         """Gate step 3: the engine decides; return only if the call may run. `job_id` names the
         expert job a call comes from, so its approval rows say so. Scout's own ask that needs the
         person opens an item and raises `AskOpen` at once: the answer runs the call later."""
-        assert self._asks is not None and self._engine is not None
+        assert self._holds is not None and self._engine is not None
         req = await self.ask_request(
             call, spec, source_kind, job_id=job_id, ask_id=uuid.uuid4().hex
         )
@@ -389,7 +389,7 @@ class Toolbox:
     ) -> AskRequest:
         """The engine's request for one tool call: the one shape a new ask and an open ask
         decided again share."""
-        assert self._asks is not None
+        assert self._holds is not None
         gate = gate_tier(spec, self._modes().get(spec.name))
         if spec.task_kind is not None and gate is not Tier.off and not self._person(call):
             gate = Tier.person_only  # work no person asked for never starts without their yes
@@ -404,7 +404,7 @@ class Toolbox:
             summary=summarise(call.text, spec.name, shown.input),
             input=shown.input,
             tier=gate,
-            how_to_ask=tool_asker(self._asks, shown, spec.name, gate, ask_id, job_id),
+            how_to_ask=tool_asker(self._holds, shown, spec.name, gate, ask_id, job_id),
             job_id=job_id,
             turn_id=call.turn or None,
             ask_id=ask_id,
@@ -517,7 +517,7 @@ class Toolbox:
             raise RpcError(ErrorCode.denied, f"{spec.name} is turned off by the owner.")
         if spec.task_kind is not None and self._tasks is not None:
             call = self._claim(call, spec.task_kind)
-        if gate is Tier.auto or self._engine is None or self._asks is None:
+        if gate is Tier.auto or self._engine is None or self._holds is None:
             return call  # nobody is asked and nothing is logged
         # A follow-up in a task the person started is already their yes; one Scout starts on
         # a timer or a job's news goes through the engine.

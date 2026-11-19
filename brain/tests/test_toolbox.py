@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 import types
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -14,7 +14,10 @@ from job_rows import fresh_work, tasks_for
 
 from brain.asks import Asks
 from brain.bodies import Bodies
+from brain.holds import Holds
+from brain.memory import Memory
 from brain.mind.turn import Call
+from brain.open_items import OpenItems
 from brain.permission import (
     Decision,
     Engine,
@@ -429,6 +432,14 @@ class AskBodies:
         self.sent.append(params)
 
 
+def holds_over(bodies) -> Holds:
+    """The hold of expert and tool asks over these bodies, on its own throwaway database."""
+    work = fresh_work()
+    return Holds(
+        Asks(bodies, work), work, OpenItems(Memory(":memory:").db, lambda: datetime.now(UTC))
+    )
+
+
 def opened_asks(bodies):
     return [p for p in bodies.sent if p["state"] == "open"]
 
@@ -466,7 +477,7 @@ def gated(tool_effect="change", locked=False, online=("desktop",), stored=None, 
         ]
     )
     stored = {} if stored is None else stored
-    return Toolbox([source], stored, Asks(bodies, fresh_work())), source, bodies, stored
+    return Toolbox([source], stored, holds_over(bodies)), source, bodies, stored
 
 
 def call_with_text(name, call_id="c1", text="Doing it."):
@@ -486,7 +497,7 @@ async def test_ask_mode_tool_opens_an_ask_and_runs_on_allow():
     ask = opened_asks(bodies)[0]
     assert ask["text"] == "Doing it." and ask["tool"] == "t"
     assert source.ran == []  # nothing ran while the ask is open
-    box._asks.answer(ask["id"], "allow", "desktop")
+    box._holds.asks.answer(ask["id"], "allow", "desktop")
     assert await task == "ran t"
 
 
@@ -494,7 +505,7 @@ async def test_deny_gives_denied_and_the_tool_never_runs():
     box, source, bodies, _ = gated()
     task = asyncio.create_task(box.run(call("t")))
     await until(lambda: opened_asks(bodies))
-    box._asks.answer(opened_asks(bodies)[0]["id"], "deny", "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[0]["id"], "deny", "desktop")
     with pytest.raises(RpcError) as err:
         await task
     assert err.value.code == ErrorCode.denied
@@ -506,7 +517,7 @@ async def test_always_saves_auto_runs_and_next_call_asks_nothing():
     box, source, bodies, stored = gated()
     task = asyncio.create_task(box.run(call("t")))
     await until(lambda: opened_asks(bodies))
-    box._asks.answer(opened_asks(bodies)[0]["id"], "always", "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[0]["id"], "always", "desktop")
     assert await task == "ran t"
     assert stored == {"t": "auto"}
     assert await box.run(call("t")) == "ran t"
@@ -520,9 +531,9 @@ async def test_locked_tool_never_saves_auto_and_cannot_be_answered_always():
     ask = opened_asks(bodies)[0]
     assert ask["options"] == ["allow", "deny"]
     with pytest.raises(RpcError) as err:
-        box._asks.answer(ask["id"], "always", "desktop")
+        box._holds.asks.answer(ask["id"], "always", "desktop")
     assert err.value.code == ErrorCode.invalid_params
-    box._asks.answer(ask["id"], "allow", "desktop")
+    box._holds.asks.answer(ask["id"], "allow", "desktop")
     assert await task == "ran t"
     assert stored == {}
 
@@ -532,7 +543,7 @@ async def test_locked_tool_asks_by_default():
     task = asyncio.create_task(box.run(call("t")))
     await until(lambda: opened_asks(bodies))
     assert source.ran == []
-    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
     assert await task == "ran t"
 
 
@@ -550,7 +561,7 @@ async def test_locked_tool_asks_again_after_set_mode_ask():
     task = asyncio.create_task(box.run(call("t")))
     await until(lambda: opened_asks(bodies))
     assert source.ran == []
-    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
     assert await task == "ran t"
 
 
@@ -559,7 +570,7 @@ async def test_always_button_stays_hidden_for_locked():
     task = asyncio.create_task(box.run(call("t")))
     await until(lambda: opened_asks(bodies))
     assert opened_asks(bodies)[0]["options"] == ["allow", "deny"]
-    box._asks.answer(opened_asks(bodies)[0]["id"], "deny", "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[0]["id"], "deny", "desktop")
     with pytest.raises(RpcError):
         await task
 
@@ -577,8 +588,8 @@ async def test_two_calls_in_one_step_open_independent_asks_with_shared_text():
     await until(lambda: len(opened_asks(bodies)) == 2)
     a, b = opened_asks(bodies)
     assert a["id"] != b["id"] and a["text"] == b["text"] == "Both now."
-    box._asks.answer(a["id"], "allow", "desktop")
-    box._asks.answer(b["id"], "deny", "desktop")
+    box._holds.asks.answer(a["id"], "allow", "desktop")
+    box._holds.asks.answer(b["id"], "deny", "desktop")
     assert await first == "ran t"
     with pytest.raises(RpcError):
         await second
@@ -587,7 +598,7 @@ async def test_two_calls_in_one_step_open_independent_asks_with_shared_text():
 async def test_home_caller_skips_the_ask():
     spec_home = ToolSpec("h", "h", {"type": "object"}, frozenset({"home", "scout"}))
     bodies = AskBodies()
-    box = Toolbox([FakeSource([spec_home])], asks=Asks(bodies, fresh_work()))
+    box = Toolbox([FakeSource([spec_home])], asks=holds_over(bodies))
     assert await box.run(call("h"), caller="home") == "ran h"
     assert bodies.sent == []
 
@@ -595,10 +606,10 @@ async def test_home_caller_skips_the_ask():
 async def test_other_caller_in_audience_is_still_asked():
     spec_x = ToolSpec("x", "x", {"type": "object"}, frozenset({"scout", "expert"}))
     bodies = AskBodies()
-    box = Toolbox([FakeSource([spec_x])], asks=Asks(bodies, fresh_work()))
+    box = Toolbox([FakeSource([spec_x])], asks=holds_over(bodies))
     task = asyncio.create_task(box.run(call("x"), caller="expert"))
     await until(lambda: opened_asks(bodies))
-    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
     assert await task == "ran x"
 
 
@@ -611,7 +622,7 @@ async def test_turn_cancel_mid_ask_closes_it_cancelled_and_leaves_nothing():
     with pytest.raises(asyncio.CancelledError):
         await task
     assert bodies.sent[-1] == {"id": ask["id"], "state": "closed", "reason": "cancelled"}
-    assert box._asks.open_asks() == []
+    assert box._holds.asks.open_asks() == []
     assert source.ran == []
 
 
@@ -734,7 +745,7 @@ def recorded(online=("desktop",), **kw):
 async def answer_with(box, bodies, option):
     task = asyncio.create_task(box.run(call_with_text("t")))
     await until(lambda: opened_asks(bodies))
-    box._asks.answer(opened_asks(bodies)[0]["id"], option, "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[0]["id"], option, "desktop")
     return task
 
 
@@ -774,10 +785,10 @@ async def test_app_tool_row_has_source_app():
     bodies = AskBodies()
     log = FakeApprovals()
     source = AppLike([ToolSpec("a__x", "x", {"type": "object"})])
-    box = Toolbox([source], asks=Asks(bodies, fresh_work()), approvals=log)
+    box = Toolbox([source], asks=holds_over(bodies), approvals=log)
     task = asyncio.create_task(box.run(call("a__x")))
     await until(lambda: opened_asks(bodies))
-    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
     await task
     assert log.rows[0]["source"] == "app"
 
@@ -797,9 +808,7 @@ async def test_toolbox_without_approvals_behaves_as_before():
 
 # --- Scout answers an ask under a preference (the side-check) ----------------------------
 
-from datetime import UTC, datetime  # noqa: E402
 
-from brain.memory import Memory  # noqa: E402
 from brain.mind.turn import Final  # noqa: E402
 from brain.side_check import SideCheck  # noqa: E402
 
@@ -836,7 +845,7 @@ def scouted(mem, check, online=("desktop",), locked=False):
     )
     stored = {}
     box = Toolbox(
-        [source], stored, Asks(bodies, fresh_work()), approvals, deciders=[SideCheckDecider(check)]
+        [source], stored, holds_over(bodies), approvals, deciders=[SideCheckDecider(check)]
     )
     return box, source, bodies, stored, sent
 
@@ -874,7 +883,7 @@ async def test_pass_falls_through_to_the_person_ask(mem):
     box, _, bodies, _, _ = scouted(mem, check, locked=True)
     task = asyncio.create_task(box.run(call_with_text("t")))
     await until(lambda: opened_asks(bodies))
-    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
     assert await task == "ran t"
     assert check.facts == []  # a locked ask is never shown to Scout: the floor
     [row] = list_approvals(mem, "all", 10, None)
@@ -917,7 +926,7 @@ async def test_removed_preference_sends_next_ask_to_the_person(mem):
     rules.remove_preference(mem.db, pref.id)
     task = asyncio.create_task(box.run(call_with_text("t")))
     await until(lambda: len(opened_asks(bodies)) == 2)  # the person is asked now
-    box._asks.answer(opened_asks(bodies)[-1]["id"], "deny", "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[-1]["id"], "deny", "desktop")
     with pytest.raises(RpcError):
         await task
 
@@ -934,7 +943,7 @@ async def test_stored_auto_run_is_logged_as_rule(mem):
 async def test_plain_read_is_not_logged(mem):
     approvals = approvals_on(mem, lambda m, p: None, lambda: NOW)
     source = FakeSource([ToolSpec("r", "read it", {"type": "object"}, effect="read")])
-    asks = Asks(AskBodies(("desktop",)), fresh_work())
+    asks = holds_over(AskBodies(("desktop",)))
     box = Toolbox([source], {}, asks, approvals)  # real engine: the skip is the auto tier's
     assert await box.run(call_with_text("r")) == "ran r"
     assert list_approvals(mem, "all", 10, None) == []
@@ -944,10 +953,10 @@ async def test_a_read_set_to_ask_is_logged(mem):
     approvals = approvals_on(mem, lambda m, p: None, lambda: NOW)
     source = FakeSource([ToolSpec("r", "read it", {"type": "object"}, effect="read")])
     bodies = AskBodies(("desktop",))
-    box = Toolbox([source], {"r": "ask"}, Asks(bodies, fresh_work()), approvals)
+    box = Toolbox([source], {"r": "ask"}, holds_over(bodies), approvals)
     task = asyncio.create_task(box.run(call_with_text("r")))
     await until(lambda: opened_asks(bodies))
-    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
     assert await task == "ran r"
     [row] = list_approvals(mem, "all", 10, None)
     assert (row.tool, row.outcome) == ("r", "approved")
@@ -962,7 +971,7 @@ async def test_a_failing_preference_count_sends_the_ask_to_the_person(mem, monke
     monkeypatch.setattr("brain.approvals.rules.use_preference", boom)
     task = asyncio.create_task(box.run(call_with_text("t")))
     await until(lambda: opened_asks(bodies))  # Scout's grant was a pass: the person is asked
-    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
     assert await task == "ran t"
     [row] = list_approvals(mem, "all", 10, None)
     assert row.decided_by == "person"
@@ -1006,7 +1015,7 @@ async def test_person_allow_once_is_offered_but_always_is_not(mem, choice, expec
     box, bodies = offered(mem, offers=offers)
     task = asyncio.create_task(box.run(call_with_text("t")))
     await until(lambda: opened_asks(bodies))
-    box._asks.answer(opened_asks(bodies)[0]["id"], choice, "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[0]["id"], choice, "desktop")
     await task
     assert offers.considered == expected  # "always" just made the tool Auto: no offer
 
@@ -1019,7 +1028,7 @@ async def test_person_only_tool_approval_is_never_offered(mem):
     box._engine._offers = offers
     task = asyncio.create_task(box.run(call_with_text("t")))
     await until(lambda: opened_asks(bodies))
-    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
     assert await task == "ran t"
     assert offers.considered == []
 
@@ -1029,7 +1038,7 @@ async def test_refusal_and_scout_approval_are_not_offered(mem):
     box, bodies = offered(mem, offers=offers)
     task = asyncio.create_task(box.run(call_with_text("t")))
     await until(lambda: opened_asks(bodies))
-    box._asks.answer(opened_asks(bodies)[0]["id"], "deny", "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[0]["id"], "deny", "desktop")
     with pytest.raises(RpcError):
         await task
     scout, _ = offered(mem, FakeSideCheck(preference(mem)), offers)
@@ -1045,7 +1054,7 @@ class RaisingSideCheck:
 async def _still_asks_the_person(box, bodies):
     task = asyncio.create_task(box.run(call_with_text("t")))
     await until(lambda: opened_asks(bodies))
-    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
     assert await task == "ran t"
 
 
@@ -1064,7 +1073,7 @@ async def test_locked_tool_under_a_general_preference_with_default_deleted_asks_
     task = asyncio.create_task(box.run(call_with_text("t")))
     await until(lambda: opened_asks(bodies))
     assert source.ran == []  # the general preference did not approve it
-    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
     assert await task == "ran t"
 
 
@@ -1078,7 +1087,7 @@ async def test_locked_tool_with_a_preference_naming_it_still_asks_the_person(mem
     task = asyncio.create_task(box.run(call_with_text("t")))
     await until(lambda: opened_asks(bodies))
     assert source.ran == []  # a locked tool is never Scout's to approve: the floor
-    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
     assert await task == "ran t"
 
 
@@ -1125,7 +1134,7 @@ def nudger(mem, check=None, owner=False, online=("desktop",), offers=None):
         [BrainSource(tools)],
         lambda: stored,
         stored.__setitem__,
-        Asks(bodies, fresh_work()),
+        holds_over(bodies),
         engine,
         person_task=lambda turn_id: owner and turn_id == "t1",
     )
@@ -1163,7 +1172,7 @@ async def test_tell_expert_on_a_brain_turn_asks_the_owner(mem):
     await until(lambda: opened_asks(bodies))
     assert opened_asks(bodies)[0]["tool"] == "tell_expert"
     assert jobs.told == []  # held on the ask
-    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
     assert await task == "note queued for job j1"
     [row] = list_approvals(mem, "all", 10, None)
     assert (row.tool, row.outcome, row.decided_by) == ("tell_expert", "approved", "person")
@@ -1182,7 +1191,7 @@ async def test_tell_expert_on_a_brain_turn_when_the_side_check_passes_asks_the_o
     box, jobs, bodies, _ = nudger(mem, FakeSideCheck(None))
     task = asyncio.create_task(box.run(nudge()))
     await until(lambda: opened_asks(bodies))
-    box._asks.answer(opened_asks(bodies)[0]["id"], "deny", "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[0]["id"], "deny", "desktop")
     with pytest.raises(RpcError):
         await task
     assert jobs.told == []
@@ -1193,7 +1202,7 @@ async def test_a_failing_side_check_on_a_nudge_asks_the_owner_not_allows(mem):
     task = asyncio.create_task(box.run(nudge()))
     await until(lambda: opened_asks(bodies))
     assert jobs.told == []
-    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
     await task
 
 
@@ -1260,7 +1269,7 @@ async def test_on_call_reports_a_call_the_owner_denied_as_refused():
     box._on_call = lambda *a: seen.append(a)
     task = asyncio.create_task(box.run(call("t")))
     await until(lambda: opened_asks(bodies))
-    box._asks.answer(opened_asks(bodies)[0]["id"], "deny", "desktop")
+    box._holds.asks.answer(opened_asks(bodies)[0]["id"], "deny", "desktop")
     with pytest.raises(RpcError):
         await task
     assert [s[3] for s in seen] == ["refused"]
@@ -1403,7 +1412,7 @@ class FakeRunner:
 def _engine_box(decision, spec_=None, stored=None, owner=False):
     engine = FakeEngine(decision)
     source = FakeSource([spec_ or ToolSpec("t", "t tool", {"type": "object"})])
-    asks = Asks(AskBodies(), fresh_work())
+    asks = holds_over(AskBodies())
     stored = {} if stored is None else stored
     box = RealToolbox(
         [source],
@@ -1508,7 +1517,7 @@ async def test_stored_auto_runs_without_the_engine_asking_the_person():
         [FakeSource([ToolSpec("t", "t tool", {"type": "object"})])],
         lambda: stored,
         stored.__setitem__,
-        Asks(bodies, fresh_work()),
+        holds_over(bodies),
         engine,
     )
     assert await box.run(call_with_text("t")) == "ran t"
