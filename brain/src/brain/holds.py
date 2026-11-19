@@ -9,6 +9,7 @@ it is the log entry; it ends with the answer, the cancel or the job.
 """
 
 import asyncio
+import logging
 import uuid
 from contextlib import suppress
 from dataclasses import dataclass
@@ -19,6 +20,8 @@ from brain.mind.turn import Call
 from brain.open_items import OpenItemRefused, OpenItems, at_time
 from brain.protocol import ErrorCode, RpcError
 from brain.store.work import State, TransitionRefused, WorkStore
+
+_log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:  # tasks imports tools, which imports jobs, which holds this
     from brain.tasks import Tasks
@@ -193,10 +196,15 @@ class Holds:
         task.add_done_callback(self._stopping.discard)
 
     async def _stop(self, ask_id: str, item, body_id: str) -> None:
-        if item and item.task_id and self._tasks:
-            await self._tasks.stop(item.task_id, body_id)
-        if ask_id in self._held:  # no task to stop, or it was over already: this card still goes
-            self._cancel(ask_id)
+        try:
+            if item and item.task_id and self._tasks:
+                await self._tasks.stop(item.task_id, body_id)
+        except Exception:
+            _log.exception("stopping the task from card %s", ask_id)
+        finally:
+            # No task to stop, it was over already, or the stop failed: this card still goes.
+            if ask_id in self._held:
+                self._cancel(ask_id)
 
     def _row_ended(self, work_id: str, kind: str, to: str) -> None:
         """The row ended from outside (its job closed, or a restart scan): the wait is done."""

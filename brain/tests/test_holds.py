@@ -263,6 +263,26 @@ async def test_stop_the_task_ends_it_and_cancels_every_card_it_holds():
     assert rig.asks.open_asks() == []
 
 
+async def test_a_failing_stop_still_cancels_the_pressed_card():
+    rig = Rig()
+    waiting = rig.ask(job_id=rig.job(task_id=rig.task()), ask_id="a1")
+    await rig.card()
+
+    async def broken(task_id: str) -> None:
+        raise RuntimeError("boom")
+
+    rig.tasks.hooks = no_hooks(stop_jobs=broken, close_cards=rig.holds.close)
+
+    async def boom(*_):
+        raise RuntimeError("stop failed")
+
+    rig.tasks.stop = boom
+    rig.asks.answer("a1", "stop_task", "desktop")
+    with pytest.raises(RpcError) as err:
+        await waiting  # the expert is not left hanging
+    assert err.value.code == ErrorCode.cancelled
+
+
 async def test_a_stopped_task_opens_no_new_card():
     rig = Rig()
     job = rig.job(task_id=rig.task())
