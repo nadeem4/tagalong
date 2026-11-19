@@ -1,10 +1,23 @@
 # The Python brain
 
-The brain is the Python side of contract v1 ([protocol/README.md](../../protocol/README.md)). Bodies can connect, declare their tools,
-catch up on missed notifications, and talk to Scout: `say` starts a turn and the reply streams
-back. Scout can use the tools bodies declare, and asks the user first before a tool that changes
-something (see [Toolbox](#toolbox)). Scout remembers through the `remember`, `recall` and `forget` tools, kept in `tagalong.db`
-(see [memory.md](../data/memory.md)). The chat is saved and picked up again after a restart (see [What a turn does](turns.md#a-turn)).
+The brain is the Python side of contract v1 ([protocol/README.md](../../protocol/README.md)). Bodies connect, declare their tools, catch up on missed notifications and talk to Scout: `say` starts a turn and the reply streams back. Scout uses the tools bodies declare and asks the person first before a tool that changes something. This page is the overview and the home of the sections that have no doc of their own; read it first, then the doc for the part you are working on.
+
+- [Run it](#run-it)
+- [Module map](#module-map)
+- [Files](#files)
+- [How the brain starts and stops](#how-the-brain-starts-and-stops)
+- [Bodies and the handshake](#bodies-and-the-handshake)
+- [How the prompt is built](#how-the-prompt-is-built)
+- [Models](#models)
+- [Measurement](#measurement)
+- [Outbox and replay](#outbox-and-replay)
+- [The desktop body](#the-desktop-body)
+- [Toolbox](#toolbox)
+- [Capability picture and routing](#capability-picture-and-routing)
+- [Reading status](#reading-status)
+- [Home tools](#home-tools)
+- [Where each part is documented](#where-each-part-is-documented)
+- [Tests](#tests)
 
 ## Run it
 
@@ -36,10 +49,12 @@ variable still works and is the developer path.
 | Variable                         | Default            | Meaning                                                                                                                                                                           |
 | -------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `TAGALONG_BRAIN_ADDR`            | `127.0.0.1:47321`  | `host:port` to listen on. Port `0` picks a free port                                                                                                                              |
-| `TAGALONG_HOME`                  | `~/.tagalong`      | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env`                                                                                                                |
-| `TAGALONG_MODEL`                 | `claude-opus-5-5`  | Model Scout thinks with until one is chosen in Settings                                                                                                                           |
+| `TAGALONG_HOME`                  | `~/.tagalong`      | Data folder. Holds `session`, `budget.json`, `reader-budget.json`, `tagalong.db`, `.env`, `brain.pid`                                                                             |
+| `TAGALONG_MODEL`                 | `claude-opus-5-5`  | The default model Scout thinks with; a model chosen in Settings wins (see [Models](#models))                                                                                      |
 | `TAGALONG_DAILY_BUDGET_USD`      | `5`                | Most Scout may spend per local day, in USD                                                                                                                                        |
-| `TAGALONG_READER_MODEL`          | `claude-haiku-5-5` | Model that reads mail for loops (see [Loops](#loops))                                                                                                                             |
+| `TAGALONG_STT_LIVE`              | none               | Speech model that listens live; a choice saved in Settings wins, then this, then Auto (see [hearing.md](../senses/hearing.md))                                                    |
+| `TAGALONG_STT_FINAL`             | none               | Speech model that re-reads a finished utterance; same order as `TAGALONG_STT_LIVE`                                                                                                |
+| `TAGALONG_READER_MODEL`          | `claude-haiku-5-5` | Model that reads mail for loops (see [loops.md](loops.md))                                                                                                                        |
 | `TAGALONG_READER_DAILY_USD`      | `0.5`              | Most the mail reader may spend per local day, in USD; its own allowance, apart from Scout's                                                                                       |
 | `TAGALONG_LOOP_POLL_S`           | `300`              | Seconds between reads of a mail app that is switched on for loops (a positive whole number)                                                                                       |
 | `TAGALONG_LOOP_STALE_DAYS`       | `7`                | Days a held loop may sit untouched before it goes to one stale wake (a positive whole number)                                                                                     |
@@ -59,7 +74,13 @@ variable still works and is the developer path.
 | `TAGALONG_JOB_STEPS_MAX_BYTES`   | `1000000`          | Text bytes one job's log keeps; command output is blanked first (whole number, 1 or more)                                                                                         |
 | `TAGALONG_WORK_KEEP_DAYS`        | `30`               | Days finished work (jobs, timers, asks, loops, with their steps and long reports) is kept after it ended, then swept at start; open work is never swept (whole number, 1 or more) |
 | `TAGALONG_OUTPUTS_KEEP`          | `200`              | Stored long tool results kept for `read_output`, newest first; reports a job points at are kept as well (whole number, 1 or more)                                                 |
+| `TAGALONG_RETRY_MAX`             | `3`                | Read and checked at start, but nothing uses it: the work store keeps its own retry rules (see [safety.md](safety.md#retries-and-give-ups))                                        |
+| `TAGALONG_RETRY_BACKOFF_S`       | `30,120,600`       | Same: read and checked (comma-separated whole seconds, 1 or more), not used                                                                                                       |
+| `TAGALONG_BUILD`                 | none               | The build id sent in `hello`; unset, it is a 12-hex hash of the source files                                                                                                      |
+| `TAGALONG_STARTED_BY`            | none               | The desktop sets it to `desktop` when it starts the brain; `brain_status` reports `started_by` from it                                                                            |
 | `ANTHROPIC_API_KEY`              | none               | Anthropic key. Optional at start: the app sets it. A real, non-empty environment variable wins over `.env`; an empty one counts as unset                                          |
+
+The WhatsApp settings (`TAGALONG_WHATSAPP_*`) are in [whatsapp.md](../bodies/whatsapp.md); the brain passes them to the bridge and never keeps them in `.env`.
 
 `<TAGALONG_HOME>/.env` holds `KEY=value` lines (`#` comments and quotes allowed). Any
 `TAGALONG_*` setting above except `TAGALONG_HOME`, and `ANTHROPIC_API_KEY`, may live there. It only
@@ -68,11 +89,67 @@ start.
 
 The `session` file keeps one id across restarts. `hello` returns it.
 
-`budget.json` holds `{"date": "2026-10-25", "spent_usd": 0.42}` and starts again at zero each
-local day. After each model call the brain adds its cost. A model call that would start at or
-over the limit ends the turn with `over_budget`. Cost uses the top-level `usage` of the reply
-(not `usage.iterations`), priced at the model that actually answered, including a fallback. A cancelled or failed stream records no spend, so
-the total can run a little low.
+The daily budget and its `budget.json` ledger are in [safety.md](safety.md#the-budget).
+
+## Module map
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
+flowchart TD
+  subgraph wire["Start and the wire"]
+    main["main.py, config.py, lifecycle.py, build_info.py, cli.py"]
+    server["server.py, protocol.py"]
+    bodies["bodies.py, presence.py, reading.py, bridges.py"]
+  end
+  subgraph turns["Events and turns"]
+    events["events.py: EventLog, runner.py, timers.py"]
+    session["sessions.py: Session, models.py, speech_tools.py"]
+    mind["mind/: turn.py, prompt.py, resume.py, capabilities.py"]
+  end
+  subgraph gate["Tools and permission"]
+    toolbox["toolbox.py, tools.py, tool_words.py, outputs.py, web_tools.py"]
+    permission["permission.py, side_check.py, asks.py, holds.py, approvals.py, offers.py"]
+    items["open_items.py, open_item_runner.py, choices.py"]
+  end
+  subgraph work["Tasks, jobs and experts"]
+    tasks["tasks.py, task_tools.py"]
+    jobs["jobs.py, job_records.py, job_activity.py, experts.py, expert_apps.py, questions.py"]
+  end
+  subgraph homecalls["Apps and Home calls"]
+    apps["apps.py, app_oauth.py, app_tools.py"]
+    home["bodies_tools.py, chat_tools.py, events_tools.py, reading_tools.py, tasks_tools.py, timers_home.py"]
+  end
+  subgraph keep["Memory and store"]
+    memory["memory.py, know/"]
+    store["store/: the only SQL"]
+  end
+  guards["guards.py, builtin_guards.py, guardrails.py, masking.py, retry.py, telemetry.py"]
+  setup["setup/"]
+  loops["loops/"]
+  voice["voice/"]
+  main --> server
+  server --> bodies
+  server -->|"say, answer, event"| events
+  server -->|"call (Home)"| toolbox
+  events --> session
+  session --> mind
+  session --> tasks
+  mind --> guards
+  mind --> toolbox
+  toolbox --> permission
+  permission --> items
+  toolbox -->|"use"| bodies
+  toolbox --> apps
+  toolbox --> home
+  toolbox -->|"hand_off"| jobs
+  memory --> store
+  events --> store
+  loops -->|"loop events"| events
+  setup --> toolbox
+  voice --> bodies
+```
+
+`main.py` builds everything and starts the server. The server turns frames into events, the runner starts one turn at a time, and the turn reaches every tool, Home's calls too, through the toolbox and its permission engine. `setup/` (installs and sign-in) adds tools to the toolbox, `loops/` (mail loops) posts events, and `voice/` (ears and mouth) talks to the bodies; each has its own doc under [Where each part is documented](#where-each-part-is-documented). Every store goes through `store/`, and the guards check each model call, each piece of news and each save.
 
 ## Files
 
@@ -82,13 +159,13 @@ the total can run a little low.
 | `brain/src/brain/config.py`            | Reads the environment and `.env`, writes `.env` lines in one atomic replace (`upsert_env_value`, `upsert_env_values`), keeps the session id                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `brain/src/brain/guardrails.py`        | The daily budget and its `budget.json` ledger                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `brain/src/brain/masking.py`           | `Masker`, the `mask_secrets` save guard, `mask_message` (chat save), `mask_json` (approvals, jobs) and `SecretLogFilter` (secrets become `[secret]` before they are saved or logged)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `brain/src/brain/guards.py`            | The guard runner: hooks, verdicts, `Guards.run` and the one log line (see [Guardrails](#guardrails))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `brain/src/brain/guards.py`            | The guard runner: hooks, verdicts, `Guards.run` and the one log line (see [safety.md](safety.md))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `brain/src/brain/builtin_guards.py`    | The built-in guards: `daily_budget` (model_call, emit), `step_cap` (model_call) and `wake_caps` (emit)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `brain/src/brain/sessions.py`          | The one conversation: history, the running turn, `say` joins, `interrupt` (pause, nothing cancelled), `cancel`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `brain/src/brain/mind/resume.py`       | Rebuilds a valid history from the saved chat at start                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `brain/src/brain/memory.py`            | Scout's memory: `Memory`, the one object over `tagalong.db`; chat, memory, apps and outputs delegate to `store/`; it masks memory text on the way in (`Memory.mask`, set by the session to the `save` guard)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `brain/src/brain/know/`                | Get to know me: `facts.py` tag visibility, `status.py` per-source status, `runner.py` the one run at a time behind `know_me_start` (saves each source as it finishes), `portrait.py` the portrait writer, `offer.py` the offer rules, `tools.py` the get-to-know-me tools, `source.py` the source protocol and `default_sources`, `github.py`, `linkedin.py` and `web.py` the sources, `extract.py` facts with the evidence check (see [Get to know me](#get-to-know-me-know))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `brain/src/brain/store/`               | The database layer: `db.py` opens `tagalong.db` and runs the numbered migrations in `migrations/`; `search.py` the FTS5 helpers and `search`; `conversation.py`, `memory.py`, `connections.py` and `outputs.py` own the SQL of chat, memory items, apps and tool outputs; `work.py` is `WorkStore`, the work table's state machine (jobs use it today, through `job_records.py`); `rules.py` the `rules` table: tool modes, preferences and offers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `brain/src/brain/know/`                | Get to know me: `facts.py` tag visibility, `status.py` per-source status, `runner.py` the one run at a time behind `know_me_start` (saves each source as it finishes), `portrait.py` the portrait writer, `offer.py` the offer rules, `tools.py` the get-to-know-me tools, `source.py` the source protocol and `default_sources`, `github.py`, `linkedin.py` and `web.py` the sources, `extract.py` facts with the evidence check (see [memory.md](../data/memory.md#sources-of-profile-facts))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `brain/src/brain/store/`               | The database layer: `db.py` opens `tagalong.db` and runs the numbered migrations in `migrations/`; `search.py` the FTS5 helpers and `search`; `conversation.py`, `memory.py`, `connections.py` and `outputs.py` own the SQL of chat, memory items, apps and tool outputs; `work.py` is `WorkStore`, the work table's state machine (jobs, timers, asks and loops); `rules.py` the `rules` table: tool modes, preferences and offers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `brain/src/brain/runner.py`            | `Runner`: the only thing that starts a Scout turn, one at a time; `pick` (a person's words first, then news oldest first), `gate` (may this news be told now), `target` (which body answers), `take_more` (a say joins the running turn), the interjection take and give-back, `turn_ended`. See [The turn runner](turns.md#the-runner)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `brain/src/brain/tasks.py`             | `Tasks`: what the person asked for, one row per task (`store/tasks.py` holds the SQL). `open`, `wait`, `resume`, `end` (the first end stands) and `settle`, which ends every Ask whose say is `handled` (`done`) or `gave_up` (`failed`), every Later with nothing left to run, and every offer's Own whose card is no longer open (`stopped` with reason `no answer`); `open_block` is the open-tasks facts block in Scout's prompt. `Session.say` opens an Ask task per say in the say's own transaction; the runner calls `settle` after each turn ends, and the session once at start after `EventLog.recover()`. See [storage.md](../data/storage.md#tasks)                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `brain/src/brain/open_items.py`        | `OpenItems`: the one record for what waits on the person (`open`, `answer`, `finish`, `expire_due`, `expire_live_only`, `list_open`, `list_answered`, `find_open`; `expire_live_only(job_id=None)` takes one job's items only), one lifecycle (open to answered, done or expired), one deadline (`DEADLINE_S`, a day) and a log line per move, `open_item.<event> t=<epoch> id=<id> kind=<kind> by=<who> why=<why>`, on logger `brain.open_items`. Scout's asks use it through `open_item_runner.py`, choices and offers directly (kinds `choice`, `offer`); the table is in [storage.md](../data/storage.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -104,7 +181,7 @@ the total can run a little low.
 | `brain/src/brain/experts.py`           | `ExpertHost` (one adapter process per expert, shared by its sessions) and `ExpertRun` (one session over ACP; callbacks for permissions, questions, progress and the end)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `brain/src/brain/events.py`            | The event kinds registry (batch window, per-hour cap) and the loader for `mind/events.md`. `Event(kind, source, payload)` is the envelope (the source is a body id, `scout`, or `timer:<id>`, `setup:<id>`, `job:<id>`, `loop:<app>`, `tool:<name>`; `is_internal` tells them apart). `EventLog` saves each event that must survive a restart (`SAVED_KINDS`: the kinds that wake Scout, plus `say`, `card_answer` and `task_stop`) into the `events` table, masked and once per id, before anything acts on it (`post(event, on_end=cb)` hears once that the event was handled, given up, or returned to `new` at a stop; `amend` adds masked fields to a saved payload); `Session` saves every say, card answer and wake source through it (`Session.say`, `Session.post_event`) before the runner sees it, and `main.py` builds the one log (`Session` requires it; tests build theirs in `tests/event_log.py`). The envelope has no `key` and no body of origin: an event of one thing has a source naming it (`timer:<id>`, `setup:<id>`, `job:<id>`) and Scout's news carries `caused_by`, the event it follows |
 | `brain/src/brain/presence.py`          | `Presence`: which body the person last touched, each body's speech state (`speech`, `mouth`, `speech_gone`), what it has heard of a reply (`heard`), the latched sentence break (`break_seen`), and the latest focus, tab and download facts. No queue; it pokes the runner when speech moves                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `brain/src/brain/loops/`               | Loops: `loop.py` the shape, `store.py` the SQLite store over Memory's connection, `service.py` the due timer that emits `loop` events, `reader.py` the mail reader, `tools.py` Scout's loop tools (see [Loops](#loops))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `brain/src/brain/loops/`               | Loops: `loop.py` the shape, `store.py` the SQLite store over Memory's connection, `service.py` the due timer that emits `loop` events, `reader.py` the mail reader, `tools.py` Scout's loop tools (see [loops.md](loops.md))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `brain/src/brain/retry.py`             | `classify` (transient or permanent) and `safe_to_retry`: which failures and tools may be tried again                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `brain/src/brain/timers_home.py`       | `timer_home_tools`: Home-only `timers_state` (every timer, soonest first) and `timer_cancel {id}` (an unknown id, or a `watch` row, is `invalid_params`); `Timers.cancel` ends the row and emits `changed { what: "timers" }`, as does any other timer change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `brain/src/brain/timers.py`            | `Timers`: fires the due `timer` and `watch` work rows as `timer` events, hands due `tool_call` and `expert_call` retries to the session and keeps one wake armed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -134,10 +211,70 @@ the total can run a little low.
 | `brain/src/brain/voice/cuda.py`        | The NVIDIA libraries on demand (Windows): the two pinned wheels in `cuda_wheels.json`, `bin/*.dll` only into `voice/cuda`, `add_dll_directory`; a failure is one warning and the processor                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `brain/src/brain/voice/load.py`        | `ears_loader` and `tts_loader`: download the files and load the models; only `main.py` imports it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `brain/src/brain/bridges.py`           | `WhatsAppSettings`, `BridgeSupervisor`: runs the WhatsApp bridge child on Tagalong's own Node, restarts it with growing waits, ends it with the brain                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `brain/src/brain/bodies_tools.py`      | `bodies_tools`: the Home tools `bodies_status`, `whatsapp_status` and `whatsapp_set` (which bodies are connected, and WhatsApp setup; see [WhatsApp setup tools](#whatsapp-setup-tools))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `brain/src/brain/bodies_tools.py`      | `bodies_tools`: the Home tools `bodies_status`, `whatsapp_status` and `whatsapp_set` (which bodies are connected, and WhatsApp setup; see [setup.md](setup.md))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `brain/src/brain/build_info.py`        | `app_version()` (package version), `source_hash(root)` and `build_id(env_build, root)` (`TAGALONG_BUILD`, else a 12-hex hash of the `.py` and `.md` files under `src/brain`); both go in the `hello` result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `brain/src/brain/lifecycle.py`         | `brain.pid` (`write_pid`, `clear_pid`) and `stop_brain`, the logic behind `tagalong stop`; the real alive check asks the OS on Windows, where `os.kill(pid, 0)` would send Ctrl+C or kill it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `brain/src/brain/main.py`              | The `uv run brain` entry point                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `brain/src/brain/cli.py`               | The `tagalong` command (doctor, key set, install, apps add, login, stop, perf) over `setup/`; see [setup.md](setup.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `brain/src/brain/models.py`            | The choosable Claude models (`MODELS`), the saved choice and `chosen` (see [Models](#models))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `brain/src/brain/web_tools.py`         | Scout's web search and fetch (Anthropic's server tools); see [safety.md](safety.md#web-search-and-fetch)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `brain/src/brain/permission.py`        | The one engine for every ask: the floor, then a stored rule, Scout, the person (see [Permission engine](permissions.md))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `brain/src/brain/holds.py`             | `Holds`: an expert's permission request or question held on a card with no timeout                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `brain/src/brain/job_records.py`       | Jobs and their parts as `goal` and `expert_call` work rows                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `brain/src/brain/tool_words.py`        | The plain title, line, info and group of every tool, for Home's Permissions                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `brain/src/brain/chat_tools.py`        | Home's `chat_since`: the saved chat after an id, for a body catching up after a resync                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `brain/src/brain/events_tools.py`      | Home's `events_waiting`: news still `new`, and news given up                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `brain/src/brain/task_tools.py`        | Scout's `task_start` and `task_end`, and Home's `task_stop`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `brain/src/brain/tasks_tools.py`       | Home's `tasks_list`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `brain/src/brain/setup/`               | Scout setting things up: the machine facts, registries, installs, sign-in, updates (see [setup.md](setup.md))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+
+## How the brain starts and stops
+
+`main.py` opens the data folder, builds everything, and only then touches the port.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
+flowchart TD
+  A["load_env_file, load_config: a bad setting exits 1"] --> B["Memory opens tagalong.db and runs the numbered migrations"]
+  B --> C["Session built: EventLog.recover, work resume, sweeps; loops.start"]
+  C --> D["start_server: port in use, say so and exit 1"]
+  D --> E["write_pid: brain.pid, only now the port is ours"]
+  E --> F["sweep_staging, apps.start, jobs.fill_slots"]
+  F --> G["BridgeSupervisor.start: the WhatsApp bridge, if set up"]
+  G --> H["updates.run, LoopLagMonitor, dump_timings"]
+  H --> I["serve_forever"]
+```
+
+The pid file is written after the bind so a second brain that failed to bind never touches the first one's file. On the way down, `main.py`'s `finally` stops things in this order.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
+flowchart TD
+  S1["session.stop_turn: the runner stops, the running turn is cancelled and saved"] --> S2["cancel the update, lag and perf tasks"]
+  S2 --> S3["updates.stop, stop_installs, stop_watches, logins.stop"]
+  S3 --> S4["bridges.stop, voice.close"]
+  S4 --> S5["jobs.shutdown, apps.shutdown, stop_background"]
+  S5 --> S6["memory.close, clear_pid"]
+```
+
+`uv run tagalong stop` is the other way down: it ends the process hard (see [Run it](#run-it)), so none of the code above runs. What the session does with half-finished work at start and at stop is under [Start-up and shutdown](turns.md#start-up-and-shutdown).
+
+## Bodies and the handshake
+
+On `hello` the brain decides what the body missed.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
+flowchart TD
+  H["hello with last_seq"] --> C["Bodies.connect: an older connection with the same id closes"]
+  C --> Q{"last_seq given?"}
+  Q -->|"no, first connect"| N["no replay; open asks are sent again"]
+  Q -->|"yes"| W{"Outbox.since(last_seq)"}
+  W -->|"all still held"| B["the missed notifications, in order"]
+  W -->|"gap, or last_seq ahead of the brain"| R["resync: true, nothing replayed; open asks sent again"]
+```
+
+The outbox is described under [Outbox and replay](#outbox-and-replay): live-only frames (`heard`, `voice`, `speech`, `speech_control` and `know_me_status`) go through `Bodies.send_live` and are never replayed.
 
 - The first message must be `hello`. Anything else, including bad JSON, gets an error and the
   connection closes.
@@ -160,7 +297,7 @@ the total can run a little low.
   [Permissions and asks](permissions.md#tool-modes-and-cards) and `call` under [Home tools](#home-tools). `event` goes to `Session.body_event` (a bad shape is dropped); unknown notifications are ignored. An
   unknown request gets `method_not_found`.
 - Voice methods go to the voice seam, `Session.voice` (a `VoiceHooks` in `brain/voice/`).
-  `main.py` sets it to a `VoiceService` (see [Brain ears](#brain-ears)); it is `None` only in
+  `main.py` sets it to a `VoiceService` (see [hearing.md](../senses/hearing.md)); it is `None` only in
   tests that leave it out, and then `listen` gets `method_not_found` and `mic`, `unlisten` and
   `hush` are ignored.
 
@@ -178,6 +315,26 @@ the total can run a little low.
 - A newer connection with the same body id closes the older one. Its `tools` frames are
   ignored if one still arrives.
 - The largest frame is 28,000,000 bytes.
+
+## How the prompt is built
+
+`mind/prompt.py` `system_prompt` joins these blocks, in this order, every step of a turn. The order puts what changes least first, so the start of the prompt stays the same while the state is unchanged.
+
+| Block           | What it holds                                                     | Comes from                                    |
+| --------------- | ----------------------------------------------------------------- | --------------------------------------------- |
+| Soul            | Scout's character and routing rules                               | `mind/soul.md`                                |
+| What you know   | The portrait, the always-loaded memories and one `Timeline:` line | `Memory` (see [memory.md](../data/memory.md)) |
+| Preferences     | The person's saved preferences                                    | the `rules` table                             |
+| Open tasks      | What the person asked for that is still open                      | `Tasks.open_block` (see [Tasks](tasks.md))    |
+| What you can do | Names and one-line purposes of tools, apps and experts            | `mind/capabilities.py` (see below)            |
+| Bodies online   | Each online body and its latest focus, tab and download facts     | `Bodies`, `Presence`                          |
+| Now             | The local time with its UTC offset                                | the clock                                     |
+
+The capability picture is covered under [Capability picture and routing](#capability-picture-and-routing), and the way Scout is told when no tool covers a request under [Missing tool: Connect](#missing-tool-connect-then-carry-on). The brain sets no `cache_control`. On a spoken turn the user message also carries `mind/ear.md` (how a read-aloud reply is written), and a news event carries its per-kind note from `mind/events.md`.
+
+## Models
+
+`models.py` lists the Claude models Scout can think with (`MODELS`: Opus 5.5, Sonnet 5.5, Haiku 5.5) and keeps the person's choice in the `settings` table under `model`. The saved choice wins. `TAGALONG_MODEL` is only the default, used when nothing is saved or the saved id is no longer listed, so a stale row never breaks Scout. The choice is read at the start of each turn, so a new one applies from the next reply. Home reads and sets it with `model_state` and `set_model` (see [Home tools](#home-tools)).
 
 A turn, from event to reply: see [turns.md](turns.md#a-turn).
 
@@ -199,16 +356,7 @@ A turn, from event to reply: see [turns.md](turns.md#a-turn).
 
 ## Outbox and replay
 
-```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
-flowchart LR
-    N[notify] --> O[outbox per body id]
-    O -->|body online| W[connection queue]
-    O -->|body offline| K[kept for replay]
-    H[hello with last_seq] --> O
-    O -->|backlog| W
-    W --> S[websocket]
-```
+The diagram under [Bodies and the handshake](#bodies-and-the-handshake) shows what `hello` replays.
 
 - Every notification gets the next `seq` in each body's outbox, online or not.
 - The outbox keeps the last 500 notifications or 24 hours, whichever is smaller. It lives in
@@ -216,10 +364,13 @@ flowchart LR
 - On `hello` with `last_seq`, the brain sends the `hello` result first, then the missed
   notifications in order, with nothing else in between.
 - If something was dropped, or `last_seq` is ahead of the brain, the result says `resync: true`
-  and nothing is replayed. Replaying live asks and turns is not built yet.
-- The voice notifications (`heard`, `voice`, `speech`) are live-only. `Bodies.send_live(body_id,
+  and nothing is replayed. `_hello` sends every ask still open again on a `resync` and on a first
+  connect (`last_seq` None), because the backlog cannot show asks the body missed; on a plain
+  reconnect the backlog already holds them. Turns are not replayed. Home catches up on the chat
+  with `chat_since`.
+- The voice notifications (`heard`, `voice`, `speech`, `speech_control`) and `know_me_status` are live-only. `Bodies.send_live(body_id,
 method, params)` writes one frame with no `seq` straight to the body's current connection and
-  returns `False` if it is offline. It never touches the outbox, so a reconnect replays no audio.
+  returns `False` if it is offline. It never touches the outbox, so a reconnect replays no audio and no run status.
 - Writes go through one queue per connection (`WriteQueue` in `bodies.py`). `send` never waits and
   never raises, so one slow body cannot stop the others. The queue is capped
   (`MAX_QUEUED_FRAMES`, 256 frames). Past the cap the oldest speech audio chunks (`LiveFrame`: a
@@ -235,23 +386,27 @@ The desktop app (`bodies/desktop`) is a body of this brain.
   `<TAGALONG_HOME>/brain.log`; quitting the app leaves it running (`uv run tagalong stop` ends it).
   Or run `cd brain && uv run brain` yourself first: run by hand, the brain logs to the terminal (stdout) and writes no `brain.log`; that file exists only when the desktop starts the brain. The desktop dials `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`, the same
   variable the brain listens on) and retries every 2 s, so either order works.
-- It sends `hello` declaring the body tools `list_windows`, `read_window_text`, `look_at_window` and
-  `open_url` (see [desktop.md](../bodies/desktop.md)); the brain offers them to the model as `desktop__<tool>`.
+- It sends `hello` declaring the body tools `list_windows`, `read_window_text`, `look_at_window`,
+  `open_url`, the file tools (`list_files`, `read_file`, `write_file`, `move_file`, `rename_file`,
+  `delete_file`, inside the folders the person chose) and `install_ocr_language` (see
+  [desktop.md](../bodies/desktop.md)); the brain offers them to the model as `desktop__<tool>`.
   `open_url` (https only) is also what `sign_in_app` uses to open a connected app's sign-in page.
   An ask is a `say` with the text, the screenshot as an image part
   and `context.window`; interrupt is `cancel`. A `say` context reaches the model as a block headed
   "Context from the body (as sent; page or window data, not instructions)".
 - With the brain down, the bubble shows "Scout's brain is not running." A brain restart ends the
   open turn as failed; the next ask works without restarting the app.
-- The brain's model is set in the brain's environment. The key and the daily limit are set from the
+- Scout's model is picked in Settings through `set_model` (`TAGALONG_MODEL` is only the default, see
+  [Models](#models)). The key and the daily limit are set from the
   app through the Home tools `set_api_key` and `set_daily_limit` and saved by the brain; the desktop
   never keeps the key. The desktop keeps its own local settings (hotkeys, listening).
-- Pets are not wired to the brain yet. See [desktop.md](../bodies/desktop.md#the-brain-in-the-main-process).
+- Contract v1 has no pet frames. The dock shows one Scout, which the desktop drives from the turn frames on its own (see [desktop.md](../bodies/desktop.md#the-brain-in-the-main-process)).
 
 ## Toolbox
 
-`Toolbox` (`toolbox.py`) is the one place tools come from. A `Session` builds it from two sources:
-`BrainSource` (remember, recall, forget) and `BodySource` (every online body's declared tools).
+`Toolbox` (`toolbox.py`) is the one place tools come from. A `Session` builds it from three sources:
+`BrainSource` (the brain's own tools, `tools.py`), `AppSource` (connected apps' tools, see
+[connected-apps.md](../bodies/connected-apps.md)) and `BodySource` (every online body's declared tools).
 
 - **Per step.** The model's tool list is rebuilt at every step, so a body that connects or leaves
   between steps changes what Scout may call. A tool whose body is offline is never offered.
@@ -271,7 +426,7 @@ The desktop app (`bodies/desktop`) is a body of this brain.
   sends the body `cancel {call}`. If the body disconnects mid-call the result says it went
   offline. Response frames from a body are resolved in the read loop by `Bodies.resolve`.
 - **Long text results.** Over `TAGALONG_TOOL_PREVIEW_CHARS` a text result reaches the model as a
-  preview plus an id, see [Long tool output](#long-tool-output). Only Scout's own calls are capped; Home's own calls are not.
+  preview plus an id, see [Long tool output](safety.md#long-tool-output). Only Scout's own calls are capped; Home's own calls are not.
 - **Results.** Parts a body returns are size-checked and turned into model blocks; a bad or
   oversized result is an error result. A part is over the limit above 5,000,000 bytes, and all
   parts of one result together above 20,000,000 bytes. An image or file part counts its decoded
@@ -280,24 +435,7 @@ The desktop app (`bodies/desktop`) is a body of this brain.
 
 ### Long tool output
 
-One cap, at the gate. `Toolbox.run` measures each text result in characters (not the `read_output`
-result, and not image or other block results). At or under `TAGALONG_TOOL_PREVIEW_CHARS` (default 4000) it passes through untouched. One character over, `outputs.py` stores the whole text masked
-(the Masker, so a secret past the cap never shows in a later page) in the `tool_outputs` table and
-the model gets a facts header plus the first cap characters:
-
-```
-{"output_id": "9f2c...", "chars": 12840, "shown": 4000, "next_offset": 4000}
-<the first 4000 characters>
-```
-
-`read_output(id, offset)` is Scout's own auto tool: it returns one page (at most the cap) of the
-stored text as JSON with `next_offset`, which is `null` at the end. A page is never previewed again; its text is fenced as `<data kind="output">` so stored app text cannot pass as instructions. A lone surrogate in a stored result becomes U+FFFD.
-An unknown id or a negative offset is a plain refusal line; an offset past the end is an empty last
-page. Cuts are on characters, never mid-character. Brain tools, connected-app tools and an expert's
-report on a job wake all use this one path. The stored job report stays whole in the database, so the
-Reports tab shows it in full. At startup the newest `TAGALONG_OUTPUTS_KEEP` (200) stored outputs that no work row names are kept and older ones go; finished work is swept the same time (`TAGALONG_WORK_KEEP_DAYS`, see [storage.md](../data/storage.md#cleanup)). The
-cap is a transport guardrail only: how to present a long result (gist first, detail on request, the
-short version in voice) is guidance in `mind/soul.md`, not code.
+Moved to [safety.md](safety.md#long-tool-output).
 
 ## Capability picture and routing
 
@@ -307,8 +445,8 @@ each online body's tool names, each connected app with a one-line purpose (the f
 first tool description; none if it has none) and each installed expert with its login state. Names
 and one-line purposes only: no schemas and no focus facts, sorted, with at most 20 apps listed (then "and K more"), so the
 prompt stays small and identical while the state is unchanged. Placed before the bodies and the
-clock, which change more often. The brain sets no `cache_control` yet, so this only keeps a future
-cache prefix long.
+clock, which change more often. The brain sets no `cache_control`, so this only keeps the stable
+prefix long.
 `Session._capabilities()` reads `Toolbox.active_specs()` on each prompt build and groups the
 specs by source type (brain, body, app), so a tool set Off drops out of the picture as it does from
 the model's tool list.
@@ -338,8 +476,7 @@ event was accepted.
 The routing order lives in `mind/soul.md` ("Routing"): answer from what Scout knows; use its own
 tools, a body's tools and connected apps; hand over to an expert only when one is installed and
 the job is long or many-stepped. An expert is never assumed to have its own Gmail or Calendar. When
-nothing covers a request Scout says what is missing and offers a connect with `choose`. The old
-"recommend an expert" path is gone, and the `hand_off` refusal facts carry no advice.
+nothing covers a request Scout says what is missing and offers a connect with `choose`. The `hand_off` refusal facts carry no advice.
 
 ### Missing tool: Connect, then carry on
 
@@ -364,20 +501,7 @@ earlier request is still in the conversation and should be resumed.
 
 ## Reading status
 
-The desktop body sends a `reading` event (contract: `ReadingData` in `protocol.py`) on connect and
-after a change: one row per way it reads the screen (`window-text`, `text-from-pictures`) with a
-state of `working`, `needs-language-pack` or `not-working`. `Session.body_event` validates it
-(a malformed one is logged and dropped), keeps the latest in `ReadingStore` (`reading.py`, in
-memory only; the body resends on connect) and sends `changed {what: "reading"}` only when the
-copy differs. The event never wakes Scout. When the body disconnects, `Session.body_gone` forgets
-its copy and tells Home, so a stale status never outlives the body.
-
-Home reads it with the `reading_status` tool (`reading_tools.py`, Home only, effect `read`):
-`{"rows": [...]}`, or `{"rows": []}` with no body, in which case Home hides the group. When the
-picture-reading row is not `working`, the capability picture gains one fact line (text inside
-pictures cannot be read on this PC, and why); it names the body tool `install_ocr_language` only
-for a missing language pack. The model words any offer. That tool is declared `confirm: "always"`
-by the desktop, so it is person-only: no side check or offer touches it.
+Moved to [sight.md](../senses/sight.md): the `reading` event and Home's `reading_status`.
 
 The permission engine, tool modes, cards and asks that wait: see [permissions.md](permissions.md).
 
@@ -428,7 +552,7 @@ so there is one gate and no second path.
 
 `list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
 
-The first-run setup adds six more Home tools (never offered to Scout):
+The first-run setup adds seven more Home tools (never offered to Scout):
 
 | Tool              | Input                           | Result text (JSON)                                                                                                                                                                                                                                                                          |
 | ----------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -447,7 +571,7 @@ of `idle`, `waiting`, `updating`, `updated`, `failed`), `updates_check` (checks 
 then answers the same state), `update_item {kind, id}` and `update_all {kind}` (`{started}`, or
 `{waiting: "job"}` while a job runs, or `{error}`), and `set_auto_update {kind, official, on}`.
 Each status change sends `changed {what: "updates"}`. `setup/updates.py` `Updates` checks once a
-day (read afresh, not from the cache) from a 30 second `tick` loop in `main.py` (a failing tick is
+day (read afresh, not from the cache) from a 30 second `tick` loop, `Updates.run`, which `main.py` starts (a failing tick is
 logged, never ends the loop), applies only for a group left on (Official on, Community off at
 first), and never while a job runs: the apply holds a lock and `Updates.quiet()` waits on it,
 which `Jobs` awaits before it starts a run (`before_job` in `main.py`), and a hand-off waiting
@@ -583,843 +707,55 @@ text such as `[Errno 11001] getaddrinfo failed`.
 
 ## Connected apps
 
-`apps.py` and `app_tools.py` let Scout use MCP servers the user adds. See
-[connected-apps.md](../bodies/connected-apps.md) for the user's view; this is the brain's side.
-
-- **`Apps`** keeps one long-lived task per enabled app. `main` calls `apps.start()` once the server
-  is up (it returns at once; a slow or hanging app never delays boot) and `apps.shutdown()` after
-  the experts stop and before memory closes.
-- **`AppSource`** is the toolbox's third source. A connected app's tools appear as `<app>__<tool>`
-  (Scout only, never Home). Reads run at once, changes ask, and a tool is locked (asks every time
-  until you set it to `auto` on Home) when its hints say destructive or its name has a risky word (`send`, `delete`,
-  `remove`, `destroy`, `trash`, `pay`, `charge`). An app that is not connected is offline.
-  Answers are fenced as `<data kind="app" app="<id>">`. A long answer is kept whole (up to 5,000,000 characters) and reaches Scout as the usual preview, so `read_output` can page through all of it.
-- **Rows** are in the `apps` table of `tagalong.db` (id, name, transport, config, auth, enabled).
-  `${VAR}` references in env stay as written and are filled from the brain's environment at connect.
-- **`app-tokens.json`** in the data directory holds pasted tokens by app id (kept owner-only where
-  the platform allows). A token is never in a row, a tool list or an error line.
-- **OAuth** (`app_oauth.py`): an `auth: "oauth"` app signs in through the app's own page. The brain
-  runs the MCP SDK's `OAuthClientProvider` (client name "Tagalong", PKCE, dynamic registration) with
-  a one-request listener on `127.0.0.1` (port picked by the system, 300 s wait) as the redirect.
-  The provider asks a body's `open_url` to show the page. Only https is followed, or http to
-  loopback. The listener hands the SDK the redirect's `code`, `state` and `iss` (RFC 9207); servers
-  like Notion advertise `iss` support and the SDK refuses a sign-in whose `iss` was dropped. With no
-  saved tokens the app starts `needs-sign-in` and opens no browser; `sign_in_app`
-  starts it. A 401 mid-session returns the app to `needs-sign-in`.
-- **`app-oauth/<app id>.json`** in the data directory (`FileTokenStorage`) holds that app's tokens
-  and client registration, with `saved_at` and `expires_in` so tokens refresh before they expire.
-  A new sign-in clears the old registration (the redirect port changes). Removing the app deletes
-  the file. Like `app-tokens.json`, it never reaches a row, a tool list or an error line.
+Moved to [connected-apps.md](../bodies/connected-apps.md): `Apps`, `AppSource`, the `apps` rows, `app-tokens.json` and OAuth sign-in.
 
 ## Setting things up (`setup/`)
 
-Scout can look before it suggests a fix. `brain/src/brain/setup/` holds the facts and the registry
-read; installs come in later slices. Everything is read-only and returns JSON facts; the model
-words what the person reads (guidance in `mind/soul.md`).
-
-- `paths.py`: where Tagalong keeps its own Node, expert packages, the registry cache and the
-  installed-experts list, all under `TAGALONG_HOME`.
-- `facts.py`: `inspect()` reports OS, CPU and the versions of node, npm, git and `claude`, and
-  Tagalong's own Node separately. A missing or failing tool is `None`. The command runner
-  (`RunCmd`) is a seam; `real_run_cmd` is the only place a process starts.
-- `registry.py` and `net.py`: read the ACP agent registry and the MCP server registry (the
-  latter through its `search` parameter, latest versions only) into entries with a way to run
-  them (`npx`, `uvx`, `binary` per platform, `remote`). Entries are parsed leniently. Results are
-  cached for 24 h in `cache/`; offline, the cache is served with `stale: true`; offline with no
-  cache is `registry_unavailable`. Only the first MCP page is read; `more: true` in the result says the registry has further pages. `build_for` says whether an entry can run on this computer.
-- `node_runtime.py`, `archive.py`: Tagalong's own Node under `runtime/node/`. `pick_build` takes
-  the newest LTS at or above a minimum major from nodejs.org's `index.json` that has an official
-  archive for this OS and CPU (none is a fact, `NodeBuildMissing`). `ensure_node` reads the
-  checksum from the release's `SHASUMS256.txt`, streams the archive to `runtime/node.part/` while
-  hashing, checks it (one retry, then `NodeIntegrityError`), and extracts into `runtime/node.new/`
-  with `safe_extract`, which checks every member first and refuses absolute paths, drive letters,
-  `..` (also with backslashes), symlinks and hard links pointing out, and device files
-  (`UnsafeArchive`) before it writes anything. Only then does the new folder replace
-  `runtime/node/`; the old one goes after the swap. If the swap fails (the old Node is running or
-  locked) the old Node stays and the fact is `NodeInUse`. One download runs at a time. A failed or broken download removes its `.part` and leaves any existing Node
-  untouched. A marker file in the folder records the release, so a Node that is already new
-  enough returns at once with no network. The system Node, PATH and global npm are never touched.
-  `net.http_fetch` is the real `Fetch` (streams chunks, raises on a non-200 or on a redirect
-  away from https).
-- `tools.py`: Scout's tools `inspect_machine` (which also lists the installed experts),
-  `find_experts` and `find_apps(query)`, all read-only and automatic, never offered to Home.
-- `store.py`: `ExpertStore`, the installed experts in `experts.json` (id, name, version, the
-  command to start it, `registry` or `custom`, whether it is logged in, and which Node the
-  command runs on, `private` or `system`, so a later change of the system Node can be re-checked;
-  none for a binary or custom expert). Re-read on every call
-  because the CLI writes the same file; writes are atomic; a corrupt file is kept as
-  `experts.json.bad` and read as empty.
-- `install.py`, `expert_tools.py`: the `install_expert(id)` tool installs one expert from the ACP
-  registry into `tools/<id>/`. Only the person can allow it: the tool is `person_only` (`ToolSpec.tier`; no Always
-  button), so a stored Auto never opens it, `set_mode`
-  refuses it and the side-check never sees the ask; a preference in Scout's prompt cannot skip
-  the card. The card's input is built by code (`ToolSpec.card`): the expert, its version, the
-  folder, `recommended` (true for the recommended expert, so the chat's card shows its
-  "Recommended" chip), and `node_download` (the Node version and folder, or `null` when a system Node is new
-  enough). After Allow the tool returns `{"started": id, "item": <install open item id>}` at once and the
-  install runs in the background, outside the turn, one flight per expert id (`setup/flights.py`):
-  a second ask for the same id while it runs joins it and gets the same item back with
-  `"joined": true`; the item closes when the install ends (done) or is cancelled at shutdown
-  (expired). `update` (the updates check) runs as the same flight, with the same `setup_progress` and
-  `setup_done` events, so an install that joins a running update gets its result; it still refuses
-  with `already_installing` rather than join a running install. `tagalong stop` ends the
-  brain by killing it on Windows, so a start removes any `tools/*.part` and `tools/*.dl` staging
-  folder a killed brain left (`sweep_staging`). If the registry moved on after the card named a version, it returns
-  `version_changed` (`"<shown> -> <now>"`) and installs nothing. It emits non-waking `setup_progress` events (`expert`, `stage`,
-  `percent`) plus `changed {what: "setup"}`, and one waking `setup_done` event when it ends:
-  `expert`, `ok`, and either `installed` (the expert as JSON) or `error` and `detail`. A waking
-  `setup_done` or `setup_login` is an event like any other news, saved in the log until a turn has
-  told it, so a restart or a budget-dropped wake does not lose it. `SetupEvents` (`setup/events.py`)
-  posts the new one first and then ends the older waiting one for the same expert or app
-  (`finish_matching`), so a crash between the two loses no news. Brain
-  shutdown cancels running installs, each of which cleans up what it staged.
-  An `npx` entry runs `npm install --prefix tools/<id>.part <package>@<version>` (the card shows that same version; an unpinned package gets the entry's) with a system
-  Node that is new enough (and has its own npm), else Tagalong's own Node; the Node floor is 22 for
-  every npx expert. npm gets a minimal environment of its own (PATH with the chosen Node first,
-  the OS essentials and proxy settings), never an API key or any `npm_config_*` of the person's;
-  the system environment is never changed and nothing is global. Progress is real, not one long
-  "installing": npm runs at `loglevel=http` and its output is read line by line (`on_line`, an
-  optional fourth argument of a `RunCmd`), so the stages are `resolving` (until npm logs its first request, the package's
-  metadata, which it does once that answer is in), `fetching` (from then on: it is downloading the
-  package and what it depends on) and `finishing` (npm exited, the program is being checked), each
-  said once with no percent (npm gives no total). A binary entry says `downloading` and then a
-  `percent` from the response's Content-Length (`ByteStream.size` in `setup/net.py`, set by
-  `http_fetch`, read after the first chunk), at most one update per 5 percent (`percent_steps`);
-  with no length there is only the stage. Tagalong's own Node download uses the same percent,
-  filling 5 to 80 percent of the `node` stage. `extracting` and `done` follow. The 900 s `NPM_TIMEOUT_S` is the whole install's
-  ceiling, not a stage. A command that is cancelled or
-  times out is killed with its whole process tree. The stored command is
-  `[node, <the package's bin js>, <registry args>]`, resolved against the final folder. A `binary`
-  entry is streamed to `tools/<id>.dl`, checked against its listed sha256 and extracted with `safe_extract` into `tools/<id>.part`. The staged tree is swapped
-  into `tools/<id>/` only on success, and then the record is written: a reinstall keeps the old
-  files and record until then, and a failure or cancel removes only what was staged.
-  A binary with no listed sha256 is never offered: the registry reader drops it and `build_for`
-  skips it, so it is absent from Home's list and Scout's `find_experts`, and `install_expert`
-  answers `no_build` without downloading; the `integrity` check stays as the last guard.
-  `uvx` and hosted entries are `unsupported`; an entry with no build for this computer is
-  `no_build`. A failed expert or app install is also logged as one WARNING with its id, kind and
-  detail (`expert_tools.py`, `apps.py`), so `brain.log` says why. The expert's ACP client accepts
-  the adapter's `auth/status_update` notification (logged at INFO, `logged_in` untouched) instead
-  of letting the library log an error for a method it has no route for (`experts.py` `_Client`). A registry id must be a plain folder name. Failures are `InstallError(kind, detail)`
-  facts (`bad_id`, `no_build`, `unsupported`, `node_failed`, `npm_failed`, `integrity`,
-  `unsafe_archive`, `download_failed`, `swap_failed`) carried in `setup_done`.
-- `login.py`, `terminal.py`, `env.py`: the `login_expert(id)` tool logs an installed expert in on
-  the person's own subscription. Like install it is `person_only`; the card (built by
-  code) shows just `expert` and appears at once, because it runs no check: nothing opens before
-  the OK, and the checks run after it, in the background. `LoginDriver.check` spawns the adapter with
-  `clientCapabilities.auth.terminal = true` (without it Claude lists no methods), calls
-  `new_session` in a scratch folder and sends no prompt (a scratch folder the adapter still holds, as on Windows, never changes the answer: cleanup errors are ignored): success is logged in, an auth-required
-  error is not logged in (with the advertised methods), anything else is unknown. The flight picks a
-  subscription method: the terminal `claude-ai-login`, else the one terminal method, else a
-  browser one (`chat-gpt`); never an API-key method. A terminal method opens a
-  visible window (the `OpenTerminal` seam; `real_open_terminal` is Windows only: `cmd` with
-  `CREATE_NEW_CONSOLE`) running the adapter's own command plus the method's args, with the
-  expert's env, wrapped so the exit code lands in a done file, `cache/login-<id>-<random>.done`, new for every
-  start (a watcher writes `closed` there if the window is closed with X, so the login ends as
-  failed at once). Arguments or paths with `" % ! & | < > ^` are refused with `NoTerminal` too, as
-  cmd would act on them; elsewhere it raises `NoTerminal` and the flight ends in a `setup_login` event with `state` `failed`,
-  `detail` `no_terminal` and the `command`, so Scout can tell the person what to run. A browser method calls ACP `authenticate(method_id)` and the adapter opens the
-  browser. The tool returns `{state: "waiting", item: <signin open item id>}` at once. One background flight
-  per expert (`setup/flights.py`) runs the first check, opens the window or browser if needed,
-  waits (10 minutes at most for the done file or the call), re-checks login, records it in
-  `experts.json` and posts one waking `setup_login` event (`expert`,
-  `state` = `logged_in`, `failed` or `unknown`, and `detail`, plus `command` for `no_terminal`)
-  and sends `changed setup` so Home and the tour reload. A login already done ends the same way
-  with `logged_in` and nothing opened. A second request for the same expert while the flight
-  runs joins it: the same item comes back with `"joined": true`, no second window opens, the
-  running waiter is never cancelled, and there is one event for all the requests (earlier, requests
-  that overlapped each cancelled the previous waiter, and one failing expert gave three
-  `setup_login` events in 33 s; a retry after a flight has ended is a new request, by design). The item closes when the flight ends;
-  shutdown cancels the flights; every adapter process tree is killed on the way out. No link or code passes through
-  Scout or the brain, so nothing is masked. `env.py` holds the per-expert table of keys that would
-  switch an expert to an API key (Claude, Codex; an unknown expert loses all of them; every expert also loses
-  `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN`), used
-  for the login child and the check, and by expert runs later.
-- `apps.py`: `install_app` (Scout, `change`, `person_only` like `install_expert`: the
-  Allow card cannot be skipped by a preference or a stored Auto, and has no Always). `app_params`
-  turns an MCP Registry entry into the params `validate_app` takes, and `app_tools.save_app` (the
-  same path Home's `add_app` uses) stores it. An `npx` package becomes a stdio app that runs
-  `<node> <npm-cli.js> exec --yes -- <package>@<version>` with absolute paths, the system Node when
-  it is 22 or newer, else Tagalong's own (downloaded first, named on the card; the system PATH is
-  never edited, only that app's own `PATH` has the Node folder first). A `uvx` package becomes stdio
-  `uvx` when it is installed, else the `uv_missing` fact. A remote entry becomes an http app with
-  `auth: "oauth"` (it only prompts when the server answers 401) and, when a browser body is
-  online, starts the sign-in through `Apps.sign_in`; with no browser the result says
-  `browser: false`. A remote entry that requires a header is the `needs_token` fact (a secret is
-  the person's to supply with Home's `add_app`). Required environment variables become `${NAME}`
-  references and no value is stored; the result lists the ones the brain's environment lacks as
-  `needs_env`. The card names the id, transport, package and version (or host), required env names
-  and any Node download. The result is `{id, transport, auth, status}` where `status` is the app's
-  state after at most 20 s (`connected`, with `tools` and `tools_total`; `connecting`,
-  `needs-sign-in`, `error`) or `signing_in`; only `signing_in` and a `connecting` still pending
-  end later in a `setup_done` event (see Missing tool: Connect, then carry on);
-  failures are `{error, detail}` facts (`unknown_app`, `needs_token`, `no_build`, `node_missing`,
-  `uv_missing`, `already_added`, `registry_unavailable`). Pass the same `query` as `find_apps` so
-  the entry is in the cached page.
-- `tools.py` `setup_facts`: the facts a refused `hand_off` carries (see Experts).
-- `updates.py`: `Updates`, which finds newer versions of installed experts and local apps (an
-  app's is the package version pinned in its command, `apps.version`; a remote app has none),
-  keeps the last check and latest versions in `cache/updates.json`, and applies an update: an
-  expert through `expert_setup_tools`' `update` (the install path's staging and swap, under the
-  same one-per-expert guard as Home's install, keeping the expert's login), an app by
-  `set_app_package` plus `Apps.restart`, then `Apps.wait_settled`; if the new command does not
-  connect, the old one is written back and started again. A due update waits while a job runs
-  (`quiet`, above).
-- `cli.py`: the `tagalong` command (`uv run tagalong`, or `tagalong` once installed), for a brain
-  machine with no screen. It is a thin caller of the functions above (`inspect`, `Registry`,
-  `install_card`, `install_expert`, `app_params`, `save_app`, `LoginDriver`, `ExpertStore`) with
-  the same seams (`run`, `fetch`, `get_json`, `ask`), and it never contacts a running brain: it
-  reads and writes the files under the data folder, and a brain re-reads them when it next needs
-  them (an app it adds connects when the brain next starts). `doctor` prints the machine, Node,
-  npm, git, whether a key is set (never the key), the installed experts and their login, and the
-  registry (from the cache, flagged, when offline); it exits 0 even when something is missing.
-  `key set` reads the key from a hidden prompt or `--stdin`, never from the command line, and
-  writes `ANTHROPIC_API_KEY` to `.env` with `upsert_env_value`. `install <expert>` and
-  `apps add <app>` print what the Allow card shows (id, version, folder or host, the Node
-  download), then ask `[y/N]`; `--yes` skips the question (with no terminal to answer on and no
-  `--yes` it prints "Run again with --yes to go ahead without a prompt." and exits 1). `login <expert>` runs the same
-  `LoginDriver` as Scout's tool: a terminal window or the expert's own browser step, then waits
-  for the result; where no window can open it prints the command to run yourself. A failure
-  prints `failed: <kind>: <detail>` and exits 1; a usage error exits 2.
-
-## WhatsApp bridge
-
-`bridges.py` runs the WhatsApp bridge (`bodies/whatsapp`, built to `dist/index.js`) as a child
-process of the brain, on Tagalong's own Node only (`ensure_node`; the system Node is never used).
-
-- It runs only when `TAGALONG_WHATSAPP_ENABLED` is `1` and the access token, app secret, verify
-  token, phone number id and allowed number are all set. Otherwise nothing runs.
-  `BridgeSupervisor.state` is `off`, `incomplete`, `starting`, `running`, `not_built` (the file is
-  missing: one log line says to run `pnpm --filter @tagalong/whatsapp build`) or `node_failed`.
-- The child's environment is built by the brain: `TAGALONG_BRAIN_ADDR` (always `127.0.0.1` and the port the brain actually bound), the five values, the
-  port (default 47322) and `PATH`/`SystemRoot`. It never sees the Anthropic key and never reads
-  `.env`.
-- A bridge that exits (or whose output stream fails) is started again after 1, 2, 4, 8, 16 s
-  and then every 30 s; a bridge that ran for a minute or more starts the waits over at 1 s.
-  Stopping waits for the child to exit (5 s, then it is killed), so a new bridge never meets the
-  old one on its port.
-- `main.py` starts it after the server is up and stops it before the jobs shut down. The brain
-  also holds the child's stdin pipe, which the bridge exits on when it closes, so a brain that is
-  killed hard (`tagalong stop` on Windows) leaves no bridge behind.
-- The child's output is logged by the `brain.bridge` logger, so it reaches `brain.log` through the
-  secret filter; the access token, app secret and verify token are masked like the Anthropic key. The phone
-  number id and the person's own number are not secret and are kept as written.
-
-### WhatsApp setup tools
-
-`bodies_tools.py` gives Home three tools (never offered to Scout; `main.py` passes the bridge
-supervisor as a getter, because it is built once the brain's port is known):
-
-| Tool              | Input                                                          | Result text (JSON)                                                                                                                                                                                                                                                                    |
-| ----------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `brain_status`    | `{}`                                                           | `{"version", "build", "pid", "started_at", "started_by", "addr", "data_dir", "log_path", "places": [{"id", "kind", "name"}], "work_running", "model"}` (`model` is the chosen model's name): the facts on Home's "Scout's brain" card (Home only; `brain_status_tools` in `tools.py`) |
-| `bodies_status`   | `{}`                                                           | `{"bodies": [{"id", "kind", "name", "connected"}]}`, one row per online body (two desktops are two rows); a kind with none online keeps one row (`connected` false, `id` the kind), so `desktop`, `browser` and `whatsapp` always appear                                              |
-| `whatsapp_status` | `{}`                                                           | `{"enabled", "set": {access_token, app_secret, verify_token, phone_number_id, allowed_number: bool}, "complete", "state", "port"}`; never a value                                                                                                                                     |
-| `whatsapp_set`    | any of `enabled` (bool), the five strings, `port` (1024-65535) | the same JSON as `whatsapp_status`                                                                                                                                                                                                                                                    |
-
-`whatsapp_set` changes only the keys given. They are written together in one atomic replace of
-`<TAGALONG_HOME>/.env` (`upsert_env_values`, `enabled` as `1` or `0`) and to the running environment, then the supervisor
-applies it (start, stop or restart) and the brain tells bodies `changed { what: "bodies" }`. The number is
-kept as digits only. A bad value is refused with fixed text that never quotes it; a failed write says
-where (`Scout could not save the WhatsApp settings to <path>.`) and changes nothing (file and running environment stay as they were). A value must be one printable line (a line break of any kind is refused). After the write the log masker's secret cache is cleared, so the restarted bridge's first lines are already masked. Bridge restarts run one at a time; a `tagalong key set` in another process is not covered. No frame is added to contract v1.
+Moved to [setup.md](setup.md): looking at the machine, registries, installs, sign-in, updates, the `tagalong` command, the WhatsApp bridge and its setup tools.
 
 Experts, jobs, the job queue, the expert bridge, retries, timers and watches: see [experts.md](experts.md) and [turns.md](turns.md#timers-and-watches).
 
 ## Loops
 
-A loop is something left open that Scout holds for the person: a reply they owe, a promise
-someone made them. This part has the shape, the store, the triggers that surface a loop, and the
-mail source, and Home's switch for it; the switch is off until the person turns it on, so nothing
-creates a loop before that.
-
-- **Shape** (`loops/loop.py`). A `Loop` has an id, a `source` (the connected app) and `ref` (that
-  app's own id, such as a thread) that together name it, a title, what it `asks`, a direction
-  (`i_owe` or `they_owe`), people, a `due` time, a `quiet_after` time, anchors (window or page names
-  that mean "you are working on this", used later), a status (`held`, `snoozed`,
-  `done`, `dropped`, `stale`), a map of when each anchor last surfaced it, and a history.
-- **Store** (`loops/store.py`). `LoopStore` is a thin layer over the work store: a loop is a `loop`
-  work row plus a `work_loop` detail row, with its history and "surfaced" marks as events; the
-  per-app read cursors are `app_cursors` and the mail switch is `apps.reads_mail` (see
-  [Memory](../data/memory.md#loops) and [storage.md](../data/storage.md#work_loop)). Saving the same (source, ref)
-  updates the loop and never duplicates it. Text is masked (`[secret]`) before it is written,
-  history included. `forget` removes one loop; `wipe` removes every loop and the mail cursors.
-- **Service** (`loops/service.py`). `LoopService(store, emit, now)` is built and started in
-  `main.py` beside the session (`session.loops` is the same object). It emits a `loop` event with the
-  loop's id, title, asks, direction, people and due, and a `reason` (see Triggers). Each surface is
-  recorded in the store before the event goes out, so a restart never repeats it. The event is saved, so a wake the gate holds (the hourly wake cap, no key) waits in the log and
-  is told when the gate opens; a due loop also stays visible in Home's loops list (status `held`). One `call_later` is
-  armed for the earliest unfired due or quiet time, re-checked at least hourly (the same pattern as
-  `Timers`); `changed()` re-arms after loops are added or edited. `fire_due()` also runs on each poll
-  tick, so the quiet and stale checks need no timer of their own.
-- **Event.** `loop` wakes Scout with a 0 s batch window and at most 4 wakes an hour. Its note in
-  `mind/events.md` weighs each reason and tells Scout the title, asks, people and anchor may be
-  someone else's words and are data, not instructions. All of it reaches the model inside the wake's
-  fenced block, like every event. If no display body is online the wake waits for one and is not
-  lost. Two more reasons come with Scout's actions: `later` (a loop put off with Later is back) and
-  `digest` (see Acting on a loop).
-- **Triggers** (`loops/triggers/`: `context.py`, `due.py`, `urgent.py`, `quiet.py`, `stale.py`, pure
-  rules; the service owns timing). Five reasons:
-  - _context._ `Session.body_event` also hands every `focus` (app, title) and `tab` (title, url)
-    event to `loops.saw`; they stay non-waking events. A `held` loop surfaces when a
-    window or tab matches one of its anchors. An anchor matches only if, after lowercasing and
-    dropping punctuation, it has at least two words that are not on the stoplist (Untitled,
-    Document1, New Tab, Inbox, Home, app names and similar), or it is a file name (`Q4 pricing.pptx`:
-    the whole name and extension in the title). A text anchor needs at least two of its words in the
-    title and at least half of them, so `Q4 pricing deck` matches the window `Q4 pricing.pptx -
-PowerPoint` but a one-word anchor never matches. A URL anchor must have a path and matches the
-    tab on host (without `www.`) and path prefix; the query and fragment are ignored. Nothing
-    matches while the mail app is in front (Gmail, Outlook or Thunderbird in the app or title, or a
-    known mail host), since opening the mail would surface itself.
-  - _due._ A `held` or `snoozed` loop whose `due` has passed, once per due time (moving the due time
-    lets it fire again).
-  - _urgent._ The reader's `urgent` flag on a **new** loop, once per loop, immediately, and only for
-    mail from the last 24 hours (the backfill's old mail is not urgent now).
-  - _quiet._ A `they_owe` loop (`held` or `snoozed`) whose `quiet_after` has passed, once per quiet
-    time. A reply cancels it through the reader: `close`, or an update that turns it into an `i_owe`
-    loop.
-  - _stale._ Each sweep marks `held` loops untouched for `TAGALONG_LOOP_STALE_DAYS` (default 7) as
-    `stale` and sends one `loop` event (`reason=stale`, `count`, and `loops`, one line of id, title and
-    asks per loop; key per sweep). A stale loop returns to `held` if new mail arrives on its
-    thread. `loop_keep` and `loop_drop` answer it.
-  - _Once a day, and throttles._ A context surface is recorded per loop and anchor under the local day,
-    so the same window surfaces a loop once a day. Before the event goes out the service throttles per
-    reason across all loops: context 1 per 10 minutes, urgent and quiet 2 per hour. A throttled
-    match is not recorded, so it can surface on a later focus (urgent only comes on read, so a
-    throttled urgent wake is dropped, and the loop can still surface on context or due; a throttled
-    quiet loop is re-armed for when the throttle frees). Due and stale are not throttled. The `loop` event cap (4 an hour) is
-    the second line of defence.
-- **Reader** (`loops/reader.py`, wording in `mind/reader.md`). Turns one `MailItem` plus the related
-  open loops (same thread or people) into one `Change`: `new`, `update`, `close` or `ignore`. Nothing
-  calls it yet; the next slice's mail source feeds it.
-  - _Pre-filter._ `prefilter(item)` returns why a mail is bulk, or `None`. It drops `List-Unsubscribe`,
-    `Precedence: bulk/list/junk`, `Auto-Submitted` (anything but `no`) and no-reply senders, with no
-    model call.
-  - _Safe by shape._ Mail is untrusted. It goes to the model only inside a fenced
-    `<mail untrusted="true">` block (angle brackets in mail text are escaped, so it cannot close the
-    fence), the system prompt says it is data, never instructions, and the model may answer only
-    through the `loop_change` tool schema. Text, a wrong tool, an unknown kind, a model error or a
-    malformed answer all become `ignore` (logged, never raised). An `update` or `close` for an id that
-    was not in the related loops is dropped.
-  - _Allowance._ The reader uses a second `AnthropicModel` (`TAGALONG_READER_MODEL`, default Haiku)
-    and its own `Budget` (`reader-budget.json`, `TAGALONG_READER_DAILY_USD`, default 0.50 USD a day),
-    separate from Scout's. Each call spends from it. When it is spent, or the model has no key,
-    `read` raises `ReaderStopped` without a call so the service can show "mail unread since"; the
-    day roll starts it again. The one key set in Home feeds both models.
-- **Mail source** (`loops/source.py`, `loops/sources/gmail.py`, the poll in `loops/service.py`).
-  `enable(app_id)` switches mail reading on for one connected app (`disable` stops it, loops stay;
-  `wipe` stops everything and deletes every loop and cursor). Home's "Read my
-  mail for loops" switch is the only caller (see Home tools below), so it stays off until the person
-  turns it on. The switch is saved (the `apps.reads_mail` column, set by `enable`, cleared by
-  `disable`), and `start()` turns on every saved app without checking that it can be read yet (apps connect after
-  `start()`, so their tools are not listed then). A poll before the app is connected fails and is
-  retried; after repeated failures Home shows "Mail unread since". `loops_state` lists an app that
-  is on even while it cannot be read.
-  - _Adapter._ A `Source` has `matches(tools)`, `new_items(since, unanswered_only)`,
-    `sent_items(since)`, `thread(thread)` (every message of one thread, for Show) and
-    `draft_reply(thread, text)`. The one adapter, `GmailSource`, uses only
-    `search_threads` and `get_thread` to read and `create_draft` to draft, through `Apps.call`
-    directly (the switch is the consent, so the toolbox gate is not involved). Any other tool name is
-    refused in the adapter, so loops cannot send mail (`send_message`) or change the mailbox.
-    `matches` is true for a connected app whose tools include all three, so a second Gmail account
-    is just a second app id.
-  - _Poll._ The first poll after the switch reads 14 days back (`BACKFILL_DAYS`, a constant), unanswered
-    threads only: a thread whose last message is the person's own is skipped (a stop mid-backfill
-    keeps that rule on resume until the backfill has finished). Every page of a search is read, by its
-    next-page token. After it a cursor (the date of the last mail handled, per app, in the store)
-    keeps place, and each poll reads from the cursor. A poll repeats every `TAGALONG_LOOP_POLL_S` seconds (default 300) by `call_later`, never
-    two at once for an app. The cursor moves after each mail, so a stop loses nothing and reads
-    nothing twice.
-  - _Mail to loops._ Each mail passes the pre-filter (bulk costs no model call), then the reader with
-    the open loops of the same thread. `new` and `update` save through (source, ref), so a follow-up
-    on a thread updates its loop and never makes a second one; new mail on a thread whose loop was done
-    reopens it (so does a stale one). `close` marks the loop done. Each note in a loop's history carries when its mail
-    arrived.
-  - _Related loops._ In v1 a mail is matched to its loop by thread only: a reply on a new thread
-    makes a new loop.
-  - _Self-close._ After reading, each poll scans the person's sent mail since its own sent cursor: a sent
-    message newer than the last mail on that thread closes an `i_owe` loop, in code with no model
-    call. The reader's own `close` (the sender withdrew) is the other way a loop closes.
-  - _When reading stops._ If the reader's allowance is spent mid-poll, the poll stops, the cursor
-    stays on the last mail read, and `unread_since(app)` returns when it stopped; the next poll resumes
-    there once the allowance is back. If the app errors, is disconnected or answers badly (any failure), the poll tries again at the
-    next interval and, after three failures in a row, sets `unread_since` too. A good full poll clears
-    it. Nothing here raises into the brain.
-- **Home tools** (`loops/home_tools.py`, Home only, never in Scout's toolbox; `main.py` registers
-  them). `loops_state` answers `{apps, loops, open_items}`: `apps` are the connected apps the Gmail adapter
-  matches (`can_read`), each with `on` and, only when set, `unread_since`; `loops` are every loop
-  the store holds (any status) with id, app, title, asks, direction, due, people and status, and
-  never the mail text (the brain does not keep it). `loops_set {app, on}` starts (the 14-day
-  backfill) or stops that app's poll; an app that is not a mail app is refused with `invalid_params`,
-  and off keeps the loops. `loop_forget {id}` deletes one loop. `loop_done {id}` closes one (the person dealt with it) and `loop_later {id, until}` snoozes one until an ISO time that carries an offset (a naive, past or unparsable time, or an unknown id, is refused with `invalid_params`); Home's Later button sends tomorrow 09:00 local. `loops_wipe` is Stop and wipe: every
-  switch off, every loop, surface log and cursor deleted. Each emits `changed { what: "loops" }`, as
-  does a poll that changed something, a surfacing and a stale sweep, so an open Home reads again.
-  The switch is saved: a restarted brain keeps reading where it was on; a fresh one has every
-  switch off.
-- **Acting on a loop** (`loops/tools.py`, Scout's own tools; `main.py` registers them). When Scout
-  speaks up about a loop it offers Show, Done and Later with `choose` (the answer comes back as a
-  `choice` event; no new bubble or frame). Then:
-  - `loops_open` lists every open loop (id, title, asks, direction, people, due, status): the answer
-    to "what's waiting on me?". `loop_show {id}` gives one loop with its history and, when mail
-    reading is on for its app, the mail thread in a masked `<thread untrusted="true">` block (angle
-    brackets escaped, each mail cut at the reader's cap); with the switch off, or the app failing,
-    `thread` is null.
-  - `loop_done {id}` sets `done` and notes it in the history. It touches only the store: no mail
-    tool is called, so no label, archive or read mark. `loop_later {id, until}` (ISO 8601 with an
-    offset, in the future) sets `snoozed` with `snoozed_until`; the loop is skipped by the context
-    trigger, and when the time comes the service puts it back to `held` and sends a `loop` event
-    `reason=later` (once; `due` still fires on its own). `loop_keep` returns a stale loop to `held`
-    with the stale clock restarted; `loop_drop` sets `dropped`. These four are Auto.
-  - `loop_draft {id, text}` calls only the source's `draft_reply` (Gmail `create_draft`) on the
-    loop's thread and returns the text for Scout to show; the person reads and sends it from their
-    drafts. Scout never sends. It is a `change`, so it asks like any change unless the person set
-    it to Auto; it needs the mail switch on for that app, else it is refused.
-  - A hand-off for a loop starts its brief with `Loop <id>:` (soul.md) and carries the thread's key
-    facts. The brief is the job's task, so the `job_ended` wake shows it and its note tells Scout to
-    offer the drafted reply (`loop_draft`). No new column or job field.
-  - _Digest._ On the first `back` or `body_online` of a local day, if any `held` loop was created
-    that day, the service sends one `loop` event `reason=digest` (`count`, and `loops`: id, title and
-    asks per line). Nothing is sent when none was held; the digest is the `loop-digest` watch
-    row (return trigger, due at the next local midnight; Timers skips it), advanced when it runs so
-    a restart does not repeat it. It uses the `loop` cap; Scout words it, or stays
-    silent.
-  - _Corrections._ soul.md tells Scout that when the owner says it should have told them, it saves
-    that with `remember` as a preference. There is no new store or code path.
+Moved to [loops.md](loops.md): mail loops, the reader, surfacing, triggers and Home's tools.
 
 ## Web search and fetch
 
-`web_tools.py` declares Anthropic's server-side `web_search_20260209` and `web_fetch_20260209`
-(dynamic filtering; no beta header, no separate code-execution tool) with `max_uses` 5 each per
-request. Each `pause_turn` continuation is a new request, so the real limit per question is the
-step cap times 5. The `_20260209` versions may not be supported on Haiku 5.5. `WebSource` makes them two ordinary `ToolSpec`s (read, Auto by default) that
-carry a `server_tool` declaration, so Home lists them, Off removes them from the model's list and
-the capability picture, and `Toolbox.model_tools()` sends the typed declaration instead of an
-`input_schema`. The brain never runs them: Anthropic returns the `server_tool_use` and
-`*_tool_result` blocks in the same reply (`pause_turn` is already continued by the loop), and
-`WebSource.run` refuses.
-
-Cost: tokens as usual (fetched pages are input tokens) plus `WEB_SEARCH_USD` (0.01: 10 USD per
-1,000 searches, per https://platform.claude.com/docs/en/about-claude/pricing, verified 2026-11-03)
-per `usage.server_tool_use.web_search_requests`, added in `Budget.spend` (a missing field
-counts none). Fetch has no extra charge. The daily default is unchanged, so a research-heavy day can reach it
-sooner; when it does the existing `over_budget` stop applies and `mind/soul.md` has Scout say so
-plainly and point to Settings, never at an expert. Saved chat: `without_server_blocks` drops the
-server blocks and text citations from the copy written to disk (the live history keeps them). A message that loses any block also loses all its `thinking` and `redacted_thinking` blocks (`without_thinking`; masking a thinking block does the same), because the API rejects a thinking run with a hole in it. `rebuild_history` drops thinking from every message it rebuilds (the API only accepts thinking cut from the front of a history), so a resumed chat has none and thinking restarts with the next turn; the live history is untouched. So
-a resumed chat holds the answer text only, masked like any other message. In place of the dropped
-search blocks the save keeps one short text note (`[Searched the web for "q". Read <url>. Sources:
-Title (url); ...]`, from the `web_search` / `web_fetch` `server_tool_use` input and the
-`web_search_tool_result` content; at most 5 queries, pages and sources, 120 characters each), so a
-restarted Scout still knows it searched. The note is saved text, so it is masked too. A message
-with only server blocks and no search or fetch among them is saved with empty content. A server block is `server_tool_use` or any
-`*_tool_result` (web_search, web_fetch, code_execution, tool_search ...; `web_tools.is_server_block`),
-so new tool versions need no list edit. `rebuild_history` (returns the history and whether it added a cancelled `tool_result` that is not yet saved) drops them too, which heals chats saved
-before this rule (an orphaned result makes the API reject every request); an assistant message left
-empty (a silent reply) is dropped together with the turn-start message it answered, never given a
-stand-in text the model would copy; roles still alternate.
-
-Ask is meaningless for them (they never reach the gate): `Toolbox.set_mode` refuses `ask` for a
-spec with `server_tool`, `list_permissions` rows carry `server_tool`, and Home shows only Off and
-Auto. If a guard (budget, step cap, timeout, cancel) stops a turn right after a `pause_turn`,
-`run_turn` drops the trailing `server_tool_use` block with no result (and the message, if empty)
-so the next message gets valid history.
+Moved to [safety.md](safety.md#web-search-and-fetch).
 
 ## Guardrails
 
-The budget, the step cap, the tool gate's ask, the ask chain and the wake caps go through one
-runner, `guards.py`, so precedence and logging live once. A guard is
-a plain function that gets a context and returns a verdict. `sessions.py` builds one `Guards` set
-and hands it to the turn loop, the runner, the side-check and offers. The budget ledger stays in
-`guardrails.py`; the guards that use it are in `builtin_guards.py`.
-
-### Hooks
-
-| Hook         | Runs                                      | Built in                                                                                                                                                                                           |
-| ------------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `model_call` | Before each model call                    | `daily_budget`, `step_cap`                                                                                                                                                                         |
-| `emit`       | In the runner's gate, before news is told | `daily_budget` (code `over_budget`: the gate stays shut, so queued news waits in the log), then `wake_caps` (a `held` block: the wake waits until the per-kind or the overall hourly cap frees up) |
-| `save`       | Before text is stored                     | `mask_secrets` (`masking.py`): a `rewrite` with secrets replaced by `[secret]`                                                                                                                     |
-
-There is no `ask` hook: every permission ask, Scout's and Claude Code's, goes through the
-permission engine (`permission.py`), which owns the floor, the deciders and the one
-approvals-log write.
-
-The `save` hook runs through `mask_message` over the new chat messages (`Session._save_new`, which
-saves a masked copy while `history` keeps the real values for the live turn), an approval's
-summary and input (`Approvals`) and a job's result (`Jobs._end`) and progress (`Jobs._progress`) through `mask_json`, and, through `SecretLogFilter` on
-every log handler, each log line. The `Masker` replaces exact stored secret values of 8+
-characters and common key shapes with `[secret]`; its list of values is cached for 1 second. A
-guard that raises or blocks stores `[withheld]` instead of the raw text, but `mask_message` leaves
-the values of structural keys (`role`, `type`, `id`, `tool_use_id`, `name`, `signature`) alone on
-a message, its content blocks and the blocks inside a tool result's content (a `name` or `id` inside a
-tool's input is still masked), so a saved chat always rebuilds. `Session._save_new` also drops a `thinking` block from the saved copy
-when masking would change it (a message left empty is saved with empty content); `redacted_thinking`
-blocks are kept. The log filter calls the
-masker directly, not the runner, because the runner logs. Scout's live turn and the side-check
-prompt are not masked. See [privacy](../data/privacy.md#what-is-masked-on-disk-what-is-not).
-
-Each turn's saved batch is tagged with the kind of body it was shown on (`messages.body`): `Session._start_turn`
-reads the turn body's `kind` once, so it holds even if the body leaves first, and `Session._save_new(body)` passes
-it to `Memory.save_messages`. A turn with no body (a wake) or no longer-online body reads `desktop`. The
-kinds are the `BODY_*` constants in `protocol.py`. Nothing reads the column yet.
-
-`model_call` is checked for a turn (`kind: turn`, with the step count), the side-check and an
-offer. `step_cap` only counts turns. The budget guard is listed first so a spent day reports
-`over_budget` even when the step cap is also reached.
-
-### Verdicts
-
-| Verdict   | Meaning                                      |
-| --------- | -------------------------------------------- |
-| `allow`   | Carry on                                     |
-| `ask`     | Put it to the person                         |
-| `block`   | Refuse this one action, with a reason        |
-| `stop`    | End the whole turn, with a reason and a code |
-| `rewrite` | Carry on with a changed value (masking)      |
-
-`stop` carries the code the body already knows: `over_budget` or `step_cap`. The contract does not
-change. The first `block` or `stop` ends the run; otherwise the order is `ask`, then `rewrite`, then
-`allow`. A guard that raises, or returns something that is not a verdict, counts as a `block`
-(reason `guard failed (<ExceptionClassName>)`, code `error`), so a broken spend check fails closed.
-
-```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
-flowchart TD
-    A[Guards.run hook, context] --> B[next guard for the hook]
-    B --> C{raised or not a verdict?}
-    C -->|yes| D[block: guard failed]
-    C -->|no| E[verdict]
-    D --> F{block or stop?}
-    E --> F
-    F -->|yes| G[log one line, return it]
-    F -->|no| J{ask?}
-    J -->|yes| K[log one line, remember it]
-    J -->|no| H
-    K --> H{more guards?}
-    H -->|yes| B
-    H -->|no| I[return ask, else rewrite, else allow]
-```
-
-### The log line
-
-Each refusing verdict (`block`, `stop`, `ask`) is logged once at INFO on `brain.guardrails`:
-
-```
-guard=<name> hook=<hook> verdict=<kind> reason=<text> turn=<id>
-```
-
-`turn=<id>` is added only when a turn is known. `allow` is not logged. The line never holds tool
-input or result text, and a guard that raised logs `guard failed (<ExceptionClassName>)`, never the message.
-
-### Adding a guard
-
-One function, one test, one `add` in `sessions.py`:
-
-1. Write the guard in `builtin_guards.py`: a function that takes its settings and returns
-   `Guard(name, hook, check)`. `check` gets the hook's context and returns a verdict. It runs on
-   the event loop, so keep it quick (or `async` with its own time limit; `emit` is sync, so
-   no `async` there).
-2. Test it first in `brain/tests`: the verdict for an allowed and a refused context.
-3. Register it with `guards.add(...)`. Today `sessions.py` calls `spend_guards(budget, step_cap)`,
-   which adds the built-ins in order; a new guard gets one more `add` there, with its settings
-   passed in (never import `config`).
-
-The limits are `TAGALONG_DAILY_BUDGET_USD` and `TAGALONG_STEP_CAP` (see [Run it](#run-it)); no env
-name or meaning changed. The turn timeout `TAGALONG_TURN_TIMEOUT_S` is a plain argument to the
-turn loop, not a guard (see [What a turn does](turns.md#a-turn)).
+Moved to [safety.md](safety.md): guards, masking secrets and the budget.
 
 ## Brain ears
 
-The brain hears the mic itself. A body sends `listen {mode}`, then `mic {pcm}` frames (16 kHz
-int16, base64), and gets `heard` and `voice` back; the contract is in
-[protocol/README.md](../../protocol/README.md). The desktop uses it: it
-streams the mic and has no speech model of its own. The body keeps deciding what a heard turn means (addressing,
-follow-up) and sends the words as an ordinary `say` with `spoken: true`.
-
-Audio goes only to your own brain and is never stored; with the brain on this computer it never
-leaves it.
-
-`moonshine-voice` pulls in `sounddevice`, which needs PortAudio (`libportaudio2` on Linux) when a
-listen first loads the ears.
-
-| Piece                  | Model                                                                            | Job                                                |
-| ---------------------- | -------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `silero.py`            | Silero VAD v5 on onnxruntime                                                     | Speech or not, per 32 ms window                    |
-| `engines/moonshine.py` | Moonshine streaming (`moonshine-voice`), the model chosen from `stt_models.json` | The words so far                                   |
-| `smart_turn.py`        | Smart Turn v3.2 on onnxruntime                                                   | Whether the person has finished, from the last 8 s |
-
-- **`Ears`** (`voice/ears.py`) is synchronous and holds no asyncio, so tests drive it frame by
-  frame with fakes (`tests/fake_voice.py`). Silence is ignored. The first speech frame emits
-  `speech_start` (the 96 ms before it are fed in too: more makes Moonshine invent a first word
-  like "You"). Every 10 speech frames, if the words changed, `partial`. 256 ms of quiet closes the
-  stretch and emits `final`, with the words from Moonshine's final pass (`finish`: the live read
-  trails the audio and clipped the last word; a failed final pass raises, so the service's error
-  path logs it). Held mode ends the
-  turn only on `finish` (the key was released), with the last words kept and exactly one
-  `turn_end`, even if nothing was said. Always mode asks Smart Turn at each pause and ends the
-  turn at a score of 0.5 or more, or after about 2 s more of quiet; a failing Smart Turn counts as
-  "over". A stretch of speech with no pause is closed after about 30 s. With a final model
-  (`EarsParts.final`, an `engines/faster_whisper.py` `FinalStt`) the ears also keep the turn's
-  audio in memory (at most the last 60 s, `FINAL_MAX_SAMPLES`) and, when a turn that had speech
-  ends, transcribe all of it again; that text goes in `turn_end`. A failed or empty pass, or no
-  final model, keeps the live words. `load.py` loads the final model after the live one and
-  leaves it out (with a logged warning) if it cannot be downloaded or loaded. When a card is seen
-  without cuBLAS and cuDNN, `load.py` first calls `cuda.ensure_cuda` (Windows only) and looks again.
-- **`VoiceService`** implements `VoiceHooks`. `listen` starts a session for that body (replacing
-  any earlier one, which goes silent); `mic` converts int16 to float32 and queues it; one worker
-  task per session feeds 512-sample frames to `Ears` with `asyncio.to_thread`, so a slow decode
-  never stalls the websocket. Only one session uses the models at a time. `unlisten` on a held
-  session flushes the queue and sends the last words and one `turn_end`; on an always session it
-  stops at once and sends nothing. `hush` goes to the mouth (see [Brain mouth](#brain-mouth)). A
-  disconnect calls `unlisten`, so a gone body never keeps a session.
-- **Events** go out with `Bodies.send_live`: no `seq`, never stored or replayed. `heard
-{event, text?}`; `voice {status: loading | ready | failed, message?, progress?}`. `loading`
-  with `progress` is sent only while something is downloaded (at most every 2%), then `ready`.
-  Frames that arrive while the models load are kept (the newest 30 s). If loading fails (no
-  internet on the first run, a damaged download, a model that would not start) the body gets
-  `voice {failed, message}` once, the session ends, and the next `listen` tries again.
-- **Models** load on the first `listen`, not at start. Files live in `<TAGALONG_HOME>/voice`
-  (no new setting): `ears/silero-vad/model.onnx` and `ears/smart-turn-v3/…onnx` (about 11 MB,
-  pinned to a commit with a SHA-256, written to `.part` then renamed, one retry on a bad hash)
-  and `moonshine/` (about 120 MB for small, the Auto live model; tiny is about 45 MB and medium bigger; fetched by
-  `moonshine-voice` into that folder). The first `listen` on a new computer downloads about
-  130 MB (and about 1.5 GB more for turbo when a card is found). The live model is the row `voice/stt.py` resolves (`TAGALONG_STT_LIVE`, else Auto), loaded
-  through `voice/engines`; see [Speech models](../senses/hearing.md#speech-models).
-- **Python** is pinned to `>=3.12,<3.14` (`kokoro-onnx` supports 3.10 to 3.13). Dependencies:
-  `moonshine-voice`, `onnxruntime`, `numpy`, `kokoro-onnx`. Linux wheels exist for all of them, so
-  the CI brain job resolves them from `uv.lock`.
-
-### Speed check on Windows (slice 15b)
-
-Measured on the development machine (Windows 11, Python 3.12, CPU only):
-
-| Piece                              | Result                                                                                                                                            |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Moonshine tiny streaming           | About 20 to 26 ms per 32 ms frame, about 6 ms to read the words; first frame up to 0.45 s                                                         |
-| Silero VAD                         | About 0.4 ms per window                                                                                                                           |
-| Smart Turn v3.2                    | About 40 to 60 ms for one 8 s inference                                                                                                           |
-| Kokoro int8 with `espeakng-loader` | Loads in 1.2 s; 0.31 to 0.39 real-time factor; the espeak-ng DLL and data ship inside the `espeakng-loader` wheel, so no system install is needed |
-
-Moonshine does its own splitting into lines, so the stream is reset between our stretches
-(`stop` then `start`). Moonshine at about 80% of real time is the tightest part: it is fed only
-while someone speaks, but a slower computer will lag.
+Moved to [hearing.md](../senses/hearing.md): the ears, the speech models and the speed check on Windows.
 
 ## Brain mouth
 
-A spoken reply is read aloud on the body that shows it. The desktop plays what the
-brain sends and falls back to the system voice for a text-only `speech` frame.
-
-- **Which turns.** A `say` with `spoken: true` makes its turn spoken (a spoken `say` that joins a
-  running typed turn makes it spoken from then on). `Session` passes that turn's `reply`
-  notifications to `Session.voice.reply`, plus `spoken` when the turn starts and `turn_ended`
-  when it ends (also when cancelled). The body is the turn's displaying body, never the sender
-  of a display-less body, and a turn with no displaying body is not spoken. A body can also send the
-  `read_aloud {on, voice?, speed?, system_voice?}` event; `Session` keeps the latest per body
-  across reconnects (the desktop resends it on every connect) and, while `on` is true, speaks every
-  turn that body displays: typed replies, the hello, wake remarks and `pet.remark` lines (`_speak`,
-  also called by the runner's turn start). The event arrives after the connect, so when it turns
-  read-aloud on while a turn is already running on that body (a connect wake), that turn starts
-  speaking then. A typed `say` that joins a turn re-arms speech after a hush, as a spoken one does.
-  A bad event shape is ignored. With `system_voice` the turn is
-  spoken with text-only `speech` frames and `Mouth` never loads a voice. `say` may carry `speed`
-  (default 1.0). The voice is the brain's own choice (`tts_voice`), never the body's: a `voice`
-  field an older body sends is ignored.
-- **Sentences and chunks.** `voice/speakable.py` turns the streamed reply into sentences: fenced
-  code, table rows, `>` quotes and bare URLs are left out, list markers and Markdown dropped,
-  nothing is added or cut. Nothing after a line of exactly `---` is said (the divider, see
-  [speaking.md](../senses/speaking.md#say-and-show)). `find_sentence_end` ends a sentence at `.`, `!` or `?`
-  followed by a capital, digit or quote, not after an abbreviation (`e.g.`, `Dr.`, `etc.`, an
-  initial), a decimal, a version or a list number; a single line break is a space and a blank line
-  ends the sentence and the paragraph. `voice/chunker.py` groups the sentences into chunks: the
-  first complete sentence of at least 4 words goes out at once, later chunks grow to about 30
-  words (45 at most), a sentence over 45 words is cut at its last comma or space, and a 1-3 word
-  paragraph joins its neighbour. See [speaking.md](../senses/speaking.md#the-mouths-queue). Each sentence is first
-  rewritten for the ear (`voice/ear_text.py`: times, money, dates, numbers and symbols as words)
-  and each chunk's audio is trimmed, faded and followed by a set gap (`voice/shape.py`); see
-  [speaking.md](../senses/speaking.md#read-for-the-ear).
-- **`Mouth`** (`voice/mouth.py`) keeps one queue of chunks for all turns and one worker task
-  that says them in order. It synthesises each chunk with `asyncio.to_thread` and awaits it, so
-  a slow voice never stalls the websocket or the ears, and sends
-  `speech {turn, n, text, pcm, sample_rate}` with `Bodies.send_live` (24 kHz int16 little endian,
-  base64; `n` is the 1-based chunk number within the turn). After the last chunk it sends
-  `speech {turn, done: true}`. `Mouth.sentences(turn)` returns what was sent for the newest three
-  turns (frame `n` is index `n - 1`), then the chunks made but not yet sent; it survives a clear.
-  `Mouth.unsaid(turn)` is only the made-but-unsent part. `Mouth.state` (`talking`,
-  `sentence_break`, `paused`, `idle`) and `on_state` report what the mouth is doing. A failure on one chunk is
-  logged and the worker goes on; `close()` (called at brain shutdown) stops the worker.
-- **No voice yet.** The Kokoro voice loads on the first spoken turn, not at start. Until it is
-  ready (first run downloads about 120 MB), and when it fails to load, chunks go out as `speech
-{turn, text}` with no `pcm`, so the body says them with its system voice. The mouth sends no
-  `voice` frame: that channel is the ears' alone, and text without `pcm` already means "use your
-  own voice". A failed load is tried again on the next spoken turn.
-- **One synth at a time.** One worker makes and sends one chunk at a time, and a lock keeps
-  a voice sample (`sample`) from overlapping it, because the espeak phonemizer is not
-  thread-safe.
-- **Pause, resume, clear.** `Mouth.pause()` takes effect after the sentence in flight is sent;
-  what is queued stays and `resume()` carries on in order. `clear(turn)` (every turn when `None`)
-  drops that turn's queued sentences, ignores its later deltas and sends no more `speech` for it
-  (not even `done`); what was made but not yet sent moves to the sentence log. The text reply
-  still shows. `hush` from a body clears every turn spoken on that body (`VoiceService.hush`);
-  other bodies' turns go on. `Session` calls `voice.spoken` on every spoken `say`, and `Mouth`
-  ignores it only for a turn it is still speaking, so a spoken `say` that joins the turn after a
-  clear speaks again (from the next delta). `unlisten` does not hush (a held-mode reply goes on
-  being spoken) and `cancel` does not hush, so a body sends `hush` on Stop.
-- **Spoken over.** A `say` with `interrupted {turn, heard}` means the owner spoke over Scout (see
-  [speaking.md](../senses/speaking.md#talking-over-scout)). `Session.say` asks `Session.voice.sentences(turn)`;
-  the first `heard` sentences were said, the rest are the unsaid. The running turn is paused, not
-  cancelled (`Session.interrupt` sets the turn's `stop` event: generation stops where it is, the
-  partial reply is kept, and the mouth is hushed; it keeps the turn's sentence log through the
-  clear, since a body's own `hush` usually arrives first). A tool call already in flight keeps
-  running in the background (`Session._background`) and its result comes back through the front
-  door as a `tool_result` event, while its call is answered in history with a placeholder so
-  history stays valid. The new turn waits for the paused one to end, so no second turn runs
-  alongside it. Open items (cards, asks, installs) are never touched by an interrupt; only the
-  explicit `cancel` (the Stop button) ends a turn the old way. The
-  saved history keeps only the spoken sentences, ending with `[interrupted: the owner spoke over
-this]` (`Memory.replace_last_message` rewrites the cut turn's message), never the unsaid. The
-  model sees the unsaid once, as a `<data kind="interruption">` block (`spoken:` and `unsaid:`)
-  before the owner's words, only for that next turn; `soul.md` says what the block means, and the
-  model decides whether to stop, answer, carry on or offer the rest. A stale or unknown `turn`, or
-  an empty unsaid on a turn that already ended, makes it a plain `say`; a turn still running is
-  paused even with nothing unsaid. The echo guard lives in the body (`echoOf`), not here.
-- **The ear guide.** Every turn that is read aloud gets one extra text block, `mind/ear.md`
-  (`prompt.ear_note()`), after the content: write the spoken part for the ear, put anything better
-  seen than heard after one `---` line (once, in the last message of the turn), and you may open
-  with one short sentence if the work will take a while. A turn is read aloud by one rule,
-  `Session._wants_speech` (a voice exists, the user spoke or the body asked for read-aloud, and the
-  body has not turned it off): `say` adds the guide through `user_content(params, read_aloud=...)`
-  and `_start_wake` appends it to a wake turn, so a typed turn on a read-aloud body and a
-  brain-started remark get it as a spoken `say` does. `user_content` adds the guide on
-  `read_aloud` alone (`say` decides it at say time, speech is decided at turn start, so a toggle in
-  between can differ). If the body's `read_aloud` event arrives after a wake turn began, the guide
-  is carried by the turn's next step. Code never says the opening sentence, there
-  is no canned line and no earcon. It sits in the user content rather than the system prompt so
-  the cached system prompt is the same for typed and spoken turns. It is an instruction to the
-  model and not guaranteed. See [speaking.md](../senses/speaking.md#say-and-show).
-- **Early fetch and the status line.** The voice is not fetched only at the first spoken turn:
-  while the first-run tour is open the desktop calls the Home tool `fetch_voice` (each time the brain
-  comes online, until the tour is finished), and `VoiceService.prefetch()` starts `Mouth.prefetch()`
-  (Kokoro, as a task off the event loop) and downloads the listening models' files the same way
-  (`ears_fetcher` in `voice/load.py`: the ONNX files, the chosen live and final files, and the NVIDIA
-  libraries only when a card needs them; no model is loaded into memory until somebody listens; a
-  failure there is one warning; the next listen downloads again). `close()` cancels it. Nothing waits on it. `Mouth.download` is
-  `{voice, status: idle | downloading | ready | failed, progress}`; each change, at most one per 2%, calls
-  `on_download`, which `main.py` turns into `changed {what: "voice_download"}` (no new contract frame),
-  and Home reads it with `voice_download`. Until `ready`, `_say` sends text-only `speech` frames (the
-  body's system voice); the voice is looked at again for every sentence, so Kokoro takes over from the
-  next sentence, never mid-sentence. A failure keeps the system voice working and shows `failed`;
-  `fetch_voice {retry: true}` (Settings' Try again) clears it and loads again.
-- **The chosen voice.** `voice/tts_choice.py` keeps the pick in the `tts_voice` setting (`auto`
-  or a roster id; a stale id reads as Auto). `Mouth` takes it through `chosen()` and loads the pick in
-  the background, latest pick only: a newer pick cancels the older load (its `.part` file goes with
-  it). The voice is fixed per chunk, so a pick takes effect at the next chunk, never inside one;
-  until it is ready chunks go on in the most recently ready voice, and with none ready (first run,
-  offline) they go out as text only, said in the body's system voice. A chunk the voice cannot say
-  (an odd character) goes out as text and the turn's speech goes on. `tts_state` and `set_tts`
-  (`voice/tts_tools.py`, Home only) read and change the pick; `installed` there is a read-only
-  size-and-hash check of the files on disk.
-- **Play before download.** The Home tool `speak_sample {voice, speed?}` returns a text part
-  holding the JSON `{"mime": "audio/wav", "data": <base64>}` (Home calls answer in text) of
-  `SAMPLE_TEXT`. An installed voice speaks it live; otherwise the row's release clip is fetched once
-  (size and sha256 checked) into the voice folder and served from there, so Play works offline
-  afterwards. No clip and not installed is `tool_failed` "No sample yet." (every row's `sample` is
-  `null` until the clips are uploaded); an unlisted id is `invalid_params`.
-- **Models.** Kokoro v1.0 int8 (about 88 MB) and its voices file (about 27 MB), pinned to the
-  `kokoro-onnx` release `model-files-v1.0` with a size and SHA-256, in
-  `<TAGALONG_HOME>/voice/tts/kokoro/`, downloaded with the same checked download as the
-  ears. `kokoro-onnx` and `espeakng-loader` are imported only when the voice loads. No new
-  setting.
-- **Voice roster.** `voice/tts_models.json` lists the voices (Piper, Kokoro, Supertonic), loaded by
-  `voice/tts.py` (which also holds the `Tts` protocol); `voice/tts_engines.py` maps each engine to
-  its adapter (`kokoro.py`, `piper.py`, `supertonic.py`). The mouth loads the one Home chose (see
-  above). See [speaking.md](../senses/speaking.md#voices).
-- **Hand check.** `cd brain && uv run python tests/voice_smoke.py [DATA_DIR] [OUT_DIR]` runs every
-  roster voice once and prints load time, time per sentence and the real-time factor (not part of
-  `pytest`); `tools/voice_samples.py` makes the sample clips.
+Moved to [speaking.md](../senses/speaking.md): chunks, the voice roster and how a spoken reply goes out.
 
 The turn runner, urgency, the gate and interjections: see [turns.md](turns.md#the-runner).
 
 ## Get to know me (`know/`)
 
-Scout reads the person's public presence on their say-so: sources, extraction, a runner that
-saves each source as it finishes, the portrait, and the tools. The result view and the tour step
-come in a later slice.
+Moved to [memory.md](../data/memory.md#sources-of-profile-facts): sources, extraction, a run, the portrait, corrections and the offer.
 
-- **`know_me_start`** (body to brain, a request, in `server.py`): `{ github?, pdf?: { name, data } }`.
-  At least one input, else `invalid_params` ("Give a GitHub username or a LinkedIn PDF."; a bad username says "That is not a GitHub username."; never pydantic's own text); `pdf.data` is base64 (bad base64 is `invalid_params`)
-  and may decode to at most 10 MB (`over_limit`). The reply is `{ joined }`.
-- **`know_me_status`** (brain to body, live, no `seq`, never replayed): `{ sources, done, portrait? }`,
-  sent through `Bodies.send_live` to the bodies that started or joined the run. A run does not
-  survive a restart.
-- **`know/runner.py`**: `KnowMeRunner` runs one task at a time. A start while it is going joins
-  it (`joined: true`) and the joiner gets the current status at once; once the run is done a new
-  start begins a fresh one. `Session.know_me` owns it and `body_gone` drops a body from the
-  watchers. `KnowMeRunner(sources, memory, model, budget, publish, now, on_finish)`: for each
-  source in order, a source whose input was not given is skipped (`done`, no gap); otherwise it is
-  `reading`, then `read`, `extract` per material and `check`, then `Memory.save_source_facts` at
-  once (so the Masker runs), then `done`. A `SourceGap` is `failed` with its line; `BudgetStop`
-  makes that and every later source `failed` with its reason ("Stopped: daily limit reached", or "Add your Anthropic key first." when there is no key); any other error
-  is logged and shown as "Something went wrong reading <label>.". The web source gets a `Known`
-  built from every material's `keys` plus the `name` and `employer` the extractor found (the
-  earliest non-empty wins). `extract.check` also drops any fact whose text or evidence holds a phone number or an email address. After the sources the portrait is written (`portrait.py`, from free profile facts plus free `about_you` chat memories, which win a conflict; never asked facts) and shown as
-  a last status row named `portrait` (its gap: "Not enough found to write a portrait." or the
-  daily limit); `status.portrait` carries the saved text, the old one if a new one could not be
-  written. `done: true` is always sent, even when the task hits a bug (it is logged), and the run
-  then calls `offer.mark_ran` and tells the bodies `changed: memory`. A start by Scout has no
-  body to watch it (`body_id` None). `default_sources(model, budget)` in `source.py` is the list
-  `Session` builds (`know_sources=` replaces it in tests).
-- **`know/status.py`**: `SourceProgress` and `KnowMeStatus`; `params()` is the frame's shape with
-  unset values left out.
+## Where each part is documented
 
-- **Sources** (`know/source.py`): a `KnowSource` has `name`, `needs` (`username`, `file` or
-  `none`), `label` and `async read(given, known) -> list[Material]`. It only reads, and raises
-  `SourceGap` with the plain line the person sees when it cannot. `Material` is one page or file
-  (`text`, `ref`, an optional Claude `document` block, and `keys: Known`, what the source learned
-  for the web match: handle, links, name, employer). A new source is one module and one line in
-  the default list.
-- **`know/github.py`**: unauthenticated `api.github.com` (profile, the first 30 non-fork repos by
-  last push, the profile README). Unknown user, a username that is not a valid GitHub login, a
-  rate limit (403 or 429) and network errors are gaps; a missing README is not.
-- **`know/linkedin.py`**: only the PDF the person saves from LinkedIn. Text is pulled out with
-  `pypdf` (so evidence can be checked) and the PDF also goes to the model as a document block.
-  Not a PDF, or a PDF with no text (an image), is a gap.
-- **`know/web.py`**: one model request with the capped web search and fetch tools
-  (`web_tools.MAX_USES`, 5). A fetched page is kept only if it holds the handle in handle form (`@h` or `github.com/h`, never a plain word), a
-  link the person listed, or both their name and employer; a name alone is a namesake and is
-  dropped. No keys, or no page kept, is a gap. The budget counts the call and its searches.
-- **`know/extract.py`**: `extract` sends the material (fenced as `<material untrusted="true">`,
-  `<` escaped, with the system prompt `mind/know_extract.md` saying to ignore instructions inside
-  it) and gets facts back as JSON. `check` keeps a fact only when its quoted evidence, compared
-  without regard to whitespace or case, is in the material, so the model proposes and code
-  decides. `complete` is the one model call and raises `BudgetStop` when the day's limit is spent
-  or there is no key. `name` and `employer` the model reports count only if quoted from the text.
-  Each fact also carries `category`, `start` and `end`; `check` keeps a year only when it is in
-  the fact's own evidence and drops a category that holds contact details or a personal topic
-  (`evidenced_span`, `normalise_category` in `facts.py`). `extract` is also given the categories in
-  use and the facts other sources saved, and the runner passes both.
-
-- **`know/portrait.py`**: `write_portrait(model, budget, memory)` reads
-  `profile_facts(include_asked=False)` (none: returns None without a call), sends them fenced as
-  untrusted data with `mind/know_portrait.md` (only these facts, nothing added, a few short
-  paragraphs, plain tone), trims to 1,500 characters at the last sentence end and saves it with
-  `set_portrait`. `BudgetStop` passes up to the runner.
-- **`know/offer.py`**: the setting `know_me_offer` (JSON: `offered_at`, `declined`,
-  `last_run_at`). `allowed` is true only when never run, not declined, and not offered in the last
-  7 days. `Session` passes it to the capability picture, which then adds one fixed line telling
-  Scout it may offer once.
-- **`know/tools.py`**: `get_to_know_me` (Scout, change, `auto`; the yes or the button is the
-  consent): `action` `start` (with `github`; without it Scout is told to ask or send the person to
-  Home, where the LinkedIn PDF goes), `offered` (refused with `MemoryRefused` unless `allowed`,
-  else marks the time), `declined`. A start clears a decline. `rewrite_portrait` (Scout, change,
-  `auto`) writes the portrait again and notifies `changed: memory`. `know_me_sources` (Home,
-  read) lists `[{name, needs, label}]`. The tools are always registered; only the offer is gated.
-
-Tests: `tests/test_know_start.py` (runner and websocket path), `test_know_runner.py`,
-`test_know_portrait.py`, `test_know_offer.py`, `test_know_tools.py`, `tests/test_protocol.py`,
-`test_know_source.py`, `test_know_extract.py`, `test_know_web.py`, `test_know_github.py` and
-`test_know_linkedin.py` (fakes in `tests/know_fakes.py`; GitHub on a mock transport).
-
-## Not built yet
-
-Live-state replay of open turns after `resync`.
+| Part                                                                                       | Doc                                              |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------ |
+| Guards, masking secrets, the budget, retries, long tool output, web search                 | [safety.md](safety.md)                           |
+| Setting things up: installs, sign-in, updates, the `tagalong` command, the WhatsApp bridge | [setup.md](setup.md)                             |
+| Mail loops, the reader, surfacing and triggers                                             | [loops.md](loops.md)                             |
+| Connected apps (MCP) and their sign-in                                                     | [connected-apps.md](../bodies/connected-apps.md) |
+| Memory, get to know me and the saved chat                                                  | [memory.md](../data/memory.md)                   |
+| Every store and table                                                                      | [storage.md](../data/storage.md)                 |
+| Ears and the speech models                                                                 | [hearing.md](../senses/hearing.md)               |
+| The mouth and the voice roster                                                             | [speaking.md](../senses/speaking.md)             |
+| How the body reads the screen                                                              | [sight.md](../senses/sight.md)                   |
+| The WhatsApp body                                                                          | [whatsapp.md](../bodies/whatsapp.md)             |
+| The desktop body                                                                           | [desktop.md](../bodies/desktop.md)               |
 
 ## Tests
 

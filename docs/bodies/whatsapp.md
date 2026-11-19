@@ -183,7 +183,7 @@ The Places page (`bodies/ui/src/home/places-view.tsx`) shows This PC, the Chrome
 - The values stay on this PC (`<TAGALONG_HOME>/.env`). They are never returned by a tool or by IPC.
 
 The page uses the Home tools `bodies_status`, `whatsapp_status` and `whatsapp_set`
-([brain.md](../brain/README.md#whatsapp-setup-tools)) through `ipc/bodies.ts` ([desktop.md](desktop.md)).
+([brain.md](../brain/setup.md#whatsapp-setup-tools)) through `ipc/bodies.ts` ([desktop.md](desktop.md)).
 Saving or switching makes the brain start, stop or restart the bridge at once.
 
 ## One-time setup on Meta's side
