@@ -107,6 +107,18 @@ def laters_to_settle(db: sqlite3.Connection) -> list[str]:
     return [r[0] for r in rows]
 
 
+def owns_to_settle(db: sqlite3.Connection) -> list[str]:
+    """Open or waiting Owns with nothing waiting on the person and no event: an offer whose card
+    lapsed or never opened. An offer's Own carries no events and ends on its answer."""
+    rows = db.execute(
+        "SELECT t.id FROM tasks t WHERE t.kind='own' AND t.state IN ('open','waiting')"
+        " AND NOT EXISTS (SELECT 1 FROM events e WHERE e.task=t.id)"
+        " AND NOT EXISTS (SELECT 1 FROM open_items i WHERE i.task_id=t.id AND i.state='open')"
+        " ORDER BY t.created_at, t.rowid"
+    ).fetchall()
+    return [r[0] for r in rows]
+
+
 def last_event_at(db: sqlite3.Connection, task_id: str) -> str | None:
     return db.execute("SELECT MAX(at) FROM events WHERE task=?", (task_id,)).fetchone()[0]
 

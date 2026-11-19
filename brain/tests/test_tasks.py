@@ -114,6 +114,13 @@ def test_settle_ends_what_the_sweeps_name(tasks, db):
     assert tasks.get(ask).state == "done" and tasks.get(later).state == "done"
 
 
+def test_settle_stops_a_bare_own_task_as_no_answer(tasks):
+    own = tasks.open("own", "scout")
+    assert tasks.settle() == [own]
+    row = tasks.get(own)
+    assert (row.state, row.end_reason) == ("stopped", "no answer")
+
+
 # ---- stop the task (spec 6.13) ----
 
 

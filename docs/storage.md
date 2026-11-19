@@ -39,7 +39,7 @@ connection from `store.db.open_db`; nothing else opens the file.
 - `store/events.py`: owns `events` (`insert`, `get`, `list_new`, `new_ids`, `set_taken`, `set_state`,
   `chain`) and `EventRow`; `events.py` `EventLog` is the one caller.
 - `store/tasks.py`: owns `tasks` (`insert`, `get`, `set_state`, `list_open`, `asks_to_settle`,
-  `laters_to_settle`, `last_event_at`, `open_of_source`) and `TaskRow`; `tasks.py` `Tasks` is the one caller.
+  `laters_to_settle`, `owns_to_settle`, `last_event_at`, `open_of_source`) and `TaskRow`; `tasks.py` `Tasks` is the one caller.
 - `store/work.py`: `WorkStore` over `work`, `work_events`, `work_fts` and the detail tables
   `work_job`, `work_timer`, `work_loop`, `work_ask` and `job_steps`: create, the state machine,
   rollup, retry, due queries, search, the resume scan and the sweep. Jobs, asks, timers and loops
@@ -708,9 +708,11 @@ columns and drops `work.source_message_id` (never written).
 - Written by: `tasks.py` `Tasks` (`open`, `watching`, `wait`, `resume`, `end`, `settle`) through
   `store/tasks.py`. The first end of a task stands; a second `end` changes nothing.
 - Ended by one sweep, not by hooks: `Tasks.settle()` ends an open Ask `done` when its say is
-  `handled` and `failed` when it is `gave_up`, and a Later with no live work row and no `new` or
-  `taken` event `done`. The runner calls it after every turn ends, and the session at start after
-  `EventLog.recover()`, so a crash cannot leave one open.
+  `handled` and `failed` when it is `gave_up`, a Later with no live work row and no `new` or
+  `taken` event `done`, and an Own with no open item and no event `stopped` (reason `no answer`).
+  An offer's Own ends on its answer first: `done`, `declined` or `stopped`. The runner
+  calls it after every turn ends, and the session at start after `EventLog.recover()`, so a
+  crash cannot leave one open.
 - Read by: `Tasks.open_block()`, the open-tasks block in Scout's system prompt (newest first, at
   most 15 lines then `and N more`, Asks left out, titles made safe for the data fence).
 - Retention: `Tasks.sweep(TAGALONG_WORK_KEEP_DAYS)` deletes ended tasks older than the setting at

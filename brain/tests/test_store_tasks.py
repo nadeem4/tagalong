@@ -88,6 +88,37 @@ def test_laters_to_settle_skips_a_later_with_a_planned_timer_or_new_event(db):
     assert tasks.laters_to_settle(db) == ["quiet"]
 
 
+def _item(db, id, task_id, state):
+    db.execute(
+        "INSERT INTO open_items(id, kind, task_id, state, created_at, deadline_at, window_s)"
+        " VALUES (?,'offer',?,?,?,?,1)",
+        (id, task_id, state, T, LATER),
+    )
+
+
+def test_owns_to_settle_skips_an_own_task_with_an_open_item_or_an_event(db):
+    for id in ("card", "told"):
+        tasks.insert(db, task(id, kind="own"))
+    events.insert(db, event("e1", "told", "handled", kind="setup_done"))
+    _item(db, "i1", "card", "open")
+    assert tasks.owns_to_settle(db) == []
+
+
+def test_owns_to_settle_stops_a_bare_own_and_one_whose_offer_expired(db):
+    tasks.insert(db, task("bare", kind="own"))
+    tasks.insert(db, task("lapsed", kind="own"))
+    tasks.insert(db, task("waiting", kind="own"))
+    _item(db, "i1", "lapsed", "expired")
+    _item(db, "i2", "waiting", "open")
+    assert tasks.owns_to_settle(db) == ["bare", "lapsed"]
+
+
+def test_owns_to_settle_leaves_a_watch_task_with_handled_events(db):
+    tasks.insert(db, task("w", kind="watch"))
+    events.insert(db, event("e1", "w", "handled", kind="loop_due"))
+    assert tasks.owns_to_settle(db) == []
+
+
 def test_last_event_at(db):
     tasks.insert(db, task("t1"))
     assert tasks.last_event_at(db, "t1") is None

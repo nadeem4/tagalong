@@ -4,6 +4,8 @@ writes the sentence. Nothing is saved unless the person answers "Yes, auto-appro
 An offer is an `offer` open item with a card: nothing waits on it and no timer drops it. The
 answer is a card answer this code takes (`answered`), and one not answered when the brain stops is
 shown again when a body comes online (`resume`, which a connect calls).
+An offer is also an Own task (Scout's own idea): done on Yes, declined on Keep asking, stopped
+with reason `no answer` when it lapsed or the answer was not one of the two.
 """
 
 import asyncio
@@ -23,6 +25,7 @@ from brain.open_items import OpenItem, OpenItemRefused, OpenItems
 from brain.side_check import prompt_section
 from brain.store import rules
 from brain.store.db import utc_text
+from brain.tasks import Tasks
 
 log = logging.getLogger(__name__)
 
@@ -66,6 +69,7 @@ class Offers:
         memory: Memory,
         asks: Asks,
         items: OpenItems,
+        tasks: Tasks,
         approvals: Approvals,
         settings: OfferSettings,
         now: Callable[[], datetime],
@@ -77,6 +81,7 @@ class Offers:
         self._memory = memory
         self._asks = asks
         self._items = items
+        self._task_rows = tasks  # `_tasks` below is the look futures
         self._approvals = approvals  # saves the preference, so Home hears about it
         self._settings = settings
         self._now = now
@@ -125,8 +130,10 @@ class Offers:
         if sentence is None:
             rules.add_offer(self._memory.db, group_key, utc_text(self._now()), "none")
             return
+        task = self._task_rows.open("own", "scout", title=sentence)
         item = self._items.open(
             "offer",
+            task_id=task,
             saved_call={
                 "group": group_key,
                 "source": source,
@@ -141,6 +148,7 @@ class Offers:
         at start nobody is there to see a card; with nobody online the items just stay open."""
         for item in self._items.expire_due(self._now(), "offer"):
             self._asks.expire(item.id, "timeout")  # the card of a lapsed offer leaves the screen
+            self._end_task(item, "stopped", "no answer")
         if not self._asks.anyone_online():
             return
         for item in self._items.list_open(kind="offer"):
@@ -210,6 +218,7 @@ class Offers:
         if item is None:
             return
         if item.state != "open":  # it ended first: the tap still counts as a look with no answer
+            self._end_task(item, "stopped", "no answer")
             rules.add_offer(
                 self._memory.db, item.saved_call["group"], utc_text(self._now()), "no_answer"
             )
@@ -225,6 +234,10 @@ class Offers:
                 pass
         if outcome == "no_answer":
             self._items.finish(item.id, "no_answer")
+        state, reason = {"yes": ("done", None), "keep_asking": ("declined", None)}.get(
+            outcome, ("stopped", "no answer")
+        )
+        self._end_task(item, state, reason)
         if outcome == "yes":
             self._approvals.add_preference(
                 sentence=call["sentence"],
@@ -233,3 +246,7 @@ class Offers:
                 group_key=group_key,
             )
         rules.add_offer(self._memory.db, group_key, utc_text(self._now()), outcome)
+
+    def _end_task(self, item: OpenItem, state: str, reason: str | None) -> None:
+        if item.task_id is not None:
+            self._task_rows.end(item.task_id, state, reason=reason)  # the first end stands
