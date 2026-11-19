@@ -206,11 +206,8 @@ def sweep(db: sqlite3.Connection, before: str) -> int:
     ).rowcount
 
 
-def finish_task(db: sqlite3.Connection, task_id: str, end_reason: str, at: str) -> None:
-    """A task was stopped: the news still waiting for it is handled, never told. Events a turn
-    holds (`taken`) are left to that turn's end."""
-    db.execute(
-        "UPDATE events SET state='handled', end_reason=?, handled_at=?"
-        " WHERE task=? AND state='new'",
-        (end_reason, at, task_id),
-    )
+def new_ids_of_task(db: sqlite3.Connection, task_id: str) -> list[str]:
+    """The news still waiting for a task. Events a turn holds (`taken`) are left to its end."""
+    return [
+        r[0] for r in db.execute("SELECT id FROM events WHERE task=? AND state='new'", (task_id,))
+    ]

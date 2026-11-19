@@ -490,6 +490,8 @@ class ExpertRun:
             raise ExpertError(
                 f"The expert did not answer within {self._startup_timeout:g} s to a mode change."
             ) from None
+        if self._stopping:  # a stop landed while the mode was set: nothing is to be driven
+            raise ExpertError("The run was stopped before it began.")
         self._active = True
         self._start_quiet()
         self._task = asyncio.ensure_future(self._drive(task))
@@ -506,6 +508,7 @@ class ExpertRun:
         # From inside on_end (or after the run) there is nothing to wait for, and a task
         # must not await itself.
         if task is None or task.done() or task is asyncio.current_task() or not self._active:
+            self._stopping = True  # a `begin` still setting the mode will see it and not drive
             await self._host.release(self)
             return
         if not self._stopping:

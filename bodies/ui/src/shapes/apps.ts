@@ -99,6 +99,8 @@ export const ConnectorConfirmParams = z.object({
   /** When Scout will look at this card again (ISO), and who chose the time. */
   checkBackAt: z.string().optional(),
   checkBackBy: z.enum(['scout', 'person']).optional(),
+  /** The brain marked the ask urgent. */
+  urgent: z.boolean().optional(),
 });
 export type ConnectorConfirmParams = z.infer<typeof ConnectorConfirmParams>;
 

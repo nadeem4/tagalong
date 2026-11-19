@@ -355,6 +355,10 @@ class EventLog:
         self.ended(ids, state)
         return ids
 
+    def finish_task(self, task_id: str, end_reason: str) -> None:
+        """A task was stopped: the news still waiting for it is handled, never told."""
+        self.finish(store.new_ids_of_task(self._db, task_id), "handled", end_reason=end_reason)
+
     def ended(self, ids: list[str], state: str) -> None:
         """Call each event's `on_end` once; a raising hook must not stop the others."""
         for id in ids:

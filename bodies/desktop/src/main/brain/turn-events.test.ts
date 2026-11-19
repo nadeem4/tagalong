@@ -552,6 +552,20 @@ describe('createTurnEvents: asks', () => {
       });
     });
 
+    it('a task card carries urgent so the card can say it matters now', () => {
+      const [e] = make().map(
+        'ask',
+        jobAsk({
+          text: 'Send it?',
+          options: ['allow', 'deny', 'not_now', 'stop_task'],
+          tool: 'send_message',
+          task: { id: 'k1' },
+          urgent: true,
+        }),
+      );
+      expect(e).toMatchObject({ urgent: true });
+    });
+
     it("Scout's save_preference ask (a tool, no free_text) is Scout's, not a question", () => {
       const [e] = make().map(
         'ask',

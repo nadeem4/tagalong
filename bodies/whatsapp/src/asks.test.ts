@@ -41,6 +41,12 @@ describe('AskDesk', () => {
     });
   });
 
+  test('a typed stop answers a card whose own option is stop', () => {
+    const desk = new AskDesk();
+    desk.open(ask({ options: ['keep', 'stop'] }));
+    expect(desk.fromText('stop')).toEqual({ ask: 'a1', option: 'stop' });
+  });
+
   test('test_typed_not_now_and_stop_answer_a_task_card', () => {
     const desk = new AskDesk();
     desk.open(ask({ options: ['allow', 'deny', 'not_now', 'stop_task'] }));

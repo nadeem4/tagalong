@@ -108,7 +108,10 @@ export class AskDesk {
 function match(ask: OpenAsk, said: string): Answer | null {
   if (ask.free_text) return { ask: ask.id, option: ask.options[0] ?? '', text: said };
   const word = said.toLowerCase();
-  const wanted = SYNONYMS[word] ?? word;
+  // The synonym stands only when the card has that option; else the word is its own option.
+  const synonym = SYNONYMS[word];
+  const wanted =
+    synonym !== undefined && ask.options.some((o) => o.toLowerCase() === synonym) ? synonym : word;
   const byNumber = /^\d+$/.test(word) ? ask.options[Number(word) - 1] : undefined;
   const option = byNumber ?? ask.options.find((o) => o.toLowerCase() === wanted);
   return option === undefined ? null : { ask: ask.id, option };
