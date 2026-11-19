@@ -120,6 +120,9 @@ class Tasks:
     def open_watch(self, source: str) -> str | None:
         return store.open_of_source(self._db, "watch", source)
 
+    def list_all(self, include_ended: bool = False) -> list[store.TaskRow]:
+        return store.list_all(self._db, include_ended)
+
     def named_by(self, event_ids: list[str]) -> list[dict]:
         """What a turn's frame names of its tasks: id, kind and title of each non-Ask task the
         events belong to. Empty for a say alone."""

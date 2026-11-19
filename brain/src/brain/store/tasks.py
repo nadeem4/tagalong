@@ -73,6 +73,15 @@ def list_open(db: sqlite3.Connection, exclude_kind: str = "ask") -> list[TaskRow
     return [TaskRow(*r) for r in rows]
 
 
+def list_all(db: sqlite3.Connection, include_ended: bool) -> list[TaskRow]:
+    """Every non-Ask task, newest first; ended ones only when asked."""
+    where = "" if include_ended else " AND state IN ('open','waiting')"
+    rows = db.execute(
+        f"SELECT {_COLS} FROM tasks WHERE kind<>'ask'{where} ORDER BY created_at DESC, rowid DESC"
+    ).fetchall()
+    return [TaskRow(*r) for r in rows]
+
+
 def of_events(db: sqlite3.Connection, event_ids: list[str]) -> list[TaskRow]:
     """The non-Ask tasks these events belong to, oldest first, each once."""
     marks = ",".join("?" * len(event_ids))
