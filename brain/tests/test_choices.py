@@ -76,6 +76,17 @@ async def test_an_answer_emits_a_choice_event_with_option_and_text():
     assert event.payload == {"ask": ask_id, "question": "Which?", "option": "b", "text": ""}
 
 
+async def test_a_choice_answer_posts_choice_from_the_event(monkeypatch):
+    async def boom(*_a, **_kw):
+        raise AssertionError("a choice must not wait on its card")
+
+    monkeypatch.setattr(Asks, "open", boom)
+    _, events, choices = rig()
+    ask_id = choices.ask("Which?", ["a", "b"], None, False)
+    choices._asks.answer(ask_id, "a", "desktop")  # no waiting task: the answer is the event
+    assert [e.payload["option"] for e in events] == ["a"]
+
+
 async def test_typed_text_answer_is_carried_as_text():
     _, events, choices = rig()
     ask_id = choices.ask("Which?", ["a"], None, True)
@@ -105,7 +116,6 @@ async def test_choice_timeout_expires_item_not_silent_drop():
     (event,) = events  # Scout hears that nobody answered
     assert event.kind == "choice" and event.payload["expired"] == "yes"
     assert event.payload["option"] == "" and event.payload["question"] == "Which?"
-    assert choices._tasks == set()
     assert bodies.sent[-1]["reason"] == "timeout"
 
 

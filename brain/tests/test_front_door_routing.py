@@ -184,11 +184,10 @@ async def test_card_answer_not_held_behind_waiting_say():
     await session.say("desktop", say("first"))
     await settle()  # the turn is running, held on the gate
     await session.say("whatsapp", say("from the phone"))  # its own turn, queued behind the first
-    seen: list[str] = []
-    session.ask_runner.answered = lambda ask, option, body, at=None: seen.append(ask)
+    posted = spy_posts(session)
     session._asks.on_item_answer("a1", "allow", "desktop")  # the card hook the answer frame calls
     await settle()
-    assert seen == ["a1"]  # the door was not blocked by the say waiting for the turn
+    assert [e.kind for e in posted] == ["card_answer"]  # not blocked by the say waiting
     gate.set()
     await idle(session)
 

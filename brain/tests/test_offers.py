@@ -9,15 +9,15 @@ from types import SimpleNamespace
 import pytest
 from ask_log import add_approval, approvals_on
 
-from brain.asks import Answer
+from brain.asks import Asks
 from brain.guards import stop
 from brain.memory import Memory
 from brain.mind.turn import Final
 from brain.offers import Offers, OfferSettings
 from brain.open_items import OpenItems
-from brain.protocol import ErrorCode, RpcError
 from brain.store import rules
 from brain.store.db import utc_text
+from brain.store.work import WorkStore
 
 NOW = datetime(2026, 10, 28, 9, 0, 0, tzinfo=UTC)
 YES, KEEP = "Yes, auto-approve", "Keep asking"
@@ -65,25 +65,34 @@ class Budget:
 
 
 class FakeAsks:
-    def __init__(self, answer=None, online=True, hang=False, during=None):
-        self.answer = answer if answer is not None else Answer(YES)
+    """card() records the card and, unless it hangs, answers it through the registered handler."""
+
+    def __init__(self, answer=YES, online=True, hang=False, during=None):
+        self.answer = answer
         self.online = online
         self.during = during  # runs while the card is shown, before the person answers
         self.hang = hang  # the card is shown and nobody answers before the brain stops
         self.opened = []
+        self.handlers = {}
+        self.up = set()
 
     def anyone_online(self):
         return self.online
 
-    async def open(self, **kw):
-        self.opened.append(kw)
+    def register(self, kind, handler):
+        self.handlers[kind] = handler
+
+    def is_open(self, ask_id):
+        return ask_id in self.up
+
+    def card(self, ask_id, *, kind, **kw):
+        self.opened.append({"kind": kind, **kw})
+        self.up.add(ask_id)
         if self.during:
             self.during()
-        if self.hang:
-            await asyncio.Event().wait()
-        if isinstance(self.answer, Exception):
-            raise self.answer
-        return self.answer
+        if not self.hang:
+            self.up.discard(ask_id)
+            self.handlers[kind](ask_id, self.answer, "desktop", None, None)
 
 
 @pytest.fixture
@@ -188,7 +197,7 @@ async def test_model_error_still_counts_as_a_look(mem):
 
 
 async def test_keep_asking_blocks_for_seven_days_then_allows(mem):
-    rig = Rig(mem, asks=FakeAsks(Answer(KEEP)))
+    rig = Rig(mem, asks=FakeAsks(KEEP))
     rig.approve(n=3)
     await rig.consider()
     assert [o for _, o in rules.offers_for(mem.db, GROUP)] == ["keep_asking"]
@@ -223,23 +232,14 @@ async def test_yes_saves_the_preference_with_source_tool_group(rig):
 
 
 async def test_keep_asking_saves_nothing(mem):
-    rig = Rig(mem, asks=FakeAsks(Answer(KEEP)))
+    rig = Rig(mem, asks=FakeAsks(KEEP))
     rig.approve(n=3)
     await rig.consider()
     assert not any(not p.builtin for p in rules.list_preferences(mem.db))
 
 
-@pytest.mark.parametrize(
-    "answer",
-    [
-        RpcError(ErrorCode.timeout, "nobody answered"),
-        RpcError(ErrorCode.cancelled, "cancelled"),
-        RuntimeError("boom"),
-        Answer("something else"),
-    ],
-)
-async def test_ask_failure_saves_nothing_and_records_no_answer(mem, answer):
-    rig = Rig(mem, asks=FakeAsks(answer))
+async def test_an_unknown_answer_saves_nothing_and_records_no_answer(mem):
+    rig = Rig(mem, asks=FakeAsks("something else"))
     rig.approve(n=3)
     await rig.consider()
     assert not any(not p.builtin for p in rules.list_preferences(mem.db))
@@ -263,7 +263,6 @@ async def test_offer_text_names_the_sentence(rig):
     assert ask["options"] == [YES, KEEP]
     assert ask["tool"] == "approval_offer"
     assert ask["input"] == {"sentence": "Fine to read files", "group": GROUP}
-    assert ask["timeout"] is None  # an offer is not dropped by a timer
     assert ask["text"] == "Fine to read files"  # the model's words, no canned lead
 
 
@@ -333,7 +332,7 @@ async def test_offer_survives_restart(mem):
     [item] = OpenItems(mem.db, lambda: NOW).list_open()
     assert item.kind == "offer"
 
-    again = Rig(mem, asks=FakeAsks(Answer(YES)))  # a new brain over the same database
+    again = Rig(mem, asks=FakeAsks(YES))  # a new brain over the same database
     again.offers.resume()
     while again.offers._tasks:
         await asyncio.gather(*list(again.offers._tasks))
@@ -354,7 +353,7 @@ async def test_resume_with_nobody_online_keeps_the_offer_until_a_body_comes(mem)
         task.cancel()
     await asyncio.gather(*first.offers._tasks, return_exceptions=True)
 
-    asks = FakeAsks(Answer(YES), online=False)  # the brain starts before any body connects
+    asks = FakeAsks(YES, online=False)  # the brain starts before any body connects
     again = Rig(mem, asks=asks)
     again.offers.resume()
     await asyncio.sleep(0)
@@ -371,7 +370,7 @@ async def test_resume_with_nobody_online_keeps_the_offer_until_a_body_comes(mem)
 
 
 async def test_a_nobody_online_answer_leaves_the_offer_open(mem):
-    rig = Rig(mem, asks=FakeAsks(Answer(None)))
+    rig = Rig(mem, asks=FakeAsks(hang=True))
     rig.approve(n=3)
     await rig.consider()
     assert len(rig.items.list_open()) == 1
@@ -380,10 +379,37 @@ async def test_a_nobody_online_answer_leaves_the_offer_open(mem):
 
 async def test_a_yes_after_the_deadline_is_no_answer_not_a_crash(mem):
     rig = Rig(mem)
-    rig.asks = FakeAsks(Answer(YES), during=lambda: setattr(rig, "clock", NOW + timedelta(days=2)))
+    rig.asks = FakeAsks(YES, during=lambda: setattr(rig, "clock", NOW + timedelta(days=2)))
     rig.offers._asks = rig.asks
+    rig.asks.register("offer", rig.offers.answered)
     rig.approve(n=3)
     await rig.consider()  # must not raise
     assert not any(not p.builtin for p in rules.list_preferences(mem.db))
     assert [o for _, o in rules.offers_for(mem.db, GROUP)] == ["no_answer"]
+    assert rig.items.list_open() == []
+
+
+async def test_an_offer_answer_is_handled_by_event(mem, monkeypatch):
+    class Bodies:
+        sent = []
+
+        def display_ids(self):
+            return ["desktop"]
+
+        def notify(self, method, params):
+            self.sent.append(params)
+
+    async def boom(*_a, **_kw):
+        raise AssertionError("an offer must not wait on its card")
+
+    monkeypatch.setattr(Asks, "open", boom)
+    asks = Asks(Bodies(), WorkStore(mem.db, lambda: NOW))
+    rig = Rig(mem, asks=asks)
+    rig.approve(n=3)
+    await rig.consider()
+    [item] = rig.items.list_open(kind="offer")
+    assert asks.is_open(item.id)  # the card is up and nothing waits on it
+    asks.answer(item.id, YES, "desktop")
+    assert [o for _, o in rules.offers_for(mem.db, GROUP)] == ["yes"]
+    assert any(not p.builtin for p in rules.list_preferences(mem.db))
     assert rig.items.list_open() == []

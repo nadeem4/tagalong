@@ -74,10 +74,7 @@ class AskRunner:
         tasks: Tasks,
         task: Callable[[str], str | None] = lambda turn: None,
         cause: Callable[[str], str | None] = lambda turn: None,
-        *,
-        finish: Callable[[list[str], str], None],  # EventLog.finish: ends a card answer's event
     ) -> None:
-        self._finish = finish
         self._cause = cause  # turn id -> the event that turn took, None outside it: the ask's cause
         self._task = task  # turn id -> the task the turn works on: the card belongs to it
         self._tasks_of = tasks
@@ -189,12 +186,9 @@ class AskRunner:
         body_id: str,
         check_back_at: "datetime | str | None" = None,
     ) -> None:
-        """A card was answered: the answer is saved as a `card_answer` event that this code
-        handles, so it starts no turn; the saved call runs, whatever became of the turn. Not now
+        """A card was answered (its `card_answer` event is already saved and handled by the
+        session, so it starts no turn): the saved call runs, whatever became of the turn. Not now
         only moves the check-back; Stop task ends the task."""
-        answer = Event("card_answer", body_id, {"ask": ask_id, "option": option})
-        self._emit(answer)
-        self._finish([answer.id], "handled")  # before the runner looks: its poke waits a tick
         if option == "not_now":
             self._not_now(ask_id, _time(check_back_at), body_id)
         else:

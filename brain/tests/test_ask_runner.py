@@ -104,17 +104,24 @@ class Rig:
             self.items,
             self.asks,
             lambda: self.box,
-            lambda event, **kw: (
-                self.answers if event.kind == "card_answer" else self.events
-            ).append(event),
+            self.events.append,
             lambda: self.clock[0],
             self.approvals,
             tasks=self.tasks,
             task=lambda turn: "k1" if turn == "t1" else None,
             cause=lambda turn: "evt-ask-turn" if turn == "t1" else None,
-            finish=lambda ids, state: self.finished.append((ids, state)),
         )
-        self.asks.on_item_answer = self.runner.answered
+        # What the session does for every answer: save the event, handled by code, no turn.
+
+        def saved(ask, option, body):
+            event = Event("card_answer", body, {"ask": ask, "option": option})
+            self.answers.append(event)
+            self.finished.append(([event.id], "handled"))
+
+        self.asks.on_item_answer = saved
+        self.asks.register(
+            "ask", lambda ask, opt, body, _text, at: self.runner.answered(ask, opt, body, at)
+        )
         self.box = Toolbox(
             [self.source],
             lambda: self.stored,
