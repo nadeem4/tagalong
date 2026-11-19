@@ -36,6 +36,7 @@ class Event:
     # Two reports of the same fact are equal even though each has its own id.
     id: str = field(default_factory=lambda: uuid4().hex, compare=False)
     at: datetime | None = None
+    task: str | None = None
 
 
 Urgency = Literal["now", "next_pause", "idle", "hold"]
@@ -216,6 +217,7 @@ class EventLog:
             source=event.source,
             caused_by=event.caused_by,
             payload=payload,
+            task=event.task,
         )
         with transaction(self._db):
             if not store.insert(self._db, row):

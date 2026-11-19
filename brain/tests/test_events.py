@@ -558,3 +558,8 @@ def test_a_duplicate_post_announces_nothing(log):
     log.on_change = lambda: seen.append(1)
     log.post(Event("say", "desktop", {"text": "hi"}, id="s1"))
     assert seen == []
+
+
+def test_post_saves_the_task(log):
+    log.post(Event("say", "desktop", {"text": "hi"}, id="e1", task="t1"))
+    assert log.get("e1").task == "t1"
