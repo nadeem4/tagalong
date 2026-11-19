@@ -64,7 +64,7 @@ flowchart TD
   VS -->|"512-sample frames, asyncio.to_thread"| EARS["Ears thread, ears.py"]
   EARS --> VAD["Silero VAD: speech or not, per frame"]
   VAD -->|"speech"| LIVE["Moonshine live: heard partial every 10 frames"]
-  VAD -->|"256 ms quiet closes the stretch"| CLOSE["heard final: the live words"]
+  VAD -->|"256 ms quiet closes the stretch"| CLOSE["heard final: the stretch's words, Moonshine finish"]
   CLOSE --> MODE{"listen mode"}
   MODE -->|"held"| UN["wait for unlisten"]
   MODE -->|"always"| ST["Smart Turn: score 0.5 or more, or about 2 s more quiet"]
@@ -143,8 +143,9 @@ listen first loads the ears.
   `progress` is sent only while something is downloaded (at most every 2%), then `ready`. Frames
   that arrive while the models load are kept (the newest 30 s). If loading fails (no internet on
   the first run, a damaged download, a model that would not start) the body gets
-  `voice {failed, message}` once, the session ends (a held one sends an empty `turn_end`), and the
-  next `listen` tries again.
+  `voice {failed, message}` once, the session ends with no `heard`, and the next `listen` tries
+  again. If listening fails after the models loaded, a held session still ends with its last words
+  (or an empty `turn_end`) and an always one gets `voice {failed}`.
 - **Models** load on the first `listen`, not at start. `VoiceService.reload()` (after a speech-model
   pick) bumps a generation: a session already running keeps its models and the next listen loads
   the new ones. `prefetch()` downloads the files early without loading them (the first-run tour
@@ -174,14 +175,13 @@ someone speaks, but a slower computer will lag.
 
 Contract v1 (see [protocol/README.md](../../protocol/README.md)):
 
-| Frame | Direction | Meaning |
-| ----- | --------- | ------- |
-
-| `listen { mode: 'held' or 'always' }` | body to brain | Request: start hearing. Rejected with `BrainOffline` while the brain is down; the desktop then shows "Listening could not start" or the offline words. |
-| `mic { pcm }` | body to brain | A frame of 16 kHz mono 16-bit samples, base64. Main converts the renderer's Float32 frame (clamped, rounded). |
-| `unlisten` | body to brain | Notification: stop hearing. In held mode the brain then ends the turn with what it heard. |
-| `heard { event, text? }` | brain to body | `speech_start`, `partial`, `final`, `turn_end`. Main maps these to the renderer's `speechStart`, `partial`, `final`, `turnEnd`. |
-| `voice { status, message?, progress? }` | brain to body | The ears' models: `loading` (with `progress`), `ready` or `failed`. Only the ears send it; the mouth sends none. |
+| Frame                                   | Direction     | Meaning                                                                                                                                                |
+| --------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `listen { mode: 'held' or 'always' }`   | body to brain | Request: start hearing. Rejected with `BrainOffline` while the brain is down; the desktop then shows "Listening could not start" or the offline words. |
+| `mic { pcm }`                           | body to brain | A frame of 16 kHz mono 16-bit samples, base64. Main converts the renderer's Float32 frame (clamped, rounded).                                          |
+| `unlisten`                              | body to brain | Notification: stop hearing. In held mode the brain then ends the turn with what it heard.                                                              |
+| `heard { event, text? }`                | brain to body | `speech_start`, `partial`, `final`, `turn_end`. Main maps these to the renderer's `speechStart`, `partial`, `final`, `turnEnd`.                        |
+| `voice { status, message?, progress? }` | brain to body | The ears' models: `loading` (with `progress`), `ready` or `failed`. Only the ears send it; the mouth sends none.                                       |
 
 `heard` and `voice` are live only (no `seq`), so they are not replayed after a reconnect.
 `createVoiceBridge` remembers the open listening mode (also when `listen` found the brain
@@ -602,7 +602,7 @@ The words come from a list of models kept as data, not from one hard-wired model
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
-flowchart LR
+flowchart TD
   saved["saved choice: stt_live, stt_final (stt_choice.py)"] --> resolve["resolve in stt.py"]
   env["TAGALONG_STT_LIVE, TAGALONG_STT_FINAL"] --> resolve
   auto["Auto: the row's auto hint, detect_hardware"] --> resolve
@@ -648,22 +648,21 @@ The results of the last run, the decision and the exact commands are in
 From `IPC` in `bodies/desktop/src/shared/ipc.ts`. Handlers are in `main/ipc/voice.ts` unless noted.
 The playback channels are in [speaking.md](speaking.md#ipc-channels).
 
-| Channel | Direction | Payload | Notes |
-| ------- | --------- | ------- | ----- |
-
-| `tagalong:voice:ears-listen` | invoke | `mode` | Anything but `held` or `always` throws. For `held`, main first notes the active window (`noteActiveWindow`, never the selection). Then the brain's `listen`. |
-| `tagalong:voice:mic-frame` | send | `Float32Array` | Copied into a `Float32Array` if needed, converted to 16-bit, sent as `mic`. Never kept. |
-| `tagalong:voice:ears-stop` | invoke | none | The brain's `unlisten`. |
-| `tagalong:voice:ears-event` | main → windows | `{ event, text? }` | Every window. From `heard`. |
-| `tagalong:voice:ears-status` | main → windows | `EarsStatus` | Every window. From `voice`, or a failed `listen`. |
-| `tagalong:voice:get-listening` / `set-listening` | invoke | `boolean` → `ListeningState` | A non-boolean is refused with "Always listening is on or off." |
-| `tagalong:voice:set-follow-up` | invoke | `boolean` | A non-boolean is refused. Applied only while on and not paused. |
-| `tagalong:voice:listening` | main → windows | `ListeningState` | |
-| `tagalong:voice:talk` | main → panel | `at: number` | The talk key confirmed. |
-| `tagalong:voice:talk-release` / `talk-cancel` | main → panel | none | |
-| `tagalong:voice:stop` | main → windows | none | The stop key, or a cancelled turn. |
-| `tagalong:voice:models` | invoke | → `VoiceModels { ears }` | The health check: whether the brain's ears have failed. |
-| `tagalong:status:set` | invoke | `(id, on)` | Handled by `setPanelMark`. The panel can set only `mic-busy`, `mic-failed` and `say-name`. |
+| Channel                                          | Direction      | Payload                      | Notes                                                                                                                                                        |
+| ------------------------------------------------ | -------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `tagalong:voice:ears-listen`                     | invoke         | `mode`                       | Anything but `held` or `always` throws. For `held`, main first notes the active window (`noteActiveWindow`, never the selection). Then the brain's `listen`. |
+| `tagalong:voice:mic-frame`                       | send           | `Float32Array`               | Copied into a `Float32Array` if needed, converted to 16-bit, sent as `mic`. Never kept.                                                                      |
+| `tagalong:voice:ears-stop`                       | invoke         | none                         | The brain's `unlisten`.                                                                                                                                      |
+| `tagalong:voice:ears-event`                      | main → windows | `{ event, text? }`           | Every window. From `heard`.                                                                                                                                  |
+| `tagalong:voice:ears-status`                     | main → windows | `EarsStatus`                 | Every window. From `voice`, or a failed `listen`.                                                                                                            |
+| `tagalong:voice:get-listening` / `set-listening` | invoke         | `boolean` → `ListeningState` | A non-boolean is refused with "Always listening is on or off."                                                                                               |
+| `tagalong:voice:set-follow-up`                   | invoke         | `boolean`                    | A non-boolean is refused. Applied only while on and not paused.                                                                                              |
+| `tagalong:voice:listening`                       | main → windows | `ListeningState`             |                                                                                                                                                              |
+| `tagalong:voice:talk`                            | main → panel   | `at: number`                 | The talk key confirmed.                                                                                                                                      |
+| `tagalong:voice:talk-release` / `talk-cancel`    | main → panel   | none                         |                                                                                                                                                              |
+| `tagalong:voice:stop`                            | main → windows | none                         | The stop key, or a cancelled turn.                                                                                                                           |
+| `tagalong:voice:models`                          | invoke         | → `VoiceModels { ears }`     | The health check: whether the brain's ears have failed.                                                                                                      |
+| `tagalong:status:set`                            | invoke         | `(id, on)`                   | Handled by `setPanelMark`. The panel can set only `mic-busy`, `mic-failed` and `say-name`.                                                                   |
 
 `earsListen`, `micFrame` and `earsStop` run through one promise chain (`inOrder`). Frames and a
 stop therefore wait behind a held listen that is still noting the window, and the brain hears them
@@ -760,17 +759,15 @@ The full statement is in [privacy.md](../data/privacy.md).
 
 ## Tests that pin it
 
-| Test | Pins |
-| ---- | ---- |
-
-| `bodies/desktop/src/main/ipc/voice.test.ts` | Mode validation, window noting, ordering, offline failure, `hush`, `speak_sample`, the re-listen on reconnect, heard/voice/speech forwarding, `speech_state` to the brain (a bad shape dropped) and `speech_control` to the panel alone, addressing (follow-up, "stop", `mightBeStop`), marks. |
-| `bodies/desktop/src/main/talk-key.test.ts` | The 250 ms confirm, shortcuts sending nothing, taps, repeats, cancel, key change, keycodes, and a hook that will not load. |
-| `bodies/desktop/src/main/always-listening.test.ts`, `status-marks.test.ts` | State, follow-up gating, pause reasons, the guard timing and logging, saving in order, `listening-on` and `say-name` marks. |
-| `bodies/ui/src/voice/listen-controller.test.ts` | Hold, release and cancel, late mics, `turnEnd` ownership, the always session lifecycle, addressing, stop, speech start once per turn, a held question that is only Scout's echo, the follow-up window, speech over Scout (pause, resume on noise or echo, interrupt), retry back-off. |
-| `bodies/ui/src/voice/push-to-talk.test.ts` | Repeats, missed release, the mic button, spent holds. |
-| `bodies/ui/src/shapes/addressing.test.ts`, `voice.test.ts`; `bodies/desktop/src/shared/voice.test.ts`, `settings.test.ts` | "Scout"-like words, possessives, follow-up, stop, `chosenMouth`, `Pushable`. |
-| `bodies/desktop/src/renderer/src/mic.test.ts`, `remote-ears.test.ts`, `voice-seam.test.ts` | The mic closed on audio failure and a worklet failure not read as busy, handlers kept until a held `turnEnd`, the seam. |
-| `bodies/desktop/src/renderer/src/talk-rules.test.ts`, `mic-failure.test.ts` | `FollowUpCue`, `EarsNotes`, `FailureStreak`, `HeardInbox`, `TalkOver` (the key pauses, real words cut off, nothing resumes), `micFailure`. |
-| `bodies/desktop/e2e/listening.spec.ts` | Always listening off at launch, on only when switched (the brain gets `listen` and mic frames), a "Scout, ..." turn answered, then off again (`unlisten`). |
-
-| `brain/tests/test_voice_*.py` | Silero, Smart Turn, Moonshine and Whisper behind fakes, `Ears` frame by frame, `VoiceService` sessions, the speech-model list and choice, the CUDA fetch. |
+| Test                                                                                                                      | Pins                                                                                                                                                                                                                                                                                           |
+| ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bodies/desktop/src/main/ipc/voice.test.ts`                                                                               | Mode validation, window noting, ordering, offline failure, `hush`, `speak_sample`, the re-listen on reconnect, heard/voice/speech forwarding, `speech_state` to the brain (a bad shape dropped) and `speech_control` to the panel alone, addressing (follow-up, "stop", `mightBeStop`), marks. |
+| `bodies/desktop/src/main/talk-key.test.ts`                                                                                | The 250 ms confirm, shortcuts sending nothing, taps, repeats, cancel, key change, keycodes, and a hook that will not load.                                                                                                                                                                     |
+| `bodies/desktop/src/main/always-listening.test.ts`, `status-marks.test.ts`                                                | State, follow-up gating, pause reasons, the guard timing and logging, saving in order, `listening-on` and `say-name` marks.                                                                                                                                                                    |
+| `bodies/ui/src/voice/listen-controller.test.ts`                                                                           | Hold, release and cancel, late mics, `turnEnd` ownership, the always session lifecycle, addressing, stop, speech start once per turn, a held question that is only Scout's echo, the follow-up window, speech over Scout (pause, resume on noise or echo, interrupt), retry back-off.          |
+| `bodies/ui/src/voice/push-to-talk.test.ts`                                                                                | Repeats, missed release, the mic button, spent holds.                                                                                                                                                                                                                                          |
+| `bodies/ui/src/shapes/addressing.test.ts`, `voice.test.ts`; `bodies/desktop/src/shared/voice.test.ts`, `settings.test.ts` | "Scout"-like words, possessives, follow-up, stop, `chosenMouth`, `Pushable`.                                                                                                                                                                                                                   |
+| `bodies/desktop/src/renderer/src/mic.test.ts`, `remote-ears.test.ts`, `voice-seam.test.ts`                                | The mic closed on audio failure and a worklet failure not read as busy, handlers kept until a held `turnEnd`, the seam.                                                                                                                                                                        |
+| `bodies/desktop/src/renderer/src/talk-rules.test.ts`, `mic-failure.test.ts`                                               | `FollowUpCue`, `EarsNotes`, `FailureStreak`, `HeardInbox`, `TalkOver` (the key pauses, real words cut off, nothing resumes), `micFailure`.                                                                                                                                                     |
+| `bodies/desktop/e2e/listening.spec.ts`                                                                                    | Always listening off at launch, on only when switched (the brain gets `listen` and mic frames), a "Scout, ..." turn answered, then off again (`unlisten`).                                                                                                                                     |
+| `brain/tests/test_voice_*.py`                                                                                             | Silero, Smart Turn, Moonshine and Whisper behind fakes, `Ears` frame by frame, `VoiceService` sessions, the speech-model list and choice, the CUDA fetch.                                                                                                                                      |

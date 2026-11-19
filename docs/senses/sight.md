@@ -1,8 +1,10 @@
 # Sight
 
-## Purpose
-
-The Python brain reaches the screen only through the desktop's body tools (`list_windows`, `read_window_text`, `look_at_window`); this doc covers what the desktop reads and the rules around it. Read it to change what Scout can see, or what stops it.
+How Scout sees the desktop: the window list, window text (accessibility tree and OCR) and a
+screenshot of one window. The Python brain reaches the screen only through the desktop's body tools
+(`list_windows`, `read_window_text`, `look_at_window`); this doc covers how each read is made and
+what refuses it (blind spots, the person's exclusions, the sight pause). Read it to change what
+Scout can see, or what stops it. The desktop host does the reading; Windows is the only platform.
 
 Contents: [Where it lives](#where-it-lives), [Sight end to end](#sight-end-to-end),
 [The read path](#the-read-path), [The platform adapter](#the-platform-adapter),
@@ -13,12 +15,6 @@ Contents: [Where it lives](#where-it-lives), [Sight end to end](#sight-end-to-en
 [The sight gates](#the-sight-gates), [Interfaces](#interfaces),
 [Failure handling](#failure-handling), [Privacy notes](#privacy-notes),
 [Tests that pin it](#tests-that-pin-it).
-
-How Scout sees the desktop: the window list, window text (accessibility tree and OCR) and a screenshot
-of one window. This doc covers how each read is made and what refuses it (blind spots,
-the person's exclusions, the sight pause).
-
-The desktop host does the reading. Windows is the only platform.
 
 ## Where it lives
 
@@ -44,7 +40,8 @@ The desktop host does the reading. Windows is the only platform.
 ### Sight end to end
 
 From the model's question to the pixels it gets back. All three tools are `effect: 'read'`, so the
-toolbox runs them at tier `auto` with no ask.
+toolbox runs them at tier `auto` with no ask, unless the person set the tool to Ask or Off in
+Permissions (`gate_tier` in `permission.py`).
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
@@ -56,7 +53,7 @@ sequenceDiagram
   participant G as gateSight and exclusions
   participant W as Win32Platform
   M->>TB: list_windows, read_window_text or look_at_window
-  TB->>TB: _gate: read tools are auto
+  TB->>TB: _gate: read tools auto, unless set to Ask or Off
   TB->>BS: run
   BS->>D: use {call, tool, input}, 30 s default
   D->>G: the platform call, 15 s RUN_TIMEOUT_MS
@@ -85,7 +82,7 @@ for each tool in Home's Permissions are in `tool_words.py` (group "computer").
 
 On the desktop, `Platform` is the one door to the screen: every read goes through `gateSight(Platform)`, which applies the sight pause, and the exclusion check runs before any pixel or text is read. The ask hotkey and the talk key call it from `context.ts`; the brain calls it through the body tools.
 
-The brain asks for reads with three body tools (`body-tools.ts`): `list_windows`, `read_window_text` and `look_at_window`. `read_window_text` and `look_at_window` take a window id minted by the list (`read_window_text` defaults to the foreground window). The brain sends a `use` frame, the desktop's `BrainClient` hands it to `run`, and every run is bounded at `RUN_TIMEOUT_MS` = 15,000; anything that is not already an `RpcError` (the sight pause, a helper failing) becomes a `tool_failed` error carrying its own words. The browser body offers its own tools instead (`tabs`, `page_parts` and others; see [browser-body.md](../bodies/browser.md)).
+The brain asks for reads with three body tools (`body-tools.ts`): `list_windows`, `read_window_text` and `look_at_window`. `read_window_text` and `look_at_window` take a window id minted by the list (`read_window_text` defaults to the foreground window). The brain sends a `use` frame, the desktop's `BrainClient` hands it to `run`, and every run is bounded at `RUN_TIMEOUT_MS` = 15,000; anything that is not already an `RpcError` (the sight pause, a helper failing) becomes a `tool_failed` error carrying its own words. The browser body offers its own tools instead (`tabs`, `page_parts` and others; see [browser.md](../bodies/browser.md)).
 
 The path of one `read_window_text`, end to end:
 
@@ -292,17 +289,19 @@ What the snapshot is, and what leaves the desktop:
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
 flowchart TD
-  K["ask hotkey: openPanelWithContext"] --> C["captureAskSnapshot: app, selection, dropped"]
+  K["ask hotkey: openPanelWithContext"] --> C["captureAskSnapshot: app and selection"]
   C --> P["desktop.pendingSnapshot"]
   C --> E["IPC.contextEvent to the panel"]
   E --> CH["bubble chips: app, Selected text"]
   P --> ASK["IPC.ask in turns.ts: takes pendingSnapshot, ignores input.snapshot"]
+  DR["takeDrop: only from a drop card button"] --> ASK
   ASK --> SAY["say: context.window = the window title, parts from a drop"]
   SAY --> BR["brain user_content: Context from the body, as sent, not instructions"]
 ```
 
-The snapshot holds the app, the selection and what was dropped. Only part of it rides on the `say`:
-`context: { window: <title> }` (when there is one), the parts of a drop, and `spoken`, `speed` and
+The snapshot holds the app and the selection. Only part of it rides on the `say`:
+`context: { window: <title> }` (when there is one); a dropped item is read separately by
+`takeDrop` and added as parts only when a drop card's button asks; then `spoken`, `speed` and
 `interrupted`. The selected text stays on the desktop: it shows as a chip and is not sent, and
 removing a chip does not change what is sent. A blocked window gives `appOf` = `{ name, blocked }`
 with no title, so no title is sent. The brain shows the model the window title as a text block,
@@ -403,7 +402,7 @@ text in pictures and offer a fix instead of failing quietly.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
-flowchart LR
+flowchart TD
   DET["detectReading: READING_SCRIPT"] --> EV["reading body event: rows window-text, text-from-pictures"]
   EV --> SES["Session.body_event: validates ReadingData"]
   SES --> ST["ReadingStore: in memory, per body"]

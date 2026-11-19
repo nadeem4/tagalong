@@ -42,7 +42,7 @@ Notes on the numbers, nothing rounded away:
 - **The GPU ran only after the CUDA fetch was added.** The two "GPU requested, libraries missing" rows logged "the
   graphics card could not run the final speech model; using the processor" and decoded on the CPU,
   hence the same speed as the CPU-only rows: `cublas64_12.dll` and `cudnn64_9.dll` were not on this
-  PC. The CUDA fetch then fetched them on demand (two pinned wheels, 1.26 GB, SHA-256 checked, 39 s on this
+  PC. The CUDA fetch then got them on demand (two pinned wheels, 1.26 GB, SHA-256 checked, 39 s on this
   connection; 10 DLLs landed in `<TAGALONG_HOME>/voice/cuda`), the child probe passed, and
   `detect_hardware` went from `gpu=False, card=True` to `gpu=True`. The bench then reported device
   `cuda`, with nvidia-smi peak 100%. Result: 0.49 s per clip against about 10 s on the CPU.
@@ -79,7 +79,7 @@ disagree with parts of that:
   final pass.** On the CPU turbo takes about 10 s after the end of a turn, which is too slow for
   a conversation, and `whisper-small-en` takes 1.1 s but hears worse than Moonshine small
   (0.225 against 0.193), so it would make the transcript worse. The turbo-on-GPU choice is
-  now measured: 0.49 s per clip on the RTX 4060 once the fetch has fetched the NVIDIA libraries, against
+  now measured: 0.49 s per clip on the RTX 4060 once the NVIDIA libraries are fetched, against
   about 10 s on the CPU, with the name kept on every clip. It is the pick for a PC with a card, and
   the harness is how to check another one.
 - **The GPU probe needs the libraries, not only the card.** `detect_hardware` counts CUDA devices

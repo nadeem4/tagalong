@@ -40,26 +40,19 @@ lane is what you hear.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
-flowchart LR
-  M["model reply deltas"]
-  subgraph TEXT["Text lane"]
-    D["turn.delta to the bubble: the whole Markdown reply"]
-  end
-  subgraph SPEECH["Speech lane"]
-    SS["SpokenStream: only text before the --- divider"]
-    TS["to_speakable: no code, tables, quotes, URLs"]
-    FE["for_the_ear: times, money, numbers as words"]
-    CK["Chunker: a few whole sentences"]
-    Q["Mouth queue, one worker"]
-    T["TTS worker thread: Tts.synth"]
-    SH["shape_chunk: trim, fade, gap"]
-    SS --> TS --> FE --> CK --> Q --> T --> SH
-  end
-  M --> D
-  M --> SS
+flowchart TD
+  M["model reply deltas, Session"]
+  M -->|"text lane"| D["reply delta frames to the bubble: the whole Markdown reply"]
+  M -->|"speech lane: Mouth.reply"| SS["SpokenStream: only text before the --- divider"]
+  SS --> TS["to_speakable: no code, tables, quotes, URLs"]
+  TS --> FE["for_the_ear: times, money, numbers as words"]
+  FE --> CK["Chunker: a few whole sentences"]
+  CK --> Q["Mouth queue, one worker"]
+  Q --> T["TTS thread: Tts.synth, Piper, Kokoro or Supertonic"]
+  T --> SH["shape_chunk: trim, fade, gap"]
   SH -->|"speech frame n: text, pcm, sample_rate"| SP["SpeechPlayer in the panel"]
   SP -->|"speech_state: started, ended, paused, idle"| PR["Presence: per-body speech state"]
-  PR --> RUN["runner gate: next_pause news"]
+  PR --> RUN["runner: next_pause news at a sentence_break"]
 ```
 
 The bubble gets every delta; the voice gets only the part before a line that is exactly `---`, so
@@ -268,10 +261,37 @@ these words instead, through `Mouth.replace`). The call is cut off after 5 s bec
 held meanwhile. Only a real replace counts as telling the news; otherwise the event goes back to
 `new` and a plain turn tells it later. The full flow is in [turns.md](../brain/turns.md).
 
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
+sequenceDiagram
+  participant R as Runner
+  participant S as Session
+  participant MO as Mouth
+  participant P as SpeechPlayer
+  P->>R: speech_state at a sentence break (Presence.at_break)
+  R->>R: take one next_pause event
+  R->>S: interject(body, news)
+  S->>MO: pause()
+  MO->>P: speech_control pause
+  S->>S: speech_tools interject call, 5 s cap
+  opt speech_replace, and the person did not talk over Scout
+    S->>MO: replace(turn, body, words)
+    MO->>P: speech_control clear {turn}
+    MO->>P: speech frames under a new turn id
+  end
+  S->>MO: resume()
+  MO->>P: speech_control resume
+  S-->>R: told, or the event waits as new again
+```
+
+The voice is held only for the one short call and always resumes after it. A replace mutes the old
+turn's unsaid words and speaks the new words as a turn of its own; if the person talked over Scout
+meanwhile, nothing is replaced and the player stays paused for them.
+
 ### Talking over Scout
 
-Talking over Scout pauses it; nothing is destroyed. The mic stays open while Scout speaks, and the
-system voice no longer deafens it. What the person said then decides what happens. The decision
+Talking over Scout pauses it; nothing is destroyed. The mic stays open while Scout speaks, the
+system voice included. What the person said then decides what happens. The decision
 is mechanical where it can be and the brain's where it matters:
 
 ```mermaid
@@ -296,7 +316,7 @@ flowchart TD
   (`player.cutOff()`, so the brain hushes) and sends the question with `interrupted`.
 - **Always.** With Scout speaking, any speech pauses it. With Scout quiet, only the first
   addressed partial, or the addressed `turnEnd`, of a turn brings the bubble up.
-- **The bubble.** It no longer stops the running reply when listening starts. The Stop button and
+- **The bubble.** Listening starting does not stop the running reply. The Stop button and
   the close still do (`bridge.interrupt`, which cancels the turn: an explicit stop). Real words
   reach the brain as a `say` with `interrupted`, and the brain pauses the turn.
 - **Stop.** Cancelling a turn does not hush its speech on the brain. So `turns.ts#interrupt` cancels
@@ -555,7 +575,7 @@ settings are in [hearing.md](hearing.md#settings-fields).
 
 | Test                                                                                                                                                                       | Pins                                                                                                                                                                                                                                                                                                                                                                               |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bodies/desktop/src/main/ipc/turns.test.ts`                                                                                                                                | A spoken ask carries `spoken`, `voice` and `speed`; a cancelled turn also stops the voice.                                                                                                                                                                                                                                                                                         |
+| `bodies/desktop/src/main/ipc/turns.test.ts`                                                                                                                                | A spoken ask carries `spoken` and `speed`; a cancelled turn also stops the voice.                                                                                                                                                                                                                                                                                                  |
 | `bodies/desktop/src/shared/voice.test.ts`, `settings.test.ts`                                                                                                              | `chosenMouth`, the voice and speed settings.                                                                                                                                                                                                                                                                                                                                       |
 | `bodies/desktop/src/renderer/src/voice-player.test.ts`                                                                                                                     | `SpeechPlayer` order, answering and speaking state, cutOff dropping late chunks and sending `hush`, pause and resume (the held sentence is not replayed, the queue is kept), clear (no `hush`), the `speech_state` events per sentence, `applySpeechControl`, the sentences played to the end, the turn's text, the system-voice fallback, `playVoiceSample`, system voice choice. |
 | `bodies/desktop/e2e/smoke.spec.ts`                                                                                                                                         | Talking to Scout on the fake brain's `heard` and `speech` frames and Chromium's fake mic, ending with the "Hold Right Ctrl to reply" hint and a spoken `say`.                                                                                                                                                                                                                      |
