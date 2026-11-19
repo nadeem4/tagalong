@@ -105,9 +105,12 @@ export function ExpertsTab({
   onAdd,
   onAddAnyway,
   updates,
+  answered,
 }: {
   updates: UpdatesControls | null;
   setup: SetupOverview;
+  /** Counts the times the brain said a setup moved on; a row's card line clears with it. */
+  answered: number;
   asking: ReadonlySet<string>;
   onAct: (id: string) => Promise<Outcome | null>;
   onAdd: (id: string) => Promise<Outcome | null>;
@@ -115,7 +118,7 @@ export function ExpertsTab({
 }) {
   const [text, setText] = useState('');
   const [more, setMore] = useState(false);
-  const { outcomes, track, clear } = useOutcomes();
+  const { outcomes, track, clear } = useOutcomes(answered);
   const { browseExperts: items, progress, failed } = setup;
 
   const split = setup.showMoreFrom ?? items.length;

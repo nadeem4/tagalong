@@ -2582,7 +2582,7 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
    then "Ready". With the brain stopped the page says Tagalong could not read this and that you can
    connect your tools later in Home, under Connections. Step 11 has no Skip: **I’ll do this later**
    and **Finish** both end the tour. On Home's **Connections** page **Your experts** lists
-   Claude Code with its state; the **Experts** tab's **Add an expert** offers more (an Official one has **Add** and opens an Allow card first; a community one shows the check card first, and **Add anyway** is that approval, so it opens no further Allow card) (Log in on a Claude Code you already logged into elsewhere opens no card: it says "Already logged in." and the chip turns ready).
+   Claude Code with its state; the **Experts** tab's **Add an expert** offers more (an Official one has **Add** and opens an Allow card first; a community one shows the check card first, and **Add anyway** is that approval, so it opens no further Allow card). The row says "Answer the card to add it." while the card is up; **Deny** (or letting it lapse) clears that line and says "Okay, nothing was changed." at the top of the page, and a card that Allow turns into a refusal or failure says so in plain words, never silence (Log in on a Claude Code you already logged into elsewhere opens no card: it says "Already logged in." and the chip turns ready).
 3. **Action:** on step 7 press **Copy chrome://extensions**, paste it somewhere; press **Show
    folder** and **Copy folder path**. **Expected:** the address and the add-on folder path are
    what you pasted; the folder opens.

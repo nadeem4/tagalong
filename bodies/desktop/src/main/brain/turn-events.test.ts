@@ -536,7 +536,7 @@ describe('createTurnEvents: asks', () => {
     it("Scout's save_preference ask (a tool, no free_text) is Scout's, not a question", () => {
       const [e] = make().map(
         'ask',
-        jobAsk({ text: 'Keep it?', options: ['Save it', 'Not now'], tool: 'save_preference' }),
+        jobAsk({ text: 'Keep it?', options: ['allow', 'deny'], tool: 'save_preference' }),
       );
       expect(e).toMatchObject({ app: 'Scout', tool: 'save_preference' });
       expect(e).not.toHaveProperty('question');
@@ -545,7 +545,7 @@ describe('createTurnEvents: asks', () => {
     it("Scout's save_preference ask (a tool, no free_text) is Scout's, not a question", () => {
       const [e] = make().map(
         'ask',
-        jobAsk({ text: 'Keep it?', options: ['Save it', 'Not now'], tool: 'save_preference' }),
+        jobAsk({ text: 'Keep it?', options: ['allow', 'deny'], tool: 'save_preference' }),
       );
       expect(e).toMatchObject({ app: 'Scout', tool: 'save_preference' });
       expect(e).not.toHaveProperty('question');

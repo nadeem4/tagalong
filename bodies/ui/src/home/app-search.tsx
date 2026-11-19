@@ -25,6 +25,7 @@ export function AppSearch({
   onAdd,
   onAddAnyway,
   onAddApp,
+  answered,
 }: {
   /** The brain is away: the page already says so once, so the list error stays quiet. */
   offline: boolean;
@@ -34,6 +35,8 @@ export function AppSearch({
   apps: AppInfo[];
   /** Changes when the apps changed (an add finished): search again, the list has moved on. */
   refresh: number;
+  /** Counts the times the brain said a setup moved on; a row's card line clears with it. */
+  answered: number;
   onAdd: (row: AppRow, query: string) => Promise<Outcome | null>;
   onAddAnyway: (row: AppRow, query: string) => Promise<Outcome | null>;
   onAddApp: (params: AppAddParams) => Promise<boolean>;
@@ -50,7 +53,7 @@ export function AppSearch({
   const [settled, setSettled] = useState(false);
   const [loading, setLoading] = useState(false);
   const [byHand, setByHand] = useState(false);
-  const { outcomes, track, clear } = useOutcomes();
+  const { outcomes, track, clear } = useOutcomes(answered);
   const latest = useRef(0);
   // While an outcome is on a row, the brain no longer lists that app; keep the list as it is.
   const frozen = useRef(false);

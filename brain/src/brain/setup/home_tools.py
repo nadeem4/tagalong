@@ -81,15 +81,12 @@ class SetupProgress:
     def fail(self, tool: str, subject: str, error: str | None) -> None:
         """A Home card ended: how, for the row that was pressed (None clears an earlier one)."""
         self._current = None
-        self._failed = (
-            None
-            if error is None
-            else {
-                "expert": subject,
-                "error": error,
-                **({"kind": "app"} if tool == "install_app" else {}),
-            }
-        )
+        app = tool == "install_app"
+        # An expert's row has no words for "you said no" or "it lapsed": it just stays as it was.
+        if error is None or (not app and error in ("denied", "lapsed")):
+            self._failed = None
+        else:
+            self._failed = {"expert": subject, "error": error, **({"kind": "app"} if app else {})}
 
     def current(self) -> dict | None:
         return self._current

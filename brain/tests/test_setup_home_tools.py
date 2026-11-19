@@ -559,6 +559,10 @@ def test_a_home_card_that_ends_badly_is_a_failure_home_can_word_and_reloads():
     assert progress.failed() == {"expert": "io.x/y", "error": "unknown_app", "kind": "app"}
     ended("install_expert", {"id": "goose"}, "failed")
     assert progress.failed() == {"expert": "goose", "error": "failed"}
+    ended("install_expert", {"id": "goose"}, "denied")  # saying no is no failure on an expert row
+    assert progress.failed() is None
+    ended("install_app", {"id": "io.x/y"}, "denied")  # an app's no is worded at the top of Home
+    assert progress.failed() == {"expert": "io.x/y", "error": "denied", "kind": "app"}
     ended("install_app", {"id": "io.x/y"}, None)  # a clean add clears it
     assert progress.failed() is None
-    assert sent == [("changed", {"what": "setup"})] * 3
+    assert sent == [("changed", {"what": "setup"})] * 5

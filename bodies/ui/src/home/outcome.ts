@@ -2,7 +2,7 @@
  * How an add ended, kept per row so the words sit beside the thing the person pressed instead of
  * in a line at the top of the page. Contains Outcome and useOutcomes.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export interface Outcome {
   text: string;
@@ -11,8 +11,15 @@ export interface Outcome {
   added: boolean;
 }
 
-export function useOutcomes() {
+/** `answered` changes when the brain says a setup moved on (a card answered): the words wait no more. */
+export function useOutcomes(answered = 0) {
   const [outcomes, setOutcomes] = useState<ReadonlyMap<string, Outcome>>(new Map());
+  const seen = useRef(answered);
+  useEffect(() => {
+    if (seen.current === answered) return;
+    seen.current = answered;
+    setOutcomes(new Map());
+  }, [answered]);
   /** Runs an add and files its outcome under the row's id. */
   const track = async (id: string, call: Promise<Outcome | null>): Promise<void> => {
     const outcome = await call;

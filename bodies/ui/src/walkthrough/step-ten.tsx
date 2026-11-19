@@ -154,7 +154,8 @@ export function StepTen({
   useEffect(
     () =>
       onBrainChanged((what) => {
-        if (what === 'setup') load();
+        // An app added from a card says `apps`, an install moving on says `setup`.
+        if (what === 'setup' || what === 'apps') load();
       }),
     [onBrainChanged, load],
   );

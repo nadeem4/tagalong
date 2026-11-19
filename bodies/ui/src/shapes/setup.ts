@@ -95,7 +95,9 @@ const Wire = z
         percent: z.number().optional(),
       })
       .nullable(),
-    failed: z.object({ expert: z.string(), error: z.string() }).nullable(),
+    failed: z
+      .object({ expert: z.string(), error: z.string(), kind: z.literal('app').optional() })
+      .nullable(),
   })
   .transform(
     ({
