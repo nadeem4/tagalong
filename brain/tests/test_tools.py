@@ -1,5 +1,6 @@
 """Tests for the memory tools: schemas, dispatch, recall formatting and size cap."""
 
+import asyncio
 import base64
 import datetime
 import json
@@ -593,6 +594,28 @@ async def test_list_experts_is_read_only_and_shows_untested_for_unknown_ids(home
 async def test_hand_off_refusal_is_a_plain_line(home):
     home.jobs.error = JobError("not started")
     assert await home.run("hand_off", {"task": "t", "folder": "C:/p"}) == "not started"
+
+
+async def test_a_refused_hand_off_ends_its_new_task_stopped(home):
+    home.jobs.error = JobError("not started")
+    await home.run("hand_off", {"task": "t", "folder": "C:/p"})
+    assert home.tasks.get(home.jobs.task_id).state == "stopped"
+
+
+async def test_a_cancelled_hand_off_ends_its_new_task_stopped(home):
+    # The person talks over the turn while the mode card waits: the task must not stay open.
+    home.jobs.error = asyncio.CancelledError()
+    with pytest.raises(asyncio.CancelledError):
+        await home.run("hand_off", {"task": "t", "folder": "C:/p"})
+    assert home.tasks.get(home.jobs.task_id).state == "stopped"
+
+
+async def test_a_cancelled_hand_off_keeps_a_task_it_was_given_open(home):
+    tid = home.tasks.open("do", "desktop-1", title="the build")
+    home.jobs.error = asyncio.CancelledError()
+    with pytest.raises(asyncio.CancelledError):
+        await home.run("hand_off", {"task": "t", "folder": "C:/p", "task_id": tid})
+    assert home.tasks.get(tid).state == "open"
 
 
 async def test_hand_off_refusal_with_facts_returns_the_facts_as_json(home):

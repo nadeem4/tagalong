@@ -10,6 +10,7 @@ import sqlite3
 from collections.abc import Callable
 from datetime import datetime, timedelta
 
+from brain.events import PERSON_KINDS
 from brain.store import tasks as store
 from brain.store.db import transaction, utc_text
 from brain.store.memory import MemoryRefused
@@ -85,6 +86,16 @@ class Tasks:
 
     def get(self, id: str) -> store.TaskRow | None:
         return store.get(self._db, id)
+
+    def person_cause(self, event_id: str | None) -> bool:
+        """The one person rule: the event is a person's say or card answer. A missing or swept
+        event is not (fail safe: the hand-off card shows)."""
+        return event_id is not None and store.event_kind(self._db, event_id) in PERSON_KINDS
+
+    def is_person(self, id: str | None) -> bool:
+        """Whether a person started the task: the event that caused it is a person's."""
+        row = None if id is None else store.get(self._db, id)
+        return row is not None and self.person_cause(row.caused_by)
 
     def source_of(self, id: str | None) -> str | None:
         row = None if id is None else store.get(self._db, id)

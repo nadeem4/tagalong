@@ -15,6 +15,7 @@ from brain.protocol import ErrorCode, RpcError
 from brain.setup import home_tools
 from brain.setup import registry as registry_module
 from brain.setup.facts import Machine
+from brain.setup.flights import not_for_home
 from brain.setup.home_tools import WHY_PER_REPLY, SetupProgress, home_setup_tools
 from brain.setup.registry import Registry
 from brain.setup.store import InstalledExpert
@@ -586,3 +587,36 @@ async def test_expert_rows_carry_licence_repo_and_account(tmp_path):
     assert [r["account"] for r in rows] == [True, False]
     assert rows[1]["licence"] == "Apache-2.0" and rows[1]["repo"] == "https://g.test/zed"
     assert rows[0]["repo"] == ""
+
+
+async def test_a_home_install_opens_no_task_but_scouts_does(tmp_path):
+    # Home's Connections buttons are not Scout's work: nothing would ever end a task they open.
+    claimed: list[str] = []
+    claim = not_for_home(lambda given, title: claimed.append(title) or "t1")
+    results: list[str | None] = []
+
+    async def run(args):
+        results.append(claim(None, "install x"))
+        return json.dumps({"started": args["id"]})
+
+    async def inspect():
+        return Machine("windows", "x64", None, None, None, None, None)
+
+    async def ask(**kw):
+        return Answer("allow")
+
+    tools = home_setup_tools(
+        Registry(tmp_path, lambda url: None),
+        inspect,
+        lambda: [],
+        lambda: [],
+        ask,
+        lambda **kw: None,
+        [(ToolSpec("install_expert", "d", {}, effect="change", card=None), run)],
+        SetupProgress(lambda event: None),
+        FakeWhy(),
+    )
+    home = {spec.name: h for spec, h in tools}["setup_expert"]
+    await home({"id": "x", "approved": True})
+    assert results == [None] and claimed == []
+    assert claim(None, "install y") == "t1" and claimed == ["install y"]  # Scout's own path

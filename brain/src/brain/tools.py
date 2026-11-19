@@ -854,6 +854,7 @@ def expert_tools(
             return "hand_off needs apps to be a list of connected app ids."
         given = args.get("task_id")
         tid = tasks.claim(given, cause(), "do", args["task"])
+        started = False
         try:
             job_id = await jobs.start(
                 args["task"],
@@ -867,11 +868,15 @@ def expert_tools(
                 task_id=tid,
                 caused_by=cause(),
             )
+            started = True
         except JobError as err:
-            if given is None:
-                tasks.end(tid, "stopped", reason="the hand-off was refused")
             # Setup facts (ids and numbers) are facts only; Scout words them. Else the plain line.
             return json.dumps(err.facts) if err.facts else str(err)
+        finally:
+            # Refused, or the person talked over the turn: a task made for this call must not
+            # stay open for nothing.
+            if not started and given is None:
+                tasks.end(tid, "stopped", reason="the hand-off was refused")
         tasks.wait(tid)
         # Facts only; Scout words them. Without a continue, the session is simply fresh.
         result = {

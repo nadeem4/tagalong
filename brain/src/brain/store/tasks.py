@@ -114,10 +114,15 @@ def event_source(db: sqlite3.Connection, event_id: str) -> str | None:
     return None if r is None else r[0]
 
 
+def event_kind(db: sqlite3.Connection, event_id: str) -> str | None:
+    r = db.execute("SELECT kind FROM events WHERE id=?", (event_id,)).fetchone()
+    return None if r is None else r[0]
+
+
 def timers_of(db: sqlite3.Connection, task_id: str) -> list[str]:
-    """The timer and watch rows of a task that have not run out: planned or paused."""
+    """The timer rows of a task that have not run out: planned or paused."""
     rows = db.execute(
-        "SELECT id FROM work WHERE task_id=? AND kind IN ('timer','watch')"
+        "SELECT id FROM work WHERE task_id=? AND kind='timer'"
         " AND state IN ('planned','paused') ORDER BY created_at, rowid",
         (task_id,),
     ).fetchall()

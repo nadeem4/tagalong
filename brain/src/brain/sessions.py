@@ -305,6 +305,7 @@ class Session:
             setup_facts=setup_facts,
             emit=self._emit_job_event,
             task_source=self.tasks.source_of,
+            person_task=self.tasks.is_person,
             finish_news=self.events.finish_matching,
             on_timers_changed=lambda: timers.changed(),
             outputs=outputs,
@@ -788,8 +789,7 @@ class Session:
         needs no ask. A body's wake, a timer or a job's news is not a person."""
         if turn_id is None or turn_id != self._turn_id or not self._busy():
             return False
-        row = self.events.get(self._turn_cause) if self._turn_cause else None
-        return row is not None and row.kind == "say"
+        return self.tasks.person_cause(self._turn_cause)
 
     def ready(self) -> bool:
         return getattr(self._model, "ready", True)  # fakes and other models need no key

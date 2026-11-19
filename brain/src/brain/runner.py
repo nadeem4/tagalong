@@ -17,7 +17,14 @@ from typing import Protocol
 
 from brain.bodies import Bodies
 from brain.builtin_guards import WAKE_WINDOW_S
-from brain.events import EVENT_KINDS, EventKind, EventLog, is_internal, load_notes
+from brain.events import (
+    EVENT_KINDS,
+    PERSON_KINDS,
+    EventKind,
+    EventLog,
+    is_internal,
+    load_notes,
+)
 from brain.guards import EmitCtx, Hook
 from brain.presence import Presence
 from brain.store.events import EventRow
@@ -26,7 +33,6 @@ from brain.tools import _fence_safe
 
 _log = logging.getLogger(__name__)
 
-PERSON_KINDS = frozenset({"say", "card_answer"})
 IDLE_WINDOW_S = 10  # idle news stays quiet this long after the person last spoke
 GROUP_CAP = 20  # one turn tells at most this many events, so a long backlog cannot swamp it
 RECHECK_S = 60.0  # news behind a closed gate is looked at again at least this often

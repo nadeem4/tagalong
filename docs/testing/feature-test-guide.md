@@ -477,8 +477,8 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     even when a rule or a saved preference would cover it: nothing starts until you pick.
     Save a preference that covers nudges and repeat: Scout proceeds and the row says it was
     Scout's decision. Type a
-    message into a wake turn that is already running: once it reaches Scout, the next nudge goes
-    through with no ask (a nudge already waiting on its card still asks). With the bubble
+    message into a wake turn that is already running: the turn stays a non-person one (its first
+    event was the wake), so the next nudge still asks. With the bubble
     closed (nobody online) the nudge waits like any Scout ask and runs if you allow it later.
 
 ## Claude Code asks Scout first (real brain, real Claude Code)

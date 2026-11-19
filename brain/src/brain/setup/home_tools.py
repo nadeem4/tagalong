@@ -18,6 +18,7 @@ from brain.protocol import ErrorCode, RpcError
 from brain.setup.apps import app_facts
 from brain.setup.env import is_tested
 from brain.setup.facts import Machine
+from brain.setup.flights import from_home
 from brain.setup.grouping import group_entries
 from brain.setup.registry import (
     ACP_URL,
@@ -83,6 +84,11 @@ class SetupProgress:
 
     def failed(self) -> dict | None:
         return self._failed
+
+
+async def _run(handler: Handler, args: dict) -> str:
+    with from_home():  # a press on Home opens no task (setup/flights.py)
+        return await handler(args)
 
 
 def _token(message: str) -> str | None:
@@ -324,10 +330,10 @@ def home_setup_tools(
             # the OK for a community one; a bare `approved` never installs community code.
             if tool == "install_app" and approved:
                 if facts.get("official") is True:
-                    return await handler(args)
+                    return await _run(handler, args)
                 if community_ok:
                     log("approved")
-                    return await handler(args)
+                    return await _run(handler, args)
             try:
                 answer = await ask(
                     text="",
@@ -344,7 +350,7 @@ def home_setup_tools(
             log(outcome)
             if outcome != "approved":
                 return json.dumps({"error": "denied"})
-        return await handler(args)
+        return await _run(handler, args)
 
     def parts(args: dict) -> tuple[dict, bool]:
         inner_args = {k: v for k, v in args.items() if k not in ("approved", "community_ok")}

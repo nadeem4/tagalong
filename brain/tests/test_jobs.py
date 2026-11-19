@@ -29,8 +29,9 @@ from brain.open_items import OpenItemRefused, OpenItems
 from brain.permission import Decision, Engine, Grant, Person, SideCheckDecider, Tier
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.store import InstalledExpert
+from brain.store import events as store_events
 from brain.store import rules
-from brain.store.events import list_state
+from brain.store.events import EventRow, list_state
 from brain.store.work import ActivityEntry, WorkStore
 from brain.tools import work_tools
 
@@ -222,6 +223,7 @@ class Rig:
             on_timers_changed=lambda: setattr(self, "timers_changed", self.timers_changed + 1),
             apps=apps,
             task_source=tasks_for(self.memory).source_of,
+            person_task=tasks_for(self.memory).is_person,
             items=self.items,
             **({} if before_start is None else {"before_start": before_start}),
         )
@@ -2750,11 +2752,17 @@ async def test_owner_hand_off_with_apps_logs_the_kept_apps_and_makes_no_offer(ma
     assert rig.offers.considered == []
 
 
-async def hand_off_tier(make_rig, source):
-    """The tier a hand-off with apps asks the engine at, for a task that came from `source`."""
+async def hand_off_tier(make_rig, source, cause_kind="say"):
+    """The tier a hand-off with apps asks the engine at, for a task that came from `source`,
+    caused by an event of `cause_kind` (None: no cause)."""
     engine = FakeEngine(Decision("deny", "no_decider"))
     rig = apps_rig(make_rig, Answer("Plan"), engine=engine)
-    tid = tasks_for(rig.memory).open("do", source)
+    if cause_kind:
+        store_events.insert(
+            rig.memory.db,
+            EventRow(id="c1", kind=cause_kind, at="2026-01-01T11:00:00+00:00", source=source),
+        )
+    tid = tasks_for(rig.memory).open("do", source, caused_by="c1" if cause_kind else None)
     with pytest.raises(JobError, match="not started"):
         await rig.jobs.start("task", str(rig.folder), apps=["lin"], task_id=tid)
     return engine.requests[0].tier
@@ -2762,7 +2770,16 @@ async def hand_off_tier(make_rig, source):
 
 async def test_a_non_person_task_always_shows_the_hand_off_card(make_rig):
     # person_only: no standing rule and no side check may approve it for the person.
-    assert await hand_off_tier(make_rig, "timer:t1") is Tier.person_only
+    assert await hand_off_tier(make_rig, "timer:t1", "timer") is Tier.person_only
+
+
+async def test_a_hand_off_in_a_wake_turn_shows_the_card_though_a_body_is_the_source(make_rig):
+    # One rule: a person task is one a say or card answer caused, not one a body's wake did.
+    assert await hand_off_tier(make_rig, "desktop-1", "back") is Tier.person_only
+
+
+async def test_a_task_with_no_cause_shows_the_hand_off_card(make_rig):
+    assert await hand_off_tier(make_rig, "desktop-1", None) is Tier.person_only
 
 
 async def test_a_person_task_hand_off_asks_at_the_usual_tier(make_rig):

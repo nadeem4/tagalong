@@ -20,7 +20,7 @@ from typing import Literal
 
 from brain.asks import Answer, Asks
 from brain.config import DEFAULT_JOB_STEPS_MAX_BYTES, DEFAULT_JOB_STEPS_MAX_ENTRIES
-from brain.events import Event, is_internal
+from brain.events import Event
 from brain.experts import ExpertHosts, ExpertRun, PermissionRequest, Question, QuietFacts
 from brain.guards import Guards
 from brain.job_activity import PAGE_LIMIT, JobActivity, _clip, activity_line, activity_summary
@@ -118,6 +118,7 @@ class Jobs:
         guards: Guards | None = None,
         on_away: Callable[[str, str], None] = lambda job_id, what: None,
         task_source: Callable[[str | None], str | None] = lambda task: None,
+        person_task: Callable[[str | None], bool] = lambda task: False,
         setup_facts: Callable[[], Awaitable[dict]] | None = None,
         emit: Callable[[Event], None] = lambda event: None,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
@@ -131,6 +132,7 @@ class Jobs:
         steps_max_bytes: int = DEFAULT_JOB_STEPS_MAX_BYTES,
     ) -> None:
         self._task_source = task_source  # task id -> where it came from (a body, or not)
+        self._person_task = person_task  # task id -> whether a person's say or answer began it
         self._items = items  # an expert's permission ask is a live-only item; None: none kept
         self._steps_max_entries = steps_max_entries  # caps of one job's step log (settings)
         self._steps_max_bytes = steps_max_bytes
@@ -900,11 +902,6 @@ class Jobs:
         """The event the turn that handed this job off took: its news is caused by it."""
         goal = self._records.work.get(job_id) if job_id else None
         return ((goal and goal.input) or {}).get("caused_by")
-
-    def _person_task(self, task: str | None) -> bool:
-        """Whether a person started the task: its source is a body, not a timer or a job."""
-        source = self._task_source(task)
-        return source is not None and not is_internal(source)
 
     def _item_body(self, job_id: str | None) -> str:
         """The body its task came from, or the brain: where an expert's ask is shown (T2c drops

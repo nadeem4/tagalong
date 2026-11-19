@@ -32,9 +32,9 @@ def task_tools(
         return json.dumps({"task": tasks.for_turn(cause(), kind, title.strip())})
 
     async def task_end(args: dict) -> str:
-        id, result = args.get("task"), args.get("result")
+        id, result = args.get("task_id"), args.get("result")
         if not isinstance(id, str) or not isinstance(result, str):
-            raise MemoryRefused("task_end needs task and result as text.")
+            raise MemoryRefused("task_end needs task_id and result as text.")
         row = tasks.get(id)
         if row is None or row.state in ("done", "failed", "stopped", "declined"):
             raise MemoryRefused(f"no open task {id}.")
@@ -68,11 +68,11 @@ def task_tools(
     end = ToolSpec(
         "task_end",
         "End a task that is finished, with a one-line result. Refused while a job runs under it "
-        "(stop the job first). Cancels the task's timers and watches.",
+        "(stop the job first). Cancels the task's timers.",
         {
             "type": "object",
-            "properties": {"task": {"type": "string"}, "result": {"type": "string"}},
-            "required": ["task", "result"],
+            "properties": {"task_id": {"type": "string"}, "result": {"type": "string"}},
+            "required": ["task_id", "result"],
         },
         effect="change",
         default_mode="auto",

@@ -83,13 +83,12 @@ async def test_task_start_refuses_ask_and_watch(rig, kind):
 async def test_task_end_records_the_result_and_cancels_its_timers(rig):
     tid = rig.tasks.open("later", "desktop-1", title="remind")
     t = rig.work.create("timer", "ping", due_at=NOW, task_id=tid)
-    w = rig.work.create("watch", "poll", due_at=NOW, task_id=tid)
     other = rig.work.create("timer", "other", due_at=NOW, task_id="zzzzzz")
-    out = json.loads(await rig.call("task_end", {"task": tid, "result": "all done"}))
+    out = json.loads(await rig.call("task_end", {"task_id": tid, "result": "all done"}))
     assert out == {"task": tid, "state": "done"}
     got = rig.tasks.get(tid)
     assert (got.state, got.result) == ("done", "all done")
-    assert sorted(i for i, _ in rig.timers.cancelled) == sorted([t.id, w.id])
+    assert [i for i, _ in rig.timers.cancelled] == [t.id]
     assert other.id not in [i for i, _ in rig.timers.cancelled]
 
 
@@ -97,17 +96,17 @@ async def test_task_end_refuses_while_a_job_runs(rig):
     tid = rig.tasks.open("do", "desktop-1")
     rig.running[tid] = ["j1"]
     with pytest.raises(MemoryRefused, match="stop the job first"):
-        await rig.call("task_end", {"task": tid, "result": "x"})
+        await rig.call("task_end", {"task_id": tid, "result": "x"})
     assert rig.tasks.get(tid).state == "open"
 
 
 async def test_task_end_refuses_an_unknown_or_ended_task(rig):
     with pytest.raises(MemoryRefused):
-        await rig.call("task_end", {"task": "nope", "result": "x"})
+        await rig.call("task_end", {"task_id": "nope", "result": "x"})
     tid = rig.tasks.open("do", "desktop-1")
     rig.tasks.end(tid, "done")
     with pytest.raises(MemoryRefused):
-        await rig.call("task_end", {"task": tid, "result": "x"})
+        await rig.call("task_end", {"task_id": tid, "result": "x"})
 
 
 def test_both_tools_are_scouts_own_and_run_on_their_own(rig):
