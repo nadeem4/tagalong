@@ -2,7 +2,8 @@
 
 A say opens an Ask, which no one sees and which ends with its turn; later slices open Do, Later,
 Watch and Own tasks. `settle` ends Asks, Laters and told Owns by looking at the rows, not by
-hooks, so a crash cannot leave one open. `open_block` is the facts line Scout reads about what is open.
+hooks, so a crash cannot leave one open. `open_block` is the facts line Scout reads about
+what is open.
 `stop` is the one place a task is stopped (spec 6.13): the session passes it what to call.
 """
 
