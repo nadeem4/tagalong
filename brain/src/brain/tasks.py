@@ -1,9 +1,9 @@
 """Tasks: what the person asked for, one row each, that events and work hang off.
 
 A say opens an Ask, which no one sees and which ends with its turn; later slices open Do, Later,
-Watch and Own tasks. `settle` ends Asks, Laters and told Owns by looking at the rows, not by
-hooks, so a crash cannot leave one open. `open_block` is the facts line Scout reads about
-what is open.
+Watch and Own tasks. `settle` ends Asks, Laters and Owns with nothing left waiting by looking at
+the rows, not by hooks, so a crash cannot leave one open. `open_block` is the facts line Scout
+reads about what is open.
 `stop` is the one place a task is stopped (spec 6.13): the session passes it what to call.
 """
 
@@ -223,7 +223,7 @@ class Tasks:
 
     def settle(self) -> list[str]:
         """End every Ask whose say is over, every Later with nothing left to run and every Own
-        whose news is told (or that has none and no open item)."""
+        with no open item and no news."""
         ended = []
         with transaction(self._db):
             at = utc_text(self._now())
@@ -233,8 +233,8 @@ class Tasks:
             for id in store.laters_to_settle(self._db):
                 if store.set_state(self._db, id, "done", at=at):
                     ended.append(id)
-            for id, state, reason in store.owns_to_settle(self._db):
-                if store.set_state(self._db, id, state, at=at, end_reason=reason):
+            for id in store.owns_to_settle(self._db):
+                if store.set_state(self._db, id, "stopped", at=at, end_reason="no answer"):
                     ended.append(id)
         return ended
 

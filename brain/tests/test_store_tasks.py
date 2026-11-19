@@ -96,23 +96,12 @@ def _item(db, id, task_id, state):
     )
 
 
-def test_owns_to_settle_skips_an_own_task_with_an_open_item_or_news_still_to_tell(db):
-    for id in ("told", "waiting", "card", "untold"):
+def test_owns_to_settle_skips_an_own_task_with_an_open_item_or_an_event(db):
+    for id in ("card", "told"):
         tasks.insert(db, task(id, kind="own"))
     events.insert(db, event("e1", "told", "handled", kind="setup_done"))
-    events.insert(db, event("e2", "waiting", "handled", kind="setup_done"))
-    events.insert(db, event("e3", "waiting", "new", kind="setup_done"))
-    events.insert(db, event("e4", "card", "handled", kind="setup_done"))
-    events.insert(db, event("e5", "untold", "taken", kind="setup_done"))
     _item(db, "i1", "card", "open")
-    assert tasks.owns_to_settle(db) == [("told", "done", None)]
-
-
-def test_owns_to_settle_ends_a_gave_up_own_failed(db):
-    tasks.insert(db, task("t", kind="own"))
-    events.insert(db, event("e1", "t", "handled", kind="setup_done"))
-    events.insert(db, event("e2", "t", "gave_up", kind="setup_done"))
-    assert tasks.owns_to_settle(db) == [("t", "failed", None)]
+    assert tasks.owns_to_settle(db) == []
 
 
 def test_owns_to_settle_stops_a_bare_own_and_one_whose_offer_expired(db):
@@ -121,10 +110,7 @@ def test_owns_to_settle_stops_a_bare_own_and_one_whose_offer_expired(db):
     tasks.insert(db, task("waiting", kind="own"))
     _item(db, "i1", "lapsed", "expired")
     _item(db, "i2", "waiting", "open")
-    assert tasks.owns_to_settle(db) == [
-        ("bare", "stopped", "no answer"),
-        ("lapsed", "stopped", "no answer"),
-    ]
+    assert tasks.owns_to_settle(db) == ["bare", "lapsed"]
 
 
 def test_owns_to_settle_leaves_a_watch_task_with_handled_events(db):

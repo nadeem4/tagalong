@@ -114,18 +114,6 @@ def test_settle_ends_what_the_sweeps_name(tasks, db):
     assert tasks.get(ask).state == "done" and tasks.get(later).state == "done"
 
 
-def test_settle_ends_an_own_task_whose_event_was_handled(tasks, db):
-    own = tasks.open("own", "setup:claude")
-    store_events.insert(
-        db,
-        EventRow(
-            id="e1", kind="setup_done", at="2026-01-01T11:00:00+00:00", source="setup:claude",
-            state="handled", task=own,
-        ),
-    )  # fmt: skip
-    assert tasks.settle() == [own] and tasks.get(own).state == "done"
-
-
 def test_settle_stops_a_bare_own_task_as_no_answer(tasks):
     own = tasks.open("own", "scout")
     assert tasks.settle() == [own]
