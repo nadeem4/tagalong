@@ -109,6 +109,7 @@ import type { BrainStatusControl } from './ipc/brain-status';
 import { registerBodiesIpc } from './ipc/bodies';
 import { registerLoopsIpc } from './ipc/loops';
 import { registerEventsIpc } from './ipc/events';
+import { registerTasksIpc } from './ipc/tasks';
 import { registerTimersIpc } from './ipc/timers';
 import { registerModelIpc } from './ipc/model';
 import { registerVoiceModelsIpc, startVoiceFetch } from './ipc/voice-models';
@@ -1037,6 +1038,7 @@ function registerIpc(): void {
   registerLoopsIpc(handle, { brain: required().brain });
   registerTimersIpc(handle, { brain: required().brain });
   registerEventsIpc(handle, { brain: required().brain });
+  registerTasksIpc(handle, { brain: required().brain });
   registerModelIpc(handle, { brain: required().brain });
   registerVoiceModelsIpc(handle, { brain: required().brain });
   registerBodiesIpc(handle, { brain: required().brain });

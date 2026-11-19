@@ -11,6 +11,7 @@ export * from './context';
 export * from './echo';
 export * from './know-me';
 export * from './events';
+export * from './tasks';
 export * from './loops';
 export * from './model';
 export * from './memory';

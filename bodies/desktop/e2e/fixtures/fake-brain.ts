@@ -1395,6 +1395,34 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
               },
             ],
           };
+        } else if (params.tool === 'tasks_list') {
+          // A watch task (open, started by a timer), and an own task that already ended.
+          value = {
+            tasks: [
+              {
+                id: 'kw1',
+                kind: 'watch',
+                state: 'open',
+                title: 'Watching Gmail',
+                source: 'timer:w1',
+                caused_by: 'e1',
+                chain: [{ kind: 'timer', source: 'timer:w1' }],
+                created_at: '2026-11-17T08:00:00+00:00',
+                ended_at: null,
+              },
+              {
+                id: 'ko1',
+                kind: 'own',
+                state: 'done',
+                title: 'Check for updates',
+                source: 'scout',
+                caused_by: null,
+                chain: [],
+                created_at: '2026-11-16T08:00:00+00:00',
+                ended_at: '2026-11-16T08:05:00+00:00',
+              },
+            ],
+          };
         } else if (params.tool === 'timers_state') value = { timers };
         else if (params.tool === 'task_stop') {
           taskStops.push(String(params.input?.task));
