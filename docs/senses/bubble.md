@@ -7,7 +7,7 @@ the cards it hosts, the dock pet, the status marks and Home. It never
 imports Electron, opens a socket or calls a Node API. Each host hands it a `HostBridge`, and that
 is all it knows about the outside world.
 
-The desktop windows that render these components are in [desktop.md](desktop.md). Speech (the
+The desktop windows that render these components are in [desktop.md](../bodies/desktop.md). Speech (the
 queue, the mouth, listening) is in [voice.md](voice.md); this doc covers only what the bubble
 decides to hand to it.
 
@@ -41,7 +41,7 @@ Host-side files that feed these components: `bodies/desktop/src/renderer/src/pan
 
 The bubble shows what Scout writes; it does not cut or summarise anything. Scout's soul tells it to put the
 gist first, laid out so it is easy to follow, and give the detail when asked, so a long tool result or
-expert report (which reaches Scout as a capped preview, see [brain.md](brain.md#long-tool-output))
+expert report (which reaches Scout as a capped preview, see [brain.md](../brain/README.md#long-tool-output))
 appears as a short structured answer plus an offer of the rest.
 
 ### A reply that streamed while the desktop was away
@@ -76,7 +76,7 @@ Every method is required: Home's calls (approvals, jobs, connections, permission
 `usageSummary`), the hand-off questions, `approveTool` and the health calls (`checkHealth`,
 `openFix`, `openLogs`). On desktop the preload supplies all but the health calls (`PreloadBridge`);
 the renderer's `fullBridge()` adds those. Each method's channel on desktop is in
-[desktop.md](desktop.md#the-ipc-modules).
+[desktop.md](../bodies/desktop.md#the-ipc-modules).
 
 `TurnEvent` is derived from the protocol's notification catalog, not restated: `{ type: N } &
 NotificationParamsOf<N>` for every `turn.*` notification plus `connector.confirm`, `connector.dismiss`,
@@ -117,7 +117,7 @@ conversation: past exchanges (`Exchange { question, answer, failed }`) plus the 
 
 **Scout's own line.** A line Scout starts (a remark) is kept as `scoutLine`, separate from `reply`,
 and seeded from the `remark` prop when the person clicks the quiet line open (`GreetingLine`
-`onOpen(text)`; the panel hands the text over, see [desktop.md](desktop.md)). A `pet.remark` turn
+`onOpen(text)`; the panel hands the text over, see [desktop.md](../bodies/desktop.md)). A `pet.remark` turn
 event while the bubble is open sets it too. Asking anything moves it into `past` as an `Exchange`
 with `question: null`, so a follow-up keeps it and the full chat shows it first, with no user tile.
 Lines Scout starts show `ScoutMark` (the still SVG head, 20 px) and the name above
@@ -166,7 +166,7 @@ stateDiagram-v2
 - `turn.delta` and `turn.completed` count only for `mine`. A completed turn with no text and a
   `stopReason` shows `stopStatus` as a quiet line ("Declined" for `refusal`, "Stopped: too many
   steps" for `tool_limit`), never spoken. Otherwise the answer shows through `Answer`. With Scout talks
-  on the brain reads a typed question's answer aloud too (the `read_aloud` event, docs/voice.md).
+  on the brain reads a typed question's answer aloud too (the `read_aloud` event, docs/senses/voice.md).
 - `turn.error` for `mine`, or a rejected `ask`, shows a `role="alert"` box with an error icon, the
   message (or "Tagalong could not reach its brain.") and one **Try again**, which asks the same
   question again (never while another answer is running). An earlier failed exchange keeps the box
@@ -231,9 +231,9 @@ The bubble keeps each one's state from its notification:
 | `DropCard`             | the `drop` prop     | Explain (asks "Explain this." or the person's words), Hand it to an expert (asks "Hand this to an expert: … (path)"), both with `drop: true`; Cancel                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | a button; a new drop reopens it                                                                              |
 | `ConnectorConfirmCard` | `connector.confirm` | The options are a vertical stack of full-width rows (`.bubble-choices`, one row per `.bubble-choice`, labels wrap, in Scout's order; the recommended one is the gold primary and carries a "Recommended" tag, and with none recommended the first is primary): Not now / Always allow / Allow (Allow last and gold; the card opens with a facts list and, for a locked tool, an "Always asks" chip) (`approveTool(approvalId, 'once' \| 'always' \| 'deny')`). Always allow shows only when the event's `options` include `always` (a locked tool has none); an event without `options` gets Allow and Not now. A task card (its `options` include `not_now`) reads No instead of Not now for the refusal and adds a Not now button (`not_now`) and a Stop the task button (`stop_task`), both answered by option name with `answerJobAsk` (the job card labels the same two options in plain words too). The card leads with the task's title (`card-task`), and when the event carries `checkBackAt` it shows "Checking back at 15:30" (a "Set by you" chip when `checkBackBy` is `person`) with a Change time control: a time picker whose Set time answers `not_now` with `checkBackAt` (the next time the clock reads that, as an ISO time), so the brain moves the check-back. Stop the task asks no second question. `turn-events.ts` carries `task`, `checkBackAt` and `checkBackBy` from the `ask` frame onto the card. A hand-off card has no apps checklist: its apps arrive as one "name, name" line in its facts (`turn-events.ts`), and Allow approves them. A brain ask (it has `options`) leads with Scout's own words and shows the tool name, never "Change in <app>"; its text shows whole. Open asks queue oldest first and the card shows the head, so several asks at once each get their turn. A click that does not get through (brain offline) leaves the card up | an answer that got through; its turn ending; `connector.dismiss` for it; `asks.changed` no longer listing it |
 
-Asks are described in [brain.md](brain.md).
+Asks are described in [brain.md](../brain/README.md).
 
-**Loops in the bubble.** When Scout brings up a held loop (see [brain.md](brain.md#loops)) it asks
+**Loops in the bubble.** When Scout brings up a held loop (see [brain.md](../brain/README.md#loops)) it asks
 with `choose`, so Show, Done and Later are these same option rows, the recommended one first. The
 answer comes back to Scout as a `choice` event and Scout calls its loop tools. There is no loop card
 or frame of its own.
@@ -242,7 +242,7 @@ or frame of its own.
 as before, no new one) and a card that ended while the body was away is closed with `reason: "timeout"` (the only reason the contract has for it, so a card dropped
 because an expert's process ended reads the same).
 The same open items are listed on Home's Tasks page, Waiting tab, under "Waiting on you" (see
-[desktop.md](desktop.md)); no frame or card was added.
+[desktop.md](../bodies/desktop.md)); no frame or card was added.
 
 **GreetingLine.** The quiet line beside the pet, rendered by the panel instead of the bubble for
 a remark or a brain status mark. It fades after `holdMs` (7,000 ms
@@ -273,7 +273,7 @@ flowchart LR
 
 **Placement.** `Speech` wraps every look and draws a rotated square as the tail on the `tail` side,
 34 px above the bottom, so the bubble reads as the pet speaking. Main places the window; see
-[desktop.md](desktop.md#the-window-inventory).
+[desktop.md](../bodies/desktop.md#the-window-inventory).
 
 ### The health check
 
@@ -302,7 +302,7 @@ The mind decides what is said: everything it writes is spoken except what it put
 block, which the bubble shows and the voice skips. Show-only means a fenced code block, a table row
 (a line starting with `|`) or a quoted line (starting with `>`). Bare URLs are dropped too. The
 brain does this before it speaks (`brain/src/brain/voice/speakable.py`; see
-[brain.md](brain.md#brain-mouth)); the bubble only shows the full answer.
+[brain.md](../brain/README.md#brain-mouth)); the bubble only shows the full answer.
 
 ### Answers
 
@@ -347,14 +347,14 @@ A turn that ends with nothing said is not a status mark; it shows `stopStatus`'s
 ### DockPet and the moods
 
 `DockPet` (`dock-pet.tsx`) draws the live Scout in a 96 px box: `ScoutFace` (`scout-face.tsx`), the
-mascot engine's `<Mascot>` (see [mascot.md](mascot.md)) with the character in `mascot/scout.ts`,
+mascot engine's `<Mascot>` (see [mascot.md](../bodies/mascot.md)) with the character in `mascot/scout.ts`,
 not interactive, pixel ratio capped at 1, fading in when ready. `MOOD_STATE`
 (`mascot/mood-states.ts`, pure) turns a `DockMood` into the engine's mood: `dozing` becomes
 `sleeping`, every other mood keeps its name. The engine blinks and breathes by itself, so the dock
 has no frame or blink logic.
 
 **The moods** (`DockMood`, `DOCK_MOODS`, twelve) and what the dock shows. Props and triggers are in
-[mascot.md](mascot.md#scout-on-the-dock).
+[mascot.md](../bodies/mascot.md#scout-on-the-dock).
 
 | Mood          | Tag (9 px, top right) | Means                                                       |
 | ------------- | --------------------- | ----------------------------------------------------------- |
@@ -407,7 +407,7 @@ The `aria-label` reads `<name> <mood words>`, then ", sight paused",
 `DRAG_THRESHOLD` (4 px, `dock.ts#moveDrag`) is a drag: each step goes to main as `dragAvatar(dx,
 dy)` and the release as `dropAvatar()`. A press that does not move is a click: `looked`, then
 `openBubble()`. A file, link or text dragged in from another app is a drop (`pet-input.ts`), never
-a drag of the pet. Drops are in [desktop.md](desktop.md#the-ipc-modules) (`dropOnPet`).
+a drag of the pet. Drops are in [desktop.md](../bodies/desktop.md#the-ipc-modules) (`dropOnPet`).
 
 ### Home
 
@@ -449,7 +449,7 @@ The nav lists six pages (`HomePage`), the companion's name filling in where it a
   re-read (a new filter, a change notice) is dropped. Until a read succeeds nothing is claimed; a failed read shows an alert.
   `e2e/approvals.spec.ts` covers it on the fake brain.
 - **Jobs.** `JobsPanel` (`home/jobs-panel.tsx`) lists the jobs Scout handed to Claude Code, each with
-  Stop while it runs; see [brain.md](brain.md#experts).
+  Stop while it runs; see [brain.md](../brain/README.md#experts).
 
 ## Interfaces
 
@@ -498,7 +498,7 @@ the brain.
 
 The UI only sees what the bridge returns: keys never cross it. Removing a
 chip keeps that part out of the ask. A dropped item is sent only by a drop card button. Status
-marks and the health card are shown, never spoken. See [privacy.md](privacy.md).
+marks and the health card are shown, never spoken. See [privacy.md](../data/privacy.md).
 
 ## Tests that pin it
 

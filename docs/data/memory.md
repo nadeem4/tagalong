@@ -6,7 +6,7 @@ The Python brain (`brain/`) keeps what Scout should remember across restarts in 
 `tagalong.db` in the data folder (`TAGALONG_HOME`). Code is in `brain/src/brain/memory.py` (the
 store object) and `store/memory.py` (the SQL and the kinds), `tools.py` (the model's tools) and
 `mind/prompt.py` (the "What you know" block). It also saves the chat and picks it up after a
-restart (see [brain.md](brain.md)).
+restart (see [brain.md](../brain/README.md)).
 
 ### Kinds
 
@@ -57,7 +57,7 @@ Right after the summary, the prompt carries one `Timeline:` line when any free f
 
 ### Sources of profile facts
 
-"Get to know me" reads GitHub (public API), the PDF the person saves from LinkedIn, and the web, one `KnowSource` each (see [brain.md](brain.md#get-to-know-me-know)). A model proposes facts from each source's material, but a fact is kept only when the words it quotes as evidence are in that material (whitespace and case ignored); anything else is dropped. A web page counts only when it holds the person's handle, a link they listed, or both their name and employer, so a namesake's page is dropped. Material is fenced as untrusted data, so text in a README or page cannot instruct the extractor.
+"Get to know me" reads GitHub (public API), the PDF the person saves from LinkedIn, and the web, one `KnowSource` each (see [brain.md](../brain/README.md#get-to-know-me-know)). A model proposes facts from each source's material, but a fact is kept only when the words it quotes as evidence are in that material (whitespace and case ignored); anything else is dropped. A web page counts only when it holds the person's handle, a link they listed, or both their name and employer, so a namesake's page is dropped. Material is fenced as untrusted data, so text in a README or page cannot instruct the extractor.
 
 ### Portrait
 
@@ -92,7 +92,7 @@ Home turns the facts into a timeline in the browser, from the rows `list_memorie
 | `forget`   | Deletes one item by id                                                                                                                                                                          |
 
 `read_output` (Scout's own) pages the stored copy of a long tool result by id; see
-[Long tool output](brain.md#long-tool-output).
+[Long tool output](../brain/README.md#long-tool-output).
 
 - The same text saved twice in a kind is one item.
 - A full kind, text over the cap, a wrong kind or an unknown id is refused with a plain sentence.
@@ -129,7 +129,7 @@ the history notes and the "surfaced" marks. How far each app's mail was read, an
 is on, live in `app_cursors` and `apps.reads_mail`; the daily digest is the `loop-digest` watch.
 `loops/store.py` only translates between a `Loop` and those rows. Text is masked before it is
 saved. Forgetting a loop deletes its rows; wiping deletes every loop and the mail cursors. See
-[storage.md](storage.md#work_loop) and [Loops](brain.md#loops).
+[storage.md](storage.md#work_loop) and [Loops](../brain/README.md#loops).
 
 ### Saved chat
 
@@ -166,7 +166,7 @@ flowchart LR
 
 ## Watches
 
-A standing check is a `watch` work row, not a memory (storage.md, `work_timer`). Scout adds one with
+A standing check is a `watch` work row, not a memory (data/storage.md, `work_timer`). Scout adds one with
 the `watch` tool (`add` with a note and `every_minutes`, at least 5), lists them, `pause`s,
 `switch_on`s or `cancel`s one. A watch wakes Scout as a `timer` event every `every_minutes` until it
 is cancelled or paused; a paused watch never fires. The old `tracking` memories became paused

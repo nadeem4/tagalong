@@ -51,7 +51,7 @@ Tagalong lives in the system tray, and Scout sits on your desktop. [First run](#
 You need Windows 11, Node.js 22 or newer and pnpm 10.
 
 The desktop talks to the Python brain and starts it for you when none is running (you need `uv`
-and an Anthropic key, which the first-run walkthrough asks for; see [docs/brain.md](docs/brain.md)). The brain
+and an Anthropic key, which the first-run walkthrough asks for; see [docs/brain/README.md](docs/brain/README.md)). The brain
 runs on Python 3.12 or 3.13; `uv` fetches one if you have neither.
 
 ```powershell
@@ -69,7 +69,7 @@ The desktop never stops the brain, whoever started it. Its output goes to `~/.ta
 (or `<TAGALONG_HOME>/brain.log`). To stop it, run `cd brain && uv run tagalong stop`.
 
 The brain can also run the WhatsApp bridge (it starts only when `TAGALONG_WHATSAPP_*` are set; see
-`.env.example` and [docs/brain.md](docs/brain.md#whatsapp-bridge)). Home > Places shows which places you can talk to Scout from (this PC, the browser add-on, WhatsApp) and sets WhatsApp up ([docs/whatsapp.md](docs/whatsapp.md)).
+`.env.example` and [docs/brain/README.md](docs/brain/README.md#whatsapp-bridge)). Home > Places shows which places you can talk to Scout from (this PC, the browser add-on, WhatsApp) and sets WhatsApp up ([docs/bodies/whatsapp.md](docs/bodies/whatsapp.md)).
 
 To let Scout hand work to an expert (Claude Code or Codex, each tested), have Scout install
 it from the registry; nothing is installed ahead of time. With several installed, Scout names the
@@ -118,7 +118,7 @@ preference. With a preference of yours saved, Scout looks at each ask first and 
 under that preference, then tells you which one. Anything unclear still comes to you. A nudge you ask for in chat goes straight
 through (a hand-off always shows its Allow card, and the card never holds Scout's turn); one Scout decides on itself (when a job goes quiet, say) is asked like any other action,
 and a preference can cover it. Home's
-**Approvals** page shows all of it. See [docs/brain.md](docs/brain.md).
+**Approvals** page shows all of it. See [docs/brain/README.md](docs/brain/README.md).
 
 When a choice is yours (which expert to set up, say), Scout asks with clickable options, names the
 one it recommends and may take a typed answer instead. It does not wait on you: it ends its turn and
@@ -136,7 +136,7 @@ which app is in front (never one you excluded, and none while sight is paused); 
 stay silent, at most twice an hour per kind. When Claude Code asks a question during a job, Scout
 gets it first and answers from what it knows, or passes it to you. A long tool result or expert
 report reaches Scout as a preview of `TAGALONG_TOOL_PREVIEW_CHARS` characters (default 4000) and an id;
-Scout presents the gist first and reads more on request. See [docs/brain.md](docs/brain.md).
+Scout presents the gist first and reads more on request. See [docs/brain/README.md](docs/brain/README.md).
 
 The [developer guide](docs/development.md) covers getting pnpm, testing, packaging and the browser
 body.
@@ -171,7 +171,7 @@ its bodies fit together.
 |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Data export and delete-all in Settings                              |
 | Memory across restarts                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Code signing (the installer is unsigned) and an app icon of its own |
 | The browser body: Scout lists and reads your open tabs, pictures the front one, reads its links, tables and forms, searches history, bookmarks and downloads, acts on tabs, and takes questions from a right-click, the address bar or your voice (it listens; the desktop answers), in Chrome, Edge and other Chromium browsers, after you allow each step                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |                                                                     |
-| The WhatsApp body (bridge core): a Node bridge takes Meta's signed webhook from your one allowed number, says it to the brain sends Scout's finished answer back to the chat within WhatsApp's 24-hour window (cut after four messages), and shows permission asks as reply buttons or a numbered list that you answer by tap or text; the brain starts it ([docs/whatsapp.md](docs/whatsapp.md))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |                                                                     |
+| The WhatsApp body (bridge core): a Node bridge takes Meta's signed webhook from your one allowed number, says it to the brain sends Scout's finished answer back to the chat within WhatsApp's 24-hour window (cut after four messages), and shows permission asks as reply buttons or a numbered list that you answer by tap or text; the brain starts it ([docs/bodies/whatsapp.md](docs/bodies/whatsapp.md))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |                                                                     |
 
 # Using Tagalong
 
@@ -303,7 +303,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
 - **Connections**: two tabs. **Apps** lists your apps (Official, then Community) and searches the app registry (the Official version first with **Add**, other makers behind "N more from other makers" with **Add…** and a check card, a short curated Popular list when the box is empty, never the registry's raw first page; how an add ended shows on its row) and **Experts** lists yours and an open, curated list to add from, Claude Code first (a download with no checksum is never offered; Log in, Update or Add; each asks first). Both tabs keep what you installed up to date: "Checked N minutes ago", **Check for updates**, **Update all (n)**, a switch per group (Official on, Community off at first), `v1.2 → v1.3` with **Update** on a row, "Always up to date" on a web app, and no update ever runs while a job is running. So "what is on my calendar" or "any reviews waiting on
   GitHub" just work. The Python brain runs these itself (stdio or http MCP apps, a pasted key for
   http) and this page reads and changes them through the brain, so the brain has to be running.
-  Apps with their own sign-in page work too (see [docs/connected-apps.md](docs/connected-apps.md)).
+  Apps with their own sign-in page work too (see [docs/bodies/connected-apps.md](docs/bodies/connected-apps.md)).
   An expert reaches the apps a job was given only through the brain, which asks you as usual and keeps every token. The hand-off card lists those apps, and Allow approves them; there is no removing one before Send.
   - **Sign in**: an app that signs in with its own page shows **Needs sign-in** and a **Sign in**
     button. It opens the app's page in your browser; the chip reads **Waiting for the browser**
@@ -320,7 +320,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   - Scout reads with an app on its own. Anything that changes something (a tool the app does not
     mark read-only) shows a card in Scout's bubble: which app, what will change, **Allow** or
     **Cancel**.
-- **Places**: where you can talk to Scout. **This PC**, the **Chrome add-on** (Connected or Not set up, with **Get the add-on**, which opens the tour at its Browser step) and **WhatsApp** (Connected, Not set up or Offline), and WhatsApp's setup under its row ([docs/whatsapp.md](docs/whatsapp.md)).
+- **Places**: where you can talk to Scout. **This PC**, the **Chrome add-on** (Connected or Not set up, with **Get the add-on**, which opens the tour at its Browser step) and **WhatsApp** (Connected, Not set up or Offline), and WhatsApp's setup under its row ([docs/bodies/whatsapp.md](docs/bodies/whatsapp.md)).
 - **Approvals**: the preferences Scout follows (the sentence, when you agreed to it, how often it was used, with **Edit** and **Remove**; "Always ask me before risky actions" is listed like any other), a summary of how many asks there were, how many Scout answered and how many you refused, and the history of every permission ask by day, filtered by **All**, **Decided by Scout** or **Refused**. A row Scout approved says so and quotes the preference it relied on. When Scout approves an ask, a small quiet card in the bubble says "Approved for you" and which preference it used.
 - **What Scout remembers**: a summary of you (with the years it covers), your facts as a timeline (newest year first, grouped by category, quiet years folded, undated facts last; open one for its quote and where it was read), then your preferences and conversation summaries. Delete any one.
 - **Settings**, in six sections. Press ⓘ beside a setting for the longer story. Below the form,
@@ -365,7 +365,7 @@ body for the Python brain, so a brain must be running (`pnpm dev:desktop` starts
 
 Ask Scout about your tabs. The first time it needs something (your tabs, a site, your history and
 so on), a small window asks you. More in
-[The browser body](docs/browser-body.md).
+[The browser body](docs/bodies/browser.md).
 
 You can also ask out loud: open the popup and click **Ask by voice**. The first time, a tab asks you to
 allow the microphone. Click **Done talking** when you finish; the answer is shown and spoken on the
@@ -410,7 +410,7 @@ such as `.env` are refused.
   the apps table, deletes them on **Disconnect**, and saves chat, approvals, job results and
   progress and logs with keys and tokens shown as `[secret]` (Scout's live turn is not masked).
 
-The full detail is in [Privacy in detail](docs/privacy.md).
+The full detail is in [Privacy in detail](docs/data/privacy.md).
 
 ## Troubleshooting
 
@@ -440,7 +440,7 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 - [Architecture](docs/architecture.md): how the brain and its bodies fit together, and how everything that wants Scout's attention reaches Scout (the event log and runner, open items and the speech queue).
 - [Feature test guide](docs/testing/feature-test-guide.md): manual tests for this build.
 - [Product](bodies/PRODUCT.md) and [design system](bodies/DESIGN.md).
-- [Privacy in detail](docs/privacy.md): exactly what is read, when, and what never is.
+- [Privacy in detail](docs/data/privacy.md): exactly what is read, when, and what never is.
 
 ## Licence
 

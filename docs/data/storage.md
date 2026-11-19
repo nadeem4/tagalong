@@ -10,7 +10,7 @@ The brain keeps its data in one SQLite file, `tagalong.db`, under `TAGALONG_HOME
 `brain/src/brain/store/migrations/`, applied in order and numbered by `PRAGMA user_version` (see
 [Store layer](#store-layer)); a file from a newer brain stops the brain at start, and so does a
 Python SQLite without FTS5. Times are UTC ISO text. What the desktop and the browser body keep is
-in [desktop.md](desktop.md#what-it-stores) and [browser-body.md](browser-body.md#what-it-stores).
+in [desktop.md](../bodies/desktop.md#what-it-stores) and [browser-body.md](../bodies/browser.md#what-it-stores).
 
 ## Store layer
 
@@ -326,7 +326,7 @@ has already changed (`expect=`), so two writers on one row never overwrite each 
   The retry columns are used by Scout's goal `tool_call` rows (`safe_to_retry` comes from the
   tool's effect and name, `error_kind` from `retry.classify`) and by `expert_call` restarts;
   `Timers` reruns the due ones, and a step that gives up emits `work_failed`
-  (see [brain.md](brain.md#retries-and-give-ups)).
+  (see [brain.md](../brain/README.md#retries-and-give-ups)).
 - Resume scan at start (`resume_scan`, run by `Jobs.startup`): open asks and questions expire
   ("brain restarted"); an active expert call with a saved session whose expert can reload it
   becomes `blocked` (Scout is told and offers to carry on), any other `failed`; an active tool
@@ -790,7 +790,7 @@ Connected apps (MCP servers).
   added again.
 - Masked: secrets are moved out of the row into separate files before it is saved
   (`apps.py` `split_secrets`); `${VAR}` references stay as written. See
-  [connected-apps.md](connected-apps.md).
+  [connected-apps.md](../bodies/connected-apps.md).
 
 ## Tool outputs
 

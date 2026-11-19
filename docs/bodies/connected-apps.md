@@ -128,7 +128,7 @@ flowchart TD
   warns Scout will no longer ask. Choose **Ask** again to undo. Scout's own side-check never
   looks at a locked tool.
 
-Modes are the toolbox's usual ones (see [brain.md](brain.md)), but every app tool starts at `ask`,
+Modes are the toolbox's usual ones (see [brain.md](../brain/README.md)), but every app tool starts at `ask`,
 read-only ones too (`default_mode="ask"`): the app's own hint never lets a tool run unasked. The
 user may save `auto` for any of them, and for a locked one only through that Home switch.
 
@@ -149,7 +149,7 @@ dropped is offline ("<app> is not connected right now."), and a disabled app's t
 
 ### Home calls
 
-Home-only tools (see the table in [brain.md](brain.md#home-tools)): `list_apps`, `add_app`,
+Home-only tools (see the table in [brain.md](../brain/README.md#home-tools)): `list_apps`, `add_app`,
 `set_app_enabled`, `remove_app`, `restart_app`. `add_app` stores the token and the other secrets in
 `app-tokens.json` only after the rest is valid, and removes them again if saving the row fails.
 `remove_app` stops the app and deletes its row and every key of that app (token, env values, url
@@ -213,7 +213,7 @@ sign-in`, `Not working`, `Off`), the on/off switch, and quiet **Restart** and **
   experts that install and run on this PC are listed. The expert check card shows the licence and a
   link to the code (`licence`, `repo`). Progress ("Getting what it needs to run") and
   a failed install show on the expert's row. These go through `setup_overview`, `setup_expert` and
-  `setup_app` (see [brain.md](brain.md#home-tools)): the button opens the same Allow card Scout's
+  `setup_app` (see [brain.md](../brain/README.md#home-tools)): the button opens the same Allow card Scout's
   install opens, and progress rides `changed setup`.
 - **Trust at the door**: the desktop's `ipc/setup.ts` honours `approved` for an app only from the Home
   window, and for an expert only from the tour or from Home with `community_ok`; anything else opens
@@ -235,7 +235,7 @@ sign-in`, `Not working`, `Off`), the on/off switch, and quiet **Restart** and **
   the name over its command line (`node files-server.js`) or web address, and a coloured status
   chip; Claude Code closes the list. A group above it, "How Scout reads your screen", has two rows
   (Reading window text, Text from pictures) with the same kind of chip; see [desktop.md](desktop.md). Secrets never show: the brain strips
-  them from `list_apps` (see [brain.md](brain.md#home-tools)). Env values and secret url parts are
+  them from `list_apps` (see [brain.md](../brain/README.md#home-tools)). Env values and secret url parts are
   moved to the token file for you; do not put secrets in args, which stay in the row.
 - **Per-tool permissions** stay in Settings › Permissions; this page has no tool list.
 
@@ -251,7 +251,7 @@ than the brain's; TLS, pairing and multi-user.
 (`registry.modelcontextprotocol.io`, latest versions only) and lists each server with whether it
 can run on this computer. Packages map to `npx` (npm) or `uvx` (pypi); hosted servers are
 `remote`. Each row also says whether it is Official (the service's own reversed domain, see
-[docs/brain.md](brain.md)), who published it, where it runs, how it signs in and its licence. A
+[docs/brain/README.md](../brain/README.md)), who published it, where it runs, how it signs in and its licence. A
 search page is 30 entries and may carry a cursor for the next. Results are cached for 24 h under
 `<TAGALONG_HOME>/cache/`, one file per query and cursor. Nothing is installed or connected by
 searching.
@@ -264,7 +264,7 @@ card facts (who made it, where it runs, sign-in, licence, "not yet audited by an
 stored Auto skips it. After Allow it saves the app through the same code as `add_app`. Two overlapping calls for the same app join one add (one `install` open item, `setup/flights.py`) and share its result (the second never gets `already_added`); a cancelled turn never cancels that add. A connected
 app is reported with its tool names in the result; a sign-in or slow start that ends later sends
 a `setup_done` event (app, name, ok, state, tools, tools_total; `tools` lists at most 30 names, `tools_total` is the full count), so Scout can carry on with the request that led
-to the Connect offer (see [docs/brain.md](brain.md#missing-tool-connect-then-carry-on)).
+to the Connect offer (see [docs/brain/README.md](../brain/README.md#missing-tool-connect-then-carry-on)).
 
 - **Local (`npx`, `uvx`).** A stdio app that runs by absolute path: Node's `npm exec` (the system
   Node if 22 or newer, else Tagalong's own, downloaded first) or `uvx` when it is installed
@@ -308,7 +308,7 @@ and when Home presses **Check for updates**.
   every status change and the page reads the state again.
 - **Home calls** (`setup/home_tools.py`, never offered to Scout): `updates_state`,
   `updates_check`, `update_item {kind, id}`, `update_all {kind}` (`{started}`, `{waiting: "job"}`
-  or `{error}`), `set_auto_update {kind, official, on}`; see [brain.md](brain.md#home-tools).
+  or `{error}`), `set_auto_update {kind, official, on}`; see [brain.md](../brain/README.md#home-tools).
 - The page side is `bodies/ui/src/home/updates-bar.tsx` (the header, the two switches and the
   row's update side) used by `apps-tab.tsx` and `experts-group.tsx`.
 
@@ -332,7 +332,7 @@ and when Home presses **Check for updates**.
 ## Privacy notes
 
 - Tokens and secrets are only in `app-tokens.json` and `app-oauth/`, never in a row, a tool list, a log line or an error.
-  What reaches disk is also masked if a secret shows up in it anyway (see [privacy](privacy.md)).
+  What reaches disk is also masked if a secret shows up in it anyway (see [privacy](../data/privacy.md)).
 - App answers are fenced as data so the model reads them but never obeys them.
 - Arguments go to the app as Scout filled them in, after the user allowed the change.
 
@@ -343,7 +343,7 @@ local MCP server hosted by the brain (`expert_apps.py`, `127.0.0.1`, random port
 per job part) that lists only those apps' tools. Every call runs through the same gate as Scout's
 (Ask, Auto, Off, preferences) and is logged in Approvals with the job id; answers are masked and
 capped. The token ends with the job part. Scout names the apps in `hand_off`; the card lists them,
-the person may remove some, and the job gets only the rest. See [the bridge](brain.md#apps-for-an-expert-the-bridge).
+the person may remove some, and the job gets only the rest. See [the bridge](../brain/README.md#apps-for-an-expert-the-bridge).
 
 ## On a job's timeline
 
@@ -351,11 +351,11 @@ When Scout calls an app's tool while working for a job (a wake about it, or afte
 to it), the call is a step on that job's timeline, labelled `app:<app id>` (the id before `__` in
 the tool's name), with the tool's short name and its masked, clipped arguments and a status of
 done, failed or refused. The app's result is never copied there. See Scout's own steps in
-[docs/brain.md](brain.md).
+[docs/brain/README.md](../brain/README.md).
 
 ## Mail as a source for loops
 
-A connected Gmail app can also feed Scout's loops (see [brain.md](brain.md#loops)), but only when
+A connected Gmail app can also feed Scout's loops (see [brain.md](../brain/README.md#loops)), but only when
 reading is switched on for that app (saved as `apps.reads_mail`) (the Home switch comes with a later slice; it is off until
 then). The loops service reads through `Apps.call` directly, so the toolbox gate is not involved:
 the switch is the consent. The Gmail adapter (`loops/sources/gmail.py`) may call only

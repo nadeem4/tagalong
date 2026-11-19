@@ -11,8 +11,8 @@ one turn. Each subsystem has its own page, linked from [the subsystem map](#subs
 
 The brain is the Python program in `brain/`: the conversation, Scout's mind, memory, experts,
 connected apps and asks. It never knows which operating system or which body it is serving. See
-[brain.md](brain.md). Everything it keeps is in one SQLite file behind the `store/` package, the
-only code that runs SQL ([storage.md](storage.md)).
+[brain.md](brain/README.md). Everything it keeps is in one SQLite file behind the `store/` package, the
+only code that runs SQL ([storage.md](data/storage.md)).
 
 A body is a thin shell around it. It perceives (selection, windows, screenshots, page text),
 offers tools and presents (the figure, the bubble, the voice). A body reaches the brain only
@@ -21,7 +21,7 @@ desktop app (`bodies/desktop`) dials it from its main process (`bodies/desktop/s
 `startBrain`; in dev it starts the brain if none is running, or run `cd brain && uv run brain` yourself). So does the browser body
 (`bodies/browser`), a tools-only body that gives Scout the `tabs`, `page_parts`, `browser_search`
 and `tab_actions` tools and lets you ask Scout from a right-click or the address bar; see
-[browser-body.md](browser-body.md).
+[browser-body.md](bodies/browser.md).
 
 Speech is the one capability that lives in the desktop body rather than the brain: the
 speech-to-text and text-to-speech models are native ONNX runtimes. The brain only learns that an
@@ -70,10 +70,10 @@ How they connect:
   forwarded to every window as `IPC.turnEvent` by `forwardToRenderers` in `main/index.ts`.
 - **Voice.** Also through the brain. Main forwards the microphone to it as `mic` frames and
   relays its `heard`, `voice` and `speech` frames to the windows; the panel plays the audio. There
-  is nothing voice-specific running in Electron. Details in [voice.md](voice.md).
+  is nothing voice-specific running in Electron. Details in [voice.md](senses/voice.md).
 - **Browser to brain.** The service worker owns a `BrainClient` socket (default
   `127.0.0.1:47321`, the same address as the desktop), with a keepalive call every 20 s so the
-  worker stays awake. See [browser-body.md](browser-body.md).
+  worker stays awake. See [browser-body.md](bodies/browser.md).
 
 There is one desktop instance per user: `app.requestSingleInstanceLock()` runs before anything
 else, because two desktops would fight over the global shortcuts and the settings file.
@@ -115,7 +115,7 @@ and `@tagalong/*`.
 
 The desktop bundles the workspace packages into its main, preload and renderer builds with
 electron-vite; only the native dependencies stay external (`get-windows` and
-`uiohook-napi`; `bodies/desktop/electron.vite.config.ts`). See [desktop.md](desktop.md).
+`uiohook-napi`; `bodies/desktop/electron.vite.config.ts`). See [desktop.md](bodies/desktop.md).
 
 ## Body contracts
 
@@ -123,18 +123,18 @@ A body implements two things.
 
 **Perception.** The desktop reads the screen itself: the window list, captures, OCR and the
 selection (`bodies/desktop/src/main/platform`). Exclusions and the built-in blind spots are checked before
-anything is read; the details are in [sight.md](sight.md). The Python brain asks for reads through
+anything is read; the details are in [sight.md](senses/sight.md). The Python brain asks for reads through
 the desktop's body tools (`list_windows`, `read_window_text`, `look_at_window`).
 
 **Presentation.** The desktop renders Scout and its bubble, shows the cards (the drop card, the
 settings card) and speaks. The UI package draws all of it against `HostBridge`
 (`bodies/ui/src/host-bridge.ts`), which the desktop implements over IPC. The browser body has no
-presentation: it only offers tools. See [bubble.md](bubble.md).
+presentation: it only offers tools. See [bubble.md](senses/bubble.md).
 
 ## The brain connection
 
 The contract, its envelope, every message, sessions, replay and errors are in
-[protocol/README.md](../protocol/README.md). The Python side is in [brain.md](brain.md). The
+[protocol/README.md](../protocol/README.md). The Python side is in [brain.md](brain/README.md). The
 desktop's client is `BrainClient`, started by `startBrain` (`main/brain/start.ts`); the browser
 body has its own socket in its service worker. The brain binds `127.0.0.1` only; there is no
 pairing or TLS yet (single user).
@@ -145,18 +145,18 @@ pairing or TLS yet (single user).
    (`captureAskSnapshot` in `main/context.ts`: the front window and the selection, no pixels) and
    opens the bubble; a click on the figure opens it with nothing captured. Typing or the talk key
    produces the text: the talk key is watched by a key hook in main (`main/talk-key.ts`), the
-   microphone runs in the renderer, and the brain transcribes it ([voice.md](voice.md)). The
+   microphone runs in the renderer, and the brain transcribes it ([voice.md](senses/voice.md)). The
    bubble sends `IPC.ask`; `registerTurnIpc` (`main/ipc/turns.ts`) adds the pending snapshot, or a
    dropped item when a drop card's button sent it, and sends the ask to the brain.
 2. **Turn.** The brain runs the turn: prompt, model, tools, asks. It answers only with
-   notifications ([brain.md](brain.md), [connected-apps.md](connected-apps.md)).
+   notifications ([brain.md](brain/README.md), [connected-apps.md](bodies/connected-apps.md)).
 3. **Bubble.** Main maps the brain's notifications to turn events (`main/brain/turn-events.ts`)
    and forwards each to every window as `IPC.turnEvent` (`forwardToRenderers` in `main/index.ts`).
-   See [bubble.md](bubble.md).
+   See [bubble.md](senses/bubble.md).
 4. **Voice.** A question asked by voice carries `spoken: true`, so the brain speaks the answer with
    Kokoro and sends `speech` frames. Main relays them as `IPC.speechChunk` and the panel's
    `SpeechPlayer` (`renderer/src/voice-player.ts`) plays them, or speaks a text-only frame with the
-   system voice. Stop sends `hush`; the player reports `speech_state` and obeys `speech_control`. See [voice.md](voice.md).
+   system voice. Stop sends `hush`; the player reports `speech_state` and obeys `speech_control`. See [voice.md](senses/voice.md).
 
 ## Boot and shutdown
 
@@ -213,8 +213,8 @@ flowchart LR
 
 Words go into the log; the runner starts every turn from it; replies go out through the one speech
 queue; open items sit beside the turn and hand their answers back through the log. See
-[brain.md](brain.md#the-turn-runner-and-urgency), [voice.md](voice.md#the-mouths-queue) and
-[storage.md](storage.md#open-items).
+[brain.md](brain/README.md#the-turn-runner-and-urgency), [voice.md](senses/voice.md#the-mouths-queue) and
+[storage.md](data/storage.md#open-items).
 
 ## Subsystem map
 
@@ -222,22 +222,22 @@ queue; open items sit beside the turn and hand their answers back through the lo
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 flowchart LR
   subgraph Bodies
-    DK["desktop.md"]
-    BU["bubble.md"]
-    VO["voice.md"]
-    SI["sight.md"]
-    BX["browser-body.md"]
+    DK["bodies/desktop.md"]
+    BU["senses/bubble.md"]
+    VO["senses/voice.md"]
+    SI["senses/sight.md"]
+    BX["bodies/browser.md"]
   end
   subgraph Brain
-    BR["brain.md"]
-    ME["memory.md"]
-    CA["connected-apps.md"]
+    BR["brain/README.md"]
+    ME["data/memory.md"]
+    CA["bodies/connected-apps.md"]
   end
   subgraph Foundations
     PR["protocol/README.md"]
-    SS["settings-and-secrets.md"]
-    ST["storage.md"]
-    WA["whatsapp.md"]
+    SS["data/settings-and-secrets.md"]
+    ST["data/storage.md"]
+    WA["bodies/whatsapp.md"]
   end
   DK --> BU
   DK --> VO
@@ -250,17 +250,17 @@ flowchart LR
   Bodies --> WA
 ```
 
-| Doc                                                | Covers                                                                              | Main code                                                                                                                            |
-| -------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| [protocol/README.md](../protocol/README.md)        | Contract v1 between the brain and the bodies                                        | `protocol/ts/src`, `brain/src/brain/protocol.py`                                                                                     |
-| [brain.md](brain.md)                               | The Python brain: files, tools, asks, experts, memory, the mind                     | `brain/src/brain`                                                                                                                    |
-| [desktop.md](desktop.md)                           | Windows, tray, hotkeys, IPC modules, platform adapter, packaging, log file          | `bodies/desktop/src/main`, `bodies/desktop/src/preload`, `bodies/desktop/src/renderer`                                               |
-| [bubble.md](bubble.md)                             | The companion bubble, status marks, drops                                           | `bodies/ui/src`                                                                                                                      |
-| [voice.md](voice.md)                               | Hearing, speaking, talk key, always listening, talking over Scout, the system voice | `main/ipc/voice.ts`, `renderer/src/voice-player.ts`, `main/talk-key.ts`, `main/always-listening.ts`, `bodies/ui/src/shapes/voice.ts` |
-| [sight.md](sight.md)                               | Window list, captures, OCR, exclusions, pausing sight                               | `bodies/desktop/src/main/platform`                                                                                                   |
-| [memory.md](memory.md)                             | The memory store                                                                    | `brain/src/brain/memory.py`                                                                                                          |
-| [connected-apps.md](connected-apps.md)             | MCP connections, tool calls, approvals for writes                                   | `brain/src/brain/apps.py`, `app_tools.py`                                                                                            |
-| [browser-body.md](browser-body.md)                 | The browser body: identity, the `tabs` tool, permissions, popup, install            | `bodies/browser/src`                                                                                                                 |
-| [whatsapp.md](whatsapp.md)                         | The WhatsApp body: webhook, Graph send, 24-hour window                              | `bodies/whatsapp/src`                                                                                                                |
-| [settings-and-secrets.md](settings-and-secrets.md) | Settings store, hiding secrets in logs                                              | `bodies/desktop/src/main/settings-store.ts`, `hide-secrets.ts`                                                                       |
-| [privacy.md](privacy.md)                           | What is captured, sent, kept and deleted                                            | across the above                                                                                                                     |
+| Doc                                                     | Covers                                                                              | Main code                                                                                                                            |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| [protocol/README.md](../protocol/README.md)             | Contract v1 between the brain and the bodies                                        | `protocol/ts/src`, `brain/src/brain/protocol.py`                                                                                     |
+| [brain.md](brain/README.md)                             | The Python brain: files, tools, asks, experts, memory, the mind                     | `brain/src/brain`                                                                                                                    |
+| [desktop.md](bodies/desktop.md)                         | Windows, tray, hotkeys, IPC modules, platform adapter, packaging, log file          | `bodies/desktop/src/main`, `bodies/desktop/src/preload`, `bodies/desktop/src/renderer`                                               |
+| [bubble.md](senses/bubble.md)                           | The companion bubble, status marks, drops                                           | `bodies/ui/src`                                                                                                                      |
+| [voice.md](senses/voice.md)                             | Hearing, speaking, talk key, always listening, talking over Scout, the system voice | `main/ipc/voice.ts`, `renderer/src/voice-player.ts`, `main/talk-key.ts`, `main/always-listening.ts`, `bodies/ui/src/shapes/voice.ts` |
+| [sight.md](senses/sight.md)                             | Window list, captures, OCR, exclusions, pausing sight                               | `bodies/desktop/src/main/platform`                                                                                                   |
+| [memory.md](data/memory.md)                             | The memory store                                                                    | `brain/src/brain/memory.py`                                                                                                          |
+| [connected-apps.md](bodies/connected-apps.md)           | MCP connections, tool calls, approvals for writes                                   | `brain/src/brain/apps.py`, `app_tools.py`                                                                                            |
+| [browser-body.md](bodies/browser.md)                    | The browser body: identity, the `tabs` tool, permissions, popup, install            | `bodies/browser/src`                                                                                                                 |
+| [whatsapp.md](bodies/whatsapp.md)                       | The WhatsApp body: webhook, Graph send, 24-hour window                              | `bodies/whatsapp/src`                                                                                                                |
+| [settings-and-secrets.md](data/settings-and-secrets.md) | Settings store, hiding secrets in logs                                              | `bodies/desktop/src/main/settings-store.ts`, `hide-secrets.ts`                                                                       |
+| [privacy.md](data/privacy.md)                           | What is captured, sent, kept and deleted                                            | across the above                                                                                                                     |

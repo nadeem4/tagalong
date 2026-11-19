@@ -1,10 +1,10 @@
 # The Python brain
 
-The brain is the Python side of contract v1 ([protocol/README.md](../protocol/README.md)). Bodies can connect, declare their tools,
+The brain is the Python side of contract v1 ([protocol/README.md](../../protocol/README.md)). Bodies can connect, declare their tools,
 catch up on missed notifications, and talk to Scout: `say` starts a turn and the reply streams
 back. Scout can use the tools bodies declare, and asks the user first before a tool that changes
 something (see [Toolbox](#toolbox)). Scout remembers through the `remember`, `recall` and `forget` tools, kept in `tagalong.db`
-(see [memory.md](memory.md)). The chat is saved and picked up again after a restart (see [What a turn does](#what-a-turn-does)).
+(see [memory.md](../data/memory.md)). The chat is saved and picked up again after a restart (see [What a turn does](#what-a-turn-does)).
 
 ## Run it
 
@@ -90,8 +90,8 @@ the total can run a little low.
 | `brain/src/brain/know/`                | Get to know me: `facts.py` tag visibility, `status.py` per-source status, `runner.py` the one run at a time behind `know_me_start` (saves each source as it finishes), `portrait.py` the portrait writer, `offer.py` the offer rules, `tools.py` the get-to-know-me tools, `source.py` the source protocol and `default_sources`, `github.py`, `linkedin.py` and `web.py` the sources, `extract.py` facts with the evidence check (see [Get to know me](#get-to-know-me-know))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `brain/src/brain/store/`               | The database layer: `db.py` opens `tagalong.db` and runs the numbered migrations in `migrations/`; `search.py` the FTS5 helpers and `search`; `conversation.py`, `memory.py`, `connections.py` and `outputs.py` own the SQL of chat, memory items, apps and tool outputs; `work.py` is `WorkStore`, the work table's state machine (jobs use it today, through `job_records.py`); `rules.py` the `rules` table: tool modes, preferences and offers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `brain/src/brain/runner.py`            | `Runner`: the only thing that starts a Scout turn, one at a time; `pick` (a person's words first, then news oldest first), `gate` (may this news be told now), `target` (which body answers), `take_more` (a say joins the running turn), the interjection take and give-back, `turn_ended`. See [The turn runner](#the-turn-runner-and-urgency)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `brain/src/brain/tasks.py`             | `Tasks`: what the person asked for, one row per task (`store/tasks.py` holds the SQL). `open`, `wait`, `resume`, `end` (the first end stands) and `settle`, which ends every Ask whose say is `handled` (`done`) or `gave_up` (`failed`), every Later with nothing left to run, and every offer's Own whose card is no longer open (`stopped` with reason `no answer`); `open_block` is the open-tasks facts block in Scout's prompt. `Session.say` opens an Ask task per say in the say's own transaction; the runner calls `settle` after each turn ends, and the session once at start after `EventLog.recover()`. See [storage.md](storage.md#tasks)                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `brain/src/brain/open_items.py`        | `OpenItems`: the one record for what waits on the person (`open`, `answer`, `finish`, `expire_due`, `expire_live_only`, `list_open`, `list_answered`, `find_open`; `expire_live_only(job_id=None)` takes one job's items only), one lifecycle (open to answered, done or expired), one deadline (`DEADLINE_S`, a day) and a log line per move, `open_item.<event> t=<epoch> id=<id> kind=<kind> by=<who> why=<why>`, on logger `brain.open_items`. Scout's asks use it through `open_item_runner.py`, choices and offers directly (kinds `choice`, `offer`); the table is in [storage.md](storage.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `brain/src/brain/tasks.py`             | `Tasks`: what the person asked for, one row per task (`store/tasks.py` holds the SQL). `open`, `wait`, `resume`, `end` (the first end stands) and `settle`, which ends every Ask whose say is `handled` (`done`) or `gave_up` (`failed`), every Later with nothing left to run, and every offer's Own whose card is no longer open (`stopped` with reason `no answer`); `open_block` is the open-tasks facts block in Scout's prompt. `Session.say` opens an Ask task per say in the say's own transaction; the runner calls `settle` after each turn ends, and the session once at start after `EventLog.recover()`. See [storage.md](../data/storage.md#tasks)                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `brain/src/brain/open_items.py`        | `OpenItems`: the one record for what waits on the person (`open`, `answer`, `finish`, `expire_due`, `expire_live_only`, `list_open`, `list_answered`, `find_open`; `expire_live_only(job_id=None)` takes one job's items only), one lifecycle (open to answered, done or expired), one deadline (`DEADLINE_S`, a day) and a log line per move, `open_item.<event> t=<epoch> id=<id> kind=<kind> by=<who> why=<why>`, on logger `brain.open_items`. Scout's asks use it through `open_item_runner.py`, choices and offers directly (kinds `choice`, `offer`); the table is in [storage.md](../data/storage.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `brain/src/brain/toolbox.py`           | `Toolbox`: lists and gates every tool call, from `BrainSource`, `AppSource` and `BodySource`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `brain/src/brain/asks.py`              | `Asks`: shows the cards (Scout's permission cards, choices, offers, preferences, an expert's ask) and takes their answers through the open item's handler; no waiter in it (only `Holds` waits, for an expert's ACP call, and keeps the work row)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `brain/src/brain/open_item_runner.py`  | `AskRunner`: Scout's asks as `ask` open items. A call that needs the person is saved and its card shown, and the turn goes on; the answer, however late, runs the saved call through the same gate and emits `ask_ended` (source `scout`, `caused_by` the event the asking turn took, kept on the item). An item belongs to the task of the turn that opened it (the runner takes the turn's task). A task's card also offers Not now and Stop the task. The runner also arms the check-back and deadline timer (`card_due`, `card_expired`), the restart close and the card shown again when a body joins                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
@@ -146,7 +146,7 @@ the total can run a little low.
   is wrong; otherwise a bad shape gets `invalid_params`.
 - The `hello` result carries the brain's `version` and `build` (both optional on the wire, so an
   older brain that sends neither is still understood; `protocol` stays 1). The desktop compares
-  them with its own to decide on a restart (see [desktop.md](desktop.md#brain-version-check-and-restart)).
+  them with its own to decide on a restart (see [desktop.md](../bodies/desktop.md#brain-version-check-and-restart)).
   `TAGALONG_STARTED_BY=desktop` (set by the desktop when it spawns the brain) is reported by
   `brain_status` as `started_by: "desktop"`; unset, it is `"person"`.
 - After `hello`, `tools` replaces the body's tool list and answers `{}`. A second `hello` gets
@@ -223,13 +223,13 @@ flowchart TD
   tools (see Toolbox); a refused or failed call ends as an error result the model reads.
   Memory rows carry a tag, source, evidence and visibility, and one code-written portrait leads
   "What you know"; `recall` leaves personal facts out unless asked (see
-  [memory.md](memory.md#provenance-and-visibility)).
+  [memory.md](../data/memory.md#provenance-and-visibility)).
   `recall` also takes `year`, `from_year`, `to_year` and `category` to look up a period or a
   theme in saved facts, with words optional (see
-  [memory.md](memory.md#what-the-prompt-shows-and-what-recall-finds)).
+  [memory.md](../data/memory.md#what-the-prompt-shows-and-what-recall-finds)).
   `remember` also takes optional `category`, `start` and `end`; a year counts only when the
   person said it in this turn (`Session` passes the owner's text to `brain_tools` as `said`), and a
-  wake turn has none (see [memory.md](memory.md#dates-and-categories)).
+  wake turn has none (see [memory.md](../data/memory.md#dates-and-categories)).
 - A turn ends with one of `done`, `cancelled`, `error`, `over_budget` or `step_cap`. A refusal or
   a failed model call is `error`.
 - **No key.** `Session.say` checks `model.ready` first. Without a key it returns a turn id, sends
@@ -266,7 +266,7 @@ flowchart TD
   part is over 5 MB (decoded), or whose parts total over 20 MB, is refused with `over_limit`
   before anything is saved or sent. A cancel during a tool step ends on the
   cancelled `tool_result`, which is valid as is.
-- Chat is saved after every step (see [memory.md](memory.md)): when the turn starts, after each tool
+- Chat is saved after every step (see [memory.md](../data/memory.md)): when the turn starts, after each tool
   round (`on_step`) and at its end. A crash mid-turn loses only the step in flight.
 - On start the history is rebuilt from the saved chat. It begins at the turn of the latest
   compaction block, is capped at 50 messages trimmed to whole turns (a newest turn over 50 is kept whole), and a tool call left
@@ -336,7 +336,7 @@ The desktop app (`bodies/desktop`) is a body of this brain.
   Or run `cd brain && uv run brain` yourself first: run by hand, the brain logs to the terminal (stdout) and writes no `brain.log`; that file exists only when the desktop starts the brain. The desktop dials `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`, the same
   variable the brain listens on) and retries every 2 s, so either order works.
 - It sends `hello` declaring the body tools `list_windows`, `read_window_text`, `look_at_window` and
-  `open_url` (see [desktop.md](desktop.md)); the brain offers them to the model as `desktop__<tool>`.
+  `open_url` (see [desktop.md](../bodies/desktop.md)); the brain offers them to the model as `desktop__<tool>`.
   `open_url` (https only) is also what `sign_in_app` uses to open a connected app's sign-in page.
   An ask is a `say` with the text, the screenshot as an image part
   and `context.window`; interrupt is `cancel`. A `say` context reaches the model as a block headed
@@ -346,7 +346,7 @@ The desktop app (`bodies/desktop`) is a body of this brain.
 - The brain's model is set in the brain's environment. The key and the daily limit are set from the
   app through the Home tools `set_api_key` and `set_daily_limit` and saved by the brain; the desktop
   never keeps the key. The desktop keeps its own local settings (hotkeys, listening).
-- Pets are not wired to the brain yet. See [desktop.md](desktop.md#the-brain-in-the-main-process).
+- Pets are not wired to the brain yet. See [desktop.md](../bodies/desktop.md#the-brain-in-the-main-process).
 
 ## Toolbox
 
@@ -395,7 +395,7 @@ stored text as JSON with `next_offset`, which is `null` at the end. A page is ne
 An unknown id or a negative offset is a plain refusal line; an offset past the end is an empty last
 page. Cuts are on characters, never mid-character. Brain tools, connected-app tools and an expert's
 report on a job wake all use this one path. The stored job report stays whole in the database, so the
-Reports tab shows it in full. At startup the newest `TAGALONG_OUTPUTS_KEEP` (200) stored outputs that no work row names are kept and older ones go; finished work is swept the same time (`TAGALONG_WORK_KEEP_DAYS`, see [storage.md](storage.md#cleanup)). The
+Reports tab shows it in full. At startup the newest `TAGALONG_OUTPUTS_KEEP` (200) stored outputs that no work row names are kept and older ones go; finished work is swept the same time (`TAGALONG_WORK_KEEP_DAYS`, see [storage.md](../data/storage.md#cleanup)). The
 cap is a transport guardrail only: how to present a long result (gist first, detail on request, the
 short version in voice) is guidance in `mind/soul.md`, not code.
 
@@ -568,7 +568,7 @@ locked tool is `ask`; then the tool's own default; then the effect. The same fun
 
 The user's saved choices live in `tagalong.db` as `mode` rows of the `rules` table (`tool` is the full
 tool name, `effect` is `off`, `ask` or `auto`); `brain.store.rules` reads and writes them
-(see [storage.md](storage.md#rules)).
+(see [storage.md](../data/storage.md#rules)).
 
 No row means the tool's default applies. `Toolbox.set_mode` accepts `auto` for a locked tool: that
 is the explicit unlock, made with the Home switch (which warns first, see
@@ -603,7 +603,7 @@ Shipped defaults match the design: built-in memory, timers, `read_output` and th
 `tab_actions` ask); every app tool asks until changed. `test_tools.py` pins the built-in rows
 against the real specs and the body tests pin each body's declared `effect` and `confirm`.
 
-Expert jobs (Claude Code hand-offs) live in `work` rows, read through `JobRecords` (`job_records.py`, the only code that knows the layout; columns in [storage.md](storage.md#jobs-as-work-rows)). A job is a `goal` row with the job id; each expert hand-off inside it is an `expert_call` row named `<job>.<part>` (`p1`, `p2`, ...). `work_job` holds what `work` has no column for: agent, folder, mode and the first task. `JobRecords` hands out the same `Job` and `JobPart` shapes as before: a job has id, task, folder, mode, state, start and end times, `parent_job` (the job a follow-up continued, kept as a `continued` event), Scout's `watch` list, and `title`, `scout_result` and `closed_at` (Scout writes the title with `hand_off`, the result with `set_job_result` and closes the job with `close_job`, which takes an optional `outcome` of `done` or `failed`). A part has agent, task, `folder` (parts of one job may work in different folders; a session is only continued in the part's own folder), state, reason, progress, report, session id, a `reported` flag and start and end times. Work states map back to the words Home has always shown: `active` is `running`, `done` is `done`, `failed` is `error`, and `cancelled` (or anything else) is `stopped`; a part's reason is left out when it only repeats its state. A report or result over 2,000 characters keeps its start in the row and the whole text in `tool_outputs`. A finished part has no progress line (the work store clears it when a row ends). A job's state is derived: `running` while any part runs, `error` once the job is closed as failed, otherwise the outcome of the part that ended last. Parts still running at brain start become `blocked` when their session can be reloaded, otherwise `failed`, with reason `brain restarted`; the job stays open, and the activity log and timers of those jobs are cleaned by `Jobs.startup`. Carrying on from a part a restart, a shutdown or a stop left behind starts the continuation as its own job and closes the old one as `cancelled` ("carried on") and already reported, so it does not stay open beside the new one. Only an explicit carry-on (`hand_off` with `continue_job`) closes a failed or stopped job; the implicit same-folder continuation does it only for a part the restart held (blocked, reason `brain restarted`), so a genuine failure is not hidden by a new task in that folder. An older job with another part still open, or a part added to the same job, stays open. A failed part blocks its job, and adding a part to a blocked job makes it run again. A part's id is fixed before its run starts, so anything the run reports while starting files under that part. A job's wake note carries the report of the part that just ended (tagged with the part, its expert and its folder when there are several); the other parts appear as facts only, and Scout reads one with `job_report`.
+Expert jobs (Claude Code hand-offs) live in `work` rows, read through `JobRecords` (`job_records.py`, the only code that knows the layout; columns in [storage.md](../data/storage.md#jobs-as-work-rows)). A job is a `goal` row with the job id; each expert hand-off inside it is an `expert_call` row named `<job>.<part>` (`p1`, `p2`, ...). `work_job` holds what `work` has no column for: agent, folder, mode and the first task. `JobRecords` hands out the same `Job` and `JobPart` shapes as before: a job has id, task, folder, mode, state, start and end times, `parent_job` (the job a follow-up continued, kept as a `continued` event), Scout's `watch` list, and `title`, `scout_result` and `closed_at` (Scout writes the title with `hand_off`, the result with `set_job_result` and closes the job with `close_job`, which takes an optional `outcome` of `done` or `failed`). A part has agent, task, `folder` (parts of one job may work in different folders; a session is only continued in the part's own folder), state, reason, progress, report, session id, a `reported` flag and start and end times. Work states map back to the words Home has always shown: `active` is `running`, `done` is `done`, `failed` is `error`, and `cancelled` (or anything else) is `stopped`; a part's reason is left out when it only repeats its state. A report or result over 2,000 characters keeps its start in the row and the whole text in `tool_outputs`. A finished part has no progress line (the work store clears it when a row ends). A job's state is derived: `running` while any part runs, `error` once the job is closed as failed, otherwise the outcome of the part that ended last. Parts still running at brain start become `blocked` when their session can be reloaded, otherwise `failed`, with reason `brain restarted`; the job stays open, and the activity log and timers of those jobs are cleaned by `Jobs.startup`. Carrying on from a part a restart, a shutdown or a stop left behind starts the continuation as its own job and closes the old one as `cancelled` ("carried on") and already reported, so it does not stay open beside the new one. Only an explicit carry-on (`hand_off` with `continue_job`) closes a failed or stopped job; the implicit same-folder continuation does it only for a part the restart held (blocked, reason `brain restarted`), so a genuine failure is not hidden by a new task in that folder. An older job with another part still open, or a part added to the same job, stays open. A failed part blocks its job, and adding a part to a blocked job makes it run again. A part's id is fixed before its run starts, so anything the run reports while starting files under that part. A job's wake note carries the report of the part that just ended (tagged with the part, its expert and its folder when there are several); the other parts appear as facts only, and Scout reads one with `job_report`.
 
 An expert's permission request that reaches the person, and an expert's question Scout passed on, are held by `Holds` (`holds.py`): a card with no timeout, an `expert_ask` open item (`live_only`, with the job's id and task; its id is the card's ask id) and an `ask` work row that is its log entry. It is opened only when the person is asked, so a rule's or Scout's grant leaves none. The expert waits on a future in memory; the card's answer event (`Asks.answer`, which saves a `card_answer` and calls the handler `Holds` registered for kinds `expert_ask` and `question`) resolves it, so nothing in a Scout turn waits and the job keeps its slot meanwhile. The item is finished once the person has answered (an expert's reject is never turned into an allow). A card of a task also offers Not now (the check-back moves and the wait goes on) and Stop the task (the task ends and every card of it is closed, whichever card it was pressed on, a Scout `ask` card included; the job keeps running until T2d kills its process, but it can open no new card on the ended task: `Holds.ask` raises cancelled). The toolbox's cards for an expert's app tools (`Holds.permission`) belong to no part, so a part ending never cancels them. When Scout's side-check says yes first, the card closes as answered by Scout. Not now on an expert card moves its check-back, but no `card_due` is posted for it yet (Scout's own `ask` cards get one); that is deferred. Each part's own asks are cancelled when that part ends or is stopped (`Holds.cancel_part`; its request is cancelled), a job that ends releases its waits with the reason, and when the job's last part ends `Jobs._forget` calls `OpenItems.expire_live_only(job_id=...)` as the backstop, so only that job's items expire. A later answer to the card is refused with `not_found` and "that ask expired; the expert stopped" (`Session.answer`, for `expert_ask` items only). `Job.open_items` lists the ids of the asks the person saw, read from `open_items` by `job_id`.
 
@@ -617,7 +617,7 @@ erDiagram
 
 When a job ends, Scout is woken to report it (see [Jobs and tools](#jobs-and-tools)).
 
-An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-and-confirm)):
+An ask is a `confirm` ask (see [protocol/README.md](../../protocol/README.md#asks-and-confirm)):
 
 - **Options.** `["allow", "always", "deny"]`, or `["allow", "deny"]` for a locked tool (a locked
   tool is only unlocked on Home). `always` allows this call and saves `auto` for the tool.
@@ -715,7 +715,7 @@ flowchart TD
 - **Turn cancelled.** A Scout ask is not tied to its turn, so a cancel leaves the card and the
   saved call alone; a later yes still runs the call. Only a job's ask or a turn-bound card closes
   with `reason: "cancelled"`.
-- **Relaunch of a body.** A body that joins with no `last_seq` (the desktop is a new process) is sent every open ask again after the hello result, and can still answer it; the turn or job waiting on it goes on. The desktop keeps the cards it was sent and its bubble pulls them when it mounts, since the live frame can arrive before any window exists (`openConfirms`, see [desktop.md](desktop.md)). Known gap: after a relaunch the bubble cannot Stop the old turn (open turns are not announced again), so the old turn stays until it ends (a Scout ask no longer holds it). There is no "Stop job" in the bubble: the bubble's Stop ends the turn; a job is stopped from Home > Jobs.
+- **Relaunch of a body.** A body that joins with no `last_seq` (the desktop is a new process) is sent every open ask again after the hello result, and can still answer it; the turn or job waiting on it goes on. The desktop keeps the cards it was sent and its bubble pulls them when it mounts, since the live frame can arrive before any window exists (`openConfirms`, see [desktop.md](../bodies/desktop.md)). Known gap: after a relaunch the bubble cannot Stop the old turn (open turns are not announced again), so the old turn stays until it ends (a Scout ask no longer holds it). There is no "Stop job" in the bubble: the bubble's Stop ends the turn; a job is stopped from Home > Jobs.
 - **Reconnect.** A job's ask or a turn-bound card waits in memory, with an `active` `ask` work row. A restart expires them ("brain restarted"), but keeps a Scout ask (an open item)
   with its deadline: it comes back when a body that shows cards joins (see
   [Restart and return](#restart-and-return)). A body that joins with no `last_seq`, or that is told
@@ -936,7 +936,7 @@ The first-run setup adds six more Home tools (never offered to Scout):
 | `model_state`     | `{}`                            | `{"provider": "anthropic", "model", "default", "models": [{"id", "name", "line"}]}`; `model` is the choice in force, `default` the one used when none is chosen                                                                                                                             |
 | `set_model`       | `{"model": str}`                | `{"model": str}`; `invalid_params` for an id not in `models`; saves it and sends `changed {what: "model"}`; it applies from the next reply, the one running keeps its model                                                                                                                 |
 | `stt_state`       | `{}`                            | `{"live", "final", "models": [{"id", "label", "role", "size_mb", "gpu", "languages", "note"}], "gpu_name"}`; `live` and `final` are the choice in force (an id, `auto` or, for final, `off`); `gpu_name` is the first NVIDIA card or null, asked once per brain run (`voice/stt_choice.py`) |
-| `set_stt`         | `{"live"?: str, "final"?: str}` | `{"live", "final"}`; `invalid_params` for none given or an id not listed for that role; saves it, calls `VoiceService.reload()` and sends `changed {what: "stt"}`; it applies from the next listen, never under a running session (see [voice.md](voice.md))                                |
+| `set_stt`         | `{"live"?: str, "final"?: str}` | `{"live", "final"}`; `invalid_params` for none given or an id not listed for that role; saves it, calls `VoiceService.reload()` and sends `changed {what: "stt"}`; it applies from the next listen, never under a running session (see [voice.md](../senses/voice.md))                      |
 
 Updates add five Home tools (`setup/home_tools.py` `home_update_tools`, never offered to Scout):
 `updates_state` (read; `{checkedAt, auto: {apps: {official, community}, experts: {...}}, items:
@@ -950,7 +950,7 @@ logged, never ends the loop), applies only for a group left on (Official on, Com
 first), and never while a job runs: the apply holds a lock and `Updates.quiet()` waits on it,
 which `Jobs` awaits before it starts a run (`before_job` in `main.py`), and a hand-off waiting
 on its Allow card counts as running (`Jobs.starting`); see
-[connected-apps.md](connected-apps.md#updates).
+[connected-apps.md](../bodies/connected-apps.md#updates).
 
 The Connections page and the tour add three more Home tools (`setup/home_tools.py`, never offered
 to Scout): `setup_overview` (read; `{experts: [{id, name, version, state, tested}], apps,
@@ -1043,7 +1043,7 @@ more characters of the description; the line never carries markup or link target
 The approvals calls are Home-only. A bad filter, cursor, id or sentence is `invalid_params` with a
 plain line. `remove_preference` and `edit_preference` send `changed {what: "approvals"}`, as does
 every recorded ask and every preference the offer saves. In `list_approvals`, `preference` is the
-sentence as it was when Scout approved, so later edits or removals do not change old rows. Home's Approvals page that shows the history is in [bubble.md](bubble.md#home).
+sentence as it was when Scout approved, so later edits or removals do not change old rows. Home's Approvals page that shows the history is in [bubble.md](../senses/bubble.md#home).
 
 | Tool                | Input                                                    | Result text (JSON)                                                                                                                                                                                                                                              |
 | ------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1056,7 +1056,7 @@ sentence as it was when Scout approved, so later edits or removals do not change
 
 The app calls below are Home-only. A refusal is `invalid_params` with a plain line. Each change
 sends `changed {what: "apps"}`, as does every status change of an app. Home's Connections page calls
-all six (see [connected-apps.md](connected-apps.md#homes-connections-page)).
+all six (see [connected-apps.md](../bodies/connected-apps.md#homes-connections-page)).
 
 | Tool              | Input                                                                                            | Result text (JSON)                                                                                                                                                                            |
 | ----------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1082,7 +1082,7 @@ text such as `[Errno 11001] getaddrinfo failed`.
 ## Connected apps
 
 `apps.py` and `app_tools.py` let Scout use MCP servers the user adds. See
-[connected-apps.md](connected-apps.md) for the user's view; this is the brain's side.
+[connected-apps.md](../bodies/connected-apps.md) for the user's view; this is the brain's side.
 
 - **`Apps`** keeps one long-lived task per enabled app. `main` calls `apps.start()` once the server
   is up (it returns at once; a slow or hanging app never delays boot) and `apps.shutdown()` after
@@ -1467,7 +1467,7 @@ output and exit codes under Jobs and tools).
 
 `Jobs` (`jobs.py`) owns the running `ExpertRun`s, one per part (`_runs[job][part]`, with the
 activity logs and ask ids keyed the same way), and the job records (`JobRecords`, goal and expert_call `work` rows;
-columns in [storage.md](storage.md#jobs-as-work-rows)). `start()` checks the request and
+columns in [storage.md](../data/storage.md#jobs-as-work-rows)). `start()` checks the request and
 calls `_start_part`, the one place an expert run begins; it adds a part to the job and counts
 running parts against the two slots (see the queue below). Callbacks (`permission`, `question`, `progress`, `quiet`,
 `end`) carry the part, so two parts of one job never share an ask. `tell_expert` and `stop_job`
@@ -1708,7 +1708,7 @@ and it is cut at 120, so a title cannot break out of the section. Only online bo
 `focus` with an empty `app` is a body clearing it (an excluded window is in front, or sight is
 paused): the body's line then shows no "in front" part.
 
-A `tab` and a `download` come from a browser body (see [browser-body.md](browser-body.md#events)).
+A `tab` and a `download` come from a browser body (see [browser-body.md](../bodies/browser.md#events)).
 Like `focus` they are `wakes=False` kinds: the brain keeps only the latest of each per body, starts
 no turn and spends no budget, and the next from the same body replaces it. `state`
 must be `complete` or `interrupted`; a `download` with `started` or any other state is dropped, as is
@@ -1729,7 +1729,7 @@ since the brain started never wakes, a quick reconnect does not either, and a br
 **Who started a turn.** The `turn` notification carries `events` (the event ids the turn took) and
 `source` (the started turn's event source: the body for a say, the waking event's source for a wake).
 Bodies use `source` to show nothing while a wake runs (see
-[desktop.md](desktop.md#the-brain-in-the-main-process)). A person who talks while a wake runs joins
+[desktop.md](../bodies/desktop.md#the-brain-in-the-main-process)). A person who talks while a wake runs joins
 it (a `joined` frame names their say) when the wake is shown on the body they used;
 from another body they get a turn of their own after it. The body shows it like any turn. A `back`'s `idle_seconds` is the time since the last input, not since the body
 noticed the idle.
@@ -1964,7 +1964,7 @@ person (or Scout for them) answers with `resolve_step`: retry, skip or stop. It 
 `tool_call` or `expert_call` row; retry and skip need it `failed` or `blocked`. Stop stops the
 job's running experts, then closes the job as failed through `Jobs.close`. A step that ended while
 the brain was down is not repeated unless it was safe (see the resume scan in
-[storage.md](storage.md)). A failed step nobody was told about (the wake never started, or the
+[storage.md](../data/storage.md)). A failed step nobody was told about (the wake never started, or the
 scan failed it as "unsure if it ran") is told at the next start, once: the `work_failed` event's
 id is `work_failed:{step}@{ended_at}`, so a second telling is refused by the log. A step that gives
 up and its news are saved in one transaction.
@@ -1995,7 +1995,7 @@ Scout can leave itself a message for later. `Timers` (`timers.py`) fires the due
 (timer events held together share one wake) and wakes at most 6 times an hour.
 
 A timer is a `work` row of kind `timer`, a watch one of kind `watch`; the next time is `due_at` and
-the repeat is `work_timer.repeat_s` (see [storage.md](storage.md)). Times are stored in UTC.
+the repeat is `work_timer.repeat_s` (see [storage.md](../data/storage.md)). Times are stored in UTC.
 The "Now" line in Scout's prompt carries the owner's UTC offset so Scout can turn "at 3pm" into an
 ISO time.
 
@@ -2064,7 +2064,7 @@ creates a loop before that.
 - **Store** (`loops/store.py`). `LoopStore` is a thin layer over the work store: a loop is a `loop`
   work row plus a `work_loop` detail row, with its history and "surfaced" marks as events; the
   per-app read cursors are `app_cursors` and the mail switch is `apps.reads_mail` (see
-  [Memory](memory.md#loops) and [storage.md](storage.md#work_loop)). Saving the same (source, ref)
+  [Memory](../data/memory.md#loops) and [storage.md](../data/storage.md#work_loop)). Saving the same (source, ref)
   updates the loop and never duplicates it. Text is masked (`[secret]`) before it is written,
   history included. `forget` removes one loop; `wipe` removes every loop and the mail cursors.
 - **Service** (`loops/service.py`). `LoopService(store, emit, now)` is built and started in
@@ -2278,7 +2278,7 @@ tool's input is still masked), so a saved chat always rebuilds. `Session._save_n
 when masking would change it (a message left empty is saved with empty content); `redacted_thinking`
 blocks are kept. The log filter calls the
 masker directly, not the runner, because the runner logs. Scout's live turn and the side-check
-prompt are not masked. See [privacy](privacy.md#what-is-masked-on-disk-what-is-not).
+prompt are not masked. See [privacy](../data/privacy.md#what-is-masked-on-disk-what-is-not).
 
 Each turn's saved batch is tagged with the kind of body it was shown on (`messages.body`): `Session._start_turn`
 reads the turn body's `kind` once, so it holds even if the body leaves first, and `Session._save_new(body)` passes
@@ -2354,7 +2354,7 @@ turn loop, not a guard (see [What a turn does](#what-a-turn-does)).
 
 The brain hears the mic itself. A body sends `listen {mode}`, then `mic {pcm}` frames (16 kHz
 int16, base64), and gets `heard` and `voice` back; the contract is in
-[protocol/README.md](../protocol/README.md). The desktop uses it: it
+[protocol/README.md](../../protocol/README.md). The desktop uses it: it
 streams the mic and has no speech model of its own. The body keeps deciding what a heard turn means (addressing,
 follow-up) and sends the words as an ordinary `say` with `spoken: true`.
 
@@ -2406,7 +2406,7 @@ listen first loads the ears.
   and `moonshine/` (about 120 MB for small, the Auto live model; tiny is about 45 MB and medium bigger; fetched by
   `moonshine-voice` into that folder). The first `listen` on a new computer downloads about
   130 MB (and about 1.5 GB more for turbo when a card is found). The live model is the row `voice/stt.py` resolves (`TAGALONG_STT_LIVE`, else Auto), loaded
-  through `voice/engines`; see docs/voice.md, Speech models.
+  through `voice/engines`; see docs/senses/voice.md, Speech models.
 - **Python** is pinned to `>=3.12,<3.14` (`kokoro-onnx` supports 3.10 to 3.13). Dependencies:
   `moonshine-voice`, `onnxruntime`, `numpy`, `kokoro-onnx`. Linux wheels exist for all of them, so
   the CI brain job resolves them from `uv.lock`.
@@ -2449,16 +2449,16 @@ brain sends and falls back to the system voice for a text-only `speech` frame.
 - **Sentences and chunks.** `voice/speakable.py` turns the streamed reply into sentences: fenced
   code, table rows, `>` quotes and bare URLs are left out, list markers and Markdown dropped,
   nothing is added or cut. Nothing after a line of exactly `---` is said (the divider, see
-  [Say and show](voice.md#say-and-show)). `find_sentence_end` ends a sentence at `.`, `!` or `?`
+  [Say and show](../senses/voice.md#say-and-show)). `find_sentence_end` ends a sentence at `.`, `!` or `?`
   followed by a capital, digit or quote, not after an abbreviation (`e.g.`, `Dr.`, `etc.`, an
   initial), a decimal, a version or a list number; a single line break is a space and a blank line
   ends the sentence and the paragraph. `voice/chunker.py` groups the sentences into chunks: the
   first complete sentence of at least 4 words goes out at once, later chunks grow to about 30
   words (45 at most), a sentence over 45 words is cut at its last comma or space, and a 1-3 word
-  paragraph joins its neighbour. See [Voice](voice.md#the-mouths-queue). Each sentence is first
+  paragraph joins its neighbour. See [Voice](../senses/voice.md#the-mouths-queue). Each sentence is first
   rewritten for the ear (`voice/ear_text.py`: times, money, dates, numbers and symbols as words)
   and each chunk's audio is trimmed, faded and followed by a set gap (`voice/shape.py`); see
-  [Read for the ear](voice.md#read-for-the-ear).
+  [Read for the ear](../senses/voice.md#read-for-the-ear).
 - **`Mouth`** (`voice/mouth.py`) keeps one queue of chunks for all turns and one worker task
   that says them in order. It synthesises each chunk with `asyncio.to_thread` and awaits it, so
   a slow voice never stalls the websocket or the ears, and sends
@@ -2487,7 +2487,7 @@ brain sends and falls back to the system voice for a text-only `speech` frame.
   clear speaks again (from the next delta). `unlisten` does not hush (a held-mode reply goes on
   being spoken) and `cancel` does not hush, so a body sends `hush` on Stop.
 - **Spoken over.** A `say` with `interrupted {turn, heard}` means the owner spoke over Scout (see
-  [Voice](voice.md#talking-over-scout)). `Session.say` asks `Session.voice.sentences(turn)`;
+  [Voice](../senses/voice.md#talking-over-scout)). `Session.say` asks `Session.voice.sentences(turn)`;
   the first `heard` sentences were said, the rest are the unsaid. The running turn is paused, not
   cancelled (`Session.interrupt` sets the turn's `stop` event: generation stops where it is, the
   partial reply is kept, and the mouth is hushed; it keeps the turn's sentence log through the
@@ -2517,7 +2517,7 @@ this]` (`Memory.replace_last_message` rewrites the cut turn's message), never th
   is carried by the turn's next step. Code never says the opening sentence, there
   is no canned line and no earcon. It sits in the user content rather than the system prompt so
   the cached system prompt is the same for typed and spoken turns. It is an instruction to the
-  model and not guaranteed. See [Say and show](voice.md#say-and-show).
+  model and not guaranteed. See [Say and show](../senses/voice.md#say-and-show).
 - **Early fetch and the status line.** The voice is not fetched only at the first spoken turn:
   while the first-run tour is open the desktop calls the Home tool `fetch_voice` (each time the brain
   comes online, until the tour is finished), and `VoiceService.prefetch()` starts `Mouth.prefetch()`
@@ -2554,7 +2554,7 @@ this]` (`Memory.replace_last_message` rewrites the cut turn's message), never th
 - **Voice roster.** `voice/tts_models.json` lists the voices (Piper, Kokoro, Supertonic), loaded by
   `voice/tts.py` (which also holds the `Tts` protocol); `voice/tts_engines.py` maps each engine to
   its adapter (`kokoro.py`, `piper.py`, `supertonic.py`). The mouth loads the one Home chose (see
-  above). See [voice.md](voice.md#voices).
+  above). See [voice.md](../senses/voice.md#voices).
 - **Hand check.** `cd brain && uv run python tests/voice_smoke.py [DATA_DIR] [OUT_DIR]` runs every
   roster voice once and prints load time, time per sentence and the real-time factor (not part of
   `pytest`); `tools/voice_samples.py` makes the sample clips.
@@ -2563,7 +2563,7 @@ this]` (`Memory.replace_last_message` rewrites the cut turn's message), never th
 
 `runner.py` is the only thing that starts a Scout turn, and it runs one at a time ("busy" means the
 runner has a turn). Everything that wants Scout's attention (say, timers, loops, job questions and
-results, install results) is saved first as an event ([storage.md](storage.md#events)). The runner
+results, install results) is saved first as an event ([storage.md](../data/storage.md#events)). The runner
 looks again when an event is posted, a turn ends, speech moves or a body connects.
 
 **Order.** `pick` takes the person's words first, then news oldest first (equal times keep their
@@ -2643,7 +2643,7 @@ otherwise it would be answered again. Only when the message before the retry hol
 did a tool round, or for retried events saved by different earlier turns, nothing is cut, so no
 tool call loses its answer. A cut row does not count as saved: `set_resume` and the restart's
 split skip it, so that event is told in full again. See
-[memory.md](memory.md#saved-chat).
+[memory.md](../data/memory.md#saved-chat).
 
 ### Start-up and shutdown
 

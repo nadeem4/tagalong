@@ -1,10 +1,10 @@
 # Privacy in detail
 
-What Tagalong reads, when, and what it never reads. The short version is in the [README](../README.md#privacy).
-How each part is built is in the subsystem docs: [sight.md](sight.md) (captures, exclusions),
-[voice.md](voice.md) (microphone and speech),
-[memory.md](memory.md), [brain.md](brain.md) (the Python brain's prompts, asks and
-experts), [connected-apps.md](connected-apps.md), [browser-body.md](browser-body.md) and
+What Tagalong reads, when, and what it never reads. The short version is in the [README](../../README.md#privacy).
+How each part is built is in the subsystem docs: [sight.md](../senses/sight.md) (captures, exclusions),
+[voice.md](../senses/voice.md) (microphone and speech),
+[memory.md](memory.md), [brain.md](../brain/README.md) (the Python brain's prompts, asks and
+experts), [connected-apps.md](../bodies/connected-apps.md), [browser-body.md](../bodies/browser.md) and
 [settings-and-secrets.md](settings-and-secrets.md).
 
 ## What is captured, and when
@@ -27,7 +27,7 @@ others (never a minimized one, which has nothing drawn), fetch another monitor, 
 Blind spots refuse every one. A screenshot, a window picture and a window read from a picture
 (OCR) are announced on Scout and in the tray tooltip like any capture; listing windows, reading a
 window's text layer and a close-up crop are not announced (the full
-table is under "Capture announcements" in [sight.md](sight.md#capture-announcements)). Those run
+table is under "Capture announcements" in [sight.md](../senses/sight.md#capture-announcements)). Those run
 only inside a turn you started, are shown in the panel as they happen, and obey everything below.
 
 ## What the window list holds
@@ -102,7 +102,7 @@ storage), and the number of the last message it received (session storage, which
 the browser closes). It keeps no pages, tabs or conversations. The toolbar popup lists what you have
 allowed, and Chrome's extension page can remove any of it. What the brain does with a page it was given follows the brain's
 own rules. The extension's public privacy policy, for the Chrome Web Store, is
-[chrome-web-store/privacy-policy.md](chrome-web-store/privacy-policy.md).
+[chrome-web-store/privacy-policy.md](../chrome-web-store/privacy-policy.md).
 
 ## What is never read
 
@@ -134,7 +134,7 @@ own rules. The extension's public privacy policy, for the Chrome Web Store, is
   Stripe keys), login tokens (JWTs), private key blocks, the password in a connection string, the
   values of `PASSWORD=`, `SECRET=`, `TOKEN=` and `API_KEY=` settings, and card numbers become a
   marker such as `[hidden: API key]`, so the pet knows something was there without seeing it.
-- **Experts.** Claude Code runs in the folder you name, on your own Claude login, through the Agent Client Protocol. Each thing it wants to do that needs permission comes back to you as an ask (see [brain.md](brain.md#experts)). A note you ask Scout to pass to a working expert
+- **Experts.** Claude Code runs in the folder you name, on your own Claude login, through the Agent Client Protocol. Each thing it wants to do that needs permission comes back to you as an ask (see [brain.md](../brain/README.md#experts)). A note you ask Scout to pass to a working expert
   (`tell_expert`) leaves the machine to that expert like the brief did.
 - **A monitor with an excluded window on it.** Tagalong never photographs a whole screen, only
   one listed window at a time, and a window on the exclusion list is refused before any pixel is
@@ -227,7 +227,7 @@ when Scout calls one of their tools in a turn you started.
   same way. It goes to Scout's brain provider like any window text, and is not stored.
 - **Tokens and keys.** The Python brain keeps sign-in tokens, a pasted key, a local tool's secret
   env values and secret url parts in its own files, `app-tokens.json` and `app-oauth/`, never in
-  the apps table, the repository or logs; see [connected apps](connected-apps.md) and the next
+  the apps table, the repository or logs; see [connected apps](../bodies/connected-apps.md) and the next
   section. **Disconnect** deletes them.
 
 ### What an expert can reach
@@ -349,7 +349,7 @@ flowchart LR
   of a word is not cut off), each frame dropped as a newer one comes. Only the text goes on, to
   Scout's provider, exactly as if you had typed it, with the name of the window you are on (never
   the selected text).
-- **In the browser,** the same rule holds: the browser body's microphone is open only while you ask by voice from the popup, and its frames go to your own brain and nowhere else. See [browser-body.md](browser-body.md#voice).
+- **In the browser,** the same rule holds: the browser body's microphone is open only while you ask by voice from the popup, and its frames go to your own brain and nowhere else. See [browser-body.md](../bodies/browser.md#voice).
 
 - The microphone is the one picked in Settings → Voice, or the system default. Windows' own
   microphone privacy setting applies.
