@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   ApprovedParams,
+  AskParams,
   BackEventData,
   DownloadEventData,
   FocusEventData,
@@ -308,5 +309,28 @@ describe('know_me frames', () => {
     expect(
       KnowMeStatusParams.safeParse({ sources: [], done: true, portrait: 'x'.repeat(1501) }).success,
     ).toBe(false);
+  });
+});
+
+describe('task cards', () => {
+  const card = {
+    seq: 1,
+    id: 'a1',
+    state: 'open',
+    text: 'Send it?',
+    confirm: true,
+    tool: 'send_mail',
+    input: { to: 'sam' },
+    task: { id: 't1', title: 'Reply to Sam' },
+    check_back_at: '2026-11-18T10:30:00Z',
+    check_back_by: 'scout',
+    urgent: false,
+  };
+
+  it('accepts a task card with not_now and stop_task', () => {
+    const options = ['allow', 'deny', 'not_now', 'stop_task'];
+    expect(AskParams.safeParse({ ...card, options }).success).toBe(true);
+    const swapped = ['allow', 'deny', 'stop_task', 'not_now'];
+    expect(AskParams.safeParse({ ...card, options: swapped }).success).toBe(false);
   });
 });

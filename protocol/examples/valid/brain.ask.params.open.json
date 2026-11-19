@@ -7,6 +7,10 @@
     "state": "open",
     "turn": "t2",
     "text": "Which folder?",
-    "options": ["Downloads", "Desktop"]
+    "options": ["Downloads", "Desktop", "not_now", "stop_task"],
+    "task": { "id": "4f2a9c" },
+    "check_back_at": "2026-11-16T15:30:00+00:00",
+    "check_back_by": "person",
+    "urgent": true
   }
 }

@@ -62,6 +62,15 @@ const CONFIRM_OPTIONS = [
   ['allow', 'deny'],
   ['allow', 'always', 'deny'],
 ];
+// A card that belongs to a task adds these two after its own options.
+const TASK_OPTIONS = ['not_now', 'stop_task'];
+
+const same = (a: string[], b: string[]) => a.length === b.length && a.every((v, i) => v === b[i]);
+const confirmOptions = (options: string[]) =>
+  CONFIRM_OPTIONS.some(
+    (o) =>
+      same(o, options) || (same(TASK_OPTIONS, options.slice(-2)) && same(o, options.slice(0, -2))),
+  );
 
 export const SayResult = z.object({}).strict();
 export type SayResult = z.infer<typeof SayResult>;
@@ -213,6 +222,10 @@ const AskOpen = z
     input: Input.optional(),
     free_text: z.boolean().optional(),
     recommended: z.string().optional(),
+    task: z.object({ id: Id, title: z.string().optional() }).optional(),
+    check_back_at: z.string().optional(),
+    check_back_by: z.enum(['scout', 'person']).optional(),
+    urgent: z.boolean().optional(),
   })
   .refine(
     (a) => a.recommended === undefined || a.options.includes(a.recommended),
@@ -220,13 +233,8 @@ const AskOpen = z
   )
   .refine(
     (a) =>
-      !a.confirm ||
-      (a.tool !== undefined &&
-        a.input !== undefined &&
-        CONFIRM_OPTIONS.some(
-          (o) => o.length === a.options.length && o.every((v, i) => v === a.options[i]),
-        )),
-    'a confirm ask needs tool, input and options ["allow","deny"] or ["allow","always","deny"]',
+      !a.confirm || (a.tool !== undefined && a.input !== undefined && confirmOptions(a.options)),
+    'a confirm ask needs tool, input and options ["allow","deny"] or ["allow","always","deny"], then "not_now" and "stop_task" on a task card',
   );
 
 const AskClosed = z.object({
