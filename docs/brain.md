@@ -639,24 +639,22 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
   `by="side_check"` and closes the card (`Engine._beside_card`, `AskRequest.show_card` and
   `settled`, `AskRunner.settle`). A very long input is cut to 4,000 characters in what the model sees.
   The floor keeps a locked or person-only tool from this look: only a standing rule or you decide it.
-- **Follow-ups under the preference rule.** The session keeps `_owner_turn` (`Session.owner_turn()`):
-  true while the running turn is the owner's, meaning they started it (a say) or typed
-  into it (a wake turn they start a turn after is not theirs). It ends with the turn, so the next timer wake starts
-  as Scout's own. No contract change. `tell_expert` is an `ask`-mode tool marked `follow_up`: on an
-  owner turn the gate waves it through (their message was the yes, no ask, no log entry;
-  never for a `person_only` tool); on a
-  wake turn it runs the normal decision (the side-check, the Allow card, with offers
-  after a person's allow). A stored `auto` (Home's permission switch) still means no ask. With
-  nobody online the nudge waits like any Scout ask (see [Asks that wait](#asks-that-wait)). `hand_off`
-  is different: a wake turn (a job ended, a timer: no message from the person started it) can
-  never start a job. The tool answers "hand_off refused: only a message from the person can start
-  a job." and Scout tells the person what it would run; they ask in chat if they want it (LT1-4: a
-  stopped job was restarted by wakes, each costing money). On an owner turn `hand_off` shows the
+- **Follow-ups under the preference rule.** `Session.person_task(turn_id)` is true while that
+  turn runs and its first event is a person's say; a body's wake, a timer or a job's news is not.
+  No contract change. `tell_expert` is an `ask`-mode tool marked `follow_up`: in a person's task
+  the gate waves it through (their message was the yes, no ask, no log entry; never for a
+  `person_only` tool); in any other task it runs the normal decision (the side-check, the Allow
+  card, with offers after a person's allow). A stored `auto` (Home's permission switch) still
+  means no ask. With nobody online the nudge waits like any Scout ask (see
+  [Asks that wait](#asks-that-wait)).
+- **The start-work rule.** Any task may hand off (`hand_off` has no turn check), but a task no
+  person started (its source is a timer, a setup flight or a job, not a body) is always shown the
   mode card. With no apps the card never reaches the engine. When apps ride along the card goes
   through the engine (kind `hand_off_followup`, source `claude_code`, tool `hand_off`, group
-  `<expert>:<folder>`) with no allow-once for Scout or a preference, so only the person answers:
-  the card pick is logged as a person row and offered like any approval. The card has no timeout;
-  it ends with its job or turn. A cancel leaves no row.
+  `<expert>:<folder>`) with no allow-once for Scout or a preference, so only the person answers;
+  on such a task the engine is asked at tier `person_only`, so not even a standing rule approves
+  it. The card pick is logged as a person row and offered like any approval. The card has no
+  timeout; it ends with its job or turn. A cancel leaves no row.
 - **Claude Code's permission asks.** `Jobs._permission` builds an `expert_request` ask (tier
   `ask`, group `<expert>:<folder>`) with the expert's own option names on the card and gives it
   to the engine. A standing rule or Scout's grant answers with the expert's allow-once option (an
@@ -672,16 +670,16 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 flowchart TD
-  A[Scout calls tell_expert] --> B{owner turn?}
+  A[Scout calls tell_expert] --> B{a person's task?}
   B -- yes --> C[runs now, no ask, no row]
   B -- no --> F{preference covers it?}
   F -- yes --> G[runs once, row by scout]
   F -- no or error --> D{anyone online?}
   D -- no --> E[ask stays open, shown when a body joins]
   D -- yes --> H[ask the owner: Allow card]
-  X[Scout calls hand_off] --> Y{owner turn?}
-  Y -- yes --> Z[mode card]
-  Y -- no --> R[refused: only a message from the person can start a job]
+  X[Scout calls hand_off] --> Y{a person's task?}
+  Y -- yes --> Z[mode card, usual tier]
+  Y -- no --> R[mode card, person only]
 ```
 
 - **Offers.** After you approve by hand, `Offers.consider` may open a separate ask (`tool`
@@ -1350,6 +1348,15 @@ started with apps (`ExpertRun.apps`, set from `hand_off`'s `apps`, see below), `
 `ExpertApps` (`expert_apps.py`) for a grant and passes one MCP server in `new_session` /
 `load_session` `mcp_servers`. Without apps `mcp_servers` stays `[]`.
 
+**Task tools and routing (T2b).** `task_tools.py` gives Scout `task_start` (a Do, Later or Own
+task) and `task_end` (it cancels the task's planned timers and watches, and refuses while a job
+still runs under it: Scout stops the job first). A job, an install, a sign-in, a connected-app add and
+a timer each hang off a task: the call's `task_id` names an open one, else `Session.claim_task`
+opens a new task from the turn's first event (a joined running flight opens none). The job's goal
+row keeps `task_id` and `input.caused_by`; its news is posted with that task. `Runner.target`
+sends news to the body in use, else the body its task came from (`Tasks.source_of`, only when that
+source is a body), else the first screen; `EventLog.origin_body` is gone.
+
 **Hand-off carries apps (B26e).** `hand_off` takes `apps`, a list of connected app ids the job
 needs (none by default). `Jobs.start` refuses an id that is unknown ("no app x; connected apps:
 ...") or not `connected` (off, needs sign-in, error) before anything starts. The mode card's
@@ -1651,7 +1658,7 @@ flowchart TD
 
 | Tool             | Audience    | Effect | Gate                          | Does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ---------------- | ----------- | ------ | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hand_off`       | scout       | change | tier `auto` (asks for itself) | `{task, folder, expert?, continue_job?, fresh?, title?, job?}`. `title` names a new job; `job` adds a part to that open job (title ignored; a closed or unknown job is a plain refusal). Returns JSON `{job, part, title, session, why_fresh, parent_job}` (`title` is the saved, masked one; null when attaching to a job), or the plain reason it did not start                                                                                                                                                                  |
+| `hand_off`       | scout       | change | tier `auto` (asks for itself) | `{task, folder, expert?, continue_job?, fresh?, title?, job?, apps?, task_id?}`. `task_id` puts the job under an open task (else a new Do task opens for the turn); `title` names a new job; `job` adds a part to that open job (title ignored; a closed or unknown job is a plain refusal). Returns JSON `{task, job, part, title, session, why_fresh, parent_job}` (`title` is the saved, masked one; null when attaching to a job), or the plain reason it did not start                                                        |
 | `list_experts`   | scout, home | read   | `auto`                        | `{"experts": [{id, name, version, logged_in, tested, can_resume}]}`; `tested` is true for `claude-acp`, `codex-acp` only, `can_resume` is null until sessions can resume                                                                                                                                                                                                                                                                                                                                                           |
 | `tell_expert`    | scout       | change | `ask`, free on an owner turn  | `{job, note, part?}`. `part` names which running part when the job has several. Queues a follow-up prompt for a running job; Scout-started nudges follow the preference rule (see Follow-ups under the preference rule)                                                                                                                                                                                                                                                                                                            |
 | `close_job`      | scout       | change | `auto`                        | `{job}`. Scout's judgement that the work is done: sets `closed_at`, state stays the last outcome. Refused (plain line) for an unknown or closed job or one with a running part                                                                                                                                                                                                                                                                                                                                                     |

@@ -472,8 +472,9 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
 17. **Action:** with a job running, ask Scout in chat to nudge it ("tell it to use tabs"). Then let
     a check-back timer wake Scout and have it nudge or continue a job on its own.
     **Expected:** the chat request goes through with no card and no new row in Approvals. The nudge
-    Scout starts on a wake asks you first (an Allow card for `tell_expert`). On a wake Scout never
-    starts a job (`hand_off` is refused): it tells you what it would run and waits for you to ask.
+    Scout starts on a wake asks you first (an Allow card for `tell_expert`). On a wake Scout may
+    start a job, but a reminder's or a job's follow-up hand-off always shows the mode card first,
+    even when a rule or a saved preference would cover it: nothing starts until you pick.
     Save a preference that covers nudges and repeat: Scout proceeds and the row says it was
     Scout's decision. Type a
     message into a wake turn that is already running: once it reaches Scout, the next nudge goes
