@@ -1,7 +1,9 @@
-# Speech model measurements (V3)
+# Speech model measurements
+
+A dated benchmark record (2026-11-13), not a spec: the numbers describe one PC on one day.
 
 What the speech-to-text candidates scored on the dev PC, the Auto rule chosen from the numbers,
-and how to run it again. Harness: `brain/tools/stt_bench/` (see [voice.md](voice.md)).
+and how to run it again. Harness: `brain/tools/stt_bench/` (see [hearing.md](hearing.md#speech-models)).
 
 ## Setup
 
@@ -27,20 +29,20 @@ and how to run it again. Harness: `brain/tools/stt_bench/` (see [voice.md](voice
 | moonshine-small        | live  | CPU (no GPU path)                    | 0.193 | 100%      | 15.44     | 16         | 5.14       |
 | moonshine-medium       | live  | CPU (no GPU path)                    | 0.199 | 100%      | 15.60     | 3          | 6.47       |
 | whisper-large-v3-turbo | final | GPU requested, libraries missing     | 0.199 | 100%      | 3.96      | n/a        | 9.56       |
-| whisper-large-v3-turbo | final | GPU, cuda (libraries fetched, V3b)   | 0.017 | 100%      | 1.05      | 100        | 0.49       |
+| whisper-large-v3-turbo | final | GPU, cuda (libraries fetched)        | 0.017 | 100%      | 1.05      | 100        | 0.49       |
 | whisper-large-v3-turbo | final | CPU only (`CUDA_VISIBLE_DEVICES=-1`) | 0.199 | 100%      | 3.98      | 5          | 10.08      |
 | whisper-small-en       | final | GPU requested                        | 0.225 | 87%       | 3.99      | 3          | 1.15       |
 | whisper-small-en       | final | CPU only (`CUDA_VISIBLE_DEVICES=-1`) | 0.225 | 87%       | 4.00      | 3          | 1.14       |
 
 Idle (Silero VAD on silence, as in Always mode, 60 s): 0.004 cores. This is the ears loop only;
-the wake word model comes in V5.
+a wake word model would add to this.
 
 Notes on the numbers, nothing rounded away:
 
-- **The GPU ran only after V3b.** The two "GPU requested, libraries missing" rows (V3) logged "the
+- **The GPU ran only after the CUDA fetch was added.** The two "GPU requested, libraries missing" rows logged "the
   graphics card could not run the final speech model; using the processor" and decoded on the CPU,
   hence the same speed as the CPU-only rows: `cublas64_12.dll` and `cudnn64_9.dll` were not on this
-  PC. V3b then fetched them on demand (two pinned wheels, 1.26 GB, SHA-256 checked, 39 s on this
+  PC. The CUDA fetch then got them on demand (two pinned wheels, 1.26 GB, SHA-256 checked, 39 s on this
   connection; 10 DLLs landed in `<TAGALONG_HOME>/voice/cuda`), the child probe passed, and
   `detect_hardware` went from `gpu=False, card=True` to `gpu=True`. The bench then reported device
   `cuda`, with nvidia-smi peak 100%. Result: 0.49 s per clip against about 10 s on the CPU.
@@ -77,12 +79,12 @@ disagree with parts of that:
   final pass.** On the CPU turbo takes about 10 s after the end of a turn, which is too slow for
   a conversation, and `whisper-small-en` takes 1.1 s but hears worse than Moonshine small
   (0.225 against 0.193), so it would make the transcript worse. The turbo-on-GPU choice is
-  now measured: 0.49 s per clip on the RTX 4060 once V3b has fetched the NVIDIA libraries, against
+  now measured: 0.49 s per clip on the RTX 4060 once the NVIDIA libraries are fetched, against
   about 10 s on the CPU, with the name kept on every clip. It is the pick for a PC with a card, and
   the harness is how to check another one.
 - **The GPU probe needs the libraries, not only the card.** `detect_hardware` counts CUDA devices
   through CTranslate2 (so a PC with a driver but no toolkit is seen, and `CUDA_VISIBLE_DEVICES=-1`
-  hides the card) and also requires cuBLAS and cuDNN to be found (on the system, or in `<TAGALONG_HOME>/voice/cuda`, where V3b fetches them). Without it, this PC would have been told
+  hides the card) and also requires cuBLAS and cuDNN to be found (on the system, or in `<TAGALONG_HOME>/voice/cuda`, where the fetch puts them). Without it, this PC would have been told
   "GPU", loaded turbo, fallen back to a 10 s CPU decode on every turn. The old probe looked for
   `cudart64_12` and missed this card entirely.
 - The final model is chosen by the `auto` hints in `stt_models.json`; changing the rule is a data

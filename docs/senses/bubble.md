@@ -8,7 +8,7 @@ imports Electron, opens a socket or calls a Node API. Each host hands it a `Host
 is all it knows about the outside world.
 
 The desktop windows that render these components are in [desktop.md](../bodies/desktop.md). Speech (the
-queue, the mouth, listening) is in [voice.md](voice.md); this doc covers only what the bubble
+queue, the mouth, listening) is in [speaking.md](speaking.md) and [hearing.md](hearing.md); this doc covers only what the bubble
 decides to hand to it.
 
 ## Where it lives
@@ -29,7 +29,7 @@ decides to hand to it.
 | `job-line.tsx`                                       | `useRunningStep`, `JobLine`: the live job line                                                                                                                                 |
 | `dock-pet.tsx`, `scout-face.tsx`, `mascot/`          | `DockPet`, `DockMood`, `ListeningDot`; `ScoutFace`, Scout's character, `MOOD_STATE`                                                                                            |
 | `home/`                                              | `HomeView` and its pages                                                                                                                                                       |
-| `voice/`                                             | `PushToTalk`, `ListenController` (see [voice.md](voice.md))                                                                                                                    |
+| `voice/`                                             | `PushToTalk`, `ListenController` (see [hearing.md](hearing.md))                                                                                                                |
 | `theme/tokens.ts`, `settings/settings-styles.ts`     | Theme tokens; `SETTINGS_CSS`                                                                                                                                                   |
 
 Host-side files that feed these components: `bodies/desktop/src/renderer/src/panel.tsx` (the bubble),
@@ -143,7 +143,7 @@ filled that holds text keeps at least 8 px inside (12 to 16 px for cards and mes
 **One answer, as a state machine.** `reply` is one of:
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
 stateDiagram-v2
   [*] --> idle
   idle --> running: submit (ask sent)
@@ -166,7 +166,7 @@ stateDiagram-v2
 - `turn.delta` and `turn.completed` count only for `mine`. A completed turn with no text and a
   `stopReason` shows `stopStatus` as a quiet line ("Declined" for `refusal`, "Stopped: too many
   steps" for `tool_limit`), never spoken. Otherwise the answer shows through `Answer`. With Scout talks
-  on the brain reads a typed question's answer aloud too (the `read_aloud` event, docs/senses/voice.md).
+  on the brain reads a typed question's answer aloud too (the `read_aloud` event, [speaking.md](speaking.md#which-turns-are-spoken)).
 - `turn.error` for `mine`, or a rejected `ask`, shows a `role="alert"` box with an error icon, the
   message (or "Tagalong could not reach its brain.") and one **Try again**, which asks the same
   question again (never while another answer is running). An earlier failed exchange keeps the box
@@ -189,19 +189,20 @@ stateDiagram-v2
 - An install card sits under Scout's sentence inside the same reply, not after it.
 - **Stop** (while running) calls `interrupt(mine)`.
 - A spoken question (`talk.onHeard`) asks with `asSpoken`, so the ask carries `spoken: true`. The
-  brain speaks the answer and the panel plays it ([voice.md](voice.md)). After the turn completes
+  brain speaks the answer and the panel plays it ([speaking.md](speaking.md)). After the turn completes
   the hints show "Hold <key> to reply".
 - **Talking over a spoken answer** (Always listening or the key): the panel
   pauses Scout, and words that are not noise or Scout's echo arrive as an ordinary heard question
-  whose `say` carries `interrupted` (see [Voice](voice.md#talking-over-scout)).
+  whose `say` carries `interrupted` (see [Talking over Scout](speaking.md#talking-over-scout)).
 - **Listening does not interrupt.** Starting to listen leaves the turn running: the talk key
-  only pauses Scout's voice (see [Voice](voice.md#talking-over-scout)). Real words are asked like
+  only pauses Scout's voice (see [Talking over Scout](speaking.md#talking-over-scout)). Real words are asked like
   any question; the brain pauses the old turn, and `submit` shows the new one. Only the Stop button
   and the close interrupt a turn on their own.
 
 **Chips.** `chipsOf(snapshot)` makes up to two removable chips: the app (`name · window title`),
-and `Selected text`. Removing one leaves that part out of the ask (`without`). A new snapshot
-brings every chip back.
+and `Selected text`. They show what the ask hotkey captured; removing one hides the chip. The desktop
+sends only the window title with the ask (`context.window`), never the selected text, whatever the
+chips show (see [sight.md](sight.md#the-ask-snapshot)). A new snapshot brings every chip back.
 
 **The header.** The bubble's surface is `on-navy` (and injects `CONTROLS_CSS`), so focus rings are gold. The quick bubble's header row is Scout's mark and name over a status line, the two switches, the speaking indicator, an expand button and ×; the context chips sit in their own row below it, so they never crowd the close button. Hovering or focusing a switch or the mic draws a tooltip above it (name, what a click does, and the talk key). The mic button sits inside the question box (the box pads 44px on the right for it). **Always listening** and **Seeing your screen**
 are 32 px icon buttons (mic, eye) with `aria-pressed` and a tooltip ("Always listening: off", with "Click to turn on. Hold <key> to talk once."), drawn gold when on; Seeing calls `toggleSightPause` (the same pause as
@@ -264,7 +265,7 @@ disappears when the next `jobs` change leaves nothing running. A failed read (br
 once and shows no line.
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
 flowchart LR
   A[brain: changed job_activity or jobs] --> B[useRunningStep, 250 ms throttle]
   B --> C[bridge.runningSteps]
@@ -298,11 +299,12 @@ is `openLogsFolder`.
 
 ### Show-only blocks
 
-The mind decides what is said: everything it writes is spoken except what it puts in a show-only
-block, which the bubble shows and the voice skips. Show-only means a fenced code block, a table row
-(a line starting with `|`) or a quoted line (starting with `>`). Bare URLs are dropped too. The
-brain does this before it speaks (`brain/src/brain/voice/speakable.py`; see
-[brain.md](../brain/README.md#brain-mouth)); the bubble only shows the full answer.
+The main rule for what is spoken is the `---` divider: the reply's spoken part comes first, and a
+line that is only `---` ends it; everything after the divider is shown and not spoken. Inside the
+spoken part, show-only blocks are skipped too: a fenced code block, a table row (a line starting with
+`|`) or a quoted line (starting with `>`). Bare URLs are dropped. The brain does this before it
+speaks (`brain/src/brain/voice/speakable.py`; see [speaking.md](speaking.md#say-and-show)); the
+bubble only shows the full answer.
 
 ### Answers
 
@@ -496,8 +498,8 @@ the brain.
 
 ## Privacy notes
 
-The UI only sees what the bridge returns: keys never cross it. Removing a
-chip keeps that part out of the ask. A dropped item is sent only by a drop card button. Status
+The UI only sees what the bridge returns: keys never cross it. The chips show what was captured;
+only the window title rides on the ask, and the selected text is never sent. A dropped item is sent only by a drop card button. Status
 marks and the health card are shown, never spoken. See [privacy.md](../data/privacy.md).
 
 ## Tests that pin it
