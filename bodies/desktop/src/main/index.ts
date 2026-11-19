@@ -43,7 +43,9 @@ import {
 import { captureNotice, captureTooltip } from './capture-notice';
 import { captureActiveWindow, captureAskSnapshot } from './context';
 import type { TurnEvent } from '@tagalong/ui/shapes';
+import { callJson } from './brain/call-json';
 import { createTurnEvents } from './brain/turn-events';
+import { z } from 'zod';
 import { startBrain } from './brain/start';
 import { startingGate } from './brain/starting-gate';
 import { homedir } from 'node:os';
@@ -297,6 +299,26 @@ async function start(): Promise<void> {
   trackSay = (id) => turnEvents.trackSay(id);
   untrackSay = (id) => turnEvents.untrackSay(id);
   openConfirms = () => turnEvents.openConfirms();
+  // When the link last went down, so a catch-up shows only what was saved while away.
+  let linkOnline = false;
+  let awayAt = 0;
+  let catchUpPending = false;
+  const SavedChat = z.object({
+    messages: z.array(
+      z.object({ id: z.string(), role: z.string(), text: z.string(), at: z.string() }),
+    ),
+  });
+  // A resync means replies may have streamed past the replay window: read them from the saved chat.
+  const catchUp = async (): Promise<void> => {
+    try {
+      const anchor = turnEvents.chatAnchor();
+      const input = anchor === undefined ? {} : { after_id: anchor };
+      const { messages } = SavedChat.parse(await callJson(brain, 'chat_since', input));
+      turnEvents.caughtUp(messages, awayAt).forEach(forwardTurn);
+    } catch (error) {
+      console.warn(`the catch-up after a resync failed: ${String(error)}`);
+    }
+  };
   // A brain that stays down fails the open turns, so the bubble does not stream forever.
   const watchOffline = offlineWatch(() => turnEvents.resync().forEach(forwardTurn));
   // The Add key mark follows the brain's own answer; an unreadable answer leaves it as it is.
@@ -354,12 +376,22 @@ async function start(): Promise<void> {
       desktop?.voiceBridge.onNotification(method, params);
       turnEvents.map(method, params).forEach(forwardTurn);
     },
-    onResync: () => turnEvents.resync().forEach(forwardTurn),
+    onResync: () => {
+      turnEvents.resync().forEach(forwardTurn);
+      // The client says online right after this; a call made now would not be sent yet.
+      catchUpPending = true;
+    },
     // Every hello names the brain's version and build: an older one is restarted or flagged.
     onHello: (hello) => void brainControl?.check(hello),
     onStatus: (status) => {
       brainStatus = status;
       markBrainLink(statusMarks, status);
+      if (status !== 'online' && linkOnline) awayAt = Date.now();
+      linkOnline = status === 'online';
+      if (linkOnline && catchUpPending) {
+        catchUpPending = false;
+        void catchUp();
+      }
       // A listening session open when the link dropped asks the new connection to listen.
       if (status === 'online') {
         desktop?.voiceBridge.onOnline();

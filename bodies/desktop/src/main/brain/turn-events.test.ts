@@ -710,3 +710,44 @@ describe('createTurnEvents joined and blank remarks', () => {
     expect(m.map('turn', turn('ended', 'done'))).toEqual([]);
   });
 });
+
+describe('createTurnEvents catching up after a resync', () => {
+  const AWAY = Date.parse('2026-11-17T09:00:00Z');
+  const saved = (id: string, role: string, text: string, at = '2026-11-17T09:05:00Z') => ({
+    id,
+    role,
+    text,
+    source: null,
+    at,
+  });
+
+  it('re-reads the chat after a resync', () => {
+    const m = make();
+    expect(m.chatAnchor()).toBeUndefined(); // the first time: the brain sends the last few
+    const events = m.caughtUp([saved('7', 'assistant', 'Here is the long answer.')], AWAY);
+    expect(events).toMatchObject([{ type: 'pet.remark', text: 'Here is the long answer.' }]);
+    expect(m.chatAnchor()).toBe('7');
+  });
+
+  it('shows a caught-up reply once', () => {
+    const m = make();
+    const rows = [saved('7', 'assistant', 'Once only.')];
+    expect(m.caughtUp(rows, AWAY)).toHaveLength(1);
+    expect(m.caughtUp(rows, AWAY)).toEqual([]);
+  });
+
+  it('ignores messages the person sent from this body', () => {
+    const m = make();
+    const rows = [saved('7', 'user', 'what is the weather'), saved('8', 'assistant', 'Sunny.')];
+    expect(m.caughtUp(rows, AWAY)).toMatchObject([{ text: 'Sunny.' }]);
+    expect(m.chatAnchor()).toBe('8');
+  });
+
+  it('shows nothing when the saved chat has nothing new', () => {
+    const m = make();
+    const old = saved('3', 'assistant', 'Said before the link went down.', '2026-11-17T08:00:00Z');
+    expect(m.caughtUp([old], AWAY)).toEqual([]);
+    expect(m.caughtUp([], AWAY)).toEqual([]);
+    expect(m.chatAnchor()).toBe('3'); // seen, so not asked for again
+  });
+});

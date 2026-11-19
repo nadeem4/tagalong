@@ -12,6 +12,14 @@ const LOST_MESSAGE = 'Scout lost the thread there. Ask again?';
 
 const STOP_REASON = { done: 'end', cancelled: 'aborted', step_cap: 'tool_limit' } as const;
 
+/** One row of the brain's saved chat, as its `chat_since` tool sends it. */
+export interface SavedChatMessage {
+  id: string;
+  role: string;
+  text: string;
+  at: string;
+}
+
 export function createTurnEvents(petId: () => string, session: () => string | null = () => null) {
   // Insertion order is start order, which resync() reports in.
   const open = new Map<string, string>();
@@ -170,6 +178,9 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
     return [card];
   }
 
+  // The newest saved message already looked at; a catch-up asks for what came after it.
+  let lastChatId: number | undefined;
+
   return {
     map(method: string, params: unknown): TurnEvent[] {
       if (method === 'turn') {
@@ -221,6 +232,33 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
      */
     openConfirms(): TurnEvent[] {
       return [...asks.values()];
+    },
+
+    /** The id to give `chat_since`: none the first time, so the brain sends its last few. */
+    chatAnchor(): string | undefined {
+      return lastChatId === undefined ? undefined : String(lastChatId);
+    },
+
+    /**
+     * After a resync: the assistant messages the brain saved while the link was down (`awayAt`,
+     * ms) that were not shown yet, each as a remark. A turn cut off by the lost link also gets
+     * its error from resync(); the saved reply arrives beside it.
+     */
+    caughtUp(messages: SavedChatMessage[], awayAt: number): TurnEvent[] {
+      const events: TurnEvent[] = [];
+      for (const m of messages) {
+        const id = Number(m.id);
+        if (lastChatId !== undefined && id <= lastChatId) continue;
+        lastChatId = id;
+        if (m.role !== 'assistant' || m.text.trim() === '' || Date.parse(m.at) < awayAt) continue;
+        events.push({
+          type: 'pet.remark',
+          remarkId: crypto.randomUUID(),
+          petId: petId(),
+          text: m.text,
+        });
+      }
+      return events;
     },
 
     /** The brain lost what these turns were doing; tell the UI instead of leaving them open. */

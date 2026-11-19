@@ -155,6 +155,15 @@ export interface FakeBrain {
   sendApproved(note: { tool: string; text: string; preference: string }): void;
   /** Scout starts a turn on its own and says one line: the desktop shows it as a quiet line. */
   sendRemark(text: string): void;
+  /**
+   * The link drops, a reply is saved while it is down, and the next hello says `resync: true`:
+   * the desktop must read the reply with `chat_since`. Every `chat_since` call's input is kept.
+   */
+  dropWithSavedReply(text: string): void;
+  /** Every `chat_since` input the desktop sent, in order. */
+  chatSinceCalls: Record<string, unknown>[];
+  /** How many times a body said hello (the link came up). */
+  hellos: number;
   close(): Promise<void>;
 }
 
@@ -430,6 +439,11 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   // Seq is the brain's, not the connection's: it keeps rising across a reconnect.
   let seq = 0;
   let turns = 0;
+  // The brain's saved chat, for `chat_since`, and whether the next hello says resync.
+  const savedChat: { id: string; role: string; text: string; source: string; at: string }[] = [];
+  const chatSinceCalls: Record<string, unknown>[] = [];
+  let resyncNext = false;
+  let hellos = 0;
   const answers: FakeBrain['answers'] = [];
   const permissionSets: { tool: string; mode: string }[] = [];
   // Home's loops: one mail app, off at first. Turning it on "reads" one mail into a held loop,
@@ -695,9 +709,11 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           session: 's1',
           tools: [],
           seq,
-          resync: false,
+          resync: resyncNext,
           ...(options.hello ?? own),
         };
+        resyncNext = false;
+        hellos += 1;
         socket.send(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result }));
       } else if (msg.method === 'listen') {
         mode = String(msg.params?.mode);
@@ -944,6 +960,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             job?: string;
             part?: string;
             after_rev?: number;
+            after_id?: string;
             id?: number;
             filter?: string;
             usd?: number;
@@ -961,7 +978,11 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           };
         };
         let value: unknown = {};
-        if (params.tool === 'list_jobs') {
+        if (params.tool === 'chat_since') {
+          chatSinceCalls.push(params.input ?? {});
+          const after = Number(params.input?.after_id ?? 0);
+          value = { messages: savedChat.filter((m) => Number(m.id) > after), more: false };
+        } else if (params.tool === 'list_jobs') {
           // Like the brain: Scout's copy of a long result is cut with an ellipsis.
           value = {
             jobs: jobs.map((j) =>
@@ -1625,6 +1646,22 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           JSON.stringify({ jsonrpc: '2.0', method: 'approved', params: { seq: ++seq, ...note } }),
         );
       }
+    },
+    chatSinceCalls,
+    get hellos() {
+      return hellos;
+    },
+    dropWithSavedReply: (text) => {
+      // Saved a moment after the link drops; later than the drop so the desktop counts it as new.
+      savedChat.push({
+        id: String(savedChat.length + 1),
+        role: 'assistant',
+        text,
+        source: 'desktop',
+        at: new Date(Date.now() + 5_000).toISOString(),
+      });
+      resyncNext = true;
+      for (const client of server.clients) client.terminate();
     },
     sendRemark: (text) => {
       const turn = `t${++turns}`;
