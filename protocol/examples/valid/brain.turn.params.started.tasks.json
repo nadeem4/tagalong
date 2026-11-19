@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "method": "turn",
+  "params": {
+    "seq": 2,
+    "turn": "t2",
+    "body": "desktop",
+    "state": "started",
+    "events": ["e5"],
+    "source": "loop:gmail",
+    "tasks": [{ "id": "a1b2c3", "kind": "watch", "title": "Watching Gmail" }]
+  }
+}

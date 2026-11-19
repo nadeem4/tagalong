@@ -836,6 +836,7 @@ async def test_hello_lists_home_tools_as_contract_records(env):
         "stop_job",
         "stt_state",
         "task_stop",
+        "tasks_list",
         "timer_cancel",
         "timers_state",
         "tts_state",

@@ -114,6 +114,7 @@ from brain.store.events import EventRow
 from brain.store.work import TransitionRefused, WorkRow, WorkStore
 from brain.task_tools import task_tools
 from brain.tasks import Tasks, TaskStopHooks
+from brain.tasks_tools import tasks_tools
 from brain.timers import Timers
 from brain.timers_home import timer_home_tools
 from brain.toolbox import SEP, BodySource, BrainSource, Handler, Toolbox, ToolSpec
@@ -373,6 +374,7 @@ class Session:
             + work_tools(self.records.work, self.jobs, timers.changed)
             + timer_tools(self.records, timers, now, lambda: self._turn_cause, self.tasks)
             + task_tools(self.tasks, timers, self.jobs.running_for, lambda: self._turn_cause)
+            + tasks_tools(self.tasks, events)
             + timer_home_tools(self.records.work, timers)
             + output_tools(outputs)
             + question_tools(questions)
@@ -864,13 +866,16 @@ class Session:
     def _started_frame(self, turn_id: str, body_id: str | None, events: list[str]) -> dict:
         """The `started` frame: the events the turn took and the first one's source (a say's is
         the body, news's its source), so a body can tell which of its says it answers."""
-        return {
+        frame = {
             "turn": turn_id,
             "body": body_id,
             "state": "started",
             "events": events,
             "source": self._event_source(events[0] if events else None, body_id),
         }
+        if tasks := self.tasks.named_by(events):
+            frame["tasks"] = tasks
+        return frame
 
     def _event_source(self, event_id: str | None, body_id: str | None) -> str:
         row = self.events.get(event_id) if event_id else None

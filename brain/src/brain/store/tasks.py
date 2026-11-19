@@ -73,6 +73,26 @@ def list_open(db: sqlite3.Connection, exclude_kind: str = "ask") -> list[TaskRow
     return [TaskRow(*r) for r in rows]
 
 
+def list_all(db: sqlite3.Connection, include_ended: bool) -> list[TaskRow]:
+    """Every non-Ask task, newest first; ended ones only when asked."""
+    where = "" if include_ended else " AND state IN ('open','waiting')"
+    rows = db.execute(
+        f"SELECT {_COLS} FROM tasks WHERE kind<>'ask'{where} ORDER BY created_at DESC, rowid DESC"
+    ).fetchall()
+    return [TaskRow(*r) for r in rows]
+
+
+def of_events(db: sqlite3.Connection, event_ids: list[str]) -> list[TaskRow]:
+    """The non-Ask tasks these events belong to, oldest first, each once."""
+    marks = ",".join("?" * len(event_ids))
+    rows = db.execute(
+        f"SELECT {_COLS} FROM tasks WHERE kind<>'ask' AND id IN"
+        f" (SELECT task FROM events WHERE id IN ({marks})) ORDER BY created_at, rowid",
+        event_ids,
+    ).fetchall()
+    return [TaskRow(*r) for r in rows]
+
+
 def open_of_source(db: sqlite3.Connection, kind: str, source: str) -> str | None:
     """The id of the open or waiting task of this kind from this source, if there is one."""
     r = db.execute(
@@ -108,11 +128,13 @@ def laters_to_settle(db: sqlite3.Connection) -> list[str]:
 
 
 def owns_to_settle(db: sqlite3.Connection) -> list[str]:
-    """Open or waiting Owns with nothing waiting on the person and no event: an offer whose card
-    lapsed or never opened. An offer's Own carries no events and ends on its answer."""
+    """Open or waiting Owns that had an item and have none open now and no event: an offer whose
+    card lapsed. An offer's Own ends on its answer; an Own Scout started itself (`task_start`)
+    never had an item and is left alone."""
     rows = db.execute(
         "SELECT t.id FROM tasks t WHERE t.kind='own' AND t.state IN ('open','waiting')"
         " AND NOT EXISTS (SELECT 1 FROM events e WHERE e.task=t.id)"
+        " AND EXISTS (SELECT 1 FROM open_items i WHERE i.task_id=t.id)"
         " AND NOT EXISTS (SELECT 1 FROM open_items i WHERE i.task_id=t.id AND i.state='open')"
         " ORDER BY t.created_at, t.rowid"
     ).fetchall()

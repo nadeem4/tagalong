@@ -120,6 +120,15 @@ class Tasks:
     def open_watch(self, source: str) -> str | None:
         return store.open_of_source(self._db, "watch", source)
 
+    def list_all(self, include_ended: bool = False) -> list[store.TaskRow]:
+        return store.list_all(self._db, include_ended)
+
+    def named_by(self, event_ids: list[str]) -> list[dict]:
+        """What a turn's frame names of its tasks: id, kind and title of each non-Ask task the
+        events belong to. Empty for a say alone."""
+        rows = store.of_events(self._db, event_ids) if event_ids else []
+        return [{"id": r.id, "kind": r.kind, "title": r.title} for r in rows]
+
     def timers_of(self, id: str) -> list[str]:
         return store.timers_of(self._db, id)
 
@@ -222,8 +231,8 @@ class Tasks:
             _log.exception("stopping task %s: %s", task, what)
 
     def settle(self) -> list[str]:
-        """End every Ask whose say is over, every Later with nothing left to run and every Own
-        with no open item and no news."""
+        """End every Ask whose say is over, every Later with nothing left to run and every offer's
+        Own whose card is no longer open."""
         ended = []
         with transaction(self._db):
             at = utc_text(self._now())

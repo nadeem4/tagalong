@@ -789,6 +789,17 @@ Automated: `pnpm --filter @tagalong/ui test` (`tasks-view`, `now-card`, `timers-
 6. **Action:** press the Waiting tab (`waiting-tab.test.tsx`, `e2e/tasks.spec.ts`).
    **Expected:** each piece of news Scout has not told yet shows as its gist and how long it has waited, and the list and count update by themselves when the brain saves or finishes an event; one Scout gave up on carries "Scout could not finish"; with none, "Nothing is waiting to be told."
 
+## Tasks in the turn and the task list (automated only)
+
+`cd brain && uv run pytest tests/test_tasks_tools.py tests/test_protocol.py -q`,
+`tests/test_sessions.py::test_a_wake_turn_names_its_tasks_and_a_say_turn_names_none` and
+`pnpm --filter @tagalong/contract test`. No screen yet: the Tasks page lists them in T3e-2.
+
+1. **Action:** a wake for a task starts a turn; a say starts another.
+   **Expected:** the wake's `started` frame names the task (`id`, `kind`, `title`); the say's has no `tasks`.
+2. **Action:** call Home's `tasks_list`.
+   **Expected:** every non-Ask task with its source and `chain`; ended ones only with `include_ended`.
+
 ## The mail switch and the loops list (fake brain, then real)
 
 Automated: `pnpm --filter @tagalong/ui test` (`loops-panel.test.tsx`), the desktop ipc test

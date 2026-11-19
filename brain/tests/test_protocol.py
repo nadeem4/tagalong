@@ -303,6 +303,23 @@ def test_turn_started_carries_events_and_source():
         turn.model_validate({**started, "events": ["e1"]})
 
 
+def test_started_carries_tasks():
+    turn = BRAIN_TO_BODY["turn"][0]
+    frame = {
+        "seq": 1, "turn": "t", "body": "b", "state": "started", "events": ["e1"],
+        "source": "loop:gmail", "tasks": [{"id": "a1b2c3", "kind": "watch", "title": "Mail"}],
+    }  # fmt: skip
+    assert turn.model_validate(frame).tasks[0].kind == "watch"
+    with pytest.raises(ValidationError):
+        turn.model_validate({**frame, "tasks": [{"id": "a1b2c3"}]})
+
+
+def test_started_without_tasks_still_validates():
+    turn = BRAIN_TO_BODY["turn"][0]
+    frame = {"seq": 1, "turn": "t", "body": "b", "state": "started", "events": ["e1"]}
+    assert turn.model_validate({**frame, "source": "desktop"}).tasks is None
+
+
 def test_turn_joined_carries_events():
     turn = BRAIN_TO_BODY["turn"][0]
     joined = {

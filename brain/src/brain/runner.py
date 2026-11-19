@@ -262,16 +262,16 @@ class Runner:
             return []
         self._taken.setdefault(turn.id, []).extend(r.id for r in rows)
         self.record_take(rows)
-        self._bodies.notify(
-            "turn",
-            {
-                "turn": turn.id,
-                "body": turn.body,
-                "state": "joined",
-                "events": [r.id for r in rows],
-                "source": rows[0].source,
-            },
-        )
+        frame = {
+            "turn": turn.id,
+            "body": turn.body,
+            "state": "joined",
+            "events": [r.id for r in rows],
+            "source": rows[0].source,
+        }
+        if tasks := self._tasks.named_by(frame["events"]):
+            frame["tasks"] = tasks
+        self._bodies.notify("turn", frame)
         return rows
 
     async def _loop(self) -> None:
