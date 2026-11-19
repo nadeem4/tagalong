@@ -16,7 +16,7 @@ import pytest
 from ask_log import approvals_on, list_approvals
 from fake_clock import FakeClock
 from fake_engine import FakeEngine
-from job_rows import add_timer, end_job, tasks_for
+from job_rows import add_timer, end_job, no_hooks, tasks_for
 
 from brain.asks import AskExpired, Asks
 from brain.events import Event, EventLog
@@ -34,7 +34,7 @@ from brain.setup.store import InstalledExpert
 from brain.store import rules
 from brain.store.events import list_state
 from brain.store.work import ActivityEntry, WorkStore
-from brain.tasks import Tasks, TaskStopHooks
+from brain.tasks import Tasks
 from brain.tools import work_tools
 
 AGENT = Path(__file__).parent / "fake_acp_agent.py"
@@ -224,7 +224,7 @@ class Rig:
         self.asks_real = Asks(asks)
         self.tasks = Tasks(self.memory.db, lambda text: text, lambda: self.wall, items=self.items)
         self.holds = Holds(self.asks_real, self.records.work, self.items, self.tasks)
-        self.tasks.hooks = TaskStopHooks(
+        self.tasks.hooks = no_hooks(
             close_cards=self.holds.close, stop_jobs=lambda t: self.jobs.stop_task(t)
         )
         self.jobs = Jobs(

@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
+from job_rows import no_hooks
 
 from brain.masking import Masker
 from brain.protocol import ErrorCode, RpcError
@@ -36,6 +37,7 @@ class FakeTimers:
 def rig(tmp_path):
     db = open_db(tmp_path / "t.db")
     tasks = Tasks(db, Masker(lambda: []).mask, lambda: NOW)
+    tasks.hooks = no_hooks()
     work = WorkStore(db, lambda: NOW)
     timers = FakeTimers()
     running: dict[str, list[str]] = {}

@@ -4,6 +4,7 @@ Pins that ids are short and unique, that saved text is masked, that the first en
 stands, and that the open-tasks block is facts only, newest first, capped.
 """
 
+import dataclasses
 from datetime import UTC, datetime
 
 import pytest
@@ -134,19 +135,24 @@ class Hooks:
     def cancel_turn_if_only(self, ids: set[str]) -> None:
         self.calls.append(("turn", sorted(ids)))
 
+    def finish_events(self, task_id: str) -> None:
+        self.calls.append(("news", task_id))
+
     def wire(self) -> TaskStopHooks:
         return TaskStopHooks(
-            self.stop_jobs, self.cancel_rows, self.close_cards, self.cancel_turn_if_only
+            self.stop_jobs,
+            self.cancel_rows,
+            self.close_cards,
+            self.finish_events,
+            self.cancel_turn_if_only,
         )
 
 
 def stoppable(db, hooks=None):
     posted: list[Event] = []
     items = OpenItems(db, lambda: NOW)
-    tasks = Tasks(
-        db, Masker(lambda: []).mask, lambda: NOW, items=items, post=posted.append,
-        hooks=None if hooks is None else hooks.wire(),
-    )  # fmt: skip
+    tasks = Tasks(db, Masker(lambda: []).mask, lambda: NOW, items=items, post=posted.append)
+    tasks.hooks = (hooks or Hooks()).wire()
     return tasks, items, posted
 
 
@@ -184,19 +190,6 @@ async def test_stop_closes_its_open_cards(db):
     assert ("cards", ["c1"]) in hooks.calls
 
 
-async def test_stop_marks_new_events_handled_stopped(db):
-    tasks, _, _ = stoppable(db, Hooks())
-    task = tasks.open("do", "desktop")
-    other = tasks.open("do", "desktop")
-    event_of(db, "e1", task)
-    event_of(db, "e2", task, "taken")
-    event_of(db, "e3", other)
-    await tasks.stop(task, "desktop")
-    e1, e2, e3 = (store_events.get(db, i) for i in ("e1", "e2", "e3"))
-    assert (e1.state, e1.end_reason) == ("handled", "stopped")
-    assert e2.state == "taken" and e3.state == "new"
-
-
 async def test_stop_cancels_a_turn_holding_only_that_tasks_events(db):
     hooks = Hooks()
     tasks, _, _ = stoppable(db, hooks)
@@ -215,9 +208,19 @@ async def test_stop_twice_is_a_no_op(db):
     assert len(hooks.calls) == calls and len(posted) == 1
 
 
-async def test_stop_without_hooks_still_ends_the_task_and_its_cards(db):
-    tasks, items, posted = stoppable(db)
-    task = tasks.open("do", "desktop")
-    items.open("expert_ask", task_id=task, id="c1")
-    assert await tasks.stop(task, "desktop") == [task]
-    assert items.for_task(task) == [] and [e.kind for e in posted] == ["task_stop"]
+async def test_a_failing_step_does_not_skip_the_rest_or_later_tasks(db, caplog):
+    hooks = Hooks()
+
+    async def broken_jobs(task_id: str) -> None:
+        raise RuntimeError("boom")
+
+    tasks, _, posted = stoppable(db, hooks)
+    tasks.hooks = dataclasses.replace(hooks.wire(), stop_jobs=broken_jobs)
+    parent = tasks.open("do", "desktop")
+    event_of(db, "e1", parent, "handled")
+    child = tasks.open("do", "desktop", caused_by="e1")
+    assert await tasks.stop(parent, "desktop") == [parent, child]
+    assert [c[0] for c in hooks.calls].count("rows") == 2  # both tasks went on past the failure
+    assert [c for c in hooks.calls if c[0] == "news"] == [("news", parent), ("news", child)]
+    assert hooks.calls[-1] == ("turn", sorted([parent, child]))
+    assert [e.kind for e in posted] == ["task_stop"]

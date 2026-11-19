@@ -408,6 +408,7 @@ class Session:
             stop_jobs=self.jobs.stop_task,
             cancel_rows=timers.cancel_task,
             close_cards=self.ask_runner.close_cards,
+            finish_events=lambda task: events.finish_task(task, "stopped"),
             cancel_turn_if_only=self.runner.cancel_if_only,
         )
         self._asks.on_item_answer = self._card_answered

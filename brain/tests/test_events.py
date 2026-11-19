@@ -546,6 +546,21 @@ def test_finish_matching_announces_a_change(log):
     assert seen == [1]
 
 
+def test_finish_task_handles_its_new_news_and_fires_the_hooks(log):
+    ended = []
+    log.post(Event("timer", "timer:1", {}, id="n1", task="k1"), on_end=ended.append)
+    log.post(Event("timer", "timer:2", {}, id="n2", task="k1"))
+    log.post(Event("timer", "timer:3", {}, id="n3", task="k2"))
+    log.take(["n2"], "turn1")  # a turn holds it: left to that turn's end
+    seen = []
+    log.on_change = lambda: seen.append(1)
+    log.finish_task("k1", "stopped")
+    n1, n2, n3 = (log.get(i) for i in ("n1", "n2", "n3"))
+    assert (n1.state, n1.end_reason) == ("handled", "stopped")
+    assert n2.state == "taken" and n3.state == "new"
+    assert seen == [1] and ended == ["handled"]
+
+
 def test_a_duplicate_post_announces_nothing(log):
     log.post(Event("say", "desktop", {"text": "hi"}, id="s1"))
     seen = []
