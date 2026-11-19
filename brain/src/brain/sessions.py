@@ -394,6 +394,7 @@ class Session:
             self.tasks,
             self._turn_task,
             lambda turn: self._turn_cause if turn and turn == self._turn_id else None,
+            self.holds.close,
         )
         self._asks.on_item_answer = self._card_answered
         self._asks.register(

@@ -28,7 +28,7 @@ from brain.permission import (
     StandingRule,
     stored_auto_rules,
 )
-from brain.protocol import RpcError
+from brain.protocol import ErrorCode, RpcError
 from brain.store import rules
 from brain.store.work import WorkStore
 from brain.tasks import Tasks
@@ -101,6 +101,7 @@ class Rig:
             None,
             lambda name: self.stored.__setitem__(name, "auto"),
         )
+        self.holds = Holds(self.asks, self.work, self.items, self.tasks)
         self.runner = AskRunner(
             self.items,
             self.asks,
@@ -111,6 +112,7 @@ class Rig:
             tasks=self.tasks,
             task=lambda turn: "k1" if turn == "t1" else None,
             cause=lambda turn: "evt-ask-turn" if turn == "t1" else None,
+            close_cards=self.holds.close,
         )
         # What the session does for every answer: save the event, handled by code, no turn.
 
@@ -127,7 +129,7 @@ class Rig:
             [self.source],
             lambda: self.stored,
             self.stored.__setitem__,
-            Holds(self.asks, self.work, self.items, self.tasks),
+            self.holds,
             self.engine,
             runner=self.runner,
             tasks=self.tasks,
@@ -426,6 +428,24 @@ async def test_stop_task_closes_the_card_and_posts_task_stop():
     assert (stop.payload, stop.source) == ({"task": "k1", "by": "desktop"}, "desktop")
     assert rig.source.ran == []
     assert [e.kind for e in rig.events] == ["task_stop"]  # no ask_ended: the task is over
+
+
+async def test_stop_task_on_an_ask_card_releases_a_held_expert_card_of_the_task():
+    rig = Rig()
+    await rig.box.run(call())
+    [card] = rig.opened()
+    rig.work.create("goal", "a job", id="j1", state="active", task_id="k1")
+    held = asyncio.ensure_future(
+        rig.holds.ask(kind="question", text="Which?", options=["A"], ask_id="x1", job_id="j1")
+    )
+    await asyncio.sleep(0)
+    assert rig.asks.is_open("x1")
+    rig.asks.answer(card["id"], "stop_task", "desktop")
+    await rig.settle()
+    with pytest.raises(RpcError) as err:
+        await held
+    assert err.value.code == ErrorCode.cancelled
+    assert not rig.asks.is_open("x1")
 
 
 async def test_stop_task_on_a_card_whose_task_already_ended_still_tells_scout():

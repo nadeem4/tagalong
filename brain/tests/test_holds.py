@@ -259,3 +259,54 @@ async def test_stop_the_task_ends_it_and_cancels_every_card_it_holds():
         assert err.value.code == ErrorCode.cancelled
     assert rig.tasks.get("k1").state == "stopped"
     assert rig.asks.open_asks() == []
+
+
+async def test_a_stopped_task_opens_no_new_card():
+    rig = Rig()
+    job = rig.job(task_id=rig.task())
+    rig.tasks.stop("k1", "desktop")
+    with pytest.raises(RpcError) as err:
+        await rig.holds.ask(kind="question", text="Which?", options=["A"], job_id=job)
+    assert err.value.code == ErrorCode.cancelled
+    assert rig.cards() == [] and rig.asks.open_asks() == []
+
+
+async def test_a_toolbox_card_owns_no_part_so_cancelling_p1_leaves_it():
+    rig = Rig()
+    job = rig.job()
+    waiting = asyncio.ensure_future(
+        rig.holds.permission(call(), "desktop__x", False, parent_id=job)
+    )
+    other = rig.ask(job_id=job, part="p1", ask_id="a1")
+    await rig.card(2)
+    rig.holds.cancel_part(job, "p1")
+    with pytest.raises(RpcError):
+        await other
+    assert not waiting.done()
+    waiting.cancel()
+
+
+async def test_close_cancels_a_held_card_and_only_tells_bodies_of_another():
+    rig = Rig()
+    waiting = rig.ask(job_id=rig.job(), ask_id="a1")
+    await rig.card()
+    rig.holds.close(["a1", "gone"])
+    with pytest.raises(RpcError) as err:
+        await waiting
+    assert err.value.code == ErrorCode.cancelled
+    assert rig.asks.open_asks() == []
+    assert {"id": "gone", "state": "closed", "reason": "timeout"} in [p for _, p in rig.bodies.sent]
+
+
+async def test_a_card_scout_granted_closes_as_answered_by_scout():
+    rig = Rig()
+    waiting = rig.ask(job_id=rig.job(task_id=rig.task()), ask_id="a1")
+    await rig.card()
+    rig.items.answer("a1", "allow", "scout")
+    rig.items.finish("a1", "approved")
+    waiting.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await waiting
+    assert rig.last() == {
+        "id": "a1", "state": "closed", "reason": "answered", "option": "allow", "by": "scout",
+    }  # fmt: skip

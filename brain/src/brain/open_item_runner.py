@@ -62,7 +62,10 @@ class AskRunner:
         tasks: Tasks,
         task: Callable[[str], str | None] = lambda turn: None,
         cause: Callable[[str], str | None] = lambda turn: None,
+        close_cards: Callable[[list[str]], None] | None = None,
     ) -> None:
+        # Stop the task closes the task's other cards; `Holds.close` also releases a held expert's.
+        self._close_cards = close_cards or self._close_on_bodies
         self._cause = cause  # turn id -> the event that turn took, None outside it: the ask's cause
         self._task = task  # turn id -> the task the turn works on: the card belongs to it
         self._tasks_of = tasks
@@ -207,8 +210,12 @@ class AskRunner:
             self._end(item, "refused", "the person stopped the task, but it was already over")
         for other in closed:
             self._raw.pop(other, None)
-            self._asks.card_closed(other)
+        self._close_cards(closed)
         self.changed()
+
+    def _close_on_bodies(self, ids: list[str]) -> None:
+        for one in ids:
+            self._asks.card_closed(one)
 
     async def _carry_out(self, item: OpenItem, option: str) -> None:
         call = _call(item)

@@ -32,7 +32,7 @@ class Reply(NamedTuple):
 @dataclass
 class _Held:
     job_id: str | None
-    part: str
+    part: str | None
     future: asyncio.Future[Reply]
 
 
@@ -71,6 +71,7 @@ class Holds:
             confirm=True,
             ask_id=ask_id,
             job_id=parent_id,
+            part=None,  # the toolbox's card belongs to no part, so no part's end cancels it
         )
         return reply.option
 
@@ -86,12 +87,17 @@ class Holds:
         confirm: bool = False,
         ask_id: str | None = None,
         job_id: str | None = None,
-        part: str = "p1",
+        part: str | None = "p1",
     ) -> Reply:
         """Show the card and wait for its answer, however long it takes. Raises RpcError
         (cancelled) when the part or task ends, AskExpired when the job's row ends."""
         ask_id = ask_id or uuid.uuid4().hex
         goal = None if job_id is None else self._work.get(job_id)
+        if goal and goal.task_id and self._tasks:
+            row = self._tasks.get(goal.task_id)
+            if row is not None and row.state not in ("open", "waiting"):
+                # Stop the task does not kill the job yet (T2d): it may not open a new card.
+                raise RpcError(ErrorCode.cancelled, "the task has ended")
         item = self._items.open(
             "expert_ask",
             task_id=goal.task_id if goal else None,
@@ -121,8 +127,11 @@ class Holds:
             return await held.future
         except BaseException as err:
             self._held.pop(ask_id, None)
+            item = self._items.get(ask_id)
             if isinstance(err, AskExpired):
                 self.asks.expire(ask_id, err.reason)
+            elif item is not None and item.state == "done" and item.reason == "approved":
+                self.asks.close_answered(ask_id, "scout")  # Scout's side-check said yes first
             else:
                 self.asks.cancel(ask_id)
             self._end_row(ask_id, "expired", "ask cancelled")
@@ -135,6 +144,15 @@ class Holds:
         for ask_id, held in list(self._held.items()):
             if (held.job_id, held.part) == (job_id, part):
                 self._cancel(ask_id)
+
+    def close(self, ask_ids: list[str]) -> None:
+        """Cards ended from outside (Stop the task on another card): a held one is cancelled and
+        its expert told; any other is only closed on the bodies."""
+        for ask_id in ask_ids:
+            if ask_id in self._held:
+                self._cancel(ask_id)
+            else:
+                self.asks.card_closed(ask_id)
 
     def _cancel(self, ask_id: str) -> None:
         held = self._held.pop(ask_id, None)
@@ -169,11 +187,7 @@ class Holds:
         """The person ended the task from this card: the task ends and every card it held goes."""
         item = self._items.get(ask_id)
         closed = self._tasks.stop(item.task_id, body_id) if item and item.task_id else []
-        for other in dict.fromkeys([ask_id, *closed]):
-            if other in self._held:
-                self._cancel(other)
-            else:
-                self.asks.card_closed(other)
+        self.close(list(dict.fromkeys([ask_id, *closed])))
 
     def _row_ended(self, work_id: str, kind: str, to: str) -> None:
         """The row ended from outside (its job closed, or a restart scan): the wait is done."""
