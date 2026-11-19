@@ -230,10 +230,10 @@ class Session:
         self.events = events
         # Long tool results and expert reports reach the model as a capped preview; the full text
         # is stored masked for read_output. At startup finished work goes first (with the reports
-        # it points at), then handled events as old, then the oldest outputs nothing points at.
+        # it points at), then the oldest outputs nothing points at. Handled events and ended
+        # tasks are swept after the Asks settle below.
         outputs = OutputStore(memory, self.guards, preview_chars)
         work.sweep(work_keep_days)
-        events.sweep(work_keep_days)
         outputs.prune(outputs_keep)
         notify = bodies.notify
         # main passes the installed experts and the quiet threshold; the defaults keep tests short.
@@ -320,6 +320,9 @@ class Session:
             events.recover()
             self.tasks.settle()
             self._tell_settled(self.jobs.startup())
+        # Only now: a handled say swept first would leave its Ask open for good.
+        events.sweep(work_keep_days)
+        self.tasks.sweep(work_keep_days)
         timers = self.timers = Timers(
             self.records.work,
             self.post_event,

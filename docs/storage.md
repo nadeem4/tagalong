@@ -710,7 +710,9 @@ columns and drops `work.source_message_id` (never written).
   `EventLog.recover()`, so a crash cannot leave one open.
 - Read by: `Tasks.open_block()`, the open-tasks block in Scout's system prompt (newest first, at
   most 15 lines then `and N more`, Asks left out, titles made safe for the data fence).
-- Index: `tasks_open(state, created_at)`.
+- Retention: `Tasks.sweep(TAGALONG_WORK_KEEP_DAYS)` deletes ended tasks older than the setting at
+  start, after `settle()` and next to the event sweep; open and waiting tasks stay.
+- Indexes: `tasks_open(state, created_at)`; `events_task(task)` on `events`, for the settle queries.
 
 ## Open items
 
@@ -802,7 +804,8 @@ A long tool result stored whole, so Scout can read the rest of a capped preview 
 
 ## Cleanup
 
-At brain start, `Session` runs three things, in this order:
+At brain start, `Session` runs these, in this order (3 and 4 run after `Tasks.settle()` ends the
+Asks whose say is over, so a handled say is never swept before its Ask ends):
 
 1. `WorkStore.sweep(TAGALONG_WORK_KEEP_DAYS)` (default 30). A tree is removed when its root
    is `done`, `failed`, `cancelled` or `expired`, its `ended_at` is older than the setting, and
@@ -810,9 +813,10 @@ At brain start, `Session` runs three things, in this order:
    goal with a running child is never swept. Per root, in one transaction, it deletes the `work`
    rows, their `work_events`, the job's `job_steps`, the `work_job`, `work_timer`, `work_loop` and
    `work_ask` rows, and the `tool_outputs` rows named by `detail_id`. A crash leaves whole trees.
-2. `EventLog.sweep(TAGALONG_WORK_KEEP_DAYS)`: deletes `handled` events older than the setting.
+2. `prune_outputs(TAGALONG_OUTPUTS_KEEP)` (default 200), for outputs no work row names.
+3. `EventLog.sweep(TAGALONG_WORK_KEEP_DAYS)`: deletes `handled` events older than the setting.
    Events still owed or shown (`new`, `taken`, `gave_up`) are never swept.
-3. `prune_outputs(TAGALONG_OUTPUTS_KEEP)` (default 200), for outputs no work row names.
+4. `Tasks.sweep(TAGALONG_WORK_KEEP_DAYS)`: deletes ended tasks older than the setting.
 
 Chat, memories, rules, apps and cursors are not swept.
 

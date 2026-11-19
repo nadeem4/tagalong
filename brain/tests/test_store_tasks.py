@@ -93,3 +93,15 @@ def test_last_event_at(db):
     assert tasks.last_event_at(db, "t1") is None
     events.insert(db, event("e1", "t1", "handled"))
     assert tasks.last_event_at(db, "t1") == T
+
+
+def test_sweep_removes_old_ended_tasks_only(db):
+    tasks.insert(db, task("old_done"))
+    tasks.set_state(db, "old_done", "done", at=T)
+    tasks.insert(db, task("old_open"))
+    tasks.insert(db, task("new_done"))
+    tasks.set_state(db, "new_done", "done", at=LATER)
+    assert tasks.sweep(db, "2026-01-01T10:03:00+00:00") == 1
+    assert tasks.get(db, "old_done") is None
+    assert tasks.get(db, "old_open") is not None
+    assert tasks.get(db, "new_done") is not None

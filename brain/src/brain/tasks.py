@@ -8,7 +8,7 @@ crash cannot leave one open. `open_block` is the facts line Scout reads about wh
 import secrets
 import sqlite3
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from brain.store import tasks as store
 from brain.store.db import transaction, utc_text
@@ -100,6 +100,12 @@ class Tasks:
                 if store.set_state(self._db, id, "done", at=at):
                     ended.append(id)
         return ended
+
+    def sweep(self, keep_days: int) -> int:
+        """Delete ended tasks older than `keep_days`, so the table does not grow forever."""
+        before = utc_text(self._now() - timedelta(days=keep_days))
+        with transaction(self._db):
+            return store.sweep(self._db, before)
 
     def open_block(self, limit: int = 15) -> str:
         """One header and a line per open task, newest first; empty when none. Facts only."""

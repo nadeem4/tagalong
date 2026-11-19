@@ -2550,9 +2550,10 @@ split skip it, so that event is told in full again. See
   failed attempt (the fourth time gives it up, which ends a crash loop) and comes back `new`
   with `end_reason` `restart` and no wait; it is marked `resume` only when its request was saved,
   so one that died before the save comes back in full. Events an interjection held go back to `new`
-  with no attempt counted. Orphan `card_answer` rows are handled. Next to the work sweep,
-  `EventLog.sweep(keep_days)` deletes handled events older than `TAGALONG_WORK_KEEP_DAYS`; events
-  that are not handled are kept.
+  with no attempt counted. Orphan `card_answer` rows are handled. After the Asks settle
+  (`Tasks.settle()`, so a handled say is never swept before its Ask ends), `EventLog.sweep(keep_days)`
+  deletes handled events older than `TAGALONG_WORK_KEEP_DAYS`; events that are not handled are kept.
+  `Tasks.sweep(keep_days)` then deletes ended tasks older than the same setting.
 - **Shutdown.** `session.stop_turn()` runs first in `main.py`'s `finally`. It stops the runner
   (the turn's events go back to `new`, no attempt), cancels the running turn and waits up to 5 s
   for it, so its end saves its steps. Its events are then marked `resume` (reason `stop`), so

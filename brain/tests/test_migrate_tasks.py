@@ -19,3 +19,4 @@ def test_0038_adds_tasks_and_task_columns_and_drops_source_message_id(tmp_path):
     assert "task" in [r[1] for r in db.execute("PRAGMA table_info(events)")]
     assert db.execute("SELECT count(*) FROM tasks").fetchone() == (0,)
     assert "tasks_open" in [r[1] for r in db.execute("PRAGMA index_list(tasks)")]
+    assert "events_task" in [r[1] for r in db.execute("PRAGMA index_list(events)")]

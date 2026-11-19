@@ -25,5 +25,6 @@ def migrate(db) -> None:
     )
     db.execute("CREATE INDEX tasks_open ON tasks(state, created_at)")
     db.execute("ALTER TABLE events ADD COLUMN task TEXT NULL")
+    db.execute("CREATE INDEX events_task ON events(task)")
     db.execute("ALTER TABLE work ADD COLUMN task_id TEXT NULL")
     db.execute("ALTER TABLE work DROP COLUMN source_message_id")

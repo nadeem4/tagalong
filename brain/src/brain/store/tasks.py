@@ -99,3 +99,11 @@ def laters_to_settle(db: sqlite3.Connection) -> list[str]:
 
 def last_event_at(db: sqlite3.Connection, task_id: str) -> str | None:
     return db.execute("SELECT MAX(at) FROM events WHERE task=?", (task_id,)).fetchone()[0]
+
+
+def sweep(db: sqlite3.Connection, before: str) -> int:
+    """Delete ended tasks that ended before `before`; open and waiting ones stay."""
+    return db.execute(
+        "DELETE FROM tasks WHERE state IN ('done','failed','stopped','declined') AND ended_at<?",
+        (before,),
+    ).rowcount
