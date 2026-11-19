@@ -222,7 +222,6 @@ class Rig:
             now=lambda: self.wall,
             on_timers_changed=lambda: setattr(self, "timers_changed", self.timers_changed + 1),
             apps=apps,
-            task_source=tasks_for(self.memory).source_of,
             person_task=tasks_for(self.memory).is_person,
             items=self.items,
             **({} if before_start is None else {"before_start": before_start}),
@@ -3000,4 +2999,4 @@ async def test_an_expert_ask_nobody_answers_expires_with_no_answer(make_rig):
     item_id = rig.asks.opened[1]["ask_id"]
     await until(lambda: rig.items.get(item_id).state == "expired")
     assert rig.items.get(item_id).reason == "no_answer"
-    assert rig.items.get(item_id).origin_body == "brain"  # no task: no body to show it
+    assert rig.items.get(item_id).task_id is None  # a job with no task: a card of no task

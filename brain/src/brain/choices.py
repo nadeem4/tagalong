@@ -42,7 +42,7 @@ class Choices:
         if not self._asks.anyone_online():
             raise MemoryRefused("nobody is online to ask.")
         # Tied to this process: the waiting task dies with it, so the item expires at start.
-        ask_id = self._items.open("choice", "brain", live_only=True, ttl_s=self._timeout).id
+        ask_id = self._items.open("choice", live_only=True, ttl_s=self._timeout).id
         task = asyncio.get_running_loop().create_task(
             self._wait(ask_id, text, options, recommended, free_text)
         )

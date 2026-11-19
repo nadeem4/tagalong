@@ -26,7 +26,7 @@ from brain.guards import Guards
 from brain.job_activity import PAGE_LIMIT, JobActivity, _clip, activity_line, activity_summary
 from brain.job_records import Job, JobPart, JobRecords, home_state
 from brain.masking import mask_json
-from brain.open_items import BRAIN, OpenItemRefused, OpenItems
+from brain.open_items import OpenItemRefused, OpenItems
 from brain.outputs import OutputStore, preview
 from brain.permission import (
     AskRequest,
@@ -117,7 +117,6 @@ class Jobs:
         engine: Engine | None = None,
         guards: Guards | None = None,
         on_away: Callable[[str, str], None] = lambda job_id, what: None,
-        task_source: Callable[[str | None], str | None] = lambda task: None,
         person_task: Callable[[str | None], bool] = lambda task: False,
         setup_facts: Callable[[], Awaitable[dict]] | None = None,
         emit: Callable[[Event], None] = lambda event: None,
@@ -131,7 +130,6 @@ class Jobs:
         steps_max_entries: int = DEFAULT_JOB_STEPS_MAX_ENTRIES,
         steps_max_bytes: int = DEFAULT_JOB_STEPS_MAX_BYTES,
     ) -> None:
-        self._task_source = task_source  # task id -> where it came from (a body, or not)
         self._person_task = person_task  # task id -> whether a person's say or answer began it
         self._items = items  # an expert's permission ask is a live-only item; None: none kept
         self._steps_max_entries = steps_max_entries  # caps of one job's step log (settings)
@@ -903,12 +901,6 @@ class Jobs:
         goal = self._records.work.get(job_id) if job_id else None
         return ((goal and goal.input) or {}).get("caused_by")
 
-    def _item_body(self, job_id: str | None) -> str:
-        """The body its task came from, or the brain: where an expert's ask is shown (T2c drops
-        the column this fills)."""
-        task = self.task_of(job_id)
-        return (self._task_source(task) or BRAIN) if self._person_task(task) else BRAIN
-
     def _changed(self) -> None:
         self._notify("changed", {"what": "jobs"})
 
@@ -961,7 +953,12 @@ class Jobs:
             if self._items is None:
                 return await person()
             self._items.open(
-                "expert_ask", self._item_body(job_id), live_only=True, job_id=job_id, id=ask_id
+                "expert_ask",
+                task_id=self.task_of(job_id),
+                caused_by=self.caused_by(job_id),
+                live_only=True,
+                job_id=job_id,
+                id=ask_id,
             )
             try:
                 answer = await person()

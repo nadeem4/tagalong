@@ -123,7 +123,6 @@ class Offers:
             return
         item = self._items.open(
             "offer",
-            "brain",
             saved_call={
                 "group": group_key,
                 "source": source,

@@ -261,10 +261,10 @@ async def test_home_loop_done_and_later_unknown_id_are_invalid_params(rig):
 
 async def test_loops_state_has_no_held_open_items_and_loops_can_still_be_held(rig):
     saved = {"name": "delete_files", "input": {}, "text": "I'll delete 3 old logs."}
-    rig.items.open("ask", "desktop", saved_call=saved)
-    rig.items.open("choice", "desktop", live_only=True)
-    rig.items.open("expert_ask", "desktop", live_only=True)
-    rig.items.open("offer", "brain", saved_call={"sentence": "Always allow reading files?"})
+    rig.items.open("ask", saved_call=saved)
+    rig.items.open("choice", live_only=True)
+    rig.items.open("expert_ask", live_only=True)
+    rig.items.open("offer", saved_call={"sentence": "Always allow reading files?"})
     rows = (await rig.call("loops_state"))["open_items"]
     assert [(r["kind"], r["title"], r["age_s"]) for r in rows] == [
         ("Permission", "I'll delete 3 old logs.", 7200),
@@ -274,7 +274,7 @@ async def test_loops_state_has_no_held_open_items_and_loops_can_still_be_held(ri
     ]
     assert all(r["id"] for r in rows)
     with pytest.raises(sqlite3.IntegrityError):
-        rig.items.open("held", "brain")
+        rig.items.open("held")
     lp = rig.add()
     state = await rig.call("loops_state")
     assert [(x["id"], x["status"]) for x in state["loops"]] == [(lp.id, "held")]

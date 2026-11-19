@@ -264,7 +264,7 @@ async def test_interrupt_keeps_partial_and_unsaid():
 
 async def test_interrupt_does_not_close_open_items():
     session, sent, voice = make_voiced(SnapGate([asyncio.Event(), "ok"]))
-    item = session.items.open("expert_ask", "desktop", live_only=True, job_id="j1")
+    item = session.items.open("expert_ask", live_only=True, job_id="j1")
     first = await said(session, sent, "desktop", say("tell me"))
     voice.logs[first.turn] = ["One.", "Two."]
     await settle()

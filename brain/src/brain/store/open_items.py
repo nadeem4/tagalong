@@ -9,8 +9,8 @@ import sqlite3
 from dataclasses import dataclass
 
 _COLUMNS = (
-    "id, kind, origin_body, state, saved_call_json, live_only, job_id, created_at, deadline_at,"
-    " closed_at, closed_by, answer, reason"
+    "id, kind, state, task_id, caused_by, saved_call_json, live_only, job_id, created_at,"
+    " deadline_at, check_back_at, check_back_by, urgent, closed_at, closed_by, answer, reason"
 )
 
 
@@ -18,13 +18,17 @@ _COLUMNS = (
 class StoredItem:
     id: str
     kind: str
-    origin_body: str
     state: str
+    task_id: str | None
+    caused_by: str | None
     saved_call: dict | None
     live_only: bool
     job_id: str | None
     created_at: str
     deadline_at: str
+    check_back_at: str | None
+    check_back_by: str | None
+    urgent: bool
     closed_at: str | None
     closed_by: str | None
     answer: str | None
@@ -33,7 +37,7 @@ class StoredItem:
 
 def _item(r: tuple) -> StoredItem:
     return StoredItem(
-        r[0], r[1], r[2], r[3], json.loads(r[4]) if r[4] else None, bool(r[5]), *r[6:]
+        *r[:5], json.loads(r[5]) if r[5] else None, bool(r[6]), *r[7:12], bool(r[12]), *r[13:]
     )
 
 
@@ -42,25 +46,34 @@ def insert(
     id: str,
     *,
     kind: str,
-    origin_body: str,
+    task_id: str | None = None,
+    caused_by: str | None = None,
     saved_call: dict | None,
     live_only: bool,
     job_id: str | None,
     created_at: str,
     deadline_at: str,
+    check_back_at: str | None = None,
+    check_back_by: str | None = None,
+    urgent: bool = False,
 ) -> None:
     db.execute(
-        "INSERT INTO open_items(id, kind, origin_body, saved_call_json, live_only, job_id,"
-        " created_at, deadline_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO open_items(id, kind, task_id, caused_by, saved_call_json, live_only, job_id,"
+        " created_at, deadline_at, check_back_at, check_back_by, urgent)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             id,
             kind,
-            origin_body,
+            task_id,
+            caused_by,
             None if saved_call is None else json.dumps(saved_call),
             int(live_only),
             job_id,
             created_at,
             deadline_at,
+            check_back_at,
+            check_back_by,
+            int(urgent),
         ),
     )
 
@@ -90,20 +103,38 @@ def close(
     return cur.rowcount == 1
 
 
+def set_check_back(
+    db: sqlite3.Connection,
+    id: str,
+    at: str | None,
+    by: str | None,
+    deadline_at: str | None = None,
+) -> None:
+    """Set when to look at an open item again and who set it; the deadline moves only when given."""
+    db.execute(
+        "UPDATE open_items SET check_back_at=?, check_back_by=?,"
+        " deadline_at=COALESCE(?, deadline_at) WHERE id=? AND state='open'",
+        (at, by, deadline_at, id),
+    )
+
+
 def _select(db: sqlite3.Connection, where: str, args: tuple = ()) -> list[StoredItem]:
     sql = f"SELECT {_COLUMNS} FROM open_items WHERE {where} ORDER BY created_at, rowid"
     return [_item(r) for r in db.execute(sql, args)]
 
 
-def list_open(
-    db: sqlite3.Connection, origin_body: str | None = None, kind: str | None = None
-) -> list[StoredItem]:
-    where, args = "state='open'", ()
-    if origin_body is not None:
-        where, args = where + " AND origin_body=?", (*args, origin_body)
-    if kind is not None:
-        where, args = where + " AND kind=?", (*args, kind)
-    return _select(db, where, args)
+def list_open(db: sqlite3.Connection, kind: str | None = None) -> list[StoredItem]:
+    if kind is None:
+        return _select(db, "state='open'")
+    return _select(db, "state='open' AND kind=?", (kind,))
+
+
+def for_task(db: sqlite3.Connection, task_id: str) -> list[StoredItem]:
+    return _select(db, "state='open' AND task_id=?", (task_id,))
+
+
+def due_checks(db: sqlite3.Connection, now: str) -> list[StoredItem]:
+    return _select(db, "state='open' AND check_back_at IS NOT NULL AND check_back_at<=?", (now,))
 
 
 def due(db: sqlite3.Connection, now: str, kind: str | None = None) -> list[StoredItem]:
