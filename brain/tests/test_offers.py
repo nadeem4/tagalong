@@ -75,6 +75,7 @@ class FakeAsks:
         self.opened = []
         self.handlers = {}
         self.up = set()
+        self.expired = []
 
     def anyone_online(self):
         return self.online
@@ -84,6 +85,10 @@ class FakeAsks:
 
     def is_open(self, ask_id):
         return ask_id in self.up
+
+    def expire(self, ask_id, reason):
+        self.up.discard(ask_id)
+        self.expired.append((ask_id, reason))
 
     def card(self, ask_id, *, kind, **kw):
         self.opened.append({"kind": kind, **kw})
@@ -413,3 +418,24 @@ async def test_an_offer_answer_is_handled_by_event(mem, monkeypatch):
     assert [o for _, o in rules.offers_for(mem.db, GROUP)] == ["yes"]
     assert any(not p.builtin for p in rules.list_preferences(mem.db))
     assert rig.items.list_open() == []
+
+
+async def test_an_answer_to_an_offer_already_closed_is_a_no_answer(mem):
+    rig = Rig(mem, asks=FakeAsks(hang=True))
+    rig.approve(n=3)
+    await rig.consider()
+    [item] = rig.items.list_open(kind="offer")
+    rig.items.expire(item.id, "gone")  # it ended before the tap arrived
+    rig.offers.answered(item.id, YES, "desktop", None, None)
+    assert [o for _, o in rules.offers_for(mem.db, GROUP)] == ["no_answer"]
+    assert not any(not p.builtin for p in rules.list_preferences(mem.db))
+
+
+async def test_resume_closes_the_card_of_an_offer_past_its_deadline(mem):
+    rig = Rig(mem, asks=FakeAsks(hang=True))
+    rig.approve(n=3)
+    await rig.consider()
+    [item] = rig.items.list_open(kind="offer")
+    rig.clock = NOW + timedelta(days=2)
+    rig.offers.resume()
+    assert rig.asks.expired == [(item.id, "timeout")]

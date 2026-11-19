@@ -10,6 +10,7 @@ import datetime
 import json
 from types import SimpleNamespace
 
+import pytest
 from event_log import make_session
 from test_sessions import Gate, Open, join, say, settle
 
@@ -17,6 +18,7 @@ from brain.bodies import Bodies
 from brain.events import Event, EventKind
 from brain.memory import Memory
 from brain.mind.turn import Final
+from brain.protocol import ErrorCode, RpcError
 from brain.toolbox import ToolSpec
 
 KINDS = {  # the real urgency; uncapped and unbatched so the test needs no clock
@@ -123,3 +125,24 @@ async def test_after_a_restart_nothing_resumes():
     assert len(session.history) == 2  # rebuilt through mind/resume.py, as saved text only
     assert session._task is None and model.seen == [] and installs == []
     assert session.open_asks() == []  # the Connect question died with the old process
+
+
+async def test_a_choose_card_answer_is_saved_once_and_a_second_tap_saves_nothing():
+    session, _, _ = rig([use("choose", question="Pick?", options=["a", "b"]), "Asked.", "Ok."])
+    join(session, "desktop")
+    await session.say("desktop", say(REQUEST))
+    await idle(session)
+    (ask,) = [a for a in session.open_asks() if a.get("tool") == "choose"]
+
+    def saved(kind):
+        rows = session._memory.db.execute("SELECT state FROM events WHERE kind=?", (kind,))
+        return [r[0] for r in rows.fetchall()]
+
+    session.answer(ask["id"], "a", "desktop")
+    await idle(session)
+    assert saved("card_answer") == ["handled"] and len(saved("choice")) == 1
+    with pytest.raises(RpcError) as err:
+        session.answer(ask["id"], "a", "desktop")
+    assert err.value.code == ErrorCode.not_found
+    await idle(session)
+    assert len(saved("card_answer")) == 1 and len(saved("choice")) == 1

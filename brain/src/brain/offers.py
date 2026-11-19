@@ -139,7 +139,8 @@ class Offers:
     def resume(self) -> None:
         """Show again the offers the last run left unanswered. Called when a body connects, since
         at start nobody is there to see a card; with nobody online the items just stay open."""
-        self._items.expire_due(self._now(), "offer")
+        for item in self._items.expire_due(self._now(), "offer"):
+            self._asks.expire(item.id, "timeout")  # the card of a lapsed offer leaves the screen
         if not self._asks.anyone_online():
             return
         for item in self._items.list_open(kind="offer"):
@@ -206,7 +207,12 @@ class Offers:
     ) -> None:
         """The person answered the card: the preference is saved only on an explicit yes."""
         item = self._items.get(ask_id)
-        if item is None or item.state != "open":
+        if item is None:
+            return
+        if item.state != "open":  # it ended first: the tap still counts as a look with no answer
+            rules.add_offer(
+                self._memory.db, item.saved_call["group"], utc_text(self._now()), "no_answer"
+            )
             return
         call = item.saved_call
         group_key = call["group"]

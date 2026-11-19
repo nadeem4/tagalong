@@ -2,7 +2,9 @@
 
 `permission` is the confirm ask of a job's tool call (it waits); `open` is for work with no turn
 (expert jobs): custom options, optional typed answer, no default timeout. `show` is Scout's own
-permission card: it has no waiter, because the open item behind it takes the answer. A waiting
+permission card: it has no waiter, because the open item behind it takes the answer. `card` is
+the same for any other kind (choice, offer): a handler registered per kind with `register` takes
+its answer, and `on_item_answer` tells the session, which saves the `card_answer`. A waiting
 future lives in memory; the `ask` work row beside it is the record, so a restart leaves an expired
 row instead of nothing. A row ends with its ask (answered, timed out, cancelled) or with its
 parent job. The first answer wins; later ones are not_found. Timeout and cancel close the ask
@@ -44,7 +46,7 @@ class _Open:
 
 
 Handler = Callable[[str, str, str, str | None, str | None], None]
-ASK_TIMEOUT_S = 300.0  # how long a turn-bound card (choices, offers, setup) waits
+ASK_TIMEOUT_S = 300.0  # how long Home's setup asks wait
 
 
 def _nobody(*_: object) -> None:
