@@ -112,3 +112,14 @@ test('Now shows a waiting ask, a running job and a timer; the tabs count and Can
   await expect.poll(() => brain.timerCancels, { timeout: 15_000 }).toEqual(['t2']);
   await expect(home.getByRole('tab', { name: 'Timers (1)' })).toBeVisible({ timeout: 15_000 });
 });
+
+test('a queued job shows its place in line and Stop ends its task', async () => {
+  const home = await windowFor('home');
+  brain.queueJob({ id: 'jq', task: 'Tidy the docs', place: 2, taskId: 'kq' });
+  await home.getByRole('tab', { name: /^Jobs/ }).click();
+  const row = home.getByRole('listitem').filter({ hasText: 'Tidy the docs' });
+  await expect(row).toContainText('Waiting', { timeout: 15_000 });
+  await expect(row).toContainText('2nd in line');
+  await row.getByRole('button', { name: 'Stop Tidy the docs' }).click();
+  await expect.poll(() => brain.taskStops, { timeout: 15_000 }).toContain('kq');
+});

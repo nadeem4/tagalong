@@ -106,6 +106,13 @@ describe('registerJobsIpc', () => {
     expect(calls).toEqual([['list_jobs', {}]]);
   });
 
+  it('keeps the place and task of a queued job', async () => {
+    const queued = { ...BRAIN_ROW, state: 'queued', parts: [], place: 2, task_id: 'k2' };
+    const { invoke } = setup(() => text({ jobs: [queued] }));
+    const [row] = (await invoke(IPC.listJobs)) as { place?: number; taskId?: string }[];
+    expect([row?.place, row?.taskId]).toEqual([2, 'k2']);
+  });
+
   it('maps every part of a job, oldest first', async () => {
     const second = { ...BRAIN_ROW.parts[0], id: 'p2', expert: 'gemini', state: 'done' };
     const { invoke } = setup(() =>

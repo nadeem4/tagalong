@@ -321,6 +321,8 @@ class FakeJobs:
         self.fresh = None
         self.error = None
         self.rows = []
+        self.queued = []
+        self.task_ids: dict[str, str] = {}
         self.activity_jobs = set()
         self.steps = []
         self.experts = []
@@ -366,6 +368,12 @@ class FakeJobs:
         self.calls.append(("close", job_id) + (() if outcome == "done" else (outcome,)))
         if self.error:
             raise self.error
+
+    def queue(self):
+        return self.queued
+
+    def task_of(self, job_id):
+        return self.task_ids.get(job_id)
 
     def requeue(self, job_id):
         self.calls.append(("requeue", job_id))
@@ -797,6 +805,21 @@ async def test_list_jobs_is_json_with_the_row_fields(home, mem, records):
     )
     # The expert, its progress and result moved into the parts; nothing is duplicated up here.
     assert not {"expert", "progress", "result", "reason", "session_id"} & set(out["jobs"][0])
+
+
+async def test_list_jobs_shows_queued_goals_with_their_place(home, records):
+    records.add_job("run", "claude-acp", "t", "C:/x", "default")
+    at = datetime.datetime(2026, 10, 27, tzinfo=datetime.UTC)
+    for n in (1, 2):
+        records.plan_job(f"q{n}", "claude-acp", f"wait {n}", "C:/x", "", None, None, at)
+    home.jobs.rows = records.list_jobs(20)
+    home.jobs.queued = records.queue()
+    home.jobs.task_ids = {"q1": "k1"}
+    rows = {j["id"]: j for j in json.loads(await home.run("list_jobs"))["jobs"]}
+    assert (rows["q1"]["state"], rows["q1"]["place"]) == ("queued", 1)
+    assert (rows["q2"]["state"], rows["q2"]["place"]) == ("queued", 2)
+    assert rows["q1"]["task"] == "wait 1" and rows["q1"]["task_id"] == "k1"  # Stop needs it
+    assert "place" not in rows["run"] and rows["run"]["state"] == "running"
 
 
 async def test_home_list_jobs_shape_unchanged(home, records):
