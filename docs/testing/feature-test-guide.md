@@ -3104,3 +3104,8 @@ Automated: `cd brain && uv run pytest tests/test_events.py tests/test_runner.py 
 5. **Crash loop.** Kill the brain during the same say four starts in a row. **Expected:** the start after the fourth kill gives the say up (`gave_up`, reason `restart`) and runs nothing.
 6. **Old events are swept.** Set `TAGALONG_WORK_KEEP_DAYS=1`, make an event `handled` more than a day ago (edit `handled_at` in `tagalong.db`), and restart. **Expected:** that row is gone; `new`, `taken` and `gave_up` rows stay.
 7. **Timers.** Let a one-off timer fire and be told, then ask Scout to cancel it. **Expected:** Scout says it already fired.
+
+## Catch up after a resync (automated on the fake brain; by hand with the real brain)
+
+1. **Automated.** `pnpm --filter @tagalong/desktop test:e2e e2e/catch-up.spec.ts` drops the link, saves a reply on the fake brain and answers `resync: true`. **Expected:** the bubble shows the reply once and `chat_since` was called once with no `after_id`.
+2. **By hand.** With the real brain and the desktop open, put the PC to sleep or disconnect the network, let a long reply finish on WhatsApp (or ask something long and disconnect mid-reply), then reconnect. **Expected:** after the reconnect the reply appears in the bubble once; a second reconnect does not show it again.

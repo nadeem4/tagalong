@@ -170,6 +170,7 @@ The saved chat, so a restart picks the conversation back up.
   `event_ids` and `sources` and returns the new row ids), `set_cut(ids)` and `replace_last_message`
   (through `Memory`, called from `sessions.py`, which saves after every step of a turn).
 - Read by: `store/conversation.py` `load_messages` (skips `cut` rows; via `mind/resume.py` `rebuild_history`, which also says whether it added a cancelled tool_result) and `search`.
+- Also read by: `store/conversation.py` `since(db, after_id, limit)`, the rows with words after an id (or the last few), oldest first, for Home's `chat_since` tool.
 - Retention: kept forever.
 - Upgrade: migration `0026_message_body` adds `body`; every old row reads `desktop`.
 - Upgrade: migration `0027_message_cut` adds `cut` (0 or 1): a request cancelled before any
