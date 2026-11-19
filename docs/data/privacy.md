@@ -4,8 +4,37 @@ What Tagalong reads, when, and what it never reads. The short version is in the 
 How each part is built is in the subsystem docs: [sight.md](../senses/sight.md) (captures, exclusions),
 [hearing.md](../senses/hearing.md) and [speaking.md](../senses/speaking.md) (microphone and speech),
 [memory.md](memory.md), [brain.md](../brain/README.md) (the Python brain's prompts, asks and
-experts), [connected-apps.md](../bodies/connected-apps.md), [browser-body.md](../bodies/browser.md) and
+experts), [connected-apps.md](../bodies/connected-apps.md), [browser.md](../bodies/browser.md) and
 [settings-and-secrets.md](settings-and-secrets.md).
+
+## What leaves your machine
+
+One picture first. The brain runs on your computer; each arrow out of it is a service it contacts,
+and each is described in the section named beside it.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
+flowchart LR
+  subgraph here["Your computer"]
+    brain["Python brain"]
+    local["Stays here: audio (heard on the CPU),<br/>memory, tagalong.db, screenshots (never saved)"]
+  end
+  brain -->|"each turn: your words, screen text you asked about,<br/>memory notes, Now line; web search and fetch"| anth["Anthropic API"]
+  brain -->|"hand-offs, on your own login"| exp["Expert CLIs<br/>(Claude Code and others)"]
+  brain -->|"tool calls you allowed"| mcp["Connected apps (MCP)"]
+  brain -->|"public lists, your search words"| reg["Registries: cdn.agentclientprotocol.com,<br/>registry.modelcontextprotocol.io"]
+  brain -->|"model files only, no text or audio"| dl["Hugging Face, files.pythonhosted.org (CUDA wheels),<br/>nodejs.org, registry.npmjs.org"]
+  brain -->|"only when you start it"| know["Get to know me: api.github.com,<br/>the web through Anthropic's tools"]
+  brain -->|"WhatsApp replies, through the bridge"| wa["Meta Graph API"]
+  brain --- local
+```
+
+Everything below the Anthropic line is opt-in: it runs only after you ask, press Allow or switch it
+on. Audio never leaves your computer: it is turned into text by small models on your own CPU, and only
+the text can go to Anthropic. See [Registries](#registries-what-is-contacted),
+[Connected apps](#connected-apps-what-goes-to-them), [Talking to Scout](#talking-to-scout-your-microphone),
+[Get to know me](#get-to-know-me-what-leaves-your-machine) and, for the Meta setup,
+[whatsapp.md](../bodies/whatsapp.md).
 
 ## What is captured, and when
 
@@ -282,7 +311,7 @@ brain (Kokoro) or on this computer (the system voice). With **Scout talks** on, 
 aloud too (the desktop tells the brain it wants read-aloud); with it off nothing is read aloud.
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
 flowchart LR
   B["Spoken question"] --> M["Your brain"]
   M -->|"default"| K["Kokoro on your brain"]
@@ -323,7 +352,7 @@ keys either. Pressing any other key while you hold the talk key (Right Ctrl+C, s
 microphone and sends nothing, because you meant a shortcut.
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
 flowchart LR
   K["Talk key held, mic clicked, or Always listening on"] --> M["Mic (echo cancellation)"]
   M --> V["Your own brain: VAD, Moonshine, Smart Turn"]
@@ -341,7 +370,7 @@ flowchart LR
 - **Model files are checked.** The brain fetches its model files (listening and Kokoro) from one
   fixed Hugging Face commit, never from a branch that can move, and each must match a SHA-256
   written into the brain. A file that does not match is never kept. The download fetches the
-  models only; no audio is sent. If the models cannot load, the bubble says so, and Scout keeps
+  models only; no audio is sent. On a Windows PC with an NVIDIA card the brain may also fetch the CUDA libraries (cuBLAS, cuDNN) for the final speech model from `files.pythonhosted.org`, pinned wheels checked the same way, into `voice/cuda/`. If the models cannot load, the bubble says so, and Scout keeps
   speaking in the system voice when Kokoro is the one that failed.
 - **Audio goes only to your own brain and is never stored; with the brain on this computer it never
   leaves it.** It lives in memory until it has been turned into text, and is then dropped. Before

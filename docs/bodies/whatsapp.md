@@ -11,16 +11,24 @@ contract: it is an ordinary body whose `kind` is `whatsapp`. This page covers th
 ## Flow
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
 flowchart LR
   P[Phone] --> M[Meta Cloud API]
-  M -->|HTTPS webhook| F[Public tunnel]
-  F --> B[Bridge, started by the brain]
-  B -->|say, loopback| R[Brain, always on]
+  M -->|"HTTPS webhook POST"| F[Public tunnel]
+  F --> W["Bridge webhook, 127.0.0.1:port<br/>(X-Hub-Signature-256 HMAC check)"]
+  W -->|"signature ok: 200, then say"| B["Bridge core<br/>(bridge.ts, body id whatsapp)"]
+  W -->|"missing or wrong: 401"| X[dropped]
+  B -->|"say, loopback websocket"| R[Brain, always on]
   R -->|reply| B
-  B -->|Graph API send| M
+  B -->|"Graph API send"| M
   M --> P
+  S["Brain supervisor<br/>(bridges.py)"] -->|"starts Node, env vars, stdin pipe"| B
+  S -.->|"pipe closes when the brain dies"| Q["bridge exits"]
 ```
+
+The webhook checks the HMAC of the raw body against the app secret before it parses anything. The
+brain starts the bridge and holds its stdin pipe open; when the brain is gone the pipe closes and
+the bridge quits.
 
 The brain starts and watches the bridge (`brain/src/brain/bridges.py`, see [brain.md](../brain/README.md)). It
 gives the bridge its settings as environment variables and holds a stdin pipe open. When that pipe
@@ -30,6 +38,7 @@ secret filter.
 
 ## Identity and context
 
+- The body id is the fixed word `whatsapp` (`BODY` in `bridge.ts`), not a made-up per-install id like the desktop's or the browser's. There is only ever one bridge, started by the brain, so two bodies can never share the id. [protocol/README.md](../../protocol/README.md) says a body id is "never a fixed word"; the bridge is the one body that breaks that rule, and the two documents disagree.
 - Hello: `{"protocol":2,"body":{"id":"whatsapp","kind":"whatsapp","name":"WhatsApp"},"tools":[]}`. No
   tools and no `display: false`, so the brain counts it as a body that shows answers.
 - Each text becomes `say` with a fresh `id` (a UUID, so the brain can tell a retry from a new say) and `context: {channel: "whatsapp", note: "text chat on a phone; keep replies short and offer detail on request"}`.
@@ -119,9 +128,19 @@ many-questions moments are facts sent as events, never canned text.
 
 ## Settings the bridge reads
 
-Passed by the brain, never from `.env`: `TAGALONG_WHATSAPP_ACCESS_TOKEN`, `_APP_SECRET`, `_VERIFY_TOKEN`,
-`_PHONE_NUMBER_ID`, `_ALLOWED_NUMBER`, `_PORT` (default 47322) and `TAGALONG_BRAIN_ADDR` (default
-`127.0.0.1:47321`). A missing value stops the bridge with a plain message that names the variable and
+The brain reads seven variables (`WHATSAPP_VARS` in `bridges.py`) and passes the rest to the bridge; the bridge never reads `.env`:
+
+| Variable                            | Meaning                                                |
+| ----------------------------------- | ------------------------------------------------------ |
+| `TAGALONG_WHATSAPP_ENABLED`         | Brain only: `1`, `true` or `yes` turns the bridge on   |
+| `TAGALONG_WHATSAPP_ACCESS_TOKEN`    | Meta Graph bearer token (secret)                       |
+| `TAGALONG_WHATSAPP_APP_SECRET`      | Signs the webhook body, checked with HMAC (secret)     |
+| `TAGALONG_WHATSAPP_VERIFY_TOKEN`    | Meta's `GET` verify token (secret)                     |
+| `TAGALONG_WHATSAPP_PHONE_NUMBER_ID` | The sending number's id (the person's own, not secret) |
+| `TAGALONG_WHATSAPP_ALLOWED_NUMBER`  | The one phone allowed to talk to Scout (not secret)    |
+| `TAGALONG_WHATSAPP_PORT`            | Webhook port on 127.0.0.1, default 47322               |
+
+The bridge also reads `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`). A missing required value stops the bridge with a plain message that names the variable and
 never shows a value.
 
 ## Files
