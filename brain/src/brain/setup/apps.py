@@ -29,7 +29,7 @@ from brain.open_items import OpenItems
 from brain.permission import Tier
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.facts import Machine
-from brain.setup.flights import Flights
+from brain.setup.flights import Claim, Flights, no_task
 from brain.setup.install import (
     InstallError,
     NoBuild,
@@ -205,6 +205,7 @@ def app_setup_tools(
     wait_s: float = CONNECT_WAIT_S,
     sign_in_wait_s: float = SIGN_IN_WAIT_S,
     opener: Callable[[str], OpenUrl | None] | None = None,
+    claim: Claim = no_task,
 ) -> tuple[list[tuple[ToolSpec, Handler]], Callable[[], Awaitable[None]]]:
     """The tools, and a `stop_watches` that cancels pending connect watches at shutdown (a
     cancelled watch emits nothing: nobody is left to wake)."""
@@ -244,7 +245,7 @@ def app_setup_tools(
 
     watching: set[asyncio.Task] = set()  # held so a watch is not collected mid-wait
 
-    async def announce(app_id: str, name: str) -> None:
+    async def announce(app_id: str, name: str, task: str | None) -> None:
         """Wait for the app to stop connecting, then tell Scout how it ended."""
         loop = asyncio.get_running_loop()
         end = loop.time() + sign_in_wait_s
@@ -262,10 +263,10 @@ def app_setup_tools(
             facts["tools"], facts["tools_total"] = ", ".join(names), total
         elif status.error:
             facts["detail"] = status.error
-        emit(Event("setup_done", f"setup:{app_id}", facts))
+        emit(Event("setup_done", f"setup:{app_id}", facts, task=task))
 
-    def watch(app_id: str, name: str) -> None:
-        task = asyncio.get_running_loop().create_task(announce(app_id, name))
+    def watch(app_id: str, name: str, task_id: str | None) -> None:
+        task = asyncio.get_running_loop().create_task(announce(app_id, name, task_id))
         watching.add(task)
         task.add_done_callback(watching.discard)
 
@@ -279,9 +280,11 @@ def app_setup_tools(
         if entry is None:
             return fail("unknown_app", str(args.get("id")))
         # Both callers wait on the shared add through a shield: a cancelled turn leaves it running.
-        return await asyncio.shield(flights.start(entry.id, lambda: add(entry)).task)
+        # A running add keeps its own task; a repeat joins it and opens none.
+        task = None if flights.has(entry.id) else claim(args.get("task_id"), f"add {entry.id}")
+        return await asyncio.shield(flights.start(entry.id, lambda: add(entry, task)).task)
 
-    async def add(entry: RegistryEntry) -> str:
+    async def add(entry: RegistryEntry, task: str | None) -> str:
         try:
             row = await add_registry_app(
                 entry, home, inspect_fn, fetch, get_json, apps, memory, tokens, notify
@@ -304,7 +307,7 @@ def app_setup_tools(
                     await apps.sign_in(row.id, open_url)
                 except AppError as err:
                     return fail("refused", str(err), id=row.id)
-                watch(row.id, row.name)
+                watch(row.id, row.name, task)
                 return json.dumps({**out, "status": "signing_in"})
             out["browser"] = False
         missing = [n for n in row.config.get("env", {}) if n != "PATH" and n not in env]
@@ -314,7 +317,7 @@ def app_setup_tools(
         if out["status"] == "connected":
             out["tools"], out["tools_total"] = tool_facts(row.id)
         elif out["status"] == "connecting":  # still starting: the end arrives as an event
-            watch(row.id, row.name)
+            watch(row.id, row.name, task)
         return json.dumps(out)
 
     spec = ToolSpec(
@@ -327,7 +330,11 @@ def app_setup_tools(
         "event says how.",
         {
             "type": "object",
-            "properties": {"id": {"type": "string"}, "query": {"type": "string"}},
+            "properties": {
+                "id": {"type": "string"},
+                "query": {"type": "string"},
+                "task_id": {"type": "string"},
+            },
             "required": ["id"],
         },
         effect="change",

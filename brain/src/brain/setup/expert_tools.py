@@ -20,7 +20,7 @@ from brain.open_items import OpenItems
 from brain.permission import Tier
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.facts import Machine, RunCmd
-from brain.setup.flights import Flights
+from brain.setup.flights import Claim, Flights, no_task
 from brain.setup.install import InstallError, install_card, install_expert
 from brain.setup.login import LoginDriver
 from brain.setup.net import GetJson
@@ -31,7 +31,11 @@ from brain.voice.models import Fetch
 
 log = logging.getLogger(__name__)
 InspectFn = Callable[[], Awaitable[Machine]]
-_ID_SCHEMA = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
+_ID_SCHEMA = {
+    "type": "object",
+    "properties": {"id": {"type": "string"}, "task_id": {"type": "string"}},
+    "required": ["id"],
+}
 
 
 def expert_setup_tools(
@@ -45,6 +49,7 @@ def expert_setup_tools(
     emit: Callable[[Event], None],
     notify: Callable[[str, dict], None],
     items: OpenItems,
+    claim: Claim = no_task,
 ) -> tuple[
     list[tuple[ToolSpec, Handler]],
     Callable[[RegistryEntry], Awaitable[InstalledExpert]],
@@ -76,13 +81,13 @@ def expert_setup_tools(
             # Facts only, as the error text Scout reads; nothing was asked or installed.
             raise RpcError(ErrorCode.tool_failed, failure(*_facts(err))) from err
 
-    async def run_install(entry: RegistryEntry) -> InstalledExpert:
+    async def run_install(entry: RegistryEntry, task: str | None = None) -> InstalledExpert:
         """Install and post how it ended as an event; the failure is raised after telling, for
         `update`, which waits on the same flight (a joiner of either kind gets the same events)."""
 
         def progress(step: dict) -> None:
             facts = {"expert": entry.id, **{k: v for k, v in step.items() if v is not None}}
-            emit(Event("setup_progress", f"setup:{entry.id}", facts))
+            emit(Event("setup_progress", f"setup:{entry.id}", facts, task=task))
             notify("changed", {"what": "setup"})
 
         try:
@@ -96,17 +101,17 @@ def expert_setup_tools(
             else:
                 log.warning("install of %s failed: %r", entry.id, err)
                 facts = {"expert": entry.id, "ok": False, "error": "failed", "detail": repr(err)}
-            emit(Event("setup_done", f"setup:{entry.id}", facts))
+            emit(Event("setup_done", f"setup:{entry.id}", facts, task=task))
             notify("changed", {"what": "setup"})
             raise
         facts = {"expert": entry.id, "ok": True, "installed": json.dumps(asdict(expert))}
-        emit(Event("setup_done", f"setup:{entry.id}", facts))
+        emit(Event("setup_done", f"setup:{entry.id}", facts, task=task))
         notify("changed", {"what": "setup"})
         return expert
 
-    async def background_install(entry: RegistryEntry) -> None:
+    async def background_install(entry: RegistryEntry, task: str | None) -> None:
         try:
-            await run_install(entry)
+            await run_install(entry, task)
         except Exception:  # already told and logged by run_install
             pass
 
@@ -122,8 +127,12 @@ def expert_setup_tools(
         was = shown.pop(entry.id, None)
         if was is not None and was != entry.version:
             return failure("version_changed", f"{was} -> {entry.version}")
-        flight = flights.start(entry.id, lambda: background_install(entry))
+        # A running install keeps its own task; a repeat joins it and opens none.
+        task = None if flights.has(entry.id) else claim(args.get("task_id"), f"install {entry.id}")
+        flight = flights.start(entry.id, lambda: background_install(entry, task))
         out: dict = {"started": entry.id, "item": flight.item.id}
+        if task:
+            out["task"] = task
         if flight.joined:  # already installing: the one running install is the answer
             out["joined"] = True
         return json.dumps(out)
@@ -154,7 +163,9 @@ def _facts(err: Exception) -> tuple[str, str]:
     return "registry_unavailable", str(err)
 
 
-def login_tools(home: Path, driver: LoginDriver) -> list[tuple[ToolSpec, Handler]]:
+def login_tools(
+    home: Path, driver: LoginDriver, claim: Claim = no_task
+) -> list[tuple[ToolSpec, Handler]]:
     """`login_expert`: the person logs in on their own subscription, in a terminal window or the
     browser the expert opens. No link or code passes through Scout. Like install, it asks every
     time, and the window or browser opens only after the OK. The card needs no check, so it
@@ -173,8 +184,12 @@ def login_tools(home: Path, driver: LoginDriver) -> list[tuple[ToolSpec, Handler
         expert = found(args)
         if expert is None:
             return json.dumps({"error": "unknown_expert", "detail": str(args.get("id"))})
-        item, joined = driver.start(expert)
+        running = driver.running(expert.id)
+        task = None if running else claim(args.get("task_id"), f"sign in to {expert.id}")
+        item, joined = driver.start(expert, task)
         out: dict = {"state": "waiting", "item": item.id}
+        if task:
+            out["task"] = task
         if joined:  # a sign-in is already running: it is the answer
             out["joined"] = True
         return json.dumps(out)

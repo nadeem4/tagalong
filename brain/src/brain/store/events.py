@@ -204,16 +204,3 @@ def sweep(db: sqlite3.Connection, before: str) -> int:
     return db.execute(
         "DELETE FROM events WHERE state='handled' AND handled_at<?", (before,)
     ).rowcount
-
-
-def chain(db: sqlite3.Connection, id: str, limit: int = 20) -> list[EventRow]:
-    """This event, then what caused it, and so on; stops at a missing parent or the limit."""
-    out: list[EventRow] = []
-    cur: str | None = id
-    while cur is not None and len(out) < limit:
-        row = get(db, cur)
-        if row is None:
-            break
-        out.append(row)
-        cur = row.caused_by
-    return out

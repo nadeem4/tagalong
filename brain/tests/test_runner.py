@@ -179,10 +179,29 @@ def test_news_goes_to_the_body_in_use():
     assert rig.runner.target(rig.post("timer", "timer:1", "n1")) == "desktop"
 
 
-def test_news_falls_back_to_the_body_that_caused_it():
-    rig = Rig()
-    say = rig.post("say", "desktop", "s1")
-    rig.log.post(Event("job_ended", "job:1", {}, caused_by=say.id, id="n1"))
+def news_of_task(rig, source, id="n1"):
+    task = rig.tasks.open("ask", source)
+    rig.log.post(Event("job_ended", "job:1", {}, task=task, id=id))
+    news = rig.log.get(id)
+    assert news is not None
+    return news
+
+
+def test_news_goes_to_the_task_source_after_a_restart():
+    # Nobody is in use (a restart forgot it): the task's own body gets the news.
+    rig = Rig(online=("desktop", "laptop"), display=("desktop", "laptop"))
+    assert rig.runner.target(news_of_task(rig, "laptop")) == "laptop"
+
+
+def test_news_goes_to_the_task_source_when_the_body_in_use_is_offline():
+    rig = Rig(online=("desktop", "laptop"), display=("desktop", "laptop"))
+    rig.presence.touch("browser")  # in use, but gone
+    assert rig.runner.target(news_of_task(rig, "laptop")) == "laptop"
+
+
+def test_news_with_no_task_goes_to_the_first_screen():
+    rig = Rig(online=("desktop", "laptop"), display=("desktop", "laptop"))
+    rig.log.post(Event("job_ended", "job:1", {}, id="n1"))
     news = rig.log.get("n1")
     assert news is not None
     assert rig.runner.target(news) == "desktop"

@@ -46,6 +46,7 @@ from brain.setup.apps import app_setup_tools
 from brain.setup.events import SetupEvents
 from brain.setup.expert_tools import expert_setup_tools, login_tools
 from brain.setup.facts import inspect, real_run_cmd
+from brain.setup.flights import not_for_home
 from brain.setup.home_tools import (
     SetupProgress,
     home_app_rows,
@@ -169,6 +170,9 @@ async def _run() -> None:
         config.data_dir, experts, real_open_terminal, emit_event, setup_items, notify=bodies.notify
     )
     progress = SetupProgress(emit_event)
+    # The session exists later; a setup call joins its turn's task, or opens a Do for it.
+    # Home's own buttons reach the same handlers and open none (setup/flights.py).
+    claim = not_for_home(lambda given, title: session.claim_task(given, "do", title))
     expert_tools, reinstall, stop_installs = expert_setup_tools(
         config.data_dir,
         registry,
@@ -180,6 +184,7 @@ async def _run() -> None:
         progress.emit,
         bodies.notify,
         setup_items,
+        claim,
     )
     app_tools, stop_watches = app_setup_tools(
         config.data_dir,
@@ -195,8 +200,9 @@ async def _run() -> None:
         os.environ,
         emit_event,
         setup_items,
+        claim=claim,
     )
-    login = login_tools(config.data_dir, logins)
+    login = login_tools(config.data_dir, logins, claim)
 
     updates = Updates(
         config.data_dir,

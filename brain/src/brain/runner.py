@@ -17,7 +17,14 @@ from typing import Protocol
 
 from brain.bodies import Bodies
 from brain.builtin_guards import WAKE_WINDOW_S
-from brain.events import EVENT_KINDS, EventKind, EventLog, is_internal, load_notes
+from brain.events import (
+    EVENT_KINDS,
+    PERSON_KINDS,
+    EventKind,
+    EventLog,
+    is_internal,
+    load_notes,
+)
 from brain.guards import EmitCtx, Hook
 from brain.presence import Presence
 from brain.store.events import EventRow
@@ -26,7 +33,6 @@ from brain.tools import _fence_safe
 
 _log = logging.getLogger(__name__)
 
-PERSON_KINDS = frozenset({"say", "card_answer"})
 IDLE_WINDOW_S = 10  # idle news stays quiet this long after the person last spoke
 GROUP_CAP = 20  # one turn tells at most this many events, so a long backlog cannot swamp it
 RECHECK_S = 60.0  # news behind a closed gate is looked at again at least this often
@@ -408,9 +414,9 @@ class Runner:
         """The body a turn for this event runs on, or None when no body displays (the event
         then waits). Only a body that displays is ever chosen: a reply sent to one that shows
         nothing is lost. An event a body sent (a say, a tap on the phone) answers there. Else a
-        say goes where the person is, and news where the person is, else back to the body that
-        caused it; else the first screen. The phone is otherwise chosen only when no screen is
-        online: Scout speaks first on a screen."""
+        say goes where the person is, and news where the person is, else the body its task came
+        from; else the first screen. The phone is otherwise chosen only when no screen is online:
+        Scout speaks first on a screen."""
         shown = self._bodies.display_ids()
         if row.source in shown:
             return row.source
@@ -420,7 +426,8 @@ class Runner:
 
         wanted = [self._presence.using_now()]
         if row.kind not in PERSON_KINDS:
-            wanted.append(self._events.origin_body(row.id, lambda s: not is_internal(s)))
+            source = self._tasks.source_of(row.task)
+            wanted.append(source if source and not is_internal(source) else None)
         return next((b for b in wanted if fits(b)), shown[0] if shown else None)
 
     def gate(self, row: EventRow, at_break: bool = False) -> bool:

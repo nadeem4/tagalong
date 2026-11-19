@@ -273,12 +273,6 @@ def test_post_runs_then_in_the_same_transaction(log):
     assert log.get("e1") is None
 
 
-def test_origin_body_walks_to_the_first_body(log):
-    log.post(Event("say", "browser", {}, id="e1"))
-    log.post(Event("job_ended", "job:j1", {}, caused_by="e1", id="e2"))
-    assert log.origin_body("e2", lambda s: not is_internal(s)) == "browser"
-
-
 @pytest.mark.parametrize(
     "source", ["scout", "timer:t1", "setup:s1", "job:x", "loop:gmail", "tool:x"]
 )

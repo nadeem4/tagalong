@@ -198,7 +198,7 @@ class Toolbox:
         save_mode: Callable[[str, str], None],
         asks: Asks | None = None,
         engine: Engine | None = None,
-        owner_turn: Callable[[str | None], bool] = lambda turn_id: False,
+        person_task: Callable[[str | None], bool] = lambda turn_id: False,
         on_call: Callable[[Call, ToolSpec, str, str, str | None, BaseException | None], None]
         | None = None,
         outputs: OutputStore | None = None,
@@ -218,7 +218,7 @@ class Toolbox:
         self._save_mode = save_mode
         self._asks = asks  # None skips gate step 3 (the ask)
         self._engine = engine  # None skips it too
-        self._owner_turn = owner_turn
+        self._person_task = person_task
 
     def mode(self, spec: ToolSpec) -> Literal["off", "ask", "auto"]:
         return resolve_mode(spec, self._modes().get(spec.name))
@@ -480,9 +480,9 @@ class Toolbox:
             raise RpcError(ErrorCode.denied, f"{spec.name} is turned off by the owner.")
         if gate is Tier.auto or self._engine is None or self._asks is None:
             return  # nobody is asked and nothing is logged
-        # A follow-up the owner asked for in chat is already their yes; one Scout starts on a
-        # wake goes through the engine.
-        if spec.follow_up and gate is not Tier.person_only and self._owner_turn(call.turn):
+        # A follow-up in a task the person started is already their yes; one Scout starts on
+        # a timer or a job's news goes through the engine.
+        if spec.follow_up and gate is not Tier.person_only and self._person_task(call.turn):
             return
         await self._ask(call, spec, kind, job_id, wait)
 

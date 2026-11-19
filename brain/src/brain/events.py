@@ -56,8 +56,11 @@ class EventKind:
     max_per_hour: int | None = None
 
 
+# A person's words and card answers: what makes a turn, and the tasks it opens, a person's.
+PERSON_KINDS = frozenset({"say", "card_answer"})
+
 _KINDS = (
-    # A person's words and card answers: never a wake (see runner.PERSON_KINDS).
+    # A person's words and card answers: never a wake (see PERSON_KINDS).
     EventKind("say", urgency="now", wakes=False),
     EventKind("card_answer", urgency="now", wakes=False),
     EventKind("timer", urgency="next_pause", batch_seconds=0, max_per_hour=6),
@@ -355,7 +358,3 @@ class EventLog:
                 hook(state)
             except Exception:
                 _log.exception("an event's on_end failed id=%s", id)
-
-    def origin_body(self, id: str, is_body: Callable[[str], bool]) -> str | None:
-        """The first source on the way back through `caused_by` that is a body."""
-        return next((r.source for r in store.chain(self._db, id) if is_body(r.source)), None)

@@ -127,6 +127,18 @@ WORDS: dict[str, Words] = {
         'Right after starting a job, Scout writes a short checklist of what should happen (for example "tests pass"). It ticks items as the expert reports. You see it on the job page.',
         "jobs",
     ),
+    "task_start": Words(
+        "Start a task",
+        "Opens a task for work that goes on after the reply.",
+        "Scout gives bigger work, a reminder or something it noticed its own task, with a short title, so it can keep track of it and you can stop it.",
+        "jobs",
+    ),
+    "task_end": Words(
+        "Finish a task",
+        "Closes a task that is done and notes the result.",
+        "Scout closes a task when its work is finished. It cancels the task's timers, and it will not close one while an expert is still working on it.",
+        "jobs",
+    ),
     "tell_expert": Words(
         "Message a running expert",
         "Sends a follow-up note to an expert mid-job.",

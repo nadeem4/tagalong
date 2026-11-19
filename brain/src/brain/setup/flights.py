@@ -8,13 +8,46 @@ The item closes when the task ends: done, or expired if it was cancelled (shutdo
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any
 
 from brain.open_items import OpenItem, OpenItemRefused, OpenItems
 
 log = logging.getLogger(__name__)
+
+# (task_id the call named or None, a title) -> the task its news is told under. The brain's
+# session makes one; a command line with no brain has none.
+Claim = Callable[[object, str], str | None]
+
+
+def no_task(given: object, title: str) -> None:
+    return None
+
+
+# Set while Home's own buttons run a setup handler: that work is the person's, not a task of
+# Scout's, and nothing would ever end a task it opened.
+_from_home: ContextVar[bool] = ContextVar("from_home", default=False)
+
+
+@contextmanager
+def from_home() -> Iterator[None]:
+    token = _from_home.set(True)
+    try:
+        yield
+    finally:
+        _from_home.reset(token)
+
+
+def not_for_home(claim: Claim) -> Claim:
+    """`claim`, except during a Home press, which opens no task."""
+
+    def scoped(given: object, title: str) -> str | None:
+        return None if _from_home.get() else claim(given, title)
+
+    return scoped
 
 
 @dataclass(frozen=True)

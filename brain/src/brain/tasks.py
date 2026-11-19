@@ -10,8 +10,10 @@ import sqlite3
 from collections.abc import Callable
 from datetime import datetime, timedelta
 
+from brain.events import PERSON_KINDS
 from brain.store import tasks as store
 from brain.store.db import transaction, utc_text
+from brain.store.memory import MemoryRefused
 from brain.store.work import TITLE_CAP
 from brain.tools import _fence_safe
 
@@ -61,8 +63,39 @@ class Tasks:
             store.insert(self._db, row)
         return id
 
+    def for_turn(self, cause: str | None, kind: str, title: str | None = None) -> str:
+        """A new task for the turn that took `cause`: it comes from that event's source and is
+        caused by it. With no cause (Scout on its own) the source is `scout`."""
+        source = (None if cause is None else store.event_source(self._db, cause)) or "scout"
+        return self.open(kind, source, caused_by=cause, title=title)
+
+    def claim(self, given: object, cause: str | None, kind: str, title: str) -> str:
+        """The task a tool call works for: the open one named, or a new `kind` task for the turn
+        that took `cause`. The caller waits it once what it set going has started."""
+        if given is None:
+            id = self.for_turn(cause, kind, title)
+        else:
+            row = store.get(self._db, given) if isinstance(given, str) else None
+            if row is None or row.state not in ("open", "waiting"):
+                raise MemoryRefused(f"no open task {given}.")
+            id = row.id
+        return id
+
+    def timers_of(self, id: str) -> list[str]:
+        return store.timers_of(self._db, id)
+
     def get(self, id: str) -> store.TaskRow | None:
         return store.get(self._db, id)
+
+    def person_cause(self, event_id: str | None) -> bool:
+        """The one person rule: the event is a person's say or card answer. A missing or swept
+        event is not (fail safe: the hand-off card shows)."""
+        return event_id is not None and store.event_kind(self._db, event_id) in PERSON_KINDS
+
+    def is_person(self, id: str | None) -> bool:
+        """Whether a person started the task: the event that caused it is a person's."""
+        row = None if id is None else store.get(self._db, id)
+        return row is not None and self.person_cause(row.caused_by)
 
     def source_of(self, id: str | None) -> str | None:
         row = None if id is None else store.get(self._db, id)

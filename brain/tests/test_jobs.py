@@ -15,7 +15,7 @@ import pytest
 from ask_log import approvals_on, list_approvals
 from fake_clock import FakeClock
 from fake_engine import FakeEngine
-from job_rows import add_timer, end_job
+from job_rows import add_timer, end_job, tasks_for
 
 from brain.asks import Answer, AskExpired
 from brain.events import Event, EventLog
@@ -26,11 +26,12 @@ from brain.jobs import JobError, Jobs, job_note
 from brain.masking import Masker, mask_secrets
 from brain.memory import Memory
 from brain.open_items import OpenItemRefused, OpenItems
-from brain.permission import Decision, Engine, Grant, Person, SideCheckDecider
+from brain.permission import Decision, Engine, Grant, Person, SideCheckDecider, Tier
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.store import InstalledExpert
+from brain.store import events as store_events
 from brain.store import rules
-from brain.store.events import list_state
+from brain.store.events import EventRow, list_state
 from brain.store.work import ActivityEntry, WorkStore
 from brain.tools import work_tools
 
@@ -221,6 +222,8 @@ class Rig:
             now=lambda: self.wall,
             on_timers_changed=lambda: setattr(self, "timers_changed", self.timers_changed + 1),
             apps=apps,
+            task_source=tasks_for(self.memory).source_of,
+            person_task=tasks_for(self.memory).is_person,
             items=self.items,
             **({} if before_start is None else {"before_start": before_start}),
         )
@@ -1892,6 +1895,17 @@ async def test_a_failed_step_emits_job_step_failed_with_command_exit_and_summary
     assert TOKEN not in str(event.payload)
 
 
+async def test_job_news_carries_the_task(make_rig, monkeypatch):
+    monkeypatch.setenv("FAKE_ACP_META_ONLY", "1")
+    rig = make_rig(FakeAsks(Answer("Plan")), FAIL_THEN_HANG)
+    tid = tasks_for(rig.memory).open("do", "desktop-1")
+    job_id = await rig.jobs.start("go", str(rig.folder), task_id=tid, caused_by="e1")
+    await until(lambda: rig.emitted)
+    (event,) = rig.emitted
+    assert (event.task, event.caused_by) == (tid, "e1")
+    assert rig.jobs.task_of(job_id) == tid and rig.jobs.caused_by(job_id) == "e1"
+
+
 async def test_the_failed_step_fact_is_one_clipped_line(make_rig):
     rig = make_rig(FakeAsks(Answer("Plan")))
     text = "a\nb " + "z" * 500
@@ -2738,6 +2752,40 @@ async def test_owner_hand_off_with_apps_logs_the_kept_apps_and_makes_no_offer(ma
     assert rig.offers.considered == []
 
 
+async def hand_off_tier(make_rig, source, cause_kind="say"):
+    """The tier a hand-off with apps asks the engine at, for a task that came from `source`,
+    caused by an event of `cause_kind` (None: no cause)."""
+    engine = FakeEngine(Decision("deny", "no_decider"))
+    rig = apps_rig(make_rig, Answer("Plan"), engine=engine)
+    if cause_kind:
+        store_events.insert(
+            rig.memory.db,
+            EventRow(id="c1", kind=cause_kind, at="2026-01-01T11:00:00+00:00", source=source),
+        )
+    tid = tasks_for(rig.memory).open("do", source, caused_by="c1" if cause_kind else None)
+    with pytest.raises(JobError, match="not started"):
+        await rig.jobs.start("task", str(rig.folder), apps=["lin"], task_id=tid)
+    return engine.requests[0].tier
+
+
+async def test_a_non_person_task_always_shows_the_hand_off_card(make_rig):
+    # person_only: no standing rule and no side check may approve it for the person.
+    assert await hand_off_tier(make_rig, "timer:t1", "timer") is Tier.person_only
+
+
+async def test_a_hand_off_in_a_wake_turn_shows_the_card_though_a_body_is_the_source(make_rig):
+    # One rule: a person task is one a say or card answer caused, not one a body's wake did.
+    assert await hand_off_tier(make_rig, "desktop-1", "back") is Tier.person_only
+
+
+async def test_a_task_with_no_cause_shows_the_hand_off_card(make_rig):
+    assert await hand_off_tier(make_rig, "desktop-1", None) is Tier.person_only
+
+
+async def test_a_person_task_hand_off_asks_at_the_usual_tier(make_rig):
+    assert await hand_off_tier(make_rig, "desktop-1") is Tier.ask
+
+
 async def test_owner_hand_off_without_apps_asks_no_engine(make_rig):
     engine = FakeEngine(Decision("deny", "no_decider"))
     rig = make_rig(FakeAsks(Answer("Plan")), engine=engine)
@@ -2946,10 +2994,10 @@ async def test_a_rule_granted_expert_ask_writes_no_item(make_rig):
 
 async def test_an_expert_ask_nobody_answers_expires_with_no_answer(make_rig):
     rig = make_rig(FakeAsks(Answer("Plan"), Answer(None)), ASK_STEPS)
-    job = await rig.jobs.start("go", str(rig.folder))
+    await rig.jobs.start("go", str(rig.folder))
     await until(lambda: [i for i in rig.items.list_open() if i.id in rig.asks.open_ids] == [])
     await until(lambda: rig.asks.opened[1:])
     item_id = rig.asks.opened[1]["ask_id"]
     await until(lambda: rig.items.get(item_id).state == "expired")
     assert rig.items.get(item_id).reason == "no_answer"
-    assert rig.items.get(item_id).origin_body == rig.jobs.origin(str(job))
+    assert rig.items.get(item_id).origin_body == "brain"  # no task: no body to show it

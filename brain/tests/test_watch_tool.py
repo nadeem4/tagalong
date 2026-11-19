@@ -4,7 +4,7 @@ import datetime
 import json
 
 import pytest
-from job_rows import records_for
+from job_rows import records_for, tasks_for
 
 from brain.memory import Memory
 from brain.store.memory import MemoryRefused
@@ -26,7 +26,9 @@ def rig():
     mem = Memory(":memory:")
     records = records_for(mem, lambda: T0)
     fake = FakeTimers()
-    handlers = {s.name: h for s, h in timer_tools(records, fake, lambda: T0)}
+    handlers = {
+        s.name: h for s, h in timer_tools(records, fake, lambda: T0, lambda: None, tasks_for(mem))
+    }
 
     async def watch(**args):
         return await handlers["watch"](args)

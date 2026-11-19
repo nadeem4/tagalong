@@ -245,27 +245,27 @@ column for. `store/work.py` (`WorkStore`) is the only code that touches these ta
 
 One row per piece of work, in a tree: a goal has steps, and a step can have asks and timers.
 
-| Column                                 | Type             | Meaning                                                                            |
-| -------------------------------------- | ---------------- | ---------------------------------------------------------------------------------- |
-| `id`                                   | TEXT PRIMARY KEY | Short id (8 hex characters)                                                        |
-| `parent_id`                            | TEXT             | The work this belongs to; null for a root                                          |
-| `root_id`                              | TEXT             | Top of the tree; its own id for a root                                             |
-| `seq`                                  | INTEGER          | Order among siblings                                                               |
-| `kind`                                 | TEXT             | `goal`, `expert_call`, `tool_call`, `ask`, `question`, `timer`, `loop`, `watch`    |
-| `state`                                | TEXT             | `planned`, `active`, `blocked`, `paused`, `done`, `failed`, `cancelled`, `expired` |
-| `title`                                | TEXT             | Scout's words, masked, capped at 200                                               |
-| `input`                                | TEXT (JSON)      | What the step was given, so a retry knows what to run                              |
-| `summary`                              | TEXT             | Short text of what was done, found or left; what Scout reads                       |
-| `detail_id`                            | TEXT             | Points to `tool_outputs`: the full text                                            |
-| `progress`                             | TEXT             | One live line while `active`; cleared when the row ends                            |
-| `checkpoint`                           | TEXT (JSON)      | Enough to carry on (an expert call keeps its session id)                           |
-| `attempt`, `max_attempts`              | INTEGER          | Retries so far, and the limit (default 3)                                          |
-| `safe_to_retry`                        | INTEGER          | 0 or 1                                                                             |
-| `error_kind`, `last_error`             | TEXT             | `transient` or `permanent`; the masked error, capped at 300                        |
-| `due_at`                               | TEXT             | Next time something should happen: timer, retry backoff, cadence                   |
-| `created_at`, `updated_at`, `ended_at` | TEXT             | UTC ISO text                                                                       |
-| `end_reason`                           | TEXT             | Why it ended, in a short phrase                                                    |
-| `task_id`                              | TEXT             | The task this root row belongs to (null until a task owns it), or null             |
+| Column                                 | Type             | Meaning                                                                                                                 |
+| -------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `id`                                   | TEXT PRIMARY KEY | Short id (8 hex characters)                                                                                             |
+| `parent_id`                            | TEXT             | The work this belongs to; null for a root                                                                               |
+| `root_id`                              | TEXT             | Top of the tree; its own id for a root                                                                                  |
+| `seq`                                  | INTEGER          | Order among siblings                                                                                                    |
+| `kind`                                 | TEXT             | `goal`, `expert_call`, `tool_call`, `ask`, `question`, `timer`, `loop`, `watch`                                         |
+| `state`                                | TEXT             | `planned`, `active`, `blocked`, `paused`, `done`, `failed`, `cancelled`, `expired`                                      |
+| `title`                                | TEXT             | Scout's words, masked, capped at 200                                                                                    |
+| `input`                                | TEXT (JSON)      | What the step was given, so a retry knows what to run; a goal also keeps `caused_by` (the event the hand-off came from) |
+| `summary`                              | TEXT             | Short text of what was done, found or left; what Scout reads                                                            |
+| `detail_id`                            | TEXT             | Points to `tool_outputs`: the full text                                                                                 |
+| `progress`                             | TEXT             | One live line while `active`; cleared when the row ends                                                                 |
+| `checkpoint`                           | TEXT (JSON)      | Enough to carry on (an expert call keeps its session id)                                                                |
+| `attempt`, `max_attempts`              | INTEGER          | Retries so far, and the limit (default 3)                                                                               |
+| `safe_to_retry`                        | INTEGER          | 0 or 1                                                                                                                  |
+| `error_kind`, `last_error`             | TEXT             | `transient` or `permanent`; the masked error, capped at 300                                                             |
+| `due_at`                               | TEXT             | Next time something should happen: timer, retry backoff, cadence                                                        |
+| `created_at`, `updated_at`, `ended_at` | TEXT             | UTC ISO text                                                                                                            |
+| `end_reason`                           | TEXT             | Why it ended, in a short phrase                                                                                         |
+| `task_id`                              | TEXT             | The task this root row belongs to (null until a task owns it), or null                                                  |
 
 Indexes: `(state, due_at)`, `(root_id, seq)`, `(parent_id, seq)` and `(kind, state)`. Whether
 Scout has told the person is not kept on the row: news is an event in the `events` table, and the
@@ -672,7 +672,7 @@ never saved. Nothing acts on an event before its row exists, so a brain kill los
   A timer's event is saved in the same transaction that fires the timer. An event whose news is
   derived (a job ending, a step giving up) has a fixed id, `job_ended:{job}@{ended_at}` or
   `work_failed:{step}@{ended_at}`, so a restart telling it again is one row.
-- Read by: `EventLog.get`, `ready` and `origin_body` (the `caused_by` chain back to a body).
+- Read by: `EventLog.get` and `ready`; `Tasks.is_person` reads a task's cause event kind.
 - Restart: `EventLog.recover()` runs at start. A row still `taken` counts as a failed attempt
   (`attempts` + 1, `resume` 1, `end_reason` `restart`, ready at once); the fourth time it is
   `gave_up`. A row an interjection held goes back to `new` with no attempt counted, and an orphan

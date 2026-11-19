@@ -192,10 +192,27 @@ class JobRecords:
     # ---- writing ----
 
     def add_job(
-        self, id: str, agent: str, task: str, folder: str, mode: str, parent_job: str | None = None
+        self,
+        id: str,
+        agent: str,
+        task: str,
+        folder: str,
+        mode: str,
+        parent_job: str | None = None,
+        *,
+        task_id: str | None = None,
+        caused_by: str | None = None,
     ) -> Job:
-        """A new running job with its first part, p1."""
-        self.work.create("goal", "", id=id, state="active")
+        """A new running job with its first part, p1. It belongs to `task_id`; its news says
+        which event the hand-off came from."""
+        self.work.create(
+            "goal",
+            "",
+            id=id,
+            state="active",
+            task_id=task_id,
+            input={"caused_by": caused_by} if caused_by else None,
+        )
         self.work.set_job_detail(id, folder=folder, mode=mode, task=task)
         if parent_job:
             self.work.add_event(id, "continued", {"from": parent_job})
@@ -257,7 +274,9 @@ class JobRecords:
 
     def set_watch(self, job_id: str, items: list[dict] | None) -> None:
         """Replace Scout's watch list for a job; none or empty clears it."""
-        self.work.update(job_id, input={"watch": items} if items else {})
+        goal = self.work.get(job_id)
+        kept = {k: v for k, v in ((goal and goal.input) or {}).items() if k != "watch"}
+        self.work.update(job_id, input={**kept, "watch": items} if items else kept)
 
     def close_job(self, job_id: str, outcome: Literal["done", "failed"] = "done") -> None:
         """Scout judged the work finished. Its result stays as it was; ending the goal also

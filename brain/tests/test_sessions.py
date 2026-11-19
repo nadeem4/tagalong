@@ -2871,30 +2871,30 @@ async def test_closing_a_job_cancels_its_timers_and_the_ended_wake_still_comes()
 # --- turn origin: who the running turn belongs to (JM5) ----------------------------------
 
 
-async def test_a_say_started_turn_is_an_owner_turn():
+async def test_a_say_started_turn_is_a_person_task():
     gate = asyncio.Event()
     session, _ = make(Gate([gate, "ok"]))
-    assert session.owner_turn() is False  # nothing running
+    assert session.person_task(None) is False  # nothing running
     await session.say("desktop", say("hi"))
     await settle()
-    assert session.owner_turn() is True
+    assert session.person_task(session._turn_id) is True
     gate.set()
     await finish(session)
 
 
-async def test_a_timer_wake_turn_is_not_an_owner_turn():
+async def test_a_wake_turn_is_not_a_person_task():
     gate = asyncio.Event()
     session, _ = make(Gate([gate, "ok"]), kinds=None)
     join(session, "desktop")
     session.body_event("desktop", "back", {"idle_seconds": 600})
     await settle()
     assert session._busy()
-    assert session.owner_turn() is False
+    assert session.person_task(session._turn_id) is False
     gate.set()
     await idle(session)
 
 
-async def test_the_next_wake_after_an_owner_turn_is_not_an_owner_turn():
+async def test_the_next_wake_after_a_person_task_is_not_a_person_task():
     gate = asyncio.Event()
     session, _ = make(Gate(["one", gate, "two"]), kinds=None)
     join(session, "desktop")
@@ -2903,7 +2903,7 @@ async def test_the_next_wake_after_an_owner_turn_is_not_an_owner_turn():
     session.body_event("desktop", "back", {"idle_seconds": 600})
     await settle()
     assert session._busy()
-    assert session.owner_turn() is False
+    assert session.person_task(session._turn_id) is False
     gate.set()
     await idle(session)
 

@@ -543,7 +543,7 @@ def new_items(tmp_path) -> OpenItems:
     return OpenItems(open_db(tmp_path / "items.db"), lambda: datetime.now(UTC))
 
 
-def make_tools(tmp_path, npm, mach=None, updaters=None, items=None):
+def make_tools(tmp_path, npm, mach=None, updaters=None, items=None, claim=None):
     emitted: list[Event] = []
     notes: list[tuple[str, dict]] = []
 
@@ -561,6 +561,7 @@ def make_tools(tmp_path, npm, mach=None, updaters=None, items=None):
         emitted.append,
         lambda m, p: notes.append((m, p)),
         items or new_items(tmp_path),
+        **({} if claim is None else {"claim": claim}),
     )
     if updaters is not None:
         updaters.append(update)
@@ -601,6 +602,21 @@ async def test_install_tool_returns_at_once_and_the_install_finishes_in_the_back
     assert progress and all(e.source == "setup:claude-acp" for e in progress)
     assert progress[0].payload["expert"] == "claude-acp" and "stage" in progress[0].payload
     assert ("changed", {"what": "setup"}) in notes
+    await stop()
+
+
+async def test_install_news_carries_the_task(tmp_path, ensure):
+    claimed = []
+
+    def claim(given, title):
+        claimed.append((given, title))
+        return "t1"
+
+    tools, emitted, _, stop = make_tools(tmp_path, Npm(), claim=claim)
+    out = json.loads(await tools["install_expert"][1]({"id": "claude-acp", "task_id": "t0"}))
+    await settled(emitted)
+    assert claimed == [("t0", "install claude-acp")] and out["task"] == "t1"
+    assert {e.task for e in emitted} == {"t1"}  # progress and done both
     await stop()
 
 
