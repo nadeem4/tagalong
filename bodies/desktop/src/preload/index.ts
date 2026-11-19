@@ -44,6 +44,7 @@ import type {
 import type {
   BodiesState,
   LoopsState,
+  TaskRow,
   WaitingEvent,
   ModelState,
   SttState,
@@ -146,6 +147,7 @@ const bridge: PreloadBridge = {
   timersState: () => ipcRenderer.invoke(IPC.timersState) as Promise<TimerRow[]>,
   cancelTimer: (id: string) => ipcRenderer.invoke(IPC.timersCancel, id) as Promise<void>,
   eventsWaiting: () => ipcRenderer.invoke(IPC.eventsWaiting) as Promise<WaitingEvent[]>,
+  tasksList: () => ipcRenderer.invoke(IPC.tasksList) as Promise<TaskRow[]>,
   bodiesState: () => ipcRenderer.invoke(IPC.bodiesState) as Promise<BodiesState>,
   setWhatsApp: (change: WhatsAppChange) =>
     ipcRenderer.invoke(IPC.whatsappSet, change) as Promise<void>,

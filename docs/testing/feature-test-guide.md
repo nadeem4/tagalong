@@ -771,12 +771,12 @@ Needs the same setup as the hand-off section above.
 
 ## The Tasks page (fake brain, then real)
 
-Automated: `pnpm --filter @tagalong/ui test` (`tasks-view`, `now-card`, `timers-tab` tests),
+Automated: `pnpm --filter @tagalong/ui test` (`tasks-view`, `task-row`, `now-card`, `timers-tab` tests, `shapes/tasks.test.ts`),
 `cd brain && uv run pytest tests/test_timers_home.py tests/test_timers.py -q`, and the e2e
 `e2e/tasks.spec.ts` on the fake brain. By hand, with a real brain:
 
 1. **Action:** open Home and press Tasks.
-   **Expected:** a Now card, then tabs Jobs, Waiting and Timers, each with a count once loaded.
+   **Expected:** a Now card, then tabs Jobs, Waiting, Timers and All tasks, each with a count once loaded.
 2. **Action:** ask Scout to "remind me in 10 minutes to stretch", then look at Now and the Timers tab.
    **Expected:** Now lists the note with "in N min"; the Timers tab lists it with its local time.
 3. **Action:** press Cancel on it.
@@ -788,12 +788,14 @@ Automated: `pnpm --filter @tagalong/ui test` (`tasks-view`, `now-card`, `timers-
    **Expected:** the ask shows at the top of Now; Allow, Always or Not now answers it and it goes.
 6. **Action:** press the Waiting tab (`waiting-tab.test.tsx`, `e2e/tasks.spec.ts`).
    **Expected:** each piece of news Scout has not told yet shows as its gist and how long it has waited, and the list and count update by themselves when the brain saves or finishes an event; one Scout gave up on carries "Scout could not finish"; with none, "Nothing is waiting to be told."
+7. **Action:** press the All tasks tab (`task-row.test.tsx`, `e2e/tasks.spec.ts`).
+   **Expected:** every task Scout is doing, watching or offering (never a plain answer to something you said) is listed with its kind, state and "from <source>"; a running one has Stop, an ended one does not. Press Stop on a Watch task: it ends and the row shows Stopped.
 
 ## Tasks in the turn and the task list (automated only)
 
 `cd brain && uv run pytest tests/test_tasks_tools.py tests/test_protocol.py -q`,
 `tests/test_sessions.py::test_a_wake_turn_names_its_tasks_and_a_say_turn_names_none` and
-`pnpm --filter @tagalong/contract test`. No screen yet: the Tasks page lists them in T3e-2.
+`pnpm --filter @tagalong/contract test`. The Tasks page lists them (All tasks tab, below).
 
 1. **Action:** a wake for a task starts a turn; a say starts another.
    **Expected:** the wake's `started` frame names the task (`id`, `kind`, `title`); the say's has no `tasks`.
