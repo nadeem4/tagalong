@@ -8,7 +8,8 @@ changed while a job runs: a due update waits in a queue and `tick` applies it on
 Last-checked time and the latest versions seen live in `cache/updates.json`, so a restart keeps
 them. Failures are logged and shown on the row; the old version stays.
 The daily check is one Watch task ("Checking for updates"): stopping it turns the daily check off
-for good (a setting, like the mail switch) until the person turns auto-update on or checks now, never an update already queued or running. A check posts no news, so nothing names it.
+for good (a setting, like the mail switch) until the person turns auto-update on or checks now;
+an update already queued or running is never stopped. A check posts no news, so nothing names it.
 """
 
 import asyncio
