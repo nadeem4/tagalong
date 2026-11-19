@@ -4,100 +4,31 @@ How to build, run, test and package Tagalong from source, and the conventions th
 
 ## Repository layout
 
-A pnpm workspace monorepo. One Python brain, many thin TypeScript bodies.
+A pnpm workspace monorepo. One Python brain, many thin TypeScript bodies. The [Layout section of CLAUDE.md](../CLAUDE.md) maps the files inside each folder; this is the top level.
 
 ```text
 tagalong/
-  package.json                      # pnpm workspace root (private)
-  pnpm-workspace.yaml
-  tsconfig.base.json                # plus tsconfig.json and tsconfig.tests.json
-  vitest.config.ts                  # projects: bodies/*, protocol/ts; coverage thresholds
-  eslint.config.js
-  .github/workflows/ci.yml          # changes, build (Linux), brain (Linux), e2e (Windows)
-  docs/
-    README.md                       # the index and reading order
-    architecture.md                 # the whole system
-    bodies/desktop.md, bodies/browser.md, senses/bubble.md, senses/voice.md   # the hosts
-    senses/sight.md, data/memory.md, bodies/connected-apps.md, brain/README.md   # the subsystems
-    data/settings-and-secrets.md, data/privacy.md, development.md
-    testing/feature-test-guide.md   # manual tests
-    chrome-web-store/               # store listing kit and the extension's privacy policy
-  protocol/                         # contract v1 for the Python brain (README.md is the spec)
-    examples/                       # sample frames shared by the TypeScript and Python tests
-    ts/                             # @tagalong/contract: zod schemas for contract v1
-  brain/                            # the Python brain: uv project, tests/; src/brain/ has protocol.py,
-                                    # config.py, models.py (Scout's choosable models), bodies.py, server.py, apps.py, app_tools.py,
-                                    # job_records.py (jobs as work rows), retry.py (retry rules),
-                                    # main.py and cli.py (the `tagalong` command; see docs/brain/README.md);
-                                    # store/ opens tagalong.db and runs its numbered migrations
-                                    # (db.py, search.py, conversation.py, memory.py, connections.py,
-                                    # outputs.py, rules.py, settings.py, work.py, migrations/; the only code
-                                    # that runs SQL; see docs/data/storage.md)
-                                    # tools/stt_bench/ is a dev-only speech-model harness (not shipped, never in CI; see docs/senses/voice.md)
+  protocol/        contract v1: README.md is the spec, examples/ the shared sample frames,
+                   ts/ the zod schemas (@tagalong/contract)
+  brain/           the Python brain: uv project, src/brain/, tests/
   bodies/
-    ui/src/
-      index.ts, host-bridge.ts      # HostBridge contract and its React context
-      shapes/                       # @tagalong/ui/shapes, React-free: addressing, apps, context, memory,
-                                    # pet, status, turn-events, voice (also imported by desktop main)
-      dock-pet.tsx, companion-bubble.tsx
-      scout-face.tsx, scout-mark.tsx # the live Scout on the dock; the still SVG head everywhere else
-      mascot/                       # scout.ts (Scout's character spec), mood-states.ts (dock mood to engine mood)
-      connector-confirm.tsx, drop-card.tsx,
-      health-card.tsx, status-mark.tsx, answer.tsx
-      home/                         # Home: HomeView and its pages (Overview, Jobs, Connections, Approvals,
-                                    # What Scout remembers, Settings, Spend)
-      settings/settings-styles.ts   # the Settings sheet's styles
-      model/model-field.tsx         # the Scout model picker (Settings' "Scout's model")
-      voice/                        # push to talk, the listen controller, the speech queue, what is spoken aloud
-      theme/                        # design tokens
-      test-support/fake-host-bridge.ts
-    desktop/
-      electron.vite.config.ts       # main / preload / renderer builds
-      playwright.config.ts
-      electron-builder.json         # installer config: NSIS (Windows), dmg, AppImage, deb
-      scripts/ensure-electron.mjs   # fetches the Electron binary
-      scripts/fetch-native.mjs      # fetches get-windows' prebuilt binding before packaging
-      scripts/start-fresh.mjs       # runs the app on a new temp data folder
-      e2e/                          # smoke, brain-offline, hotkey-recovery, listening
-                                    # (Always listening), asks, permissions and jobs.spec.ts
-                                    # (Home's Jobs panel and a job's asks)
-      e2e/fixtures/fake-brain.ts    # a ws server speaking contract v1, for smoke, listening, asks, permissions, jobs
-      src/main/ipc/model.ts         # Settings' model_state / set_model calls to the brain
-      src/main/ipc/voice-models.ts  # Settings' stt_state / set_stt, tts_state / set_tts and voice_download / fetch_voice calls to the brain
-      src/main/                     # index.ts, brain/ (turn-events.ts,
-                                    # start.ts), context.ts,
-                                    # hotkeys.ts, talk-key.ts, always-listening.ts,
-                                    # tray-icon.ts, tray-menu.ts,
-                                    # sight-pause.ts, drop.ts, settings-store.ts, hide-secrets.ts,
-                                    # log-file.ts, ipc/,
-                                    # platform/, windows/
-      src/main/platform/            # capture, downscale, ocr,
-                                    # read-text, text-layer, sight-gate,
-                                    # window-helper, window-list, window-shot, selection, win32
-      src/main/windows/             # one module per window: avatar, panel, home
-      src/preload/index.ts          # exposes window.tagalong and window.tagalongHost
-      src/renderer/                 # avatar (Scout), panel (the bubble),
-                                    # and home (Home) HTML, src/*.tsx
-      src/renderer/src/settings/    # the Settings page, one file per section
-      src/shared/ipc.ts             # IPC channel names and the host-only API type
-      src/shared/                   # settings.ts (Settings schema and defaults), blind-spots.ts, voice.ts
-    browser/                        # browser body (Chromium MV3), built by Vite into dist/ (load unpacked)
-      src/manifest.ts               # the manifest as data; the build writes dist/manifest.json
-      src/body.ts, identity.ts      # the body: one BrainClient, tools, body id <browser>-<4 chars>
-      src/tools/, permissions.ts    # the tabs tool and the permission broker
-      src/popup/, src/permission/   # the toolbar popup and the permission windows (incl. mic.html)
-      src/voice/, src/offscreen/    # ask by voice: the session, the mic page hold, the offscreen mic page
-      src/content/page-reader.ts    # injected on demand: selection, URL, title, page text
+    ui/            shared React UI (bubble, dock pet, Home, walkthrough) and its React-free shapes
+    mascot/        the WebGL mascot engine
+    desktop/       the Electron body (main, preload, renderer, e2e/)
+    browser/       the browser body (Chromium MV3)
+    whatsapp/      the WhatsApp bridge (Node, bundled to one file)
+  docs/            one doc per subsystem, grouped in brain/, senses/, bodies/, data/, testing/
+  .github/         CI and release workflows
 ```
 
-| Package           | Responsibility                                                                                                                                                                                               |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `protocol/ts`     | `@tagalong/contract`: zod schemas for contract v1. Depends only on zod.                                                                                                                                      |
-| `bodies/ui`       | React components shared by hosts: `DockPet`, `CompanionBubble` and its cards, Home's `HomeView`, the first-run `Walkthrough`, and the `HostBridge` context. `@tagalong/ui/shapes` is the React-free part.    |
-| `bodies/mascot`   | `@tagalong/mascot`: the WebGL mascot engine (a fork of wobnimo, MIT) with props and custom moods. Private. See [mascot.md](bodies/mascot.md).                                                                |
-| `bodies/desktop`  | Electron host. Dials the Python brain over the loopback socket, and owns Scout's window, the bubble, Home, the tray, hotkeys, secret storage, and Scout's voice and ears.                                    |
-| `bodies/browser`  | Browser body (Chromium MV3). Dials the Python brain through `@tagalong/contract` and offers the `tabs` tool, with a permission window and a toolbar popup. It can listen by voice (listen only).             |
-| `bodies/whatsapp` | WhatsApp body (Node, bundled to one file). Takes Meta's signed webhook, says it to the brain through `@tagalong/contract`, sends the reply back; the brain starts it. See [whatsapp.md](bodies/whatsapp.md). |
+| Package           | Responsibility                                                                                                                                                                                                                                           |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `protocol/ts`     | `@tagalong/contract`: zod schemas for contract v1. Depends only on zod.                                                                                                                                                                                  |
+| `bodies/ui`       | React components shared by hosts: `DockPet`, `CompanionBubble` and its cards, Home's `HomeView`, the first-run `Walkthrough`, and the `HostBridge` context. `@tagalong/ui/shapes` is the React-free part.                                                |
+| `bodies/mascot`   | `@tagalong/mascot`: the WebGL mascot engine (a fork of wobnimo, MIT) with props and custom moods. Private. See [bodies/mascot.md](bodies/mascot.md).                                                                                                     |
+| `bodies/desktop`  | Electron body. Dials the Python brain over the loopback socket, and owns Scout's windows, the bubble, Home, the tray, hotkeys and the settings store. It forwards the microphone and plays the audio; the hearing and speaking models live in the brain. |
+| `bodies/browser`  | Browser body (Chromium MV3). Dials the Python brain through `@tagalong/contract` and offers the `tabs`, `page_parts`, `browser_search` and `tab_actions` tools, with a permission window and a toolbar popup. It can listen by voice (listen only).      |
+| `bodies/whatsapp` | WhatsApp body (Node, bundled to one file). Takes Meta's signed webhook, says it to the brain through `@tagalong/contract`, sends the reply back; the brain starts it. See [whatsapp.md](bodies/whatsapp.md).                                             |
 
 ## How to run
 
@@ -209,7 +140,7 @@ the browser body are not measured: the Playwright suites cover them.
   electron-vite, so they are `devDependencies`; the desktop's `dependencies` are exactly what the
   packaged app loads at runtime (the native modules and the voice libraries), which electron-builder
   copies. The full list is under "Bundling the workspace packages" in
-  [desktop.md](bodies/desktop.md#bundling-the-workspace-packages).
+  [bodies/desktop.md](bodies/desktop.md#bundling-the-workspace-packages).
 - **The browser body ships inside.** `bodies/browser/dist` is copied to `resources/extension`, so
   someone with only the installer can still load it unpacked. `pnpm package:win` from the root builds
   it first.
@@ -220,7 +151,7 @@ the browser body are not measured: the Playwright suites cover them.
   `resources/brain`. To bump uv, change both constants from the new release's `.sha256` file. The
   brain reads no `mode.txt`, so none is shipped. A new brain dependency (for example
   `faster-whisper`) needs no bundle change: `uv sync --frozen` installs it from `uv.lock` on first
-  run. The packaged build runs the final speech model on the CPU unless a CUDA toolkit is on PATH (no CUDA libraries are bundled). First-run use of these files is a later slice.
+  run. The packaged build runs the final speech model on the CPU unless a CUDA toolkit is on PATH (no CUDA libraries are bundled).
 - **Release.** Pushing a tag `vX.Y.Z` runs `.github/workflows/release.yml` on Windows: it checks the
   tag equals `v` plus the desktop `version`, runs `pnpm package:win`, and publishes the installer
   with `gh release create --generate-notes`. Bump `bodies/desktop/package.json` first, then tag.
@@ -260,18 +191,9 @@ runs somewhere.
 
 ### End-to-end tests and fakes
 
-The `e2e` CI job runs the Electron end-to-end suites. `bodies/desktop/e2e/` holds the Playwright suites
-that launch the built app: `smoke.spec.ts` (the bubble, talking, a tool call, pause, hotkeys, Home),
-`hotkey-recovery.spec.ts`
-(a key another app owns), `listening.spec.ts` (Always listening: off at launch, switched on, a turn
-that starts with "Scout" is heard and answered, switched off), `brain-offline.spec.ts`,
-`walkthrough.spec.ts` (the first-run tour and its key step, on a fake brain whose key state and `set_api_key` answers a test scripts), `asks.spec.ts` (the permission ask in the bubble), `approvals.spec.ts` (Home's Approvals page and
-the `approved` report card), `jobs.spec.ts` (Claude Code jobs and their cards), `permissions.spec.ts`
-(Home's Permissions list) and `where-things-run.spec.ts` (Overview's "Where things run" card). Run
-them with `pnpm --filter @tagalong/desktop test:e2e`.
+The `e2e` CI job runs the Electron end-to-end suites. `bodies/desktop/e2e/` holds the Playwright specs that launch the built app, one per feature: the bubble and a tool call (`smoke`), `chat`, `catch-up`, `asks`, `approvals`, `permissions`, `jobs`, `tasks`, `loops`, `connections`, `know-me`, `walkthrough`, `key-settings`, `where-things-run`, `file-folders`, listening (`listening`, `mic-meter`), interrupting (`interrupt`, `interrupt-key`), keys (`hotkey-recovery`), the brain being away (`brain-offline`) and the quiet log (`quiet-log`). `design-shots.spec.ts` saves screenshots for design review. Run them all with `pnpm --filter @tagalong/desktop test:e2e`.
 
-The suites run offline on fakes. The desktop answers turns only through a brain, so `smoke.spec.ts` and
-`listening.spec.ts` start `e2e/fixtures/fake-brain.ts`, a `ws` server that speaks contract v1 (it answers
+The suites run offline on fakes. The desktop answers turns only through a brain, so the specs start `e2e/fixtures/fake-brain.ts`, a `ws` server that speaks contract v1 (it answers
 `hello`, then every `say` with one scripted reply; it also answers Home's permission and jobs tools and, for a
 say that mentions "permission" or "hand off", opens the asks `asks.spec.ts` and `jobs.spec.ts` need), and pass
 its address as `TAGALONG_BRAIN_ADDR`.
@@ -306,7 +228,7 @@ yourself (`cd brain && uv run brain`) is used as is. Set `TAGALONG_START_BRAIN=0
 the desktop starting one.
 
 The packaged app runs the same launch with `resources\uv\uv.exe` and `resources\brain`, syncing
-the brain's dependencies first; see [desktop.md](bodies/desktop.md).
+the brain's dependencies first; see [bodies/desktop.md](bodies/desktop.md).
 
 To see what a new user sees, run `pnpm --filter @tagalong/desktop
 start:fresh`: it starts on a new folder in the temp directory (`--user-data-dir`), so your own `%APPDATA%\Tagalong` is never touched. Quit any
@@ -320,7 +242,7 @@ you normally never call it yourself.
 
 ### Choosing Scout's brain
 
-The Python brain picks Scout's model and holds its keys (see [brain.md](brain/README.md)). You enter your Anthropic key in the app: the first-run walkthrough asks for it, and **Settings → Anthropic key** changes it and the daily limit. A real `ANTHROPIC_API_KEY` in the environment still works and wins (the developer path). **Settings → Scout's model** picks the Claude model (the brain saves it). The desktop has no provider picker and no sign-in check.
+The Python brain picks Scout's model and holds its keys (see [brain/README.md](brain/README.md)). You enter your Anthropic key in the app: the first-run walkthrough asks for it, and **Settings → Anthropic key** changes it and the daily limit. A real `ANTHROPIC_API_KEY` in the environment still works and wins (the developer path). **Settings → Scout's model** picks the Claude model (the brain saves it). The desktop has no provider picker and no sign-in check.
 
 Once running: Scout sits on screen as a small always-on-top window, `Ctrl+Shift+Space` captures the
 selection and the active window and opens the bubble beside it, Escape or focus loss hides the
@@ -354,8 +276,8 @@ immediately, with no restart.
 ### Scout
 
 A fresh install starts with one companion, **Scout**, which lives in the Python brain. Memories and
-conversations are the brain's, saved in its own store (see [memory.md](data/memory.md) and
-[brain.md](brain/README.md)).
+conversations are the brain's, saved in its own store (see [data/memory.md](data/memory.md) and
+[brain/README.md](brain/README.md)).
 
 ### Capture
 
@@ -367,10 +289,7 @@ that capture is blocked here, naming only the exclusion entry that matched.
 
 ### No pairing token
 
-The Python brain has no pairing token: it is single user and listens on `127.0.0.1`, and a body's
-`hello` carries only the protocol version, its kind and its tools (see
-`hello` carries only the protocol version, its kind and its tools (see
-[protocol/README.md](../protocol/README.md)). The desktop shows no pairing step.
+The Python brain has no pairing token: it is single user and listens on `127.0.0.1`. A body's `hello` carries the protocol version, its id, kind and name, its tools and an optional `last_seq` (see [protocol/README.md](../protocol/README.md)). The desktop shows no pairing step.
 
 The data directory is `%APPDATA%\Tagalong` on Windows, which is `productName` in
 `bodies/desktop/package.json`: Electron derives it from there, and changing it moves everyone's
@@ -381,7 +300,7 @@ settings and saved keys with no migration.
 The browser body is a second body for the Python brain: it offers Scout the `tabs`, `page_parts`,
 `browser_search` and `tab_actions` tools, and you can ask Scout from a right-click on selected text or
 the address bar. It has no chat and no side panel; Scout talks in the desktop bubble. Everything is in
-[browser-body.md](bodies/browser.md).
+[bodies/browser.md](bodies/browser.md).
 
 **It needs the brain running.** The body dials the brain on `127.0.0.1:47321` (change it in the
 popup) and retries by itself, so start a brain first (`pnpm dev:desktop` does, or `cd brain && uv run brain`).
@@ -423,7 +342,7 @@ opens a `.env` file. Copying it therefore changes nothing at runtime.
 
 The desktop reads the variables below straight from the process environment. **Set them in the
 shell you launch from**, as shown above. The brain's variables (its key, model, budget and limits) are
-listed in `.env.example` and described in [brain.md](brain/README.md).
+listed in `.env.example` and described in [brain/README.md](brain/README.md).
 
 | Variable                | Status                                                                                                                                                                                                                                   |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -448,18 +367,23 @@ listed in `.env.example` and described in [brain.md](brain/README.md).
   it. Comments explain why, limits, units and parse-compat rules; phase numbers, PR references and
   history belong in git. Test files get a one-line header.
 - **Commits** use Conventional Commits, for example `feat(desktop): add the capture notice`.
-- **Diagrams** are Mermaid only, and every block starts with the monochrome init line the docs
-  share (copy it from any doc in `docs/`): grey lines and titles, so diagrams read on GitHub's light
-  and dark themes.
+- **Diagrams** are Mermaid only, black and white, and must read on a dark background and a light one. Every block starts with exactly this init line (copy it from any doc in `docs/`):
+
+  ```text
+  %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
+
+  ```
+
+  Use no `classDef`, `style` or `linkStyle`, no colours and no emoji; lines, arrows and titles are mid grey and the boxes are white with black text, so nothing disappears on either background. Check a diagram by rendering it on both a black and a white page and reading every label.
 
 ## Known gaps
 
 Gaps that are real in the code on `main`, each explained in the doc it links to.
 
 - **No Fast Refresh in dev.** The renderer uses Vite's esbuild JSX transform, not
-  `@vitejs/plugin-react`. See [desktop.md](bodies/desktop.md#bundling-the-workspace-packages).
+  `@vitejs/plugin-react`. See [bodies/desktop.md](bodies/desktop.md#bundling-the-workspace-packages).
 - **Windows only, unsigned installer.** There is no macOS or Linux platform adapter, so the app
   stops at launch there; the Windows installer is unsigned. See
-  [desktop.md](bodies/desktop.md#the-platform-adapter) and [desktop.md](bodies/desktop.md#packaging).
+  [bodies/desktop.md](bodies/desktop.md#the-platform-adapter) and [bodies/desktop.md](bodies/desktop.md#packaging).
 - **Real voice models are not run in CI.** The Python tests use fake adapters and the Electron
-  suites run on a fake brain, so synthesis and transcription run only on a real machine. See [voice.md](senses/voice.md#tests-that-pin-it).
+  suites run on a fake brain, so synthesis and transcription run only on a real machine. See [hearing.md](senses/hearing.md) and [speaking.md](senses/speaking.md).
