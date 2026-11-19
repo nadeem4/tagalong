@@ -13,32 +13,32 @@ source of truth; each doc cites the files it describes. How to build and run fro
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | [architecture.md](architecture.md)             | Processes, packages and import rules, host contracts, the host transport, the life of one turn, boot and shutdown, the subsystem map |
 | [../protocol/README.md](../protocol/README.md) | Contract v1 between the Python brain and the bodies: the source of truth                                                             |
-| [brain.md](brain/README.md)                           | The Python brain: how to run it, its files, hello and tools, the outbox and replay, what is not built yet                            |
+| [brain.md](brain/README.md)                    | The Python brain: how to run it, its files, hello and tools, the outbox and replay, what is not built yet                            |
 | [principles.md](principles.md)                 | The rules the code follows: one brain and many bodies, what code does versus what the model decides, no technical debt               |
 
 ### Hosts
 
-| Doc                                | Covers                                                                                                                         |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| [desktop.md](bodies/desktop.md)           | The Electron host: windows, tray, hotkeys, IPC modules, the platform adapter, settings applied live, packaging, the log file   |
-| [bubble.md](senses/bubble.md)             | The companion bubble in `bodies/ui`: status marks, drops                                                                       |
-| [mascot.md](bodies/mascot.md)             | The mascot engine in `bodies/mascot`: the wobnimo fork, specs, moods, custom moods, parts per mood, props                      |
-| [voice.md](senses/voice.md)               | Hearing and speaking: the talk key, always listening, follow-up, talking over Scout, the system voice                          |
+| Doc                                  | Covers                                                                                                                         |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| [desktop.md](bodies/desktop.md)      | The Electron host: windows, tray, hotkeys, IPC modules, the platform adapter, settings applied live, packaging, the log file   |
+| [bubble.md](senses/bubble.md)        | The companion bubble in `bodies/ui`: status marks, drops                                                                       |
+| [mascot.md](bodies/mascot.md)        | The mascot engine in `bodies/mascot`: the wobnimo fork, specs, moods, custom moods, parts per mood, props                      |
+| [voice.md](senses/voice.md)          | Hearing and speaking: the talk key, always listening, follow-up, talking over Scout, the system voice                          |
 | [browser-body.md](bodies/browser.md) | The browser body: identity, its four tools, right-click and address-bar asks, permissions, popup, install                      |
-| [whatsapp.md](bodies/whatsapp.md)         | The WhatsApp body: one-time Meta setup, Home > Connections > Bodies, webhook rules, Graph send, 24-hour window, build and test |
+| [whatsapp.md](bodies/whatsapp.md)    | The WhatsApp body: one-time Meta setup, Home > Connections > Bodies, webhook rules, Graph send, 24-hour window, build and test |
 
 ### Perception, memory and apps
 
-| Doc                                    | Covers                                                                          |
-| -------------------------------------- | ------------------------------------------------------------------------------- |
+| Doc                                           | Covers                                                                          |
+| --------------------------------------------- | ------------------------------------------------------------------------------- |
 | [sight.md](senses/sight.md)                   | Perception: window list, captures, OCR, exclusions, focus events, pausing sight |
-| [memory.md](data/memory.md)                 | The memory store, recall, summaries, forgetting, the saved chat                 |
+| [memory.md](data/memory.md)                   | The memory store, recall, summaries, forgetting, the saved chat                 |
 | [connected-apps.md](bodies/connected-apps.md) | MCP connections, tool calls, approvals for writes                               |
 
 ### Foundations
 
-| Doc                                                | Covers                                                                      |
-| -------------------------------------------------- | --------------------------------------------------------------------------- |
+| Doc                                                     | Covers                                                                      |
+| ------------------------------------------------------- | --------------------------------------------------------------------------- |
 | [settings-and-secrets.md](data/settings-and-secrets.md) | The settings store, secrets on the way out                                  |
 | [privacy.md](data/privacy.md)                           | What is captured, sent, kept and deleted                                    |
 | [storage.md](data/storage.md)                           | Every store by kind: tables, files, secrets, caches, body-side, memory only |
