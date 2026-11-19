@@ -5,6 +5,7 @@ Image and document blocks are stored as text markers, so the file never holds sc
 
 import json
 import sqlite3
+from dataclasses import dataclass
 
 from brain.protocol import BODY_DESKTOP
 from brain.store.db import transaction
@@ -107,3 +108,31 @@ def load_messages(db: sqlite3.Connection, include_cut: bool = False) -> list[dic
     where = "" if include_cut else "WHERE cut=0 "
     rows = db.execute(f"SELECT role, content_json FROM messages {where}ORDER BY id")
     return [{"role": r, "content": json.loads(c)} for r, c in rows]
+
+
+@dataclass(frozen=True)
+class ChatRow:
+    id: int
+    role: str
+    text: str
+    source: str | None
+    at: str
+
+
+def since(db: sqlite3.Connection, after_id: int | None, limit: int) -> tuple[list[ChatRow], bool]:
+    """Saved messages with words, oldest first: those after `after_id`, or the last `limit` when
+    it is None or names no row. `more` is true when rows were left out."""
+    known = (
+        after_id is not None
+        and db.execute("SELECT 1 FROM messages WHERE id=?", (after_id,)).fetchone()
+    )
+    cols = "SELECT id, role, text, source, at FROM messages WHERE cut=0 AND text!=''"
+    if known:
+        rows = db.execute(f"{cols} AND id>? ORDER BY id LIMIT ?", (after_id, limit + 1)).fetchall()
+        more = len(rows) > limit
+        rows = rows[:limit]
+    else:
+        rows = db.execute(f"{cols} ORDER BY id DESC LIMIT ?", (limit + 1,)).fetchall()
+        more = len(rows) > limit
+        rows = rows[:limit][::-1]
+    return [ChatRow(*r) for r in rows], more

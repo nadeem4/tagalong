@@ -82,3 +82,37 @@ def test_saved_user_rows_keep_their_event_and_source(tmp_path):
     ]
     conversation.set_cut(db, ids[:2], True)
     assert conversation.load_messages(db) == [msgs[2]]
+
+
+def _chat(db, n):
+    msgs = [{"role": "assistant", "content": f"m{i}"} for i in range(n)]
+    return conversation.save_messages(db, msgs, AT, sources=[None] * n)
+
+
+def test_since_returns_rows_after_an_id(tmp_path):
+    db = _db(tmp_path)
+    ids = _chat(db, 4)
+    rows, more = conversation.since(db, ids[1], 10)
+    assert [r.text for r in rows] == ["m2", "m3"] and not more
+    assert rows[0].id == ids[2] and rows[0].role == "assistant" and rows[0].at == AT
+
+
+def test_since_with_no_id_returns_the_last_rows(tmp_path):
+    db = _db(tmp_path)
+    _chat(db, 5)
+    rows, more = conversation.since(db, None, 2)
+    assert [r.text for r in rows] == ["m3", "m4"] and more
+
+
+def test_since_reports_more_when_limited(tmp_path):
+    db = _db(tmp_path)
+    ids = _chat(db, 5)
+    rows, more = conversation.since(db, ids[0], 2)
+    assert [r.text for r in rows] == ["m1", "m2"] and more
+
+
+def test_since_an_unknown_id_acts_as_none(tmp_path):
+    db = _db(tmp_path)
+    _chat(db, 3)
+    rows, _ = conversation.since(db, 999, 2)
+    assert [r.text for r in rows] == ["m1", "m2"]

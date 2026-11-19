@@ -22,6 +22,7 @@ from brain.bodies import Bodies
 from brain.bodies_tools import bodies_tools
 from brain.bridges import ENTRY, WHATSAPP_SECRETS, BridgeSupervisor, private_node, real_spawn
 from brain.build_info import app_version, build_id
+from brain.chat_tools import chat_tools
 from brain.config import in_quiet_hours, load_config, load_env_file, session_id
 from brain.events import EventLog
 from brain.events_tools import events_tools
@@ -290,6 +291,7 @@ async def _run() -> None:
             OpenItems(memory.db, lambda: datetime.now(UTC)),
         )
         + events_tools(memory.db, lambda: datetime.now(UTC))
+        + chat_tools(memory.db)
         + loop_tools(loops)
         + brain_status_tools(brain_status)
         + home_update_tools(updates)
