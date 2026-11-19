@@ -439,6 +439,8 @@ export interface HostBridge {
   listJobs(): Promise<JobRow[]>;
   /** Stops one running job; rejects when the brain refuses (already ended, say). */
   stopJob(job: string): Promise<void>;
+  /** Stops a whole task (its jobs, timers and cards); rejects when the brain refuses (unknown task). */
+  stopTask(task: string): Promise<void>;
   /** A job's steps after `afterRev` (0 for all); rejects for an unknown job. */
   jobActivity(job: string, afterRev: number): Promise<JobActivityPage>;
   /** One part's report (masked by the brain), or null if it has none; rejects for an unknown part. */

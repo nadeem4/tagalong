@@ -76,6 +76,8 @@ export interface FakeBrain {
   setTimers(rows: Record<string, unknown>[]): void;
   /** Every timer id Home sent to `timer_cancel`, in order. */
   timerCancels: string[];
+  /** Every task id Home sent to `task_stop`, in order. */
+  taskStops: string[];
   /** Every updates call Home made, in order: `check`, `item app files`, `all app`, `auto app community on`. */
   updateCalls: string[];
   /** Replace fields of the `updates_state` answer and the rows `list_apps` answers, then tell the bodies `changed: updates`. */
@@ -433,6 +435,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   const loopCalls: string[] = [];
   let timers: Record<string, unknown>[] = [];
   const timerCancels: string[] = [];
+  const taskStops: string[] = [];
   const loopApps = [{ id: 'gmail', name: 'Gmail', on: false }];
   let heldLoops: Record<string, unknown>[] = [];
   const stops: string[] = [];
@@ -1353,7 +1356,10 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             ],
           };
         } else if (params.tool === 'timers_state') value = { timers };
-        else if (params.tool === 'timer_cancel') {
+        else if (params.tool === 'task_stop') {
+          taskStops.push(String(params.input?.task));
+          value = { stopped: [String(params.input?.task)] };
+        } else if (params.tool === 'timer_cancel') {
           timerCancels.push(String(params.input?.id));
           timers = timers.filter((t) => t.id !== params.input?.id);
           notify('changed', { what: 'timers' });
@@ -1442,6 +1448,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     permissionSets,
     loopCalls,
     timerCancels,
+    taskStops,
     updateCalls,
     setUpdates: (patch, apps) => {
       updatesState = { ...updatesState, ...patch };

@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 from brain.masking import Masker
+from brain.protocol import ErrorCode, RpcError
 from brain.store import events as store_events
 from brain.store.db import open_db
 from brain.store.events import EventRow
@@ -110,9 +111,24 @@ async def test_task_end_refuses_an_unknown_or_ended_task(rig):
 
 
 def test_both_tools_are_scouts_own_and_run_on_their_own(rig):
-    for spec in rig.specs.values():
+    for spec in (rig.specs["task_start"], rig.specs["task_end"]):
         assert (spec.audience, spec.effect, spec.default_mode) == (
             frozenset({"scout"}),
             "change",
             "auto",
         )
+
+
+async def test_task_stop_from_home_stops_the_task(rig):
+    tid = rig.tasks.open("do", "desktop-1", title="fix the build")
+    assert rig.specs["task_stop"].audience == frozenset({"home"})
+    assert rig.specs["task_stop"].effect == "change"
+    out = json.loads(await rig.call("task_stop", {"task": tid}))
+    assert out == {"stopped": [tid]}
+    assert rig.tasks.get(tid).state == "stopped"
+
+
+async def test_task_stop_of_an_unknown_task_is_invalid_params(rig):
+    with pytest.raises(RpcError) as err:
+        await rig.call("task_stop", {"task": "nope"})
+    assert err.value.code == ErrorCode.invalid_params

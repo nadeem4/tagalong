@@ -67,6 +67,7 @@ export const IPC = {
   whatsappSet: 'tagalong:bodies:whatsapp-set',
   listJobs: 'tagalong:jobs:list',
   stopJob: 'tagalong:jobs:stop',
+  stopTask: 'tagalong:tasks:stop',
   jobActivity: 'tagalong:jobs:activity',
   jobReport: 'tagalong:jobs:report',
   runningSteps: 'tagalong:jobs:running-steps',

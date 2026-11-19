@@ -120,6 +120,8 @@ export interface FakeHostBridge extends HostBridge {
   jobs: JobRow[];
   /** Every stopJob call's job id, in order. */
   readonly jobStops: readonly string[];
+  /** Every stopTask call's task id, in order. */
+  readonly taskStops: readonly string[];
   /** How many times Retry was pressed on the brain setup line. */
   readonly setupRetries: () => number;
   /** The brain card's calls in order: `restart`, `restart-after-work`, `open-folder`, `open-log`, `copy-details`. */
@@ -304,6 +306,7 @@ export function createFakeHostBridge(
   const whatsappChanges: WhatsAppChange[] = [];
   const readingCalls: string[] = [];
   const jobStops: string[] = [];
+  const taskStops: string[] = [];
   let setupRetries = 0;
   const brainActions: string[] = [];
   const activityCalls: [string, number][] = [];
@@ -627,6 +630,7 @@ export function createFakeHostBridge(
     },
     jobs: (options.jobs ?? []).map((row) => ({ ...row })),
     jobStops,
+    taskStops,
     setupRetries: () => setupRetries,
     brainActions,
     usageSummary() {
@@ -800,6 +804,10 @@ export function createFakeHostBridge(
     },
     stopJob(job) {
       jobStops.push(job);
+      return Promise.resolve();
+    },
+    stopTask(task) {
+      taskStops.push(task);
       return Promise.resolve();
     },
     jobActivity(job, afterRev) {

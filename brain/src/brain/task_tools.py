@@ -1,4 +1,4 @@
-"""Scout's task tools: start a Do, Later or Own task, and end one.
+"""Scout's task tools: start a Do, Later or Own task, and end one. Home's stops one.
 
 Ask and Watch tasks are made by code, never by Scout. Ending a task cancels its planned timers
 and watches, but never while a job still runs under it: Scout stops the job first.
@@ -7,6 +7,7 @@ and watches, but never while a job still runs under it: Scout stops the job firs
 import json
 from collections.abc import Callable
 
+from brain.protocol import ErrorCode, RpcError
 from brain.store.memory import MemoryRefused
 from brain.tasks import Tasks
 from brain.timers import Timers
@@ -48,6 +49,13 @@ def task_tools(
         tasks.end(id, "done", result=result)
         return json.dumps({"task": id, "state": "done"})
 
+    async def task_stop(args: dict) -> str:
+        id = args.get("task")
+        row = tasks.get(id) if isinstance(id, str) else None
+        if row is None:
+            raise RpcError(ErrorCode.invalid_params, f"There is no task {id}.")
+        return json.dumps({"stopped": await tasks.stop(id, "home")})
+
     start = ToolSpec(
         "task_start",
         "Open a task for work that outlives this reply. kind do: background work (a hand-off or "
@@ -77,4 +85,15 @@ def task_tools(
         effect="change",
         default_mode="auto",
     )
-    return [(start, task_start), (end, task_end)]
+    stop = ToolSpec(
+        "task_stop",
+        "Stop a task: its jobs, timers and cards go, and so do the tasks it started.",
+        {
+            "type": "object",
+            "properties": {"task": {"type": "string"}},
+            "required": ["task"],
+        },
+        frozenset({"home"}),
+        effect="change",
+    )
+    return [(start, task_start), (end, task_end), (stop, task_stop)]

@@ -16,7 +16,7 @@ A card of yours ran out its wait with no answer (ask, tool, summary, reason). No
 
 ## task_stop
 
-The owner pressed Stop task on a card (task, by): that task is over and its waiting cards are gone. Do not carry on with it or start it again unless they ask. Say nothing unless a word helps, such as what was left undone.
+The owner pressed Stop task on a card, or stopped it from Home (task, by): that task is over, its jobs, timers and waiting cards are gone, and so are the tasks it started. Do not carry on with it or start it again unless they ask. Say nothing unless a word helps, such as what was left undone.
 
 ## ask_ended
 

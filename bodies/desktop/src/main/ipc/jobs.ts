@@ -1,6 +1,7 @@
 /**
- * IPC for Home's Jobs panel: list Claude Code jobs, stop one, and read a job's steps. All go
- * through the brain's tools (list_jobs, stop_job, job_activity); the brain owns job state and
+ * IPC for Home's Jobs panel: list Claude Code jobs, stop one, stop a whole task, and read a job's
+ * steps. All go through the brain's tools (list_jobs, stop_job, task_stop, job_activity); the
+ * brain owns job state and
  * refuses a stop it must not do, so a refusal rejects here and the panel shows the truth again.
  * Contains registerJobsIpc.
  */
@@ -85,6 +86,11 @@ export function registerJobsIpc(handle: IpcHandle, deps: { brain: BrainCall }): 
     // The brain would refuse an unknown id too; a page that sends a non-string is not ours.
     if (typeof job !== 'string' || job === '') throw new Error('bad job id');
     await brain.call('stop_job', { job });
+  });
+  // Stop the task, not one job: its jobs, timers and cards all end (the brain does it).
+  handle(IPC.stopTask, async (_event, task: unknown) => {
+    if (typeof task !== 'string' || task === '') throw new Error('bad task id');
+    await brain.call('task_stop', { task });
   });
   handle(IPC.jobActivity, async (_event, job: unknown, afterRev: unknown) => {
     if (typeof job !== 'string' || job === '') throw new Error('bad job id');

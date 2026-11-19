@@ -161,6 +161,7 @@ const bridge: PreloadBridge = {
   copyBrainDetails: () => ipcRenderer.invoke(IPC.brainCopyDetails) as Promise<void>,
   listJobs: () => ipcRenderer.invoke(IPC.listJobs) as Promise<JobRow[]>,
   stopJob: (job: string) => ipcRenderer.invoke(IPC.stopJob, job) as Promise<void>,
+  stopTask: (task: string) => ipcRenderer.invoke(IPC.stopTask, task) as Promise<void>,
   jobActivity: (job: string, afterRev: number) =>
     ipcRenderer.invoke(IPC.jobActivity, job, afterRev) as Promise<JobActivityPage>,
   jobReport: (job: string, part: string) =>

@@ -124,6 +124,14 @@ describe('registerJobsIpc', () => {
     expect(calls).toEqual([['stop_job', { job: 'j1' }]]);
   });
 
+  it('stops a task through the brain and refuses a bad task id', async () => {
+    const { invoke, calls } = setup(() => text({ stopped: ['k1'] }));
+    await invoke(IPC.stopTask, 'k1');
+    expect(calls).toEqual([['task_stop', { task: 'k1' }]]);
+    await expect(invoke(IPC.stopTask, '')).rejects.toThrow('bad task id');
+    expect(calls).toHaveLength(1);
+  });
+
   it('rejects when the brain refuses the stop', async () => {
     const { invoke } = setup(() => Promise.reject(new RpcError(-32602, 'not running')));
     await expect(invoke(IPC.stopJob, 'j1')).rejects.toBeInstanceOf(RpcError);
@@ -241,9 +249,16 @@ describe('registerJobsIpc', () => {
     await expect(invoke(IPC.jobReport, 'j1', 'p1')).rejects.toThrow('brain sent bad report');
   });
 
-  it('handles its five channels and nothing else', () => {
+  it('handles its six channels and nothing else', () => {
     expect(setup(() => []).channels()).toEqual(
-      [IPC.listJobs, IPC.stopJob, IPC.jobActivity, IPC.jobReport, IPC.runningSteps].sort(),
+      [
+        IPC.listJobs,
+        IPC.stopJob,
+        IPC.stopTask,
+        IPC.jobActivity,
+        IPC.jobReport,
+        IPC.runningSteps,
+      ].sort(),
     );
   });
 });
