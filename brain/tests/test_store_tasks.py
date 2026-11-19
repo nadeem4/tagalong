@@ -88,6 +88,22 @@ def test_laters_to_settle_skips_a_later_with_a_planned_timer_or_new_event(db):
     assert tasks.laters_to_settle(db) == ["quiet"]
 
 
+def test_owns_to_settle_skips_an_own_task_with_an_open_item(db):
+    for id in ("told", "waiting", "card", "untold", "bare"):
+        tasks.insert(db, task(id, kind="own"))
+    events.insert(db, event("e1", "told", "handled", kind="setup_done"))
+    events.insert(db, event("e2", "waiting", "handled", kind="setup_done"))
+    events.insert(db, event("e3", "waiting", "new", kind="setup_done"))
+    events.insert(db, event("e4", "card", "handled", kind="setup_done"))
+    events.insert(db, event("e5", "untold", "taken", kind="setup_done"))
+    db.execute(
+        "INSERT INTO open_items(id, kind, task_id, state, created_at, deadline_at, window_s)"
+        " VALUES ('i1','offer','card','open',?,?,1)",
+        (T, LATER),
+    )
+    assert tasks.owns_to_settle(db) == ["told"]  # "bare" has no event: nothing says it was told
+
+
 def test_last_event_at(db):
     tasks.insert(db, task("t1"))
     assert tasks.last_event_at(db, "t1") is None

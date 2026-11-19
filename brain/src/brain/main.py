@@ -167,7 +167,11 @@ async def _run() -> None:
     events = EventLog(memory.db, masker, lambda: datetime.now().astimezone())
     events.on_change = lambda: bodies.notify("changed", {"what": "events"})
     # Setup news waits in the event log until a turn tells it; the session exists later.
-    emit_event = SetupEvents(lambda event: session.post_event(event), events.finish_matching).emit
+    emit_event = SetupEvents(
+        lambda event: session.post_event(event),
+        events.finish_matching,
+        lambda source, title: session.tasks.open("own", source, title=title),
+    ).emit
     logins = LoginDriver(
         config.data_dir, experts, real_open_terminal, emit_event, setup_items, notify=bodies.notify
     )
