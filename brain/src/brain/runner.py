@@ -408,9 +408,9 @@ class Runner:
         """The body a turn for this event runs on, or None when no body displays (the event
         then waits). Only a body that displays is ever chosen: a reply sent to one that shows
         nothing is lost. An event a body sent (a say, a tap on the phone) answers there. Else a
-        say goes where the person is, and news where the person is, else back to the body that
-        caused it; else the first screen. The phone is otherwise chosen only when no screen is
-        online: Scout speaks first on a screen."""
+        say goes where the person is, and news where the person is, else the body its task came
+        from; else the first screen. The phone is otherwise chosen only when no screen is online:
+        Scout speaks first on a screen."""
         shown = self._bodies.display_ids()
         if row.source in shown:
             return row.source
@@ -420,7 +420,8 @@ class Runner:
 
         wanted = [self._presence.using_now()]
         if row.kind not in PERSON_KINDS:
-            wanted.append(self._events.origin_body(row.id, lambda s: not is_internal(s)))
+            source = self._tasks.source_of(row.task)
+            wanted.append(source if source and not is_internal(source) else None)
         return next((b for b in wanted if fits(b)), shown[0] if shown else None)
 
     def gate(self, row: EventRow, at_break: bool = False) -> bool:

@@ -355,7 +355,3 @@ class EventLog:
                 hook(state)
             except Exception:
                 _log.exception("an event's on_end failed id=%s", id)
-
-    def origin_body(self, id: str, is_body: Callable[[str], bool]) -> str | None:
-        """The first source on the way back through `caused_by` that is a body."""
-        return next((r.source for r in store.chain(self._db, id) if is_body(r.source)), None)

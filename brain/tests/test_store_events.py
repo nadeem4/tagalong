@@ -57,13 +57,6 @@ def test_set_taken_moves_only_new_rows(db):
     assert events.get(db, "e1").turn_id == "t1"
 
 
-def test_chain_walks_caused_by(db):
-    events.insert(db, row("e1"))
-    events.insert(db, row("e2", caused_by="e1"))
-    events.insert(db, row("e3", caused_by="e2"))
-    assert [r.id for r in events.chain(db, "e3")] == ["e3", "e2", "e1"]
-
-
 def test_state_check_refuses_unknown_state(db):
     events.insert(db, row("e1"))
     with pytest.raises(sqlite3.IntegrityError):
