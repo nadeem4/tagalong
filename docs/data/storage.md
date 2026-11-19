@@ -21,37 +21,35 @@ below go table by table.
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
 flowchart LR
+  brain["Python brain"]
+  desk["Desktop launch.ts"]
+  desk2["Desktop main process"]
   subgraph home["TAGALONG_HOME"]
     db[("tagalong.db<br/>WAL: chat, memory, work, rules,<br/>events, tasks, settings")]
     env[".env<br/>API key, daily limit, WhatsApp values"]
-    log["brain.log"]
-    pid["brain.pid"]
-    cache["cache/<br/>*-registry.json, login-*.done"]
-    voice["voice/<br/>models, tts/, cuda/ DLLs"]
-    runtime["runtime/node<br/>(Tagalong's own Node)"]
-    tools["tools/&lt;expert&gt;/ and experts.json<br/>(installed experts)"]
-    apps["app-tokens.json, app-oauth/<br/>(connected apps' secrets)"]
+    logs["brain.log, brain.pid"]
+    dl["cache/ (registry lists, login marks)<br/>voice/ (models, tts/, cuda/ DLLs)<br/>runtime/node (Tagalong's own Node)"]
+    inst["tools/&lt;expert&gt;/, experts.json<br/>app-tokens.json, app-oauth/"]
+    uvdirs["runtime/venv, runtime/python, cache/uv<br/>(packaged app only)"]
   end
   subgraph ud["Electron userData"]
     set["settings.json (.bak, .corrupt)"]
     dlog["logs/tagalong.log"]
   end
-  brain["Python brain"] -->|"store/ (the only SQL)"| db
-  brain -->|"upsert_env_values: key set, Home"| env
-  brain -->|"logging"| log
-  desk["Desktop launch.ts"] -->|"appends uv output"| log
-  brain -->|"lifecycle.write_pid"| pid
-  brain -->|"setup/net.py"| cache
-  brain -->|"voice/ downloads"| voice
-  brain -->|"setup/node_runtime.py"| runtime
-  brain -->|"setup/install.py"| tools
-  brain -->|"app_oauth.py, apps.py"| apps
-  desk2["Desktop main process"] -->|"SettingsStore"| set
+  brain -->|"store/ (the only SQL)"| db
+  brain -->|"upsert_env_values"| env
+  brain -->|"logging, lifecycle.write_pid"| logs
+  brain -->|"setup/net.py, voice/,<br/>setup/node_runtime.py"| dl
+  brain -->|"setup/install.py,<br/>app_oauth.py, apps.py"| inst
+  desk -->|"appends uv output"| logs
+  desk -->|"uv sync, packaged"| uvdirs
+  desk2 -->|"SettingsStore"| set
   desk2 -->|"log-file.ts"| dlog
 ```
 
-Notice that only the brain writes under `TAGALONG_HOME` (the desktop only appends the brain's launch
-output to `brain.log`), and that the desktop's settings never reach the brain. `.env` is the one file
+Notice that the brain writes almost everything under `TAGALONG_HOME`. The desktop only appends the
+brain's launch output to `brain.log` and, when packaged, has uv install the brain's Python and venv
+under `runtime/` and `cache/uv`. The desktop's settings never reach the brain. `.env` is the one file
 other tools may edit by hand; `cache/`, `voice/` and `runtime/` can be deleted and are fetched again.
 
 ## Store layer
@@ -286,9 +284,9 @@ What Scout remembers across restarts, by kind.
 | `period`          | TEXT                | `year` for a dated fact, `day` for a summary; null for core                                                                            |
 | `span_start`      | TEXT                | First year of a dated fact (`'2019'`), or the start of an episodic entry; null for undated core                                        |
 | `span_end`        | TEXT                | End of that time                                                                                                                       |
-| `source_msg_from` | INTEGER             | First chat message the entry was made from; not set yet                                                                                |
-| `source_msg_to`   | INTEGER             | Last chat message it was made from; not set yet                                                                                        |
-| `source_work_id`  | TEXT                | The work row it describes; not set yet                                                                                                 |
+| `source_msg_from` | INTEGER             | First chat message the entry was made from; nothing sets it                                                                            |
+| `source_msg_to`   | INTEGER             | Last chat message it was made from; nothing sets it                                                                                    |
+| `source_work_id`  | TEXT                | The work row it describes; nothing sets it                                                                                             |
 | `tag`             | TEXT                | Topic of a fact (`work`, `skills`, `personal`, ...); empty for old rows                                                                |
 | `source`          | TEXT                | `chat` (default), or where a `profile` fact came from (`github`, `linkedin`, `web`); `know` for the portrait                           |
 | `source_ref`      | TEXT                | The page or repo a profile fact came from; null otherwise                                                                              |
@@ -316,7 +314,7 @@ The `settings` row `know_me_offer` (JSON text: `offered_at`, `declined`, `last_r
 - Upgrade: migration `0033_memory_profile` adds `tag`, `source`, `source_ref`, `evidence` and
   `visibility` (old rows: `chat`, no tag, `free`) and creates `memory_dismissed`.
 - Upgrade: migration `0034_memory_category` adds `category`. No backfill: old rows stay
-  uncategorised and undated, and the span columns from 0025 now also carry a fact's years.
+  uncategorised and undated, and the span columns from 0025 also carry a fact's years.
 
 `memories_fts` is an FTS5 index over `memories.text`, built and searched the same way as
 `messages_fts`; it backs the `recall` tool.

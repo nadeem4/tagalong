@@ -19,13 +19,13 @@ flowchart LR
     brain["Python brain"]
     local["Stays here: audio (heard on the CPU),<br/>memory, tagalong.db, screenshots (never saved)"]
   end
-  brain -->|"each turn: your words, screen text you asked about,<br/>memory notes, Now line; web search and fetch"| anth["Anthropic API"]
-  brain -->|"hand-offs, on your own login"| exp["Expert CLIs<br/>(Claude Code and others)"]
-  brain -->|"tool calls you allowed"| mcp["Connected apps (MCP)"]
-  brain -->|"public lists, your search words"| reg["Registries: cdn.agentclientprotocol.com,<br/>registry.modelcontextprotocol.io"]
-  brain -->|"model files only, no text or audio"| dl["Hugging Face, files.pythonhosted.org (CUDA wheels),<br/>nodejs.org, registry.npmjs.org"]
-  brain -->|"only when you start it"| know["Get to know me: api.github.com,<br/>the web through Anthropic's tools"]
-  brain -->|"WhatsApp replies, through the bridge"| wa["Meta Graph API"]
+  brain --> anth["Anthropic API<br/>each turn: your words, screen text you asked about,<br/>memory notes, Now line; web search and fetch"]
+  brain --> exp["Expert CLIs (Claude Code and others)<br/>hand-offs, on your own login"]
+  brain --> mcp["Connected apps (MCP)<br/>tool calls you allowed"]
+  brain --> reg["Registries: cdn.agentclientprotocol.com,<br/>registry.modelcontextprotocol.io<br/>public lists, your search words"]
+  brain --> dl["Downloads, no text or audio: Hugging Face,<br/>GitHub releases, files.pythonhosted.org,<br/>nodejs.org, npm, PyPI"]
+  brain --> know["Get to know me, only when you start it:<br/>api.github.com, the web through Anthropic's tools"]
+  brain --> wa["Meta Graph API<br/>WhatsApp replies, through the bridge"]
   brain --- local
 ```
 
@@ -367,8 +367,9 @@ flowchart LR
   CPU: Silero VAD (MIT, about 2 MB) spots speech, Moonshine tiny (Useful Sensors, MIT, quantised,
   about 32 MB) writes the words, shown in the bubble as you talk, and Smart Turn v3.2 (Pipecat,
   BSD-2-Clause, about 9 MB) judges when you have finished. The app itself holds no speech model.
-- **Model files are checked.** The brain fetches its model files (listening and Kokoro) from one
-  fixed Hugging Face commit, never from a branch that can move, and each must match a SHA-256
+- **Model files are checked.** The brain fetches its model files (listening and the voices) from
+  fixed addresses (a pinned Hugging Face commit, or a versioned GitHub release for Kokoro's files),
+  never from a branch that can move, and each must match a SHA-256
   written into the brain. A file that does not match is never kept. The download fetches the
   models only; no audio is sent. On a Windows PC with an NVIDIA card the brain may also fetch the CUDA libraries (cuBLAS, cuDNN) for the final speech model from `files.pythonhosted.org`, pinned wheels checked the same way, into `voice/cuda/`. If the models cannot load, the bubble says so, and Scout keeps
   speaking in the system voice when Kokoro is the one that failed.

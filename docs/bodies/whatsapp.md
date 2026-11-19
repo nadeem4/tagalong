@@ -38,7 +38,7 @@ secret filter.
 
 ## Identity and context
 
-- The body id is the fixed word `whatsapp` (`BODY` in `bridge.ts`), not a made-up per-install id like the desktop's or the browser's. There is only ever one bridge, started by the brain, so two bodies can never share the id. [protocol/README.md](../../protocol/README.md) says a body id is "never a fixed word"; the bridge is the one body that breaks that rule, and the two documents disagree.
+- The body id is the fixed word `whatsapp` (`BODY` in `bridge.ts`), not a made-up per-install id like the desktop's or the browser's. There is only ever one bridge, started by the brain, so two bodies can never share the id. [protocol/README.md](../../protocol/README.md) says a body id is "never a fixed word"; the bridge is the one exception to that rule.
 - Hello: `{"protocol":2,"body":{"id":"whatsapp","kind":"whatsapp","name":"WhatsApp"},"tools":[]}`. No
   tools and no `display: false`, so the brain counts it as a body that shows answers.
 - Each text becomes `say` with a fresh `id` (a UUID, so the brain can tell a retry from a new say) and `context: {channel: "whatsapp", note: "text chat on a phone; keep replies short and offer detail on request"}`.

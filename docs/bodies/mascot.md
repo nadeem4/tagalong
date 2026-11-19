@@ -156,10 +156,10 @@ about 19% at 30 fps against 5 to 10% at 4 fps (the range is the hops, blinks and
 **First frame.** `ScoutFace` shows the still `ScoutGlyph` until the live mascot reports `ready` (its first real
 frame), then fades the canvas in over it (the still head goes once the 200 ms fade ends, so there is no gap), so the dock is never empty while the shader builds. On Windows, ANGLE
 builds the shader through the HLSL compiler, which inlines every call and takes seconds per extra copy of the distance
-field or of the LED face; the first frame took about 95 s. The compiler now leaves out the floor shadow for a mascot
+field or of the LED face, so the compiler keeps the shader small: it leaves out the floor shadow for a mascot
 with no floor (`floor: 0`, the dock), reads the material from the march instead of a second distance query,
 and writes the LED face, its eyes and its mouth once each (`compiler/compile.test.ts` pins the counts). The dock
-warms the shader as soon as the page loads. Time from launch to the first live frame: about 95 s before, 27 to 40 s now.
+warms the shader as soon as the page loads. Time from launch to the first live frame is about 27 to 40 s.
 
 The engine breathes and blinks on its own, so the dock has no frame or blink logic. Under
 `prefers-reduced-motion: reduce` the engine (`respectReducedMotion`, default true) holds the mood's
