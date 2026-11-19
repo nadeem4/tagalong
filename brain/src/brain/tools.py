@@ -37,7 +37,7 @@ from brain.models import DEFAULT_MODEL_ID, MODELS, PROVIDER
 from brain.models import chosen as chosen_model
 from brain.models import save as save_model
 from brain.outputs import OutputStore
-from brain.permission import Tier, tier
+from brain.permission import NEW_TASK_ARG, Tier, tier
 from brain.protocol import ErrorCode, RpcError
 from brain.questions import ANSWERED, PASSED, ScoutQuestions
 from brain.setup.env import is_tested
@@ -844,8 +844,16 @@ def expert_tools(
 ) -> list[tuple[ToolSpec, Handler]]:
     """Scout's hand-off tools. A refusal (JobError) is a plain line for Scout; Home's stop_job
     raises it as an RpcError so the body shows the same words. A job hangs off a task: the
-    one named by task_id, else a new Do task for the turn. Whether a person started that task
-    decides if the hand-off card may be skipped (jobs.py), not whether Scout may start work."""
+    one named by task_id, else a new Do task for the turn, claimed at the gate so its card
+    belongs to it. A task no person began always shows the card (toolbox.py)."""
+
+    async def hand_off_card(args: dict) -> dict:
+        """What the hand-off card shows: the task, folder, expert, mode and apps asked for."""
+        shown = {k: args[k] for k in ("task", "folder", "expert", "mode") if args.get(k)}
+        apps = args.get("apps")
+        if isinstance(apps, list) and apps:
+            shown["apps"] = jobs.card_apps([a for a in apps if isinstance(a, str)])
+        return shown
 
     async def hand_off(args: dict) -> str:
         _need_text("hand_off", args, "task", "folder")
@@ -853,7 +861,11 @@ def expert_tools(
         if not isinstance(apps, list) or not all(isinstance(a, str) for a in apps):
             return "hand_off needs apps to be a list of connected app ids."
         given = args.get("task_id")
+        # The gate claims the task before a card opens (task_kind); a task it made for this call
+        # is still this call's to end if nothing starts.
+        made = given is None or args.get(NEW_TASK_ARG) is True
         tid = tasks.claim(given, cause(), "do", args["task"])
+        row = tasks.get(tid)
         started = False
         try:
             job_id = await jobs.start(
@@ -865,8 +877,10 @@ def expert_tools(
                 job=_text_arg(args, "job"),
                 title=_text_arg(args, "title"),
                 apps=apps,
+                mode=_text_arg(args, "mode"),
                 task_id=tid,
-                caused_by=cause(),
+                # The task's own cause: an approved card runs after its turn has ended.
+                caused_by=row.caused_by if row else None,
             )
             started = True
         except JobError as err:
@@ -875,7 +889,7 @@ def expert_tools(
         finally:
             # Refused, or the person talked over the turn: a task made for this call must not
             # stay open for nothing.
-            if not started and given is None:
+            if not started and made:
                 tasks.end(tid, "stopped", reason="the hand-off was refused")
         tasks.wait(tid)
         # Facts only; Scout words them. Without a continue, the session is simply fresh.
@@ -888,7 +902,7 @@ def expert_tools(
             "part": getattr(job_id, "part", "p1"),
             "title": getattr(job_id, "title", None),
         }
-        if mode := getattr(job_id, "mode", None):  # the person's pick; Scout does not set it
+        if mode := getattr(job_id, "mode", None):
             result["mode"] = mode
         return json.dumps(result)
 
@@ -990,8 +1004,13 @@ def expert_tools(
                 "hand_off",
                 "Hand a task to an expert, which works in a folder on the user's computer and "
                 "reports back when done. Use the folder the user named; if they did not name "
-                "one, ask them which folder first, never guess. The user picks how much freedom "
-                "the expert gets; this tool asks them itself. With several experts installed, "
+                "one, ask them which folder first, never guess. The person sees a card with the "
+                "task, folder, expert and apps and says yes before anything starts; it returns "
+                "at once and the hand-off runs when they allow it. Name a mode (by id or name, "
+                "from the expert's own modes) only when the task needs one; omitted, the "
+                "expert's default applies. An unknown mode is found only after the person "
+                "approves, so name a mode only from an earlier result's offered list. "
+                "With several experts installed, "
                 "name one by its id from list_experts. A hand-off continues that expert's last "
                 "finished session in the same folder when it can (the result says continued, "
                 "and parent_job names the job). Pass fresh: true for an unrelated task or when "
@@ -1002,7 +1021,7 @@ def expert_tools(
                 "with a summary of what changed, the test results and what is left. Leave "
                 "planning and splitting to the expert; never paste the chat or direct each step. "
                 "Pass apps (connected app ids) only for the apps the job needs: the person sees "
-                "them on the card and may remove some, and the expert reaches only those. "
+                "them on the card, and the expert reaches only those. "
                 "Then call watch_job with what you expect. A job is your piece of work: give a new "
                 "one a short title in your own words, and to start another part under a job "
                 "that is still open (another expert, or a next step) pass its id as job. Close "
@@ -1035,6 +1054,11 @@ def expert_tools(
                             "type": "string",
                             "description": "An open job's id: add this hand-off as a part of it.",
                         },
+                        "mode": {
+                            "type": "string",
+                            "description": "The expert's mode to work in, by id or name; "
+                            "optional (the expert's default).",
+                        },
                         "apps": {
                             "type": "array",
                             "items": {"type": "string"},
@@ -1049,7 +1073,10 @@ def expert_tools(
                 },
                 scout,
                 effect="change",
-                tier=Tier.auto,  # asks for itself, so the gate adds none
+                default_mode="ask",
+                tier=Tier.ask,
+                card=hand_off_card,
+                task_kind="do",
             ),
             hand_off,
         ),

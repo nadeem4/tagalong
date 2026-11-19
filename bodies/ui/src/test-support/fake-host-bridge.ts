@@ -151,12 +151,7 @@ export interface FakeHostBridge extends HostBridge {
   /** Every answer to a connector confirm card, in order. */
   readonly approvals: readonly { approvalId: string; decision: 'once' | 'always' | 'deny' }[];
   /** Every answer to a Claude Code job's ask (its own option, or typed text), in order. */
-  readonly jobAnswers: readonly {
-    approvalId: string;
-    option: string;
-    text?: string;
-    apps?: string[];
-  }[];
+  readonly jobAnswers: readonly { approvalId: string; option: string; text?: string }[];
   /** The brain's apps; a test edits them, then emits `connections.changed`. */
   apps: AppInfo[];
   readonly addedConnections: readonly AppAddParams[];
@@ -294,7 +289,7 @@ export function createFakeHostBridge(
   const asks: AskInput[] = [];
   const interrupts: string[] = [];
   const approvals: { approvalId: string; decision: 'once' | 'always' | 'deny' }[] = [];
-  const jobAnswers: { approvalId: string; option: string; text?: string; apps?: string[] }[] = [];
+  const jobAnswers: { approvalId: string; option: string; text?: string }[] = [];
   const addedConnections: AppAddParams[] = [];
   const enabledCalls: { id: string; enabled: boolean }[] = [];
   const restarts: string[] = [];

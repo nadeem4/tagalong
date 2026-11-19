@@ -472,16 +472,16 @@ describe('createTurnEvents: asks', () => {
       });
     });
 
-    it("a hand-off ask's apps become the card's apps, not a line of JSON in its words", () => {
+    it("a hand-off card's apps are a line of names in its facts, not JSON", () => {
       const apps = [{ id: 'lin', name: 'Linear' }];
       const [e] = make().map(
         'ask',
-        jobAsk({ text: 'Fix it', tool: 'hand_off', input: { folder: 'C:\\p', apps } }),
+        open({ text: 'Fix it', tool: 'hand_off', input: { folder: 'C:\\p', apps } }),
       );
       expect(e).toMatchObject({
         type: 'connector.confirm',
-        apps,
-        summary: 'Fix it\nfolder: C:\\p',
+        summary: 'Fix it',
+        facts: { folder: 'C:\\p', apps: 'Linear' },
       });
     });
 

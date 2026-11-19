@@ -321,6 +321,7 @@ class ExpertHost:
             run.session_id = session.session_id
         self._sessions[run.session_id] = run
         modes = session.modes.available_modes if session.modes else []
+        run.default_mode = session.modes.current_mode_id if session.modes else None
         return [Mode(m.id, m.name, m.description or "") for m in modes]
 
     async def release(self, run: "ExpertRun", broken: bool = False) -> None:
@@ -440,6 +441,7 @@ class ExpertRun:
         # Set when a resume was asked: True = reopened, False = fresh session and why.
         self.resumed: bool | None = None
         self.fresh_reason: str | None = None
+        self.default_mode: str | None = None  # the mode the expert's session starts in
 
     @property
     def process(self) -> asyncio.subprocess.Process | None:

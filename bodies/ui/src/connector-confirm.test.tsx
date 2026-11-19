@@ -263,59 +263,46 @@ describe('the connector confirm card', () => {
       expect(screen.queryByRole('region', { name: 'Scout asks' })).toBeNull();
     });
 
-    describe('a hand-off with apps', () => {
-      const withApps = () =>
-        jobAsk({
-          summary: 'Fix the login bug\nfolder: C:\\work\\app',
-          apps: [
-            { id: 'lin', name: 'Linear' },
-            { id: 'mail', name: 'Mail' },
-          ],
-        });
-
-      it('lists each app and sends them all when none is removed', async () => {
-        const bridge = createFakeHostBridge();
-        renderBubble(bridge);
-        act(() => bridge.emit(withApps()));
-        const card = screen.getByRole('region', { name: 'Scout asks' });
-        expect(card).toHaveTextContent('Linear');
-        expect(card).toHaveTextContent('Mail');
-        await act(async () => {
-          fireEvent.click(screen.getByRole('button', { name: 'Plan' }));
-          await Promise.resolve();
-        });
-        expect(bridge.jobAnswers).toEqual([
-          { approvalId: APPROVAL, option: 'Plan', apps: ['lin', 'mail'] },
-        ]);
+    describe('a hand-off card', () => {
+      const handOff = () => ({
+        ...confirm(),
+        app: 'Scout',
+        tool: 'hand_off',
+        summary: 'Hand the login fix to Claude Code?',
+        options: ['allow', 'deny', 'not_now', 'stop_task'],
+        facts: { task: 'Fix the login bug', folder: 'C:\\work\\app', apps: 'Linear, Mail' },
       });
 
-      it('removing an app takes it off the card and out of the answer', async () => {
+      it('shows the hand-off facts with no app checklist', () => {
         const bridge = createFakeHostBridge();
         renderBubble(bridge);
-        act(() => bridge.emit(withApps()));
-        fireEvent.click(screen.getByRole('button', { name: 'Remove Mail' }));
-        const card = screen.getByRole('region', { name: 'Scout asks' });
-        expect(card).not.toHaveTextContent('Mail');
-        await act(async () => {
-          fireEvent.click(screen.getByRole('button', { name: 'Plan' }));
-          await Promise.resolve();
-        });
-        expect(bridge.jobAnswers).toEqual([
-          { approvalId: APPROVAL, option: 'Plan', apps: ['lin'] },
-        ]);
+        act(() => bridge.emit(handOff()));
+        const card = screen.getByRole('region', { name: 'Allow hand_off?' });
+        expect(card).toHaveTextContent('Fix the login bug');
+        expect(card).toHaveTextContent('Linear, Mail');
+        expect(screen.queryByRole('button', { name: /Remove/ })).toBeNull();
       });
 
-      it('removing every app sends an empty list, never the original', async () => {
+      it('Not now and Stop task answer by option name', async () => {
         const bridge = createFakeHostBridge();
         renderBubble(bridge);
-        act(() => bridge.emit(withApps()));
-        fireEvent.click(screen.getByRole('button', { name: 'Remove Linear' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Remove Mail' }));
+        act(() => bridge.emit(handOff()));
         await act(async () => {
-          fireEvent.click(screen.getByRole('button', { name: 'Plan' }));
+          fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
           await Promise.resolve();
         });
-        expect(bridge.jobAnswers).toEqual([{ approvalId: APPROVAL, option: 'Plan', apps: [] }]);
+        expect(bridge.jobAnswers).toEqual([{ approvalId: APPROVAL, option: 'not_now' }]);
+      });
+
+      it('Stop task ends the task, and No still denies', async () => {
+        const bridge = createFakeHostBridge();
+        renderBubble(bridge);
+        act(() => bridge.emit(handOff()));
+        await act(async () => {
+          fireEvent.click(screen.getByRole('button', { name: 'Stop task' }));
+          await Promise.resolve();
+        });
+        expect(bridge.jobAnswers).toEqual([{ approvalId: APPROVAL, option: 'stop_task' }]);
       });
     });
 

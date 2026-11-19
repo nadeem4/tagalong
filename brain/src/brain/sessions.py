@@ -310,7 +310,6 @@ class Session:
             steps_max_bytes=job_steps_max_bytes,
             setup_facts=setup_facts,
             emit=self._emit_job_event,
-            person_task=self.tasks.is_person,
             finish_news=self.events.finish_matching,
             on_timers_changed=lambda: timers.changed(),
             outputs=outputs,
@@ -406,6 +405,8 @@ class Session:
             on_call=self._on_tool_call,
             outputs=outputs,
             runner=self.ask_runner,
+            tasks=self.tasks,
+            cause=lambda: self._turn_cause,
         )
         if apps is not None and isinstance(make_run, ExpertHosts):
             # Experts reach apps only through the brain, by the same gate as Scout's own calls.
@@ -1285,10 +1286,10 @@ class Session:
         option: str,
         body_id: str,
         text: str | None = None,
-        apps: list[str] | None = None,
+        check_back_at: str | None = None,
     ) -> None:
         try:
-            self._asks.answer(ask_id, option, body_id, text, apps)
+            self._asks.answer(ask_id, option, body_id, text, check_back_at)
         except RpcError as err:
             item = self.items.get(ask_id)
             expired = item is not None and (item.kind, item.state) == ("expert_ask", "expired")

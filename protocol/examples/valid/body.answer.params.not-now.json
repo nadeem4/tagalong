@@ -1,0 +1,6 @@
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "answer",
+  "params": { "ask": "a1", "option": "not_now", "check_back_at": "2026-11-16T17:00:00+00:00" }
+}

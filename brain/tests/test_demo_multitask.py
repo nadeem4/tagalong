@@ -36,7 +36,6 @@ from test_sessions import (
     tool_call,
 )
 
-from brain.asks import Answer
 from brain.bodies import Bodies
 from brain.events import EventKind
 from brain.experts import ExpertHost, ExpertRun
@@ -152,7 +151,7 @@ async def test_2_stop_while_a_job_finishes_never_runs_two_turns_at_once():
     strict=True, reason="C3: a third hand-off is refused ('2 jobs are already running'), no queue"
 )
 async def test_3a_a_third_handoff_is_queued_not_refused(make_rig):  # noqa: F811
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan"), Answer("Plan")))
+    rig = make_rig(FakeAsks())
     await rig.jobs.start("one", str(rig.folder))
     await rig.jobs.start("two", str(rig.folder))
     try:
@@ -163,9 +162,6 @@ async def test_3a_a_third_handoff_is_queued_not_refused(make_rig):  # noqa: F811
     print(f"\n[3a] third hand-off accepted: {third}")
 
 
-@pytest.mark.xfail(
-    strict=True, reason="C2: an unanswered hand-off card blocks the turn, so says and news wait"
-)
 async def test_3b_an_open_hand_off_card_does_not_block_new_says_and_news(tmp_path, monkeypatch):
     script = tmp_path / "script.json"
     script.write_text(json.dumps(HANG))
@@ -229,7 +225,7 @@ async def test_3b_an_open_hand_off_card_does_not_block_new_says_and_news(tmp_pat
     finally:
         for card in open_asks(sent):
             try:
-                session.answer(card["id"], "cancel", "desktop")
+                session.answer(card["id"], "deny", "desktop")
             except RpcError:
                 pass
         await asyncio.sleep(0.3)

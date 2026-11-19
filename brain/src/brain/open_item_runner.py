@@ -21,7 +21,7 @@ from brain.asks import Asks
 from brain.events import Event
 from brain.mind.turn import Call
 from brain.open_items import DEADLINE_S, OpenItem, OpenItemRefused, OpenItems
-from brain.permission import AskRequest, PersonAnswer, Tier, summarise
+from brain.permission import NEW_TASK_ARG, AskRequest, PersonAnswer, Tier, summarise
 from brain.protocol import RpcError
 from brain.store.work import TransitionRefused
 from brain.tasks import Tasks
@@ -32,6 +32,11 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 KIND = "ask"
+
+
+def _bare(input: dict) -> dict:
+    """A call's own arguments: the task the gate gave it is not part of what it asks."""
+    return {k: v for k, v in input.items() if k not in ("task_id", NEW_TASK_ARG)}
 
 
 def _call(item: OpenItem) -> Call:
@@ -109,7 +114,7 @@ class AskRunner:
             "masked": saved != raw,
         }
         at = None if check_back is None else self._now() + check_back
-        item = self._items.find_open(KIND, {"name": saved["name"], "input": saved["input"]})
+        item = self.find(call.name, call.input)
         if item is not None:
             if at is not None:
                 try:
@@ -119,9 +124,10 @@ class AskRunner:
                 except OpenItemRefused:
                     pass  # the person's own time stands
             return item
+        named = call.input.get("task_id")  # a call that works for a task belongs to it
         item = self._items.open(
             KIND,
-            task_id=self._task(call.turn),
+            task_id=named if isinstance(named, str) else self._task(call.turn),
             caused_by=self._cause(call.turn),
             check_back_at=at,
             urgent=urgent,
@@ -136,6 +142,17 @@ class AskRunner:
         )  # fmt: skip
         self.changed()
         return item
+
+    def find(self, name: str, input: dict) -> OpenItem | None:
+        """The open card for this same call, whatever task the gate gave each try: the call's
+        own arguments are compared, not its task_id or new_task."""
+        saved = self._approvals.mask({"name": name, "input": input, "text": ""})
+        want = _bare(saved["input"])
+        for item in self._items.list_open(KIND):
+            c = item.saved_call or {}
+            if c.get("name") == saved["name"] and _bare(c.get("input") or {}) == want:
+                return item
+        return None
 
     def _card_task(self, item: OpenItem) -> dict | None:
         """The fields a task's card carries: the task, and when it will be looked at again."""
@@ -261,6 +278,8 @@ class AskRunner:
         """Close the item and wake Scout with what happened; he words it."""
         self._items.finish(item.id, outcome)
         self._raw.pop(item.id, None)
+        if outcome != "approved":  # refused or failed before the call ran: the task has no work
+            self._drop_new_task(item, reason)
         call = _call(item)
         facts: dict[str, str | int] = {
             "ask": item.id,
@@ -331,6 +350,7 @@ class AskRunner:
         call = _call(item)
         summary = summarise(call.text, call.name, call.input)
         self._record_ask(item, "expired", "none", "no answer")
+        self._drop_new_task(item, "no answer")
         facts: dict[str, str | int] = {
             "ask": item.id,
             "tool": call.name,
@@ -340,6 +360,11 @@ class AskRunner:
         self._emit(
             Event("card_expired", "scout", facts, caused_by=item.caused_by, task=item.task_id)
         )
+
+    def _drop_new_task(self, item: OpenItem, reason: str) -> None:
+        """A task the gate opened for this call ends when the call will never run."""
+        if item.task_id and _call(item).input.get(NEW_TASK_ARG) is True:
+            self._tasks_of.end(item.task_id, "stopped", reason=reason)
 
     def _record_ask(self, item: OpenItem, outcome: str, by: str, reason: str) -> None:
         call = _call(item)

@@ -396,36 +396,9 @@ def test_say_speed_edges():
     assert say.model_validate({"id": "e1", "text": "hi", "speed": 2}).speed == 2
 
 
-def test_answer_carries_an_optional_kept_apps_list():
+def test_answer_has_no_apps():
     answer = BODY_TO_BRAIN["answer"][0]
-    assert answer.model_validate({"ask": "a1", "option": "Plan"}).apps is None
-    assert answer.model_validate({"ask": "a1", "option": "Plan", "apps": ["lin"]}).apps == ["lin"]
-    assert answer.model_validate({"ask": "a1", "option": "Plan", "apps": []}).apps == []
-    with pytest.raises(ValidationError):
-        answer.model_validate({"ask": "a1", "option": "Plan", "apps": "lin"})
-
-
-def test_ask_open_carries_task_and_check_back():
-    params = {
-        "seq": 1,
-        "id": "a",
-        "state": "open",
-        "text": "t",
-        "options": ["allow", "deny", "not_now", "stop_task"],
-        "confirm": True,
-        "tool": "x",
-        "input": {},
-        "task": {"id": "k1"},
-        "check_back_at": "2026-11-16T15:30:00+00:00",
-        "check_back_by": "person",
-        "urgent": True,
-    }
-    ask = AskOpen.model_validate(params)
-    assert (ask.task.id, ask.check_back_by, ask.urgent) == ("k1", "person", True)
-    with pytest.raises(ValidationError):
-        AskOpen.model_validate({**params, "options": ["allow", "deny", "stop_task", "not_now"]})
-    with pytest.raises(ValidationError):
-        AskOpen.model_validate({**params, "check_back_by": "robot"})
+    assert "apps" not in answer.model_fields
 
 
 def test_ask_open_accepts_free_text_and_recommended():
@@ -505,3 +478,34 @@ def test_know_me_status_bounds():
 def test_say_ignores_a_voice_the_brain_owns_the_choice():
     params = SayParams.model_validate({"id": "e1", "text": "a", "voice": "x"})
     assert not hasattr(params, "voice")
+
+
+def test_ask_open_carries_task_and_check_back():
+    params = {
+        "seq": 1,
+        "id": "a",
+        "state": "open",
+        "text": "t",
+        "options": ["allow", "deny", "not_now", "stop_task"],
+        "confirm": True,
+        "tool": "x",
+        "input": {},
+        "task": {"id": "k1"},
+        "check_back_at": "2026-11-16T15:30:00+00:00",
+        "check_back_by": "person",
+        "urgent": True,
+    }
+    ask = AskOpen.model_validate(params)
+    assert (ask.task.id, ask.check_back_by, ask.urgent) == ("k1", "person", True)
+    with pytest.raises(ValidationError):
+        AskOpen.model_validate({**params, "options": ["allow", "deny", "stop_task", "not_now"]})
+    with pytest.raises(ValidationError):
+        AskOpen.model_validate({**params, "check_back_by": "robot"})
+
+
+def test_answer_check_back_only_with_not_now():
+    answer = BODY_TO_BRAIN["answer"][0]
+    at = "2026-11-16T17:00:00+00:00"
+    assert answer.model_validate({"ask": "a", "option": "not_now", "check_back_at": at})
+    with pytest.raises(ValidationError):
+        answer.model_validate({"ask": "a", "option": "allow", "check_back_at": at})

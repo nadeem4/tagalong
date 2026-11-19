@@ -653,16 +653,14 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   the page, Remove, the Scout filter, the report card and an offer ask on the fake brain.
 - **Job asks:** a Claude Code job asks the person through the same `ask` path, but without
   `confirm` and with its own options. Three cases, all shown as a card in the bubble even with
-  no turn running (the bubble is brought up on `connector.confirm`): the hand-off mode ask (tool
-  `hand_off`, the folder in its input, one button per mode and Cancel), a relayed Claude Code
+  no turn running (the bubble is brought up on `connector.confirm`): the hand-off card (tool
+  `hand_off`, its facts task, folder, expert, mode and apps, with Allow, Deny, Not now and Stop task), a relayed Claude Code
   permission ask (tool `claude_code:<title>`, its input shown, one button per Claude Code option),
   and a question (no tool: a "Your answer" field with Send, Enter also sends, plus a button per
   choice when it has any). A click answers through `answerJobAsk` (`ipc/connections.ts`), which
-  calls `BrainClient.answerWith(ask, option, text?, apps?)`, sending `answer { ask, option, text?, apps? }`
-  with the option's exact name. A hand-off whose input carries `apps` (`[{ id, name }]`) lists them
-  on the card under "Apps this job may use" with a Remove button each (`turn-events.ts` lifts them
-  out of the summary into the card's `apps`); choosing a mode is Send and sends `apps` with the ids
-  still listed (an empty list when all were removed). Typed text goes as both `option` and `text`, because the brain takes
+  calls `BrainClient.answerWith(ask, option, text?, checkBackAt?)`, sending `answer { ask, option, text?, check_back_at? }`
+  with the option's exact name (`check_back_at` only with `not_now`). The IPC is `answerJobAsk(approvalId, { option, text? })`.
+  A hand-off card shows its apps as a line of names in its facts; there is no apps checklist. Typed text goes as both `option` and `text`, because the brain takes
   an unlisted option only with free text. A closed ask removes its card; `not_found` is swallowed
   as for `approveTool`.
 - **`changed` notifications:** `index.ts` sends each one's `what` to every window on

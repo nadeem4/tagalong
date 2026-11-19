@@ -8,6 +8,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
+  AnswerParams,
   ApprovedParams,
   AskParams,
   BackEventData,
@@ -332,5 +333,15 @@ describe('task cards', () => {
     expect(AskParams.safeParse({ ...card, options }).success).toBe(true);
     const swapped = ['allow', 'deny', 'stop_task', 'not_now'];
     expect(AskParams.safeParse({ ...card, options: swapped }).success).toBe(false);
+  });
+
+  it('refuses check_back_at without not_now', () => {
+    const at = '2026-11-18T10:30:00Z';
+    expect(
+      AnswerParams.safeParse({ ask: 'a1', option: 'not_now', check_back_at: at }).success,
+    ).toBe(true);
+    expect(AnswerParams.safeParse({ ask: 'a1', option: 'allow', check_back_at: at }).success).toBe(
+      false,
+    );
   });
 });

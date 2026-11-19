@@ -23,6 +23,7 @@ from brain.outputs import OutputStore, preview
 from brain.permission import (
     ASK_WAIT_ARG,
     CHECK_BACK_ARG,
+    NEW_TASK_ARG,
     URGENT_ARG,
     AskOpen,
     AskRequest,
@@ -38,10 +39,12 @@ from brain.permission import (
     tool_asker,
 )
 from brain.protocol import LIMITS, CallResult, ErrorCode, RpcError, Tool
+from brain.store.memory import MemoryRefused
 from brain.telemetry import timed
 
 if TYPE_CHECKING:
     from brain.open_item_runner import AskRunner
+    from brain.tasks import Tasks
 
 log = logging.getLogger("brain")
 
@@ -97,6 +100,10 @@ class ToolSpec:
     # Facts built by code for the Allow card (and the approvals log) instead of the model's raw
     # input, e.g. what an install will download. The handler still gets the model's input.
     card: Callable[[dict], Awaitable[dict]] | None = None
+    # The tool works for a task of this kind (hand_off: "do"): the open one its call names by
+    # `task_id`, else a new one for the turn, claimed at the gate. The call then carries it, so a
+    # card belongs to it and an approved call runs for it; a task no person began always asks.
+    task_kind: str | None = None
     # A tool Anthropic runs (web search): its typed declaration goes to the model as it is, and the
     # brain never runs it.
     server_tool: dict | None = None
@@ -226,7 +233,11 @@ class Toolbox:
         | None = None,
         outputs: OutputStore | None = None,
         runner: "AskRunner | None" = None,
+        tasks: "Tasks | None" = None,
+        cause: Callable[[], str | None] = lambda: None,  # the event the running turn took
     ) -> None:
+        self._tasks = tasks  # claims the task of a tool with `task_kind`
+        self._cause = cause
         # Scout's own asks become open items through this and never wait in their turn; without
         # it (a job's ask, or no runner) the call waits for the card.
         self._runner = runner
@@ -380,6 +391,8 @@ class Toolbox:
         decided again share."""
         assert self._asks is not None
         gate = gate_tier(spec, self._modes().get(spec.name))
+        if spec.task_kind is not None and gate is not Tier.off and not self._person(call):
+            gate = Tier.person_only  # work no person asked for never starts without their yes
         shown = call
         if spec.card is not None:
             shown = replace(call, input=await spec.card(call.input))
@@ -495,19 +508,55 @@ class Toolbox:
 
     async def _gate(
         self, call: Call, spec: ToolSpec, kind: str, job_id: str | None, wait: Hold | None
-    ) -> None:
+    ) -> Call:
+        """Gate steps 1-3; returns the call to run (with its task, for a tool that has one)."""
         stored = self._modes().get(spec.name)
         gate = gate_tier(spec, stored)
         if gate is Tier.off:
             # Plain words the model reads; it should route around, not retry.
             raise RpcError(ErrorCode.denied, f"{spec.name} is turned off by the owner.")
+        if spec.task_kind is not None and self._tasks is not None:
+            call = self._claim(call, spec.task_kind)
         if gate is Tier.auto or self._engine is None or self._asks is None:
-            return  # nobody is asked and nothing is logged
+            return call  # nobody is asked and nothing is logged
         # A follow-up in a task the person started is already their yes; one Scout starts on
         # a timer or a job's news goes through the engine.
         if spec.follow_up and gate is not Tier.person_only and self._person_task(call.turn):
-            return
-        await self._ask(call, spec, kind, job_id, wait)
+            return call
+        try:
+            await self._ask(call, spec, kind, job_id, wait)
+        except RpcError:
+            self._drop_new_task(call, f"{spec.name} was refused")
+            raise
+        return call
+
+    def _claim(self, call: Call, kind: str) -> Call:
+        """The task the call works for, put on the call: the open one it names, else a new
+        `kind` task for the turn (marked, so a call that never runs ends it)."""
+        assert self._tasks is not None
+        given = call.input.get("task_id")
+        if given is None and self._runner is not None:
+            # The same call is already a card: it belongs to that card's task, not a new one.
+            card = self._runner.find(call.name, call.input)
+            given = None if card is None else card.task_id
+        title = call.input.get("task")
+        try:
+            tid = self._tasks.claim(
+                given, self._cause(), kind, title if isinstance(title, str) else ""
+            )
+        except MemoryRefused as err:
+            raise RpcError(ErrorCode.not_found, str(err)) from err
+        self._tasks.wait(tid)  # it waits on the person's yes, then on the work
+        made = {} if given is not None else {NEW_TASK_ARG: True}
+        return replace(call, input={**call.input, "task_id": tid, **made})
+
+    def _person(self, call: Call) -> bool:
+        """Whether a person began the task the call works for (none named: not)."""
+        return self._tasks is not None and self._tasks.is_person(call.input.get("task_id"))
+
+    def _drop_new_task(self, call: Call, reason: str) -> None:
+        if self._tasks is not None and call.input.get(NEW_TASK_ARG) is True:
+            self._tasks.end(call.input["task_id"], "stopped", reason=reason)
 
     async def _run(
         self, call: Call, caller: str, found: list, job_id: str | None, wait: Hold | None
@@ -520,7 +569,7 @@ class Toolbox:
                     kind = getattr(source, "approval_source", "scout_tool")
                     found[:] = [spec, kind, False]
                     if caller != "home":
-                        await self._gate(call, spec, kind, job_id, wait)
+                        call = await self._gate(call, spec, kind, job_id, wait)
                     found[2] = True
                     # Only the run: the gate above may wait on the person.
                     async with timed("tool", name=call.name):

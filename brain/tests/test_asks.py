@@ -284,13 +284,13 @@ async def test_open_answer_carries_text():
     assert await task == Answer("a", "because")
 
 
-async def test_open_answer_carries_the_kept_apps():
+async def test_open_answer_is_the_option_and_text_only():
     bodies = FakeBodies()
     asks = Asks(bodies, fresh_work())
     task = asyncio.create_task(asks.open(text="t", options=["a", "cancel"]))
     params = await opened(bodies)
-    asks.answer(params["id"], "a", "desktop", apps=("lin",))
-    assert await task == Answer("a", None, ("lin",))
+    asks.answer(params["id"], "a", "desktop")
+    assert await task == Answer("a", None)
 
 
 async def test_free_text_accepts_unlisted_option_with_text():

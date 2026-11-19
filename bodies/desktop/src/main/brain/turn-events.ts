@@ -114,8 +114,12 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
     // when it has a tool, and a question for the person when it has none.
     const question = !p.confirm && p.tool === undefined;
     const tool = p.tool ?? 'question';
-    // A hand-off's apps are a list on the card, not a line of JSON in its words.
+    // A hand-off's apps are a line of names on the card, not JSON in its words.
     const { apps, ...rest } = (p.input ?? {}) as { apps?: unknown } & Record<string, unknown>;
+    const named = Array.isArray(apps)
+      ? apps.map((a) => (typeof a === 'object' && a !== null ? (a as { name?: string }).name : a))
+      : [];
+    const facts = named.length > 0 ? { ...rest, apps: named.join(', ') } : rest;
     // An approval offer's input is for the brain's record; its words say all there is to say.
     const input = (tool === 'approval_offer' ? [] : Object.entries(rest)).map(
       ([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`,
@@ -153,13 +157,10 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
       ...(question ? { question: true } : {}),
       ...(p.free_text ? { freeText: true } : {}),
       ...(p.recommended !== undefined ? { recommended: p.recommended } : {}),
-      ...(Array.isArray(apps) && apps.length > 0 ? { apps } : {}),
       // The install card draws itself from these; every other card is built from the summary.
       ...(tool === 'install_app' || tool === 'install_expert' ? { facts: p.input ?? {} } : {}),
       // A gate ask's input becomes the card's rows (To, Says), since its words are Scout's own.
-      ...(p.confirm && tool !== 'approval_offer' && Object.keys(rest).length > 0
-        ? { facts: rest }
-        : {}),
+      ...(p.confirm && tool !== 'approval_offer' && Object.keys(facts).length > 0 ? { facts } : {}),
     };
     asks.set(p.id, card);
     return [card];

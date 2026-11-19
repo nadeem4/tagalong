@@ -70,7 +70,7 @@ test('Home lists the job and Stop reaches the brain', async () => {
   await expect(jobs).toContainText('Stopped', { timeout: 15_000 });
 });
 
-test('a hand-off asks its mode, a relayed permission and a question with no turn running', async () => {
+test('a hand-off asks to start, a relayed permission and a question with no turn running', async () => {
   const avatar = await windowFor('avatar');
   await avatar.evaluate(() => window.tagalongHost.togglePanel());
   const panel = await windowFor('panel');
@@ -81,14 +81,14 @@ test('a hand-off asks its mode, a relayed permission and a question with no turn
   // The turn is over before any job ask opens, so the cards below stand without one.
   await expect(panel.getByText(/This is the fake brain/)).toBeVisible({ timeout: 30_000 });
 
-  const mode = panel.getByRole('region', { name: 'Scout asks' });
-  await expect(mode).toBeVisible({ timeout: 30_000 });
-  await expect(mode).toContainText('C:/work/app');
-  // The card lists the apps; removing one keeps it out of the answer.
-  await expect(mode).toContainText('Linear');
-  await mode.getByRole('button', { name: 'Remove Mail' }).click();
-  await expect(mode).not.toContainText('Mail');
-  await mode.getByRole('button', { name: 'auto', exact: true }).click();
+  const handOff = panel.getByRole('region', { name: 'Allow hand_off?' });
+  await expect(handOff).toBeVisible({ timeout: 30_000 });
+  await expect(handOff).toContainText('C:/work/app');
+  // The card names the apps it would hand over; it also offers Not now and Stop task.
+  await expect(handOff).toContainText('Linear, Mail');
+  await expect(handOff.getByRole('button', { name: 'Not now', exact: true })).toBeVisible();
+  await expect(handOff.getByRole('button', { name: 'Stop task', exact: true })).toBeVisible();
+  await handOff.getByRole('button', { name: 'Allow', exact: true }).click();
 
   const relayed = panel.getByRole('region', { name: 'Claude Code asks' });
   await expect(relayed).toContainText('Claude Code wants to run a command.', { timeout: 30_000 });
@@ -103,7 +103,7 @@ test('a hand-off asks its mode, a relayed permission and a question with no turn
   await expect
     .poll(() => brain.answers, { timeout: 15_000 })
     .toEqual([
-      { ask: 'j1', option: 'auto', apps: ['lin'] },
+      { ask: 'j1', option: 'allow' },
       { ask: 'j2', option: 'Allow once' },
       { ask: 'j3', option: 'main', text: 'main' },
     ]);
