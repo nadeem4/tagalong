@@ -562,3 +562,32 @@ async def test_stopping_the_update_watch_pauses_checks_not_installs(rig):
     await u.wait()
     assert r.reinstalled == ["claude-acp"]  # the queued install still ran
     assert u._last == last  # but no new check was made
+
+
+async def test_a_restart_keeps_the_update_checks_off(rig):
+    r = rig()
+    u = watched(r)
+    u.watch()
+    task = u.tasks.open_watch("updates")
+    u.tasks.end(task, "stopped")  # Tasks.stop ends it, then calls the hook
+    u.task_stopped(task)
+    again = r.make()  # a restart: same database
+    again.tasks = u.tasks
+    again.watch()
+    assert again.tasks.open_watch("updates") is None  # no Watch task comes back
+    await again.tick()
+    assert again._last is None  # and the daily check does not run
+
+
+async def test_turning_auto_update_on_or_checking_now_brings_checks_back(rig):
+    r = rig()
+    u = watched(r)
+    u.watch()
+    u.task_stopped(u.tasks.open_watch("updates"))
+    u.set_auto("expert", True, True)
+    assert u.tasks.open_watch("updates")
+    u.task_stopped(u.tasks.open_watch("updates"))
+    u.resume()  # what Home's check-now does first
+    assert u.tasks.open_watch("updates")
+    await u.tick()
+    assert u._last is not None

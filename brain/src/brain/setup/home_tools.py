@@ -442,6 +442,7 @@ def home_update_tools(updates: Updates) -> list[tuple[ToolSpec, Handler]]:
         return json.dumps(updates.state())
 
     async def check_now(_args: dict) -> str:
+        updates.resume()  # asking for a check brings the daily one back
         await updates.check(refresh=True)
         return json.dumps(updates.state())
 

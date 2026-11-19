@@ -216,6 +216,14 @@ class IdleSource:
         return []
 
 
+class FakeApps:
+    async def call(self, *a, **k):
+        raise AssertionError("no poll is read here")
+
+    def tools(self, app_id):
+        return []
+
+
 def watched(parts):
     from brain.tasks import Tasks
 
@@ -264,7 +272,7 @@ async def test_start_gives_an_app_reading_mail_a_watch_task(parts):
     store, clock, events, mem = parts
     store.set_on("app1", True)
     s = watched(parts)
-    s._apps = type("A", (), {"call": None, "tools": lambda self, a: []})()
+    s._apps = FakeApps()
     s.start()
     assert s.tasks.open_watch("loop:app1")
     s.disable("app1")
@@ -286,6 +294,7 @@ async def test_stopping_a_mail_watch_switches_the_app_off_for_good(parts):
     assert await stop_through_tasks(s, task) == [task]
     assert not s.is_on("app1") and "app1" not in store.on_apps()
     again = watched(parts)  # a restart: reading stays off, and no Watch task comes back
+    again._apps = FakeApps()
     again.start()
     assert not again.is_on("app1") and again.tasks.open_watch("loop:app1") is None
 
@@ -297,3 +306,47 @@ async def test_stop_leaves_held_loops_alone(parts):
     lp = held(store)
     await stop_through_tasks(s, s.tasks.open_watch("loop:app1"))
     assert store.get(lp.id).status == "held"
+
+
+async def test_switching_back_on_opens_a_new_watch_task(parts):
+    s = watched(parts)
+    s.enable("app1", IdleSource())
+    old = s.tasks.open_watch("loop:app1")
+    s.disable("app1")
+    s.enable("app1", IdleSource())
+    new = s.tasks.open_watch("loop:app1")
+    assert new and new != old and s.tasks.get(old).state == "stopped"
+    assert len(open_watches(s)) == 1
+    s.disable("app1")
+
+
+async def test_restart_reuses_the_open_watch_task(parts):
+    store, _, _, _ = parts
+    s = watched(parts)
+    s.enable("app1", IdleSource())
+    task = s.tasks.open_watch("loop:app1")
+    s._stop_polling("app1")  # the old brain is gone; reading was left on and the task open
+    again = watched(parts)
+    again._apps = FakeApps()
+    again.start()
+    assert again.tasks.open_watch("loop:app1") == task and len(open_watches(again)) == 1
+    again.disable("app1")
+
+
+async def test_homes_switch_opens_and_ends_the_watch_task(parts):
+
+    from brain.loops.home_tools import loop_home_tools
+    from brain.open_items import OpenItems
+
+    _, clock, _, mem = parts
+    s = watched(parts)
+    s.can_read = lambda app: True
+    s.enable = lambda app, source=None, _e=s.enable: _e(app, IdleSource())
+    tools = {
+        sp.name: h
+        for sp, h in loop_home_tools(s, lambda: [("app1", "App")], OpenItems(mem.db, clock))
+    }
+    await tools["loops_set"]({"app": "app1", "on": True})
+    assert s.tasks.open_watch("loop:app1")
+    await tools["loops_set"]({"app": "app1", "on": False})
+    assert s.tasks.open_watch("loop:app1") is None
