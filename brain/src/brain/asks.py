@@ -13,7 +13,7 @@ for every body. How the person's choice counts (approved, refused) is written by
 
 import asyncio
 import uuid
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from brain.bodies import Bodies
@@ -156,7 +156,6 @@ class Asks:
         ask_id: str | None = None,
         recommended: str | None = None,
         parent_id: str | None = None,
-        stay_open: bool = False,
     ) -> Answer:
         # No turn and no confirm: a job's ask can outlive turns, and confirm asks only
         # allow the fixed allow/always/deny sets. Waits until closed unless timeout is given.
@@ -164,9 +163,8 @@ class Asks:
             raise ValueError(f"ask {ask_id} is already open")
         if recommended is not None and recommended not in options:
             raise ValueError("recommended must be one of the options")
-        # A question or card is told to the person later by other means; a job's permission
-        # ask says `stay_open` and waits for somebody to come back.
-        if not stay_open and not self.anyone_online():
+        # A question or card is told to the person later by other means.
+        if not self.anyone_online():
             return Answer(None)
         params: dict = {"id": ask_id or uuid.uuid4().hex, "state": "open", "text": text}
         params["options"] = options
@@ -212,18 +210,6 @@ class Asks:
         shown = self._bodies.display_ids()
         if shown:
             ask_event("shown", ask_id, ",".join(shown))
-
-    def cancel_all(self, ask_ids: Iterable[str]) -> None:
-        """Close the named open asks as cancelled; their waiters get a cancelled error."""
-        for ask_id in ask_ids:
-            entry = self._open.get(ask_id)
-            # A done future means its waiter was cancelled or timed out; it closes the ask itself.
-            if entry is not None and entry.future is not None and not entry.future.done():
-                del self._open[ask_id]
-                ask_event("closed", ask_id, "brain", "cancelled")
-                entry.future.set_exception(RpcError(ErrorCode.cancelled, "the ask was cancelled"))
-                self._bodies.notify("ask", {"id": ask_id, "state": "closed", "reason": "cancelled"})
-                self._end_row(ask_id, "expired", "ask cancelled")
 
     def answer(
         self,

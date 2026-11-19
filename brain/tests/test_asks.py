@@ -229,42 +229,6 @@ async def test_open_with_nobody_online_returns_unanswered():
     assert bodies.sent == []
 
 
-async def test_stay_open_ask_waits_with_nobody_online():
-    bodies = FakeBodies(online=[])
-    work = fresh_work()
-    asks = Asks(bodies, work)
-    task = asyncio.create_task(
-        asks.open(text="Which?", options=["a"], ask_id="x1", parent_id=goal(work), stay_open=True)
-    )
-    await asyncio.sleep(0)
-    assert not task.done() and work.get("x1").state == "active"
-    bodies.online = ["desktop"]  # a body that joins is replayed the open ask
-    assert [a["id"] for a in asks.open_asks()] == ["x1"]
-    work.close_goal("job1", "done", "finished")
-    with pytest.raises(AskExpired) as err:
-        await task
-    assert err.value.reason == "job ended: closed by Scout"
-    assert work.get("x1").state == "expired"
-
-
-async def test_cancel_all_closes_named_asks_and_waiters_get_cancelled():
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.open(text="Which?", options=["a"], ask_id="job1-a"))
-    keep = asyncio.create_task(asks.open(text="Other?", options=["a"], ask_id="job2-a"))
-    await opened(bodies)
-    await asyncio.sleep(0)
-    asks.cancel_all(["job1-a"])
-    with pytest.raises(RpcError) as err:
-        await task
-    assert err.value.code == ErrorCode.cancelled
-    closed = [p for _, p in bodies.sent if p["state"] == "closed"]
-    assert closed == [{"id": "job1-a", "state": "closed", "reason": "cancelled"}]
-    assert [a["id"] for a in asks.open_asks()] == ["job2-a"]
-    asks.answer("job2-a", "a", "desktop")
-    await keep
-
-
 async def test_open_first_answer_wins():
     bodies = FakeBodies()
     asks = Asks(bodies, fresh_work())
@@ -275,19 +239,6 @@ async def test_open_first_answer_wins():
         asks.answer(params["id"], "b", "extension")
     assert err.value.code == ErrorCode.not_found
     assert await task == Answer("a", None)
-
-
-async def test_cancel_all_skips_an_ask_whose_waiter_was_already_cancelled():
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.open(text="Which?", options=["a"], ask_id="job1-a"))
-    await opened(bodies)
-    await asyncio.sleep(0)
-    task.cancel()  # the waiter's future is cancelled now; its cleanup runs a tick later
-    asks.cancel_all(["job1-a"])  # must not raise InvalidStateError
-    with pytest.raises(asyncio.CancelledError):
-        await task
-    assert asks.open_asks() == []
 
 
 async def test_open_rejects_a_duplicate_ask_id():
@@ -374,12 +325,6 @@ async def test_timed_out_and_cancelled_asks_expire():
         await asks.open(text="Which?", options=["a"], timeout=0.01)
     timed = bodies.sent[0][1]["id"]
     assert (work.get(timed).state, work.get(timed).end_reason) == ("expired", "timed out")
-    task = asyncio.create_task(asks.open(text="Which?", options=["a"], ask_id="x1"))
-    await asyncio.sleep(0)
-    asks.cancel_all(["x1"])
-    with pytest.raises(RpcError):
-        await task
-    assert (work.get("x1").state, work.get("x1").end_reason) == ("expired", "ask cancelled")
     task = asyncio.create_task(asks.open(text="Again?", options=["a"], ask_id="x2"))
     await asyncio.sleep(0)
     task.cancel()
