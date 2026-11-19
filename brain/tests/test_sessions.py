@@ -3999,8 +3999,8 @@ async def test_a_joined_frame_names_the_task_not_the_ask():
     await finish(session)
     joined = {p["events"][0]: p for m, p in sent if m == "turn" and p["state"] == "joined"}
     assert first.turn == joined["s2"]["turn"]
-    assert joined["s2"] is joined["s3"]  # one frame took both: the Ask is left out
-    assert joined["s3"]["tasks"] == [{"id": do, "kind": "do", "title": "tidy"}]
+    assert joined["s2"]["events"] == ["s2", "s3"]  # one frame took both; the Ask is left out
+    assert joined["s2"]["tasks"] == [{"id": do, "kind": "do", "title": "tidy"}]
 
 
 async def test_a_duplicate_say_id_opens_one_ask():
