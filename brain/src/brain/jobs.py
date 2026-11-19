@@ -39,6 +39,7 @@ from brain.protocol import RpcError
 from brain.questions import ScoutQuestions
 from brain.setup.install import NODE_FLOOR
 from brain.setup.store import InstalledExpert
+from brain.store.db import utc_text
 from brain.store.work import OPEN, ActivityEntry, TransitionRefused, WorkRow
 
 log = logging.getLogger("brain")
@@ -633,6 +634,17 @@ class Jobs:
             task.add_done_callback(self._background.discard)
             started.append(goal.id)
         return started
+
+    def requeue(self, job_id: str) -> None:
+        """The person said an approval held for a recheck still stands: the goal goes back in
+        line where its approval put it, and its hour starts again."""
+        job = self._records.get_job(job_id)
+        if job is None or job.state != "blocked" or job.parts:
+            raise JobError(f"job {job_id} is not waiting for a recheck")
+        self._records.work.set_job_detail(job_id, rechecked_at=utc_text(self._now()))
+        self._records.work.transition(job_id, "planned")
+        self._changed()
+        self.fill_slots()
 
     def _stale(self, goal: WorkRow) -> bool:
         detail = self._records.work.job_detail(goal.id) or {}

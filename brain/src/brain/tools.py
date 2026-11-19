@@ -918,6 +918,14 @@ def expert_tools(
             return str(err)
         return f"job {args['job']} closed"
 
+    async def requeue_job(args: dict) -> str:
+        _need_text("requeue_job", args, "job")
+        try:
+            jobs.requeue(args["job"])
+        except JobError as err:
+            return str(err)
+        return f"job {args['job']} is back in line, first"
+
     async def set_job_result(args: dict) -> str:
         _need_text("set_job_result", args, "job", "text")
         try:
@@ -1101,6 +1109,20 @@ def expert_tools(
                 default_mode="auto",
             ),
             close_job,
+        ),
+        (
+            ToolSpec(
+                "requeue_job",
+                "Ask the owner whether a job that waited over an hour for a free slot should "
+                "still run (job_recheck tells you which). Their card is the question: yes puts "
+                "the job first in line, no ends the task. Call it right after the event, once.",
+                {"type": "object", "properties": {"job": job_id}, "required": ["job"]},
+                scout,
+                effect="change",
+                tier=Tier.ask,
+                deny_stops_task=True,
+            ),
+            requeue_job,
         ),
         (
             ToolSpec(

@@ -362,6 +362,7 @@ async def _run() -> None:
             sys.exit(1)
         # Only now, with the port ours: a second brain that failed to bind must not touch it.
         write_pid(config.data_dir, os.getpid(), real_started(os.getpid()))
+        session.jobs.fill_slots()  # approved jobs a restart left waiting, after the resume scan
         await asyncio.to_thread(
             sweep_staging, config.data_dir
         )  # an install a killed brain left half-staged

@@ -24,7 +24,7 @@ from brain.experts import ExpertHost, ExpertHosts, ExpertRun, Question, Question
 from brain.guards import Guards
 from brain.holds import Holds
 from brain.job_records import Job, JobPart, JobRecords
-from brain.jobs import JobError, Jobs, job_note
+from brain.jobs import RECHECK_AFTER_S, JobError, Jobs, job_note
 from brain.masking import Masker, mask_secrets
 from brain.memory import Memory
 from brain.open_items import OpenItemRefused, OpenItems
@@ -436,6 +436,72 @@ async def test_a_freed_slot_starts_the_oldest_approved_goal(make_rig):
     await until(lambda: str(third) in [j.id for j in rig.records.running_jobs()])
     assert [j.id for j in rig.records.queue()] == [str(fourth)]
     assert len(rig.runs) == 3
+
+
+def plan(rig, n, approved=None, task_id=None):
+    """An approved goal waiting in line, as a hand-off with no free slot leaves it."""
+    return rig.records.plan_job(
+        f"q{n}",
+        rig.experts[0].id,
+        f"task {n}",
+        str(rig.folder),
+        "",
+        task_id,
+        None,
+        approved or rig.wall,
+    )
+
+
+async def test_planned_goals_fill_slots_at_start_up(make_rig):
+    rig = make_rig(FakeAsks())
+    for n in (1, 2, 3):
+        plan(rig, n, rig.wall + timedelta(seconds=n))
+    assert rig.jobs.fill_slots() == ["q1", "q2"]
+    assert rig.jobs.fill_slots() == []  # none starts twice, and the third waits
+    await until(lambda: len(rig.records.running_jobs()) == 2)
+    assert [j.id for j in rig.records.queue()] == ["q3"]
+
+
+async def test_a_goal_older_than_an_hour_is_blocked_and_rechecked(make_rig):
+    rig = make_rig(FakeAsks())
+    old = plan(rig, 1, rig.wall - timedelta(seconds=RECHECK_AFTER_S + 1))
+    plan(rig, 2)
+    assert rig.jobs.fill_slots() == ["q2"]  # the slot goes to the next in line
+    assert rig.records.work.get(old.id).state == "blocked"
+    (event,) = [e for e in rig.emitted if e.kind == "job_recheck"]
+    assert event.payload["job"] == "q1" and event.payload["task"] == "task 1"
+    assert event.payload["folder"] == str(rig.folder) and event.payload["approved_at"]
+
+
+async def test_requeue_puts_a_rechecked_goal_first_in_line(make_rig):
+    rig = make_rig(FakeAsks(), max_running=1)
+    await rig.jobs.start("one", str(rig.folder))
+    old = plan(rig, 1, rig.wall - timedelta(hours=2))
+    plan(rig, 2)
+    rig.records.work.transition(old.id, "blocked", reason="approved over an hour ago")
+    assert [j.id for j in rig.records.queue()] == ["q2"]
+    rig.jobs.requeue("q1")
+    assert [j.id for j in rig.records.queue()] == ["q1", "q2"]  # its approval time is kept
+    assert rig.records.work.job_detail("q1")["rechecked_at"]  # and its hour starts again
+    assert rig.jobs.fill_slots() == []  # it waits for a slot, it is not stale again
+
+
+async def test_requeue_refuses_a_job_that_is_not_waiting_for_a_recheck(make_rig):
+    rig = make_rig(FakeAsks())
+    job = await rig.jobs.start("one", str(rig.folder))
+    with pytest.raises(JobError):
+        rig.jobs.requeue(str(job))
+    with pytest.raises(JobError):
+        rig.jobs.requeue("nope")
+
+
+async def test_a_stopped_task_is_never_started_by_fill_slots(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.tasks.open("do", "desktop", id="k1", title="Fix it")
+    plan(rig, 1, task_id="k1")
+    await rig.tasks.stop("k1", "desktop")
+    assert rig.jobs.fill_slots() == []
+    assert rig.runs == []
 
 
 async def test_a_job_waiting_on_a_card_keeps_its_slot(make_rig):

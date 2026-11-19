@@ -170,7 +170,11 @@ def _allowed(kind: str, frm: str, to: str, via_close: bool) -> bool:
         return False  # a goal Scout closed as failed stays failed
     if to in _MOVES.get(frm, ()):
         return True
-    if kind == "goal" and (frm, to) in (("blocked", "active"), ("planned", "blocked")):
+    if kind == "goal" and (frm, to) in (
+        ("blocked", "active"),
+        ("planned", "blocked"),
+        ("blocked", "planned"),
+    ):
         return True  # a queued goal waits on the person (blocked) when it grows stale
     if kind != "loop":
         return False

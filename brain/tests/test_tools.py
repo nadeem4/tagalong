@@ -367,6 +367,11 @@ class FakeJobs:
         if self.error:
             raise self.error
 
+    def requeue(self, job_id):
+        self.calls.append(("requeue", job_id))
+        if self.error:
+            raise self.error
+
     def tell(self, job_id, note, part=None):
         self.calls.append(("tell", job_id, note) + ((part,) if part else ()))
         if self.error:
@@ -1180,6 +1185,7 @@ def test_home_tools_are_not_in_model_tools(home):
         "tell_expert",
         "watch_job",
         "close_job",
+        "requeue_job",
         "set_job_result",
         "list_experts",
         "stop_job",
@@ -1834,6 +1840,16 @@ async def test_hand_off_result_has_part_and_title(home):
     home.jobs.started = JobId("j1", part="p3")  # attaching: Jobs sets no title
     out = json.loads(await home.run("hand_off", {"task": "t", "folder": "C:/p", "job": "j1"}))
     assert out["title"] is None  # attaching to a job names nothing
+
+
+async def test_requeue_job_puts_the_goal_first_in_line(home):
+    spec = expert_specs(home)["requeue_job"]
+    assert spec.audience == frozenset({"scout"}) and spec.tier is Tier.ask
+    assert spec.deny_stops_task  # a no on its card ends the task
+    assert "j1" in await home.run("requeue_job", {"job": "j1"})
+    assert home.jobs.calls[-1] == ("requeue", "j1")
+    home.jobs.error = JobError("job j1 is not waiting for a recheck")
+    assert await home.run("requeue_job", {"job": "j1"}) == "job j1 is not waiting for a recheck"
 
 
 async def test_close_job_tool_closes_and_refuses_with_a_plain_line(home):

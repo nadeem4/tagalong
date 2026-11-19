@@ -52,10 +52,17 @@ class Bodies:
 
 
 class Source:
-    def __init__(self, *names, effect="change", task_kinds=None):
+    def __init__(self, *names, effect="change", task_kinds=None, deny_stops=()):
         kinds = task_kinds or {}
         self._specs = [
-            ToolSpec(n, f"{n} tool", {"type": "object"}, effect=effect, task_kind=kinds.get(n))
+            ToolSpec(
+                n,
+                f"{n} tool",
+                {"type": "object"},
+                effect=effect,
+                task_kind=kinds.get(n),
+                deny_stops_task=n in deny_stops,
+            )
             for n in names
         ]
         self.ran: list[tuple[str, dict]] = []
@@ -96,7 +103,9 @@ class Rig:
         )
         if self.tasks.get("k1") is None:  # the task turn t1 works on
             self.tasks.open("do", "desktop", id="k1", title="Fix it")
-        self.source = Source("t", "h", effect=effect, task_kinds={"h": "do"})
+        self.source = Source(
+            "t", "h", "r", effect=effect, task_kinds={"h": "do"}, deny_stops=("r",)
+        )
         self.engine = Engine(
             [StandingRule(stored_auto_rules(lambda: self.stored)), Person()],
             self.approvals,
@@ -431,6 +440,27 @@ async def test_stop_task_closes_the_card_and_posts_task_stop():
     assert (stop.payload, stop.source) == ({"task": "k1", "by": "desktop"}, "desktop")
     assert rig.source.ran == []
     assert [e.kind for e in rig.events] == ["task_stop"]  # no ask_ended: the task is over
+
+
+async def test_no_on_the_recheck_card_stops_the_task():
+    rig = Rig()
+    await rig.box.run(Call(id="c1", name="r", input={"job": "j1"}, turn="t1", text="Still on?"))
+    [card] = rig.opened()
+    rig.asks.answer(card["id"], "deny", "desktop")
+    await rig.settle()
+    assert rig.tasks.get("k1").state == "stopped"
+    assert rig.items.for_task("k1") == []
+    assert rig.source.ran == []
+    assert [e.kind for e in rig.events] == ["task_stop"]
+
+
+async def test_no_on_an_ordinary_card_leaves_the_task_open():
+    rig = Rig()
+    await rig.box.run(call())
+    [card] = rig.opened()
+    rig.asks.answer(card["id"], "deny", "desktop")
+    await rig.settle()
+    assert rig.tasks.get("k1").state != "stopped"
 
 
 async def test_stop_task_on_an_ask_card_releases_a_held_expert_card_of_the_task():

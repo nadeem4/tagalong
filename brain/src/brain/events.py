@@ -67,6 +67,8 @@ _KINDS = (
     EventKind("task_stop", urgency="now", wakes=False),
     EventKind("timer", urgency="next_pause", batch_seconds=0, max_per_hour=6),
     EventKind("job_ended", urgency="idle", batch_seconds=30, max_per_hour=10),
+    # An approved job waited over an hour for a slot: Scout asks whether it still stands.
+    EventKind("job_recheck", urgency="next_pause", batch_seconds=0, max_per_hour=6),
     # A card's check-back came (quiet hours hold it unless urgent) or its wait ran out.
     EventKind("card_due", urgency="next_pause", batch_seconds=30, max_per_hour=6),
     EventKind("card_expired", urgency="next_pause", batch_seconds=30, max_per_hour=10),
