@@ -522,8 +522,8 @@ Answer a `choose` card and an offer card: each is saved as a handled `card_answe
 4. **Action:** repeat and leave the card unanswered for 10 minutes.
    **Expected:** the card closes and Scout says nothing; answering a closed card does nothing.
 5. **Action:** after an answer, tell Scout to keep it as a preference.
-   **Expected:** a card with "Save it" and "Not now". "Save it" adds the sentence under Home, Approvals;
-   "Not now" saves nothing. A later question shows Scout acting under it, and an install still asks first.
+   **Expected:** an Allow or Deny card with the sentence. Allow adds it under Home, Approvals;
+   Deny saves nothing. A later question shows Scout acting under it, and an install still asks first.
 
 ## Permission engine (unit tests only)
 

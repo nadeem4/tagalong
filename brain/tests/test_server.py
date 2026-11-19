@@ -981,16 +981,17 @@ async def test_answer_text_reaches_the_ask():
     try:
         async with connect(url) as ws:
             await call(ws, hello())
-            task = asyncio.create_task(
-                session._asks.open(text="Which?", options=["a"], free_text=True)
-            )
+            told = []
+            session._asks.register("choice", lambda *a: told.append(a))
+            session._asks.card("c1", kind="choice", text="Which?", options=["a"], free_text=True)
             async with asyncio.timeout(5):
                 ask = (await next_method(ws, "ask"))["params"]
             params = {"ask": ask["id"], "option": "mine", "text": "typed"}
             await ws.send(json.dumps(request("answer", params, 9)))
             async with asyncio.timeout(5):
-                answer = await task
-            assert (answer.option, answer.text) == ("mine", "typed")
+                while not told:
+                    await asyncio.sleep(0.01)
+            assert told[0][1:4] == ("mine", "desktop", "typed")
     finally:
         server.close()
         await server.wait_closed()

@@ -316,10 +316,11 @@ def home_setup_tools(
                 if facts.get("official") is True:
                     return await _run(handler, args)
                 if community_ok:
+                    shown = json.dumps(facts, sort_keys=True, separators=(",", ":"))
                     record(
                         source="scout_tool",
                         tool=tool,
-                        summary=f"{tool} {json.dumps(facts, sort_keys=True, separators=(',', ':'))}",
+                        summary=f"{tool} {shown}",
                         input=facts,
                         group_key=tool,
                         outcome="approved",

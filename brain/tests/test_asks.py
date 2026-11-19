@@ -1,16 +1,14 @@
-"""Checks permission asks: open shape, answers, first-answer-wins, timeout and cancel.
+"""Checks the cards: open shape, answers by kind, first-answer-wins, close and cancel.
 
 A fake Bodies records notify() calls so no sockets are needed; every frame is also
 validated against the contract's AskParams.
 """
 
 import asyncio
-import time
 
 import pytest
-from job_rows import fresh_work
 
-from brain.asks import Answer, AskExpired, Asks
+from brain.asks import Asks
 from brain.mind.turn import Call
 from brain.protocol import AskParams, ErrorCode, RpcError
 
@@ -42,23 +40,12 @@ async def opened(bodies: FakeBodies) -> dict:
 
 
 def test_anyone_online_follows_bodies():
-    assert Asks(FakeBodies(["desktop"]), fresh_work()).anyone_online() is True
-
-
-async def test_timeout_closes_ask_and_raises_timeout():
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    with pytest.raises(RpcError) as err:
-        await asks.open(text="Which?", options=["allow"], timeout=0.01)
-    assert err.value.code == ErrorCode.timeout
-    closed = bodies.sent[-1][1]
-    assert closed["state"] == "closed" and closed["reason"] == "timeout"
-    assert asks.open_asks() == []
+    assert Asks(FakeBodies(["desktop"])).anyone_online() is True
 
 
 async def test_closed_frame_names_the_answering_body():
     bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
+    asks = Asks(bodies)
     asks.show("a1", call(), "desktop__x", False)
     params = await opened(bodies)
     asks.answer(params["id"], "allow", "extension")
@@ -73,7 +60,7 @@ async def test_closed_frame_names_the_answering_body():
 
 async def test_open_asks_lists_only_open():
     bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
+    asks = Asks(bodies)
     asks.show("a1", call(), "desktop__x", False)
     params = await opened(bodies)
     assert asks.open_asks() == [params]
@@ -83,7 +70,7 @@ async def test_open_asks_lists_only_open():
 
 async def test_open_asks_returns_copies():
     bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
+    asks = Asks(bodies)
     asks.show("a1", call(), "desktop__x", False)
     params = await opened(bodies)
     asks.open_asks()[0]["options"] = ["tampered"]
@@ -91,280 +78,52 @@ async def test_open_asks_returns_copies():
     asks.answer(params["id"], "deny", "desktop")
 
 
-async def test_answer_after_timeout_is_not_found():
+def test_free_text_accepts_unlisted_option_with_text():
     bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    with pytest.raises(RpcError):
-        await asks.open(text="Which?", options=["allow"], timeout=0.01)
-    ask_id = bodies.sent[0][1]["id"]
+    asks = Asks(bodies)
+    told = []
+    asks.register("choice", lambda *a: told.append(a))
+    asks.card("c1", kind="choice", text="Which?", options=["a", "b"], free_text=True)
     with pytest.raises(RpcError) as err:
-        asks.answer(ask_id, "allow", "desktop")
-    assert err.value.code == ErrorCode.not_found
-
-
-async def test_answer_in_the_tick_after_timeout_fired_is_not_found():
-    # Both timers come due in one loop pass: the timeout cancels the wait first, then the
-    # answer runs before the handler has closed the ask. It must not hit a finished future.
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.open(text="Which?", options=["allow"], timeout=0.05))
-    params = await opened(bodies)
-    seen: list[RpcError] = []
-
-    def late_answer() -> None:
-        try:
-            asks.answer(params["id"], "allow", "desktop")
-        except RpcError as exc:
-            seen.append(exc)
-
-    asyncio.get_running_loop().call_later(0.06, late_answer)
-    time.sleep(0.1)  # block the loop so both timers are due together
-    with pytest.raises(RpcError) as err:
-        await task
-    assert err.value.code == ErrorCode.timeout
-    assert [e.code for e in seen] == [ErrorCode.not_found]
-
-
-async def test_answer_landing_just_before_timeout_wins():
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.open(text="Which?", options=["allow"], timeout=0.05))
-    params = await opened(bodies)
-    asyncio.get_running_loop().call_later(
-        0.01, lambda: asks.answer(params["id"], "allow", "desktop")
-    )
-    time.sleep(0.1)  # answer and timeout both due in one loop pass, the answer first
-    assert (await task).option == "allow"
-    assert asks.open_asks() == []
-
-
-# --- open(): asks with no turn, custom options and typed answers ---------------
-
-
-async def test_open_shape_has_no_turn_and_no_confirm():
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(
-        asks.open(text="Run it?", options=["allow-once", "reject"], tool="Bash", input={"c": "ls"})
-    )
-    params = await opened(bodies)
-    assert params == {
-        "id": params["id"],
-        "state": "open",
-        "text": "Run it?",
-        "options": ["allow-once", "reject"],
-        "tool": "Bash",
-        "input": {"c": "ls"},
-    }
-    asks.answer(params["id"], "allow-once", "desktop")
-    assert await task == Answer("allow-once", None)
-
-
-async def test_open_answer_carries_text():
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.open(text="Which?", options=["a", "b"]))
-    params = await opened(bodies)
-    asks.answer(params["id"], "a", "desktop", text="because")
-    assert await task == Answer("a", "because")
-
-
-async def test_open_answer_is_the_option_and_text_only():
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.open(text="t", options=["a", "cancel"]))
-    params = await opened(bodies)
-    asks.answer(params["id"], "a", "desktop")
-    assert await task == Answer("a", None)
-
-
-async def test_free_text_accepts_unlisted_option_with_text():
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.open(text="Which?", options=["a", "b"], free_text=True))
-    params = await opened(bodies)
-    with pytest.raises(RpcError) as err:
-        asks.answer(params["id"], "other", "desktop")  # no text: still invalid
+        asks.answer("c1", "other", "desktop")  # no text: still invalid
     assert err.value.code == ErrorCode.invalid_params
-    asks.answer(params["id"], "other", "desktop", text="my own answer")
-    assert await task == Answer("other", "my own answer")
+    asks.answer("c1", "other", "desktop", text="my own answer")
+    assert told == [("c1", "other", "desktop", "my own answer", None)]
 
 
-async def test_unlisted_option_is_invalid_without_free_text():
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.open(text="Which?", options=["a", "b"]))
-    params = await opened(bodies)
+def test_unlisted_option_is_invalid_without_free_text():
+    asks = Asks(FakeBodies())
+    asks.card("c1", kind="choice", text="Which?", options=["a", "b"])
     with pytest.raises(RpcError) as err:
-        asks.answer(params["id"], "other", "desktop", text="typed")
+        asks.answer("c1", "other", "desktop", text="typed")
     assert err.value.code == ErrorCode.invalid_params
-    asks.answer(params["id"], "b", "desktop")
-    await task
+    asks.answer("c1", "b", "desktop")
 
 
-async def test_open_has_no_default_timeout():
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.open(text="Which?", options=["a"]))
-    params = await opened(bodies)
-    await asyncio.sleep(0.05)
-    assert not task.done()
-    asks.answer(params["id"], "a", "desktop")
-    await task
-
-
-async def test_open_with_timeout_closes_and_raises():
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
+def test_first_answer_wins():
+    asks = Asks(FakeBodies())
+    told = []
+    asks.register("choice", lambda *a: told.append(a))
+    asks.card("c1", kind="choice", text="Which?", options=["a", "b"])
+    asks.answer("c1", "a", "desktop")
     with pytest.raises(RpcError) as err:
-        await asks.open(text="Which?", options=["a"], timeout=0.01)
-    assert err.value.code == ErrorCode.timeout
-    assert bodies.sent[-1][1]["reason"] == "timeout"
-
-
-async def test_open_with_nobody_online_returns_unanswered():
-    bodies = FakeBodies(online=[])
-    asks = Asks(bodies, fresh_work())
-    assert await asks.open(text="Which?", options=["a"]) == Answer(None, None)
-    assert bodies.sent == []
-
-
-async def test_open_first_answer_wins():
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.open(text="Which?", options=["a", "b"]))
-    params = await opened(bodies)
-    asks.answer(params["id"], "a", "desktop")
-    with pytest.raises(RpcError) as err:
-        asks.answer(params["id"], "b", "extension")
+        asks.answer("c1", "b", "extension")
     assert err.value.code == ErrorCode.not_found
-    assert await task == Answer("a", None)
+    assert [t[1] for t in told] == ["a"]
 
 
-async def test_open_rejects_a_duplicate_ask_id():
+def test_card_params_omit_free_text_and_recommended_by_default():
     bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    first = asyncio.create_task(asks.open(text="Which?", options=["a"], ask_id="job1-a"))
-    await opened(bodies)
-    await asyncio.sleep(0)
+    asks = Asks(bodies)
+    asks.card("c1", kind="choice", text="Which?", options=["a", "b"])
+    [(_, params)] = bodies.sent
+    assert "free_text" not in params and "recommended" not in params
+
+
+def test_recommended_outside_options_raises():
+    asks = Asks(FakeBodies())
     with pytest.raises(ValueError):
-        await asks.open(text="Again?", options=["a"], ask_id="job1-a")
-    asks.answer("job1-a", "a", "desktop")  # the first ask is untouched
-    assert await first == Answer("a", None)
-
-
-async def test_open_ask_params_include_free_text_and_recommended_when_given():
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(
-        asks.open(text="Which?", options=["a", "b"], free_text=True, recommended="b")
-    )
-    params = await opened(bodies)
-    assert params["free_text"] is True
-    assert params["recommended"] == "b"
-    asks.answer(params["id"], "b", "desktop")
-    await task
-
-
-async def test_open_ask_params_omit_them_by_default():
-    bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
-    task = asyncio.create_task(asks.open(text="Which?", options=["a", "b"]))
-    params = await opened(bodies)
-    assert "free_text" not in params
-    assert "recommended" not in params
-    asks.answer(params["id"], "a", "desktop")
-    await task
-
-
-async def test_recommended_outside_options_raises():
-    asks = Asks(FakeBodies(), fresh_work())
-    with pytest.raises(ValueError):
-        await asks.open(text="Which?", options=["a", "b"], recommended="c")
-
-
-# --- the ask is a work row while it is open -----------------------------------
-
-
-def goal(work, id="job1"):
-    work.create("goal", "a job", id=id, state="active")
-    return id
-
-
-async def test_open_ask_is_active_row():
-    bodies = FakeBodies()
-    work = fresh_work()
-    asks = Asks(bodies, work)
-    task = asyncio.create_task(
-        asks.open(text="Which?", options=["a"], tool="Bash", parent_id=goal(work))
-    )
-    params = await opened(bodies)
-    row = work.get(params["id"])
-    assert (row.kind, row.state, row.parent_id, row.title) == ("ask", "active", "job1", "Which?")
-    assert work.ask_detail(params["id"])["tool"] == "Bash"
-    asks.answer(params["id"], "a", "desktop")
-    await task
-
-
-async def test_ask_of_a_missing_or_ended_job_is_a_root():
-    bodies = FakeBodies()
-    work = fresh_work()
-    asks = Asks(bodies, work)
-    task = asyncio.create_task(asks.open(text="Which?", options=["a"], parent_id="nope"))
-    params = await opened(bodies)
-    assert work.get(params["id"]).parent_id is None
-    asks.answer(params["id"], "a", "desktop")
-    await task
-
-
-async def test_timed_out_and_cancelled_asks_expire():
-    bodies = FakeBodies()
-    work = fresh_work()
-    asks = Asks(bodies, work)
-    with pytest.raises(RpcError):
-        await asks.open(text="Which?", options=["a"], timeout=0.01)
-    timed = bodies.sent[0][1]["id"]
-    assert (work.get(timed).state, work.get(timed).end_reason) == ("expired", "timed out")
-    task = asyncio.create_task(asks.open(text="Again?", options=["a"], ask_id="x2"))
-    await asyncio.sleep(0)
-    task.cancel()
-    with pytest.raises(asyncio.CancelledError):
-        await task
-    assert work.get("x2").state == "expired"
-
-
-async def test_goal_close_expires_open_ask_and_resolves_future():
-    bodies = FakeBodies()
-    work = fresh_work()
-    asks = Asks(bodies, work)
-    task = asyncio.create_task(
-        asks.open(text="Which?", options=["a"], ask_id="x1", parent_id=goal(work))
-    )
-    await opened(bodies)
-    work.close_goal("job1", "done", "finished")
-    with pytest.raises(AskExpired) as err:
-        await task
-    assert err.value.reason == "job ended: closed by Scout"
-    assert work.get("x1").state == "expired"
-    assert asks.open_asks() == []
-    assert bodies.sent[-1][1] == {"id": "x1", "state": "closed", "reason": "timeout"}
-    with pytest.raises(RpcError):  # a late answer finds nothing open
-        asks.answer("x1", "a", "desktop")
-
-
-async def test_open_ask_expired_after_restart():
-    bodies = FakeBodies()
-    work = fresh_work()
-    asks = Asks(bodies, work)
-    task = asyncio.create_task(asks.open(text="Which?", options=["a"], ask_id="x1"))
-    await opened(bodies)
-    # the brain dies here; a new one starts on the same file and scans
-    assert work.resume_scan(lambda row: None) == [("x1", "expired")]
-    row = work.get("x1")
-    assert (row.state, row.end_reason) == ("expired", "brain restarted")
-    assert work.resume_scan(lambda row: None) == []
-    with pytest.raises(AskExpired):  # this test's waiter outlived the "crash"; a real one cannot
-        await task
+        asks.card("c1", kind="choice", text="Which?", options=["a", "b"], recommended="c")
 
 
 def _ask_lines(caplog) -> list[str]:
@@ -374,7 +133,7 @@ def _ask_lines(caplog) -> list[str]:
 async def test_ask_logs_open_show_answer(caplog):
     caplog.set_level("INFO", logger="brain.asks")
     bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
+    asks = Asks(bodies)
     asks.show("a1", call(), "desktop__x", False)
     params = await opened(bodies)
     asks.answer(params["id"], "allow", "desktop")
@@ -386,7 +145,7 @@ async def test_ask_logs_open_show_answer(caplog):
 
 def test_a_task_card_adds_not_now_and_stop_task_after_its_own_options():
     bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
+    asks = Asks(bodies)
     asks.show("a0", call(), "desktop__x", True, {"task": None})
     task = {
         "task": {"id": "k1", "title": "Fix it"},
@@ -408,7 +167,7 @@ def test_a_task_card_adds_not_now_and_stop_task_after_its_own_options():
 
 def test_not_now_keeps_the_card_open_and_shows_the_new_time():
     bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
+    asks = Asks(bodies)
     told = []
     asks.register("ask", lambda *a: told.append(a))
     asks.show("a1", call(), "desktop__x", True, {"task": {"id": "k1", "title": None}})
@@ -426,7 +185,7 @@ def test_not_now_keeps_the_card_open_and_shows_the_new_time():
 
 def test_card_publishes_and_returns_at_once():
     bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
+    asks = Asks(bodies)
     asks.card(
         "c1", kind="choice", text="Which?", options=["a", "b"], free_text=True,
         recommended="a", tool="choose",
@@ -441,7 +200,7 @@ def test_card_publishes_and_returns_at_once():
 
 def test_a_card_answer_goes_to_its_kinds_handler_with_the_typed_text():
     bodies = FakeBodies()
-    asks = Asks(bodies, fresh_work())
+    asks = Asks(bodies)
     told, common = [], []
     asks.register("choice", lambda *a: told.append(("choice", *a)))
     asks.register("offer", lambda *a: told.append(("offer", *a)))

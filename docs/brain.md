@@ -721,19 +721,15 @@ flowchart TD
   [Restart and return](#restart-and-return)). A body that joins with no `last_seq`, or that is told
   `resync`, is sent every ask still open again, with fresh `seq` numbers. A body that reconnects
   without `resync` gets the ask once, from its backlog.
-- **Asks without a turn.** `Asks.open(text=, options=, tool=, input=, timeout=, free_text=, ask_id=, recommended=)`
-  is for work with no Scout turn (`save_preference` and setup until the next T2c-2 part moves
-  them to cards, which then removes it). Expert permission requests and questions are not here: `Holds` shows
-  their cards with `Asks.card` (a `confirm` card for a tool call, a task's Not now and Stop task) and waits with no timeout. Every other card is `Asks.show` (Scout's permission
-  card) or `Asks.card(ask_id, kind=, text=, options=, ...)` (a choice or an offer): neither waits, and
-  `Asks.register(kind, handler)` names the code that takes the answer, called with the ask id, the
-  option, the body, the typed text and the check-back time. It sends a plain ask: no `turn`, no `confirm`, any
-  option names (for example `allow-once`, `reject`). It waits until closed; there is no default
-  timeout (pass `timeout` to get one). It returns `Answer(option, text)`; with nobody online it
-  returns `Answer(None, None)` at once and opens nothing. With `free_text=True` an answer whose
-  option is not listed is accepted when it carries non-empty `text` (the user typed their own
-  answer). `Asks.cancel(ask_id)` closes a card with `reason: "cancelled"`. `answer {ask, option, text}` now passes `text` through to the ask; the
-  closed frame is unchanged. An open ask now sends `free_text: true` (when set) and `recommended`
+- **Cards.** Expert permission requests and questions are shown by `Holds` with `Asks.card` (a
+  `confirm` card for a tool call, a task's Not now and Stop task) and are the one place that waits,
+  with no timeout. Every other card is `Asks.show` (Scout's permission card) or
+  `Asks.card(ask_id, kind=, text=, options=, ...)` (a choice, an offer, a preference or a Home setup
+  card): neither waits, and `Asks.register(kind, handler)` names the code that takes the answer,
+  called with the ask id, the option, the body, the typed text and the check-back time. With
+  `free_text=True` an answer whose option is not listed is accepted when it carries non-empty
+  `text`. `Asks.cancel(ask_id)` closes a card with `reason: "cancelled"`. `answer {ask, option, text}`
+  passes `text` through to the handler. A card sends `free_text: true` (when set) and `recommended`
   (one of the options, else `ValueError`), so a body shows a text box and marks the recommendation.
 
 ### Asks that wait
@@ -865,9 +861,10 @@ refuses.
 Saved preferences reach Scout as facts: `render_preferences` (`mind/prompt.py`) lists the
 owner's non-built-in preferences, newest first (at most 40, 300 characters each), after "What you
 know" in the system prompt. They are data to weigh, not orders, and the gate stays code: a
-preference never replaces the Allow card. `save_preference {sentence, question}` (asks itself)
-shows `question` with the buttons "Save it" and "Not now" and saves through
-`Approvals.add_preference(source="setup", tool=None, group_key=None)` only on "Save it". Setup
+preference never replaces the Allow card. `save_preference {sentence, question}` is a person-only tool: the gate shows `question` as a card
+and the call runs, saving through
+`Approvals.add_preference(source="setup", tool=None, group_key=None)`, only when the person allows
+it. No rule or side-check can allow it for them, and nothing waits on the card. Setup
 preferences are never candidates for `SideCheck`, so they cannot approve an ask.
 
 ## Home tools
@@ -952,16 +949,16 @@ an expert not installed is simply absent, and `progress` and `failed` come from
 the install's `setup_progress` and `setup_done` events), `setup_expert` and `setup_app`
 (`{id, approved?}`, tier `auto`: they ask for themselves). With `approved` false they open the same Allow card Scout's
 `install_expert`, `login_expert` and `install_app` open (empty card text, so the body renders it
-from the tool and its input; it waits as long as the gate's ask) and run that tool's own handler
-on Allow. A card that refuses with an `{error: token}` (such as `unknown_expert`) is answered as that
+from the tool and its input) as an `ask` open item (`Session.open_card`) and return `{card: id}` at
+once; the answer, whenever it comes, runs that tool's own handler as a Home press (no task, no wake
+of Scout). A card that refuses with an `{error: token}` (such as `unknown_expert`) is answered as that
 token, so Home words it; any other card failure stays a tool error. A login card runs no check, so
 it shows at once. `setup_expert` with `approved` true (the tour's button is the OK) skips the card;
 `setup_app` with `approved` true connects an Official app at once, while a community app still
 opens the check card (the Allow card with the trust facts) until `community_ok` (the Connect
 anyway press) is also true; a bare `approved` never installs community code. The desktop only
 forwards `true` from the tour window or Home's own buttons. Each answered card is written to the approvals history like the gate does (source
-`scout_tool`; approved, refused, no one there or timed out); a tour press asks nothing, so it
-records nothing. An installed expert that needs login is logged in instead of reinstalled (a
+`scout_tool`), as the open item's end does; a tour press asks nothing, so it records nothing. An installed expert that needs login is logged in instead of reinstalled (a
 second press after the install: the install and the login are two presses, not one chained
 call); a ready one answers `already_ready`. `browse_apps` leaves out apps already added (matched
 by name, as `install_app` does), but the curated `popular` and `popular_more` and `browse_experts`
@@ -1729,7 +1726,7 @@ shows them as Scout does.
   ends the card and starts nothing. The card follows the ask-tier rules, so Home can set the tool
   Off or Auto like any other.
 - **Relayed asks.** Claude Code's permission requests and questions become turn-less asks
-  (`Asks.open`) tied to the job and kept open as long as it lives. A stopped or finished job
+  (`Asks.card`, shown by `Holds`) tied to the job and kept open as long as it lives. A stopped or finished job
   closes its open asks with `cancelled`. Each answer sends `changed {what: "jobs"}`. Permission
   asks and progress always go straight to the owner.
 - **Questions go to Scout first.** When a body is online, `Jobs` hands Claude Code's question to
@@ -2712,8 +2709,8 @@ event given up, a say or card answer included, oldest first, each as
 `{id, kind, source, at, age_s, gave_up, gist}`; the `gist` is the payload's first fact value cut
 short (JSON when it is not text), never prose. A new say or card answer is not listed.
 
-There is one deadline rule: `DEADLINE_S` in `open_items.py` for what waits on a person. The ask wait
-in `asks.py` (`ASK_TIMEOUT_S`) is a live card tied to one turn, not a stored wait.
+There is one deadline rule: `DEADLINE_S` in `open_items.py` for what waits on a person. Nothing in the brain
+waits on a card but `Holds`, which an expert's open call needs.
 
 Tests: `tests/test_runner.py` and `tests/test_presence.py` (fake clock), `tests/test_interjection.py`
 and `tests/test_events.py`.

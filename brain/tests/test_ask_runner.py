@@ -29,10 +29,10 @@ from brain.permission import (
     stored_auto_rules,
 )
 from brain.protocol import ErrorCode, RpcError
+from brain.setup.flights import not_for_home
 from brain.store import rules
 from brain.store.work import WorkStore
 from brain.tasks import Tasks
-from brain.setup.flights import not_for_home
 from brain.toolbox import Toolbox, ToolSpec
 
 NOW = datetime(2026, 11, 11, 9, 0, 0, tzinfo=UTC)
@@ -79,7 +79,7 @@ class Rig:
         self.memory = memory or Memory(":memory:")
         self.work = WorkStore(self.memory.db, lambda: NOW)
         self.bodies = Bodies()
-        self.asks = Asks(self.bodies, self.work)
+        self.asks = Asks(self.bodies)
         self.approvals = Approvals(self.memory, self.work, lambda m, p: None, lambda: NOW)
         self.items = OpenItems(self.memory.db, lambda: self.clock[0])
         self.stored: dict[str, str] = {}

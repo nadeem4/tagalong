@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 from ask_log import approvals_on
-from job_rows import end_job, fresh_work, records_for, tasks_for
+from job_rows import end_job, records_for, tasks_for
 
 from brain.bodies import Bodies
 from brain.guardrails import Budget
@@ -1634,7 +1634,6 @@ async def test_save_preference_needs_both_arguments(mem):
         "sentence": "s",
         "question": "q",
     }
-
 
 
 async def test_job_activity_returns_the_jobs_page_from_the_cursor(home):

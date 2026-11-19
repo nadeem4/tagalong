@@ -41,7 +41,7 @@ def rig(online=("desktop",), timeout=600.0):
     events = []
     work = fresh_work()
     choices = Choices(
-        Asks(bodies, work),
+        Asks(bodies),
         events.append,
         OpenItems(work.db, lambda: datetime.now(UTC)),
         timeout,

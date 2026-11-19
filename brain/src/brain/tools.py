@@ -25,7 +25,6 @@ from anthropic import AsyncAnthropic, AuthenticationError, PermissionDeniedError
 
 from brain.approvals import SENTENCE_MAX as PREFERENCE_MAX_CHARS
 from brain.approvals import Approvals
-from brain.asks import Asks
 from brain.choices import MAX_CHOICE_OPTIONS, Choices
 from brain.config import upsert_env_value
 from brain.guardrails import Budget

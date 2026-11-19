@@ -1,32 +1,20 @@
-"""Asks: open an ask to the bodies; a job's ask waits for one person's answer.
+"""Asks: the cards on screen, and what an answer does.
 
-`permission` is the confirm ask of a job's tool call (it waits); `open` is for work with no turn
-(expert jobs): custom options, optional typed answer, no default timeout. `show` is Scout's own
-permission card: it has no waiter, because the open item behind it takes the answer. `card` is
-the same for any other kind (choice, offer): a handler registered per kind with `register` takes
-its answer, and `on_item_answer` tells the session, which saves the `card_answer`. A waiting
-future lives in memory; the `ask` work row beside it is the record, so a restart leaves an expired
-row instead of nothing. A row ends with its ask (answered, timed out, cancelled) or with its
-parent job. The first answer wins; later ones are not_found. Timeout and cancel close the ask
-for every body. How the person's choice counts (approved, refused) is written by Approvals.
+`show` is Scout's own permission card and `card` is any other kind (choice, offer, preference,
+an expert's ask): none has a waiter. The open item behind a card takes its answer: a handler
+registered per kind with `register` runs it, and `on_item_answer` tells the session, which saves
+the `card_answer`. Nothing in the brain awaits a card but `Holds`, on purpose, for an expert's
+ACP call. The first answer wins; later ones are not_found. `expire` and `cancel` close a card for
+every body. How the person's choice counts (approved, refused) is written by Approvals.
 """
 
-import asyncio
-import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from brain.bodies import Bodies
 from brain.mind.turn import Call
 from brain.protocol import ErrorCode, RpcError
-from brain.store.work import State, TransitionRefused, WorkStore
 from brain.telemetry import ask_event
-
-
-@dataclass(frozen=True)
-class Answer:
-    option: str | None  # None: nobody was online to ask
-    text: str | None = None
 
 
 class AskExpired(Exception):
@@ -40,13 +28,11 @@ class AskExpired(Exception):
 @dataclass
 class _Open:
     params: dict
-    future: asyncio.Future[Answer] | None  # None: a card whose open item takes the answer
     free_text: bool = False
-    kind: str = ""  # which handler takes the answer of a card with no waiter
+    kind: str = ""  # which handler takes the answer
 
 
 Handler = Callable[[str, str, str, str | None, str | None], None]
-ASK_TIMEOUT_S = 300.0  # how long Home's setup asks wait
 
 
 def _nobody(*_: object) -> None:
@@ -54,15 +40,13 @@ def _nobody(*_: object) -> None:
 
 
 class Asks:
-    def __init__(self, bodies: Bodies, work: WorkStore) -> None:
+    def __init__(self, bodies: Bodies) -> None:
         self._bodies = bodies
-        self._work = work
         self._open: dict[str, _Open] = {}
         # Told (ask id, option, body id) of every card answered: the session saves the event.
         self.on_item_answer: Callable[[str, str, str], None] = lambda *_: None
         # The handler of each card kind: (ask id, option, body id, typed text, check_back_at).
         self._handlers: dict[str, Handler] = {}
-        work.on_transition(self._row_ended)
 
     def anyone_online(self) -> bool:
         return bool(self._bodies.display_ids())  # a body that shows nothing cannot be asked
@@ -77,7 +61,7 @@ class Asks:
         params = self._card(call, spec_name, locked, ask_id)
         self._with_task(params, task)
         ask_event("opened", ask_id, "brain", spec_name)
-        self._publish(_Open(params, None, kind="ask"))
+        self._publish(_Open(params, kind="ask"))
 
     @staticmethod
     def _with_task(params: dict, task: dict | None) -> None:
@@ -122,7 +106,7 @@ class Asks:
         if confirm:
             params["confirm"] = True  # the fixed allow, always, deny card of a tool call
         self._with_task(params, task)
-        self._publish(_Open(params, None, free_text, kind))
+        self._publish(_Open(params, free_text, kind))
         ask_event("opened", ask_id, "brain", tool or kind)
 
     def reschedule(self, ask_id: str, check_back_at: str, check_back_by: str) -> None:
@@ -144,65 +128,6 @@ class Asks:
             "input": call.input,
         }
 
-    async def open(
-        self,
-        *,
-        text: str,
-        options: list[str],
-        tool: str | None = None,
-        input: dict | None = None,
-        timeout: float | None = None,
-        free_text: bool = False,
-        ask_id: str | None = None,
-        recommended: str | None = None,
-        parent_id: str | None = None,
-    ) -> Answer:
-        # No turn and no confirm: a job's ask can outlive turns, and confirm asks only
-        # allow the fixed allow/always/deny sets. Waits until closed unless timeout is given.
-        if ask_id is not None and ask_id in self._open:
-            raise ValueError(f"ask {ask_id} is already open")
-        if recommended is not None and recommended not in options:
-            raise ValueError("recommended must be one of the options")
-        # A question or card is told to the person later by other means.
-        if not self.anyone_online():
-            return Answer(None)
-        params: dict = {"id": ask_id or uuid.uuid4().hex, "state": "open", "text": text}
-        params["options"] = options
-        # Bodies only learn a text box is wanted, or what is recommended, from these fields.
-        if free_text:
-            params["free_text"] = True
-        if recommended is not None:
-            params["recommended"] = recommended
-        if tool is not None:
-            params["tool"] = tool
-        if input is not None:
-            params["input"] = input
-        entry = _Open(params, asyncio.get_running_loop().create_future(), free_text)
-        return await self._wait(entry, timeout, parent_id)
-
-    async def _wait(
-        self,
-        entry: _Open,
-        timeout: float | None,
-        parent_id: str | None,
-    ) -> Answer:
-        ask_id = entry.params["id"]
-        assert entry.future is not None
-        self._record_open(entry.params, parent_id)
-        ask_event("opened", ask_id, "brain", entry.params.get("tool") or "")
-        self._publish(entry)
-        try:
-            async with asyncio.timeout(timeout):
-                return await entry.future
-        except TimeoutError:
-            if entry.future.done() and not entry.future.cancelled():
-                return entry.future.result()  # the answer landed just before the timeout
-            self._close(ask_id, "timeout")
-            raise RpcError(ErrorCode.timeout, "nobody answered the ask in time") from None
-        except asyncio.CancelledError:
-            self._close(ask_id, "cancelled")
-            raise
-
     def _publish(self, entry: _Open) -> None:
         ask_id = entry.params["id"]
         self._open[ask_id] = entry
@@ -220,28 +145,22 @@ class Asks:
         check_back_at: str | None = None,
     ) -> None:
         entry = self._open.get(ask_id)
-        # A done future means the wait was cancelled or timed out and is about to close.
-        if entry is None or (entry.future is not None and entry.future.done()):
+        if entry is None:
             raise RpcError(ErrorCode.not_found, f"no open ask {ask_id}")
         if option not in entry.params["options"] and not (entry.free_text and text):
             raise RpcError(ErrorCode.invalid_params, f"{option} is not offered by this ask")
         handler = self._handlers.get(entry.kind, _nobody)
-        if option == "not_now" and entry.future is None:
+        if option == "not_now":
             ask_event("answered", ask_id, body_id, option)
             self.on_item_answer(ask_id, option, body_id)
             handler(ask_id, option, body_id, text, check_back_at)
             return  # the card stays up; the open item moves its check-back and calls reschedule
         del self._open[ask_id]
-        if entry.future is not None:
-            entry.future.set_result(Answer(option, text))
         closed = {"id": ask_id, "state": "closed", "reason": "answered"}
         self._bodies.notify("ask", {**closed, "option": option, "by": body_id})
         ask_event("answered", ask_id, body_id, option)
-        if entry.future is None:
-            self.on_item_answer(ask_id, option, body_id)
-            handler(ask_id, option, body_id, text, None)
-        else:
-            self._end_row(ask_id, "done", "answered", {"option": option})
+        self.on_item_answer(ask_id, option, body_id)
+        handler(ask_id, option, body_id, text, None)
 
     def expire(self, ask_id: str, reason: str) -> None:
         """The deadline passed: close the card for every body."""
@@ -283,43 +202,3 @@ class Asks:
 
     def open_asks(self) -> list[dict]:
         return [dict(e.params) for e in self._open.values()]
-
-    def _close(self, ask_id: str, reason: str) -> None:
-        if self._open.pop(ask_id, None) is not None:
-            ask_event("closed", ask_id, "brain", reason)
-            self._bodies.notify("ask", {"id": ask_id, "state": "closed", "reason": reason})
-            self._end_row(
-                ask_id, "expired", "timed out" if reason == "timeout" else "ask cancelled"
-            )
-
-    def _row_ended(self, work_id: str, kind: str, to: str) -> None:
-        """The row ended from outside (its job closed, or a restart scan): the waiter is done."""
-        entry = self._open.get(work_id) if kind == "ask" else None
-        if entry is not None and entry.future is not None:  # a card's owner closes it itself
-            del self._open[work_id]
-        if entry is not None and entry.future is not None and not entry.future.done():
-            row = self._work.get(work_id)
-            why = (row.end_reason if row is not None and row.end_reason else to).removeprefix(
-                "parent ended: "
-            )
-            reason = f"job ended: {why}" if row is not None and row.parent_id else why
-            ask_event("closed", work_id, "brain", reason)
-            entry.future.set_exception(AskExpired(reason))
-            self._bodies.notify("ask", {"id": work_id, "state": "closed", "reason": "timeout"})
-
-    def _record_open(self, params: dict, parent_id: str | None) -> None:
-        ask_id = params["id"]
-        self._work.create(
-            "ask",
-            params["text"],
-            id=ask_id,
-            state="active",
-            parent_id=self._work.open_goal(parent_id),
-        )
-        self._work.add_ask(ask_id, tool=params.get("tool"))
-
-    def _end_row(self, ask_id: str, to: State, reason: str, data: dict | None = None) -> None:
-        try:
-            self._work.settle(ask_id, to, reason, data)
-        except TransitionRefused:
-            pass  # its job already ended it

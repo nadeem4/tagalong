@@ -41,7 +41,7 @@ class Rig:
         self.work = WorkStore(self.memory.db, lambda: NOW)
         self.items = OpenItems(self.memory.db, lambda: NOW)
         self.tasks = Tasks(self.memory.db, lambda text: text, lambda: NOW, items=self.items)
-        self.asks = Asks(self.bodies, self.work)
+        self.asks = Asks(self.bodies)
         self.holds = Holds(self.asks, self.work, self.items, self.tasks)
         self.saved: list[tuple] = []  # what the session saves as a card_answer event
         self.asks.on_item_answer = lambda *a: self.saved.append(a)

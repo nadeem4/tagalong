@@ -227,7 +227,7 @@ class Session:
         # One WorkStore for the jobs, asks, questions and the ask log: a job that ends takes its
         # open asks and questions with it, which only holds when they share the store's hooks.
         work = WorkStore(memory.db, now, lambda text: mask_json(self.guards, "work", text))
-        self._asks = Asks(bodies, work)
+        self._asks = Asks(bodies)
         # One set of spend guards for the loop, the runner, the side-check and offers.
         self.guards = spend_guards(budget, step_cap)
         self.guards.add(wake_caps(wakes_per_hour))
