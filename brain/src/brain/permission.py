@@ -37,6 +37,9 @@ SUMMARY_MAX = 200
 ASK_WAIT_ARG = "ask_wait_hours"
 CHECK_BACK_ARG = "check_back_minutes"  # when Scout wants the card looked at again
 URGENT_ARG = "urgent"  # the card may reach the person in quiet hours
+# Set by the gate on a call whose task it opened (a tool with `task_kind`): a call that never
+# runs ends that task, so it does not stay open for nothing.
+NEW_TASK_ARG = "new_task"
 ASK_WAIT_DEFAULT = timedelta(days=3)
 ASK_WAIT_MIN = timedelta(hours=1)
 ASK_WAIT_MAX = timedelta(days=7)
@@ -147,7 +150,7 @@ class AskOpen(Exception):
 
 @dataclass(frozen=True)
 class AskRequest:
-    kind: Literal["tool", "expert_request", "hand_off_followup"]
+    kind: Literal["tool", "expert_request"]
     source: str
     tool: str
     group_key: str

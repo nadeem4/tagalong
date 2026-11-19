@@ -92,8 +92,6 @@ export const ConnectorConfirmParams = z.object({
   freeText: z.boolean().optional(),
   /** One of `options` the brain recommends: the card marks it and lists it first. */
   recommended: z.string().optional(),
-  /** A hand-off's apps: the card lists them, the person may remove some before choosing a mode. */
-  apps: z.array(z.object({ id: z.string().min(1), name: z.string() })).optional(),
   /** An install ask's card facts (who made it, where it runs, how it signs in), as the brain sent them. */
   facts: z.record(z.string(), z.unknown()).optional(),
 });

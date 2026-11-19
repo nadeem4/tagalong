@@ -26,12 +26,11 @@ from brain.jobs import JobError, Jobs, job_note
 from brain.masking import Masker, mask_secrets
 from brain.memory import Memory
 from brain.open_items import OpenItemRefused, OpenItems
-from brain.permission import Decision, Engine, Grant, Person, SideCheckDecider, Tier
+from brain.permission import Decision, Engine, Grant, Person, SideCheckDecider
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.store import InstalledExpert
-from brain.store import events as store_events
 from brain.store import rules
-from brain.store.events import EventRow, list_state
+from brain.store.events import list_state
 from brain.store.work import ActivityEntry, WorkStore
 from brain.tools import work_tools
 
@@ -222,7 +221,6 @@ class Rig:
             now=lambda: self.wall,
             on_timers_changed=lambda: setattr(self, "timers_changed", self.timers_changed + 1),
             apps=apps,
-            person_task=tasks_for(self.memory).is_person,
             items=self.items,
             **({} if before_start is None else {"before_start": before_start}),
         )
@@ -298,20 +296,10 @@ async def test_bad_folders_give_a_plain_message_and_start_nothing(make_rig, tmp_
     assert rig.runs == [] and rig.asks.opened == []
 
 
-async def test_handoff_ask_shows_task_folder_and_mode_names_then_cancel(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")))
-    job_id = await rig.jobs.start("fix the bug", str(rig.folder))
-    ask = rig.asks.opened[0]
-    assert ask["text"] == "fix the bug"
-    assert ask["input"] == {"folder": str(rig.folder)}
-    assert ask["options"] == [
-        "Manual",
-        "Accept edits",
-        "Plan",
-        "Auto",
-        "Bypass permissions",
-        "cancel",
-    ]
+async def test_hand_off_starts_in_the_asked_mode_without_a_card(make_rig):
+    rig = make_rig(FakeAsks())
+    job_id = await rig.jobs.start("fix the bug", str(rig.folder), mode="plan")
+    assert rig.asks.opened == []  # the person answered the hand-off card before this ran
     job = rig.records.get_job(job_id)
     assert (job.state, job.mode, job.task, job.folder) == (
         "active",
@@ -327,34 +315,47 @@ async def test_handoff_ask_shows_task_folder_and_mode_names_then_cancel(make_rig
     )
 
 
-@pytest.mark.parametrize(
-    "answer", [Answer("cancel"), Answer(None), RpcError(ErrorCode.timeout, "nobody answered")]
-)
-async def test_cancel_nobody_or_timeout_at_the_mode_ask_starts_nothing(make_rig, answer):
-    rig = make_rig(FakeAsks(answer))
-    with pytest.raises(JobError, match="not started"):
-        await rig.jobs.start("task", str(rig.folder))
+async def test_a_mode_is_matched_by_name_ignoring_case(make_rig):
+    rig = make_rig(FakeAsks())
+    job_id = await rig.jobs.start("go", str(rig.folder), mode="accept EDITS")
+    assert rig.records.get_job(job_id).mode == "acceptEdits"
+
+
+async def test_an_unknown_mode_starts_nothing_and_lists_the_offered_modes(make_rig):
+    rig = make_rig(FakeAsks())
+    with pytest.raises(JobError) as refused:
+        await rig.jobs.start("task", str(rig.folder), mode="turbo")
+    assert refused.value.facts == {
+        "error": "unknown_mode",
+        "offered": ["Manual", "Accept edits", "Plan", "Auto", "Bypass permissions"],
+    }
     assert rig.records.list_jobs() == [] and rig.changed() == 0
     assert len(rig.runs) == 1
     await until(lambda: not alive(rig.runs[0]))  # the adapter process did not linger
 
 
+async def test_no_mode_keeps_the_experts_default(make_rig):
+    rig = make_rig(FakeAsks())
+    job_id = await rig.jobs.start("go", str(rig.folder))
+    assert rig.records.get_job(job_id).mode == "default"
+
+
 async def test_third_running_job_is_refused_naming_the_running_ones(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")))
+    rig = make_rig(FakeAsks())
     first = await rig.jobs.start("one", str(rig.folder))
     second = await rig.jobs.start("two", str(rig.folder))
     with pytest.raises(JobError) as refused:
         await rig.jobs.start("three", str(rig.folder))
     assert first in str(refused.value) and second in str(refused.value)
-    assert len(rig.runs) == 2 and len(rig.asks.opened) == 2
+    assert len(rig.runs) == 2
 
 
 async def test_relayed_permission_shows_claude_code_tool_and_the_pick_maps_to_its_id(make_rig):
     steps = [{"permission": {"title": "ls -la", "kind": "execute", "input": {"command": "ls"}}}]
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Yes")), steps)
+    rig = make_rig(FakeAsks(Answer("Yes")), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
-    ask = rig.asks.opened[1]
+    ask = rig.asks.opened[0]
     assert ask["tool"] == "claude_code:ls -la"
     assert ask["input"] == {"command": "ls"}
     assert ask["text"] == "" and ask["options"] == ["Yes", "No"]
@@ -365,7 +366,7 @@ async def test_relayed_permission_shows_claude_code_tool_and_the_pick_maps_to_it
 
 
 async def test_begin_failure_ends_the_row_as_error_kills_the_adapter_and_frees_the_slot(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan"), Answer("Plan")), max_running=1)
+    rig = make_rig(FakeAsks(), max_running=1)
     original = rig.make_run
 
     def failing(expert, **callbacks):
@@ -410,7 +411,7 @@ async def test_start_failure_from_the_adapter_is_a_plain_message(make_rig):
 
 
 async def test_a_job_counts_once_so_a_second_hand_off_fits_under_the_cap(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")))
+    rig = make_rig(FakeAsks())
     original = rig.make_run
     slow = []
 
@@ -436,7 +437,7 @@ async def test_a_job_counts_once_so_a_second_hand_off_fits_under_the_cap(make_ri
 
 async def test_unanswered_permission_is_cancelled(make_rig):
     steps = [{"permission": {"title": "rm x"}}]
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer(None)), steps)
+    rig = make_rig(FakeAsks(Answer(None)), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))
@@ -445,10 +446,10 @@ async def test_unanswered_permission_is_cancelled(make_rig):
 
 async def test_question_with_a_pick_and_with_typed_text(make_rig):
     steps = [{"question": {"message": "Which colour?", "options": ["Red", "Blue"]}}]
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Red")), steps)
+    rig = make_rig(FakeAsks(Answer("Red")), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
-    ask = rig.asks.opened[1]
+    ask = rig.asks.opened[0]
     assert (ask["text"], ask["options"], ask["free_text"]) == (
         "Which colour?",
         ["Red", "Blue"],
@@ -460,7 +461,7 @@ async def test_question_with_a_pick_and_with_typed_text(make_rig):
 
 async def test_typed_text_wins_over_the_option(make_rig):
     steps = [{"question": {"message": "Which colour?", "options": ["Red", "Blue"]}}]
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Red", "teal")), steps)
+    rig = make_rig(FakeAsks(Answer("Red", "teal")), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     reply = next(f for f in rig.frames() if f.get("result", {}).get("action"))
@@ -469,7 +470,7 @@ async def test_typed_text_wins_over_the_option(make_rig):
 
 async def test_unanswered_question_cancels(make_rig):
     steps = [{"question": {"message": "?", "options": ["A"]}}]
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer(None)), steps)
+    rig = make_rig(FakeAsks(Answer(None)), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     reply = next(f for f in rig.frames() if f.get("result", {}).get("action"))
@@ -478,7 +479,7 @@ async def test_unanswered_question_cancels(make_rig):
 
 async def test_progress_is_saved_and_changed_is_throttled(make_rig):
     steps = [{"text": "a"}, {"text": "b"}, {"text": "c"}, {"end": "end_turn"}]
-    rig = make_rig(FakeAsks(Answer("Plan")), steps)
+    rig = make_rig(FakeAsks(), steps)
     job_id = await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     assert rig.records.get_job(job_id).parts[-1].progress is None  # a finished part drops its tail
@@ -488,7 +489,7 @@ async def test_progress_is_saved_and_changed_is_throttled(make_rig):
 
 async def test_progress_notifies_again_after_two_seconds(make_rig):
     steps = [{"text": "a"}, {"sleep": 0.3}, {"text": "b"}, {"end": "end_turn"}]
-    rig = make_rig(FakeAsks(Answer("Plan")), steps)
+    rig = make_rig(FakeAsks(), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.changed() >= 2)  # first progress
     rig.now = 5.0
@@ -498,7 +499,7 @@ async def test_progress_notifies_again_after_two_seconds(make_rig):
 
 async def test_end_writes_the_row_and_calls_on_finished(make_rig):
     steps = [{"text": "all done"}, {"end": "end_turn"}]
-    rig = make_rig(FakeAsks(Answer("Plan")), steps)
+    rig = make_rig(FakeAsks(), steps)
     job_id = await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     job = rig.records.get_job(job_id)
@@ -514,7 +515,7 @@ async def test_job_result_is_masked_in_the_row_and_reported_note(make_rig):
     guards = Guards()
     guards.add(mask_secrets(Masker(lambda: ["fake-token-12345678"])))
     steps = [{"text": "key is fake-token-12345678"}, {"end": "end_turn"}]
-    rig = make_rig(FakeAsks(Answer("Plan")), steps, guards=guards)
+    rig = make_rig(FakeAsks(), steps, guards=guards)
     job_id = await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     job = rig.records.get_job(job_id)
@@ -535,7 +536,7 @@ async def test_job_result_masks_key_shapes(make_rig, shape):
     guards = Guards()
     guards.add(mask_secrets(Masker(lambda: [])))
     steps = [{"text": f"saw {shape} there"}, {"end": "end_turn"}]
-    rig = make_rig(FakeAsks(Answer("Plan")), steps, guards=guards)
+    rig = make_rig(FakeAsks(), steps, guards=guards)
     job_id = await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     job = rig.records.get_job(job_id)
@@ -546,15 +547,15 @@ async def test_job_result_masks_key_shapes(make_rig, shape):
     )
 
 
-async def test_the_started_job_names_the_mode_the_person_chose(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"end": "end_turn"}])
-    job_id = await rig.jobs.start("go", str(rig.folder))
+async def test_the_started_job_names_the_mode_it_runs_in(make_rig):
+    rig = make_rig(FakeAsks(), [{"end": "end_turn"}])
+    job_id = await rig.jobs.start("go", str(rig.folder), mode="Plan")
     await until(lambda: rig.finished)
     assert job_id.mode == "Plan"
 
 
 async def test_a_crashed_run_ends_as_error(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"crash": 3}])
+    rig = make_rig(FakeAsks(), [{"crash": 3}])
     job_id = await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     assert rig.records.get_job(job_id).state == "failed"
@@ -562,7 +563,7 @@ async def test_a_crashed_run_ends_as_error(make_rig):
 
 async def test_tell_queues_a_note_for_a_running_job_only(make_rig):
     steps = [[{"text": "first"}, {"sleep": 0.5}], [{"text": "second"}]]
-    rig = make_rig(FakeAsks(Answer("Plan")), steps)
+    rig = make_rig(FakeAsks(), steps)
     job_id = await rig.jobs.start("go", str(rig.folder))
     rig.jobs.tell(job_id, "also do X")
     await until(lambda: rig.finished)
@@ -585,9 +586,9 @@ async def test_a_stop_during_an_open_permission_ask_reads_stopped_not_failed(mak
         {"permission": {"title": "ls", "kind": "execute", "input": {"command": "ls"}}},
         {"tool_update": {"id": "c1", "status": "failed", "text": "The user doesn't want to"}},
     ]
-    rig = make_rig(FakeAsks(Answer("Plan"), None), steps)
+    rig = make_rig(FakeAsks(None), steps)
     job_id = await rig.jobs.start("go", str(rig.folder))
-    await until(lambda: len(rig.asks.opened) == 2 and rig.asks.open_ids)
+    await until(lambda: len(rig.asks.opened) == 1 and rig.asks.open_ids)
     await rig.jobs.stop(job_id)
     line = rig.jobs.activity_line(job_id)
     assert "0 failed" in line and "stopped" in line
@@ -600,19 +601,19 @@ async def test_shutdown_marks_steps_stopped_not_failed(make_rig):
         {"permission": {"title": "ls", "kind": "execute", "input": {"command": "ls"}}},
         {"tool_update": {"id": "c1", "status": "failed", "text": "The user doesn't want to"}},
     ]
-    rig = make_rig(FakeAsks(Answer("Plan"), None), steps)
+    rig = make_rig(FakeAsks(None), steps)
     job_id = await rig.jobs.start("go", str(rig.folder))
-    await until(lambda: len(rig.asks.opened) == 2 and rig.asks.open_ids)
+    await until(lambda: len(rig.asks.opened) == 1 and rig.asks.open_ids)
     await rig.jobs.shutdown()
     assert "0 failed" in rig.jobs.activity_line(job_id)
 
 
 async def test_stop_closes_open_asks_and_marks_stopped(make_rig):
     steps = [{"question": {"message": "?", "options": ["A"]}}]
-    rig = make_rig(FakeAsks(Answer("Plan"), None), steps)
+    rig = make_rig(FakeAsks(None), steps)
     job_id = await rig.jobs.start("go", str(rig.folder))
-    await until(lambda: len(rig.asks.opened) == 2 and rig.asks.open_ids)
-    open_id = rig.asks.opened[1]["ask_id"]
+    await until(lambda: len(rig.asks.opened) == 1 and rig.asks.open_ids)
+    open_id = rig.asks.opened[0]["ask_id"]
     before = rig.changed()
     await rig.jobs.stop(job_id)
     job = rig.records.get_job(job_id)
@@ -640,7 +641,7 @@ async def test_list_returns_the_last_twenty_newest_first_with_progress(make_rig)
 
 
 async def test_shutdown_stops_every_running_job_and_leaves_no_process(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")))
+    rig = make_rig(FakeAsks())
     first = await rig.jobs.start("one", str(rig.folder))
     await rig.jobs.start("two", str(rig.folder))
     await rig.jobs.shutdown()
@@ -650,7 +651,7 @@ async def test_shutdown_stops_every_running_job_and_leaves_no_process(make_rig):
 
 
 async def test_shutdown_swallows_one_runs_failure_and_stops_the_rest(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")))
+    rig = make_rig(FakeAsks())
     await rig.jobs.start("one", str(rig.folder))
     await rig.jobs.start("two", str(rig.folder))
 
@@ -666,7 +667,7 @@ async def test_shutdown_swallows_one_runs_failure_and_stops_the_rest(make_rig):
 async def test_shutdown_leaves_the_report_for_the_next_start(make_rig):
     # The runner is stopped first, so job_ended is only a row: it stays new and the next
     # start's runner tells it.
-    rig = make_rig(FakeAsks(Answer("Plan")))
+    rig = make_rig(FakeAsks())
 
     def finished(job) -> None:  # what Session._on_job_finished does
         rig.finished.append(job)
@@ -678,19 +679,6 @@ async def test_shutdown_leaves_the_report_for_the_next_start(make_rig):
     assert [j.id for j in rig.finished] == [job_id]
     assert rig.records.get_job(job_id).state == "cancelled"
     assert [r.source for r in list_state(rig.memory.db, "new")] == [f"job:{job_id}"]
-
-
-async def test_cancelling_start_while_it_waits_on_the_mode_ask_cleans_up(make_rig):
-    rig = make_rig(FakeAsks(), max_running=1)  # the mode ask blocks forever
-    task = asyncio.create_task(rig.jobs.start("go", str(rig.folder)))
-    await until(lambda: rig.asks.open_ids)
-    ask_id = rig.asks.opened[0]["ask_id"]
-    task.cancel()
-    with pytest.raises(asyncio.CancelledError):
-        await task
-    assert ask_id in rig.asks.closed_by_cancel and not rig.asks.open_ids
-    assert rig.jobs._starting == 0 and rig.records.list_jobs() == []
-    await until(lambda: not alive(rig.runs[0]))
 
 
 async def test_restart_blocks_running_part_with_session(make_rig):
@@ -745,20 +733,6 @@ async def test_restart_closes_a_stopped_parts_open_step_as_stopped(make_rig):
     rig.jobs.startup()
     steps = [e for e in work.activity_after("old", 0, 10) if e.kind == "command"]
     assert [(e.text, e.status, e.at) for e in steps] == [("sleep 600", "stopped", at)]
-
-
-@pytest.mark.parametrize(
-    ("answer", "why"),
-    [
-        (Answer("cancel"), "the person declined"),
-        (Answer(None), "nobody was there to answer"),
-        (RpcError(ErrorCode.timeout, "nobody answered"), "nobody was there to answer"),
-    ],
-)
-async def test_mode_card_refusal_tells_scout_why(make_rig, answer, why):
-    rig = make_rig(FakeAsks(answer))
-    with pytest.raises(JobError, match=f"not started: {why}"):
-        await rig.jobs.start("task", str(rig.folder))
 
 
 def a_job(id, task, state, reason=None, report=None) -> Job:
@@ -816,20 +790,20 @@ def reply_of(rig):
 
 async def test_scout_answer_goes_to_the_expert_and_no_user_ask_opens(make_rig):
     scout = FakeScout({"question_0": "Blue"})
-    rig = make_rig(FakeAsks(Answer("Plan")), ASK_COLOUR, scout=scout)
+    rig = make_rig(FakeAsks(), ASK_COLOUR, scout=scout)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
-    assert len(rig.asks.opened) == 1  # only the hand-off ask
+    assert rig.asks.opened == []  # nothing goes to the person
     assert reply_of(rig)["content"] == {"question_0": "Blue"}
     assert scout.asked[0][1].message == "Which colour?"
 
 
 async def test_scout_pass_opens_the_users_question_card_as_before(make_rig):
     scout = FakeScout(None)
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Red")), ASK_COLOUR, scout=scout)
+    rig = make_rig(FakeAsks(Answer("Red")), ASK_COLOUR, scout=scout)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
-    ask = rig.asks.opened[1]
+    ask = rig.asks.opened[0]
     assert (ask["text"], ask["options"], ask["free_text"]) == (
         "Which colour?",
         ["Red", "Blue"],
@@ -841,7 +815,7 @@ async def test_scout_pass_opens_the_users_question_card_as_before(make_rig):
 
 async def test_ask_with_nobody_online_skips_scout_and_cancels(make_rig):
     scout = FakeScout({"question_0": "Blue"})
-    asks = FakeAsks(Answer("Plan"), Answer(None))
+    asks = FakeAsks(Answer(None))
     rig = make_rig(asks, ASK_COLOUR, scout=scout)
     await rig.jobs.start("go", str(rig.folder))
     asks.online = False
@@ -864,17 +838,17 @@ async def test_job_stopped_while_scout_thinks_opens_no_ask(make_rig, result):
 async def test_permission_asks_never_go_to_scout(make_rig):
     steps = [{"permission": {"title": "ls -la", "kind": "execute", "input": {"command": "ls"}}}]
     scout = FakeScout({"question_0": "Blue"})
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Yes")), steps, scout=scout)
+    rig = make_rig(FakeAsks(Answer("Yes")), steps, scout=scout)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     assert scout.asked == []
-    assert rig.asks.opened[1]["tool"] == "claude_code:ls -la"
+    assert rig.asks.opened[0]["tool"] == "claude_code:ls -la"
 
 
 async def test_cancel_job_is_called_when_a_job_ends(make_rig):
     scout = FakeScout()
     steps = [{"text": "done"}, {"end": "end_turn"}]
-    rig = make_rig(FakeAsks(Answer("Plan")), steps, scout=scout)
+    rig = make_rig(FakeAsks(), steps, scout=scout)
     job_id = await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     assert scout.cancelled == [job_id]
@@ -899,7 +873,7 @@ OPTS = [
 @pytest.mark.parametrize("pick", ["Sure", "Whatever"])
 async def test_permission_allow_kinds_record_approved(make_rig, pick):
     steps = [{"permission": {"title": "ls -la", "input": {"command": "ls"}, "options": OPTS}}]
-    rig = with_approvals(make_rig, FakeAsks(Answer("Plan"), Answer(pick)), steps)
+    rig = with_approvals(make_rig, FakeAsks(Answer(pick)), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     (row,) = logged(rig)
@@ -910,7 +884,7 @@ async def test_permission_allow_kinds_record_approved(make_rig, pick):
 @pytest.mark.parametrize("pick", ["Nope", "Never"])
 async def test_permission_reject_kinds_record_refused(make_rig, pick):
     steps = [{"permission": {"title": "rm x", "options": OPTS}}]
-    rig = with_approvals(make_rig, FakeAsks(Answer("Plan"), Answer(pick)), steps)
+    rig = with_approvals(make_rig, FakeAsks(Answer(pick)), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     (row,) = logged(rig)
@@ -920,7 +894,7 @@ async def test_permission_reject_kinds_record_refused(make_rig, pick):
 async def test_permission_ask_that_expires_records_expired_with_its_reason(make_rig):
     steps = [{"permission": {"title": "rm x"}}]
     expired = AskExpired("job ended: stopped")
-    rig = with_approvals(make_rig, FakeAsks(Answer("Plan"), expired), steps)
+    rig = with_approvals(make_rig, FakeAsks(expired), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     (row,) = logged(rig)
@@ -930,7 +904,7 @@ async def test_permission_ask_that_expires_records_expired_with_its_reason(make_
 async def test_cancelled_permission_records_nothing(make_rig):
     steps = [{"permission": {"title": "rm x"}}]
     cancelled = RpcError(ErrorCode.cancelled, "the ask was cancelled")
-    rig = with_approvals(make_rig, FakeAsks(Answer("Plan"), cancelled), steps)
+    rig = with_approvals(make_rig, FakeAsks(cancelled), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     assert logged(rig) == []
@@ -938,7 +912,7 @@ async def test_cancelled_permission_records_nothing(make_rig):
 
 async def test_group_key_is_the_job_folder_for_every_title(make_rig):
     steps = [{"permission": {"title": "ls"}}, {"permission": {"title": "cat y"}}]
-    rig = with_approvals(make_rig, FakeAsks(Answer("Plan"), Answer("Yes"), Answer("No")), steps)
+    rig = with_approvals(make_rig, FakeAsks(Answer("Yes"), Answer("No")), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     rows = logged(rig)
@@ -948,7 +922,7 @@ async def test_group_key_is_the_job_folder_for_every_title(make_rig):
 
 async def test_jobs_without_approvals_unchanged(make_rig):
     steps = [{"permission": {"title": "ls"}}]
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Yes")), steps)
+    rig = make_rig(FakeAsks(Answer("Yes")), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))
@@ -989,13 +963,13 @@ def make_scouted(make_rig, asks, steps, approve=True):
 
 async def test_claude_code_approval_returns_the_allow_once_option_id(make_rig):
     steps = [{"permission": {"title": "ls -la", "input": {"command": "ls"}, "options": OPTS}}]
-    asks = FakeAsks(Answer("Plan"))  # no second answer: the person is never asked
+    asks = FakeAsks()  # no second answer: the person is never asked
     rig, check = make_scouted(make_rig, asks, steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))
     assert reply["result"]["outcome"] == {"outcome": "selected", "optionId": "a1"}
-    assert len(asks.opened) == 2  # the hand-off ask, and the card Scout took down again
+    assert len(asks.opened) == 1  # the card Scout took down again
     [row] = logged(rig)
     assert (row.outcome, row.decided_by, row.source) == ("approved", "scout", "claude_code")
     assert row.rule_id == check.result.id and row.job_id == rig.finished[0].id
@@ -1009,7 +983,7 @@ async def test_claude_code_approval_returns_the_allow_once_option_id(make_rig):
 async def test_claude_code_without_allow_once_option_passes(make_rig):
     no_once = [OPTS[1], OPTS[2]]  # allow_always and reject_once only
     steps = [{"permission": {"title": "ls", "options": no_once}}]
-    rig, check = make_scouted(make_rig, FakeAsks(Answer("Plan"), Answer("Nope")), steps)
+    rig, check = make_scouted(make_rig, FakeAsks(Answer("Nope")), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     [row] = logged(rig)
@@ -1018,9 +992,7 @@ async def test_claude_code_without_allow_once_option_passes(make_rig):
 
 async def test_claude_code_pass_falls_through_to_the_person(make_rig):
     steps = [{"permission": {"title": "ls", "options": OPTS}}]
-    rig, check = make_scouted(
-        make_rig, FakeAsks(Answer("Plan"), Answer("Sure")), steps, approve=False
-    )
+    rig, check = make_scouted(make_rig, FakeAsks(Answer("Sure")), steps, approve=False)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     assert len(check.facts) == 1
@@ -1036,7 +1008,7 @@ async def test_claude_code_pass_falls_through_to_the_person(make_rig):
 )
 async def test_only_a_person_allow_is_offered_for_consideration(make_rig, pick, expected):
     steps = [{"permission": {"title": "ls", "options": OPTS}}]
-    rig = with_approvals(make_rig, FakeAsks(Answer("Plan"), Answer(pick)), steps)
+    rig = with_approvals(make_rig, FakeAsks(Answer(pick)), steps)
     offers = rig.offers
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
@@ -1046,7 +1018,7 @@ async def test_only_a_person_allow_is_offered_for_consideration(make_rig, pick, 
 
 async def test_scout_approval_is_not_offered(make_rig):
     steps = [{"permission": {"title": "ls", "options": OPTS}}]
-    rig, _ = make_scouted(make_rig, FakeAsks(Answer("Plan")), steps)
+    rig, _ = make_scouted(make_rig, FakeAsks(), steps)
     offers = rig.offers
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
@@ -1055,7 +1027,7 @@ async def test_scout_approval_is_not_offered(make_rig):
 
 async def test_claude_code_side_check_that_raises_still_asks_the_person(make_rig):
     steps = [{"permission": {"title": "ls", "options": OPTS}}]
-    rig, check = make_scouted(make_rig, FakeAsks(Answer("Plan"), Answer("Sure")), steps)
+    rig, check = make_scouted(make_rig, FakeAsks(Answer("Sure")), steps)
 
     async def boom(facts):
         raise RuntimeError("boom")
@@ -1069,7 +1041,7 @@ async def test_claude_code_side_check_that_raises_still_asks_the_person(make_rig
 
 async def test_claude_code_preference_use_that_raises_still_asks_the_person(make_rig, monkeypatch):
     steps = [{"permission": {"title": "ls", "options": OPTS}}]
-    rig, _ = make_scouted(make_rig, FakeAsks(Answer("Plan"), Answer("Sure")), steps)
+    rig, _ = make_scouted(make_rig, FakeAsks(Answer("Sure")), steps)
 
     def boom(*args, **kwargs):
         raise RuntimeError("boom")
@@ -1086,7 +1058,7 @@ async def test_claude_code_preference_use_that_raises_still_asks_the_person(make
 
 def engine_rig(make_rig, decision, steps):
     engine = FakeEngine(decision)
-    return make_rig(FakeAsks(Answer("Plan")), steps, engine=engine), engine
+    return make_rig(FakeAsks(), steps, engine=engine), engine
 
 
 async def test_permission_goes_through_the_engine(make_rig):
@@ -1130,7 +1102,7 @@ async def test_an_engine_refusal_picks_no_option(make_rig):
 
 async def test_permission_side_check_approval_picks_allow_once_option_never_allow_always(make_rig):
     steps = [{"permission": {"title": "ls", "options": [OPTS[1], OPTS[0], OPTS[2]]}}]
-    rig, _ = make_scouted(make_rig, FakeAsks(Answer("Plan")), steps)
+    rig, _ = make_scouted(make_rig, FakeAsks(), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))
@@ -1139,7 +1111,7 @@ async def test_permission_side_check_approval_picks_allow_once_option_never_allo
 
 async def test_permission_refusal_logs_no_tool_text(make_rig, caplog):
     steps = [{"permission": {"title": "rm secret-file", "options": OPTS}}]
-    rig = with_approvals(make_rig, FakeAsks(Answer("Plan"), Answer("Nope")), steps)
+    rig = with_approvals(make_rig, FakeAsks(Answer("Nope")), steps)
     with caplog.at_level("INFO"):
         await rig.jobs.start("go", str(rig.folder))
         await until(lambda: rig.finished)
@@ -1147,7 +1119,7 @@ async def test_permission_refusal_logs_no_tool_text(make_rig, caplog):
 
 
 async def test_a_job_is_never_ended_for_taking_long(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")))
+    rig = make_rig(FakeAsks())
     job_id = await rig.jobs.start("fix it", str(rig.folder))
     await until(lambda: rig.clock._waiters)
     await rig.clock.advance(10 * 3600)  # ten hours later
@@ -1162,7 +1134,7 @@ STEP_THEN_HANG = [
 
 
 async def test_a_quiet_job_wakes_scout_with_what_it_is_running(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), STEP_THEN_HANG)
+    rig = make_rig(FakeAsks(), STEP_THEN_HANG)
     job_id = await rig.jobs.start("fix it", str(rig.folder))
     await until(lambda: rig.jobs.running_steps() and rig.clock._waiters)
     rig.wall += timedelta(minutes=34)
@@ -1186,7 +1158,7 @@ async def test_a_quiet_job_wakes_scout_with_what_it_is_running(make_rig):
 
 
 async def test_no_quiet_wake_after_the_job_ends(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "done"}])
+    rig = make_rig(FakeAsks(), [{"text": "done"}])
     await rig.jobs.start("fix it", str(rig.folder))
     await until(lambda: rig.finished)
     await rig.clock.advance(2 * 1200)
@@ -1194,7 +1166,7 @@ async def test_no_quiet_wake_after_the_job_ends(make_rig):
 
 
 async def test_a_quiet_job_with_no_running_step_omits_it(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")))  # HANG: one message, no tool call
+    rig = make_rig(FakeAsks())  # HANG: one message, no tool call
     job_id = await rig.jobs.start("fix it", str(rig.folder))
     await until(lambda: rig.records.work.activity_after(job_id, 0, 5) and rig.clock._waiters)
     await rig.clock.advance(1200)
@@ -1204,7 +1176,7 @@ async def test_a_quiet_job_with_no_running_step_omits_it(make_rig):
 
 
 async def test_expert_process_death_ends_failed_and_is_told(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "about to die"}, {"crash": 3}])
+    rig = make_rig(FakeAsks(), [{"text": "about to die"}, {"crash": 3}])
     job_id = await rig.jobs.start("fix it", str(rig.folder))
     await until(lambda: rig.finished)
     assert rig.records.get_job(job_id).state == "failed"
@@ -1213,7 +1185,7 @@ async def test_expert_process_death_ends_failed_and_is_told(make_rig):
 
 
 async def test_one_installed_expert_is_used_without_naming_it(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")))
+    rig = make_rig(FakeAsks())
     await rig.jobs.start("go", str(rig.folder))
     assert rig.expert_ids == ["claude-acp"]
 
@@ -1227,9 +1199,7 @@ async def test_two_installed_and_none_named_fails_with_the_ids(make_rig):
 
 
 async def test_a_named_expert_is_used_and_recorded_as_the_rows_agent(make_rig):
-    rig = make_rig(
-        FakeAsks(Answer("Plan")), experts=[installed("claude-acp"), installed("codex-acp")]
-    )
+    rig = make_rig(FakeAsks(), experts=[installed("claude-acp"), installed("codex-acp")])
     job_id = await rig.jobs.start("go", str(rig.folder), "codex-acp")
     assert rig.expert_ids == ["codex-acp"]
     assert rig.records.get_job(job_id).parts[-1].agent == "codex-acp"
@@ -1239,7 +1209,7 @@ async def test_asks_are_grouped_by_the_jobs_expert_so_preferences_do_not_cross(m
     steps = [{"permission": {"title": "ls"}}]
     rig = with_approvals(
         make_rig,
-        FakeAsks(Answer("Plan"), Answer("Yes")),
+        FakeAsks(Answer("Yes")),
         steps,
         experts=[installed("claude-acp"), installed("codex-acp")],
     )
@@ -1260,7 +1230,7 @@ async def test_an_unknown_expert_is_a_fact_naming_what_is_installed(make_rig):
 
 async def test_a_custom_command_alone_works_and_is_the_agent(make_rig):
     custom = installed("custom", source="custom", logged_in=None)
-    rig = make_rig(FakeAsks(Answer("Plan")), experts=[custom])
+    rig = make_rig(FakeAsks(), experts=[custom])
     job_id = await rig.jobs.start("go", str(rig.folder))
     assert rig.records.get_job(job_id).parts[-1].agent == "custom"
 
@@ -1369,7 +1339,7 @@ async def finish(rig, job_id) -> None:
 
 
 async def test_continue_job_reuses_the_saved_session_id_when_the_expert_can_resume(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=True)
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], load=True)
     first = await rig.jobs.start("one", str(rig.folder))
     await finish(rig, first)
     second = await rig.jobs.start("two", str(rig.folder), continue_job=first)
@@ -1383,7 +1353,7 @@ async def test_continue_job_reuses_the_saved_session_id_when_the_expert_can_resu
 
 
 async def test_carrying_on_from_a_restart_blocked_part_settles_the_old_job(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}], load=True)
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], load=True)
     rig.records.add_job("old", "claude-acp", "t", str(rig.folder), "plan")
     rig.records.update_part("old", "p1", session_id="s1")
     rig.jobs.startup()
@@ -1399,7 +1369,7 @@ async def test_carrying_on_from_a_part_that_failed_on_restart_closes_the_old_job
 ):
     # LT5 B1R-3: the session could not reload, so the carry-on is a fresh job; the old one must
     # not stay open beside it.
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}], load=True)
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], load=True)
     rig.records.add_job("old", "claude-acp", "t", str(rig.folder), "plan")
     rig.records.update_part("old", "p1", session_id="s1")
     monkeypatch.setattr(rig.jobs, "can_resume", lambda expert_id: False)
@@ -1412,7 +1382,7 @@ async def test_carrying_on_from_a_part_that_failed_on_restart_closes_the_old_job
 async def test_an_implicit_same_folder_hand_off_leaves_a_genuine_failure_open(make_rig):
     # Only an explicit continue_job closes a failed or stopped job; a new task in the same folder
     # must not hide a failure the person may not have seen.
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}], load=True)
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], load=True)
     rig.records.add_job("old", "claude-acp", "t", str(rig.folder), "plan")
     rig.records.update_part("old", "p1", session_id="s1")
     rig.records.update_part("old", "p1", state="failed", reason="it broke")
@@ -1421,7 +1391,7 @@ async def test_an_implicit_same_folder_hand_off_leaves_a_genuine_failure_open(ma
 
 
 async def test_carrying_on_from_a_job_a_shutdown_stopped_closes_the_old_job(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=True)
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], load=True)
     first = await rig.jobs.start("one", str(rig.folder))
     await until(lambda: rig.records.get_job(first).parts[-1].session_id)
     await rig.jobs.shutdown()
@@ -1430,7 +1400,7 @@ async def test_carrying_on_from_a_job_a_shutdown_stopped_closes_the_old_job(make
 
 
 async def test_carrying_on_from_one_of_two_blocked_parts_leaves_the_other_and_the_job(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}], load=True)
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], load=True)
     rig.records.add_job("old", "claude-acp", "t", str(rig.folder), "plan")
     rig.records.update_part("old", "p1", session_id="s1")
     rig.records.add_part("old", "claude-acp", "t2", str(rig.folder))
@@ -1444,7 +1414,7 @@ async def test_carrying_on_from_one_of_two_blocked_parts_leaves_the_other_and_th
 
 
 async def test_carrying_on_inside_the_same_job_keeps_the_job_open(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}], load=True)
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], load=True)
     rig.records.add_job("old", "claude-acp", "t", str(rig.folder), "plan")
     rig.records.update_part("old", "p1", session_id="s1")
     rig.jobs.startup()
@@ -1455,7 +1425,7 @@ async def test_carrying_on_inside_the_same_job_keeps_the_job_open(make_rig):
 
 
 async def test_an_expert_that_cannot_resume_starts_fresh_and_the_result_says_why(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=False)
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], load=False)
     first = await rig.jobs.start("one", str(rig.folder))
     await finish(rig, first)
     second = await rig.jobs.start("two", str(rig.folder), continue_job=first)
@@ -1464,7 +1434,7 @@ async def test_an_expert_that_cannot_resume_starts_fresh_and_the_result_says_why
 
 
 async def test_a_session_the_adapter_lost_falls_back_to_fresh(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=True)
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], load=True)
     first = await rig.jobs.start("one", str(rig.folder))
     await finish(rig, first)
     rig.records.update_part(first, "p1", session_id="bad-1")
@@ -1474,7 +1444,7 @@ async def test_a_session_the_adapter_lost_falls_back_to_fresh(make_rig):
 
 async def test_continuing_after_that_experts_adapter_died_leaves_the_other_expert_alone(make_rig):
     rig = make_rig(
-        FakeAsks(Answer("Plan"), Answer("Plan"), Answer("Plan")),
+        FakeAsks(),
         [{"text": "ok"}],
         experts=[installed(), installed("codex-acp")],
         load="known",  # a restarted adapter knows none of the earlier session ids
@@ -1494,7 +1464,7 @@ async def test_continuing_after_that_experts_adapter_died_leaves_the_other_exper
 
 
 async def test_a_job_that_saved_no_session_continues_fresh(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=True)
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], load=True)
     first = await rig.jobs.start("one", str(rig.folder))
     await finish(rig, first)
     rig.records.update_part(first, "p1", session_id=None)
@@ -1503,14 +1473,14 @@ async def test_a_job_that_saved_no_session_continues_fresh(make_rig):
 
 
 async def test_a_plain_hand_off_reports_a_fresh_session_without_a_reason(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")))
+    rig = make_rig(FakeAsks())
     job = await rig.jobs.start("one", str(rig.folder))
     assert (job.session, job.why_fresh) == ("fresh", None)
 
 
 async def test_continuing_from_another_expert_or_folder_is_a_job_error(make_rig, tmp_path):
     other = installed("codex-acp")
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}], experts=[installed(), other])
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], experts=[installed(), other])
     first = await rig.jobs.start("one", str(rig.folder), "claude-acp")
     await finish(rig, first)
     elsewhere = tmp_path / "elsewhere"
@@ -1525,14 +1495,14 @@ async def test_continuing_from_another_expert_or_folder_is_a_job_error(make_rig,
 
 
 async def test_continuing_a_running_job_is_a_job_error(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")))
+    rig = make_rig(FakeAsks())
     first = await rig.jobs.start("one", str(rig.folder))
     with pytest.raises(JobError, match="still running"):
         await rig.jobs.start("two", str(rig.folder), continue_job=first)
 
 
 async def test_the_new_row_records_its_parent(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=True)
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], load=True)
     first = await rig.jobs.start("one", str(rig.folder))
     await finish(rig, first)
     second = await rig.jobs.start("two", str(rig.folder), continue_job=first)
@@ -1541,9 +1511,7 @@ async def test_the_new_row_records_its_parent(make_rig):
 
 
 async def test_a_finished_jobs_adapter_is_reused_by_the_follow_up(make_rig):
-    rig = make_rig(
-        FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=True, shared=True
-    )
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], load=True, shared=True)
     first = await rig.jobs.start("one", str(rig.folder))
     await finish(rig, first)
     second = await rig.jobs.start("two", str(rig.folder), continue_job=first)
@@ -1553,7 +1521,7 @@ async def test_a_finished_jobs_adapter_is_reused_by_the_follow_up(make_rig):
 
 
 async def test_two_running_jobs_of_one_expert_share_the_process_and_the_cap_holds(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), shared=True)
+    rig = make_rig(FakeAsks(), shared=True)
     await rig.jobs.start("one", str(rig.folder))
     await rig.jobs.start("two", str(rig.folder))
     assert rig.spawns() == 1
@@ -1568,7 +1536,7 @@ async def test_can_resume_is_unknown_until_the_adapter_has_started(make_rig):
 
 
 async def test_shutdown_stops_every_host(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], shared=True)
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], shared=True)
     first = await rig.jobs.start("one", str(rig.folder))
     await finish(rig, first)
     process = next(iter(rig.hosts._hosts.values())).process
@@ -1591,7 +1559,7 @@ async def test_a_jobs_steps_are_saved_masked(make_rig):
         {"tool": {"id": "t1", "title": "Run", "kind": "execute", "input": {"command": "npm test"}}},
         {"tool_update": {"id": "t1", "status": "completed", "text": f"key {TOKEN}"}},
     ]
-    rig = make_rig(FakeAsks(Answer("Plan")), steps, guards=guards)
+    rig = make_rig(FakeAsks(), steps, guards=guards)
     job_id = await rig.jobs.start("go", str(rig.folder))
     await finish(rig, job_id)
     command, output, end = rows_of(rig, job_id)
@@ -1620,7 +1588,7 @@ async def test_a_failing_command_through_the_fake_agent_has_its_exit_code(make_r
             }
         },
     ]
-    rig = make_rig(FakeAsks(Answer("Plan")), steps)
+    rig = make_rig(FakeAsks(), steps)
     job_id = await rig.jobs.start("go", str(rig.folder))
     await finish(rig, job_id)
     command, output, _end = rows_of(rig, job_id)
@@ -1628,14 +1596,14 @@ async def test_a_failing_command_through_the_fake_agent_has_its_exit_code(make_r
 
 
 async def test_a_stopped_job_ends_its_log_with_stopped(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), HANG)
+    rig = make_rig(FakeAsks(), HANG)
     job_id = await rig.jobs.start("go", str(rig.folder))
     await rig.jobs.stop(job_id)
     assert rows_of(rig, job_id)[-1].text == "# stopped"
 
 
 async def test_an_errored_job_ends_with_the_error_reason(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"crash": 3}])
+    rig = make_rig(FakeAsks(), [{"crash": 3}])
     job_id = await rig.jobs.start("go", str(rig.folder))
     await finish(rig, job_id)
     end = rows_of(rig, job_id)[-1]
@@ -1647,7 +1615,7 @@ async def test_entries_belong_to_their_job(make_rig):
         [{"tool": {"id": "a", "title": "first", "kind": "execute"}}, {"sleep": 0.3}],
         [{"tool": {"id": "b", "title": "second", "kind": "execute"}}],
     ]
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), steps, shared=True)
+    rig = make_rig(FakeAsks(), steps, shared=True)
     one = await rig.jobs.start("one", str(rig.folder))
     await until(lambda: rows_of(rig, one))
     two = await rig.jobs.start("two", str(rig.folder))
@@ -1669,7 +1637,7 @@ TOOL_STEPS = [
 
 
 async def test_activity_page_returns_entries_after_the_cursor(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), TOOL_STEPS + [{"end": "end_turn"}])
+    rig = make_rig(FakeAsks(), TOOL_STEPS + [{"end": "end_turn"}])
     job_id = await rig.jobs.start("go", str(rig.folder))
     await finish(rig, job_id)
     page = rig.jobs.activity_page(job_id, 0)
@@ -1684,7 +1652,7 @@ async def test_activity_page_returns_entries_after_the_cursor(make_rig):
 
 
 async def test_activity_page_has_parts_and_job_times(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), TOOL_STEPS + [{"end": "end_turn"}])
+    rig = make_rig(FakeAsks(), TOOL_STEPS + [{"end": "end_turn"}])
     job_id = await rig.jobs.start("go", str(rig.folder))
     await finish(rig, job_id)
     page = rig.jobs.activity_page(job_id, 0)
@@ -1735,7 +1703,7 @@ async def test_activity_page_of_an_old_job_shows_one_part(make_rig):
 
 async def test_activity_page_cuts_at_the_page_limit(make_rig, monkeypatch):
     monkeypatch.setattr("brain.jobs.PAGE_LIMIT", 2)
-    rig = make_rig(FakeAsks(Answer("Plan")), TOOL_STEPS + [{"end": "end_turn"}])
+    rig = make_rig(FakeAsks(), TOOL_STEPS + [{"end": "end_turn"}])
     job_id = await rig.jobs.start("go", str(rig.folder))
     await finish(rig, job_id)
     page = rig.jobs.activity_page(job_id, 0)
@@ -1759,7 +1727,7 @@ async def test_an_old_job_without_rows_has_an_empty_page(make_rig):
 
 async def test_running_steps_lists_each_running_job_that_has_a_step(make_rig):
     rig = make_rig(
-        FakeAsks(Answer("Plan"), Answer("Plan")),
+        FakeAsks(),
         [[*TOOL_STEPS, {"hang": True}], [{"text": "hi"}, {"hang": True}]],
         experts=[installed(name="Claude Code")],
         shared=True,
@@ -1789,14 +1757,14 @@ async def test_running_steps_includes_a_pending_step(make_rig):
             "input": {"command": "npm ci"},
         }
     }
-    rig = make_rig(FakeAsks(Answer("Plan")), [pending, {"hang": True}], experts=[installed()])
+    rig = make_rig(FakeAsks(), [pending, {"hang": True}], experts=[installed()])
     job_id = await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.jobs.running_steps())
     assert [(s["job"], s["text"]) for s in rig.jobs.running_steps()] == [(job_id, "npm ci")]
 
 
 async def test_first_activity_change_is_sent_at_once(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), [TOOL_STEPS[0], {"hang": True}])
+    rig = make_rig(FakeAsks(), [TOOL_STEPS[0], {"hang": True}])
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: activity_changes(rig) >= 1)
 
@@ -1804,7 +1772,7 @@ async def test_first_activity_change_is_sent_at_once(make_rig):
 async def test_a_burst_sends_one_leading_and_one_trailing_change(make_rig, monkeypatch):
     monkeypatch.setattr("brain.jobs.ACTIVITY_NOTIFY_S", 0.2)
     steps = [{"text": str(i)} for i in range(30)]
-    rig = make_rig(FakeAsks(Answer("Plan")), [*steps, {"hang": True}])
+    rig = make_rig(FakeAsks(), [*steps, {"hang": True}])
     job_id = await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.records.work.last_rev(job_id) >= 1)
     await asyncio.sleep(0.05)  # the burst is over; the clock never moved
@@ -1818,7 +1786,7 @@ async def test_a_burst_sends_one_leading_and_one_trailing_change(make_rig, monke
 async def test_the_end_cancels_the_trailing_change_and_announces_itself(make_rig, monkeypatch):
     monkeypatch.setattr("brain.jobs.ACTIVITY_NOTIFY_S", 0.2)
     steps = [{"text": "a"}, {"text": "b"}, {"end": "end_turn"}]
-    rig = make_rig(FakeAsks(Answer("Plan")), steps)
+    rig = make_rig(FakeAsks(), steps)
     job_id = await rig.jobs.start("go", str(rig.folder))
     await finish(rig, job_id)
     count = activity_changes(rig)
@@ -1829,7 +1797,7 @@ async def test_the_end_cancels_the_trailing_change_and_announces_itself(make_rig
 
 async def test_the_end_sends_exactly_one_notice_after_the_end_row(make_rig, monkeypatch):
     monkeypatch.setattr("brain.jobs.ACTIVITY_NOTIFY_S", 0)  # nothing throttled
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "a"}, {"end": "end_turn"}])
+    rig = make_rig(FakeAsks(), [{"text": "a"}, {"end": "end_turn"}])
     seen: list[bool] = []  # per job_activity notice: was the end row already written?
     real = rig.jobs._notify
 
@@ -1879,7 +1847,7 @@ async def test_a_failed_step_emits_job_step_failed_with_command_exit_and_summary
     make_rig, monkeypatch
 ):
     monkeypatch.setenv("FAKE_ACP_META_ONLY", "1")
-    rig = make_rig(FakeAsks(Answer("Plan")), FAIL_THEN_HANG, guards=masking_guards())
+    rig = make_rig(FakeAsks(), FAIL_THEN_HANG, guards=masking_guards())
     job_id = await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.emitted)
     (event,) = rig.emitted
@@ -1896,7 +1864,7 @@ async def test_a_failed_step_emits_job_step_failed_with_command_exit_and_summary
 
 async def test_job_news_carries_the_task(make_rig, monkeypatch):
     monkeypatch.setenv("FAKE_ACP_META_ONLY", "1")
-    rig = make_rig(FakeAsks(Answer("Plan")), FAIL_THEN_HANG)
+    rig = make_rig(FakeAsks(), FAIL_THEN_HANG)
     tid = tasks_for(rig.memory).open("do", "desktop-1")
     job_id = await rig.jobs.start("go", str(rig.folder), task_id=tid, caused_by="e1")
     await until(lambda: rig.emitted)
@@ -1906,7 +1874,7 @@ async def test_job_news_carries_the_task(make_rig, monkeypatch):
 
 
 async def test_the_failed_step_fact_is_one_clipped_line(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")))
+    rig = make_rig(FakeAsks())
     text = "a\nb " + "z" * 500
     entry = ActivityEntry(1, 1, "2026-01-01T00:00:00+00:00", "command", text, "failed", "s", 1)
     rig.jobs._step_failed("j1", entry)
@@ -1915,7 +1883,7 @@ async def test_the_failed_step_fact_is_one_clipped_line(make_rig):
 
 
 async def test_news_of_an_ended_job_is_finished_not_told(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
+    rig = make_rig(FakeAsks(), [{"text": "ok"}])
     job_id = await rig.jobs.start("go", str(rig.folder))
     entry = ActivityEntry(1, 1, "2026-01-01T00:00:00+00:00", "command", "make", "failed", "s", 1)
     rig.jobs._step_failed(job_id, entry)  # news now waiting
@@ -1928,7 +1896,7 @@ async def test_news_of_an_ended_job_is_finished_not_told(make_rig):
 
 
 async def test_job_quiet_facts_include_the_activity_summary(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), STEP_THEN_HANG)
+    rig = make_rig(FakeAsks(), STEP_THEN_HANG)
     job_id = await rig.jobs.start("fix it", str(rig.folder))
     await until(lambda: rig.jobs.running_steps() and rig.clock._waiters)
     await rig.clock.advance(1200)
@@ -1939,7 +1907,7 @@ async def test_job_quiet_facts_include_the_activity_summary(make_rig):
 
 async def test_job_ended_note_carries_the_activity_summary_beside_the_result(make_rig):
     rig = make_rig(
-        FakeAsks(Answer("Plan")),
+        FakeAsks(),
         [
             {"tool": {"id": "t", "title": "Run", "kind": "execute", "input": {"command": "ls"}}},
             {"text": "all done"},
@@ -2091,7 +2059,7 @@ async def test_two_quick_watch_changes_end_in_one_trailing_notice(make_rig, monk
 
 
 async def test_closing_a_job_cancels_its_timers_and_rearms(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
+    rig = make_rig(FakeAsks(), [{"text": "ok"}])
     job_id = await rig.jobs.start("go", str(rig.folder))
     when = datetime.now(UTC) + timedelta(hours=1)
     a = add_timer(rig.records.work, "a", when, parent_id=job_id)
@@ -2105,7 +2073,7 @@ async def test_closing_a_job_cancels_its_timers_and_rearms(make_rig):
 
 
 async def test_closing_a_job_finishes_the_waiting_timer_news_for_it(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
+    rig = make_rig(FakeAsks(), [{"text": "ok"}])
     job_id = await rig.jobs.start("go", str(rig.folder))
     t = add_timer(rig.records.work, "a", datetime.now(UTC) + timedelta(hours=1), parent_id=job_id)
     rig.events.post(Event("timer", f"timer:{t.id}", {"id": t.id}))
@@ -2116,7 +2084,7 @@ async def test_closing_a_job_finishes_the_waiting_timer_news_for_it(make_rig):
 
 
 async def test_closing_a_job_leaves_other_jobs_and_plain_timers(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
+    rig = make_rig(FakeAsks(), [{"text": "ok"}])
     job_id = await rig.jobs.start("go", str(rig.folder))
     when = datetime.now(UTC) + timedelta(hours=1)
     rig.records.add_job("someone-else", "claude-acp", "t", str(rig.folder), "plan")
@@ -2131,7 +2099,7 @@ async def test_closing_a_job_leaves_other_jobs_and_plain_timers(make_rig):
 
 
 async def test_closing_a_job_without_timers_does_not_rearm(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
+    rig = make_rig(FakeAsks(), [{"text": "ok"}])
     job_id = await rig.jobs.start("go", str(rig.folder))
     await finish(rig, job_id)
     await until(lambda: rig.finished)
@@ -2157,36 +2125,28 @@ def hand_off_rows(rig):
     return [r for r in logged(rig) if r.tool == "hand_off"]
 
 
-async def test_owner_asked_continue_shows_the_card_and_never_runs_the_chain(make_rig):
+async def test_owner_asked_continue_opens_no_card_and_never_runs_the_chain(make_rig):
     check = FakeSideCheck(None)
-    rig = continuing(make_rig, FakeAsks(Answer("Plan"), Answer("Auto")), check)
+    rig = continuing(make_rig, FakeAsks(), check)
     first = await first_job(rig)
     second = await rig.jobs.start("two", str(rig.folder), continue_job=first)
     assert check.facts == [] and hand_off_rows(rig) == []
-    assert rig.records.get_job(second).mode == "auto"
+    assert rig.records.get_job(second).mode == "default"
 
 
-async def test_hand_off_card_has_no_timeout(make_rig):
-    asks = FakeAsks(Answer("Plan"), Answer("Auto"))
-    rig = continuing(make_rig, asks, FakeSideCheck(None))
-    first = await first_job(rig)
-    await rig.jobs.start("two", str(rig.folder), continue_job=first)
-    assert "timeout" not in asks.opened[1]  # the card ends with its turn or its job, not a clock
-
-
-async def test_a_new_job_without_continue_always_shows_the_card_even_on_a_brain_turn(make_rig):
+async def test_a_new_job_without_continue_opens_no_card_even_on_a_brain_turn(make_rig):
     check = FakeSideCheck()
-    asks = FakeAsks(Answer("Plan"), Answer("Auto"))
+    asks = FakeAsks()
     rig = continuing(make_rig, asks, check)
     check.result = pref_in(rig)
     await first_job(rig)
     second = await rig.jobs.start("two", str(rig.folder))
     assert check.facts == [] and hand_off_rows(rig) == []
-    assert len(asks.opened) == 2 and rig.records.get_job(second).mode == "auto"
+    assert asks.opened == [] and rig.records.get_job(second).mode == "default"
 
 
 async def test_a_second_hand_off_in_the_same_folder_resumes_the_earlier_session(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=True)
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], load=True)
     first = await rig.jobs.start("one", str(rig.folder))
     await finish(rig, first)
     second = await rig.jobs.start("two", str(rig.folder))
@@ -2196,19 +2156,19 @@ async def test_a_second_hand_off_in_the_same_folder_resumes_the_earlier_session(
     assert rig.records.get_job(second).parent_job == first
 
 
-async def test_implicit_continue_shows_the_mode_card_and_does_not_reuse_the_old_mode(make_rig):
-    asks = FakeAsks(Answer("Plan"), Answer("Auto"))
+async def test_implicit_continue_opens_no_card_and_takes_the_mode_it_is_given(make_rig):
+    asks = FakeAsks()
     rig = make_rig(asks, [{"text": "ok"}], load=True)
     first = await rig.jobs.start("one", str(rig.folder))
     await finish(rig, first)
-    second = await rig.jobs.start("two", str(rig.folder))
+    second = await rig.jobs.start("two", str(rig.folder), mode="Auto")
     assert rig.records.get_job(second).parent_job == first
-    assert len(asks.opened) == 2
+    assert asks.opened == []
     assert rig.records.get_job(second).mode == "auto"
 
 
 async def test_fresh_true_starts_a_new_session_and_leaves_parent_unset(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=True)
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], load=True)
     first = await rig.jobs.start("one", str(rig.folder))
     await finish(rig, first)
     second = await rig.jobs.start("two", str(rig.folder), fresh=True)
@@ -2219,7 +2179,7 @@ async def test_fresh_true_starts_a_new_session_and_leaves_parent_unset(make_rig)
 
 async def test_another_folder_or_another_expert_starts_fresh_with_no_parent(make_rig, tmp_path):
     rig = make_rig(
-        FakeAsks(Answer("Plan"), Answer("Plan"), Answer("Plan")),
+        FakeAsks(),
         [{"text": "ok"}],
         experts=[installed(), installed("codex-acp")],
         load=True,
@@ -2235,9 +2195,7 @@ async def test_another_folder_or_another_expert_starts_fresh_with_no_parent(make
 
 
 async def test_an_explicit_continue_job_beats_the_implicit_lookup(make_rig):
-    rig = make_rig(
-        FakeAsks(Answer("Plan"), Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=True
-    )
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], load=True)
     first = await rig.jobs.start("one", str(rig.folder))
     await finish(rig, first)
     second = await rig.jobs.start("two", str(rig.folder))
@@ -2247,7 +2205,7 @@ async def test_an_explicit_continue_job_beats_the_implicit_lookup(make_rig):
 
 
 async def test_continue_job_with_fresh_is_refused_plainly(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}], load=True)
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], load=True)
     first = await rig.jobs.start("one", str(rig.folder))
     await finish(rig, first)
     with pytest.raises(JobError, match="pass continue_job or fresh, not both"):
@@ -2258,7 +2216,7 @@ async def test_continue_job_with_fresh_is_refused_plainly(make_rig):
 async def test_implicit_continue_while_the_session_is_in_use_starts_fresh_with_the_reason(
     make_rig,
 ):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), load=True, shared=True)
+    rig = make_rig(FakeAsks(), load=True, shared=True)
     first = await rig.jobs.start("one", str(rig.folder))  # hangs, so it holds its session
     end_job(rig.records, first, "done")  # as if it had finished for the lookup
     second = await rig.jobs.start("two", str(rig.folder))
@@ -2269,7 +2227,7 @@ async def test_implicit_continue_while_the_session_is_in_use_starts_fresh_with_t
 async def test_an_expert_that_cannot_resume_falls_back_to_fresh_on_an_implicit_continue(
     make_rig,
 ):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}], load=False)
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], load=False)
     first = await rig.jobs.start("one", str(rig.folder))
     await finish(rig, first)
     second = await rig.jobs.start("two", str(rig.folder))
@@ -2279,7 +2237,7 @@ async def test_an_expert_that_cannot_resume_falls_back_to_fresh_on_an_implicit_c
 
 async def test_implicit_continue_never_runs_the_preference_gate(make_rig):
     check = FakeSideCheck(None)
-    rig = continuing(make_rig, FakeAsks(Answer("Plan"), Answer("Auto")), check)
+    rig = continuing(make_rig, FakeAsks(Answer("Auto")), check)
     first = await first_job(rig)
     second = await rig.jobs.start("two", str(rig.folder))
     assert rig.records.get_job(second).parent_job == first
@@ -2295,7 +2253,7 @@ async def second_part(rig, job_id, task="two"):
 
 
 async def test_start_creates_a_job_with_one_part(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")))
+    rig = make_rig(FakeAsks())
     job = await rig.jobs.start("one", str(rig.folder))
     [part] = rig.records.get_job(job).parts
     assert (job.part, part.id, part.agent, part.task, part.state) == (
@@ -2309,7 +2267,7 @@ async def test_start_creates_a_job_with_one_part(make_rig):
 
 
 async def test_part_end_updates_the_part_and_the_job_state(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
+    rig = make_rig(FakeAsks(), [{"text": "ok"}])
     job = await rig.jobs.start("one", str(rig.folder))
     await finish(rig, job)
     got = rig.records.get_job(job)
@@ -2319,7 +2277,7 @@ async def test_part_end_updates_the_part_and_the_job_state(make_rig):
 
 
 async def test_two_parts_running_keep_separate_asks_and_sessions(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")))
+    rig = make_rig(FakeAsks())
     job = await rig.jobs.start("one", str(rig.folder))
     two = await second_part(rig, job)
     assert two.part == "p2" and str(two) == str(job)
@@ -2340,7 +2298,7 @@ async def test_two_parts_running_keep_separate_asks_and_sessions(make_rig):
 
 
 async def test_tell_with_two_running_parts_needs_a_part(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")))
+    rig = make_rig(FakeAsks())
     job = await rig.jobs.start("one", str(rig.folder))
     await second_part(rig, job)
     with pytest.raises(JobError, match="several running parts: p1, p2; name one"):
@@ -2349,7 +2307,7 @@ async def test_tell_with_two_running_parts_needs_a_part(make_rig):
 
 
 async def test_stop_stops_all_running_parts(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")))
+    rig = make_rig(FakeAsks())
     job = await rig.jobs.start("one", str(rig.folder))
     await second_part(rig, job)
     await rig.jobs.stop(job)
@@ -2371,7 +2329,7 @@ async def test_restart_settles_running_parts(make_rig):
 
 
 async def test_folder_session_reuse_picks_the_part_that_has_the_session(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}], load=True)
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], load=True)
     rig.records.add_job("old", "codex-acp", "t", str(rig.folder), "plan")
     rig.records.add_part("old", "claude-acp", "t2", str(rig.folder))
     rig.records.update_part("old", "p1", state="done", reason="done", session_id="other-expert")
@@ -2403,19 +2361,19 @@ def test_job_title_falls_back_to_the_first_line_of_the_brief():
 async def test_start_stores_a_masked_title(make_rig):
     guards = Guards()
     guards.add(mask_secrets(Masker(lambda: ["fake-token-12345678"])))
-    rig = make_rig(FakeAsks(Answer("Plan")), guards=guards)
+    rig = make_rig(FakeAsks(), guards=guards)
     job = await rig.jobs.start("go", str(rig.folder), title="Deploy with fake-token-12345678")
     assert rig.records.get_job(job).title == "Deploy with [secret]"
 
 
 async def test_blank_title_falls_back(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")))
+    rig = make_rig(FakeAsks())
     job = await rig.jobs.start("go\nmore", str(rig.folder), title="  ")
     assert rig.records.get_job(job).title is None
 
 
 async def test_start_with_job_adds_a_part_to_an_open_job(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}])
+    rig = make_rig(FakeAsks(), [{"text": "ok"}])
     first = await rig.jobs.start("one", str(rig.folder), title="Mine")
     await finish(rig, first)
     two = await rig.jobs.start("two", str(rig.folder), job=str(first), title="ignored")
@@ -2426,7 +2384,7 @@ async def test_start_with_job_adds_a_part_to_an_open_job(make_rig):
 
 
 async def test_start_with_job_refuses_a_closed_or_unknown_job(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
+    rig = make_rig(FakeAsks(), [{"text": "ok"}])
     first = await rig.jobs.start("one", str(rig.folder))
     await finish(rig, first)
     rig.jobs.close(str(first))
@@ -2438,7 +2396,7 @@ async def test_start_with_job_refuses_a_closed_or_unknown_job(make_rig):
 
 
 async def test_close_sets_closed_at_and_keeps_state(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")), [{"text": "ok"}])
+    rig = make_rig(FakeAsks(), [{"text": "ok"}])
     job = await rig.jobs.start("one", str(rig.folder))
     await finish(rig, job)
     assert rig.records.get_job(job).closed_at is None  # done, but Scout has not closed it
@@ -2452,7 +2410,7 @@ async def test_close_sets_closed_at_and_keeps_state(make_rig):
 
 
 async def test_close_refuses_while_a_part_runs(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan")))
+    rig = make_rig(FakeAsks())
     job = await rig.jobs.start("one", str(rig.folder))
     with pytest.raises(JobError, match="still running") as err:
         rig.jobs.close(str(job))
@@ -2461,7 +2419,7 @@ async def test_close_refuses_while_a_part_runs(make_rig):
 
 
 async def test_part_end_wakes_scout_with_the_part_and_leaves_the_job_open(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}])
+    rig = make_rig(FakeAsks(), [{"text": "ok"}])
     job = await rig.jobs.start("one", str(rig.folder), title="Two steps")
     await finish(rig, job)
     await until(lambda: len(rig.finished) == 1)
@@ -2473,7 +2431,7 @@ async def test_part_end_wakes_scout_with_the_part_and_leaves_the_job_open(make_r
 
 
 async def test_a_part_in_another_folder_does_not_borrow_the_jobs_first_session(make_rig, tmp_path):
-    asks = FakeAsks(Answer("Plan"), Answer("Plan"))
+    asks = FakeAsks()
     rig = make_rig(asks, [{"text": "ok"}], load=True)
     other = tmp_path / "other"
     other.mkdir()
@@ -2583,7 +2541,7 @@ async def test_expert_and_scout_steps_interleave_in_order(make_rig):
 
 
 async def test_callbacks_fired_while_a_further_part_starts_file_under_that_part(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")))
+    rig = make_rig(FakeAsks())
     job = await rig.jobs.start("one", str(rig.folder))
     original, filed = rig.make_run, []
     rig.records.update_part = lambda job_id, part, **f: filed.append(part)  # spy
@@ -2619,13 +2577,13 @@ async def test_note_for_a_job_with_two_parts_reports_only_the_one_that_ended(mak
 async def test_start_result_carries_the_stored_masked_title(make_rig):
     guards = Guards()
     guards.add(mask_secrets(Masker(lambda: ["fake-token-12345678"])))
-    rig = make_rig(FakeAsks(Answer("Plan")), guards=guards)
+    rig = make_rig(FakeAsks(), guards=guards)
     job = await rig.jobs.start("go", str(rig.folder), title="Deploy fake-token-12345678")
     assert job.title == "Deploy [secret]"
 
 
 async def test_a_job_closed_while_the_mode_card_waits_takes_no_part(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")), [{"text": "ok"}])
+    rig = make_rig(FakeAsks(), [{"text": "ok"}])
     first = await rig.jobs.start("one", str(rig.folder))
     await finish(rig, first)
     real_pick = rig.jobs._pick
@@ -2652,9 +2610,7 @@ async def test_wake_names_the_part_that_ended_and_its_own_result(make_rig):
 
 
 async def test_two_concurrent_continuations_get_distinct_part_ids(make_rig):
-    rig = make_rig(
-        FakeAsks(Answer("Plan"), Answer("Plan"), Answer("Plan")), [{"text": "ok"}], max_running=3
-    )
+    rig = make_rig(FakeAsks(), [{"text": "ok"}], max_running=3)
     job = await rig.jobs.start("one", str(rig.folder))
     await finish(rig, job)
     a, b = await asyncio.gather(
@@ -2685,131 +2641,29 @@ async def test_an_unknown_or_unavailable_app_is_refused_plainly_and_starts_nothi
     assert rig.runs == [] and rig.asks.opened == [] and rig.bridge.grants == []
 
 
-async def test_the_card_lists_the_apps_with_names(make_rig):
-    rig = apps_rig(make_rig, Answer("Plan"))
-    await rig.jobs.start("task", str(rig.folder), apps=["lin", "mail", "lin"])
-    ask = rig.asks.opened[0]
-    assert ask["input"] == {
-        "folder": str(rig.folder),
-        "apps": [{"id": "lin", "name": "Lin"}, {"id": "mail", "name": "Mail"}],
-    }
-
-
-async def test_a_card_without_apps_keeps_the_old_input_and_no_mcp_server(make_rig):
-    rig = apps_rig(make_rig, Answer("Plan"))
+async def test_a_start_without_apps_grants_no_mcp_server(make_rig):
+    rig = apps_rig(make_rig)
     await rig.jobs.start("task", str(rig.folder))
-    assert rig.asks.opened[0]["input"] == {"folder": str(rig.folder)}
+    assert rig.asks.opened == []
     assert rig.bridge.grants == []
 
 
-async def test_send_with_every_app_kept_starts_the_job_with_them(make_rig):
-    rig = apps_rig(make_rig, Answer("Plan"))
+async def test_a_job_starts_with_the_apps_asked(make_rig):
+    rig = apps_rig(make_rig)
     await rig.jobs.start("task", str(rig.folder), apps=["lin", "mail"])
     assert [g.apps for g in rig.bridge.grants] == [("lin", "mail")]
 
 
-async def test_an_answer_with_a_removed_app_starts_the_job_without_it(make_rig):
-    rig = apps_rig(make_rig, Answer("Plan", apps=("lin",)))
-    await rig.jobs.start("task", str(rig.folder), apps=["lin", "mail"])
-    assert [g.apps for g in rig.bridge.grants] == [("lin",)]
-    assert rig.bridge.revoked == []  # still held for the job
-
-
-async def test_removing_every_app_leaves_the_expert_no_bridge(make_rig):
-    rig = apps_rig(make_rig, Answer("Plan", apps=()))
-    await rig.jobs.start("task", str(rig.folder), apps=["lin"])
-    assert len(rig.bridge.revoked) == 1 and rig.runs[0]._grant is None
-
-
-async def test_an_answer_cannot_add_an_app_that_was_not_on_the_card(make_rig):
-    rig = apps_rig(make_rig, Answer("Plan", apps=("lin", "mail", "nope")))
-    await rig.jobs.start("task", str(rig.folder), apps=["lin"])
-    assert [g.apps for g in rig.bridge.grants] == [("lin",)]
-    assert rig.runs[0].apps == ("lin",)
-
-
-async def test_cancel_at_the_card_revokes_the_grant_and_starts_nothing(make_rig):
-    rig = apps_rig(make_rig, Answer("cancel"))
-    with pytest.raises(JobError, match="not started"):
-        await rig.jobs.start("task", str(rig.folder), apps=["lin"])
-    assert len(rig.bridge.revoked) == 1 and rig.records.list_jobs() == []
-
-
-async def test_the_approvals_row_names_the_kept_apps(make_rig):
-    rig = apps_rig(make_rig, Answer("Plan", apps=("mail",)), approvals=True)
-    await rig.jobs.start("task", str(rig.folder), apps=["lin", "mail"])
-    [row] = hand_off_rows(rig)
-    assert (row.tool, row.outcome, row.decided_by) == ("hand_off", "approved", "person")
-    assert row.input["apps"] == ["mail"]
-
-
-async def test_owner_hand_off_with_apps_logs_the_kept_apps_and_makes_no_offer(make_rig):
-    rig = apps_rig(make_rig, Answer("Plan", apps=("mail",)), approvals=True)
-    await rig.jobs.start("task", str(rig.folder), apps=["lin", "mail"])
-    [row] = hand_off_rows(rig)
-    assert row.input == {"folder": str(rig.folder), "apps": ["mail"]}
-    assert rig.offers.considered == []
-
-
-async def hand_off_tier(make_rig, source, cause_kind="say"):
-    """The tier a hand-off with apps asks the engine at, for a task that came from `source`,
-    caused by an event of `cause_kind` (None: no cause)."""
-    engine = FakeEngine(Decision("deny", "no_decider"))
-    rig = apps_rig(make_rig, Answer("Plan"), engine=engine)
-    if cause_kind:
-        store_events.insert(
-            rig.memory.db,
-            EventRow(id="c1", kind=cause_kind, at="2026-01-01T11:00:00+00:00", source=source),
-        )
-    tid = tasks_for(rig.memory).open("do", source, caused_by="c1" if cause_kind else None)
-    with pytest.raises(JobError, match="not started"):
-        await rig.jobs.start("task", str(rig.folder), apps=["lin"], task_id=tid)
-    return engine.requests[0].tier
-
-
-async def test_a_non_person_task_always_shows_the_hand_off_card(make_rig):
-    # person_only: no standing rule and no side check may approve it for the person.
-    assert await hand_off_tier(make_rig, "timer:t1", "timer") is Tier.person_only
-
-
-async def test_a_hand_off_in_a_wake_turn_shows_the_card_though_a_body_is_the_source(make_rig):
-    # One rule: a person task is one a say or card answer caused, not one a body's wake did.
-    assert await hand_off_tier(make_rig, "desktop-1", "back") is Tier.person_only
-
-
-async def test_a_task_with_no_cause_shows_the_hand_off_card(make_rig):
-    assert await hand_off_tier(make_rig, "desktop-1", None) is Tier.person_only
-
-
-async def test_a_person_task_hand_off_asks_at_the_usual_tier(make_rig):
-    assert await hand_off_tier(make_rig, "desktop-1") is Tier.ask
-
-
-async def test_owner_hand_off_without_apps_asks_no_engine(make_rig):
-    engine = FakeEngine(Decision("deny", "no_decider"))
-    rig = make_rig(FakeAsks(Answer("Plan")), engine=engine)
-    await rig.jobs.start("task", str(rig.folder))
-    assert engine.requests == []
-
-
 async def test_an_expert_that_cannot_take_apps_refuses_before_the_card(make_rig, monkeypatch):
     monkeypatch.setenv("FAKE_ACP_NO_HTTP", "1")
-    rig = apps_rig(make_rig, Answer("Plan"))
+    rig = apps_rig(make_rig)
     with pytest.raises(JobError, match="can.t take connected apps"):
         await rig.jobs.start("task", str(rig.folder), apps=["lin"])
     assert rig.asks.opened == [] and rig.records.list_jobs() == []
 
 
-async def test_a_timeout_at_the_card_with_apps_revokes_the_grant(make_rig):
-    timeout = RpcError(ErrorCode.timeout, "nobody answered")
-    rig = apps_rig(make_rig, timeout)
-    with pytest.raises(JobError, match="not started"):
-        await rig.jobs.start("task", str(rig.folder), apps=["lin"])
-    assert len(rig.bridge.revoked) == 1 and rig.records.list_jobs() == []
-
-
-async def test_send_marks_the_grant_sent(make_rig):
-    rig = apps_rig(make_rig, Answer("Plan"))
+async def test_a_started_job_marks_the_grant_sent(make_rig):
+    rig = apps_rig(make_rig)
     await rig.jobs.start("task", str(rig.folder), apps=["lin"])
     assert rig.bridge.grants[0].sent is True
 
@@ -2845,7 +2699,7 @@ async def test_run_planned_refuses_when_the_job_is_closed(make_rig):
 
 
 async def test_resolve_step_stop_stops_running_parts_before_closing(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")))
+    rig = make_rig(FakeAsks())
     job = await rig.jobs.start("one", str(rig.folder))
     await second_part(rig, job)
     work = rig.records.work
@@ -2865,7 +2719,7 @@ async def test_a_job_does_not_start_its_expert_until_before_start_returns(make_r
     async def before_start():
         await gate.wait()  # an update is being swapped in
 
-    rig = make_rig(FakeAsks(Answer("Plan")), before_start=before_start)
+    rig = make_rig(FakeAsks(), before_start=before_start)
     starting = asyncio.ensure_future(rig.jobs.start("one", str(rig.folder)))
     await asyncio.sleep(0.1)
     assert not starting.done() and not rig.log.exists()
@@ -2881,7 +2735,7 @@ async def test_a_job_that_waited_behind_an_update_starts_the_updated_command(mak
         await gate.wait()
         rig.experts = [installed(command=[sys.executable, str(AGENT), "--updated"])]
 
-    rig = make_rig(FakeAsks(Answer("Plan")), before_start=before_start)
+    rig = make_rig(FakeAsks(), before_start=before_start)
     commands: list[list[str]] = []
     real = rig.jobs._make_run
 
@@ -2908,10 +2762,10 @@ def expert_items(rig):
 
 async def two_waiting_jobs(make_rig):
     """Two jobs, each with an expert ask nobody answers; returns the rig and the two job ids."""
-    rig = make_rig(FakeAsks(Answer("Plan"), None), ASK_STEPS)
+    rig = make_rig(FakeAsks(None), ASK_STEPS)
     one = await rig.jobs.start("one", str(rig.folder))
     await until(lambda: len(expert_items(rig)) == 1)
-    rig.asks.script += [Answer("Plan"), None]
+    rig.asks.script += [None]
     two = await rig.jobs.start("two", str(rig.folder))
     await until(lambda: len(expert_items(rig)) == 2)
     return rig, str(one), str(two)
@@ -2922,7 +2776,7 @@ def open_job_ids(rig):
 
 
 async def test_expert_ask_is_live_only(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), None), ASK_STEPS)
+    rig = make_rig(FakeAsks(None), ASK_STEPS)
     job = await rig.jobs.start("go", str(rig.folder))
     await until(lambda: expert_items(rig))
     (item,) = expert_items(rig)
@@ -2943,7 +2797,7 @@ async def test_job_stop_expires_items(make_rig):
 
 
 async def test_job_links_open_item_ids(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), None), ASK_STEPS)
+    rig = make_rig(FakeAsks(None), ASK_STEPS)
     job = await rig.jobs.start("go", str(rig.folder))
     await until(lambda: expert_items(rig))
     (item,) = expert_items(rig)
@@ -2951,10 +2805,10 @@ async def test_job_links_open_item_ids(make_rig):
 
 
 async def test_stopping_one_part_expires_only_its_own_item(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), None), ASK_STEPS)
+    rig = make_rig(FakeAsks(None), ASK_STEPS)
     job = await rig.jobs.start("one", str(rig.folder))
     await until(lambda: len(expert_items(rig)) == 1)
-    rig.asks.script += [Answer("Plan"), None]  # the second part's mode ask, then its permission
+    rig.asks.script += [None]  # the second part's mode ask, then its permission
     await second_part(rig, job)
     await until(lambda: len(expert_items(rig)) == 2)
     await rig.jobs.stop(job, "p1")
@@ -2963,7 +2817,7 @@ async def test_stopping_one_part_expires_only_its_own_item(make_rig):
 
 
 async def test_answer_after_a_stop_is_refused_as_expired(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), None), ASK_STEPS)
+    rig = make_rig(FakeAsks(None), ASK_STEPS)
     job = await rig.jobs.start("go", str(rig.folder))
     await until(lambda: expert_items(rig))
     (item,) = expert_items(rig)
@@ -2985,18 +2839,18 @@ class GrantAll:
 async def test_a_rule_granted_expert_ask_writes_no_item(make_rig):
     steps = [{"permission": {"title": "ls", "options": OPTS}}]
     engine = Engine([GrantAll()], None, None, lambda name: None)
-    rig = make_rig(FakeAsks(Answer("Plan")), steps, engine=engine)
+    rig = make_rig(FakeAsks(), steps, engine=engine)
     job = await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     assert rig.records.get_job(str(job)).open_items == []
 
 
 async def test_an_expert_ask_nobody_answers_expires_with_no_answer(make_rig):
-    rig = make_rig(FakeAsks(Answer("Plan"), Answer(None)), ASK_STEPS)
+    rig = make_rig(FakeAsks(Answer(None)), ASK_STEPS)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: [i for i in rig.items.list_open() if i.id in rig.asks.open_ids] == [])
-    await until(lambda: rig.asks.opened[1:])
-    item_id = rig.asks.opened[1]["ask_id"]
+    await until(lambda: rig.asks.opened)
+    item_id = rig.asks.opened[0]["ask_id"]
     await until(lambda: rig.items.get(item_id).state == "expired")
     assert rig.items.get(item_id).reason == "no_answer"
-    assert rig.items.get(item_id).task_id is None  # a job with no task: a card of no task
+    assert rig.items.get(item_id).task_id is None  # a job with no task shows on no body

@@ -67,7 +67,7 @@ export interface FakeBrain {
   /** "127.0.0.1:port", what TAGALONG_BRAIN_ADDR wants. */
   addr: string;
   /** Every `answer` frame the desktop sent, in order. */
-  answers: { ask: string; option: string; text?: string; apps?: string[] }[];
+  answers: { ask: string; option: string; text?: string }[];
   /** Every `set_permission` call Home made, in order. */
   permissionSets: { tool: string; mode: string }[];
   /** Every loops call the page made, in order: `set gmail on`, `forget l1`, `wipe`. */
@@ -671,7 +671,6 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           spoken?: boolean;
           mode?: string;
           state?: string;
-          apps?: string[];
           name?: string;
           data?: unknown;
         };
@@ -883,10 +882,12 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           open(
             'j1',
             {
-              text: 'How should Claude Code work?',
-              options: ['ask', 'auto', 'cancel'],
+              text: 'Hand the build fix to Claude Code?',
+              options: ['allow', 'deny', 'not_now', 'stop_task'],
+              confirm: true,
               tool: 'hand_off',
               input: {
+                task: 'Fix the build',
                 folder: 'C:/work/app',
                 apps: [
                   { id: 'lin', name: 'Linear' },
@@ -1426,7 +1427,6 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           ask,
           option: String(msg.params?.option),
           ...(text === undefined ? {} : { text }),
-          ...(Array.isArray(msg.params?.apps) ? { apps: msg.params.apps } : {}),
         });
         socket.send(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: {} }));
         notify('ask', { id: ask, state: 'closed', reason: 'answered', option: msg.params?.option });

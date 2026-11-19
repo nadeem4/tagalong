@@ -5,6 +5,7 @@ import base64
 import datetime
 import json
 import re
+from dataclasses import replace
 from functools import partial
 from types import SimpleNamespace
 
@@ -19,9 +20,12 @@ from brain.jobs import JobError, JobId
 from brain.memory import Memory
 from brain.mind.turn import Call
 from brain.outputs import OutputStore
-from brain.permission import Tier
+from brain.permission import Decision, Tier
 from brain.protocol import Body, ErrorCode, RpcError, Tool
+from brain.store import events as store_events
 from brain.store import rules
+from brain.store import tasks as store_tasks
+from brain.store.events import EventRow
 from brain.store.memory import MemoryRefused, NewFact
 from brain.store.search import Hit
 from brain.store.work import TransitionRefused
@@ -312,6 +316,7 @@ class FakeJobs:
 
     def __init__(self):
         self.calls = []
+        self.modes = []
         self.fresh = None
         self.error = None
         self.rows = []
@@ -343,7 +348,9 @@ class FakeJobs:
         apps=(),
         task_id=None,
         caused_by=None,
+        mode=None,
     ):
+        self.modes.append(mode)
         self.apps = apps
         self.task_id = task_id
         self.caused_by = caused_by
@@ -420,7 +427,7 @@ def test_expert_specs_audiences_effects_and_gate(home):
     specs = expert_specs(home)
     scout, both = frozenset({"scout"}), frozenset({"scout", "home"})
     assert specs["hand_off"].audience == scout and specs["hand_off"].effect == "change"
-    assert specs["hand_off"].tier is Tier.auto
+    assert specs["hand_off"].tier is Tier.ask and specs["hand_off"].default_mode == "ask"
     assert specs["tell_expert"].audience == scout and specs["tell_expert"].effect == "change"
     assert specs["tell_expert"].default_mode == "ask" and specs["tell_expert"].follow_up is True
     assert specs["list_jobs"].audience == frozenset({"home"})
@@ -447,6 +454,10 @@ def test_expert_model_tool_schemas(home):
         "job",
         "apps",
         "task_id",
+        "mode",
+        "ask_wait_hours",  # an ask-mode tool: the gate adds the card's wait and check-back
+        "check_back_minutes",
+        "urgent",
     }
     assert tools["hand_off"]["properties"]["apps"]["type"] == "array"
     assert tools["hand_off"]["properties"]["fresh"]["type"] == "boolean"
@@ -456,6 +467,125 @@ def test_expert_model_tool_schemas(home):
     described = {t["name"]: t["description"] for t in home.box.model_tools()}
     assert "never guess" in described["hand_off"]
     assert "fresh" in described["hand_off"] and "same folder" in described["hand_off"]
+
+
+async def test_hand_off_card_names_the_task_folder_expert_mode_and_apps(home):
+    card = await expert_specs(home)["hand_off"].card(
+        {"task": "fix it", "folder": "C:/p", "mode": "plan"}
+    )
+    assert card["task"] == "fix it" and card["folder"] == "C:/p" and card["mode"] == "plan"
+    assert "apps" not in card  # no apps asked, none shown
+
+
+async def test_hand_off_passes_the_mode_to_jobs_start(home):
+    await home.run("hand_off", {"task": "t", "folder": "C:/p", "mode": "plan"})
+    assert home.jobs.modes == ["plan"]
+
+
+class _NoDecider:
+    """An engine with no rule and no side check: only the person is left to say."""
+
+    def __init__(self):
+        self.requests = []
+
+    async def decide(self, req):
+        self.requests.append(req)
+        return Decision("deny", "no_decider")
+
+
+class _Cards:
+    """Stands in for the AskRunner: records the saved call of each card it opens."""
+
+    def __init__(self):
+        self.calls = []
+
+    def open(self, call, req, wait, **kw):
+        self.calls.append(call)
+        return SimpleNamespace(id=f"item{len(self.calls)}")
+
+
+def _hand_off_gate(home, mem, cause_kind="say", source="desktop-1"):
+    """A toolbox with only the hand-off, wired as the session does, for a turn that took an
+    event of `cause_kind` (None: no cause)."""
+    if cause_kind:
+        store_events.insert(
+            mem.db,
+            EventRow(id="c1", kind=cause_kind, at="2026-01-01T11:00:00+00:00", source=source),
+        )
+        home.cause["id"] = "c1"
+    engine, cards = _NoDecider(), _Cards()
+    box = Toolbox(
+        [BrainSource(expert_tools(home.jobs, home.tasks, lambda: home.cause["id"]))],
+        partial(rules.permission_modes, mem.db),
+        lambda name, mode: None,
+        SimpleNamespace(),
+        engine,
+        runner=cards,
+        tasks=home.tasks,
+        cause=lambda: home.cause["id"],
+    )
+    return box, engine, cards
+
+
+async def _hand_off_tier(home, mem, cause_kind, source="desktop-1", args=None):
+    box, engine, _ = _hand_off_gate(home, mem, cause_kind, source)
+    await box.run(Call("c", "hand_off", args or {"task": "t", "folder": "C:/p"}, "t1", ""))
+    return engine.requests[0].tier
+
+
+async def test_a_non_person_task_always_shows_the_hand_off_card(home, mem):
+    # person_only: no standing rule and no side check may approve it for the person.
+    assert await _hand_off_tier(home, mem, "timer", "timer:t1") is Tier.person_only
+
+
+async def test_a_hand_off_in_a_wake_turn_shows_the_card_though_a_body_is_the_source(home, mem):
+    # One rule: a person task is one a say or card answer caused, not one a body's wake did.
+    assert await _hand_off_tier(home, mem, "back") is Tier.person_only
+
+
+async def test_a_hand_off_with_no_cause_shows_the_hand_off_card(home, mem):
+    assert await _hand_off_tier(home, mem, None) is Tier.person_only
+
+
+async def test_a_person_task_hand_off_asks_at_the_usual_tier(home, mem):
+    assert await _hand_off_tier(home, mem, "say") is Tier.ask
+
+
+async def test_a_hand_off_for_a_named_task_takes_that_tasks_person_rule(home, mem):
+    tid = home.tasks.open("do", "timer:t1", title="the build")  # no person began it
+    args = {"task": "t", "folder": "C:/p", "task_id": tid}
+    assert await _hand_off_tier(home, mem, "say", args=args) is Tier.person_only
+
+
+async def test_hand_off_returns_at_once_with_the_card_open(home, mem):
+    box, _, cards = _hand_off_gate(home, mem)
+    out = await box.run(Call("c", "hand_off", {"task": "fix it", "folder": "C:/p"}, "t1", ""))
+    assert "waiting for the person" in out and home.jobs.calls == []
+    [saved] = cards.calls
+    task = home.tasks.get(saved.input["task_id"])
+    assert (task.kind, task.title, task.state, task.caused_by) == ("do", "fix it", "waiting", "c1")
+
+
+async def test_the_approved_hand_off_runs_for_the_cards_task(home, mem):
+    box, _, cards = _hand_off_gate(home, mem)
+    await box.run(Call("c", "hand_off", {"task": "fix it", "folder": "C:/p"}, "t1", ""))
+    [saved] = cards.calls
+    home.cause["id"] = None  # the card is answered after the turn
+    before = len(store_tasks.list_open(mem.db))
+    await box.carry_out(replace(saved, turn=""))
+    tid = saved.input["task_id"]
+    assert home.jobs.task_id == tid and home.jobs.caused_by == "c1"
+    assert len(store_tasks.list_open(mem.db)) == before  # no second task
+    assert home.tasks.get(tid).state == "waiting"
+
+
+async def test_a_refused_hand_off_from_a_card_ends_the_task_made_for_it(home, mem):
+    box, _, cards = _hand_off_gate(home, mem)
+    await box.run(Call("c", "hand_off", {"task": "fix it", "folder": "C:/p"}, "t1", ""))
+    [saved] = cards.calls
+    home.jobs.error = JobError("unknown_mode", {"error": "unknown_mode", "offered": ["Plan"]})
+    await box.carry_out(replace(saved, turn=""))
+    assert home.tasks.get(saved.input["task_id"]).state == "stopped"
 
 
 async def test_hand_off_reaches_jobs_start(home):
@@ -817,9 +947,9 @@ async def test_list_and_stop_work_through_the_gate_for_home(home):
         await home.box.run(Call("c", "hand_off", {"task": "t", "folder": "f"}, "", ""), "home")
 
 
-async def test_list_permissions_shows_hand_off_as_self_asking(home):
+async def test_list_permissions_shows_hand_off_as_an_ask_tool(home):
     rows = {t["name"]: t for t in json.loads(await home.run("list_permissions"))["tools"]}
-    assert rows["hand_off"]["self_asks"] is True and rows["hand_off"]["mode"] == "auto"
+    assert rows["hand_off"]["self_asks"] is False and rows["hand_off"]["mode"] == "ask"
     assert "list_jobs" not in rows  # Home only
 
 
@@ -968,14 +1098,14 @@ async def test_list_permissions_shape_unchanged(home):
 
 
 async def test_list_permissions_reports_self_asks_and_set_permission_refuses(home):
-    spec = ToolSpec("hand_off", "d", {"type": "object"}, tier=Tier.auto)
+    spec = ToolSpec("asks_itself", "d", {"type": "object"}, tier=Tier.auto)
     home.box.sources.append(BrainSource([(spec, None)]))
     row = {t["name"]: t for t in json.loads(await home.run("list_permissions"))["tools"]}[
-        "hand_off"
+        "asks_itself"
     ]
     assert row["self_asks"] is True and row["locked"] is False and row["mode"] == "auto"
     with pytest.raises(RpcError) as err:
-        await home.run("set_permission", {"tool": "hand_off", "mode": "auto"})
+        await home.run("set_permission", {"tool": "asks_itself", "mode": "auto"})
     assert err.value.code == ErrorCode.invalid_params
     assert home.sent == []
 
@@ -1867,9 +1997,10 @@ def test_built_in_defaults_match_the_spec_table(mem):
     auto = {
         "remember", "recall", "forget", "read_output", "set_timer", "list_timers",
         "cancel_timer", "watch", "job_report", "watch_job", "close_job",
-        "set_job_result", "list_experts", "hand_off", "stop_job",
+        "set_job_result", "list_experts", "stop_job",
     }  # fmt: skip
     assert {n: modes[n] for n in auto} == {n: "auto" for n in auto}
+    assert modes["hand_off"] == "ask"  # its card is the toolbox's ask
 
 
 def test_app_tools_default_to_ask_even_when_read_only(mem):

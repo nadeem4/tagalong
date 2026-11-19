@@ -25,9 +25,6 @@ from brain.telemetry import ask_event
 class Answer:
     option: str | None  # None: nobody was online to ask
     text: str | None = None
-    apps: tuple[str, ...] | None = (
-        None  # a hand-off card's kept apps; None: the card was not edited
-    )
 
 
 class AskExpired(Exception):
@@ -198,7 +195,6 @@ class Asks:
         option: str,
         body_id: str,
         text: str | None = None,
-        apps: Iterable[str] | None = None,
         check_back_at: str | None = None,
     ) -> None:
         entry = self._open.get(ask_id)
@@ -213,7 +209,7 @@ class Asks:
             return  # the card stays up; the open item moves its check-back and calls reschedule
         del self._open[ask_id]
         if entry.future is not None:
-            entry.future.set_result(Answer(option, text, None if apps is None else tuple(apps)))
+            entry.future.set_result(Answer(option, text))
         closed = {"id": ask_id, "state": "closed", "reason": "answered"}
         self._bodies.notify("ask", {**closed, "option": option, "by": body_id})
         ask_event("answered", ask_id, body_id, option)

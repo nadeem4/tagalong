@@ -423,6 +423,45 @@ async def test_an_expired_card_posts_card_expired():
         rig.asks.answer(card["id"], "allow", "desktop")
 
 
+def made_for_it(rig):
+    """A call whose task the gate opened for it (as for a hand-off): the card belongs to it."""
+    rig.tasks.open("do", "desktop", id="k2", title="Fix the build")
+    return Call("c1", "t", {"n": 1, "task_id": "k2", "new_task": True}, "t1", "Doing it.")
+
+
+async def test_a_card_belongs_to_the_task_its_call_names():
+    rig = Rig()
+    await rig.box.run(made_for_it(rig))
+    [card] = rig.opened()
+    assert rig.items.get(card["id"]).task_id == "k2"
+
+
+async def test_a_no_ends_the_task_made_for_the_call():
+    rig = Rig()
+    await rig.box.run(made_for_it(rig))
+    [card] = rig.opened()
+    rig.asks.answer(card["id"], "deny", "desktop")
+    await rig.settle()
+    assert rig.tasks.get("k2").state == "stopped" and rig.tasks.get("k1").state == "open"
+
+
+async def test_an_expired_card_ends_the_task_made_for_the_call():
+    rig = Rig()
+    await rig.box.run(made_for_it(rig))
+    rig.clock[0] = NOW + timedelta(days=3)
+    rig.runner.fire_due()
+    assert rig.tasks.get("k2").state == "stopped"
+
+
+async def test_a_no_keeps_a_task_the_call_only_named():
+    rig = Rig()
+    await rig.box.run(Call("c1", "t", {"n": 1, "task_id": "k1"}, "t1", "Doing it."))
+    [card] = rig.opened()
+    rig.asks.answer(card["id"], "deny", "desktop")
+    await rig.settle()
+    assert rig.tasks.get("k1").state == "open"
+
+
 async def test_restart_closes_an_answered_item_it_cannot_vouch_for():
     rig = Rig()
     await rig.box.run(call())

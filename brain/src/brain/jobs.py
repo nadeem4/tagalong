@@ -32,12 +32,11 @@ from brain.permission import (
     AskRequest,
     Engine,
     NoOneThere,
-    PersonAnswer,
     Tier,
     expert_asker,
     summarise,
 )
-from brain.protocol import ErrorCode, RpcError
+from brain.protocol import RpcError
 from brain.questions import ScoutQuestions
 from brain.setup.install import NODE_FLOOR
 from brain.setup.store import InstalledExpert
@@ -64,7 +63,6 @@ def _prefix(agent: str) -> str:
 # What an expert's run reports when it ends, in the words of a work row.
 _WORK_STATE = {"done": "done", "error": "failed", "stopped": "cancelled"}
 
-CANCEL = "cancel"
 PROGRESS_NOTIFY_S = 2.0  # progress chunks are cheap; bodies refetch at most this often
 ACTIVITY_NOTIFY_S = 0.25  # a watched job's steps: a page of Home or the bubble polls this often
 LIST_LIMIT = 20
@@ -117,7 +115,6 @@ class Jobs:
         engine: Engine | None = None,
         guards: Guards | None = None,
         on_away: Callable[[str, str], None] = lambda job_id, what: None,
-        person_task: Callable[[str | None], bool] = lambda task: False,
         setup_facts: Callable[[], Awaitable[dict]] | None = None,
         emit: Callable[[Event], None] = lambda event: None,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
@@ -130,7 +127,6 @@ class Jobs:
         steps_max_entries: int = DEFAULT_JOB_STEPS_MAX_ENTRIES,
         steps_max_bytes: int = DEFAULT_JOB_STEPS_MAX_BYTES,
     ) -> None:
-        self._person_task = person_task  # task id -> whether a person's say or answer began it
         self._items = items  # an expert's permission ask is a live-only item; None: none kept
         self._steps_max_entries = steps_max_entries  # caps of one job's step log (settings)
         self._steps_max_bytes = steps_max_bytes
@@ -297,10 +293,13 @@ class Jobs:
         job: str | None = None,
         title: str | None = None,
         apps: Sequence[str] = (),
+        mode: str | None = None,
         task_id: str | None = None,
         caused_by: str | None = None,
     ) -> JobId:
-        """Hand the task to an expert once the user picks a mode. Returns the job id.
+        """Hand the task to an expert in the mode Scout named (omitted: the expert's own default).
+        The person already answered the hand-off card, so nothing is asked here. Returns the job
+        id.
 
         task_id is the task the job belongs to and caused_by the event the hand-off came from:
         the job's news is told under them.
@@ -308,13 +307,13 @@ class Jobs:
         continue_job reopens that finished job's session (same expert, same folder); when the
         expert cannot, a fresh session starts and the result says why. The caller
         has already checked that a person's message started this. Without continue_job the
-        expert's last finished session in this folder is continued (its mode is not carried over,
-        the card is shown as for any new job); fresh=True skips that. job adds a part to that open
+        expert's last finished session in this folder is continued (its mode is not carried over);
+        fresh=True skips that. job adds a part to that open
         job (title is then ignored); otherwise a new job opens with Scout's title, if any.
 
-        apps are connected app ids the expert may use through the brain. They are listed on the
-        card and the person may remove some; Send approves the rest, and the job starts with
-        only those. Unknown or unavailable ids are refused before anything starts."""
+        apps are connected app ids the expert may use through the brain; the card listed them, and
+        allowing it approved them. Unknown or unavailable ids are refused before anything starts.
+        mode is matched by id or name, ignoring case; an unknown one starts nothing."""
         if continue_job and fresh:
             raise JobError("pass continue_job or fresh, not both")
         earlier = self._earlier(continue_job, folder, expert) if continue_job else None
@@ -343,6 +342,7 @@ class Jobs:
             earlier_part=earlier_part,
             new_job=job is None,
             apps=offered,
+            mode=mode,
             task_id=task_id,
             caused_by=caused_by,
         )
@@ -388,8 +388,9 @@ class Jobs:
                 )
         return offered
 
-    def _card_apps(self, offered: tuple[str, ...]) -> list[dict]:
-        return [{"id": a, "name": self._apps.name(a)} for a in offered]
+    def card_apps(self, offered: Sequence[str]) -> list[dict]:
+        """The apps as the hand-off card names them: id and the app's own name."""
+        return [{"id": a, "name": self._apps.name(a) if self._apps else a} for a in offered]
 
     async def _start_part(
         self,
@@ -402,6 +403,7 @@ class Jobs:
         earlier_part: JobPart | None = None,
         new_job: bool = True,
         apps: tuple[str, ...] = (),
+        mode: str | None = None,
         redo: WorkRow | None = None,
         task_id: str | None = None,
         caused_by: str | None = None,
@@ -453,15 +455,11 @@ class Jobs:
                 # No bridge or no http MCP: the card would promise apps the expert can't reach.
                 raise JobError("this expert can't take connected apps")
             by_name = {m.name: m.id for m in modes}
-            mode_id = None
             if redo is not None:
                 mode_id = self._redo_mode(job_id, by_name.values())
-            kept = apps
-            if mode_id is None:
-                mode_id, kept = await self._hand_off_mode(
-                    chosen, task, path, by_name, apps, self._person_task(task_id)
-                )
-                await run.keep_apps(kept)
+            else:
+                mode_id = self._pick_mode(mode, modes, run.default_mode)
+                await run.keep_apps(apps)
             if redo is not None:
                 pass  # the row exists and is active; the run attaches to it
             elif new_job:
@@ -543,6 +541,19 @@ class Jobs:
             redo=row,
         )
 
+    @staticmethod
+    def _pick_mode(asked: str | None, modes: list, default: str | None) -> str:
+        """The offered mode Scout named (by id or name), else the expert's own default."""
+        if not asked:
+            return default or (modes[0].id if modes else "")
+        for m in modes:
+            if asked.lower() in (m.id.lower(), m.name.lower()):
+                return m.id
+        raise JobError(
+            f"unknown mode {asked}",
+            {"error": "unknown_mode", "offered": [m.name for m in modes]},
+        )
+
     def _redo_mode(self, job_id: str, offered) -> str:
         job = self._records.get_job(job_id)
         mode = job.mode if job else ""
@@ -558,70 +569,6 @@ class Jobs:
         part = f"p{top}"
         taken.add(part)
         return part
-
-    async def _hand_off_mode(
-        self,
-        chosen: InstalledExpert,
-        task: str,
-        path: Path,
-        by_name: dict[str, str],
-        apps: tuple[str, ...],
-        person: bool,
-    ) -> tuple[str, tuple[str, ...]]:
-        """The mode to start in, and the apps kept. The card is the owner's own question; the
-        engine is asked only when apps ride along, so the person's pick is logged. Apps on the
-        card are the person's to approve, so nothing but the person answers for them. A task no
-        person started (a timer, a job's news) is always shown the card."""
-        kept = apps
-
-        async def card() -> PersonAnswer:
-            nonlocal kept
-            shown: dict = {"folder": str(path)}
-            if apps:
-                shown["apps"] = self._card_apps(apps)
-            answer = await self._open_ask(
-                text=task, tool="hand_off", input=shown, options=[*by_name, CANCEL]
-            )
-            if answer.option is None:
-                raise NoOneThere
-            mode = by_name.get(answer.option)
-            if mode is None:
-                raise RpcError(ErrorCode.cancelled, "the ask was cancelled")
-            # Send is the approval for the apps still on the card; the answer can only narrow.
-            if apps and answer.apps is not None:
-                kept = tuple(a for a in apps if a in answer.apps)
-                facts["apps"] = list(kept)
-            return PersonAnswer("allow", option_id=mode)
-
-        facts: dict = {"folder": str(path)}
-        if apps:
-            facts["apps"] = list(apps)
-        if self._engine is None or not apps:
-            try:
-                return (await card()).option_id, kept
-            except NoOneThere as err:
-                raise JobError("not started: nobody was there to answer") from err
-            except RpcError as err:
-                declined = err.code == ErrorCode.cancelled
-                why = "the person declined" if declined else "nobody was there to answer"
-                raise JobError(f"not started: {why}") from err
-        decision = await self._engine.decide(
-            AskRequest(
-                kind="hand_off_followup",
-                source=AGENT,
-                tool="hand_off",
-                group_key=f"{_prefix(chosen.id)}:{path}",
-                summary=summarise(task, "hand_off", facts),
-                input=facts,
-                tier=Tier.ask if person else Tier.person_only,
-                how_to_ask=card,
-                can_allow_once=False,  # only the person answers for apps
-                offer=False,
-            )
-        )
-        if not decision.allowed or decision.option_id is None:
-            raise JobError(f"not started: {decision.reason or 'the person declined'}")
-        return decision.option_id, kept
 
     @staticmethod
     def _started(job_id: str, part: str, earlier: JobPart | None, run: ExpertRun) -> JobId:

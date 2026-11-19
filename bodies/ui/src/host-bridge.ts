@@ -282,13 +282,10 @@ export interface HostBridge {
   approveTool(approvalId: string, decision: 'once' | 'always' | 'deny'): Promise<void>;
   /**
    * The answer to a Claude Code job's ask: one of its own option names, or typed text for a
-   * question. Separate from approveTool because these options are not allow/always/deny. A
-   * hand-off card also sends `apps`, the ones the person kept (an empty list: none).
+   * question. Separate from approveTool because these options are not allow/always/deny; a
+   * task card's `not_now` and `stop_task` go this way too.
    */
-  answerJobAsk(
-    approvalId: string,
-    answer: { option: string; text?: string; apps?: string[] },
-  ): Promise<void>;
+  answerJobAsk(approvalId: string, answer: { option: string; text?: string }): Promise<void>;
   /**
    * Home's Connections page: the apps the brain keeps (MCP). They reject with "brain offline"
    * while the brain is away.

@@ -994,7 +994,7 @@ function registerIpc(): void {
   registerConnectionIpc(handle, {
     brain: required().brain,
     answer: (ask, decision) => required().brain.answer(ask, decision),
-    reply: (ask, option, text, apps) => required().brain.answerWith(ask, option, text, apps),
+    reply: (ask, option, text) => required().brain.answerWith(ask, option, text),
   });
   registerSetupIpc(handle, {
     brain: required().brain,
