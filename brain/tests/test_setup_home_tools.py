@@ -549,3 +549,16 @@ async def test_a_home_install_opens_no_task_but_scouts_does(tmp_path):
     await home({"id": "x", "approved": True})
     assert results == [None] and claimed == []
     assert claim(None, "install y") == "t1" and claimed == ["install y"]  # Scout's own path
+
+
+def test_a_home_card_that_ends_badly_is_a_failure_home_can_word_and_reloads():
+    sent: list[tuple[str, dict]] = []
+    progress = SetupProgress(lambda event: None)
+    ended = home_tools.home_end_reporter(progress, lambda m, p: sent.append((m, p)))
+    ended("install_app", {"id": "io.x/y"}, "unknown_app")
+    assert progress.failed() == {"expert": "io.x/y", "error": "unknown_app", "kind": "app"}
+    ended("install_expert", {"id": "goose"}, "failed")
+    assert progress.failed() == {"expert": "goose", "error": "failed"}
+    ended("install_app", {"id": "io.x/y"}, None)  # a clean add clears it
+    assert progress.failed() is None
+    assert sent == [("changed", {"what": "setup"})] * 3

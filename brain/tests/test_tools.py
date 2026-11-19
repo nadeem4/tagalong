@@ -13,6 +13,7 @@ import pytest
 from ask_log import approvals_on
 from job_rows import end_job, records_for, tasks_for
 
+from brain.approvals import SENTENCE_MAX
 from brain.bodies import Bodies
 from brain.guardrails import Budget
 from brain.guards import Guards
@@ -1634,6 +1635,15 @@ async def test_save_preference_needs_both_arguments(mem):
         "sentence": "s",
         "question": "q",
     }
+
+
+async def test_save_preference_card_shows_exactly_what_would_be_saved(mem):
+    spec, handler = _save_preference(mem)
+    long = "  " + "x" * (SENTENCE_MAX + 50) + "  "
+    shown = (await spec.card({"sentence": long, "question": "q"}))["sentence"]
+    await handler({"sentence": long, "question": "q"})
+    (saved,) = [p for p in rules.list_preferences(mem.db) if not p.builtin]
+    assert shown == saved.sentence and len(shown) == SENTENCE_MAX
 
 
 async def test_job_activity_returns_the_jobs_page_from_the_cursor(home):

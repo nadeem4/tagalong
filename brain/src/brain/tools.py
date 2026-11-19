@@ -1746,15 +1746,18 @@ def preference_tools(approvals: Approvals) -> list[tuple[ToolSpec, Handler]]:
     can say yes for them). Saved with no tool or group, so it shows in Scout's prompt but never
     approves an ask."""
 
+    def _kept(sentence: str) -> str:
+        return sentence.strip()[:PREFERENCE_MAX_CHARS]  # what the card shows is what is saved
+
     async def save_preference(args: dict) -> str:
         _need_text("save_preference", args, "sentence", "question")
-        sentence = args["sentence"].strip()[:PREFERENCE_MAX_CHARS]
+        sentence = _kept(args["sentence"])
         approvals.add_preference(sentence=sentence, source="setup", tool=None, group_key=None)
         return json.dumps({"saved": True})
 
     async def card(args: dict) -> dict:
         _need_text("save_preference", args, "sentence", "question")  # no card for a call that fails
-        return {"sentence": args["sentence"], "question": args["question"]}
+        return {"sentence": _kept(args["sentence"]), "question": args["question"]}
 
     return [
         (

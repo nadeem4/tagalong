@@ -78,11 +78,37 @@ class SetupProgress:
                 }
         self._emit(event)
 
+    def fail(self, tool: str, subject: str, error: str | None) -> None:
+        """A Home card ended: how, for the row that was pressed (None clears an earlier one)."""
+        self._current = None
+        self._failed = (
+            None
+            if error is None
+            else {
+                "expert": subject,
+                "error": error,
+                **({"kind": "app"} if tool == "install_app" else {}),
+            }
+        )
+
     def current(self) -> dict | None:
         return self._current
 
     def failed(self) -> dict | None:
         return self._failed
+
+
+def home_end_reporter(
+    progress: SetupProgress, notify: Callable[[str, dict], None]
+) -> Callable[[str, dict, str | None], None]:
+    """What the ask runner calls when a Home setup card ends: record it where Home reads setup
+    outcomes, then tell Home to reload. Without it a refused or failed install ends silently."""
+
+    def ended(tool: str, args: dict, error: str | None) -> None:
+        progress.fail(tool, str(args.get("id")), error)
+        notify("changed", {"what": "setup"})
+
+    return ended
 
 
 async def _run(handler: Handler, args: dict) -> str:
