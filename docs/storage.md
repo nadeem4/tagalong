@@ -38,6 +38,8 @@ connection from `store.db.open_db`; nothing else opens the file.
 - `store/open_items.py`: owns `open_items` (`insert`, `get`, `close`, `list_open`, `list_answered`, `find_open`, `due`, `live_only_open`, `ids_for_job`) and `StoredItem`.
 - `store/events.py`: owns `events` (`insert`, `get`, `list_new`, `new_ids`, `set_taken`, `set_state`,
   `chain`) and `EventRow`; `events.py` `EventLog` is the one caller.
+- `store/tasks.py`: owns `tasks` (`insert`, `get`, `set_state`, `list_open`, `asks_to_settle`,
+  `laters_to_settle`, `last_event_at`) and `TaskRow`; `tasks.py` `Tasks` is the one caller.
 - `store/work.py`: `WorkStore` over `work`, `work_events`, `work_fts` and the detail tables
   `work_job`, `work_timer`, `work_loop`, `work_ask` and `job_steps`: create, the state machine,
   rollup, retry, due queries, search, the resume scan and the sweep. Jobs, asks, timers and loops
@@ -263,7 +265,7 @@ One row per piece of work, in a tree: a goal has steps, and a step can have asks
 | `due_at`                               | TEXT             | Next time something should happen: timer, retry backoff, cadence                   |
 | `created_at`, `updated_at`, `ended_at` | TEXT             | UTC ISO text                                                                       |
 | `end_reason`                           | TEXT             | Why it ended, in a short phrase                                                    |
-| `source_message_id`                    | INTEGER          | The chat message that started it, if any                                           |
+| `task_id`                              | TEXT             | The task this root row belongs to (null until a task owns it), or null             |
 
 Indexes: `(state, due_at)`, `(root_id, seq)`, `(parent_id, seq)` and `(kind, state)`. Whether
 Scout has told the person is not kept on the row: news is an event in the `events` table, and the
@@ -660,6 +662,7 @@ never saved. Nothing acts on an event before its row exists, so a brain kill los
 | `end_reason`   | TEXT             | Why it ended, or null                                                                      |
 | `resume`       | INTEGER          | 1 when the turn that took it is to be resumed; default 0                                   |
 | `handled_at`   | TEXT             | When it was handled, or null                                                               |
+| `task`         | TEXT             | The task this event belongs to (a say's Ask), or null                                      |
 
 - Written by: `events.py` `EventLog` (`post`, `amend`, `take`, `finish`, `finish_matching`,
   `backoff`, `recover`, `set_resume`, `sweep`) through `store/events.py`; `Session.say` and `Session.post_event` save before the runner sees the event.
@@ -678,6 +681,36 @@ never saved. Nothing acts on an event before its row exists, so a brain kill los
   `TAGALONG_WORK_KEEP_DAYS`, at start next to the work sweep (see [Cleanup](#cleanup)). `new`,
   `taken` and `gave_up` rows stay.
 - Index: `events_pick(state, not_before, at)` for "what is ready".
+
+### tasks
+
+What the person asked for, one row each. Events and work rows name their task (`events.task`,
+`work.task_id`). Every say opens an Ask task, in the same transaction that saves the say, so a
+retried say makes no second one. Ask tasks are never shown; later kinds (`do`, `later`, `watch`,
+`own`) are the ones the person sees. Migration `0038_tasks` creates the table, adds the two
+columns and drops `work.source_message_id` (never written).
+
+| Column                                 | Type             | Meaning                                                                          |
+| -------------------------------------- | ---------------- | -------------------------------------------------------------------------------- |
+| `id`                                   | TEXT PRIMARY KEY | Six hex characters, so Scout can cite it                                         |
+| `kind`                                 | TEXT             | `ask`, `do`, `later`, `watch` or `own` (CHECK)                                   |
+| `state`                                | TEXT             | `open`, `waiting`, `done`, `failed`, `stopped` or `declined` (CHECK)             |
+| `title`                                | TEXT             | Masked, capped at 200; null for an Ask                                           |
+| `source`                               | TEXT             | The source of the event that started it: a body id or an internal source         |
+| `caused_by`                            | TEXT             | The event that started it, or null (an Ask's say points at it instead)           |
+| `result`                               | TEXT             | The last result line, masked and capped                                          |
+| `created_at`, `updated_at`, `ended_at` | TEXT             | UTC time text                                                                    |
+| `end_reason`                           | TEXT             | Why it ended, or null                                                            |
+
+- Written by: `tasks.py` `Tasks` (`open`, `wait`, `resume`, `end`, `settle`) through
+  `store/tasks.py`. The first end of a task stands; a second `end` changes nothing.
+- Ended by one sweep, not by hooks: `Tasks.settle()` ends an open Ask `done` when its say is
+  `handled` and `failed` when it is `gave_up`, and a Later with no live work row and no `new` or
+  `taken` event `done`. The runner calls it after every turn ends, and the session at start after
+  `EventLog.recover()`, so a crash cannot leave one open.
+- Read by: `Tasks.open_block()`, the open-tasks block in Scout's system prompt (newest first, at
+  most 15 lines then `and N more`, Asks left out, titles made safe for the data fence).
+- Index: `tasks_open(state, created_at)`.
 
 ## Open items
 
