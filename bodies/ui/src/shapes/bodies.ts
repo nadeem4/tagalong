@@ -7,6 +7,7 @@
 import { z } from 'zod';
 
 const Body = z.object({
+  id: z.string(),
   kind: z.enum(['desktop', 'browser', 'whatsapp']),
   name: z.string(),
   connected: z.boolean(),

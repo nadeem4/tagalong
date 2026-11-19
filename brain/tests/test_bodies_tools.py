@@ -23,7 +23,9 @@ class FakeBodies:
         self._kinds = kinds
 
     def online(self):
-        return [Body(id=f"{k}-1", kind=k, name=f"{k} body") for k in self._kinds]
+        return [
+            Body(id=f"{k}-{i}", kind=k, name=f"{k} body {i}") for i, k in enumerate(self._kinds)
+        ]
 
 
 class FakeBridges:
@@ -81,6 +83,23 @@ async def test_bodies_status_lists_all_three_kinds(tmp_path):
         ("whatsapp", True),
     ]
     assert all(isinstance(b["name"], str) and b["name"] for b in out["bodies"])
+
+
+async def test_bodies_status_has_one_row_per_online_body(tmp_path):
+    r = Rig(tmp_path, kinds=("desktop", "desktop", "browser"))
+    out = json.loads(await r.run("bodies_status"))
+    online = [b for b in out["bodies"] if b["connected"]]
+    assert [b["kind"] for b in online] == ["desktop", "desktop", "browser"]
+    assert len({b["id"] for b in online}) == 3
+    assert [b["name"] for b in online[:2]] == ["desktop body 0", "desktop body 1"]
+
+
+async def test_bodies_status_still_lists_a_kind_with_none_online(tmp_path):
+    r = Rig(tmp_path, kinds=("desktop", "desktop"))
+    out = json.loads(await r.run("bodies_status"))
+    off = [b for b in out["bodies"] if not b["connected"]]
+    assert [(b["kind"], b["connected"]) for b in off] == [("browser", False), ("whatsapp", False)]
+    assert all(b["id"] for b in off)
 
 
 async def test_status_never_returns_a_secret(rig):

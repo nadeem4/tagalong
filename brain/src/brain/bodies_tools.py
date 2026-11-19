@@ -106,13 +106,15 @@ def bodies_tools(
         )
 
     async def bodies_status(args: dict) -> str:
+        # One row per online body; a kind with none online keeps one row so Home can still
+        # offer its setup. Offline rows have no body, so their id is the kind.
         online = bodies.online()
         rows = []
         for kind, label in _KINDS:
-            match = next((b for b in online if b.kind == kind), None)
-            rows.append(
-                {"kind": kind, "name": match.name if match else label, "connected": bool(match)}
-            )
+            mine = [b for b in online if b.kind == kind]
+            rows += [
+                {"id": b.id, "kind": kind, "name": b.name, "connected": True} for b in mine
+            ] or [{"id": kind, "kind": kind, "name": label, "connected": False}]
         return json.dumps({"bodies": rows})
 
     async def whatsapp_status(args: dict) -> str:

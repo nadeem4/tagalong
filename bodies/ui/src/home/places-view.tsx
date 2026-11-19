@@ -192,7 +192,8 @@ export function PlacesView() {
   const connected = (kind: 'desktop' | 'browser' | 'whatsapp'): boolean =>
     state.bodies.find((body) => body.kind === kind)?.connected === true;
   const wa = state.whatsapp;
-  const pc: Standing = connected('desktop') ? 'connected' : 'offline';
+  // Every online desktop is its own row by its own name; with none online, one offline row.
+  const desktops = state.bodies.filter((body) => body.kind === 'desktop' && body.connected);
   const browser: Standing = connected('browser') ? 'connected' : 'not-set-up';
   const whatsapp: Standing = connected('whatsapp')
     ? 'connected'
@@ -215,16 +216,18 @@ export function PlacesView() {
       {head}
       <section className="tg-card" aria-label="Places">
         <ul className="cx-list">
-          <li className="cx-item">
-            <Place
-              tile="PC"
-              name="This PC"
-              chip="Desktop"
-              purpose="Scout sits on your screen, reads what you point it at and talks out loud."
-            >
-              <StandingLabel standing={pc} />
-            </Place>
-          </li>
+          {(desktops.length > 0 ? desktops : [null]).map((desktop) => (
+            <li className="cx-item" key={desktop?.id ?? 'offline'}>
+              <Place
+                tile="PC"
+                name={desktop?.name ?? 'This PC'}
+                chip="Desktop"
+                purpose="Scout sits on your screen, reads what you point it at and talks out loud."
+              >
+                <StandingLabel standing={desktop !== null ? 'connected' : 'offline'} />
+              </Place>
+            </li>
+          ))}
           <li className="cx-item">
             <Place
               tile="C"
