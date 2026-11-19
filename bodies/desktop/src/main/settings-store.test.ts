@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SETTINGS_DEFAULTS, SettingsPatch } from '../shared/settings';
+import { shouldOpenWalkthrough } from './walkthrough-gate';
 import { SETTINGS_FILENAME, SettingsStore, readOrMakeBodyId } from './settings-store';
 
 let dataDir: string;
@@ -45,6 +46,15 @@ describe('readOrMakeBodyId', () => {
     const saved = new SettingsStore(dataDir).get();
     expect(saved.bodyId).toBe(id);
     expect(saved.walkthrough.done).toBe(true);
+  });
+});
+
+describe('a settings file holding only the install id', () => {
+  it('still opens the first-run tour: seen means walkthrough.done, not a settings file', () => {
+    const store = new SettingsStore(dataDir);
+    readOrMakeBodyId(store);
+    expect(existsSync(file)).toBe(true);
+    expect(shouldOpenWalkthrough(new SettingsStore(dataDir).get())).toBe(true);
   });
 });
 
