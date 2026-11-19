@@ -37,6 +37,7 @@ from test_sessions import (
 )
 
 from brain.bodies import Bodies
+from brain.chat_tools import chat_tools
 from brain.events import EventKind
 from brain.experts import ExpertHost, ExpertRun
 from brain.jobs import JobError
@@ -402,12 +403,10 @@ class Chatty:
         yield Final([{"type": "text", "text": "word " * 600}], "end_turn", SimpleNamespace())
 
 
-@pytest.mark.xfail(
-    strict=True, reason="M3: a body away during a long reply overflows its 500-frame replay window"
-)
-async def test_6e_a_body_that_was_away_during_a_long_reply_can_catch_up():
+async def test_6e_a_body_away_during_a_long_reply_resyncs_and_reads_it_from_the_saved_chat():
     bodies = Bodies()
-    session = make_session(Chatty(), Open(), bodies, 10, Memory(":memory:"), kinds=NO_WAIT)
+    memory = Memory(":memory:")
+    session = make_session(Chatty(), Open(), bodies, 10, memory, kinds=NO_WAIT)
     peer = RecordingPeer()
     desk = Body(id="desktop", kind="desktop", name="PC")
     bodies.connect(desk, [], peer, None)
@@ -416,5 +415,8 @@ async def test_6e_a_body_that_was_away_during_a_long_reply_can_catch_up():
     await session.say("whatsapp", say("write me a long answer"))
     await idle(session)
     back = bodies.connect(desk, [], RecordingPeer(), 0)
-    print(f"\n[6e] desktop reconnects: resync={back.resync}, frames replayed={len(back.backlog)}")
-    assert not back.resync
+    assert back.resync  # 600 deltas are past the replay window
+    ((_, handler),) = chat_tools(memory.db)
+    out = json.loads(await handler({}))
+    replies = [m["text"] for m in out["messages"] if m["role"] == "assistant"]
+    assert replies == ["word " * 600]

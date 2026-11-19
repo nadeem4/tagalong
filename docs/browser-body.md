@@ -501,6 +501,9 @@ Home's Places page (Home > Places) shows whether the add-on is connected to the 
 | Ask from the page, brain down    | Waits up to 5 s for the link, then drops it; the popup says it is down    |
 | `tab_actions`, only browser up   | Waits for the desktop: the ask stays open and shows when it joins         |
 
+The browser shows no chat (`display: false`), so it does not catch up on the saved chat after a
+`resync`; only a body that displays reads `chat_since`.
+
 ## Only the browser is online
 
 A body with `display: false` shows nothing, so the brain never counts it when it picks where to

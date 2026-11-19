@@ -44,6 +44,16 @@ gist first, laid out so it is easy to follow, and give the detail when asked, so
 expert report (which reaches Scout as a capped preview, see [brain.md](brain.md#long-tool-output))
 appears as a short structured answer plus an offer of the rest.
 
+### A reply that streamed while the desktop was away
+
+A reply longer than the brain's replay window cannot be replayed to a body that was away, so the
+reconnect carries `resync: true`. The desktop then reads the saved chat (`chat_since`) and shows each
+assistant reply saved after the last one it saw, once, as a `pet.remark`: the quiet line and the bubble
+render it like any wake's words, so this component has no new state. A turn cut off by the lost link
+still shows its "lost the thread" error beside it.
+If the link drops while the desktop is noting the end of a turn it just showed live, that reply can
+show once more after a resync: shown twice, never lost.
+
 ### The HostBridge contract
 
 `HostBridge` (`host-bridge.ts`) is every call and notification a component may use. Four members
