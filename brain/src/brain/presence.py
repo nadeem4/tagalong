@@ -51,12 +51,17 @@ class Presence:
         self.on_change()
 
     def talking(self) -> bool:
-        # The body that reported last is the one playing now; with none reporting, the mouth.
-        return next(reversed(self._reported.values()), self._mouth) != "idle"
+        # Talking while any body plays; with none reporting, the mouth speaks for them all.
+        if self._reported:
+            return True  # a body that is idle is not kept
+        return self._mouth != "idle"
 
     def at_break(self) -> bool:
-        """Whether the speech playing now sits between two sentences."""
-        return next(reversed(self._reported.values()), self._mouth) == "sentence_break"
+        """Whether the speech playing now sits between two sentences: every body that reports
+        is at a break, so one body's break never cuts across another still talking."""
+        if self._reported:
+            return all(s == "sentence_break" for s in self._reported.values())
+        return self._mouth == "sentence_break"
 
     def heard(self, body_id: str) -> tuple[str, int]:
         """The turn and how many of its sentences the body last reported finished."""

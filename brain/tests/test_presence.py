@@ -126,3 +126,33 @@ def test_at_break_follows_the_body_playing_now():
     assert not rig.p.at_break()
     rig.p.speech("desktop", "sentence_break", "t1", 1)
     assert rig.p.at_break()
+
+
+def test_talking_while_any_body_talks():
+    rig = Rig()
+    rig.p.speech("a", "talking")
+    rig.p.speech("b", "talking")
+    rig.p.speech("a", "idle")
+    assert rig.p.talking()  # b still plays
+    rig.p.speech("b", "idle")
+    assert not rig.p.talking()
+
+
+def test_at_break_needs_every_reporter_at_a_break():
+    rig = Rig()
+    rig.p.speech("a", "sentence_break", "t1", 1)
+    rig.p.speech("b", "talking")
+    assert not rig.p.at_break()
+    rig.p.speech("b", "sentence_break", "t1", 1)
+    assert rig.p.at_break()
+    rig.p.speech("a", "talking")  # b alone at a break does not release a
+    rig.p.speech("b", "sentence_break", "t1", 2)
+    assert not rig.p.at_break()
+
+
+def test_a_body_that_leaves_no_longer_holds_the_break():
+    rig = Rig()
+    rig.p.speech("a", "sentence_break", "t1", 1)
+    rig.p.speech("b", "talking")
+    rig.p.speech_gone("b")
+    assert rig.p.at_break()
