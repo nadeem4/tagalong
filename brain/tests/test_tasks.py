@@ -24,7 +24,7 @@ def db(tmp_path):
 
 @pytest.fixture
 def tasks(db):
-    return Tasks(db, Masker(lambda: []), lambda: NOW)
+    return Tasks(db, Masker(lambda: []).mask, lambda: NOW)
 
 
 def test_task_ids_are_6_hex_and_unique(tasks):

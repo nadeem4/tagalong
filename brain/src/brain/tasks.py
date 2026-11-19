@@ -10,7 +10,6 @@ import sqlite3
 from collections.abc import Callable
 from datetime import datetime
 
-from brain.masking import Masker
 from brain.store import tasks as store
 from brain.store.db import transaction, utc_text
 from brain.store.work import TITLE_CAP
@@ -29,10 +28,10 @@ def age_text(seconds: int) -> str:
 
 class Tasks:
     def __init__(
-        self, db: sqlite3.Connection, masker: Masker, now: Callable[[], datetime]
+        self, db: sqlite3.Connection, mask: Callable[[str], str], now: Callable[[], datetime]
     ) -> None:
         self._db = db
-        self._masker = masker
+        self._mask = mask
         self._now = now
 
     def new_id(self) -> str:
@@ -54,7 +53,7 @@ class Tasks:
         at = utc_text(self._now())
         row = store.TaskRow(
             id=id, kind=kind, state="open",
-            title=None if title is None else self._masker.mask(title)[:TITLE_CAP],
+            title=None if title is None else self._mask(title)[:TITLE_CAP],
             source=source, caused_by=caused_by, result=None,
             created_at=at, updated_at=at, ended_at=None, end_reason=None,
         )  # fmt: skip
@@ -83,7 +82,7 @@ class Tasks:
         self, id: str, state: str, *, result: str | None = None, reason: str | None = None
     ) -> bool:
         """False when the task already ended: the first end stands."""
-        result = None if result is None else self._masker.mask(result)[:RESULT_CAP]
+        result = None if result is None else self._mask(result)[:RESULT_CAP]
         with transaction(self._db):
             return store.set_state(
                 self._db, id, state, at=utc_text(self._now()), result=result, end_reason=reason
@@ -113,7 +112,9 @@ class Tasks:
             last = store.last_event_at(self._db, r.id) or r.created_at
             age = age_text(int((now - datetime.fromisoformat(last)).total_seconds()))
             title = _fence_safe(r.title or "")
-            lines.append(f"{r.id} {r.kind} {r.state} {title!r} from {r.source}, last news {age} ago")
+            lines.append(
+                f"{r.id} {r.kind} {r.state} {title!r} from {r.source}, last news {age} ago"
+            )
         if len(rows) > limit:
             lines.append(f"and {len(rows) - limit} more")
         return "\n".join(lines)

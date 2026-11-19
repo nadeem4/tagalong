@@ -3963,3 +3963,32 @@ async def test_a_cut_retry_of_requests_from_two_turns_cuts_nothing(tmp_path):
     await idle(session)
     await _cancel_the_retry(session, clock)  # one retry takes both
     assert [r[3] for r in saved_rows(memory)] == [0, 0]
+
+
+async def test_a_say_opens_an_ask_that_ends_done_with_its_turn():
+    session, _ = make(Gate(["ok"]))
+    first = say("hi")
+    await session.say("desktop", first)
+    ask = session.events.get(first.id).task
+    assert ask is not None and session.tasks.get(ask).source == "desktop"
+    await idle(session)
+    assert session.tasks.get(ask).state == "done"
+
+
+async def test_a_duplicate_say_id_opens_one_ask():
+    session, _ = make(Gate(["ok"]))
+    first = say("hi")
+    await session.say("desktop", first)
+    await session.say("desktop", first)
+    await idle(session)
+    count = session._memory.db.execute("SELECT count(*) FROM tasks").fetchone()[0]
+    assert count == 1
+
+
+async def test_the_prompt_carries_open_tasks():
+    model = Gate(["ok"])
+    session, _ = make(model)
+    session.tasks.open("do", "desktop", title="tidy the invoices")
+    await session.say("desktop", say("hi"))
+    await idle(session)
+    assert "tidy the invoices" in model.systems[-1]

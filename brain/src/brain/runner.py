@@ -21,6 +21,7 @@ from brain.events import EVENT_KINDS, EventKind, EventLog, is_internal, load_not
 from brain.guards import EmitCtx, Hook
 from brain.presence import Presence
 from brain.store.events import EventRow
+from brain.tasks import Tasks, age_text
 from brain.tools import _fence_safe
 
 _log = logging.getLogger(__name__)
@@ -66,11 +67,7 @@ def pick(
 def _age(rows: list[EventRow], now: datetime) -> str:
     """How long the oldest of these has waited, in one unit: Scout weighs old news, code never
     drops it."""
-    s = int((now - min(datetime.fromisoformat(r.at) for r in rows)).total_seconds())
-    for size, unit in ((86400, "d"), (3600, "h"), (60, "m")):
-        if s >= size:
-            return f"{s // size}{unit}"
-    return f"{max(s, 0)}s"
+    return age_text(int((now - min(datetime.fromisoformat(r.at) for r in rows)).total_seconds()))
 
 
 def wake_text(
@@ -86,7 +83,8 @@ def wake_text(
     lines = [f"Event: {kind.name}", *([f"How to weigh it: {note}"] if note else [])]
     for row in rows:
         at = datetime.fromisoformat(row.at).astimezone(now.tzinfo)
-        lines.append(f"- at {at.strftime('%Y-%m-%d %H:%M %z')}")
+        task = f" task={row.task}" if row.task else ""
+        lines.append(f"- at {at.strftime('%Y-%m-%d %H:%M %z')}{task}")
         for name, value in (row.payload or {}).items():
             first, *rest = str(value).split("\n")
             lines.append(f"  {name}: {first}")
@@ -127,6 +125,7 @@ class Runner:
         session: TurnHost,
         now: Callable[[], datetime],
         guards,
+        tasks: Tasks,
         quiet: Callable[[datetime], bool] | None = None,
         kinds: dict[str, EventKind] = EVENT_KINDS,
     ) -> None:
@@ -136,6 +135,7 @@ class Runner:
         self._session = session
         self._now = now
         self._guards = guards
+        self._tasks = tasks
         self._quiet = quiet
         self._kinds = kinds
         self.notes = load_notes()  # per-kind notes for the wake text; the session reads them too
@@ -221,6 +221,7 @@ class Runner:
             self._events.set_resume(news)
         else:
             self._events.backoff(ids, reason)
+        self._tasks.settle()  # an Ask ends with the turn that answered it, or gave its say up
         if self._turn is not None and self._turn.id == turn_id:
             self._turn = None
         self.poke()

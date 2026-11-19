@@ -105,6 +105,7 @@ from brain.store.conversation import compaction_text
 from brain.store.db import transaction
 from brain.store.events import EventRow
 from brain.store.work import TransitionRefused, WorkRow, WorkStore
+from brain.tasks import Tasks
 from brain.timers import Timers
 from brain.timers_home import timer_home_tools
 from brain.toolbox import SEP, BodySource, BrainSource, Handler, Toolbox, ToolSpec
@@ -251,9 +252,11 @@ class Session:
         # from its loop, by which time the rest of __init__ has run.
         self._kinds = {**EVENT_KINDS, **(kinds or {})}
         self.presence = Presence(bodies, now)
+        self.tasks = Tasks(memory.db, lambda text: mask_json(self.guards, "tasks", text), now)
         self.runner = Runner(
-            events, self.presence, bodies, self, now, self.guards, quiet=quiet, kinds=self._kinds
-        )
+            events, self.presence, bodies, self, now, self.guards, self.tasks,
+            quiet=quiet, kinds=self._kinds,
+        )  # fmt: skip
         self._interjection_cut = False  # the person talked over Scout during an interjection
         self._cut: tuple[str, Interruption] | None = None  # a running turn talked over, and how
         self._carried: list[dict] = []  # what an interjection changed, shown to the next turn
@@ -315,6 +318,7 @@ class Session:
         # and the news would lose the news, since the scan never settles a row twice.
         with transaction(memory.db):
             events.recover()
+            self.tasks.settle()
             self._tell_settled(self.jobs.startup())
         timers = self.timers = Timers(
             self.records.work,
@@ -469,6 +473,7 @@ class Session:
         sender = self._bodies.body(body_id)
         headless = sender is not None and sender.display is False
         # Saved first, whatever happens to it next: a say that was heard is never lost.
+        ask = self.tasks.new_id()
         say_event = Event(
             "say",
             body_id,
@@ -477,9 +482,13 @@ class Session:
                 "params": params.model_dump(mode="json", exclude_none=True),
             },
             id=params.id,
+            task=ask,
         )
+        # The Ask opens in the say's transaction: a retried say finds its id known and makes none.
         if not self.events.post(
-            say_event, on_end=lambda _state: self._live_params.pop(say_event.id, None)
+            say_event,
+            then=lambda _db: self.tasks.open("ask", body_id, id=ask),
+            on_end=lambda _state: self._live_params.pop(say_event.id, None),
         ):
             return  # a retried say: already one event, already answered or being answered
         self._live_params[say_event.id] = params
@@ -1165,6 +1174,7 @@ class Session:
                     self._latest("download"),
                     prefs,
                     self._capabilities(),
+                    self.tasks.open_block(),
                 ),
                 history=self.history,
                 tools=self.toolbox.model_tools,
