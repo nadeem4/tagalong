@@ -2780,6 +2780,15 @@ mid-turn words are told apart only by the tool call). With `after_id` it returns
 `limit` rows after it, and `more` tells the body to page on; with none, or one that names no
 row, it returns the last `limit` (default 20, at most 50). The text was masked when saved.
 
+### Tasks in the turn and the task list
+
+A `started` or `joined` turn frame carries `tasks: [{id, kind, title}]` when the events the turn
+took belong to non-Ask tasks (`Tasks.named_by`; a say alone names none, and the field is left out).
+Home's `tasks_list` tool (`tasks_tools.py`, `{include_ended?}`) returns every non-Ask task newest
+first as `{id, kind, state, title, source, caused_by, chain, created_at, ended_at}`; `chain` walks
+`caused_by` through the event log (the event, then its cause, to a depth of 5) as
+`[{kind, source}]`, and stops where an event was swept. Ended tasks are listed only when asked.
+
 There is one deadline rule: `DEADLINE_S` in `open_items.py` for what waits on a person. Nothing in the brain
 waits on a card but `Holds`, which an expert's open call needs.
 
