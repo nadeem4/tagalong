@@ -145,6 +145,7 @@ class Hooks:
             self.close_cards,
             self.finish_events,
             self.cancel_turn_if_only,
+            lambda task_id: self.calls.append(("watch", task_id)),
         )
 
 

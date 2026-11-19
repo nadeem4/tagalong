@@ -47,6 +47,7 @@ def no_hooks(**over) -> TaskStopHooks:
         close_cards=lambda ids: None,
         finish_events=lambda t: None,
         cancel_turn_if_only=lambda ids: None,
+        stop_watch=lambda t: None,
     )
     return TaskStopHooks(**{**base, **over})
 

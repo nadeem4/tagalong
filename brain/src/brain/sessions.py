@@ -219,6 +219,9 @@ class Session:
         self.voice: VoiceHooks | None = None
         # Set by main: the loops service, which also hears focus and tab to surface held loops.
         self.loops: LoopService | None = None
+        # Set by main: what each Watch task stands for (mail reading, update checks) is switched
+        # off by the part that owns it when the task is stopped.
+        self.watch_stops: list[Callable[[str], None]] = []
         self._budget = budget
         self._bodies = bodies
         self._step_cap = step_cap
@@ -411,6 +414,7 @@ class Session:
             close_cards=self.ask_runner.close_cards,
             finish_events=lambda task: events.finish_task(task, "stopped"),
             cancel_turn_if_only=self.runner.cancel_if_only,
+            stop_watch=lambda task: [stop(task) for stop in self.watch_stops],
         )
         self._asks.on_item_answer = self._card_answered
         self._asks.register(

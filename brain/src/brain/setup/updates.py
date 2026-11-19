@@ -7,6 +7,9 @@ itself only for a group the person left on (Official on, Community off at first)
 changed while a job runs: a due update waits in a queue and `tick` applies it once the job ends.
 Last-checked time and the latest versions seen live in `cache/updates.json`, so a restart keeps
 them. Failures are logged and shown on the row; the old version stays.
+The daily check is one Watch task ("Checking for updates"): stopping it turns the daily check off
+for good (a setting, like the mail switch) until the person turns auto-update on or checks now;
+an update already queued or running is never stopped. A check posts no news, so nothing names it.
 """
 
 import asyncio
@@ -18,7 +21,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from brain.apps import AppRow
 from brain.memory import Memory
@@ -28,7 +31,12 @@ from brain.setup.store import ExpertStore, InstalledExpert
 from brain.setup.trust import is_official_expert
 from brain.store.settings import get_setting, set_setting
 
+if TYPE_CHECKING:
+    from brain.tasks import Tasks
+
 log = logging.getLogger("brain")
+WATCH_SOURCE = "updates"
+CHECK_SETTING = "update_check"  # "0" once the person stopped the daily check
 Kind = Literal["app", "expert"]
 Key = tuple[str, str]
 DAILY = timedelta(hours=24)
@@ -180,6 +188,7 @@ class Updates:
         self._queue: list[Key] = []
         self._drain_task: asyncio.Task | None = None
         self._applying = asyncio.Lock()  # held while one update is swapped in
+        self.tasks: Tasks | None = None  # set by main once the session has built it
 
     # ---- the saved check ----
 
@@ -217,6 +226,8 @@ class Updates:
 
     def set_auto(self, kind: str, official: bool, on: bool) -> None:
         set_setting(self._memory.db, f"auto_update.{kind}.{_group(official)}", "1" if on else "0")
+        if on:
+            self.resume()
         self._notify("changed", {"what": "updates"})
 
     # ---- what Home shows ----
@@ -279,12 +290,32 @@ class Updates:
     async def tick(self) -> None:
         """The brain's heartbeat: the daily check when due (read afresh, a cached answer would
         hide the update), else any update that was waiting for a job to end."""
-        if self._due():
+        if self._due() and not self._checks_off():
             await self.check(refresh=True)
         else:
             self._kick()
 
+    def watch(self) -> None:
+        """Open the Watch task the daily check runs under (one, however often this is called);
+        none while the person has the check stopped."""
+        if self.tasks and not self._checks_off():
+            self.tasks.watching(WATCH_SOURCE, "Checking for updates")
+
+    def task_stopped(self, task_id: str) -> None:
+        row = self.tasks.get(task_id) if self.tasks else None
+        if row and row.kind == "watch" and row.source == WATCH_SOURCE:
+            set_setting(self._memory.db, CHECK_SETTING, "0")
+
+    def _checks_off(self) -> bool:
+        return get_setting(self._memory.db, CHECK_SETTING) == "0"
+
+    def resume(self) -> None:
+        """The person turned auto-update on or asked for a check: the daily check is back."""
+        set_setting(self._memory.db, CHECK_SETTING, "1")
+        self.watch()
+
     async def run(self) -> None:
+        self.watch()
         while True:
             try:
                 await self.tick()

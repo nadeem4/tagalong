@@ -516,7 +516,11 @@ def timer_tools(
             if args.get("every_minutes") is None:
                 raise MemoryRefused("watch add needs every_minutes.")
             every = whole_minutes(args["every_minutes"], "every_minutes")
-            row = create_row("watch", note, current + timedelta(minutes=every), every * 60)
+            given = args.get("task_id")  # a watch with no task named belongs to none
+            task_id = None if given is None else tasks.claim(given, cause(), "watch", note)
+            row = create_row(
+                "watch", note, current + timedelta(minutes=every), every * 60, task_id=task_id
+            )
             return json.dumps({"id": row.id, "every_minutes": every})
         if action == "list":
             rows = [
@@ -642,6 +646,11 @@ def timer_tools(
                         "note": {"type": "string", "description": "At most 500 characters."},
                         "every_minutes": {"type": "integer", "description": "At least 5."},
                         "id": {"type": "string"},
+                        "task_id": {
+                            "type": "string",
+                            "description": "An open task's id; the watch then belongs to it "
+                            "and stops with it.",
+                        },
                     },
                     "required": ["action"],
                 },

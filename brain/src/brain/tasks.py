@@ -44,6 +44,7 @@ class TaskStopHooks:
     close_cards: Callable[[list[str]], None]  # take its cards down on the bodies
     finish_events: Callable[[str], None]  # handle its waiting news as stopped
     cancel_turn_if_only: Callable[[set[str]], None]  # the turn that held only them
+    stop_watch: Callable[[str], None]  # switch off what a Watch task stands for (mail, updates)
 
 
 class Tasks:
@@ -108,6 +109,15 @@ class Tasks:
                 raise MemoryRefused(f"no open task {given}.")
             id = row.id
         return id
+
+    def watching(self, source: str, title: str) -> str:
+        """The open Watch task of a source, opened when there is none: one per thing watched."""
+        return store.open_of_source(self._db, "watch", source) or self.open(
+            "watch", source, title=title
+        )
+
+    def open_watch(self, source: str) -> str | None:
+        return store.open_of_source(self._db, "watch", source)
 
     def timers_of(self, id: str) -> list[str]:
         return store.timers_of(self._db, id)
@@ -187,6 +197,7 @@ class Tasks:
             self._step("its timers", task, hooks.cancel_rows, task)
             self._step("its cards", task, self._close_cards, task)
             self._step("its news", task, hooks.finish_events, task)
+            self._step("what it watches", task, hooks.stop_watch, task)
         self._step("the running turn", id, hooks.cancel_turn_if_only, set(stopped))
         if self._post:
             self._post(Event("task_stop", by, {"task": id, "by": by}, task=id))
