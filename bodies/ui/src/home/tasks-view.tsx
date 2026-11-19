@@ -1,5 +1,5 @@
 /**
- * Home's Tasks page: the work Scout has on its plate. A title, the Now card (what is live), then three tabs with counts read
+ * Home's Tasks page: the work Scout has on its plate. A title, the Now card (what is live), then four tabs with counts read
  * from the brain (Jobs, Waiting news and mail loops, Timers, and All tasks: every task with its
  * source and a Stop). Opening a job (Watch on a row) shows its page
  * in place of everything, and Back returns to the tab. The brain owns all of it; this reads the
@@ -51,7 +51,7 @@ export function TasksView() {
   const readTasks = useCallback(() => {
     bridge
       .tasksList()
-      .then((rows) => setTasks(rows.filter((row) => row.kind !== 'ask')))
+      .then(setTasks)
       .catch((error: unknown) => console.error('could not read tasks', error));
   }, [bridge]);
 

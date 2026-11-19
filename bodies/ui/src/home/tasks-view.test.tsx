@@ -1,5 +1,5 @@
 /**
- * Tests for TasksView: the page title, the three tabs with counts read from the brain, the job
+ * Tests for TasksView: the page title, the four tabs with counts read from the brain, the job
  * page opening in place of everything, the Waiting tab holding the news and the loops panel and the Timers tab.
  */
 
@@ -174,11 +174,5 @@ describe('TasksView task list', () => {
     );
     fireEvent.click(await screen.findByRole('tab', { name: 'All tasks (2)' }));
     expect(screen.getByText('Old')).toBeVisible();
-  });
-
-  it('shows no Ask task', async () => {
-    open(createFakeHostBridge({ tasks: [task('a'), task('k', { kind: 'ask', title: 'Hello' })] }));
-    fireEvent.click(await screen.findByRole('tab', { name: 'All tasks (1)' }));
-    expect(screen.queryByText('Hello')).toBeNull();
   });
 });
