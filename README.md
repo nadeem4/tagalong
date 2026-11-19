@@ -116,7 +116,7 @@ preferences, starting with "Always ask me before risky actions". After you have 
 kind of ask three times in two weeks, Scout may offer to approve it from now on; only a "Yes" saves a
 preference. With a preference of yours saved, Scout looks at each ask first and may approve it once
 under that preference, then tells you which one. Anything unclear still comes to you. A nudge you ask for in chat goes straight
-through (a follow-up you ask for still shows its mode card); one Scout decides on itself (when a job goes quiet, say) is asked like any other action,
+through (a hand-off always shows its Allow card, and the card never holds Scout's turn); one Scout decides on itself (when a job goes quiet, say) is asked like any other action,
 and a preference can cover it. Home's
 **Approvals** page shows all of it. See [docs/brain.md](docs/brain.md).
 

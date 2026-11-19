@@ -302,7 +302,7 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
 2. **Action:** ask "Hand this to Claude Code: list the files here." without naming a folder.
    **Expected:** Scout asks which folder; it does not start anything or guess one. Name a folder
    that does not exist: Scout says there is no folder at that path.
-3. **Action:** start a hand-off and press **cancel** on the mode card.
+3. **Action:** start a hand-off and press **Deny** on the hand-off card.
    **Expected:** Scout says it was not started, and no `claude` or `node` process is left.
 4. **Action:** hand off a task that edits a file in **Manual** mode.
    **Expected:** Claude Code's permission request arrives as an ask (tool and input shown, buttons
@@ -323,7 +323,7 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
    **Expected:** Scout asks which job (by title) before it sends anything; only after you answer does a note go out.
    **F15 (LT5 B1R-3):** start a job, stop the brain (`tagalong stop`), start it, then say "carry on".
    **Expected:** the new job continues the old session (`parent_job` names the old one) and the old job no longer shows as open or running; it is closed as "carried on". The same holds when the session could not reload (a fresh job starts, the old one still closes). A job that genuinely failed stays open, and Scout does not bring it up, when you hand off a new, unrelated task in the same folder.
-   **F11 (LT1-5):** answer the mode card with Manual. **Expected:** Scout then says the job runs in
+   **F11 (LT1-5):** ask Scout to hand off in Manual mode and allow the card. **Expected:** Scout then says the job runs in
    Manual mode; it never says it cannot set the mode.
    **F11 (LT1-6, by design):** after a job ends, its `claude` process stays up until
    `TAGALONG_EXPERT_IDLE_S` (300 s) after the last job, or `tagalong stop`; nothing to fix.
@@ -473,8 +473,8 @@ Jobs. Asking Scout ("list my jobs", "stop that job") also works.
     a check-back timer wake Scout and have it nudge or continue a job on its own.
     **Expected:** the chat request goes through with no card and no new row in Approvals. The nudge
     Scout starts on a wake asks you first (an Allow card for `tell_expert`). On a wake Scout may
-    start a job, but a reminder's or a job's follow-up hand-off always shows the mode card first,
-    even when a rule or a saved preference would cover it: nothing starts until you pick.
+    start a job, but a reminder's or a job's follow-up hand-off always shows its Allow card first,
+    even when a rule or a saved preference would cover it: nothing starts until you allow it.
     Save a preference that covers nudges and repeat: Scout proceeds and the row says it was
     Scout's decision. Type a
     message into a wake turn that is already running: the turn stays a non-person one (its first
@@ -2774,12 +2774,14 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 1. Automated: `cd brain && uv run pytest tests/test_jobs.py tests/test_asks.py tests/test_tools.py -q`
    and `pnpm --filter @tagalong/ui test connector-confirm`, plus
    `pnpm --filter @tagalong/desktop test:e2e -- jobs` (fake brain).
-2. By hand: ask Scout for a task that needs the app's data in a folder. The mode card lists the
-   app under "Apps this job may use" with a remove button per app.
-3. Remove the app and pick a mode: the job starts and the expert has no tool of that app (it says
-   so, or Scout fills the gap). Repeat without removing: the expert can use the app, a change
+2. By hand: ask Scout for a task that needs the app's data in a folder. The hand-off card lists the
+   app by name in its facts.
+3. Allow the card: the job starts and the expert can use the app, a change
    still asks, and Home's Approvals shows the hand-off row naming the app.
 4. `hand_off` with an app that is off or unknown is refused in plain words and no card appears.
+5. Hand-off card buttons: Allow starts the job; Deny starts nothing and the task ends stopped; Not now keeps the card and moves its check-back; Stop task closes the card and ends the task.
+6. An open hand-off card does not block Scout: say something new, or let a job's news arrive. Scout answers at once and the card stays.
+7. Ask Scout to hand off in a mode that does not exist: nothing starts, and Scout names the modes the expert offers.
 
 ## How Scout reads the screen (desktop, automated; install by hand only on a spare PC)
 
@@ -2902,7 +2904,7 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 2. Stopped is not failed: hand a long task (for example `sleep 600`) to an expert, then stop the job. Ask Scout for the job: its step reads `stopped`, the count shows `0 failed`, and Scout does not call the job failed.
 3. Restart: with that job running, restart the brain (`uv run tagalong stop`, then start it). Ask for the job: the step reads stopped, never `running`.
 4. `uv run tagalong stop` with an expert job running: afterwards no expert process (for example `claude` or the fake agent) is left in Task Manager.
-5. Decline the mode card of a hand-off: Scout says the person declined it (not a guess).
+5. Deny the hand-off card: Scout says the person declined it (not a guess).
 6. Ask Scout to stop a job with a blank job id: the refusal reads `stop_job needs job as non-empty text.` in every blank or missing case.
 7. Clear the focus after Scout answered from it and ask again: Scout says it can no longer see it, not that its earlier answer was made up.
 
@@ -2921,9 +2923,9 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 ## Live-test fixes (F12)
 
 1. Automated: `cd brain && uv run pytest tests/test_server.py -k relaunched -q`; `pnpm --filter @tagalong/desktop exec vitest run src/main/brain/turn-events.test.ts src/main/ipc/scout.test.ts src/main/ipc/jobs.test.ts src/renderer/csp.test.ts`; `pnpm --filter @tagalong/desktop test:e2e` (`quiet-log.spec.ts`: a launch with Home and the panel opened leaves no `[renderer]` line in `tagalong.log`); `pnpm --filter @tagalong/ui exec vitest run src/companion-bubble-ask.test.tsx`.
-2. Open ask survives a relaunch: ask Scout to hand a task to Claude Code and leave the permission-mode card unanswered. Quit the desktop and start it again, then open the bubble. The mode card is shown again, and choosing a mode starts the job. No "Scout is thinking" with nothing to answer.
+2. Open ask survives a relaunch: ask Scout to hand a task to Claude Code and leave the hand-off card unanswered. Quit the desktop and start it again, then open the bubble. The card is shown again, and Allow starts the job. No "Scout is thinking" with nothing to answer.
 3. Same for Claude Code's own Yes / No ask: while a job waits on it, quit and relaunch the desktop. The ask card is shown again in the bubble.
-4. Long path: the mode card for a folder with a long unbroken path (about 120 characters, no spaces) wraps inside the card; nothing is clipped on the right. The same for a long path in your own message.
+4. Long path: the hand-off card for a folder with a long unbroken path (about 120 characters, no spaces) wraps inside the card; nothing is clipped on the right. The same for a long path in your own message.
 5. Log: start the desktop with the brain not yet running. `tagalong.log` has no `script-src` line and no `jobs:running-steps` `BrainOffline` ERROR.
 6. Stop job: the bubble offers Stop (this answer) only. Stopping a job is on Home > Jobs (Stop on a running job).
 
