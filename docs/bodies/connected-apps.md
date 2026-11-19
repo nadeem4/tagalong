@@ -1,39 +1,61 @@
 # Connected apps (MCP)
 
+How the brain connects to the person's own apps through the Model Context Protocol: the app rows and secrets, sign-in, how each app tool is gated, how an expert reaches an app, updates, and Home's Connections page. Read it if you touch `apps.py`, `app_tools.py` or `app_oauth.py`, or the Connections page.
+
+- [Purpose](#purpose)
+- [Where it lives](#where-it-lives)
+- [How it works](#how-it-works)
+- [Finding apps](#finding-apps)
+- [Adding an app from the registry](#adding-an-app-from-the-registry)
+- [Updates](#updates)
+- [Storage](#storage)
+- [Failure handling](#failure-handling)
+- [Privacy notes](#privacy-notes)
+- [Experts reach apps through the brain](#experts-reach-apps-through-the-brain)
+- [Mail as a source for loops](#mail-as-a-source-for-loops)
+
 ## Purpose
 
 Scout can use the user's own apps (Notion, GitHub, Linear, or any local tool) through the Model
 Context Protocol. The Python brain is the MCP client (the official `mcp` SDK). Each app tool becomes
-one Scout tool: reads run at once, changes ask first, and risky ones ask every time until unlocked on Home.
+one Scout tool, and every one of them asks first by default, reads included: the app's own hints never
+let a tool run unasked. Risky ones are fixed higher: some ask every time until unlocked on Home, and some
+can never be unlocked.
 
 ## Where it lives
 
-| File                                   | What it holds                                                                |
-| -------------------------------------- | ---------------------------------------------------------------------------- |
-| `brain/src/brain/apps.py`              | `AppRow`, `validate_app`, `slug_for`, `expand_env`, `TokenFile`, `Apps`      |
-| `brain/src/brain/app_tools.py`         | `classify`, `specs_for`, `format_result`, `AppSource`, `app_home_tools`      |
-| `brain/src/brain/app_oauth.py`         | `FileTokenStorage`, the loopback callback listener, the OAuth provider       |
-| `brain/src/brain/store/connections.py` | The `apps` table: `list_apps`, `add_app`, `set_app_enabled`, `remove_app`    |
-| `brain/src/brain/sessions.py`          | Adds `AppSource` as the toolbox's third source, and Home's app calls         |
-| `brain/src/brain/main.py`              | Builds `Apps`, starts it after the server is up, shuts it down before memory |
-| `brain/tests/fake_mcp_server.py`       | A small stdio and http MCP server for tests                                  |
+| File                                   | What it holds                                                                      |
+| -------------------------------------- | ---------------------------------------------------------------------------------- |
+| `brain/src/brain/apps.py`              | `AppRow`, `validate_app`, `slug_for`, `expand_env`, `TokenFile`, `Apps`            |
+| `brain/src/brain/app_tools.py`         | `classify`, `specs_for`, `format_result`, `AppSource`, `app_home_tools`            |
+| `brain/src/brain/app_oauth.py`         | `FileTokenStorage`, the loopback callback listener, the OAuth provider             |
+| `brain/src/brain/store/connections.py` | The `apps` table: `list_apps`, `add_app`, `set_app_enabled`, `remove_app`          |
+| `brain/src/brain/expert_apps.py`       | The loopback MCP bridge by which an expert reaches chosen apps through the toolbox |
+| `brain/src/brain/sessions.py`          | Adds `AppSource` as the toolbox's third source, and Home's app calls               |
+| `brain/src/brain/main.py`              | Builds `Apps`, starts it after the server is up, shuts it down before memory       |
+| `brain/tests/fake_mcp_server.py`       | A small stdio and http MCP server for tests                                        |
 
 ## How it works
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
-flowchart LR
-  S["Scout calls notion__search"] --> T{"read, change or locked?"}
-  T -- "read" --> M["Apps.call"]
-  T -- "change" --> A["gate ask: allow, always, deny"]
-  T -- "locked" --> L["gate ask every time"]
-  A -- "allow or always" --> M
-  L -- "allow" --> M
-  A -- "deny" --> N["nothing runs"]
-  L -- "deny" --> N
-  M -- "stdio or http" --> P["The app's MCP server"]
-  M --> F["answer fenced as data kind app"]
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
+flowchart TD
+  S["Scout calls notion__delete_page<br/>(an expert's call comes through expert_apps.py)"] --> C["classify(tool): hints and whole words in the name"]
+  C --> F{"the tool's floor (Tier)"}
+  F -->|"pay, charge or delete in the name"| PO["person_only: only the person decides, every time<br/>Home offers Off or Ask, never Auto"]
+  F -->|"destructiveHint, or send, remove, destroy or trash"| LK["locked: the person, or an Auto the person set on Home"]
+  F -->|"anything else, read or change"| AK["ask (default_mode): the person, a stored rule or the side-check"]
+  PO --> E["permission.py: the card or the stored rule"]
+  LK --> E
+  AK --> E
+  E -->|"allow"| M["Apps.call"]
+  E -->|"deny"| N["nothing runs"]
+  M -->|"stdio or http"| P["the app's MCP server"]
+  M --> R["answer fenced as data kind app"]
 ```
+
+Notice that the floor is fixed by the tool's name and hints before any mode is looked at, and that a
+read-only hint alone never lets a tool run unasked.
 
 ### Definitions
 
@@ -68,7 +90,8 @@ added again.`.
 ### Connecting
 
 `Apps.start()` runs at boot and returns at once. Each enabled app connects in its own task, so a
-failing or hanging app is one `error` row and never stops the others, boot or a turn. A connect
+failing or hanging app is one `error` row and never stops the others, boot or a turn. `main.py` builds `Apps`,
+calls `apps.start()` once the server is up, and calls `apps.shutdown()` after the experts stop and before memory closes. A connect
 that takes over 30 seconds ends as `error`. Status is `off`, `connecting`, `connected`,
 `needs-sign-in` or `error`, with a plain line for `error`. Every change sends
 `changed {what: "apps"}`. An idle connection is pinged every 30 seconds, and a closed one turns
@@ -82,7 +105,7 @@ An `oauth` app signs in through the app's own page in the browser. The brain nev
 password; it keeps only the tokens.
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
 flowchart TD
   U["Sign in on Home"] --> H["sign_in_app id"]
   H --> O["body tool open_url"]
@@ -102,9 +125,13 @@ flowchart TD
 - **Browser**: the brain asks an online body that offers `open_url` (the desktop; https only,
   through the system browser). With none: "Open Tagalong on the machine the brain runs on to sign
   in."
+- **Provider**: the brain runs the MCP SDK's `OAuthClientProvider` (client name "Tagalong", PKCE,
+  dynamic client registration) in `app_oauth.py`.
 - **Callback**: a one-request listener on `127.0.0.1` (port picked by the system), waiting at most
-  300 seconds. A second request, or none, never signs anyone in. A new sign-in clears the old client
-  registration because the redirect port changes.
+  300 seconds. A second request, or none, never signs anyone in. It hands the SDK the redirect's
+  `code`, `state` and `iss` (RFC 9207): servers like Notion advertise `iss` support, and the SDK
+  refuses a sign-in whose `iss` was dropped. A new sign-in clears the old client registration
+  because the redirect port changes.
 - **Tokens**: `app-oauth/<app id>.json` in the data directory, with `saved_at` and `expires_in` so
   they refresh before they expire. Removing the app deletes the file.
 - **Later 401**: a 401 in a live session flips the app to `needs-sign-in` ("Sign in to X again.").
@@ -128,9 +155,9 @@ flowchart TD
   warns Scout will no longer ask. Choose **Ask** again to undo. Scout's own side-check never
   looks at a locked tool.
 
-Modes are the toolbox's usual ones (see [brain.md](../brain/README.md)), but every app tool starts at `ask`,
-read-only ones too (`default_mode="ask"`): the app's own hint never lets a tool run unasked. The
-user may save `auto` for any of them, and for a locked one only through that Home switch.
+Modes are the toolbox's usual ones (see [permissions.md](../brain/permissions.md)), but every app tool starts at `ask`,
+read-only ones too (`default_mode="ask"` in `app_tools.py`): the app's own hint never lets a tool run unasked. The
+user may save `auto` for any of them except a person-only one, and for a locked one only through that Home switch.
 
 ### Scout's side
 
@@ -139,7 +166,7 @@ dropped is offline ("<app> is not connected right now."), and a disabled app's t
 
 - **Name**: `<app id>__<tool>`, characters outside `A-Za-z0-9_-` replaced by `_`, cut to fit 64.
   A name that clashes is dropped and logged.
-- **Audience**: Scout only. Home never calls an app's tool.
+- **Audience**: Scout, and an expert through [the bridge](#experts-reach-apps-through-the-brain). Home never calls an app's tool.
 - **Result**: text blocks, resource text or links, `[image: type]` for images, or the structured
   content as JSON, fenced as `<data kind="app" app="<id>">`. A
   `</data` inside is defused so the app cannot close the fence. A long answer is previewed like any tool result: stored whole (up to 5,000,000 characters), the rest read with `read_output`.
@@ -149,7 +176,7 @@ dropped is offline ("<app> is not connected right now."), and a disabled app's t
 
 ### Home calls
 
-Home-only tools (see the table in [brain.md](../brain/README.md#home-tools)): `list_apps`, `add_app`,
+Home-only tools (see the table in [the brain overview](../brain/README.md#home-tools)): `list_apps`, `add_app`,
 `set_app_enabled`, `remove_app`, `restart_app`. `add_app` stores the token and the other secrets in
 `app-tokens.json` only after the rest is valid, and removes them again if saving the row fails.
 `remove_app` stops the app and deletes its row and every key of that app (token, env values, url
@@ -164,7 +191,7 @@ tabs, **Apps** (`apps-tab.tsx`) and **Experts** (`experts-tab.tsx`). The brain o
 keys and every fact shown; the page only asks and renders.
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
 flowchart LR
   P["ConnectionsPanel"] -- "listConnections, addConnection, ..." --> I["desktop ipc/connections.ts"]
   I -- "call list_apps, add_app, set_app_enabled, restart_app, remove_app" --> B["Python brain"]
@@ -200,7 +227,7 @@ sign-in`, `Not working`, `Off`), the on/off switch, and quiet **Restart** and **
   then `popular_more`), never the registry's raw first page.
 - **Trust kept at install**: a registry install saves `official` or `community` on the app row
   (`apps.trust`, from the entry's id); an app added by hand is `community`. Home's list reads it
-  back as `official` on each connected app, so the tag survives a restart. Apps connected before this was kept read Community until added again.
+  back as `official` on each connected app, so the tag survives a restart.
 - **Experts tab** (`experts-tab.tsx`, `experts-group.tsx`): **Your experts** (installed, Official
   first, each led by the kind of job it does from `jobs-kinds.ts` with the product underneath, an Official or Community chip (the same `cx-chip` as the app rows), a state
   chip (Ready, Needs login) and a **Log in** button; a newer version shows as `v1.2 → v1.3` with
@@ -213,7 +240,7 @@ sign-in`, `Not working`, `Off`), the on/off switch, and quiet **Restart** and **
   experts that install and run on this PC are listed. The expert check card shows the licence and a
   link to the code (`licence`, `repo`). Progress ("Getting what it needs to run") and
   a failed install show on the expert's row. These go through `setup_overview`, `setup_expert` and
-  `setup_app` (see [brain.md](../brain/README.md#home-tools)): the button opens the same Allow card Scout's
+  `setup_app` (see [the brain overview](../brain/README.md#home-tools)): the button opens the same Allow card Scout's
   install opens, and progress rides `changed setup`.
 - **Trust at the door**: the desktop's `ipc/setup.ts` honours `approved` for an app only from the Home
   window, and for an expert only from the tour or from Home with `community_ok`; anything else opens
@@ -235,7 +262,7 @@ sign-in`, `Not working`, `Off`), the on/off switch, and quiet **Restart** and **
   the name over its command line (`node files-server.js`) or web address, and a coloured status
   chip; Claude Code closes the list. A group above it, "How Scout reads your screen", has two rows
   (Reading window text, Text from pictures) with the same kind of chip; see [desktop.md](desktop.md). Secrets never show: the brain strips
-  them from `list_apps` (see [brain.md](../brain/README.md#home-tools)). Env values and secret url parts are
+  them from `list_apps` (see [the brain overview](../brain/README.md#home-tools)). Env values and secret url parts are
   moved to the token file for you; do not put secrets in args, which stay in the row.
 - **Per-tool permissions** stay in Settings › Permissions; this page has no tool list.
 
@@ -251,20 +278,20 @@ than the brain's; TLS, pairing and multi-user.
 (`registry.modelcontextprotocol.io`, latest versions only) and lists each server with whether it
 can run on this computer. Packages map to `npx` (npm) or `uvx` (pypi); hosted servers are
 `remote`. Each row also says whether it is Official (the service's own reversed domain, see
-[docs/brain/README.md](../brain/README.md)), who published it, where it runs, how it signs in and its licence. A
+[setup.md](../brain/setup.md#registries-trust-and-grouping)), who published it, where it runs, how it signs in and its licence. A
 search page is 30 entries and may carry a cursor for the next. Results are cached for 24 h under
 `<TAGALONG_HOME>/cache/`, one file per query and cursor. Nothing is installed or connected by
 searching.
 
 ## Adding an app from the registry
 
-`install_app(id, query?)` (Scout) adds a registry app without typing its settings. It is `person_only`: the Allow card names the transport, the package and version (or the host), the
+`install_app(id, query?)` (Scout) adds a registry app without typing its settings (the install mechanics are in [setup.md](../brain/setup.md#installing-an-app)). It is `person_only`: the Allow card names the transport, the package and version (or the host), the
 environment variable names it needs and any Node download, and for a community app the check
 card facts (who made it, where it runs, sign-in, licence, "not yet audited by anyone"), and neither a saved preference nor a
 stored Auto skips it. After Allow it saves the app through the same code as `add_app`. Two overlapping calls for the same app join one add (one `install` open item, `setup/flights.py`) and share its result (the second never gets `already_added`); a cancelled turn never cancels that add. A connected
 app is reported with its tool names in the result; a sign-in or slow start that ends later sends
 a `setup_done` event (app, name, ok, state, tools, tools_total; `tools` lists at most 30 names, `tools_total` is the full count), so Scout can carry on with the request that led
-to the Connect offer (see [docs/brain/README.md](../brain/README.md#missing-tool-connect-then-carry-on)).
+to the Connect offer (see [Missing tool: Connect](../brain/README.md#missing-tool-connect-then-carry-on)).
 
 - **Local (`npx`, `uvx`).** A stdio app that runs by absolute path: Node's `npm exec` (the system
   Node if 22 or newer, else Tagalong's own, downloaded first) or `uvx` when it is installed
@@ -281,7 +308,7 @@ to the Connect offer (see [docs/brain/README.md](../brain/README.md#missing-tool
 
 ## Updates
 
-`setup/updates.py` (`Updates`) keeps installed apps and experts current. The brain checks once a
+`setup/updates.py` (`Updates`) keeps installed apps and experts current (the check and its flow are in [setup.md](../brain/setup.md#updates)). The brain checks once a
 day (a 30 second `tick` loop started in `main.py` asks whether a check or a waiting update is due)
 and when Home presses **Check for updates**.
 
@@ -308,20 +335,20 @@ and when Home presses **Check for updates**.
   every status change and the page reads the state again.
 - **Home calls** (`setup/home_tools.py`, never offered to Scout): `updates_state`,
   `updates_check`, `update_item {kind, id}`, `update_all {kind}` (`{started}`, `{waiting: "job"}`
-  or `{error}`), `set_auto_update {kind, official, on}`; see [brain.md](../brain/README.md#home-tools).
+  or `{error}`), `set_auto_update {kind, official, on}`; see [the brain overview](../brain/README.md#home-tools).
 - The page side is `bodies/ui/src/home/updates-bar.tsx` (the header, the two switches and the
   row's update side) used by `apps-tab.tsx` and `experts-group.tsx`.
 
 ## Storage
 
-| Where                         | Holds                                                                                                            |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `apps` table in `tagalong.db` | `id`, `name`, `transport`, `config` (JSON), `auth`, `enabled`, `version` (the pinned package version, or empty)  |
-| `settings` table              | `auto_update.{app,expert}.{official,community}`: whether that group updates by itself                            |
-| `cache/updates.json`          | When the registries were last checked and the latest version seen for each app and expert                        |
-| `rules` table (`mode` rows)   | The user's saved `ask` or `auto` per tool, like any other tool                                                   |
-| `app-tokens.json`             | `{ "<id>": token, "<id>:env:<NAME>": value, "<id>:url_query": "a=b&c=d" }`, owner-only where the platform allows |
-| `app-oauth/<app id>.json`     | The app's OAuth tokens and client registration, per app                                                          |
+| Where                         | Holds                                                                                                                                                                                              |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps` table in `tagalong.db` | `id`, `name`, `transport`, `config` (JSON), `auth`, `enabled`, `trust` (`official` or `community`, migration 0028), `version` (the pinned package version, or empty, migration 0030), `reads_mail` |
+| `settings` table              | `auto_update.{app,expert}.{official,community}`: whether that group updates by itself                                                                                                              |
+| `cache/updates.json`          | When the registries were last checked and the latest version seen for each app and expert                                                                                                          |
+| `rules` table (`mode` rows)   | The user's saved `ask` or `auto` per tool, like any other tool                                                                                                                                     |
+| `app-tokens.json`             | `{ "<id>": token, "<id>:env:<NAME>": value, "<id>:url_query": "a=b&c=d" }`, owner-only where the platform allows                                                                                   |
+| `app-oauth/<app id>.json`     | The app's OAuth tokens and client registration, per app                                                                                                                                            |
 
 ## Failure handling
 
@@ -351,13 +378,12 @@ When Scout calls an app's tool while working for a job (a wake about it, or afte
 to it), the call is a step on that job's timeline, labelled `app:<app id>` (the id before `__` in
 the tool's name), with the tool's short name and its masked, clipped arguments and a status of
 done, failed or refused. The app's result is never copied there. See Scout's own steps in
-[docs/brain/README.md](../brain/README.md).
+[experts.md](../brain/experts.md).
 
 ## Mail as a source for loops
 
-A connected Gmail app can also feed Scout's loops (see [brain.md](../brain/README.md#loops)), but only when
-reading is switched on for that app (saved as `apps.reads_mail`) (the Home switch comes with a later slice; it is off until
-then). The loops service reads through `Apps.call` directly, so the toolbox gate is not involved:
+A connected Gmail app can also feed Scout's loops (see [loops.md](../brain/loops.md)), but only when
+reading is switched on for that app (saved as `apps.reads_mail`; the Home switch is off until the person turns it on). The loops service reads through `Apps.call` directly, so the toolbox gate is not involved:
 the switch is the consent. The Gmail adapter (`loops/sources/gmail.py`) may call only
 `search_threads` and `get_thread` to read and `create_draft` to draft; it refuses any other tool, so
 `send_message` and everything that changes the mailbox (labels, archive, read state, delete) is out
