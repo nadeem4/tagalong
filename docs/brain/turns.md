@@ -54,7 +54,7 @@ the model can raise it.
 | `now`        | at once                                                                           |
 | `next_pause` | when speech is at a `sentence_break` or idle (see below)                          |
 | `idle`       | only when speech is idle and the person has not spoken for `IDLE_WINDOW_S` (10 s) |
-| `hold`       | never: it stays `new`. The runner honours it, but no event kind uses it today     |
+| `hold`       | never: it stays `new`. The runner honours it, but no event kind uses it           |
 
 ### Event states
 
@@ -114,28 +114,7 @@ it (a `joined` frame names their say) when the wake is shown on the body they us
 from another body they get a turn of their own after it. The body shows it like any turn. A `back`'s `idle_seconds` is the time since the last input, not since the body
 noticed the idle.
 
-**Body online.** `Bodies` remembers when each body went offline. When a body connects again after
-600 s or more away, the session emits `body_online` (at most twice an hour). A body's first connect
-since the brain started never wakes, a quick reconnect does not either, and a browser body (kind
-`browser`) never wakes Scout.
-
-**Who started a turn.** The `turn` notification carries `events` (the event ids the turn took) and
-`source` (the started turn's event source: the body for a say, the waking event's source for a wake).
-Bodies use `source` to show nothing while a wake runs (see
-[desktop.md](../bodies/desktop.md#the-brain-in-the-main-process)). A person who talks while a wake runs joins
-it (a `joined` frame names their say) when the wake is shown on the body they used;
-from another body they get a turn of their own after it. The body shows it like any turn. A `back`'s `idle_seconds` is the time since the last input, not since the body
-noticed the idle.
-
-**Who started a turn.** The `turn` notification carries `events` (the event ids the turn took) and
-`source` (the started turn's event source: the body for a say, the waking event's source for a wake).
-Bodies use `source` to show nothing while a wake runs (see
-[desktop.md](../bodies/desktop.md#the-brain-in-the-main-process)). A person who talks while a wake runs joins
-it (a `joined` frame names their say) when the wake is shown on the body they used;
-from another body they get a turn of their own after it. The body shows it like any turn. A `back`'s `idle_seconds` is the time since the last input, not since the body
-noticed the idle.
-
-WhatsApp body's two moments are event kinds with urgency `next_pause`: `ask_closed` (a tap or
+The WhatsApp body's two moments are event kinds with urgency `next_pause`: `ask_closed` (a tap or
 answer met a question the brain no longer holds; fact `via`) and `many_pending` (a typed reply with
 several questions open; fact `asks`). `from_body` in `events.py` validates them like any body event;
 the notes in `mind/events.md` leave the wording to Scout. Both kinds are capped at 6 an hour: an
@@ -577,3 +556,6 @@ rows with no words and rows that call a tool are left out; saved rows have no tu
 mid-turn words are told apart only by the tool call). With `after_id` it returns the oldest
 `limit` rows after it, and `more` tells the body to page on; with none, or one that names no
 row, it returns the last `limit` (default 20, at most 50). The text was masked when saved.
+
+Tests: `tests/test_runner.py` and `tests/test_presence.py` (fake clock), `tests/test_interjection.py`
+and `tests/test_events.py`.

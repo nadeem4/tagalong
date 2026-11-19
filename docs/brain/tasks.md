@@ -21,11 +21,10 @@ States are `open`, `waiting`, `done`, `failed`, `stopped` and `declined`.
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
 stateDiagram-v2
-    [*] --> open: Tasks.open (claim at the gate or task_start)
-    open --> waiting: a card, job or timer is pending (Tasks.wait)
-    waiting --> open: Tasks.resume
-    open --> done: task_end, or an Ask whose say was handled
-    waiting --> done: task_end
+    [*] --> open: Tasks.open (a say, task_start, Offers, a Watch)
+    open --> waiting: claimed for a card, job or timer (Tasks.wait)
+    open --> done: task_end, an Ask whose say was handled, a Later with nothing left
+    waiting --> done: task_end, or a Later with nothing left (settle)
     open --> failed: an Ask whose say was given up
     open --> stopped: Tasks.stop, or an offer card that lapsed
     waiting --> stopped: Tasks.stop, or a refused or expired hand-off
@@ -36,33 +35,42 @@ stateDiagram-v2
     declined --> [*]
 ```
 
-`ENDED` is done, failed, stopped and declined. `Tasks.settle` runs after every turn and ends what the turn answered: an Ask when its say is handled or given up, a Later when nothing is left running for it, and an offer's Own task whose card lapsed.
+`ENDED` is done, failed, stopped and declined. A task the gate, a setup call or `set_timer` claims (`Tasks.claim`, then `Tasks.wait`) moves to `waiting` as soon as it is claimed (it waits on the person's yes, then on the work) and stays there until it ends; nothing moves it back to `open`. `Tasks.settle` runs after every turn and ends what the turn answered: an Ask when its say is handled or given up, a Later when nothing is left running for it, and an offer's Own task whose card lapsed.
 
 ## The orchestration map
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
 flowchart TD
-    IN[say, card_answer, timer, loop,<br/>body events, job news] --> EL[(events table: EventLog)]
-    EL --> RU[Runner: pick, gate, target]
-    RU --> TU[Scout turn]
-    TU -->|claim_task| TK[Task: ask, do, later, watch or own]
-    TU --> TB[Toolbox: tools and asks]
-    TB -->|ask mode| OI[Open item: card and saved call]
-    TB -->|hand_off| JB[Jobs: experts over ACP]
-    TB -->|set_timer, watch| TM[Timers: work rows]
-    OI -->|answer| TB
-    JB -->|job_ended, job_question| EL
+    SAY[say from a body:<br/>Session.say opens an Ask task] --> EL
+    EL[(events table: EventLog<br/>news the gate shuts waits here as new)] --> RU[Runner: pick, gate, target]
+    RU -->|one turn at a time| TU[Scout turn]
+    RU -.->|next_pause news at a sentence break| IJ[Session.interject]
+    TU --> TB[Toolbox gate: claims a task]
+    TB --> TK[(tasks: ask, do, later, watch, own)]
+    subgraph MANY [Live at once]
+        OI[open_items: Scout asks, choices,<br/>offers, installs, expert asks]
+        JS{Jobs.start: a free slot?}
+        JB[running jobs: MAX_RUNNING 2 parts]
+        JQ[queued goals: planned, oldest approved_at first]
+        TM[timers and watches: work rows]
+        LP[mail loops and the update check]
+    end
+    TB -->|ask mode: card, saved call| OI
+    TB -->|set_timer, watch| TM
+    OI -->|Allow on hand_off runs the saved call| JS
+    JS -->|yes| JB
+    JS -->|no| JQ
+    JQ -->|fill_slots when a job ends| JB
+    JB -->|permission or question card| OI
+    JB -->|job_ended, job_question, job_quiet| EL
     TM -->|timer| EL
     OI -->|ask_ended, card_due, card_expired| EL
-    TK -.->|task_id on each| OI
-    TK -.->|task_id on each| JB
-    TK -.->|task_id on each| TM
-    TK -->|Tasks.stop| ST[Stop cascade]
-    ST -->|task_stop event| EL
+    LP -->|loop| EL
+    TK -->|Tasks.stop| ST[Stop cascade: ends every row<br/>in the box with this task_id]
 ```
 
-A task is the thread that ties one piece of work together: the card, the job, the timers and the news all carry its `task_id`, so one Stop reaches all of them. Everything that comes back to Scout comes back as an event in the same log.
+Only the turn is single: the runner runs one at a time. Everything in the box lives at once: any number of cards wait on the person, up to two expert parts run (`MAX_RUNNING` in `jobs.py`) with more approved jobs queued behind them, timers and watches sleep in `work`, and news the gate shuts out waits `new` in the log. A turn never waits on any of them: it opens them and ends, and each comes back later as an event. A task is the thread that ties one piece of work together: the card, the job, the timers and the news all carry its `task_id`, so one Stop reaches all of them.
 
 ## Starting and ending tasks
 
@@ -119,16 +127,15 @@ The default check-back is two thirds of the way to the deadline. A deadline is `
 stateDiagram-v2
     [*] --> open: OpenItems.open (deadline, check-back)
     open --> open: Not now moves the check-back
-    open --> answered: the person answers
-    answered --> done: the saved call ran, or the answer was recorded
-    open --> done: Scout's side-check said yes, or finish
-    open --> expired: deadline passes, task stopped or process ended
-    answered --> done: restart closes it as failed (not known if it ran)
+    open --> answered: the person answers, or Scout's side-check says yes
+    answered --> done: the saved call ran, or a restart closed it unrun
+    open --> done: finish, such as reason cancelled when its task stopped
+    open --> expired: deadline passed, or a live-only item's process or job ended
     done --> [*]
     expired --> [*]
 ```
 
-An open item is the one record of something that waits on the person. An expired item is not reopened by a late answer. A restart closes every answered-but-unfinished ask as failed rather than run it twice.
+An open item is the one record of something that waits on the person, and `DEADLINE_S` is the one deadline rule for it. Nothing in the brain waits on a card except `Holds`, which an expert's open call needs. An expired item is not reopened by a late answer. A restart closes every answered-but-unfinished ask as failed rather than run it twice.
 
 ### Task cards
 
@@ -138,19 +145,19 @@ after the card's own options, and puts `task {id, title}`, `check_back_at`, `che
 turn: `OpenItems.not_now(id, at, by)` moves the check-back (30 minutes on when no time is given,
 by the person) and the deadline past it (the window kept in `window_s`, so it never grows), and the brain sends the card again with the new
 check-back. A check-back the person set is not moved by Scout. Stop task closes the card and calls
-`Tasks.stop(task_id, by)`. Stop task calls `Tasks.stop`, the same call Home's `task_stop` tool makes (Home only; the desktop's `tagalong:tasks:stop`).
+`Tasks.stop(task_id, by)`, the same call Home's `task_stop` tool makes (`task_tools.py`, Home only; the desktop's `tagalong:tasks:stop`).
 
 ## The Stop cascade
 
-`Tasks.stop(task_id, by)` ends a task and everything hanging off it. It returns nothing when the task is already over; the runner then tells Scout with `ask_ended` (refused) if it came from a card. The steps, in code order:
+`Tasks.stop(task_id, by)` ends a task and everything hanging off it. It returns nothing when the task is already over; when that Stop came from a Scout card, `AskRunner` tells Scout with `ask_ended` (refused) instead. The steps, in code order:
 
 1. The task ends `stopped` ("the person stopped it").
 2. Every task whose `caused_by` chain leads to it ends `stopped` too ("the task that started it was stopped").
 3. For each stopped task, through `TaskStopHooks` (all required, built by `Session`), one step at a time, so a step that fails is logged and the rest still run:
-   - `stop_jobs`: `Jobs.stop_task` stops each running part of the task's jobs (`session/cancel`; the adapter process is killed only if it ignores the stop) and cancels planned goals. A job still queued or starting never starts: `_start_part` checks the stopped set after its last await, and `ExpertRun.begin` refuses a run stopped while its mode was being set.
+   - `stop_jobs`: `Jobs.stop_task` stops each running part of the task's jobs (`session/cancel`; the adapter process is killed only if it ignores the stop) and cancels every goal of the task, queued, held or running. A job still queued or starting never starts: `_start_part` checks the stopped set after its last await, and `ExpertRun.begin` refuses a run stopped while its mode was being set.
    - `cancel_rows`: `Timers.cancel_task` cancels its timers and watches.
-   - `close_cards`: its open cards close with reason `cancelled` (`AskRunner.close_cards`, or the `Holds` card of an expert ask, which cancels its waiting expert).
-   - `finish_events`: its `new` events end `stopped` (`EventLog.finish_task`).
+   - its cards: every open item of the task is finished with reason `cancelled` (`OpenItems.finish`, so it ends `done`), then `close_cards` drops their saved calls and takes the cards down (`AskRunner.close_cards`, which also tells `Holds`, so a held expert ask cancels its waiting expert).
+   - `finish_events`: its `new` events end `handled` with reason `stopped`, never told (`EventLog.finish_task`).
    - `stop_watch`: `Session.watch_stops` runs `LoopService.task_stopped` and `Updates.task_stopped`.
 4. The running turn is cancelled when it took only these tasks' events (`Runner.cancel_if_only`).
 5. One `task_stop {task, by}` event is posted. It is a person's event with urgency `now`, so Scout never works on after it.
@@ -171,10 +178,10 @@ sequenceDiagram
     P->>T: stop(task_id, by)
     T->>T: end the task and its caused_by children as stopped
     loop each stopped task
-        T->>J: stop_jobs: stop parts, cancel planned goals
+        T->>J: stop_jobs: stop parts, cancel its goals
         T->>TM: cancel_rows: timers and watches
         T->>C: close_cards: reason cancelled
-        T->>E: finish_events: new events end stopped
+        T->>E: finish_events: new events end handled (stopped)
         T->>W: stop_watch: loops and update check
     end
     T->>R: cancel_if_only(task ids)

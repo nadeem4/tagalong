@@ -89,10 +89,13 @@ Expert jobs (Claude Code hand-offs) live in `work` rows, read through `JobRecord
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
 erDiagram
-    work ||--|{ work : "goal has expert calls"
-    work ||--o{ job_steps : "one ordered log"
-    work ||--o{ job_steps : "part, source"
+    work ||--o{ work : "goal (the job) has expert_call parts"
+    work ||--o| work_job : "agent, folder, mode, approved_at"
+    work ||--o{ work_events : "every state move"
+    work ||--o{ job_steps : "activity log, keyed by job and part"
 ```
+
+A job is one `goal` row with its parts as child `expert_call` rows; `work_job` holds the job's own columns, `work_events` the history of each row, and `job_steps` the activity log Home reads.
 
 ## Jobs
 
@@ -100,7 +103,7 @@ erDiagram
 activity logs and ask ids keyed the same way), and the job records (`JobRecords`, goal and expert_call `work` rows;
 columns in [storage.md](../data/storage.md#jobs-as-work-rows)). `start()` checks the request and
 calls `_start_part`, the one place an expert run begins; it adds a part to the job and counts
-running parts against the two slots (see the queue below). Callbacks (`permission`, `question`, `progress`, `quiet`,
+running parts and claimed starts against the two slots (see the queue below). Callbacks (`permission`, `question`, `progress`, `quiet`,
 `end`) carry the part, so two parts of one job never share an ask. `tell_expert` and `stop_job`
 take an optional `part`: with several running parts `tell` must name one, and `stop` stops all
 of them unless one is named. The job's `JobId` carries `.part`. A wake about a job with more than
@@ -123,7 +126,7 @@ keeps its claim until its goal is closed, so a failed start is never tried twice
 checked again first, because one may have been removed while it waited. Only the start-up fill
 (`fill_slots(settling=True)`) accepts an app that is still `connecting`; every later fill is as
 strict as a hand-off. A new hand-off never jumps ahead of one already in line.
-Stopping a task cancels its planned goals, so they leave the line, and `fill_slots` never starts a
+Stopping a task cancels its goals, so queued ones leave the line, and `fill_slots` never starts a
 goal of a stopped task; `shutdown` cancels the waiting starts and awaits them. Every start counts
 in `_in_flight` (a due redo of a held part, `run_planned`, takes no slot claim), and a stop's mark on a
 task is only forgotten when none is in flight or claimed. A redo refuses (`both job slots are busy`)
@@ -247,23 +250,25 @@ is the one notice, sent after that row. The Jobs list keeps its own 2 s `changed
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
 stateDiagram-v2
-    [*] --> planned: approved with no free slot (approved_at)
+    [*] --> planned: approved, no free slot (plan_job)
     [*] --> active: approved with a free slot
     planned --> active: fill_slots starts it
     planned --> blocked: approved over an hour ago (job_recheck)
     blocked --> planned: requeue_job allowed
-    active --> done: the expert finishes
-    active --> failed: error, timeout or crash
-    active --> blocked: brain restarted and the session can reload
-    active --> cancelled: stop_job or Stop the task
-    blocked --> cancelled: carried on, or the task stopped
-    failed --> cancelled: the person skips the step
+    active --> blocked: a part failed, or a restart held it (rollup)
+    blocked --> active: no part is failed or blocked any more
+    planned --> cancelled: its task stopped
+    active --> cancelled: its task stopped, or carried on
+    blocked --> cancelled: requeue_job denied, task stopped, carried on
+    active --> done: close_job
+    active --> failed: close_job failed, or resolve_step stop
+    blocked --> failed: close_job failed, or resolve_step stop
     done --> [*]
     failed --> [*]
     cancelled --> [*]
 ```
 
-These are the `work` row states of a job's goal and of each part (`expert_call`). Home shows them as `running`, `done`, `error`, `held`, `queued` and `stopped` (`home_state`). `closed_at` is separate: it is Scout's own judgement that the work is over, so a job can be `done` and still open.
+These are the `work` states of a job's `goal` row. A goal reaches `done` or `failed` only through a close (`WorkStore` refuses any other way), and its only automatic move is the rollup: a failed or blocked part blocks an active goal, and it runs again once none is left. Each part (`expert_call`) has its own row: `active` while its expert runs, then `done`, `failed` (error, timeout or crash) or `cancelled` (stopped, or a failed part skipped with `resolve_step`), or `blocked` when a restart held it. Home does not show the goal's state: it shows the job's derived state (`running` while any part runs, `error` once closed as failed, else the state of the part that ended last) through `home_state`, plus `queued` and `held` for a goal that never ran. `closed_at` is Scout's own judgement that the work is over, so a job can be `done` and still open.
 
 When a job ends, the session emits a `job_ended` event whose fact is a note (id, task, folder,
 state, reason and the report of the part that just ended (other parts of a multi-part job appear as facts only: expert, folder, state, reason; Scout reads one with `job_report`); a report over the preview cap arrives as a preview with
