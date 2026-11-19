@@ -6,9 +6,9 @@ How Tagalong is built: the processes, the packages, the wire protocol and each s
 
 - **New here.** [architecture.md](architecture.md), then [principles.md](principles.md), then [development.md](development.md) to run it, then [../protocol/README.md](../protocol/README.md).
 - **Working on the brain.** [brain/README.md](brain/README.md), [brain/turns.md](brain/turns.md), [brain/tasks.md](brain/tasks.md), [brain/permissions.md](brain/permissions.md), [brain/experts.md](brain/experts.md), then [data/storage.md](data/storage.md) and [data/memory.md](data/memory.md).
-- **Working on a body.** [bodies/desktop.md](bodies/desktop.md), [bodies/browser.md](bodies/browser.md) or [bodies/whatsapp.md](bodies/whatsapp.md); then [senses/bubble.md](senses/bubble.md) and [senses/sight.md](senses/sight.md); the shared UI is drawn with [bodies/mascot.md](bodies/mascot.md).
+- **Working on a body.** [bodies/desktop.md](bodies/desktop.md), [bodies/browser.md](bodies/browser.md) or [bodies/whatsapp.md](bodies/whatsapp.md); then [senses/bubble.md](senses/bubble.md) and [senses/sight.md](senses/sight.md); Scout's figure is drawn by the mascot engine in [bodies/mascot.md](bodies/mascot.md).
 - **Changing the contract.** [../protocol/README.md](../protocol/README.md) first (it carries a typical session), then `protocol/ts`, `brain/src/brain/protocol.py` and `protocol/examples` together.
-- **Voice.** [senses/hearing.md](senses/hearing.md), [senses/speaking.md](senses/speaking.md), [senses/stt-results.md](senses/stt-results.md), then the Voice section of the protocol.
+- **Voice.** [senses/hearing.md](senses/hearing.md), [senses/speaking.md](senses/speaking.md), [senses/stt-results.md](senses/stt-results.md), then the [Voice section](../protocol/README.md#voice) of the protocol.
 
 Before changing a feature, read its doc and run its section of [testing/feature-test-guide.md](testing/feature-test-guide.md).
 

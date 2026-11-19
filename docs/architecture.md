@@ -30,7 +30,7 @@ flowchart TB
     WA["WhatsApp bridge<br/>Node, started by bridges.py"]
   end
   subgraph Brain["Python brain (brain/src/brain)"]
-    SRV["server.py, bodies.py<br/>connections, outboxes"]
+    SRV["server.py, bodies.py, bridges.py<br/>connections, outboxes, the bridge"]
     VOX["voice/<br/>ears (hearing), mouth (speaking)"]
     EV["events.py EventLog<br/>every input saved first"]
     RUN["runner.py<br/>pick, gate, target"]
@@ -49,9 +49,10 @@ flowchart TB
     DB[("tagalong.db")]
     FILES["TAGALONG_HOME files<br/>.env, brain.log, brain.pid, models"]
   end
-  DESK -- "websocket, contract v1, 127.0.0.1:47321" --> SRV
-  BRW --> SRV
-  WA --> SRV
+  META["Meta WhatsApp Cloud API"] -- "HTTPS webhook in,<br/>Graph API out" --- WA
+  DESK -- "websocket, contract v1" --> SRV
+  BRW -- "websocket, contract v1" --> SRV
+  WA -- "websocket, contract v1" --> SRV
   SRV <--> |"mic, heard, speech"| VOX
   SRV --> EV
   EV --> RUN
@@ -62,14 +63,14 @@ flowchart TB
   EV --> STORE
   SES --> STORE
   SES -- "HTTPS" --> API
-  TB -- "MCP" --> MCP
+  TB -- "MCP, stdio or HTTP" --> MCP
   JOB -- "ACP over stdio" --> EXP
   STORE --> DB
   SETUP -- "installs" --> EXP
   SETUP --> FILES
 ```
 
-A body connects to the brain and nothing else. Everything a person says or that happens (a timer, a finished job) is saved in the event log first, and the runner starts one turn at a time from it. A turn talks to the model over HTTPS, runs tools through the toolbox (body tools over the same websocket, apps over MCP), and hands real work to an expert over ACP. Memory, tasks and events live in `tagalong.db`; keys, logs and downloaded models live in the files under `TAGALONG_HOME`.
+A body connects to the brain and nothing else, each over its own websocket to `ws://127.0.0.1:47321` (`TAGALONG_BRAIN_ADDR`); the WhatsApp bridge is a Node process the brain itself starts (`bridges.py`), and it alone reaches the internet, to Meta. Everything a person says or that happens (a timer, a finished job) is saved in the event log first, and the runner starts one turn at a time from it. A turn talks to the model over HTTPS, runs tools through the toolbox (body tools over the same websocket, apps over MCP), and hands real work to an expert over ACP; an expert reaches the apps it was granted back through the toolbox, over a loopback MCP server (`expert_apps.py`). Memory, tasks and events live in `tagalong.db`; keys, logs and downloaded models live in the files under `TAGALONG_HOME`.
 
 ## Processes and how they start
 
@@ -161,7 +162,7 @@ The brain is the Python program in `brain/`. It never knows which operating syst
 | Setup             | `setup/`, `cli.py`                                             | Installing experts and apps, the `tagalong` command                | [brain/setup.md](brain/setup.md)                                                 |
 | Safety            | `guardrails.py`, `guards.py`, `masking.py`, `retry.py`         | Budget, guards, secrets hidden, which failures retry               | [brain/safety.md](brain/safety.md)                                               |
 
-Every input reaches Scout the same way. A say, a timer, a finished job, a loop, a card answer or setup news is saved as an event. The runner (`runner.py`) is the only thing that starts a Scout turn. `pick` takes the person's words first, then news oldest first; `gate` decides whether news may be told now (key set, not quiet hours, budget left, speech and idle windows); `target` picks the body the turn runs on: the body that sent the message, else where the person is. Code sets how urgent each event kind is; the model decides what to say. The details, with the diagram of the runner, are in [brain/turns.md](brain/turns.md).
+Every input reaches Scout the same way. A say, a timer, a finished job, a loop, a card answer or setup news is saved as an event. The runner (`runner.py`) is the only thing that starts a Scout turn. `pick` takes the person's words first, then news oldest first; `gate` decides whether news may be told now (key set, not quiet hours, budget left, speech and idle windows); `target` picks the body the turn runs on: the body that sent the message, else where the person is, else the body the event's task came from, else the first screen (only a body that shows things is chosen). Code sets how urgent each event kind is; the model decides what to say. The details, with the diagram of the runner, are in [brain/turns.md](brain/turns.md).
 
 ## One request end to end
 
@@ -179,24 +180,24 @@ sequenceDiagram
   participant O as Brain mouth (voice/mouth.py)
   P->>D: holds the talk key
   D->>E: listen {mode: held}, then mic {pcm} frames
-  E-->>D: heard {partial, text}
-  E-->>D: heard {turn_end}
+  E-->>D: heard {event: partial, text}
+  E-->>D: heard {event: turn_end}
   D->>L: say {id, text, spoken: true, context}
   L->>L: save the event (state new), pick, gate, target
   L->>S: start the turn on the desktop
-  S-->>D: turn {started, events}
+  S-->>D: turn {state: started, events, source}
   S->>M: prompt, history and tools
-  M-->>S: tool_use list_windows
-  S->>D: use {call, tool, input}
+  M-->>S: tool_use desktop-a1b2c3__list_windows
+  S->>D: use {call, tool: list_windows, input}
   D-->>S: result {output}
   S->>M: tool result
   M-->>S: reply text, streamed
   S-->>D: reply {delta}, shown in the bubble
-  S->>O: reply sentences
-  O-->>D: speech {turn, n, pcm, sample_rate}
+  S->>O: the same reply deltas (mouth.reply)
+  O-->>D: speech {turn, n, text, pcm, sample_rate}
   D->>D: the panel plays the audio
-  D->>O: speech_state {started, ended}
-  S-->>D: reply {done}, turn {ended, done}
+  D->>O: speech_state {turn, n, state: started, then ended}
+  S-->>D: reply {done: true}, turn {state: ended, reason: done}
   O-->>D: speech {turn, done: true}
 ```
 
