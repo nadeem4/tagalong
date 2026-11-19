@@ -81,3 +81,10 @@ def test_set_state_stamps_handled_at_only_when_ended(db):
     events.set_state(db, ["e3"], "taken", end_reason=None, at=T)
     events.set_state(db, ["e4"], "new", end_reason=None, at=T)
     assert [handled_at(i) for i in ("e1", "e2", "e3", "e4")] == [T, T, None, None]
+
+
+def test_insert_then_get_round_trips_task(db):
+    events.insert(db, EventRow(id="e1", kind="say", at=T, source="desktop", task="t1"))
+    assert events.get(db, "e1").task == "t1"
+    events.insert(db, row("e2"))
+    assert events.get(db, "e2").task is None
