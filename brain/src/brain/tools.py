@@ -903,6 +903,8 @@ def expert_tools(
         }
         if mode := getattr(job_id, "mode", None):
             result["mode"] = mode
+        if queued := getattr(job_id, "queued", None):
+            result["queued"] = queued  # no slot was free: its place in line, 1 is next
         return json.dumps(result)
 
     async def close_job(args: dict) -> str:

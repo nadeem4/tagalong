@@ -277,6 +277,7 @@ class Rig:
         return sum(1 for f in self.frames() if "env" in f)
 
     async def teardown(self) -> None:
+        await self.jobs.shutdown()  # first: a stopped job must not start a queued one
         for job_id in list(self.jobs._runs):
             await self.jobs.stop(job_id)
         for run in self.runs:
@@ -364,16 +365,6 @@ async def test_no_mode_keeps_the_experts_default(make_rig):
     assert rig.records.get_job(job_id).mode == "default"
 
 
-async def test_third_running_job_is_refused_naming_the_running_ones(make_rig):
-    rig = make_rig(FakeAsks())
-    first = await rig.jobs.start("one", str(rig.folder))
-    second = await rig.jobs.start("two", str(rig.folder))
-    with pytest.raises(JobError) as refused:
-        await rig.jobs.start("three", str(rig.folder))
-    assert first in str(refused.value) and second in str(refused.value)
-    assert len(rig.runs) == 2
-
-
 async def test_relayed_permission_shows_claude_code_tool_and_the_pick_maps_to_its_id(make_rig):
     steps = [{"permission": {"title": "ls -la", "kind": "execute", "input": {"command": "ls"}}}]
     rig = make_rig(FakeAsks(Pick("Yes")), steps)
@@ -432,6 +423,29 @@ async def test_start_failure_from_the_adapter_is_a_plain_message(make_rig):
         await rig.jobs.start("go", str(rig.folder))
     assert isinstance(raised.value.__cause__, RuntimeError)
     assert rig.records.list_jobs() == [] and rig.asks.opened == []
+
+
+async def test_a_freed_slot_starts_the_oldest_approved_goal(make_rig):
+    rig = make_rig(FakeAsks())
+    first = await rig.jobs.start("one", str(rig.folder))
+    await rig.jobs.start("two", str(rig.folder))
+    third = await rig.jobs.start("three", str(rig.folder))
+    fourth = await rig.jobs.start("four", str(rig.folder))
+    assert (third.queued, fourth.queued) == (1, 2)
+    await rig.jobs.stop(first)
+    await until(lambda: str(third) in [j.id for j in rig.records.running_jobs()])
+    assert [j.id for j in rig.records.queue()] == [str(fourth)]
+    assert len(rig.runs) == 3
+
+
+async def test_a_job_waiting_on_a_card_keeps_its_slot(make_rig):
+    rig = make_rig(FakeAsks(None), ASK_STEPS, max_running=1)
+    job = await rig.jobs.start("go", str(rig.folder))
+    await until(lambda: expert_items(rig))
+    queued = await rig.jobs.start("two", str(rig.folder))
+    assert queued.queued == 1
+    assert [j.id for j in rig.records.running_jobs()] == [str(job)]
+    assert [j.id for j in rig.records.queue()] == [str(queued)]
 
 
 async def test_a_job_counts_once_so_a_second_hand_off_fits_under_the_cap(make_rig):
@@ -683,12 +697,12 @@ async def test_stop_of_a_queued_job_cancels_it_and_it_never_starts(make_rig, mon
 
     monkeypatch.setattr(ExpertRun, "start", slow)
     starting = asyncio.ensure_future(rig.jobs.start("go", str(rig.folder), task_id="k1"))
-    await until(lambda: rig.jobs.starting == 1)
+    await until(rig.jobs.busy)
     await rig.jobs.stop_task("k1")
     gate.set()
     with pytest.raises(JobError, match="stopped"):
         await starting
-    assert rig.records.list_jobs() == [] and rig.jobs.starting == 0
+    assert rig.records.list_jobs() == [] and not rig.jobs.busy()
     assert not any(alive(run) for run in rig.runs)
 
 
@@ -1590,9 +1604,8 @@ async def test_two_running_jobs_of_one_expert_share_the_process_and_the_cap_hold
     await rig.jobs.start("one", str(rig.folder))
     await rig.jobs.start("two", str(rig.folder))
     assert rig.spawns() == 1
-    with pytest.raises(JobError, match="2 jobs are already running"):
-        await rig.jobs.start("three", str(rig.folder))
-    assert rig.spawns() == 1
+    third = await rig.jobs.start("three", str(rig.folder))
+    assert third.queued == 1 and rig.spawns() == 1
 
 
 async def test_can_resume_is_unknown_until_the_adapter_has_started(make_rig):
@@ -2904,8 +2917,8 @@ async def test_an_expert_permission_request_does_not_block_the_turn_and_keeps_th
     await until(lambda: expert_items(rig))
     assert rig.asks.open_ids and not rig.finished
     assert [j.id for j in rig.records.running_jobs()] == [str(job)]
-    with pytest.raises(JobError, match="already running"):  # the waiting job holds its slot
-        await rig.jobs.start("two", str(rig.folder))
+    second = await rig.jobs.start("two", str(rig.folder))  # the waiting job holds its slot
+    assert second.queued == 1 and [j.id for j in rig.records.running_jobs()] == [str(job)]
     rig.asks_real.answer(rig.asks.opened[0]["ask_id"], "Yes", "desktop")  # no deadline: any time
     await until(lambda: rig.finished)
     reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))

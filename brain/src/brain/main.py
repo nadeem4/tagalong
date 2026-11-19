@@ -212,8 +212,8 @@ async def _run() -> None:
         experts,
         apps,
         reinstall,
-        # session exists by the first tick; a hand-off waiting on its card counts too
-        lambda: bool(session.records.running_jobs()) or session.jobs.starting > 0,
+        # session exists by the first tick; a job being started or waiting in line counts too
+        lambda: session.jobs.busy(),
         bodies.notify,
         lambda: datetime.now(UTC),
     )
