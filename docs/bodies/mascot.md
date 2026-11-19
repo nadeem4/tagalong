@@ -18,7 +18,7 @@ ray-marched on the GPU) and a rig; `Mascot` runs the loop (`Brain` picks the pos
 `Fx` emits particles, the renderer draws).
 
 ```mermaid
-%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
 flowchart LR
   spec[CharacterSpec] --> resolve[resolve: validate names, moods]
   props[attachProps] --> spec
@@ -156,10 +156,10 @@ about 19% at 30 fps against 5 to 10% at 4 fps (the range is the hops, blinks and
 **First frame.** `ScoutFace` shows the still `ScoutGlyph` until the live mascot reports `ready` (its first real
 frame), then fades the canvas in over it (the still head goes once the 200 ms fade ends, so there is no gap), so the dock is never empty while the shader builds. On Windows, ANGLE
 builds the shader through the HLSL compiler, which inlines every call and takes seconds per extra copy of the distance
-field or of the LED face; the first frame took about 95 s. The compiler now leaves out the floor shadow for a mascot
+field or of the LED face, so the compiler keeps the shader small: it leaves out the floor shadow for a mascot
 with no floor (`floor: 0`, the dock), reads the material from the march instead of a second distance query,
 and writes the LED face, its eyes and its mouth once each (`compiler/compile.test.ts` pins the counts). The dock
-warms the shader as soon as the page loads. Time from launch to the first live frame: about 95 s before, 27 to 40 s now.
+warms the shader as soon as the page loads. Time from launch to the first live frame is about 27 to 40 s.
 
 The engine breathes and blinks on its own, so the dock has no frame or blink logic. Under
 `prefers-reduced-motion: reduce` the engine (`respectReducedMotion`, default true) holds the mood's

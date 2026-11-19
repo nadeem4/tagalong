@@ -10,7 +10,47 @@ The brain keeps its data in one SQLite file, `tagalong.db`, under `TAGALONG_HOME
 `brain/src/brain/store/migrations/`, applied in order and numbered by `PRAGMA user_version` (see
 [Store layer](#store-layer)); a file from a newer brain stops the brain at start, and so does a
 Python SQLite without FTS5. Times are UTC ISO text. What the desktop and the browser body keep is
-in [desktop.md](../bodies/desktop.md#what-it-stores) and [browser-body.md](../bodies/browser.md#what-it-stores).
+in [desktop.md](../bodies/desktop.md#what-it-stores) and [browser.md](../bodies/browser.md#what-it-stores).
+
+## Data store map
+
+Everything the brain keeps is under one folder, `TAGALONG_HOME` (default `~/.tagalong`), except the
+desktop's own settings file in Electron's `userData` folder. This is the whole picture; the sections
+below go table by table.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
+flowchart LR
+  brain["Python brain"]
+  desk["Desktop launch.ts"]
+  desk2["Desktop main process"]
+  subgraph home["TAGALONG_HOME"]
+    db[("tagalong.db<br/>WAL: chat, memory, work, rules,<br/>events, tasks, settings")]
+    env[".env<br/>API key, daily limit, WhatsApp values"]
+    logs["brain.log, brain.pid"]
+    dl["cache/ (registry lists, login marks)<br/>voice/ (models, tts/, cuda/ DLLs)<br/>runtime/node (Tagalong's own Node)"]
+    inst["tools/&lt;expert&gt;/, experts.json<br/>app-tokens.json, app-oauth/"]
+    uvdirs["runtime/venv, runtime/python, cache/uv<br/>(packaged app only)"]
+  end
+  subgraph ud["Electron userData"]
+    set["settings.json (.bak, .corrupt)"]
+    dlog["logs/tagalong.log"]
+  end
+  brain -->|"store/ (the only SQL)"| db
+  brain -->|"upsert_env_values"| env
+  brain -->|"logging, lifecycle.write_pid"| logs
+  brain -->|"setup/net.py, voice/,<br/>setup/node_runtime.py"| dl
+  brain -->|"setup/install.py,<br/>app_oauth.py, apps.py"| inst
+  desk -->|"appends uv output"| logs
+  desk -->|"uv sync, packaged"| uvdirs
+  desk2 -->|"SettingsStore"| set
+  desk2 -->|"log-file.ts"| dlog
+```
+
+Notice that the brain writes almost everything under `TAGALONG_HOME`. The desktop only appends the
+brain's launch output to `brain.log` and, when packaged, has uv install the brain's Python and venv
+under `runtime/` and `cache/uv`. The desktop's settings never reach the brain. `.env` is the one file
+other tools may edit by hand; `cache/`, `voice/` and `runtime/` can be deleted and are fetched again.
 
 ## Store layer
 
@@ -50,7 +90,7 @@ Nothing outside this package runs SQL: `tests/test_store_boundary.py` fails if a
 under `brain/src/brain` calls `.execute`, `.executescript` or `.executemany`.
 
 - `store/migrations/`: `NNNN_name.sql` (or `NNNN_name.py` with a `migrate(db)` function) files,
-  `0001_memories` to `0039_open_items_tasks`. The numbers have no gaps (the loader refuses a gap or a
+  `0001_memories` to `0040_job_queue`. The numbers have no gaps (the loader refuses a gap or a
   duplicate). Each file runs in one transaction together with its `user_version` bump, so a
   failure leaves the file at the last good version. A file is never edited after it has merged;
   a schema change is a new file.
@@ -63,7 +103,7 @@ connection. It keeps no SQL of its own.
 Key columns only; the full columns are in each table's section.
 
 ```mermaid
-%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
 erDiagram
     work ||--o{ work : "parent_id, the tree"
     work ||--o{ work_events : "work_id"
@@ -75,6 +115,11 @@ erDiagram
     rules ||--o{ work_ask : "rule_id, a sentence rule"
     work ||--o| work_loop : "loop rows"
     apps ||--o{ app_cursors : "app_id"
+    tasks ||--o{ events : "task"
+    tasks ||--o{ work : "task_id"
+    tasks ||--o{ open_items : "task_id"
+    events ||--o{ messages : "event_id"
+    work ||--o{ open_items : "job_id, the goal id"
     memories ||--|| memories_fts : "triggers"
     messages ||--|| messages_fts : "triggers"
 
@@ -137,16 +182,54 @@ erDiagram
     messages {
         int id PK
         text role
+        text event_id
+        text source
     }
     tool_outputs {
         text id PK
+    }
+    events {
+        text id PK
+        text kind
+        text source
+        text caused_by
+        text state
+        int attempts
+        text not_before
+        text turn_id
+        text task
+    }
+    tasks {
+        text id PK
+        text kind
+        text state
+        text title
+        text source
+        text caused_by
+    }
+    open_items {
+        text id PK
+        text kind
+        text state
+        text task_id
+        text job_id
+        text deadline_at
+        text check_back_at
+    }
+    settings {
+        text key PK
+        text value
+    }
+    memory_dismissed {
+        text source PK
+        text evidence PK
     }
 ```
 
 The links are by value, not declared foreign keys: SQLite is not told about them, so deleting a
 row does not cascade; [the sweep](#cleanup) deletes a whole tree's rows itself. An offer rule's
 `group_key` and `work_ask.group_key` name the same kind of action. `memories.source_work_id` and
-`source_msg_from`/`source_msg_to` are for the memory work that comes later; nothing sets them yet. A continued job keeps the earlier job's
+`source_msg_from`/`source_msg_to` exist in the schema but nothing sets them. `settings` (a key and a value) and `memory_dismissed` (`source`, `evidence`) stand alone: `settings` holds the choices Home saves (see [settings-and-secrets.md](settings-and-secrets.md#settings-precedence)) and `memory_dismissed` the get-to-know-me facts the person threw away. A continued job keeps the earlier job's
 id in a `continued` event on its goal row.
 
 ## Conversation
@@ -201,9 +284,9 @@ What Scout remembers across restarts, by kind.
 | `period`          | TEXT                | `year` for a dated fact, `day` for a summary; null for core                                                                            |
 | `span_start`      | TEXT                | First year of a dated fact (`'2019'`), or the start of an episodic entry; null for undated core                                        |
 | `span_end`        | TEXT                | End of that time                                                                                                                       |
-| `source_msg_from` | INTEGER             | First chat message the entry was made from; not set yet                                                                                |
-| `source_msg_to`   | INTEGER             | Last chat message it was made from; not set yet                                                                                        |
-| `source_work_id`  | TEXT                | The work row it describes; not set yet                                                                                                 |
+| `source_msg_from` | INTEGER             | First chat message the entry was made from; nothing sets it                                                                            |
+| `source_msg_to`   | INTEGER             | Last chat message it was made from; nothing sets it                                                                                    |
+| `source_work_id`  | TEXT                | The work row it describes; nothing sets it                                                                                             |
 | `tag`             | TEXT                | Topic of a fact (`work`, `skills`, `personal`, ...); empty for old rows                                                                |
 | `source`          | TEXT                | `chat` (default), or where a `profile` fact came from (`github`, `linkedin`, `web`); `know` for the portrait                           |
 | `source_ref`      | TEXT                | The page or repo a profile fact came from; null otherwise                                                                              |
@@ -231,7 +314,7 @@ The `settings` row `know_me_offer` (JSON text: `offered_at`, `declined`, `last_r
 - Upgrade: migration `0033_memory_profile` adds `tag`, `source`, `source_ref`, `evidence` and
   `visibility` (old rows: `chat`, no tag, `free`) and creates `memory_dismissed`.
 - Upgrade: migration `0034_memory_category` adds `category`. No backfill: old rows stay
-  uncategorised and undated, and the span columns from 0025 now also carry a fact's years.
+  uncategorised and undated, and the span columns from 0025 also carry a fact's years.
 
 `memories_fts` is an FTS5 index over `memories.text`, built and searched the same way as
 `messages_fts`; it backs the `recall` tool.
@@ -274,7 +357,7 @@ log says whether it was told. Migration `0036_message_events` dropped the old `r
 and its index.
 
 ```mermaid
-%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
 stateDiagram-v2
     [*] --> planned
     planned --> active : turn comes

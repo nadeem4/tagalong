@@ -1,5 +1,11 @@
 # Desktop host
 
+Read this to see how the Electron body is built: its processes, windows, brain connection and Home. Contents:
+[the process model](#the-process-model), [Home's page map](#homes-page-map), [Boot](#boot),
+[the brain in the main process](#the-brain-in-the-main-process), [the dial and start decision](#dial-and-start-decision),
+[windows](#the-window-inventory), [the IPC modules](#the-ipc-modules), [preload](#preload-and-the-tagalonghost-bridge),
+[version check](#brain-version-check-and-restart) and [packaging](#packaging).
+
 ## Purpose
 
 `bodies/desktop` is the Electron body. Its main process dials the Python brain over the websocket
@@ -16,39 +22,108 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 
 ## Where it lives
 
-| Path (under `bodies/desktop/`)                   | What it holds                                                                                                                                                               |
-| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/main/index.ts`                              | The main process: single-instance lock, `start`, the `Desktop` record, window routing, tray, `registerIpc`                                                                  |
-| `src/main/brain/start.ts`                        | `startBrain`: builds and starts the `BrainClient` on the global `WebSocket`; address from `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`); declares the window body tools |
-| `src/main/brain/launch.ts`                       | `launchBrain`: spawns `uv run brain` in `brain/` when the address is local and nothing answers; detached (hidden on Windows), output to `brain.log`, never stopped          |
-| `src/main/brain/build-id.ts`, `version-check.ts` | `ownBuild` (app version, or the dev source hash) and `decideUpdate`: current, restart, ask or terminal                                                                      |
-| `src/main/ipc/brain-status.ts`                   | `createBrainStatus`: the brain card's facts, quiet restart, restart after work; `registerBrainStatusIpc`                                                                    |
-| `build/installer.nsh`                            | NSIS hooks that stop a running brain before install and uninstall                                                                                                           |
-| `src/main/brain/body-tools.ts`                   | `bodyTools(platform, exclusions, onCapture)`: the body tools declared in `hello` and their `run`                                                                            |
-| `src/main/brain/body-events.ts`                  | `createBackSender`, `frontWindow`, `startFocusWatch`, `readAloudEvent`, `readingEvent`: the `back`, `focus`, `read_aloud` and `reading` events sent to the brain            |
-| `src/main/hotkeys.ts`                            | `HotkeyManager`, `registerHotkey`, `describeHotkeyProblems`, default accelerators                                                                                           |
-| `src/main/talk-key.ts`                           | `TalkKeyWatch`, `startTalkKey`, `loadKeyHook` (see [hearing.md](../senses/hearing.md))                                                                                      |
-| `src/main/tray-menu.ts`, `tray-icon.ts`          | `trayMenuTemplate`, `createTrayIcon`                                                                                                                                        |
-| `src/main/windows/`                              | One module per window: `avatar.ts`, `panel.ts`, `home.ts`; placement in `position.ts`, `move.ts`; `bubble-focus.ts`; `page.ts` (loading a page)                             |
-| `src/main/ipc/`                                  | One `register…Ipc(handle, deps)` per area (`file-folders.ts`: the folders Scout's file tools may use); `handle.ts` (types), `fake-ipc.ts` (test double)                     |
-| `src/main/drop.ts`, `drop-io.ts`                 | Drop it on Scout: `dropDesk`, `readDrop`, `registerDropIpc`, `guardNavigation`                                                                                              |
-| `src/main/status-marks.ts`                       | `StatusMarks` and the marks main sets (see [bubble.md](../senses/bubble.md#status-marks))                                                                                   |
-| `src/main/settings-store.ts`                     | `SettingsStore`: settings.json with atomic saves, a .bak and a .corrupt copy                                                                                                |
-| `src/main/hide-secrets.ts`                       | `hideSecrets`: keys, tokens, passwords and card numbers become `[hidden: kind]` before the log file is written                                                              |
-| `src/main/front-window.ts`                       | `isMeeting`, `callOrFullScreenInFront`: Scout keeps out of the way of a call or a full-screen window                                                                        |
-| `src/main/fix-target.ts`                         | `fixPage` (the Fix it allowlist)                                                                                                                                            |
-| `src/main/log-file.ts`, `log-text.ts`            | The log file                                                                                                                                                                |
-| `src/main/platform/`                             | The platform adapter (`Platform`, `createPlatform`, `Win32Platform`, `gateSight`)                                                                                           |
-| `src/main/platform/exclusions.ts`                | `findCaptureBlock`, `secretFileRule`, `normalizeProcessName`: which window may not be read                                                                                  |
-| `src/main/platform/inventory.ts`                 | `buildInventory`: applies the exclusions to the host's window list                                                                                                          |
-| `src/main/platform/text-layer-notes.ts`          | What a window's text does not say (editors, terminals and canvas apps publish little)                                                                                       |
-| `src/preload/index.ts`, `held.ts`                | The preload: `window.tagalong` and `window.tagalongHost`; `heldUntilHeard`                                                                                                  |
-| `src/shared/ipc.ts`                              | `IPC` (every channel name) and the shapes that cross it (`HostView`, `TagalongHostApi`, ...)                                                                                |
-| `src/renderer/*.html`, `src/renderer/src/`       | One page per window: `avatar`, `panel`, `home`                                                                                                                              |
-| `electron.vite.config.ts`                        | The build: main and the voice worker, the preload, the six renderer pages                                                                                                   |
-| `electron-builder.json`                          | The installer                                                                                                                                                               |
-| `scripts/`                                       | `ensure-electron.mjs`, `fetch-native.mjs`, `start-fresh.mjs`                                                                                                                |
-| `e2e/`                                           | Playwright suites run against the built app                                                                                                                                 |
+| Path (under `bodies/desktop/`)                   | What it holds                                                                                                                                                                                             |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/main/index.ts`                              | The main process: single-instance lock, `start`, the `Desktop` record, window routing, tray, `registerIpc`                                                                                                |
+| `src/main/brain/start.ts`                        | `startBrain`: builds and starts the `BrainClient` on the global `WebSocket`; address from `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`); declares the window body tools                               |
+| `src/main/brain/launch.ts`                       | `launchBrain`: spawns `uv run brain` in `brain/` when the address is local and nothing answers; detached (hidden on Windows), output to `brain.log`, never stopped                                        |
+| `src/main/brain/build-id.ts`, `version-check.ts` | `ownBuild` (app version, or the dev source hash) and `decideUpdate`: current, restart, ask or terminal                                                                                                    |
+| `src/main/ipc/brain-status.ts`                   | `createBrainStatus`: the brain card's facts, quiet restart, restart after work; `registerBrainStatusIpc`                                                                                                  |
+| `build/installer.nsh`                            | NSIS hooks that stop a running brain before install and uninstall                                                                                                                                         |
+| `src/main/brain/body-tools.ts`                   | `bodyTools(platform, exclusions, onCapture)`: the body tools declared in `hello` and their `run`                                                                                                          |
+| `src/main/brain/body-events.ts`                  | `createBackSender`, `frontWindow`, `startFocusWatch`, `readAloudEvent`, `readingEvent`: the `back`, `focus`, `read_aloud` and `reading` events sent to the brain                                          |
+| `src/main/hotkeys.ts`                            | `HotkeyManager`, `registerHotkey`, `describeHotkeyProblems`, default accelerators                                                                                                                         |
+| `src/main/talk-key.ts`                           | `TalkKeyWatch`, `startTalkKey`, `loadKeyHook` (see [hearing.md](../senses/hearing.md) and [speaking.md](../senses/speaking.md))                                                                           |
+| `src/main/tray-menu.ts`, `tray-icon.ts`          | `trayMenuTemplate`, `createTrayIcon`                                                                                                                                                                      |
+| `src/main/windows/`                              | One module per window: `avatar.ts`, `panel.ts`, `home.ts`, `walkthrough.ts` (first-run tour; `walkthrough-size.ts`); placement in `position.ts`, `move.ts`; `bubble-focus.ts`; `page.ts` (loading a page) |
+| `src/main/ipc/`                                  | One `register…Ipc(handle, deps)` per area (`file-folders.ts`: the folders Scout's file tools may use); `handle.ts` (types), `fake-ipc.ts` (test double)                                                   |
+| `src/main/drop.ts`, `drop-io.ts`                 | Drop it on Scout: `dropDesk`, `readDrop`, `registerDropIpc`, `guardNavigation`                                                                                                                            |
+| `src/main/status-marks.ts`                       | `StatusMarks` and the marks main sets (see [bubble.md](../senses/bubble.md#status-marks))                                                                                                                 |
+| `src/main/settings-store.ts`                     | `SettingsStore`: settings.json with atomic saves, a .bak and a .corrupt copy                                                                                                                              |
+| `src/main/hide-secrets.ts`                       | `hideSecrets`: keys, tokens, passwords and card numbers become `[hidden: kind]` before the log file is written                                                                                            |
+| `src/main/front-window.ts`                       | `isMeeting`, `callOrFullScreenInFront`: Scout keeps out of the way of a call or a full-screen window                                                                                                      |
+| `src/main/fix-target.ts`                         | `fixPage` (the Fix it allowlist)                                                                                                                                                                          |
+| `src/main/log-file.ts`, `log-text.ts`            | The log file                                                                                                                                                                                              |
+| `src/main/platform/`                             | The platform adapter (`Platform`, `createPlatform`, `Win32Platform`, `gateSight`)                                                                                                                         |
+| `src/main/platform/exclusions.ts`                | `findCaptureBlock`, `secretFileRule`, `normalizeProcessName`: which window may not be read                                                                                                                |
+| `src/main/platform/inventory.ts`                 | `buildInventory`: applies the exclusions to the host's window list                                                                                                                                        |
+| `src/main/platform/text-layer-notes.ts`          | What a window's text does not say (editors, terminals and canvas apps publish little)                                                                                                                     |
+| `src/preload/index.ts`, `held.ts`                | The preload: `window.tagalong` and `window.tagalongHost`; `heldUntilHeard`                                                                                                                                |
+| `src/shared/ipc.ts`                              | `IPC` (every channel name) and the shapes that cross it (`HostView`, `TagalongHostApi`, ...)                                                                                                              |
+| `src/renderer/*.html`, `src/renderer/src/`       | One page per window: `avatar`, `panel`, `home`, `walkthrough`                                                                                                                                             |
+| `electron.vite.config.ts`                        | The build: the main process, the preload and the four renderer pages                                                                                                                                      |
+| `electron-builder.json`                          | The installer                                                                                                                                                                                             |
+| `scripts/`                                       | `ensure-electron.mjs`, `fetch-native.mjs`, `start-fresh.mjs`                                                                                                                                              |
+| `e2e/`                                           | Playwright suites run against the built app                                                                                                                                                               |
+
+## The process model
+
+One main process owns everything with power: the `BrainClient`, the windows, the tray, the hotkeys and
+the settings file. Each window is a sandboxed renderer page that sees the outside world only through
+the preload bridges. The build (`electron.vite.config.ts`) makes four renderer pages: `avatar`, `panel`,
+`home` and `walkthrough`.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
+flowchart LR
+  brain["Python brain<br/>(websocket, contract v1)"]
+  subgraph main["Main process (src/main/index.ts)"]
+    client["BrainClient<br/>(brain/start.ts)"]
+    ipc["ipc/* handlers<br/>(register...Ipc)"]
+    own["windows, tray, hotkeys,<br/>SettingsStore, platform"]
+  end
+  subgraph pre["Preload (src/preload/index.ts)"]
+    tag["window.tagalong<br/>(HostBridge)"]
+    host["window.tagalongHost<br/>(TagalongHostApi)"]
+  end
+  subgraph rend["Renderers (src/renderer/*.html)"]
+    avatar["avatar"]
+    panel["panel"]
+    home["home"]
+    walk["walkthrough"]
+  end
+  brain <-->|"frames"| client
+  client --- ipc
+  ipc --- own
+  ipc <-->|"IPC channels (shared/ipc.ts)"| pre
+  pre --> rend
+```
+
+The renderers never open a socket: a call goes renderer, preload, `ipcRenderer.invoke`, an `ipc/*`
+handler, then `BrainClient` to the brain, and the answer comes back the same way. `window.tagalong` is
+the shared `HostBridge` that `@tagalong/ui` compiles against (so the same components run in the
+browser body too). `window.tagalongHost` holds what only this host has: placement, settings, hotkeys,
+the sight pause, voice. Each `ipc/*.ts` file is one `register...Ipc(handle, deps)` for one area
+(see [The IPC modules](#the-ipc-modules)).
+
+## Home's page map
+
+Home (`bodies/ui/src/home/home-view.tsx`, opened by `windows/home.ts`) has a left navigation of seven
+pages, in this order. The page ids are the `HomePage` type; the main process can ask Home to open one
+with `IPC.homePageEvent`.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
+flowchart LR
+  nav["Home nav (HomeView)"]
+  nav --> ov["Overview<br/>(Scout card, BrainCard, WhereThingsRun, SpendCard)"]
+  nav --> tk["Tasks<br/>(TasksView, Now card)"]
+  nav --> cn["Connections<br/>(ConnectionsPanel: apps, experts)"]
+  nav --> pl["Places<br/>(PlacesView: This PC, Chrome add-on, WhatsApp)"]
+  nav --> ap["Approvals<br/>(ApprovalsView: preferences, ask history)"]
+  nav --> mem["What Scout remembers<br/>(MemoryView)"]
+  nav --> st["Settings<br/>(the host's form, PermissionsPanel)"]
+  tk --> t1["Jobs"]
+  tk --> t2["Waiting"]
+  tk --> t3["Timers"]
+  tk --> t4["All tasks"]
+```
+
+The Memory entry reads "What Scout remembers" (the companion's name fills in), and Tasks and
+Places carry a "New" badge. The Settings page is the host's own form (passed in as `settings`)
+with the Permissions card under it. The Tasks page
+(`tasks-view.tsx`) shows the Now card above four tabs. Every page reads and writes through the brain's Home tools
+(see [Talking to the brain](#talking-to-the-brain)), so Home shows what the brain holds, never a copy.
 
 ## How it works
 
@@ -75,31 +150,72 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
    so settings are read from the file before anything else needs them.
 3. Creates `AlwaysListening` from `settings.listening.always`, `StatusMarks` (broadcasting the top
    mark on `IPC.statusMarkEvent`).
-4. `startBrain(...)` builds the `BrainClient` (kept as `desktop.brain`) and starts it. It never
+4. `brainSetup.retry()` runs `launchBrain` without waiting for it (see
+   [Dial and start decision](#dial-and-start-decision)).
+5. `startBrain(...)` builds the `BrainClient` (kept as `desktop.brain`) and starts it. It never
    throws and never blocks boot: if the brain is not running, the client retries every 2 s.
-5. Creates the voice bridge (`createVoiceBridge`; hearing and speaking happen in the brain, see
+6. Creates the voice bridge (`createVoiceBridge`; hearing and speaking happen in the brain, see
    [hearing.md](../senses/hearing.md) and [speaking.md](../senses/speaking.md)) and the `Desktop` record, including the tray, the `HotkeyManager` and the
    `TalkKeyWatch`.
-6. Wires the sight pause, Always listening, the listening guard and the voice bridge's notifications, then
+7. Wires the sight pause, Always listening, the listening guard and the voice bridge's notifications, then
    `registerIpc()`.
-7. Creates the panel and the avatar window, starts presence watching and `startTalkKey`, and calls
+8. Creates the panel and the avatar window, starts presence watching and `startTalkKey`, and calls
    `applyHotkeys(settings)`. The desktop makes no launch greeting of its own; the brain decides
    whether Scout speaks first.
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
 flowchart TD
-  A["whenReady: start()"] --> B["gated platform, settings"]
-  B --> C["startBrain (retries every 2 s)"]
-  C --> E["panel window, avatar window"]
+  A["whenReady: start()"] --> B["gated platform, SettingsStore"]
+  B --> L["brainSetup.retry: launchBrain<br/>(not awaited)"]
+  L --> C["startBrain (retries every 2 s)"]
+  C --> D["voice bridge, Desktop record, registerIpc"]
+  D --> E["panel window, avatar window"]
   E --> F["talk key hook, applyHotkeys"]
 ```
+
+### Dial and start decision
+
+Before it dials, the main process decides whether to start a brain. `launchBrain` (`brain/launch.ts`)
+runs first; `BrainClient` then dials either way and retries every 2 s.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
+flowchart TD
+  A["launchBrain"] --> B{"TAGALONG_START_BRAIN=0<br/>or address not local?"}
+  B -->|yes| Z["spawn nothing"]
+  B -->|no| C{"brain/pyproject.toml exists?"}
+  C -->|no| Z
+  C -->|yes| D{"probeAddr: port answers?"}
+  D -->|"answers (a timeout counts)"| Z
+  D -->|refused| E{"packaged?"}
+  E -->|yes| F["uv sync --frozen --no-dev<br/>(setup: installing)"]
+  F -->|fails| G["setup: failed, Home offers Retry"]
+  F -->|ok| H
+  E -->|no| H["spawn uv run brain<br/>(windowsHide, unref, output to brain.log,<br/>TAGALONG_STARTED_BY=desktop)"]
+  H -->|"uv missing or child exits"| I["log one line, no respawn"]
+  Z --> J["BrainClient dials ws://addr"]
+  H --> J
+  I --> J
+  G --> J
+  J -->|"down"| K["retry every 2 s"]
+  K --> J
+  J -->|"hello"| L{"decideUpdate<br/>(version-check.ts)"}
+  L -->|"same build"| M["current"]
+  L -->|"started by desktop, no job, first time"| N["quiet restart:<br/>stopBrain, then launchBrain"]
+  L -->|"started by the person"| O["terminal: tell them to restart it"]
+  L -->|"job running, starter unknown,<br/>or already restarted"| P["ask: update prompt on Home"]
+```
+
+Notice that the desktop never stops a brain it did not start, and never stops one on quit. The packaged
+app sets uv's folders under `TAGALONG_HOME` (`packagedEnv`) and passes its version as `TAGALONG_BUILD`.
+The decision table is under [Brain version check and restart](#brain-version-check-and-restart).
 
 ### The brain in the main process
 
 `startBrain` (`brain/start.ts`) builds a `BrainClient` (from `brain/client.ts`) on the global
 `WebSocket` and dials `ws://${TAGALONG_BRAIN_ADDR}` (default `127.0.0.1:47321`). The desktop
-declares four body tools in `hello` (`brain/body-tools.ts`) and answers the brain's `use` for them.
+declares eleven body tools in `hello` (`brain/body-tools.ts`: `list_windows`, `read_window_text`, `look_at_window`, `open_url`, the six file tools and `install_ocr_language`) and answers the brain's `use` for them.
 If the socket is down the client retries every 2 s, so the app opens whether or not the brain is
 running.
 
@@ -132,7 +248,7 @@ The same call backs **Start brain** on the offline card, so it also runs when th
   capture notice. `look_at_window(windowId)` returns an image part and raises the notice; a
   minimized window fails with "That window is minimized, so there is nothing drawn to look at."
   An excluded window fails `tool_failed` with the exclusion sentence. Each run is bounded at 15 s
-  and answers `timeout` (-32004) past that. The brain now offers these to Scout as `desktop__<tool>`.
+  and answers `timeout` (-32004) past that. The brain offers these to Scout as `desktop__<tool>`.
   `open_url(url)` opens an https address in the default browser (`shell.openExternal`) and refuses
   anything else; the brain uses it for connected apps' sign-in pages. Scout can call it too, as
   `desktop__open_url`, and it always asks first (`confirm`: there is no Always allow button; only its Home switch can unlock it).
@@ -213,7 +329,7 @@ The same call backs **Start brain** on the offline card, so it also runs when th
   image part, dropped items as parts and the active window title as `context.window`, and returns
   `{ turnId }`. While the brain is offline it throws "Scout's brain is not running." Interrupt sends
   `cancel`: the explicit Stop only. Talking over Scout pauses its voice and sends the words as
-  a `say` with `interrupted` (see [speaking.md](../senses/speaking.md#talking-over-scout)).
+  a `say` with `interrupted` (see [speaking.md](../senses/speaking.md)).
 - **Turn events.** The brain's `reply` and `turn` notifications are mapped to the UI's turn events
   and go to `forwardToRenderers`, which keeps `activeTurns` for the bubble's blur rule and sends the
   events to every window on `IPC.turnEvent`. After a reconnect the client reports `resync`, and
@@ -224,13 +340,11 @@ The same call backs **Start brain** on the offline card, so it also runs when th
   holds **Show words while I talk**: `panelSettings` carries it to `useTalk`, and `shownPartial`
   (`talk-rules.ts`) hides a held (push-to-talk) question's live words when it is off, so the text
   appears at release. Always listening ignores it.
-- **Not wired yet.** Pets are a fixed local Scout; they come back when the brain plans them.
-
-`shutdown()` stops the client.
+- **Pets.** The desktop shows one fixed local Scout (`ipc/scout.ts`, `listPets`); the brain sends no pet list.
 
 ### Shared controls
 
-Every window draws its toggles, selects, sliders, money field, keycaps, buttons and the key field from `bodies/ui/src/controls/` (and `key/key-field.tsx`). Hosts inject `CONTROLS_CSS` beside their own sheet; the focus ring is navy on light surfaces and gold inside `.on-navy`, set by CSS variables rather than props. The renderer sheet `app.css` sets Onest on `body`, and the name "Scout" is Onest 600 everywhere (see bodies/DESIGN.md, Shared controls). Onest 400 and 600 is the only bundled typeface (`@fontsource/onest`; the pixel font is retired): every size is one of seven roles in `themeTokens.type`, labels are sentence case, and `bodies/ui/src/style-audit.test.ts` fails on any other size, weight, capitals or letter spacing, any padding, margin or gap off the space scale, any radius that is not a radius token and any hex colour outside `tokens.ts`; every card is the one `.tg-card` box (see bodies/DESIGN.md, Typography).
+Every window draws its toggles, selects, sliders, money field, keycaps, buttons and the key field from `bodies/ui/src/controls/` (and `key/key-field.tsx`). Hosts inject `CONTROLS_CSS` beside their own sheet; the focus ring is navy on light surfaces and gold inside `.on-navy`, set by CSS variables rather than props. The renderer sheet `app.css` sets Onest on `body`, and the name "Scout" is Onest 600 everywhere (see bodies/DESIGN.md, Shared controls). Onest 400 and 600 is the only bundled typeface (`@fontsource/onest`): every size is one of seven roles in `themeTokens.type`, labels are sentence case, and `bodies/ui/src/style-audit.test.ts` fails on any other size, weight, capitals or letter spacing, any padding, margin or gap off the space scale, any radius that is not a radius token and any hex colour outside `tokens.ts`; every card is the one `.tg-card` box (see bodies/DESIGN.md, Typography).
 
 ### The window inventory
 
@@ -266,7 +380,7 @@ Rules each module enforces:
   scale.
 - **Home.** Every tab renders in one `.home-page` box (920px at most, one inset), and each connection's On/Off is the shared `Toggle` (`role="switch"`). Escape closes it. `openHome(page?)` focuses an open one and sends
   `IPC.homePageEvent` with the page; a new one gets the page on `did-finish-load`.
-- **Settings form.** The Settings page of Home (`renderer/src/settings/settings-page.tsx`) has one **Save**, at the top beside the heading (its result shows to the left of it on the heading row; there is no footer). Each section is a `tg-card` (key, Privacy, Files Scout may use, Voice, Shortcuts, browser, "Where Scout looks for apps": the two registries, read only). Toggles, selects and the speed slider are the shared controls from `@tagalong/ui`; since they have no form name, the Voice section keeps `mouth`, `ears`, `voice`, `voiceSpeed`, `talkHotkey` and `microphoneId` (and `voiceEnabled` when on) in hidden inputs so `buildSettingsPatch` reads the same form fields as before. The three shortcuts show as keycaps (`Shortcut`, never `CommandOrControl`) with a Change button that reveals the text field holding the accelerator (a refused one opens it at once; at rest a hidden field carries it so Save still sends every key); an odd one such as `Foo+Bar` shows as plain keycaps. Check key and Set limit act alone (they never submit the form), and a key from the environment disables the key field. The Voice section also has the shared "Test your microphone" meter (`MicTest`): off until pressed, it shows the picked microphone's level, records and sends nothing, and stops on a second press, on a new device choice and when the Settings window loses focus.
+- **Settings form.** The Settings page of Home (`renderer/src/settings/settings-page.tsx`) has one **Save**, at the top beside the heading (its result shows to the left of it on the heading row; there is no footer). Each section is a `tg-card` (key, Privacy, Files Scout may use, Voice, Shortcuts, browser, "Where Scout looks for apps": the two registries, read only). Toggles, selects and the speed slider are the shared controls from `@tagalong/ui`; since they have no form name, the Voice section keeps `mouth`, `ears`, `voice`, `voiceSpeed`, `talkHotkey` and `microphoneId` (and `voiceEnabled` when on) in hidden inputs so `buildSettingsPatch` reads every value from the form. The three shortcuts show as keycaps (`Shortcut`, never `CommandOrControl`) with a Change button that reveals the text field holding the accelerator (a refused one opens it at once; at rest a hidden field carries it so Save still sends every key); an odd one such as `Foo+Bar` shows as plain keycaps. Check key and Set limit act alone (they never submit the form), and a key from the environment disables the key field. The Voice section also has the shared "Test your microphone" meter (`MicTest`): off until pressed, it shows the picked microphone's level, records and sends nothing, and stops on a second press, on a new device choice and when the Settings window loses focus.
 - **Settings.** `openSettingsPage(target)` opens Home on `fixPage(target)`. `fixPage` knows
   `voice`, `connections` and `tasks` (the chat's "Open in Tasks"); the `key` fix is not a page, so the renderer's `openFix('key')`
   calls `openWalkthrough(9)` instead.
@@ -282,7 +396,7 @@ Rules each module enforces:
   `moments.ts`) and asking (the ask and pause keys as keycaps, a static bubble preview, what Scout
   never looks at). The side panel carries the `on-navy` class so shared controls draw a gold focus
   ring there. Steps 5 to 9 sit on the shared controls: voice (a `Select` for the talk key, who
-  speaks and microphone, the shared `VoiceField` ("Pick Scout's voice") that saves its own pick at once, a `Toggle` for Scout talks, a `Slider` for speed, and a "Test your microphone" `MicTest` under the microphone that shows its level through the host's `watchMicLevel`; see [hearing.md](../senses/hearing.md#the-level-meter)), everyday jobs (a list from `bodies/ui/src/jobs-kinds.ts` that only explains, with no buttons: connecting happens on step 11), browser (a numbered list; copy `chrome://extensions` or `edge://extensions`, Show
+  speaks and microphone, the shared `VoiceField` ("Pick Scout's voice") that saves its own pick at once, a `Toggle` for Scout talks, a `Slider` for speed, and a "Test your microphone" `MicTest` under the microphone that shows its level through the host's `watchMicLevel`; see [hearing.md](../senses/hearing.md)), everyday jobs (a list from `bodies/ui/src/jobs-kinds.ts` that only explains, with no buttons: connecting happens on step 11), browser (a numbered list; copy `chrome://extensions` or `edge://extensions`, Show
   folder and Copy folder path for the add-on), "Scout asks first, and you set the limit" (a static
   approval card, the daily limit in the shared `MoneyField` stepper, saved with `set_daily_limit`
   only on Next, and only if it changed; an amount of 0 or less blocks Next; Settings' `LimitField`
@@ -300,7 +414,7 @@ Rules each module enforces:
   file, only sent to Anthropic, never written to history or logs, change or remove it in Settings)
   and never the key; "Where do I get one?" calls
   `openKeyPage`, which main answers by opening exactly the Console key page.
-  Step 10, "Let Scout get to know you" (`step-know-me.tsx`), is skippable: it mounts `KnowMeFlow` (the K5 form and result view, read through the host bridge context) and never blocks Next, because a run goes on in the brain while the person moves on. Step 11, "Connect your tools" (`step-ten.tsx`), is the one place the tour connects things, and
+  Step 10, "Let Scout get to know you" (`step-know-me.tsx`), is skippable: it mounts `KnowMeFlow` (the get-to-know-me form and result view, read through the host bridge context) and never blocks Next, because a run goes on in the brain while the person moves on. Step 11, "Connect your tools" (`step-ten.tsx`), is the one place the tour connects things, and
   nothing on it blocks Finish. It reads the brain's `setup_overview` through the host's
   `setupOverview` (and again on `changed setup`) and draws the Connections page's rows: an **Apps**
   group (Gmail, Google Calendar and Notion, each with the Official chip, "<job> · Browser sign-in"
@@ -394,7 +508,7 @@ capture. The tray carries Pause sight because that is the one hotkey whose loss 
 | Stop speaking | `hotkeys.stopVoice`  | `CommandOrControl+Shift+Alt+M` (`DEFAULT_STOP_VOICE_HOTKEY`)  | `IPC.stopVoiceEvent` to every window |
 
 The talk key (`hotkeys.talk`, default Right Ctrl) is not a global shortcut. A key hook watches it
-(`talk-key.ts`); see [hearing.md](../senses/hearing.md). Its outcome is reported here alongside the three.
+(`talk-key.ts`); see [hearing.md](../senses/hearing.md) and [speaking.md](../senses/speaking.md). Its outcome is reported here alongside the three.
 
 `openPanelWithContext` reads the selection and the active window (`captureAskSnapshot`) before the
 bubble takes focus, keeps the result as `pendingSnapshot` (sent with the next ask), announces the
@@ -512,7 +626,7 @@ Events main sends to renderers (no answer): `turnEvent`, `contextEvent`, `captur
 alone `speechChunk`, `speechDone` and `speechControl` (the brain's `speech_control`: pause, resume or
 clear what is being said). The panel sends `speechState` the other way (one-way, no answer): each
 sentence started or ended, paused, or idle, which main checks and sends on as `speech_state`. See
-[speaking.md](../senses/speaking.md).
+[hearing.md](../senses/hearing.md) and [speaking.md](../senses/speaking.md).
 
 `dropOnPet` checks the sender with `fromWindow(window)` (in `handle.ts`), which compares
 `event.sender` (set by Electron in main, so a page cannot forge it) with that window's
@@ -586,7 +700,7 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   `changed { what: "loops" }`. The fake brain turns a held loop up when the switch goes on, and
   `e2e/loops.spec.ts` walks switch, row, Forget, Cancel and Wipe. A tool the brain marks `self_asks` (Claude Code's own, which asks through a
   job) shows "Always asks" with Off and Ask only (it reads as Ask while it is on; the brain's own mode for it is auto).
-- **Tasks page:** Home's Tasks page (`bodies/ui/src/home/tasks-view.tsx`, nav label Tasks with a "New" badge) replaces the Jobs page. It shows a title, the **Now** card (`now-card.tsx`: asks waiting for the person with Deny, Always and Allow, running jobs with the live step, a clock that ticks each second, Open and Stop, "Reading <app> mail" when the switch is on and not stalled, and timers due within the hour; "Nothing is running right now." when none) and four tabs with counts, read from the brain on their own and again on `changed` for `jobs`, `events` and `timers`: **Jobs** (the Jobs panel below, embedded), **Waiting** (`waiting-tab.tsx`: the news Scout has not told yet, each with its gist and age and a "Scout could not finish" mark on a gave-up one, read through `ipc/events.ts` (`eventsWaiting` as `events:waiting`, brain tool `events_waiting`) when the page opens and again on `changed` `events`, which the brain sends whenever an event is saved or changes state; then the loops panel with its Waiting on you list of open items, where each open row also has Done and Later; Later sends tomorrow 09:00 local time with its offset) and **Timers** (`timers-tab.tsx`: note, local fire time, "every N min", Cancel) and **All tasks** (`task-row.tsx`: every task that is not an Ask, ended ones too, newest first, each with its title, kind (Watch, Own, Do, Later), state (Running, Waiting, Done, Stopped, Failed, Declined), "from <source>" (the oldest known cause in its caused-by chain, else the task's own source) and Stop on a running or waiting one; the tab count is the live ones only; read through `ipc/tasks.ts` (`tasksList` as `tasks:list`, brain tool `tasks_list` with `include_ended`) when the page opens, when the tab is pressed and after a Stop (the brain sends no change for tasks); Stop is the existing `stopTask` (`task_stop`), which ends the task and what it started). Opening a job (Watch or Open) shows its page in place of everything and Back returns to the tab. The Timers tab goes through `ipc/timers.ts` (`timersState` as `timers:state`, `cancelTimer` as `timers:cancel`; brain tools `timers_state`, `timer_cancel`); `e2e/tasks.spec.ts` covers the Now card, counts and Cancel on the fake brain (`setTimers`), and the All tasks tab listing a watch task and stopping it.
+- **Tasks page:** Home's Tasks page (`bodies/ui/src/home/tasks-view.tsx`, nav label Tasks with a "New" badge) shows a title, the **Now** card (`now-card.tsx`: asks waiting for the person with Deny, Always and Allow, running jobs with the live step, a clock that ticks each second, Open and Stop, "Reading <app> mail" when the switch is on and not stalled, and timers due within the hour; "Nothing is running right now." when none) and four tabs with counts, read from the brain on their own and again on `changed` for `jobs`, `events` and `timers`: **Jobs** (the Jobs panel below, embedded), **Waiting** (`waiting-tab.tsx`: the news Scout has not told yet, each with its gist and age and a "Scout could not finish" mark on a gave-up one, read through `ipc/events.ts` (`eventsWaiting` as `events:waiting`, brain tool `events_waiting`) when the page opens and again on `changed` `events`, which the brain sends whenever an event is saved or changes state; then the loops panel with its Waiting on you list of open items, where each open row also has Done and Later; Later sends tomorrow 09:00 local time with its offset) and **Timers** (`timers-tab.tsx`: note, local fire time, "every N min", Cancel) and **All tasks** (`task-row.tsx`: every task that is not an Ask, ended ones too, newest first, each with its title, kind (Watch, Own, Do, Later), state (Running, Waiting, Done, Stopped, Failed, Declined), "from <source>" (the oldest known cause in its caused-by chain, else the task's own source) and Stop on a running or waiting one; the tab count is the live ones only; read through `ipc/tasks.ts` (`tasksList` as `tasks:list`, brain tool `tasks_list` with `include_ended`) when the page opens, when the tab is pressed and after a Stop (the brain sends no change for tasks); Stop is the existing `stopTask` (`task_stop`), which ends the task and what it started). Opening a job (Watch or Open) shows its page in place of everything and Back returns to the tab. The Timers tab goes through `ipc/timers.ts` (`timersState` as `timers:state`, `cancelTimer` as `timers:cancel`; brain tools `timers_state`, `timer_cancel`); `e2e/tasks.spec.ts` covers the Now card, counts and Cancel on the fake brain (`setTimers`), and the All tasks tab listing a watch task and stopping it.
 - **Jobs panel:** the Jobs tab of Home's Tasks page (`bodies/ui/src/home/jobs-panel.tsx`)
   uses `list_jobs` and `stop_job` (`ipc/jobs.ts`, channels
   `jobs:list` and `jobs:stop`): the brain's snake_case rows become `JobRow`s, newest first as the
@@ -747,7 +861,7 @@ data over the channels in `shared/ipc.ts`:
   voice and ears, Always listening, drops, the health facts and status marks.
 
 Each `on…` returns an unsubscribe function. `heldUntilHeard` (`preload/held.ts`) keeps the last
-value that arrived with no listener and hands it to the first one, for three events main may send
+value that arrived with no listener and hands it to the first one, for the one event main may send
 before React subscribes: Home's page (`homePageEvent`). `micFrame`
 uses `ipcRenderer.send` (no answer). `dropOnPet` turns each `File` into its path with
 `webUtils.getPathForFile` (`File.path` is gone in Electron 44; `webUtils` is available to a
@@ -810,8 +924,8 @@ Review rule for call sites: never put speech, screen or file text in a warning's
   die with "bufferUtil.unmask is not a function" on the first masked frame.
 - **preload**: `src/preload/index.ts` to `dist/preload/index.cjs`, CommonJS, because a sandboxed
   preload cannot be an ES module while the package is.
-- **renderer**: root `src/renderer`, three HTML inputs (`avatar`, `panel`,
-  `home`) to `dist/renderer`. React and React DOM are aliased to the copies
+- **renderer**: root `src/renderer`, four HTML inputs (`avatar`, `panel`,
+  `home`, `walkthrough`) to `dist/renderer`. React and React DOM are aliased to the copies
   `@tagalong/ui` resolves, so there is one React instance. JSX uses Vite's esbuild transform
   (`jsx: 'automatic'`), not `@vitejs/plugin-react` (it needs Vite 8; the app is on Vite 7), so
   there is no Fast Refresh in development.
@@ -883,7 +997,7 @@ process, and ignores a missing file. This is checked by hand (see the feature te
 | `asarUnpack`           | `**/*.node`                                                                                                                                                                                                                                          |
 | `npmRebuild`           | `false`: every native module ships an N-API binary, which Electron loads as is                                                                                                                                                                       |
 | `publish`              | `null`: no update channel                                                                                                                                                                                                                            |
-| `extraResources`       | `../browser/dist` to `resources/extension` (the built browser body, for Load unpacked)                                                                                                                                                               |
+| `extraResources`       | `../browser/dist` to `resources/extension` (the built browser body, for Load unpacked); `build/uv` to `resources/uv`; the brain's `pyproject.toml`, `uv.lock` and `src/` to `resources/brain`                                                        |
 | `artifactName`         | `${productName}-Setup-${version}-${arch}.${ext}`                                                                                                                                                                                                     |
 | `win`                  | NSIS, x64, `executableName: Tagalong`                                                                                                                                                                                                                |
 | `nsis`                 | `oneClick: false`, `perMachine: false` (per user, no admin), install directory selectable, desktop and Start menu shortcuts, `runAfterFinish: true`, `deleteAppDataOnUninstall: false`, `include: build/installer.nsh` (stops a running brain first) |
@@ -891,8 +1005,7 @@ process, and ignores a missing file. This is checked by hand (see the feature te
 | `directories`          | output `release`                                                                                                                                                                                                                                     |
 
 Node cannot `dlopen` from inside an asar archive; files under `app.asar.unpacked` are loaded from
-there by Electron's `require` redirect, which is why every `.node` file and the ONNX runtime's DLLs
-are unpacked.
+there by Electron's `require` redirect, which is why every `.node` file is unpacked.
 
 Scripts (`bodies/desktop/package.json`): every build, run and package script first runs
 `scripts/ensure-electron.mjs`.
@@ -908,10 +1021,11 @@ app on a new temporary `--user-data-dir`, so a run never touches real data.
 
 - `Desktop` (`index.ts`): `brain`, `platform`, `settingsStore`,
   `settings`, `avatar`, `panel`, `tray`,
-  `homeWindow`, `pendingSnapshot`, `activeTurns`, `hotkeys`, `hotkeyError`,
-  `talkKey`, `talkKeyError`, `sightPause`, `voice`, `voiceWorker`,
+  `homeWindow`, `walkthroughGate`, `pendingSnapshot`, `activeTurns`, `hotkeys`, `hotkeyError`,
+  `talkKey`, `talkKeyError`, `sightPause`, `voiceBridge`,
   `listening`, `statusMarks`.
-- `startBrain({ onNotification, onStatus, onResync, env?, openSocket? })` returns the `BrainClient`.
+- `startBrain({ bodyId, platform, exclusions, onCapture, openExternal, files, reading, onNotification, onStatus, onResync, onHello, env?, openSocket? })`
+  returns the `BrainClient`.
 - Catch-up after a resync (`brain/chat-sync.ts`): the desktop keeps the id of the newest saved reply it has seen, refreshed with `chat_since {limit: 1}` when the link comes up and after each turn ends. `onResync` marks a catch-up pending; when the client says online, it calls `chat_since {after_id}` and pages while `more` is true, handing each page to `turnEvents.caughtUp`, which returns a `pet.remark` for each assistant reply said on the desktop and not seen yet and moves the anchor past every row. The pending mark clears only after the last page succeeds, so a failed call retries on the next online. No clocks are compared. `e2e/catch-up.spec.ts` covers two drops on the fake brain (`dropWithSavedReply`).
 - `HotkeyBindings { ask, pauseSight, stopVoice }`, `HotkeyOutcome`, `HotkeyAction`
   (`ask | pauseSight | stopVoice | talk`), `HotkeyRegistrar` (the test seam over `globalShortcut`).
@@ -933,7 +1047,6 @@ app on a new temporary `--user-data-dir`, so a run never touches real data.
 | `DEFAULT_STOP_VOICE_HOTKEY`         | `CommandOrControl+Shift+Alt+M` | `hotkeys.ts`             |
 | Default ask hotkey                  | `CommandOrControl+Shift+Space` | `src/shared/settings.ts` |
 | `MAX_LINE`, `MAX_FILE`              | 300 characters, 1 MB           | `log-file.ts`            |
-| Memory list                         | `limit: 200`                   | `ipc/memory.ts`          |
 | Tray icon                           | 16 x 16                        | `tray-icon.ts`           |
 | `FOCUS_POLL_MS`                     | 5,000 ms                       | `brain/body-events.ts`   |
 
@@ -959,8 +1072,7 @@ The host writes:
 
 Everything else main holds (`pendingSnapshot`, the dropped item, status marks) is
 in memory and gone on quit. `before-quit` disposes the hotkeys, the talk key hook, the
-listening-guard and presence timers, records
-the clean close and stops the brain client.
+listening-guard, presence and focus-watch timers, and stops the brain client (never the brain).
 
 ## Failure handling
 

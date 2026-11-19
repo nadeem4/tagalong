@@ -75,6 +75,84 @@ memory are applied on save (above), and Always listening has its own on and off 
 (`AlwaysListening`). The brain's own tunables (budget, step cap, turn timeout) are environment
 variables, not settings: see [brain.md](../brain/README.md#run-it).
 
+## Environment variables
+
+The brain reads these from the real environment first, then fills any it lacks from
+`<TAGALONG_HOME>/.env` (`load_env_file`; an empty variable counts as unset). `.env.example` at the
+repo root lists the same names. A bad value stops the brain at start with one line naming the
+variable. "Positive" means at least 1.
+
+| Variable                                                         | Default                   | Read by                         | Meaning                                                                             |
+| ---------------------------------------------------------------- | ------------------------- | ------------------------------- | ----------------------------------------------------------------------------------- |
+| `ANTHROPIC_API_KEY`                                              | none (Scout stays silent) | brain                           | Scout's key; the app saves it in `.env`; a real environment value wins              |
+| `TAGALONG_HOME`                                                  | `~/.tagalong`             | brain, desktop (`launch.ts`)    | The data folder; only the real environment can set it, since `.env` lives inside it |
+| `TAGALONG_BRAIN_ADDR`                                            | `127.0.0.1:47321`         | brain, desktop, WhatsApp bridge | Where the brain listens and where bodies dial                                       |
+| `TAGALONG_MODEL`                                                 | `claude-opus-5-5`         | brain                           | Scout's model until Home saves a choice                                             |
+| `TAGALONG_STT_LIVE`                                              | auto                      | brain                           | Live speech model id, or auto, until Home saves a choice                            |
+| `TAGALONG_STT_FINAL`                                             | auto                      | brain                           | Final speech model id, auto or `off`, until Home saves a choice                     |
+| `TAGALONG_DAILY_BUDGET_USD`                                      | `5.0`                     | brain                           | Daily spend cap in dollars (positive); Home's Daily limit writes it to `.env`       |
+| `TAGALONG_STEP_CAP`                                              | `25`                      | brain                           | Most steps in one turn                                                              |
+| `TAGALONG_TURN_TIMEOUT_S`                                        | `300`                     | brain                           | Seconds one turn may run                                                            |
+| `TAGALONG_LOOP_LAG_MS`                                           | `200`                     | brain                           | Event-loop block longer than this is logged                                         |
+| `TAGALONG_READER_MODEL`                                          | `claude-haiku-5-5`        | brain                           | Model that reads mail for loops                                                     |
+| `TAGALONG_READER_DAILY_USD`                                      | `0.5`                     | brain                           | The mail reader's own daily cap                                                     |
+| `TAGALONG_LOOP_POLL_S`                                           | `300`                     | brain                           | Seconds between mail reads                                                          |
+| `TAGALONG_LOOP_STALE_DAYS`                                       | `7`                       | brain                           | Days before a held loop goes to one stale wake                                      |
+| `TAGALONG_WORK_KEEP_DAYS`                                        | `30`                      | brain                           | Days finished work is kept before the sweep                                         |
+| `TAGALONG_OUTPUTS_KEEP`                                          | `200`                     | brain                           | Stored long tool results kept for `read_output`                                     |
+| `TAGALONG_RETRY_MAX`                                             | `3`                       | brain                           | Tries of a step that failed for a passing reason                                    |
+| `TAGALONG_RETRY_BACKOFF_S`                                       | `30,120,600`              | brain                           | Waits before each retry; the last repeats                                           |
+| `TAGALONG_EXPERT_CMD`                                            | none                      | brain                           | Command of one custom expert (an ACP agent)                                         |
+| `TAGALONG_JOB_QUIET_MIN`                                         | `20`                      | brain                           | Minutes a job may show no step before Scout is woken                                |
+| `TAGALONG_EXPERT_IDLE_S`                                         | `300`                     | brain                           | Seconds an expert adapter stays warm; `0` stops it at once                          |
+| `TAGALONG_WAKES_PER_HOUR`                                        | `12`                      | brain                           | Most times Scout may speak first in an hour                                         |
+| `TAGALONG_QUIET_HOURS`                                           | none                      | brain                           | `HH:MM-HH:MM` local; news is held in between, and may wrap midnight                 |
+| `TAGALONG_OFFER_MIN_APPROVALS`                                   | `3`                       | brain                           | Approvals of one kind before Scout offers a preference                              |
+| `TAGALONG_OFFER_WINDOW_DAYS`                                     | `14`                      | brain                           | Days those approvals are counted over                                               |
+| `TAGALONG_KEEP_ASKING_DAYS`                                      | `7`                       | brain                           | Days Scout keeps asking after "not now" on an offer                                 |
+| `TAGALONG_TOOL_PREVIEW_CHARS`                                    | `4000`                    | brain                           | Characters of one tool result Scout sees at once                                    |
+| `TAGALONG_JOB_STEPS_MAX_ENTRIES`                                 | `2000`                    | brain                           | Steps one job's log keeps                                                           |
+| `TAGALONG_JOB_STEPS_MAX_BYTES`                                   | `1000000`                 | brain                           | Text bytes one job's log keeps                                                      |
+| `TAGALONG_BUILD`                                                 | none (a source hash)      | brain                           | Build id sent in `hello`; the packaged desktop sets it to the app version           |
+| `TAGALONG_STARTED_BY`                                            | `person`                  | brain                           | `desktop` when the desktop started the brain, so it may restart it                  |
+| `TAGALONG_START_BRAIN`                                           | on                        | desktop                         | `0` stops the desktop from starting a local brain                                   |
+| `TAGALONG_FAKE_MIC`                                              | off                       | desktop                         | `1` points Chromium at a fake microphone (the e2e suites)                           |
+| `TAGALONG_WHATSAPP_ENABLED`                                      | off                       | brain                           | `1`, `true` or `yes` starts the WhatsApp bridge                                     |
+| `TAGALONG_WHATSAPP_ACCESS_TOKEN`, `_APP_SECRET`, `_VERIFY_TOKEN` | none                      | brain, passed to the bridge     | Secrets, masked in logs and saved text                                              |
+| `TAGALONG_WHATSAPP_PHONE_NUMBER_ID`, `_ALLOWED_NUMBER`           | none                      | brain, passed to the bridge     | The person's own numbers, not masked                                                |
+| `TAGALONG_WHATSAPP_PORT`                                         | `47322`                   | brain, bridge                   | The bridge's webhook port on 127.0.0.1                                              |
+
+The packaged desktop also sets uv's own variables for the brain (`UV_PROJECT_ENVIRONMENT`,
+`UV_PYTHON_INSTALL_DIR`, `UV_CACHE_DIR`, `UV_PYTHON_PREFERENCE`) under `TAGALONG_HOME`; they are not
+settings. An expert's process has `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` stripped
+(`setup/env.py`), because experts run on the person's own login.
+
+## Settings precedence
+
+A value can come from three places. Choices made in Home live in the brain's `settings` table
+(`tagalong.db`); the process environment and `.env` are the defaults beneath them.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
+flowchart TD
+  Q["Scout's model, speech models, speaking voice"] --> A{"Saved from Home in the<br/>settings table? (model, stt_live,<br/>stt_final, tts_voice)"}
+  A -->|yes| R1["use the saved choice"]
+  A -->|no| B{"TAGALONG_MODEL or TAGALONG_STT_*<br/>set and valid? (a voice has none)"}
+  B -->|yes| R2["use the variable"]
+  B -->|no| R3["built-in default: claude-opus-5-5, Auto"]
+  E["Every other TAGALONG_* value and the API key"] --> C{"In the real process environment?"}
+  C -->|yes| R4["use it (wins)"]
+  C -->|no| D{"In TAGALONG_HOME/.env?"}
+  D -->|yes| R5["use the .env line"]
+  D -->|no| R6["built-in default in config.py"]
+```
+
+The real environment always beats `.env` (`load_env_file` only fills what is missing). Home's saved
+model and voice choices beat both (`models.chosen`, `stt_choice.chosen_live` and `chosen_final`,
+`tts_choice`; a stale or unknown saved id falls back as if unset). Home writes the API key and the
+Daily limit to `.env`, so a real environment variable of the same name still wins on the next start.
+The desktop's own `settings.json` is separate and never read by the brain.
+
 ## Secrets
 
 ### App secrets in the Python brain
