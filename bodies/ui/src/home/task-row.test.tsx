@@ -49,6 +49,13 @@ describe('TaskRow', () => {
     expect(screen.getByText('from scout')).toBeVisible();
   });
 
+  it('names the failed and declined states', () => {
+    row({ ...base, state: 'failed', endedAt: 'x' });
+    expect(screen.getByText('Failed')).toBeVisible();
+    row({ ...base, id: 't2', state: 'declined', endedAt: 'x' });
+    expect(screen.getByText('Declined')).toBeVisible();
+  });
+
   it('hides Stop on an ended task', () => {
     row({ ...base, state: 'done', endedAt: '2026-11-17T09:00:00+00:00' });
     expect(screen.getByText('Done')).toBeVisible();

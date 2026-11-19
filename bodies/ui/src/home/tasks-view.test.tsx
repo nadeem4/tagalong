@@ -162,6 +162,20 @@ describe('TasksView task list', () => {
     expect(await screen.findByRole('tab', { name: 'All tasks (0)' })).toBeVisible();
   });
 
+  it('counts only live tasks, but lists the ended ones too', async () => {
+    open(
+      createFakeHostBridge({
+        tasks: [
+          task('a'),
+          task('w', { state: 'waiting' }),
+          task('d', { state: 'done', title: 'Old' }),
+        ],
+      }),
+    );
+    fireEvent.click(await screen.findByRole('tab', { name: 'All tasks (2)' }));
+    expect(screen.getByText('Old')).toBeVisible();
+  });
+
   it('shows no Ask task', async () => {
     open(createFakeHostBridge({ tasks: [task('a'), task('k', { kind: 'ask', title: 'Hello' })] }));
     fireEvent.click(await screen.findByRole('tab', { name: 'All tasks (1)' }));

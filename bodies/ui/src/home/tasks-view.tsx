@@ -16,6 +16,7 @@ import { TimersTab } from './timers-tab';
 import { WaitingTab } from './waiting-tab';
 import type { TaskRow as Task, TimerRow, WaitingEvent } from '../shapes';
 
+const isLive = (t: Task): boolean => t.state === 'open' || t.state === 'waiting';
 type Tab = 'jobs' | 'waiting' | 'timers' | 'tasks';
 
 export function TasksView() {
@@ -89,7 +90,7 @@ export function TasksView() {
     { id: 'jobs', label: label('Jobs', jobCount) },
     { id: 'waiting', label: label('Waiting', waiting === null ? null : waiting.length) },
     { id: 'timers', label: label('Timers', timers === null ? null : timers.length) },
-    { id: 'tasks', label: label('All tasks', tasks === null ? null : tasks.length) },
+    { id: 'tasks', label: label('All tasks', tasks === null ? null : tasks.filter(isLive).length) },
   ];
 
   const viewing = openJob === null;

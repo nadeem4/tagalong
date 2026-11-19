@@ -1,6 +1,6 @@
 /**
  * One row of the Tasks page's task list: the task's title, its kind and state, who started it
- * (the root of its caused-by chain, else the task's own source) and Stop while it is live. The
+ * (the oldest known cause in its caused-by chain, else the task's own source) and Stop while it is live. The
  * page above reads the tasks and passes them in. Contains TaskRow.
  */
 import { useState } from 'react';
@@ -13,6 +13,8 @@ const STATES: Record<string, string> = {
   waiting: 'Waiting',
   done: 'Done',
   stopped: 'Stopped',
+  failed: 'Failed',
+  declined: 'Declined',
 };
 
 export function TaskRow({
@@ -28,6 +30,7 @@ export function TaskRow({
     void Promise.resolve(onStop(task.id)).finally(() => setBusy(false));
   };
   const name = task.title ?? KINDS[task.kind] ?? task.kind;
+  // The chain is capped and ends at a swept event, so its last link is the oldest cause known.
   const from = task.chain.length > 0 ? task.chain[task.chain.length - 1]!.source : task.source;
   const live = task.state === 'open' || task.state === 'waiting';
   return (
