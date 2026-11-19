@@ -122,6 +122,7 @@ class Jobs:
         emit: Callable[[Event], None] = lambda event: None,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
         finish_news: Callable[[str, str], None] = lambda kind, source: None,
+        news_waiting: Callable[[str, str], bool] = lambda kind, source: False,
         on_timers_changed: Callable[[], None] = lambda: None,
         outputs: OutputStore | None = None,
         items: OpenItems | None = None,
@@ -140,6 +141,7 @@ class Jobs:
         self._now = now  # wall time for activity stamps and how long a step has run
         self._emit = emit  # the session's post_event: a quiet job wakes Scout through it
         self._finish_news = finish_news  # ends the waiting news of a job that is over
+        self._news_waiting = news_waiting  # is news of this kind and source still `new`?
         self._records = records  # the jobs themselves: goal and expert-call rows
         self._setup_facts = setup_facts  # machine and registry facts for a setup refusal
         self._holds = holds
@@ -427,7 +429,8 @@ class Jobs:
 
     def _check_apps(self, wanted: Sequence[str], settling: bool = False) -> tuple[str, ...]:
         """The offered apps, deduplicated; a plain refusal for one that is unknown or not usable.
-        `settling`: the brain just started, so an app still connecting is given the time."""
+        `settling`: only the start-up fill, when the apps were just started: one still connecting
+        is given the time."""
         offered = tuple(dict.fromkeys(wanted))
         known = self._apps.ids() if self._apps is not None else []
         for app_id in offered:
@@ -444,18 +447,24 @@ class Jobs:
         """The apps as the hand-off card names them: id and the app's own name."""
         return [{"id": a, "name": self._apps.name(a) if self._apps else a} for a in offered]
 
-    async def _start_part(self, job_id: str, *args, claim: str | None = None, **kw) -> JobId:
+    async def _start_part(
+        self, job_id: str, *args, claim: str | None = None, queued: bool = False, **kw
+    ) -> JobId:
         """The one seam that starts an expert run (see `_begin_part`). `claim` is the slot the
         start holds until its row exists, taken by the caller so no start can slip in while this
-        one awaits; it is given back however this ends."""
+        one awaits; it is given back however this ends. A `queued` start keeps its claim past a
+        failure: its goal is still planned, so freeing the slot here would let `fill_slots` start
+        it a second time. `_start_queued` frees the slot once the goal is closed."""
         self._in_flight += 1
         try:
             return await self._begin_part(job_id, *args, claim=claim, **kw)
         finally:
             self._in_flight -= 1
-            self._claimed.discard(claim or "")
+            if not queued:
+                self._claimed.discard(claim or "")
             self._prune_stopped()
-            self.fill_slots()  # a start that failed gives its slot to the next in line
+            if not queued:
+                self.fill_slots()  # a start that failed gives its slot to the next in line
 
     async def _begin_part(
         self,
@@ -632,10 +641,12 @@ class Jobs:
     def queue(self) -> list[Job]:
         return self._records.queue()
 
-    def fill_slots(self) -> list[str]:
+    def fill_slots(self, settling: bool = False) -> list[str]:
         """Start the oldest approved goals while slots are free; returns the ids it started. They
         start on their own, so the caller never waits for an expert to come up. A goal approved
-        over an hour ago is not started: it is asked about first (job_recheck)."""
+        over an hour ago is not started: it is asked about first (job_recheck). `settling` is
+        only the start-up fill: an app still connecting is given the time, as a hand-off never
+        would."""
         if self._closing:
             return []
         self._repeat_rechecks()
@@ -649,7 +660,7 @@ class Jobs:
                 self._recheck(goal)
                 continue
             self._claimed.add(goal.id)
-            task = asyncio.create_task(self._start_queued(goal))
+            task = asyncio.create_task(self._start_queued(goal, settling))
             self._background.add(task)
             task.add_done_callback(self._background.discard)
             started.append(goal.id)
@@ -692,10 +703,15 @@ class Jobs:
             for item in (self._items.list_open("ask") if self._items is not None else [])
             if (c := item.saved_call or {}).get("name") == "requeue_job"
         }
-        for job in self.held():
+        held = self.held()
+        for gone in set(self._rechecked) - {job.id for job in held}:
+            del self._rechecked[gone]  # answered, stopped or failed: nothing left to remember
+        for job in held:
             asked = self._rechecked.get(job.id)
-            if job.id in open_cards or (
-                asked is not None and (self._now() - asked).total_seconds() <= RECHECK_AFTER_S
+            if (
+                job.id in open_cards
+                or self._news_waiting("job_recheck", f"job:{job.id}")  # told nobody yet
+                or (asked is not None and (self._now() - asked).total_seconds() <= RECHECK_AFTER_S)
             ):
                 continue
             goal = self._records.work.get(job.id)
@@ -716,7 +732,7 @@ class Jobs:
             },
         )
 
-    async def _start_queued(self, goal: WorkRow) -> None:
+    async def _start_queued(self, goal: WorkRow, settling: bool = False) -> None:
         """Start one queued goal. If it cannot start, it ends failed and Scout is told why;
         nobody is waiting on the call, so there is no one to raise to."""
         wants = goal.input or {}
@@ -729,7 +745,7 @@ class Jobs:
             earlier = self._records.get_job(resume.get("job", ""))
             parts = earlier.parts if earlier else []
             earlier_part = next((p for p in parts if p.id == resume.get("part")), None)
-            self._check_apps(wants.get("apps") or (), settling=True)  # one may be gone by now
+            self._check_apps(wants.get("apps") or (), settling=settling)  # one may be gone now
             await self._start_part(
                 goal.id,
                 chosen,
@@ -742,13 +758,16 @@ class Jobs:
                 task_id=goal.task_id,
                 caused_by=wants.get("caused_by"),
                 claim=goal.id,
+                queued=True,
             )
             self._after_start(earlier, earlier_part, bool(wants.get("explicit")), None)
         except Exception as err:  # a start must never strand its slot
             if not isinstance(err, JobError | TransitionRefused):
                 log.exception("queued job %s could not start", goal.id)
+            self._start_failed(goal, str(err) or type(err).__name__)  # closes the goal first
+        finally:
             self._claimed.discard(goal.id)
-            self._start_failed(goal, str(err) or type(err).__name__)
+            self._prune_stopped()
             self.fill_slots()  # the slot it held is free again
 
     def _start_failed(self, goal: WorkRow, reason: str) -> None:

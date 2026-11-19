@@ -1483,8 +1483,11 @@ its slot. When a job ends, `fill_slots()` starts the oldest approved goal (oldes
 it also runs when a start fails (its slot goes on to the next in line) and once at start-up,
 after the resume scan and `apps.start()`, so a restart loses no approved job. Each
 start runs in a background task, so nothing waits for an expert to come up; one that cannot start
-ends `failed` and Scout hears it as `job_ended`; its apps are checked again first, because one may
-have been removed while it waited. A new hand-off never jumps ahead of one already in line.
+ends `failed` and Scout hears it as `job_ended`, and only then gives its slot on (a queued start
+keeps its claim until its goal is closed, so a failed start is never tried twice); its apps are
+checked again first, because one may have been removed while it waited. Only the start-up fill
+(`fill_slots(settling=True)`) accepts an app that is still `connecting`; every later fill is as
+strict as a hand-off. A new hand-off never jumps ahead of one already in line.
 Stopping a task cancels its planned goals, so they leave the line, and `fill_slots` never starts a
 goal of a stopped task; `shutdown` cancels the waiting starts and awaits them. Every start counts
 in `_in_flight` (a due redo of a held part, `run_planned`, takes no slot claim), and a stop's mark on a
@@ -1500,8 +1503,8 @@ Allow (`Jobs.requeue`) sets `work_job.rechecked_at` and moves the goal back to `
 Jobs list shows a queued row as `queued` with `place` and `task_id`; its Stop calls `task_stop`.
 A held goal (blocked, never ran) shows as `held`, "Needs your OK", with its `task_id` and the
 same Stop (`Jobs.held`). `fill_slots` posts `job_recheck` again for a held goal whose question was
-lost (a restart, a card that ran out, a silent Scout): not while its `requeue_job` card is open, and
-at most once an hour.
+lost (a restart, a card that ran out, a silent Scout): not while its `requeue_job` card is open or
+a `job_recheck` for it is still `new` in the event log, and at most once an hour.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "edgeLabelBackground": "#ffffff", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%

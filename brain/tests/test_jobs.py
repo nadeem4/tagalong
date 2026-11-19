@@ -242,6 +242,7 @@ class Rig:
             setup_facts=setup_facts,
             emit=self._emit,
             finish_news=self.events.finish_matching,
+            news_waiting=self.events.has_new,
             now=lambda: self.wall,
             on_timers_changed=lambda: setattr(self, "timers_changed", self.timers_changed + 1),
             apps=apps,
@@ -578,7 +579,8 @@ async def test_a_blocked_goal_nobody_is_asking_about_is_asked_about_again(make_r
     rig.jobs.fill_slots()
     assert len(rechecks(rig)) == 1  # not again while the ask may still be answered
     rig.wall += timedelta(seconds=RECHECK_AFTER_S + 1)
-    rig.jobs.fill_slots()  # the card ran out and Scout stayed silent: ask once more
+    rig.events.finish_matching("job_recheck", "job:q1")  # Scout heard it; the card ran out
+    rig.jobs.fill_slots()  # and nothing came of it: ask once more
     assert len(rechecks(rig)) == 2
     assert [j.id for j in rig.jobs.held()] == ["q1"]
     rig.jobs.requeue("q1")  # answered: it is a queued job again, not held
@@ -643,6 +645,94 @@ async def test_a_stop_during_a_queued_start_never_starts_it(make_rig, monkeypatc
     assert rig.records.running_jobs() == []
     assert rig.records.work.get("q1").state == "cancelled"
     await until(lambda: not any(alive(run) for run in rig.runs))
+
+
+async def test_a_failed_queued_start_is_tried_once_and_ends_the_goal(make_rig, monkeypatch):
+    rig = make_rig(FakeAsks(), max_running=1)
+    calls = []
+
+    async def boom(self, *args, **kw):
+        calls.append(1)
+        raise RuntimeError("auth required")
+
+    monkeypatch.setattr(ExpertRun, "start", boom)
+    plan(rig, 1)
+    assert rig.jobs.fill_slots() == ["q1"]
+    await asyncio.gather(*list(rig.jobs._background))
+    await asyncio.sleep(0.05)
+    assert len(calls) == 1  # the goal is still planned while it fails: never claimed again
+    assert not rig.jobs._background and not rig.jobs._claimed
+    assert rig.records.work.get("q1").state == "failed"
+
+
+async def test_a_failed_queued_start_still_hands_its_slot_on(make_rig, monkeypatch):
+    rig = make_rig(FakeAsks(), max_running=1)
+    gate = gated_start(monkeypatch, fail_first=True)
+    plan(rig, 1, rig.wall)
+    plan(rig, 2, rig.wall + timedelta(seconds=1))
+    assert rig.jobs.fill_slots() == ["q1"]
+    gate.set()
+    await until(lambda: [j.id for j in rig.records.running_jobs()] == ["q2"])
+    assert rig.records.work.get("q1").state == "failed"
+
+
+async def test_only_the_start_up_fill_waits_for_an_app_still_connecting(make_rig):
+    rig = apps_rig(make_rig)
+    rig.jobs._apps.states["lin"] = "connecting"
+    for n in (1, 2):
+        rig.records.plan_job(
+            f"q{n}",
+            rig.experts[0].id,
+            "t",
+            str(rig.folder),
+            "",
+            None,
+            None,
+            rig.wall,
+            {"apps": ["lin"]},
+        )
+    assert rig.jobs.fill_slots() == ["q1", "q2"]  # later fills are as strict as a hand-off
+    await until(lambda: rig.records.work.get("q1").state == "failed")
+    assert rig.runs == []
+    rig.records.plan_job(
+        "q3",
+        rig.experts[0].id,
+        "t",
+        str(rig.folder),
+        "",
+        None,
+        None,
+        rig.wall,
+        {"apps": ["lin"]},
+    )
+    assert rig.jobs.fill_slots(settling=True) == ["q3"]  # the brain just started: give it time
+    await until(lambda: [j.id for j in rig.records.running_jobs()] == ["q3"])
+
+
+async def test_a_recheck_still_waiting_in_the_log_is_not_posted_again(make_rig):
+    rig = make_rig(FakeAsks())
+    held = plan(rig, 1, rig.wall - timedelta(hours=2))
+    rig.records.work.transition(held.id, "blocked", reason="approved over an hour ago")
+    rig.jobs.fill_slots()
+    assert len(rechecks(rig)) == 1
+    rig.jobs._rechecked.clear()  # a restart forgets when it asked; the event is still `new`
+    rig.wall += timedelta(seconds=RECHECK_AFTER_S + 1)
+    rig.jobs.fill_slots()
+    assert len(rechecks(rig)) == 1
+
+
+async def test_the_recheck_memory_drops_a_job_that_is_no_longer_held(make_rig):
+    rig = make_rig(FakeAsks())
+    for n in (1, 2):
+        held = plan(rig, n, rig.wall - timedelta(hours=2))
+        rig.records.work.transition(held.id, "blocked", reason="approved over an hour ago")
+    rig.jobs.fill_slots()
+    assert set(rig.jobs._rechecked) == {"q1", "q2"}
+    rig.jobs.requeue("q1")
+    assert "q1" not in rig.jobs._rechecked
+    rig.records.work.transition("q2", "cancelled", reason="stopped")
+    rig.jobs.fill_slots()
+    assert rig.jobs._rechecked == {}
 
 
 async def test_a_job_waiting_on_a_card_keeps_its_slot(make_rig):

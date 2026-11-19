@@ -366,7 +366,7 @@ async def _run() -> None:
             sweep_staging, config.data_dir
         )  # an install a killed brain left half-staged
         await apps.start()  # connects in the background, so a slow app never delays boot
-        session.jobs.fill_slots()  # approved jobs a restart left waiting
+        session.jobs.fill_slots(settling=True)  # approved jobs a restart left waiting
         port = server.sockets[0].getsockname()[1]
         bridges = BridgeSupervisor(  # the WhatsApp bridge; runs only when on and set up
             env=os.environ,

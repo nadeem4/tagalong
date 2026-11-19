@@ -342,6 +342,10 @@ class EventLog:
         text = store.next_not_before(self._db, utc_text(self._now()))
         return None if text is None else datetime.fromisoformat(text)
 
+    def has_new(self, kind: str, source: str) -> bool:
+        """Is news of this kind and source still waiting to be told?"""
+        return bool(store.new_ids(self._db, kind, source))
+
     def finish_matching(
         self, kind: str, source: str, state: str = "handled", *, keep: str | None = None
     ) -> list[str]:
