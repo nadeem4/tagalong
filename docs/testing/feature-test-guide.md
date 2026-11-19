@@ -114,6 +114,11 @@ desktop app. You need `uv` and an Anthropic key.
    **Expected:** a result `{}`, then notifications: `turn` with
    `state: "started"` (its `events` lists `s1`), `reply` frames whose `delta` spell out a short greeting, exactly one
    `reply` with `done: true`, then `turn` with `state: "ended"` and `reason: "done"`.
+   Then read the database: `sqlite3 ~/.tagalong/tagalong.db "select kind, state, source from tasks"`.
+   **Expected:** one row, `ask|done|desktop`: the say's Ask task ended with its turn. Send the
+   same `say` (id `s1`) again: still one row. (Unit tests: `test_sessions.py`
+   `test_a_say_opens_an_ask_that_ends_done_with_its_turn`, `test_a_duplicate_say_id_opens_one_ask`;
+   `test_runner.py` `test_a_gave_up_say_fails_its_ask`.)
 4. **Action:** paste a `say` asking for a long story, then at once
    `{"jsonrpc":"2.0","method":"cancel","params":{"turn":"<the turn id>"}}`
    **Expected:** deltas stop, one `reply` with `done: true`, and `turn` `ended` with

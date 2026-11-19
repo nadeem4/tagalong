@@ -604,3 +604,10 @@ def test_job_wake_note_says_a_report_may_be_a_preview():
 def test_soul_has_no_numeric_limits():
     soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8")
     assert not re.search(r"\d+\s+(words|lines|sentences)", soul)
+
+
+def test_the_open_tasks_block_sits_before_capabilities():
+    sections = system_prompt(
+        NOW, [], preferences="PREFS", tasks="TASKS", capabilities="CAPS"
+    ).split("\n\n")
+    assert sections.index("PREFS") < sections.index("TASKS") < sections.index("CAPS")

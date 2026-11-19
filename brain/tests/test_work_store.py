@@ -71,7 +71,7 @@ def test_create_writes_created_event(store):
     assert _kinds(store, row.id) == ["created"]
 
 
-def test_create_stores_options(store, clock):
+def test_create_keeps_task_id_and_options(store, clock):
     due = clock.at + timedelta(minutes=5)
     row = store.create(
         "tool_call",
@@ -79,12 +79,12 @@ def test_create_stores_options(store, clock):
         input={"a": 1},
         due_at=due,
         safe_to_retry=True,
-        source_message_id=7,
+        task_id="t7",
         id="abc",
         max_attempts=5,
     )
     assert (row.id, row.input, row.safe_to_retry, row.max_attempts) == ("abc", {"a": 1}, True, 5)
-    assert row.due_at == utc_text(due) and row.source_message_id == 7
+    assert row.due_at == utc_text(due) and row.task_id == "t7"
     assert row.created_at == utc_text(START) and row.checkpoint is None
 
 

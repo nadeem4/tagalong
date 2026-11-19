@@ -18,6 +18,7 @@ from brain.runner import GROUP_CAP, Runner, pick, wake_text
 from brain.store.conversation import save_messages
 from brain.store.db import open_db, utc_text
 from brain.store.events import EventRow
+from brain.tasks import Tasks
 
 T0 = datetime(2026, 11, 16, 12, 0, tzinfo=UTC)
 
@@ -141,10 +142,12 @@ class Rig:
         self.presence = Presence(self.bodies, lambda: self.t)
         db = open_db(":memory:")
         self.log = EventLog(db, Masker(lambda: []), lambda: self.t)
+        self.tasks = Tasks(db, Masker(lambda: []).mask, lambda: self.t)
         self.session = FakeSession()
         self.runner = Runner(
-            self.log, self.presence, self.bodies, self.session, lambda: self.t, guards, quiet
-        )
+            self.log, self.presence, self.bodies, self.session, lambda: self.t, guards, self.tasks,
+            quiet,
+        )  # fmt: skip
 
     def post(self, kind: str, source: str, id: str, at: int | None = None) -> EventRow:
         when = None if at is None else T0 + timedelta(seconds=at)
@@ -974,3 +977,38 @@ async def test_old_news_is_told_with_its_age():
     [text] = rig.session.told  # the runner picked it and told it at the break
     assert 'age="3h"' in text
     await rig.runner.stop()
+
+
+async def test_a_gave_up_say_fails_its_ask():
+    rig = LoopRig()
+    ask = rig.tasks.open("ask", "desktop")
+    rig.log.post(Event("say", "desktop", {"text": "s1"}, id="s1", task=ask))
+    rig.runner.poke()
+    for wait in (30, 120, 600, 0):
+        await ticks()
+        turn = rig.session.started[-1][0]
+        rig.runner.turn_ended(turn, "error")
+        rig.t += timedelta(seconds=wait)
+        rig.runner.poke()
+    await ticks()
+    assert rig.log.get("s1").state == "gave_up"
+    assert rig.tasks.get(ask).state == "failed"
+    await rig.runner.stop()
+
+
+async def test_a_done_turn_ends_its_ask():
+    rig = LoopRig()
+    ask = rig.tasks.open("ask", "desktop")
+    rig.log.post(Event("say", "desktop", {"text": "s1"}, id="s1", task=ask))
+    rig.runner.poke()
+    await ticks()
+    assert rig.tasks.get(ask).state == "open"
+    rig.runner.turn_ended(rig.session.started[0][0], "done")
+    assert rig.tasks.get(ask).state == "done"
+    await rig.runner.stop()
+
+
+def test_wake_text_marks_the_task():
+    r = EventRow(id="1", kind="timer", at=utc_text(T0), source="timer:1", task="abc123")
+    text = wake_text(EVENT_KINDS["timer"], [r], "", T0)
+    assert "task=abc123" in text

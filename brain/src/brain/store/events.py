@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 
 _COLS = (
     "id, kind, at, source, caused_by, payload_json, state, attempts, not_before, "
-    "turn_id, end_reason, resume"
+    "turn_id, end_reason, resume, task"
 )
 
 
@@ -28,24 +28,25 @@ class EventRow:
     turn_id: str | None = None
     end_reason: str | None = None
     resume: bool = False
+    task: str | None = None
 
 
 def _row(r: tuple) -> EventRow:
     return EventRow(
         id=r[0], kind=r[1], at=r[2], source=r[3], caused_by=r[4], payload=json.loads(r[5]),
         state=r[6], attempts=r[7], not_before=r[8], turn_id=r[9], end_reason=r[10],
-        resume=bool(r[11]),
+        resume=bool(r[11]), task=r[12],
     )  # fmt: skip
 
 
 def insert(db: sqlite3.Connection, row: EventRow) -> bool:
     """False when the id exists: a retried say is one event, never two."""
     cur = db.execute(
-        f"INSERT OR IGNORE INTO events({_COLS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        f"INSERT OR IGNORE INTO events({_COLS}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             row.id, row.kind, row.at, row.source, row.caused_by, json.dumps(row.payload),
             row.state, row.attempts, row.not_before, row.turn_id, row.end_reason,
-            int(row.resume),
+            int(row.resume), row.task,
         ),
     )  # fmt: skip
     return cur.rowcount == 1

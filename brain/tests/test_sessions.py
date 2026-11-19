@@ -3963,3 +3963,84 @@ async def test_a_cut_retry_of_requests_from_two_turns_cuts_nothing(tmp_path):
     await idle(session)
     await _cancel_the_retry(session, clock)  # one retry takes both
     assert [r[3] for r in saved_rows(memory)] == [0, 0]
+
+
+async def test_a_say_opens_an_ask_that_ends_done_with_its_turn():
+    session, _ = make(Gate(["ok"]))
+    first = say("hi")
+    await session.say("desktop", first)
+    ask = session.events.get(first.id).task
+    assert ask is not None and session.tasks.get(ask).source == "desktop"
+    await idle(session)
+    assert session.tasks.get(ask).state == "done"
+
+
+async def test_a_duplicate_say_id_opens_one_ask():
+    session, _ = make(Gate(["ok"]))
+    first = say("hi")
+    await session.say("desktop", first)
+    await session.say("desktop", first)
+    await idle(session)
+    count = session._memory.db.execute("SELECT count(*) FROM tasks").fetchone()[0]
+    assert count == 1
+
+
+async def test_the_prompt_carries_open_tasks():
+    model = Gate(["ok"])
+    session, _ = make(model)
+    session.tasks.open("do", "desktop", title="tidy the invoices")
+    await session.say("desktop", say("hi"))
+    await idle(session)
+    assert "tidy the invoices" in model.systems[-1]
+
+
+def _seed_say_with_ask(memory, *, state, attempts=0, handled_at=None):
+    memory.db.execute(
+        "INSERT INTO tasks(id, kind, state, source, created_at, updated_at)"
+        " VALUES ('a1','ask','open','desktop','2026-01-01T08:00:00+00:00',"
+        "'2026-01-01T08:00:00+00:00')"
+    )
+    memory.db.execute(
+        "INSERT INTO events(id, kind, at, source, payload_json, state, attempts, turn_id,"
+        " handled_at, task) VALUES ('s1','say','2026-01-01T08:00:00+00:00','desktop','{}',"
+        "?,?,?,?,'a1')",
+        (state, attempts, "t1" if state == "taken" else None, handled_at),
+    )
+    memory.db.commit()
+
+
+def _ask_state(memory):
+    return memory.db.execute("SELECT state FROM tasks WHERE id='a1'").fetchone()[0]
+
+
+async def test_a_restart_settles_a_handled_say_whose_ask_stayed_open():
+    memory = Memory(":memory:")
+    _seed_say_with_ask(memory, state="handled", handled_at="2026-01-01T08:01:00+00:00")
+    make(Gate([]), memory, screen=False)
+    assert _ask_state(memory) == "done"
+
+
+async def test_a_restart_fails_the_ask_of_a_say_a_crash_loop_gave_up():
+    memory = Memory(":memory:")
+    _seed_say_with_ask(memory, state="taken", attempts=3)
+    make(Gate([]), memory, screen=False)
+    assert _ask_state(memory) == "failed"
+
+
+async def test_the_start_up_sweep_does_not_outrun_an_ask_settle():
+    memory = Memory(":memory:")
+    _seed_say_with_ask(memory, state="handled", handled_at="2025-01-01T08:01:00+00:00")
+    make(Gate([]), memory, screen=False)  # the say is older than work_keep_days
+    assert _ask_state(memory) == "done"
+
+
+async def test_the_start_up_sweep_removes_old_ended_tasks():
+    memory = Memory(":memory:")
+    memory.db.execute(
+        "INSERT INTO tasks(id, kind, state, source, created_at, updated_at, ended_at)"
+        " VALUES ('old','do','done','desktop','2025-01-01T08:00:00+00:00',"
+        "'2025-01-01T08:00:00+00:00','2025-01-01T08:00:00+00:00')"
+    )
+    memory.db.commit()
+    make(Gate([]), memory, screen=False)
+    assert memory.db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0] == 0

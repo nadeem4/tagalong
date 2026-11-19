@@ -38,7 +38,7 @@ _MOVES = {
 _COLUMNS = (
     "id, parent_id, root_id, seq, kind, state, title, input, summary, detail_id, progress,"
     " checkpoint, attempt, max_attempts, safe_to_retry, error_kind, last_error, due_at,"
-    " created_at, updated_at, ended_at, end_reason, source_message_id"
+    " created_at, updated_at, ended_at, end_reason, task_id"
 )
 _W_COLUMNS = ", ".join(f"w.{c.strip()}" for c in _COLUMNS.split(","))
 
@@ -89,7 +89,7 @@ class WorkRow:
     updated_at: str
     ended_at: str | None
     end_reason: str | None
-    source_message_id: int | None
+    task_id: str | None
 
 
 @dataclass(frozen=True)
@@ -424,7 +424,7 @@ class WorkStore:
         input: dict | None = None,
         due_at: datetime | None = None,
         safe_to_retry: bool = False,
-        source_message_id: int | None = None,
+        task_id: str | None = None,
         id: str | None = None,
         max_attempts: int | None = None,
     ) -> WorkRow:
@@ -444,7 +444,7 @@ class WorkStore:
             ).fetchone()[0]
             self.db.execute(
                 "INSERT INTO work(id, parent_id, root_id, seq, kind, state, title, input,"
-                " max_attempts, safe_to_retry, due_at, created_at, updated_at, source_message_id)"
+                " max_attempts, safe_to_retry, due_at, created_at, updated_at, task_id)"
                 " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     id,
@@ -460,7 +460,7 @@ class WorkStore:
                     None if due_at is None else utc_text(due_at),
                     now,
                     now,
-                    source_message_id,
+                    task_id,
                 ),
             )
             self.add_event(id, "created", {"kind": kind})
