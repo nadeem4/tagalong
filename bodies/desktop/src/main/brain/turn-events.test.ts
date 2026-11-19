@@ -710,3 +710,57 @@ describe('createTurnEvents joined and blank remarks', () => {
     expect(m.map('turn', turn('ended', 'done'))).toEqual([]);
   });
 });
+
+describe('createTurnEvents catching up after a resync', () => {
+  const saved = (id: string, text: string, body = 'desktop', role = 'assistant') => ({
+    id,
+    role,
+    text,
+    body,
+  });
+
+  it('re-reads the chat after a resync', () => {
+    const m = make();
+    expect(m.chatAnchor()).toBeUndefined(); // an empty chat: the brain sends the last few
+    const events = m.caughtUp([saved('7', 'Here is the long answer.')]);
+    expect(events).toMatchObject([{ type: 'pet.remark', text: 'Here is the long answer.' }]);
+    expect(m.chatAnchor()).toBe('7');
+  });
+
+  it('shows a caught-up reply once, over two resyncs', () => {
+    const m = make();
+    const rows = [saved('7', 'Once only.')];
+    expect(m.caughtUp(rows)).toHaveLength(1);
+    expect(m.caughtUp(rows)).toEqual([]);
+    expect(m.caughtUp([...rows, saved('8', 'Next one.')])).toMatchObject([{ text: 'Next one.' }]);
+  });
+
+  it('shows only assistant replies said on the desktop', () => {
+    const m = make();
+    const rows = [
+      saved('6', 'what is the weather', 'desktop', 'user'),
+      saved('7', 'On your phone.', 'whatsapp'),
+      saved('8', 'Sunny.'),
+    ];
+    expect(m.caughtUp(rows)).toMatchObject([{ text: 'Sunny.' }]);
+    expect(m.chatAnchor()).toBe('8');
+  });
+
+  it('shows nothing when the saved chat has nothing new', () => {
+    const m = make();
+    expect(m.caughtUp([])).toEqual([]);
+    m.seen([saved('3', 'Already on screen.')]);
+    expect(m.caughtUp([saved('3', 'Already on screen.')])).toEqual([]);
+  });
+
+  it('a reply seen live is not shown again, and the anchor never goes back', () => {
+    const m = make();
+    m.seen([saved('9', 'Streamed to me.')]);
+    expect(m.chatAnchor()).toBe('9');
+    m.seen([saved('4', 'older')]);
+    expect(m.chatAnchor()).toBe('9');
+    expect(m.caughtUp([saved('9', 'Streamed to me.'), saved('10', 'Missed.')])).toMatchObject([
+      { text: 'Missed.' },
+    ]);
+  });
+});

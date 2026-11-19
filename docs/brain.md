@@ -2767,6 +2767,14 @@ event given up, a say or card answer included, oldest first, each as
 `{id, kind, source, at, age_s, gave_up, gist}`; the `gist` is the payload's first fact value cut
 short (JSON when it is not text), never prose. A new say or card answer is not listed.
 
+Home's `chat_since` tool (`chat_tools.py`, over `store/conversation.py` `since`) is how a body
+catches up after `resync: true`: `{after_id?, limit?}` returns `{messages: [{id, role, text,
+source, body, at}], more}` oldest first, from the saved chat: assistant replies only (cut rows,
+rows with no words and rows that call a tool are left out; saved rows have no turn link, so
+mid-turn words are told apart only by the tool call). With `after_id` it returns the oldest
+`limit` rows after it, and `more` tells the body to page on; with none, or one that names no
+row, it returns the last `limit` (default 20, at most 50). The text was masked when saved.
+
 There is one deadline rule: `DEADLINE_S` in `open_items.py` for what waits on a person. Nothing in the brain
 waits on a card but `Holds`, which an expert's open call needs.
 

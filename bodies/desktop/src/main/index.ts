@@ -43,6 +43,8 @@ import {
 import { captureNotice, captureTooltip } from './capture-notice';
 import { captureActiveWindow, captureAskSnapshot } from './context';
 import type { TurnEvent } from '@tagalong/ui/shapes';
+import { callJson } from './brain/call-json';
+import { createChatSync } from './brain/chat-sync';
 import { createTurnEvents } from './brain/turn-events';
 import { startBrain } from './brain/start';
 import { startingGate } from './brain/starting-gate';
@@ -297,6 +299,12 @@ async function start(): Promise<void> {
   trackSay = (id) => turnEvents.trackSay(id);
   untrackSay = (id) => turnEvents.untrackSay(id);
   openConfirms = () => turnEvents.openConfirms();
+  // A resync means replies may have streamed past the replay window: read them from the saved chat.
+  const chatSync = createChatSync({
+    call: (tool, input) => callJson(brain, tool, input),
+    events: turnEvents,
+    forward: forwardTurn,
+  });
   // A brain that stays down fails the open turns, so the bubble does not stream forever.
   const watchOffline = offlineWatch(() => turnEvents.resync().forEach(forwardTurn));
   // The Add key mark follows the brain's own answer; an unreadable answer leaves it as it is.
@@ -353,13 +361,21 @@ async function start(): Promise<void> {
       // Heard words, the voice's status and spoken sentences: the voice bridge sends them on.
       desktop?.voiceBridge.onNotification(method, params);
       turnEvents.map(method, params).forEach(forwardTurn);
+      if (method === 'turn' && (params as { state?: string }).state === 'ended') {
+        void chatSync.turnEnded();
+      }
     },
-    onResync: () => turnEvents.resync().forEach(forwardTurn),
+    onResync: () => {
+      turnEvents.resync().forEach(forwardTurn);
+      // The client says online right after this; a call made now would not be sent yet.
+      chatSync.resynced();
+    },
     // Every hello names the brain's version and build: an older one is restarted or flagged.
     onHello: (hello) => void brainControl?.check(hello),
     onStatus: (status) => {
       brainStatus = status;
       markBrainLink(statusMarks, status);
+      if (status === 'online') void chatSync.online();
       // A listening session open when the link dropped asks the new connection to listen.
       if (status === 'online') {
         desktop?.voiceBridge.onOnline();
