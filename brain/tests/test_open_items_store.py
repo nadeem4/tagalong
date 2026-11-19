@@ -15,6 +15,7 @@ def _put(db, id="i1", **kw):
         "job_id": None,
         "created_at": "2026-11-11T09:00:00+00:00",
         "deadline_at": "2026-11-12T09:00:00+00:00",
+        "window_s": 86400,
     }
     row.update(kw)
     store.insert(db, id, **row)
@@ -28,6 +29,7 @@ def test_insert_get_roundtrip_and_survives_reopen(tmp_path):
     assert (item.kind, item.state, item.job_id) == ("ask", "open", "j1")
     assert item.saved_call == {"tool": "x"} and item.live_only is False
     assert item.closed_at is None and item.closed_by is None
+    assert item.window_s == 86400
 
 
 def test_close_only_moves_an_open_item(tmp_path):

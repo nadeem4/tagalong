@@ -736,6 +736,7 @@ gone.
 | `job_id`          | TEXT             | The job it belongs to, or null; `Job.open_items` lists a job's ids                             |
 | `created_at`      | TEXT             | UTC time text                                                                                  |
 | `deadline_at`     | TEXT             | UTC time text: `created_at` plus `DEADLINE_S` (one day) unless the item asked for another      |
+| `window_s`        | REAL             | The answer window in seconds, set at open; Not now moves the deadline by it, never growing it  |
 | `check_back_at`   | TEXT             | UTC time text: when to look at the card again, or null once it was told                        |
 | `check_back_by`   | TEXT             | Who set the check-back: `scout` or `person` (CHECK); a person's is not moved by Scout          |
 | `urgent`          | INTEGER          | 1 when Scout called the ask urgent: its check-back is told even in quiet hours                 |

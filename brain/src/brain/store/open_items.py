@@ -10,7 +10,8 @@ from dataclasses import dataclass
 
 _COLUMNS = (
     "id, kind, state, task_id, caused_by, saved_call_json, live_only, job_id, created_at,"
-    " deadline_at, check_back_at, check_back_by, urgent, closed_at, closed_by, answer, reason"
+    " deadline_at, check_back_at, check_back_by, urgent, closed_at, closed_by, answer, reason,"
+    " window_s"
 )
 
 
@@ -33,6 +34,7 @@ class StoredItem:
     closed_by: str | None
     answer: str | None
     reason: str | None
+    window_s: float
 
 
 def _item(r: tuple) -> StoredItem:
@@ -53,14 +55,15 @@ def insert(
     job_id: str | None,
     created_at: str,
     deadline_at: str,
+    window_s: float,
     check_back_at: str | None = None,
     check_back_by: str | None = None,
     urgent: bool = False,
 ) -> None:
     db.execute(
         "INSERT INTO open_items(id, kind, task_id, caused_by, saved_call_json, live_only, job_id,"
-        " created_at, deadline_at, check_back_at, check_back_by, urgent)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        " created_at, deadline_at, window_s, check_back_at, check_back_by, urgent)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             id,
             kind,
@@ -71,6 +74,7 @@ def insert(
             job_id,
             created_at,
             deadline_at,
+            window_s,
             check_back_at,
             check_back_by,
             int(urgent),

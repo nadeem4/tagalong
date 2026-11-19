@@ -371,6 +371,28 @@ async def test_stop_task_closes_the_card_and_posts_task_stop():
     assert [e.kind for e in rig.events] == ["task_stop"]  # no ask_ended: the task is over
 
 
+async def test_stop_task_on_a_card_whose_task_already_ended_still_tells_scout():
+    rig = Rig()
+    await rig.box.run(call())
+    [card] = rig.opened()
+    rig.tasks.end("k1", "done")
+    rig.asks.answer(card["id"], "stop_task", "desktop")
+    await rig.settle()
+    [ended] = [e for e in rig.events if e.kind == "ask_ended"]
+    assert (ended.payload["ask"], ended.payload["outcome"]) == (card["id"], "refused")
+    assert rig.source.ran == []
+
+
+async def test_an_ask_task_card_shows_no_task_and_no_stop_option():
+    rig = Rig()
+    rig.tasks.open("ask", "desktop", id="k2", title="Say")
+    rig.runner._task = lambda turn: "k2"
+    await rig.box.run(call())
+    [card] = rig.opened()
+    assert "task" not in card and "check_back_at" not in card
+    assert card["options"] == ["allow", "always", "deny"]
+
+
 async def test_a_yes_just_after_the_deadline_ends_it_like_the_timer_would():
     rig = Rig()
     await rig.box.run(call())

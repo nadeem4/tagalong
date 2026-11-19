@@ -42,6 +42,7 @@ class OpenItem:
     closed_by: str | None
     answer: str | None
     reason: str | None
+    window_s: float
 
 
 class OpenItemRefused(Exception):
@@ -87,6 +88,7 @@ def _item(s: store.StoredItem) -> OpenItem:
         s.closed_by,
         s.answer,
         s.reason,
+        s.window_s,
     )
 
 
@@ -122,6 +124,7 @@ class OpenItems:
             job_id=job_id,
             created_at=utc_text(now),
             deadline_at=utc_text(now + timedelta(seconds=ttl_s)),
+            window_s=ttl_s,
             # With no check-back given, look again two-thirds of the way to the deadline.
             check_back_at=utc_text(check_back_at or now + timedelta(seconds=ttl_s * 2 / 3)),
             check_back_by="scout",
@@ -195,7 +198,7 @@ class OpenItems:
         if by == "scout" and item.check_back_by == "person":
             raise OpenItemRefused("person_set")
         at = at or self._now() + timedelta(seconds=NOT_NOW_DEFAULT_S)
-        deadline = at + (item.deadline_at - item.created_at)
+        deadline = at + timedelta(seconds=item.window_s)
         store.set_check_back(self.db, id, utc_text(at), by, utc_text(deadline))
         moved = self.get(id)
         _event("not_now", moved, by, utc_text(at))

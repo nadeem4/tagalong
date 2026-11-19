@@ -140,8 +140,8 @@ class AskRunner:
     def _card_task(self, item: OpenItem) -> dict | None:
         """The fields a task's card carries: the task, and when it will be looked at again."""
         row = None if item.task_id is None else self._tasks_of.get(item.task_id)
-        if row is None:
-            return None
+        if row is None or row.kind == "ask":
+            return None  # the person never sees an Ask task: its card is a plain card
         return {
             "task": {"id": row.id, "title": row.title},
             "check_back_at": item.check_back_at.isoformat() if item.check_back_at else None,
@@ -213,7 +213,12 @@ class AskRunner:
         self._record_ask(item, "refused", "person", "the person stopped the task")
         self._items.finish(item.id, "cancelled")
         self._raw.pop(item.id, None)
-        for other in self._tasks_of.stop(item.task_id, body_id):
+        row = self._tasks_of.get(item.task_id)
+        closed = self._tasks_of.stop(item.task_id, body_id)
+        if row is None or row.state not in ("open", "waiting"):
+            # No task_stop goes out for a task already over, so Scout hears of it this way.
+            self._end(item, "refused", "the person stopped the task, but it was already over")
+        for other in closed:
             self._raw.pop(other, None)
             self._asks.card_closed(other)
         self.changed()

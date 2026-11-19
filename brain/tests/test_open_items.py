@@ -190,6 +190,15 @@ def test_not_now_moves_the_deadline_past_the_check_back(tmp_path):
     assert moved.deadline_at == at + timedelta(seconds=3600)
 
 
+def test_not_now_twice_keeps_the_original_window(tmp_path):
+    items, _ = make(tmp_path)
+    item = items.open("ask", ttl_s=3600)
+    items.not_now(item.id, T0 + timedelta(hours=5), "person")
+    at = T0 + timedelta(hours=9)
+    moved = items.not_now(item.id, at, "person")
+    assert moved.deadline_at == at + timedelta(seconds=3600)
+
+
 def test_checked_clears_the_check_back(tmp_path):
     items, clock = make(tmp_path)
     item = items.open("ask", ttl_s=900)

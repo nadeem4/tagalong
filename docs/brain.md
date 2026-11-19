@@ -766,15 +766,15 @@ the ask is logged `expired` (`decided_by: none`, reason `no answer`) and a `card
 wakes Scout. An expired ask runs nothing; the deadline never changes what is allowed. With no wait
 given the deadline is 3 days.
 
-_Task cards._ When the card has a task, `Asks.show` adds the options `not_now` and `stop_task`
+_Task cards._ When the card has a task (never an Ask task: the person does not see those, so their card is a plain card with no task fields, no Not now and no Stop task), `Asks.show` adds the options `not_now` and `stop_task`
 after the card's own options, and puts `task {id, title}`, `check_back_at`, `check_back_by` and
 `urgent` on the `ask` frame (see protocol/README.md). Not now keeps the card open and starts no
 turn: `OpenItems.not_now(id, at, by)` moves the check-back (30 minutes on when no time is given,
-by the person) and the deadline past it, and the brain sends the card again with the new
+by the person) and the deadline past it (the window kept in `window_s`, so it never grows), and the brain sends the card again with the new
 check-back. A check-back the person set is not moved by Scout. Stop task closes the card and calls
 `Tasks.stop(task_id, by)`: the task ends `stopped`, its open items end with reason `cancelled`
 (their cards close), nothing runs, and one `task_stop {task, by}` event is posted. It is a
-person's event, urgency now, so Scout never works on after it.
+person's event, urgency now, so Scout never works on after it. When Stop task finds the task already over, nothing is posted by `Tasks.stop`, so the runner tells Scout with `ask_ended` (refused).
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%

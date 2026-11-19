@@ -95,7 +95,7 @@ class Asks:
     def reschedule(self, ask_id: str, check_back_at: str, check_back_by: str) -> None:
         """Not now: the card stays open and every body is shown when it will be looked at again."""
         entry = self._open.get(ask_id)
-        if entry is not None:
+        if entry is not None and "task" in entry.params:  # a plain card shows no time
             entry.params.update(check_back_at=check_back_at, check_back_by=check_back_by)
             self._bodies.notify("ask", entry.params)
 
