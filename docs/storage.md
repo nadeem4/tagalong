@@ -690,17 +690,17 @@ retried say makes no second one. Ask tasks are never shown; later kinds (`do`, `
 `own`) are the ones the person sees. Migration `0038_tasks` creates the table, adds the two
 columns and drops `work.source_message_id` (never written).
 
-| Column                                 | Type             | Meaning                                                                          |
-| -------------------------------------- | ---------------- | -------------------------------------------------------------------------------- |
-| `id`                                   | TEXT PRIMARY KEY | Six hex characters, so Scout can cite it                                         |
-| `kind`                                 | TEXT             | `ask`, `do`, `later`, `watch` or `own` (CHECK)                                   |
-| `state`                                | TEXT             | `open`, `waiting`, `done`, `failed`, `stopped` or `declined` (CHECK)             |
-| `title`                                | TEXT             | Masked, capped at 200; null for an Ask                                           |
-| `source`                               | TEXT             | The source of the event that started it: a body id or an internal source         |
-| `caused_by`                            | TEXT             | The event that started it, or null (an Ask's say points at it instead)           |
-| `result`                               | TEXT             | The last result line, masked and capped                                          |
-| `created_at`, `updated_at`, `ended_at` | TEXT             | UTC time text                                                                    |
-| `end_reason`                           | TEXT             | Why it ended, or null                                                            |
+| Column                                 | Type             | Meaning                                                                  |
+| -------------------------------------- | ---------------- | ------------------------------------------------------------------------ |
+| `id`                                   | TEXT PRIMARY KEY | Six hex characters, so Scout can cite it                                 |
+| `kind`                                 | TEXT             | `ask`, `do`, `later`, `watch` or `own` (CHECK)                           |
+| `state`                                | TEXT             | `open`, `waiting`, `done`, `failed`, `stopped` or `declined` (CHECK)     |
+| `title`                                | TEXT             | Masked, capped at 200; null for an Ask                                   |
+| `source`                               | TEXT             | The source of the event that started it: a body id or an internal source |
+| `caused_by`                            | TEXT             | The event that started it, or null (an Ask's say points at it instead)   |
+| `result`                               | TEXT             | The last result line, masked and capped                                  |
+| `created_at`, `updated_at`, `ended_at` | TEXT             | UTC time text                                                            |
+| `end_reason`                           | TEXT             | Why it ended, or null                                                    |
 
 - Written by: `tasks.py` `Tasks` (`open`, `wait`, `resume`, `end`, `settle`) through
   `store/tasks.py`. The first end of a task stands; a second `end` changes nothing.

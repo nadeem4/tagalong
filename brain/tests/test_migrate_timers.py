@@ -44,6 +44,7 @@ def db(tmp_path):
     migrate(db, upto=20)
     _seed(db)
     migrate(db, upto=21)
+    migrate(db)  # WorkStore reads the latest schema; 0021 is proven by the rows below
     yield db
     db.close()
 
@@ -78,7 +79,7 @@ def test_timer_job_becomes_parent(work):
 
 def test_tracking_becomes_paused_watch(work):
     rows = {r.id: r for r in work.of_kind("watch")}
-    assert set(rows) == {"w1", "w2", "w3"}
+    assert set(rows) - {"loop-digest"} == {"w1", "w2", "w3"}  # a later migration adds the digest
     assert (rows["w1"].state, rows["w1"].title) == ("paused", "watch the build")
     assert work.repeat_of("w1") == 86400
     assert work.repeat_of("w2") == 7200
