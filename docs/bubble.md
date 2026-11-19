@@ -51,6 +51,8 @@ reconnect carries `resync: true`. The desktop then reads the saved chat (`chat_s
 assistant reply saved after the last one it saw, once, as a `pet.remark`: the quiet line and the bubble
 render it like any wake's words, so this component has no new state. A turn cut off by the lost link
 still shows its "lost the thread" error beside it.
+If the link drops while the desktop is noting the end of a turn it just showed live, that reply can
+show once more after a resync: shown twice, never lost.
 
 ### The HostBridge contract
 
