@@ -24,6 +24,7 @@ export function AppsTab({
   onAddAnyway,
   onAddApp,
   updates,
+  answered,
 }: {
   apps: AppInfo[];
   /** The brain's updates, null when it could not say: the card then has no update words. */
@@ -33,6 +34,7 @@ export function AppsTab({
   offline: boolean;
   busy: ReadonlySet<string>;
   refresh: number;
+  answered: number;
   onSwitch: (app: AppInfo) => void;
   onRestart: (app: AppInfo) => void;
   onSignIn: (app: AppInfo) => void;
@@ -100,6 +102,7 @@ export function AppsTab({
           busy={busy}
           apps={apps}
           refresh={refresh}
+          answered={answered}
           offline={offline}
           onAdd={onAdd}
           onAddAnyway={onAddAnyway}

@@ -183,6 +183,21 @@ describe('StepTen', () => {
     await waitFor(() => expect(host.setupOverview.mock.calls.length).toBeGreaterThan(calls));
   });
 
+  it('reads again when an app is added from its card (the brain says apps changed)', async () => {
+    const host = makeWalkthroughHost();
+    let notify: (what: string) => void = () => undefined;
+    host.onBrainChanged.mockImplementation((handler: (what: string) => void) => {
+      notify = handler;
+      return () => undefined;
+    });
+    host.setupOverview.mockImplementation(() => Promise.resolve(BASE));
+    render(<StepTen host={host} />);
+    await screen.findByText('Gmail');
+    const calls = host.setupOverview.mock.calls.length;
+    act(() => notify('apps'));
+    await waitFor(() => expect(host.setupOverview.mock.calls.length).toBeGreaterThan(calls));
+  });
+
   it('says so when the brain cannot be read, and still shows no buttons that would fail', async () => {
     const host = makeWalkthroughHost();
     host.setupOverview.mockRejectedValue(new Error('offline'));

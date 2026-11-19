@@ -41,7 +41,7 @@ def rig(online=("desktop",), timeout=600.0):
     events = []
     work = fresh_work()
     choices = Choices(
-        Asks(bodies, work),
+        Asks(bodies),
         events.append,
         OpenItems(work.db, lambda: datetime.now(UTC)),
         timeout,
@@ -76,11 +76,7 @@ async def test_an_answer_emits_a_choice_event_with_option_and_text():
     assert event.payload == {"ask": ask_id, "question": "Which?", "option": "b", "text": ""}
 
 
-async def test_a_choice_answer_posts_choice_from_the_event(monkeypatch):
-    async def boom(*_a, **_kw):
-        raise AssertionError("a choice must not wait on its card")
-
-    monkeypatch.setattr(Asks, "open", boom)
+async def test_a_choice_answer_posts_choice_from_the_event():
     _, events, choices = rig()
     ask_id = choices.ask("Which?", ["a", "b"], None, False)
     choices._asks.answer(ask_id, "a", "desktop")  # no waiting task: the answer is the event

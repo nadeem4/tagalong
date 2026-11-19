@@ -18,6 +18,7 @@ from brain.bodies import Bodies
 from brain.events import Event, EventKind
 from brain.memory import Memory
 from brain.mind.turn import Final
+from brain.permission import Tier
 from brain.protocol import ErrorCode, RpcError
 from brain.toolbox import ToolSpec
 
@@ -34,7 +35,7 @@ def use(name, **args):
     return Final([block], "tool_use", SimpleNamespace())
 
 
-def rig(steps, memory=None):
+def rig(steps, memory=None, tier=None):
     model = Gate(steps)
     bodies = Bodies()
     bodies.notify = lambda m, p: None
@@ -52,7 +53,9 @@ def rig(steps, memory=None):
         )
         return json.dumps({"id": "gcal", "status": "signing_in"})
 
-    spec = ToolSpec("install_app", "Add an app.", {"type": "object"}, default_mode="auto")
+    spec = ToolSpec(
+        "install_app", "Add an app.", {"type": "object"}, default_mode="auto", tier=tier
+    )
     session = make_session(
         model,
         Open(),
@@ -146,3 +149,17 @@ async def test_a_choose_card_answer_is_saved_once_and_a_second_tap_saves_nothing
     assert err.value.code == ErrorCode.not_found
     await idle(session)
     assert len(saved("card_answer")) == 1 and len(saved("choice")) == 1
+
+
+async def test_a_home_setup_card_opens_at_once_and_its_answer_installs():
+    # Home's Connections page: the card goes up and the call returns; the answer, whenever it
+    # comes, runs the install as a Home press, with no turn.
+    session, _, installs = rig([], tier=Tier.person_only)
+    join(session, "desktop")
+    card = await session.open_card("install_app", {"id": "gcal"})
+    (ask,) = session.open_asks()
+    assert ask["id"] == card and ask["options"] == ["allow", "deny"]
+    assert installs == []
+    session.answer(card, "allow", "desktop")
+    await settle()
+    assert installs == [{"id": "gcal"}]

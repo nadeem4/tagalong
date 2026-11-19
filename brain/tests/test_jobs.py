@@ -48,7 +48,7 @@ def installed(id="claude-acp", **kw) -> InstalledExpert:
     return InstalledExpert(**{**base, "logged_in": True, **kw})
 
 
-class Answer(NamedTuple):
+class Pick(NamedTuple):
     """A scripted answer to a card: the option picked and any typed text."""
 
     option: str | None
@@ -58,7 +58,7 @@ class Answer(NamedTuple):
 class FakeAsks:
     """The bodies behind the real Asks and Holds: shows each card and answers it from the script.
 
-    Each card shown takes the next entry: an Answer is answered through `Asks.answer` like a
+    Each card shown takes the next entry: an Pick is answered through `Asks.answer` like a
     body would, an AskExpired ends the ask's row as its job closing does, an RpcError cancels
     the hold, and None (or an empty script) leaves the card open until something ends it.
     """
@@ -91,7 +91,7 @@ class FakeAsks:
 
     def _respond(self, ask_id: str, entry) -> None:
         rig = self.rig
-        if isinstance(entry, Answer):
+        if isinstance(entry, Pick):
             rig.asks_real.answer(ask_id, entry.option or "", "desktop", entry.text)
         elif isinstance(entry, AskExpired):
             rig.records.work.settle(ask_id, "expired", entry.reason)
@@ -221,7 +221,7 @@ class Rig:
             WorkStore(self.memory.db, lambda: self.wall), self.memory.db, lambda: self.wall
         )
         asks.rig = self
-        self.asks_real = Asks(asks, self.records.work)
+        self.asks_real = Asks(asks)
         self.tasks = Tasks(self.memory.db, lambda text: text, lambda: self.wall, items=self.items)
         self.holds = Holds(self.asks_real, self.records.work, self.items, self.tasks)
         self.jobs = Jobs(
@@ -373,7 +373,7 @@ async def test_third_running_job_is_refused_naming_the_running_ones(make_rig):
 
 async def test_relayed_permission_shows_claude_code_tool_and_the_pick_maps_to_its_id(make_rig):
     steps = [{"permission": {"title": "ls -la", "kind": "execute", "input": {"command": "ls"}}}]
-    rig = make_rig(FakeAsks(Answer("Yes")), steps)
+    rig = make_rig(FakeAsks(Pick("Yes")), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     ask = rig.asks.opened[0]
@@ -467,7 +467,7 @@ async def test_a_cancelled_permission_cancels_the_experts_request(make_rig):
 
 async def test_question_with_a_pick_and_with_typed_text(make_rig):
     steps = [{"question": {"message": "Which colour?", "options": ["Red", "Blue"]}}]
-    rig = make_rig(FakeAsks(Answer("Red")), steps)
+    rig = make_rig(FakeAsks(Pick("Red")), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     ask = rig.asks.opened[0]
@@ -482,7 +482,7 @@ async def test_question_with_a_pick_and_with_typed_text(make_rig):
 
 async def test_typed_text_wins_over_the_option(make_rig):
     steps = [{"question": {"message": "Which colour?", "options": ["Red", "Blue"]}}]
-    rig = make_rig(FakeAsks(Answer("Red", "teal")), steps)
+    rig = make_rig(FakeAsks(Pick("Red", "teal")), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     reply = next(f for f in rig.frames() if f.get("result", {}).get("action"))
@@ -821,7 +821,7 @@ async def test_scout_answer_goes_to_the_expert_and_no_user_ask_opens(make_rig):
 
 async def test_scout_pass_opens_the_users_question_card_as_before(make_rig):
     scout = FakeScout(None)
-    rig = make_rig(FakeAsks(Answer("Red")), ASK_COLOUR, scout=scout)
+    rig = make_rig(FakeAsks(Pick("Red")), ASK_COLOUR, scout=scout)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     ask = rig.asks.opened[0]
@@ -859,7 +859,7 @@ async def test_job_stopped_while_scout_thinks_opens_no_ask(make_rig, result):
 async def test_permission_asks_never_go_to_scout(make_rig):
     steps = [{"permission": {"title": "ls -la", "kind": "execute", "input": {"command": "ls"}}}]
     scout = FakeScout({"question_0": "Blue"})
-    rig = make_rig(FakeAsks(Answer("Yes")), steps, scout=scout)
+    rig = make_rig(FakeAsks(Pick("Yes")), steps, scout=scout)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     assert scout.asked == []
@@ -894,7 +894,7 @@ OPTS = [
 @pytest.mark.parametrize("pick", ["Sure", "Whatever"])
 async def test_permission_allow_kinds_record_approved(make_rig, pick):
     steps = [{"permission": {"title": "ls -la", "input": {"command": "ls"}, "options": OPTS}}]
-    rig = with_approvals(make_rig, FakeAsks(Answer(pick)), steps)
+    rig = with_approvals(make_rig, FakeAsks(Pick(pick)), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     (row,) = logged(rig)
@@ -905,7 +905,7 @@ async def test_permission_allow_kinds_record_approved(make_rig, pick):
 @pytest.mark.parametrize("pick", ["Nope", "Never"])
 async def test_permission_reject_kinds_record_refused(make_rig, pick):
     steps = [{"permission": {"title": "rm x", "options": OPTS}}]
-    rig = with_approvals(make_rig, FakeAsks(Answer(pick)), steps)
+    rig = with_approvals(make_rig, FakeAsks(Pick(pick)), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     (row,) = logged(rig)
@@ -933,7 +933,7 @@ async def test_cancelled_permission_records_nothing(make_rig):
 
 async def test_group_key_is_the_job_folder_for_every_title(make_rig):
     steps = [{"permission": {"title": "ls"}}, {"permission": {"title": "cat y"}}]
-    rig = with_approvals(make_rig, FakeAsks(Answer("Yes"), Answer("No")), steps)
+    rig = with_approvals(make_rig, FakeAsks(Pick("Yes"), Pick("No")), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     rows = logged(rig)
@@ -943,7 +943,7 @@ async def test_group_key_is_the_job_folder_for_every_title(make_rig):
 
 async def test_jobs_without_approvals_unchanged(make_rig):
     steps = [{"permission": {"title": "ls"}}]
-    rig = make_rig(FakeAsks(Answer("Yes")), steps)
+    rig = make_rig(FakeAsks(Pick("Yes")), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))
@@ -1004,7 +1004,7 @@ async def test_claude_code_approval_returns_the_allow_once_option_id(make_rig):
 async def test_claude_code_without_allow_once_option_passes(make_rig):
     no_once = [OPTS[1], OPTS[2]]  # allow_always and reject_once only
     steps = [{"permission": {"title": "ls", "options": no_once}}]
-    rig, check = make_scouted(make_rig, FakeAsks(Answer("Nope")), steps)
+    rig, check = make_scouted(make_rig, FakeAsks(Pick("Nope")), steps)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     [row] = logged(rig)
@@ -1013,7 +1013,7 @@ async def test_claude_code_without_allow_once_option_passes(make_rig):
 
 async def test_claude_code_pass_falls_through_to_the_person(make_rig):
     steps = [{"permission": {"title": "ls", "options": OPTS}}]
-    rig, check = make_scouted(make_rig, FakeAsks(Answer("Sure")), steps, approve=False)
+    rig, check = make_scouted(make_rig, FakeAsks(Pick("Sure")), steps, approve=False)
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
     assert len(check.facts) == 1
@@ -1029,7 +1029,7 @@ async def test_claude_code_pass_falls_through_to_the_person(make_rig):
 )
 async def test_only_a_person_allow_is_offered_for_consideration(make_rig, pick, expected):
     steps = [{"permission": {"title": "ls", "options": OPTS}}]
-    rig = with_approvals(make_rig, FakeAsks(Answer(pick)), steps)
+    rig = with_approvals(make_rig, FakeAsks(Pick(pick)), steps)
     offers = rig.offers
     await rig.jobs.start("go", str(rig.folder))
     await until(lambda: rig.finished)
@@ -1048,7 +1048,7 @@ async def test_scout_approval_is_not_offered(make_rig):
 
 async def test_claude_code_side_check_that_raises_still_asks_the_person(make_rig):
     steps = [{"permission": {"title": "ls", "options": OPTS}}]
-    rig, check = make_scouted(make_rig, FakeAsks(Answer("Sure")), steps)
+    rig, check = make_scouted(make_rig, FakeAsks(Pick("Sure")), steps)
 
     async def boom(facts):
         raise RuntimeError("boom")
@@ -1062,7 +1062,7 @@ async def test_claude_code_side_check_that_raises_still_asks_the_person(make_rig
 
 async def test_claude_code_preference_use_that_raises_still_asks_the_person(make_rig, monkeypatch):
     steps = [{"permission": {"title": "ls", "options": OPTS}}]
-    rig, _ = make_scouted(make_rig, FakeAsks(Answer("Sure")), steps)
+    rig, _ = make_scouted(make_rig, FakeAsks(Pick("Sure")), steps)
 
     def boom(*args, **kwargs):
         raise RuntimeError("boom")
@@ -1132,7 +1132,7 @@ async def test_permission_side_check_approval_picks_allow_once_option_never_allo
 
 async def test_permission_refusal_logs_no_tool_text(make_rig, caplog):
     steps = [{"permission": {"title": "rm secret-file", "options": OPTS}}]
-    rig = with_approvals(make_rig, FakeAsks(Answer("Nope")), steps)
+    rig = with_approvals(make_rig, FakeAsks(Pick("Nope")), steps)
     with caplog.at_level("INFO"):
         await rig.jobs.start("go", str(rig.folder))
         await until(lambda: rig.finished)
@@ -1230,7 +1230,7 @@ async def test_asks_are_grouped_by_the_jobs_expert_so_preferences_do_not_cross(m
     steps = [{"permission": {"title": "ls"}}]
     rig = with_approvals(
         make_rig,
-        FakeAsks(Answer("Yes")),
+        FakeAsks(Pick("Yes")),
         steps,
         experts=[installed("claude-acp"), installed("codex-acp")],
     )
@@ -2258,7 +2258,7 @@ async def test_an_expert_that_cannot_resume_falls_back_to_fresh_on_an_implicit_c
 
 async def test_implicit_continue_never_runs_the_preference_gate(make_rig):
     check = FakeSideCheck(None)
-    rig = continuing(make_rig, FakeAsks(Answer("Auto")), check)
+    rig = continuing(make_rig, FakeAsks(Pick("Auto")), check)
     first = await first_job(rig)
     second = await rig.jobs.start("two", str(rig.folder))
     assert rig.records.get_job(second).parent_job == first

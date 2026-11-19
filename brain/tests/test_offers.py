@@ -17,7 +17,6 @@ from brain.offers import Offers, OfferSettings
 from brain.open_items import OpenItems
 from brain.store import rules
 from brain.store.db import utc_text
-from brain.store.work import WorkStore
 
 NOW = datetime(2026, 10, 28, 9, 0, 0, tzinfo=UTC)
 YES, KEEP = "Yes, auto-approve", "Keep asking"
@@ -394,7 +393,7 @@ async def test_a_yes_after_the_deadline_is_no_answer_not_a_crash(mem):
     assert rig.items.list_open() == []
 
 
-async def test_an_offer_answer_is_handled_by_event(mem, monkeypatch):
+async def test_an_offer_answer_is_handled_by_event(mem):
     class Bodies:
         sent = []
 
@@ -404,11 +403,7 @@ async def test_an_offer_answer_is_handled_by_event(mem, monkeypatch):
         def notify(self, method, params):
             self.sent.append(params)
 
-    async def boom(*_a, **_kw):
-        raise AssertionError("an offer must not wait on its card")
-
-    monkeypatch.setattr(Asks, "open", boom)
-    asks = Asks(Bodies(), WorkStore(mem.db, lambda: NOW))
+    asks = Asks(Bodies())
     rig = Rig(mem, asks=asks)
     rig.approve(n=3)
     await rig.consider()

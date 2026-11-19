@@ -51,6 +51,7 @@ const SETUP_REFUSALS: Record<string, Words> = {
   },
 };
 const LOGIN_WAITING = 'Checking the sign-in…';
+const CARD_OPEN = 'Answer the card to add it.';
 const SETUP_FAILED: Words = { text: 'Setting that up didn’t work.', error: true };
 
 /**
@@ -67,23 +68,34 @@ export function ConnectionsPanel() {
   const [tab, setTab] = useState<Tab>('apps');
   // Counts finished changes so the app search reads again; not bumped on first load.
   const [refresh, setRefresh] = useState(0);
+  // Counts the times a setup moved on: a card answered, so a row's "Answer the card" line is stale.
+  const [answered, setAnswered] = useState(0);
   const [setupFailed, setSetupFailed] = useState(false);
   const [updates, setUpdates] = useState<UpdatesState | null>(null);
   const [checking, setChecking] = useState(false);
 
-  const reloadSetup = useCallback(() => {
-    // A failure is shown on the Experts tab as one plain line; the apps list says when the brain is away.
-    bridge.setupOverview().then(
-      (latest) => {
-        setSetupFailed(false);
-        setSetup(latest);
-      },
-      () => {
-        setSetup(null);
-        setSetupFailed(true);
-      },
-    );
-  }, [bridge]);
+  const reloadSetup = useCallback(
+    (announce = false) => {
+      // A failure is shown on the Experts tab as one plain line; the apps list says when the brain is away.
+      bridge.setupOverview().then(
+        (latest) => {
+          setSetupFailed(false);
+          setSetup(latest);
+          // An app's card that ended badly (said no, lapsed, refused) is worded at the top: an
+          // expert's failure sits on its own row instead.
+          if (announce && latest.failed?.kind === 'app') {
+            const words = SETUP_REFUSALS[latest.failed.error] ?? SETUP_FAILED;
+            setStatus(words);
+          }
+        },
+        () => {
+          setSetup(null);
+          setSetupFailed(true);
+        },
+      );
+    },
+    [bridge],
+  );
 
   // No updates state (an old brain, or it is away) just means the card has no update words.
   const reloadUpdates = useCallback(() => {
@@ -118,7 +130,12 @@ export function ConnectionsPanel() {
   );
   // An install moves on (progress, done, failed): read the overview again.
   useEffect(
-    () => bridge.onBrainChanged((what) => what === 'setup' && reloadSetup()),
+    () =>
+      bridge.onBrainChanged((what) => {
+        if (what !== 'setup') return;
+        setAnswered((n) => n + 1);
+        reloadSetup(true);
+      }),
     [bridge, reloadSetup],
   );
   // An update moves on (waiting, updating, updated, failed): read the state again.
@@ -147,7 +164,7 @@ export function ConnectionsPanel() {
     }
   };
 
-  // The call returns once the person has answered the Allow card; until then the row waits. How it
+  // The call returns as soon as the Allow card is up (its answer installs later). How it
   // ended goes back to the row that was pressed, not to the top of the page.
   const setUp = async (
     id: string,
@@ -158,9 +175,11 @@ export function ConnectionsPanel() {
     let outcome: Outcome | null = null;
     await act(async () => {
       try {
-        const { error, state } = await call();
+        const { error, state, card } = await call();
         if (error !== undefined) {
           outcome = { ...(SETUP_REFUSALS[error] ?? SETUP_FAILED), added: false };
+        } else if (card !== undefined) {
+          outcome = { text: CARD_OPEN, error: false, added: false, waiting: true };
         } else if (state === 'waiting') {
           outcome = { text: LOGIN_WAITING, error: false, added: false };
         } else if (added !== undefined) {
@@ -240,6 +259,7 @@ export function ConnectionsPanel() {
             offline={offline}
             busy={asking}
             refresh={refresh}
+            answered={answered}
             onSwitch={(app) => void act(() => bridge.setConnectionEnabled(app.id, !app.enabled))}
             onRestart={(app) => void act(() => bridge.restartConnection(app.id))}
             onSignIn={(app) => void act(() => bridge.signInConnection(app.id))}
@@ -271,6 +291,7 @@ export function ConnectionsPanel() {
         {tab === 'experts' && setup !== null && (
           <ExpertsTab
             setup={setup}
+            answered={answered}
             updates={updateControls}
             asking={asking}
             onAct={(id) => setUp(id, () => bridge.setupExpert(id, false))}

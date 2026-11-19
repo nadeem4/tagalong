@@ -25,7 +25,6 @@ from anthropic import AsyncAnthropic, AuthenticationError, PermissionDeniedError
 
 from brain.approvals import SENTENCE_MAX as PREFERENCE_MAX_CHARS
 from brain.approvals import Approvals
-from brain.asks import Asks
 from brain.choices import MAX_CHOICE_OPTIONS, Choices
 from brain.config import upsert_env_value
 from brain.guardrails import Budget
@@ -1741,31 +1740,24 @@ def choice_tools(choices: Choices) -> list[tuple[ToolSpec, Handler]]:
     ]
 
 
-SAVE_IT, NOT_NOW = "Save it", "Not now"  # the card's buttons: chrome, not Scout wording
+def preference_tools(approvals: Approvals) -> list[tuple[ToolSpec, Handler]]:
+    """`save_preference`: keep a setup choice as a preference, only if the owner allows it.
+    The gate shows the card and runs this once they do (person only, so no rule or side-check
+    can say yes for them). Saved with no tool or group, so it shows in Scout's prompt but never
+    approves an ask."""
 
-
-def preference_tools(
-    approvals: Approvals, asks: Asks, timeout: float = 300.0
-) -> list[tuple[ToolSpec, Handler]]:
-    """`save_preference`: keep a setup choice as a preference, only if the owner clicks Save.
-    Saved with no tool or group, so it shows in Scout's prompt but never approves an ask."""
+    def _kept(sentence: str) -> str:
+        return sentence.strip()[:PREFERENCE_MAX_CHARS]  # what the card shows is what is saved
 
     async def save_preference(args: dict) -> str:
         _need_text("save_preference", args, "sentence", "question")
-        try:
-            answer = await asks.open(
-                text=args["question"],
-                options=[SAVE_IT, NOT_NOW],
-                tool="save_preference",
-                timeout=timeout,
-            )
-        except RpcError:  # nobody answered in time
-            return json.dumps({"saved": False})
-        if answer.option != SAVE_IT:
-            return json.dumps({"saved": False})
-        sentence = args["sentence"].strip()[:PREFERENCE_MAX_CHARS]
+        sentence = _kept(args["sentence"])
         approvals.add_preference(sentence=sentence, source="setup", tool=None, group_key=None)
         return json.dumps({"saved": True})
+
+    async def card(args: dict) -> dict:
+        _need_text("save_preference", args, "sentence", "question")  # no card for a call that fails
+        return {"sentence": _kept(args["sentence"]), "question": args["question"]}
 
     return [
         (
@@ -1773,7 +1765,7 @@ def preference_tools(
                 "save_preference",
                 "Offer to keep one of the owner's choices as a standing preference, so you "
                 "need not ask again. sentence is the preference in plain words; question is "
-                "what the owner reads on the card. It saves only if they click Save it.",
+                "what the owner reads on the card. It saves only if they allow it.",
                 {
                     "type": "object",
                     "properties": {
@@ -1784,7 +1776,8 @@ def preference_tools(
                 },
                 frozenset({"scout"}),
                 effect="change",
-                tier=Tier.auto,  # asks for itself, so the gate adds none
+                tier=Tier.person_only,
+                card=card,
             ),
             save_preference,
         )

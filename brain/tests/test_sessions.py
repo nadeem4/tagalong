@@ -1323,12 +1323,11 @@ async def test_body_tools_offered_then_gone_after_disconnect():
 async def test_session_answer_passes_text_to_the_ask():
     session, _ = make(Gate([]))
     session._bodies.display_ids = lambda: ["desktop"]
-    task = asyncio.create_task(session._asks.open(text="Which?", options=["a"], free_text=True))
-    await asyncio.sleep(0)
-    ask_id = session.open_asks()[0]["id"]
-    session.answer(ask_id, "typed", "desktop", text="my words")
-    answer = await task
-    assert (answer.option, answer.text) == ("typed", "my words")
+    told = []
+    session._asks.register("choice", lambda *a: told.append(a))
+    session._asks.card("c1", kind="choice", text="Which?", options=["a"], free_text=True)
+    session.answer("c1", "typed", "desktop", text="my words")
+    assert told[0][1:4] == ("typed", "desktop", "my words")
 
 
 # --- wake: the brain starts a turn itself (8a3) ---

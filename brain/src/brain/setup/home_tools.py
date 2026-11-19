@@ -11,7 +11,6 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from brain.apps import AppRow
-from brain.asks import ASK_TIMEOUT_S, Answer
 from brain.events import Event
 from brain.permission import Tier
 from brain.protocol import ErrorCode, RpcError
@@ -45,7 +44,7 @@ from brain.setup.why import WhyPick, shorten
 from brain.toolbox import Handler, ToolSpec
 
 InspectFn = Callable[[], Awaitable[Machine]]
-AskFn = Callable[..., Awaitable[Answer]]
+CardFn = Callable[[str, dict], Awaitable[str]]  # (tool, its args) -> the id of the open card
 RecordFn = Callable[..., None]
 _INSTALLABLE = ("npx", "binary")
 WHY_PER_REPLY = 12  # model-written lines per search reply; bounds what one search costs
@@ -79,11 +78,34 @@ class SetupProgress:
                 }
         self._emit(event)
 
+    def fail(self, tool: str, subject: str, error: str | None) -> None:
+        """A Home card ended: how, for the row that was pressed (None clears an earlier one)."""
+        self._current = None
+        app = tool == "install_app"
+        # An expert's row has no words for "you said no" or "it lapsed": it just stays as it was.
+        if error is None or (not app and error in ("denied", "lapsed")):
+            self._failed = None
+        else:
+            self._failed = {"expert": subject, "error": error, **({"kind": "app"} if app else {})}
+
     def current(self) -> dict | None:
         return self._current
 
     def failed(self) -> dict | None:
         return self._failed
+
+
+def home_end_reporter(
+    progress: SetupProgress, notify: Callable[[str, dict], None]
+) -> Callable[[str, dict, str | None], None]:
+    """What the ask runner calls when a Home setup card ends: record it where Home reads setup
+    outcomes, then tell Home to reload. Without it a refused or failed install ends silently."""
+
+    def ended(tool: str, args: dict, error: str | None) -> None:
+        progress.fail(tool, str(args.get("id")), error)
+        notify("changed", {"what": "setup"})
+
+    return ended
 
 
 async def _run(handler: Handler, args: dict) -> str:
@@ -105,7 +127,7 @@ def home_setup_tools(
     inspect_fn: InspectFn,
     experts: Callable[[], list[InstalledExpert]],
     apps: Callable[[], list[dict]],
-    ask: AskFn,
+    open_card: CardFn,
     record: RecordFn,
     inner: list[tuple[ToolSpec, Handler]],
     progress: SetupProgress,
@@ -311,45 +333,25 @@ def home_setup_tools(
                 if err.code == ErrorCode.tool_failed and (token := _token(err.message)):
                     return json.dumps({"error": token})
                 raise
-            summary = f"{tool} {json.dumps(facts, sort_keys=True, separators=(',', ':'))}"
-
-            # The same history the gate keeps, so these installs count in Home's approvals.
-            def log(outcome: str) -> None:
-                decided = "none" if outcome in ("no_one", "timed_out") else "person"
-                record(
-                    source="scout_tool",
-                    tool=tool,
-                    summary=summary,
-                    input=facts,
-                    group_key=tool,
-                    outcome=outcome,
-                    decided_by=decided,
-                )
-
             # A press is the OK for an Official app, and "Connect anyway" on the check card is
             # the OK for a community one; a bare `approved` never installs community code.
             if tool == "install_app" and approved:
                 if facts.get("official") is True:
                     return await _run(handler, args)
                 if community_ok:
-                    log("approved")
+                    shown = json.dumps(facts, sort_keys=True, separators=(",", ":"))
+                    record(
+                        source="scout_tool",
+                        tool=tool,
+                        summary=f"{tool} {shown}",
+                        input=facts,
+                        group_key=tool,
+                        outcome="approved",
+                        decided_by="person",
+                    )
                     return await _run(handler, args)
-            try:
-                answer = await ask(
-                    text="",
-                    options=["allow", "deny"],
-                    tool=tool,
-                    input=facts,
-                    timeout=ASK_TIMEOUT_S,
-                )
-            except RpcError as err:
-                if err.code == ErrorCode.timeout:
-                    log("timed_out")
-                raise
-            outcome = {"allow": "approved", None: "no_one"}.get(answer.option, "refused")
-            log(outcome)
-            if outcome != "approved":
-                return json.dumps({"error": "denied"})
+            # The card goes up and this returns; the person's answer runs the install later.
+            return json.dumps({"card": await open_card(tool, args)})
         return await _run(handler, args)
 
     def parts(args: dict) -> tuple[dict, bool]:

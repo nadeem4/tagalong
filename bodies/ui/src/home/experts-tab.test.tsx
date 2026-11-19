@@ -189,6 +189,44 @@ describe('Experts tab: add an expert', () => {
     expect(screen.getByRole('button', { name: 'Add Codex' })).toBeVisible();
   });
 
+  it('an open card says to answer it, and the row is not marked added', async () => {
+    await open({ browseExperts: [CODEX], showMoreFrom: 1 }, { card: 'ask1' });
+    await click(screen.getByRole('button', { name: 'Add Codex' }));
+    expect(within(rowOf('Codex')).getByText('Answer the card to add it.')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Add Codex' })).toBeVisible();
+  });
+
+  it('the card answered (setup changed) clears the row’s "Answer the card" line', async () => {
+    const bridge = await open({ browseExperts: [CODEX], showMoreFrom: 1 }, { card: 'ask1' });
+    await click(screen.getByRole('button', { name: 'Add Codex' }));
+    expect(within(rowOf('Codex')).getByText('Answer the card to add it.')).toBeVisible();
+    await act(async () => {
+      bridge.emitChanged('setup');
+      await Promise.resolve();
+    });
+    expect(screen.queryByText('Answer the card to add it.')).toBeNull();
+  });
+
+  it('a row that is not waiting on a card keeps its words when setup changes', async () => {
+    const bridge = await open({ browseExperts: [CODEX], showMoreFrom: 1 }, { error: 'denied' });
+    await click(screen.getByRole('button', { name: 'Add Codex' }));
+    await act(async () => {
+      bridge.emitChanged('setup');
+      await Promise.resolve();
+    });
+    expect(within(rowOf('Codex')).getByText('Okay, nothing was changed.')).toBeVisible();
+  });
+
+  it('an app whose card ended badly says so in the page’s words', async () => {
+    const bridge = await open({ browseExperts: [], showMoreFrom: 0 });
+    bridge.setup = { ...bridge.setup, failed: { expert: 'io.x/y', error: 'denied', kind: 'app' } };
+    await act(async () => {
+      bridge.emitChanged('setup');
+      await Promise.resolve();
+    });
+    expect(await screen.findByText('Okay, nothing was changed.')).toBeVisible();
+  });
+
   it('an install in progress shows its percent, a bar and what it is doing, instead of the button', async () => {
     await open({
       browseExperts: [CODEX],

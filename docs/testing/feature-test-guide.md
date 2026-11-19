@@ -522,8 +522,8 @@ Answer a `choose` card and an offer card: each is saved as a handled `card_answe
 4. **Action:** repeat and leave the card unanswered for 10 minutes.
    **Expected:** the card closes and Scout says nothing; answering a closed card does nothing.
 5. **Action:** after an answer, tell Scout to keep it as a preference.
-   **Expected:** a card with "Save it" and "Not now". "Save it" adds the sentence under Home, Approvals;
-   "Not now" saves nothing. A later question shows Scout acting under it, and an install still asks first.
+   **Expected:** an Allow or Deny card with the sentence. Allow adds it under Home, Approvals;
+   Deny saves nothing. A later question shows Scout acting under it, and an install still asks first.
 
 ## Permission engine (unit tests only)
 
@@ -2582,7 +2582,7 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
    then "Ready". With the brain stopped the page says Tagalong could not read this and that you can
    connect your tools later in Home, under Connections. Step 11 has no Skip: **I’ll do this later**
    and **Finish** both end the tour. On Home's **Connections** page **Your experts** lists
-   Claude Code with its state; the **Experts** tab's **Add an expert** offers more (an Official one has **Add** and opens an Allow card first; a community one shows the check card first, and **Add anyway** is that approval, so it opens no further Allow card) (Log in on a Claude Code you already logged into elsewhere opens no card: it says "Already logged in." and the chip turns ready).
+   Claude Code with its state; the **Experts** tab's **Add an expert** offers more (an Official one has **Add** and opens an Allow card first; a community one shows the check card first, and **Add anyway** is that approval, so it opens no further Allow card). The row says "Answer the card to add it." while the card is up; **Deny** (or letting it lapse) clears that line and says "Okay, nothing was changed." at the top of the page, and a card that Allow turns into a refusal or failure says so in plain words, never silence (Log in on a Claude Code you already logged into elsewhere opens no card: it says "Already logged in." and the chip turns ready).
 3. **Action:** on step 7 press **Copy chrome://extensions**, paste it somewhere; press **Show
    folder** and **Copy folder path**. **Expected:** the address and the add-on folder path are
    what you pasted; the folder opens.

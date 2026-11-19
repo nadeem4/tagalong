@@ -202,7 +202,7 @@ WORDS: dict[str, Words] = {
     "save_preference": Words(
         "Offer to remember a choice",
         "Asks if a choice should become a standing rule.",
-        "After you make the same call a few times, Scout may offer to remember it so it stops asking. Nothing is saved unless you click Save it.",
+        "After you make the same call a few times, Scout may offer to remember it so it stops asking. Nothing is saved unless you allow it.",
         "talking",
     ),
     "loops_open": Words(

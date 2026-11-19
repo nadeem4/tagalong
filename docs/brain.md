@@ -93,7 +93,7 @@ the total can run a little low.
 | `brain/src/brain/tasks.py`             | `Tasks`: what the person asked for, one row per task (`store/tasks.py` holds the SQL). `open`, `wait`, `resume`, `end` (the first end stands) and `settle`, which ends every Ask whose say is `handled` (`done`) or `gave_up` (`failed`) and every Later with nothing left to run; `open_block` is the open-tasks facts block in Scout's prompt. `Session.say` opens an Ask task per say in the say's own transaction; the runner calls `settle` after each turn ends, and the session once at start after `EventLog.recover()`. See [storage.md](storage.md#tasks)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `brain/src/brain/open_items.py`        | `OpenItems`: the one record for what waits on the person (`open`, `answer`, `finish`, `expire_due`, `expire_live_only`, `list_open`, `list_answered`, `find_open`; `expire_live_only(job_id=None)` takes one job's items only), one lifecycle (open to answered, done or expired), one deadline (`DEADLINE_S`, a day) and a log line per move, `open_item.<event> t=<epoch> id=<id> kind=<kind> by=<who> why=<why>`, on logger `brain.open_items`. Scout's asks use it through `open_item_runner.py`, choices and offers directly (kinds `choice`, `offer`); the table is in [storage.md](storage.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `brain/src/brain/toolbox.py`           | `Toolbox`: lists and gates every tool call, from `BrainSource`, `AppSource` and `BodySource`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `brain/src/brain/asks.py`              | `Asks`: shows Scout's permission cards with no waiter, runs a job's permission asks (they wait) and `open` asks (no turn, custom options, typed answers); each is an `ask` work row that ends with its ask or its job                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `brain/src/brain/asks.py`              | `Asks`: shows the cards (Scout's permission cards, choices, offers, preferences, an expert's ask) and takes their answers through the open item's handler; no waiter in it (only `Holds` waits, for an expert's ACP call, and keeps the work row)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `brain/src/brain/open_item_runner.py`  | `AskRunner`: Scout's asks as `ask` open items. A call that needs the person is saved and its card shown, and the turn goes on; the answer, however late, runs the saved call through the same gate and emits `ask_ended` (source `scout`, `caused_by` the event the asking turn took, kept on the item). An item belongs to the task of the turn that opened it (the runner takes the turn's task). A task's card also offers Not now and Stop task. The runner also arms the check-back and deadline timer (`card_due`, `card_expired`), the restart close and the card shown again when a body joins                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `brain/src/brain/approvals.py`         | `Approvals`: logs every ask and its outcome (the decided `ask` work rows), sends `changed: approvals`; the Home calls for the history and preferences, the preference writes (`add_preference`, `edit_preference`, `remove_preference`), and `record`, which also counts a preference Scout answered under and reports it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `brain/src/brain/side_check.py`        | `SideCheck`: before an ask reaches you, approves it once under one of your preferences or passes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -721,19 +721,15 @@ flowchart TD
   [Restart and return](#restart-and-return)). A body that joins with no `last_seq`, or that is told
   `resync`, is sent every ask still open again, with fresh `seq` numbers. A body that reconnects
   without `resync` gets the ask once, from its backlog.
-- **Asks without a turn.** `Asks.open(text=, options=, tool=, input=, timeout=, free_text=, ask_id=, recommended=)`
-  is for work with no Scout turn (`save_preference` and setup until the next T2c-2 part moves
-  them to cards, which then removes it). Expert permission requests and questions are not here: `Holds` shows
-  their cards with `Asks.card` (a `confirm` card for a tool call, a task's Not now and Stop task) and waits with no timeout. Every other card is `Asks.show` (Scout's permission
-  card) or `Asks.card(ask_id, kind=, text=, options=, ...)` (a choice or an offer): neither waits, and
-  `Asks.register(kind, handler)` names the code that takes the answer, called with the ask id, the
-  option, the body, the typed text and the check-back time. It sends a plain ask: no `turn`, no `confirm`, any
-  option names (for example `allow-once`, `reject`). It waits until closed; there is no default
-  timeout (pass `timeout` to get one). It returns `Answer(option, text)`; with nobody online it
-  returns `Answer(None, None)` at once and opens nothing. With `free_text=True` an answer whose
-  option is not listed is accepted when it carries non-empty `text` (the user typed their own
-  answer). `Asks.cancel(ask_id)` closes a card with `reason: "cancelled"`. `answer {ask, option, text}` now passes `text` through to the ask; the
-  closed frame is unchanged. An open ask now sends `free_text: true` (when set) and `recommended`
+- **Cards.** Expert permission requests and questions are shown by `Holds` with `Asks.card` (a
+  `confirm` card for a tool call, a task's Not now and Stop task) and are the one place that waits,
+  with no timeout. Every other card is `Asks.show` (Scout's permission card) or
+  `Asks.card(ask_id, kind=, text=, options=, ...)` (a choice, an offer, a preference or a Home setup
+  card): neither waits, and `Asks.register(kind, handler)` names the code that takes the answer,
+  called with the ask id, the option, the body, the typed text and the check-back time. With
+  `free_text=True` an answer whose option is not listed is accepted when it carries non-empty
+  `text`. `Asks.cancel(ask_id)` closes a card with `reason: "cancelled"`. `answer {ask, option, text}`
+  passes `text` through to the handler. A card sends `free_text: true` (when set) and `recommended`
   (one of the options, else `ValueError`), so a body shows a text box and marks the recommendation.
 
 ### Asks that wait
@@ -865,9 +861,10 @@ refuses.
 Saved preferences reach Scout as facts: `render_preferences` (`mind/prompt.py`) lists the
 owner's non-built-in preferences, newest first (at most 40, 300 characters each), after "What you
 know" in the system prompt. They are data to weigh, not orders, and the gate stays code: a
-preference never replaces the Allow card. `save_preference {sentence, question}` (asks itself)
-shows `question` with the buttons "Save it" and "Not now" and saves through
-`Approvals.add_preference(source="setup", tool=None, group_key=None)` only on "Save it". Setup
+preference never replaces the Allow card. `save_preference {sentence, question}` is a person-only tool: the gate shows `question` as a card
+and the call runs, saving through
+`Approvals.add_preference(source="setup", tool=None, group_key=None)`, only when the person allows
+it. No rule or side-check can allow it for them, and nothing waits on the card. Setup
 preferences are never candidates for `SideCheck`, so they cannot approve an ask.
 
 ## Home tools
@@ -952,16 +949,16 @@ an expert not installed is simply absent, and `progress` and `failed` come from
 the install's `setup_progress` and `setup_done` events), `setup_expert` and `setup_app`
 (`{id, approved?}`, tier `auto`: they ask for themselves). With `approved` false they open the same Allow card Scout's
 `install_expert`, `login_expert` and `install_app` open (empty card text, so the body renders it
-from the tool and its input; it waits as long as the gate's ask) and run that tool's own handler
-on Allow. A card that refuses with an `{error: token}` (such as `unknown_expert`) is answered as that
-token, so Home words it; any other card failure stays a tool error. A login card runs no check, so
+from the tool and its input) as an `ask` open item (`Session.open_card`) and return `{card: id}` at
+once; the answer, whenever it comes, runs that tool's own handler as a Home press (no task, no wake
+of Scout). A card that refuses with an `{error: token}` (such as `unknown_expert`) is answered as that
+token, so Home words it; any other card failure stays a tool error. When an answered Home card ends other than cleanly (Deny, a lapse, a refusal by the floor, an `{error: token}` or `needs_env` answer, a tool error), `AskRunner.home_ended` (`home_end_reporter` in `setup/home_tools.py`) records it in `SetupProgress.failed` (`{expert: <id>, error: <token>}`, none for an expert that was denied or lapsed, plus `kind: "app"` for an app; `denied`, `lapsed`, `refused`, `failed`, `needs_env` or the tool's own token) and sends `changed {what: "setup"}`; a clean end clears it and sends the same. Home words an app's token at the top of the Connections page and clears each row's "Answer the card" line on that reload. Home cards are not listed to Scout in `asks_waiting`. A login card runs no check, so
 it shows at once. `setup_expert` with `approved` true (the tour's button is the OK) skips the card;
 `setup_app` with `approved` true connects an Official app at once, while a community app still
 opens the check card (the Allow card with the trust facts) until `community_ok` (the Connect
 anyway press) is also true; a bare `approved` never installs community code. The desktop only
 forwards `true` from the tour window or Home's own buttons. Each answered card is written to the approvals history like the gate does (source
-`scout_tool`; approved, refused, no one there or timed out); a tour press asks nothing, so it
-records nothing. An installed expert that needs login is logged in instead of reinstalled (a
+`scout_tool`), as the open item's end does; a tour press asks nothing, so it records nothing. An installed expert that needs login is logged in instead of reinstalled (a
 second press after the install: the install and the login are two presses, not one chained
 call); a ready one answers `already_ready`. `browse_apps` leaves out apps already added (matched
 by name, as `install_app` does), but the curated `popular` and `popular_more` and `browse_experts`
@@ -1729,7 +1726,7 @@ shows them as Scout does.
   ends the card and starts nothing. The card follows the ask-tier rules, so Home can set the tool
   Off or Auto like any other.
 - **Relayed asks.** Claude Code's permission requests and questions become turn-less asks
-  (`Asks.open`) tied to the job and kept open as long as it lives. A stopped or finished job
+  (`Asks.card`, shown by `Holds`) tied to the job and kept open as long as it lives. A stopped or finished job
   closes its open asks with `cancelled`. Each answer sends `changed {what: "jobs"}`. Permission
   asks and progress always go straight to the owner.
 - **Questions go to Scout first.** When a body is online, `Jobs` hands Claude Code's question to
@@ -2712,8 +2709,8 @@ event given up, a say or card answer included, oldest first, each as
 `{id, kind, source, at, age_s, gave_up, gist}`; the `gist` is the payload's first fact value cut
 short (JSON when it is not text), never prose. A new say or card answer is not listed.
 
-There is one deadline rule: `DEADLINE_S` in `open_items.py` for what waits on a person. The ask wait
-in `asks.py` (`ASK_TIMEOUT_S`) is a live card tied to one turn, not a stored wait.
+There is one deadline rule: `DEADLINE_S` in `open_items.py` for what waits on a person. Nothing in the brain
+waits on a card but `Holds`, which an expert's open call needs.
 
 Tests: `tests/test_runner.py` and `tests/test_presence.py` (fake clock), `tests/test_interjection.py`
 and `tests/test_events.py`.

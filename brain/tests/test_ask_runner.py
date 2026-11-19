@@ -29,10 +29,12 @@ from brain.permission import (
     stored_auto_rules,
 )
 from brain.protocol import ErrorCode, RpcError
+from brain.setup.flights import not_for_home
 from brain.store import rules
 from brain.store.work import WorkStore
 from brain.tasks import Tasks
 from brain.toolbox import Toolbox, ToolSpec
+from brain.tools import preference_tools
 
 NOW = datetime(2026, 11, 11, 9, 0, 0, tzinfo=UTC)
 
@@ -78,7 +80,7 @@ class Rig:
         self.memory = memory or Memory(":memory:")
         self.work = WorkStore(self.memory.db, lambda: NOW)
         self.bodies = Bodies()
-        self.asks = Asks(self.bodies, self.work)
+        self.asks = Asks(self.bodies)
         self.approvals = Approvals(self.memory, self.work, lambda m, p: None, lambda: NOW)
         self.items = OpenItems(self.memory.db, lambda: self.clock[0])
         self.stored: dict[str, str] = {}
@@ -784,3 +786,190 @@ async def test_the_saved_cause_survives_a_restart():
     await again.settle()
     ended = [e for e in again.events if e.kind == "ask_ended"]
     assert ended and ended[0].caused_by == "evt-ask-turn"
+
+
+async def _home_card(rig, n=1):
+    home = Call(id=f"h{n}", name="t", input={"n": n, "id": f"app{n}"}, turn="", text="")
+    spec, kind = rig.box.spec_named("t")
+    req = await rig.box.ask_request(home, spec, kind, job_id=None, ask_id=f"x{n}")
+    return rig.runner.open(home, req, timedelta(hours=1), home=True)
+
+
+async def test_a_home_card_runs_as_a_press_and_does_not_wake_scout():
+    # Home's setup card: the answer runs the saved call as a Home press (it opens no task), and
+    # the install's own news tells the story, so Scout is not woken for it.
+    rig = Rig()
+    pressed: list[str | None] = []
+    claim = not_for_home(lambda given, title: "task")
+
+    async def run(call, tool):
+        pressed.append(claim(None, "install"))
+        return "ran"
+
+    rig.source.run = run
+    item = await _home_card(rig)
+    assert rig.asks.is_open(item.id)
+    rig.asks.answer(item.id, "allow", "desktop")
+    await rig.settle()
+    assert pressed == [None] and rig.items.get(item.id).state == "done"
+    assert rig.events == []
+
+
+async def test_a_home_card_that_is_denied_or_lapses_tells_scout_nothing():
+    rig = Rig()
+    denied = await _home_card(rig)
+    rig.asks.answer(denied.id, "deny", "desktop")
+    await rig.settle()
+    assert rig.items.get(denied.id).state == "done" and rig.events == []
+    lapsed = await _home_card(rig, 2)
+    rig.clock[0] = NOW + timedelta(hours=2)
+    rig.runner.fire_due()
+    assert rig.items.get(lapsed.id).state == "expired" and rig.events == []
+
+
+def _home_ends(rig):
+    ends: list[tuple[str, str | None]] = []
+    rig.runner.home_ended = lambda tool, args, token: ends.append((args["id"], token))
+    return ends
+
+
+async def test_a_home_card_that_ends_with_an_error_token_tells_home():
+    rig = Rig()
+    ends = _home_ends(rig)
+
+    async def run(call, tool):
+        return json.dumps({"error": "unknown_app", "detail": "x"})
+
+    rig.source.run = run
+    item = await _home_card(rig)
+    rig.asks.answer(item.id, "allow", "desktop")
+    await rig.settle()
+    assert ends == [("app1", "unknown_app")] and rig.events == []
+
+
+async def test_a_home_card_that_needs_env_or_raises_tells_home():
+    rig = Rig()
+    ends = _home_ends(rig)
+
+    async def run(call, tool):
+        if call.input["n"] == 1:
+            return json.dumps({"id": "a", "status": "connected", "needs_env": ["KEY"]})
+        raise RpcError(ErrorCode.tool_failed, "no")
+
+    rig.source.run = run
+    for n in (1, 2):
+        item = await _home_card(rig, n)
+        rig.asks.answer(item.id, "allow", "desktop")
+        await rig.settle()
+    assert ends == [("app1", "needs_env"), ("app2", "failed")]
+
+
+async def test_a_home_card_that_is_denied_or_lapses_tells_home_and_a_clean_add_says_none():
+    rig = Rig()
+    ends = _home_ends(rig)
+    denied = await _home_card(rig)
+    rig.asks.answer(denied.id, "deny", "desktop")
+    await rig.settle()
+    await _home_card(rig, 2)
+    rig.clock[0] = NOW + timedelta(hours=2)
+    rig.runner.fire_due()
+    rig.clock[0] = NOW
+    ok = await _home_card(rig, 3)
+    rig.asks.answer(ok.id, "allow", "desktop")
+    await rig.settle()
+    assert ends == [("app1", "denied"), ("app2", "lapsed"), ("app3", None)]
+
+
+async def test_a_returning_body_is_not_told_of_home_cards():
+    rig = Rig()
+    await _home_card(rig)
+    await rig.runner._return(3600)
+    assert [e for e in rig.events if e.kind == "asks_waiting"] == []
+
+
+class _PreferenceSource:
+    """The real save_preference tool, served to the toolbox."""
+
+    def __init__(self, approvals):
+        self._tools = {s.name: (s, h) for s, h in preference_tools(approvals)}
+
+    def specs(self):
+        return [s for s, _ in self._tools.values()]
+
+    known_specs = specs
+
+    async def run(self, call, tool):
+        return await self._tools[tool][1](call.input)
+
+    def unavailable(self, name):
+        return None
+
+
+def _saved(rig):
+    return [p.sentence for p in rules.list_preferences(rig.memory.db) if not p.builtin]
+
+
+def _preference_rig():
+    rig = Rig()
+    rig.stored["save_preference"] = "auto"  # an "Always" rule
+    rig.engine = Engine(  # a side-check that says yes to everything, beside the rule
+        [StandingRule(stored_auto_rules(lambda: rig.stored)), _SayYes(), Person()],
+        rig.approvals,
+        None,
+        lambda name: rig.stored.__setitem__(name, "auto"),
+    )
+    rig.box = Toolbox(
+        [_PreferenceSource(rig.approvals)],
+        lambda: rig.stored,
+        rig.stored.__setitem__,
+        rig.holds,
+        rig.engine,
+        runner=rig.runner,
+        tasks=rig.tasks,
+    )
+    return rig
+
+
+class _SayYes:
+    name = "side_check"
+
+    async def decide(self, req):
+        return permission.Grant("side_check")
+
+
+def _pref(sentence="  Prefer Claude Code  "):
+    return Call(
+        id="p1",
+        name="save_preference",
+        input={"sentence": sentence, "question": "Keep it?"},
+        turn="t1",
+        text="",
+    )
+
+
+async def test_save_preference_opens_a_card_a_rule_or_side_check_cannot_answer():
+    rig = _preference_rig()
+    out = await asyncio.wait_for(rig.box.run(_pref()), 1)
+    [item] = rig.items.list_open(kind="ask")
+    assert item.id in out and len(rig.opened()) == 1
+    assert _saved(rig) == []  # nothing is kept until the person answers
+
+
+async def test_allowing_the_preference_card_saves_exactly_the_shown_sentence():
+    rig = _preference_rig()
+    await rig.box.run(_pref())
+    [card] = rig.opened()
+    assert "Prefer Claude Code" in json.dumps(card)
+    rig.asks.answer(card["id"], "allow", "desktop")
+    await rig.settle()
+    assert _saved(rig) == ["Prefer Claude Code"]
+
+
+async def test_denying_the_preference_card_saves_nothing():
+    rig = _preference_rig()
+    await rig.box.run(_pref())
+    [card] = rig.opened()
+    rig.asks.answer(card["id"], "deny", "desktop")
+    await rig.settle()
+    assert _saved(rig) == []
+    assert rig.items.get(card["id"]).state == "done"

@@ -50,6 +50,7 @@ from brain.setup.flights import not_for_home
 from brain.setup.home_tools import (
     SetupProgress,
     home_app_rows,
+    home_end_reporter,
     home_setup_tools,
     home_update_tools,
 )
@@ -300,7 +301,7 @@ async def _run() -> None:
             inspect_machine,
             lambda: all_experts(experts, config.expert_cmd),
             lambda: home_app_rows(memory.list_apps(), lambda i: apps.status(i).state),
-            lambda **kw: session.asks.open(**kw),
+            lambda tool, args: session.open_card(tool, args),
             lambda **kw: session.approvals.record(**kw),
             expert_tools + app_tools + login,
             progress,
@@ -310,6 +311,7 @@ async def _run() -> None:
             config.offer_min_approvals, config.offer_window_days, config.keep_asking_days
         ),
     )
+    session.ask_runner.home_ended = home_end_reporter(progress, bodies.notify)
     bridges: BridgeSupervisor | None = None  # built once the brain's port is known
     update_loop: asyncio.Task | None = None
     lag_watch: asyncio.Task | None = None

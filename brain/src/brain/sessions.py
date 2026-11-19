@@ -81,7 +81,14 @@ from brain.offers import Offers, OfferSettings
 from brain.open_item_runner import AskRunner
 from brain.open_items import OpenItems
 from brain.outputs import OutputStore
-from brain.permission import Engine, Person, SideCheckDecider, StandingRule, stored_auto_rules
+from brain.permission import (
+    ASK_WAIT_MIN,
+    Engine,
+    Person,
+    SideCheckDecider,
+    StandingRule,
+    stored_auto_rules,
+)
 from brain.presence import Presence
 from brain.protocol import (
     BODY_DESKTOP,
@@ -220,7 +227,7 @@ class Session:
         # One WorkStore for the jobs, asks, questions and the ask log: a job that ends takes its
         # open asks and questions with it, which only holds when they share the store's hooks.
         work = WorkStore(memory.db, now, lambda text: mask_json(self.guards, "work", text))
-        self._asks = Asks(bodies, work)
+        self._asks = Asks(bodies)
         # One set of spend guards for the loop, the runner, the side-check and offers.
         self.guards = spend_guards(budget, step_cap)
         self.guards.add(wake_caps(wakes_per_hour))
@@ -365,7 +372,7 @@ class Session:
             + output_tools(outputs)
             + question_tools(questions)
             + choice_tools(choices)
-            + preference_tools(approvals, self._asks)
+            + preference_tools(approvals)
             + approval_home_tools(approvals)
             + reading_home_tools(self.reading)
             + (extra_tools or [])
@@ -630,6 +637,16 @@ class Session:
             else None
         )
         return None if row is None else row.task
+
+    async def open_card(self, tool: str, args: dict) -> str:
+        """Home's setup card for `tool`: put it up and return its id. The person's answer, whenever
+        it comes, runs the install through the same gate as Scout's, as a Home press."""
+        spec, kind = self.toolbox.spec_named(tool) or (None, "")
+        if spec is None:
+            raise RpcError(ErrorCode.unknown_tool, f"No tool named {tool}.")
+        call = Call(id=f"home:{uuid.uuid4().hex}", name=tool, input=args, turn="", text="")
+        req = await self.toolbox.ask_request(call, spec, kind, job_id=None, ask_id=call.id)
+        return self.ask_runner.open(call, req, ASK_WAIT_MIN, home=True).id
 
     def _card_answered(self, ask_id: str, option: str, body_id: str) -> None:
         """Every card answer is saved as a `card_answer` event that code handles, so it starts no

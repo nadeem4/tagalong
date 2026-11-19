@@ -4,14 +4,17 @@ A tool call that needs the person's yes opens an `ask` open item holding the cal
 on screen; the turn is told the ask is open and goes on. The answer, whenever it comes (even
 after the turn ended or the brain restarted), runs the saved call through the same gate: the
 floor and the person's answer, then the tool, and wakes Scout with the facts. A card of a task
-also offers Not now (look again later) and Stop task. It ends an ask at its deadline, wakes Scout
-when its check-back comes, and on a body's return shows cards again and tells Scout which wait.
+also offers Not now (look again later) and Stop task. A card Home's setup page opens (`home`)
+runs as a Home press and tells Scout nothing: the install's own news does. It ends an ask at its
+deadline, wakes Scout when its check-back comes, and on a body's return shows cards again and
+tells Scout which wait.
 """
 
 import asyncio
 import json
 import logging
 from collections.abc import Callable
+from contextlib import nullcontext
 from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
@@ -23,6 +26,7 @@ from brain.mind.turn import Call
 from brain.open_items import DEADLINE_S, OpenItem, OpenItemRefused, OpenItems, at_time
 from brain.permission import NEW_TASK_ARG, AskRequest, PersonAnswer, Tier, summarise
 from brain.protocol import RpcError
+from brain.setup.flights import from_home
 from brain.store.work import TransitionRefused
 from brain.tasks import Tasks
 
@@ -48,6 +52,19 @@ def _call(item: OpenItem) -> Call:
         turn="",
         text=saved.get("text") or "",
     )
+
+
+def _result_token(result: str) -> str | None:
+    """How an install's JSON answer went wrong, as a token: its `error`, or `needs_env`."""
+    try:
+        said = json.loads(result)
+    except ValueError:
+        return None
+    if not isinstance(said, dict):
+        return None
+    if isinstance(said.get("error"), str):
+        return said["error"]
+    return "needs_env" if said.get("needs_env") else None
 
 
 class AskRunner:
@@ -80,6 +97,9 @@ class AskRunner:
         # saved, so after a restart such an ask cannot run.
         self._raw: dict[str, Call] = {}
         self._handle: asyncio.TimerHandle | None = None
+        # Told how a Home setup card ended: (tool, its input, the error token or None when it
+        # went through). Wired by the process, which owns where Home reads setup outcomes.
+        self.home_ended: Callable[[str, dict, str | None], None] | None = None
 
     def open(
         self,
@@ -89,6 +109,7 @@ class AskRunner:
         *,
         check_back: timedelta | None = None,
         urgent: bool = False,
+        home: bool = False,
     ) -> OpenItem:
         """Save the call as an open item and put its card on screen. The same call again is the
         item already open, with no second card; Scout's new check-back moves the old one, unless
@@ -100,6 +121,7 @@ class AskRunner:
             **saved,
             "source": req.source,
             "masked": saved != raw,
+            **({"home": True} if home else {}),
         }
         at = None if check_back is None else self._now() + check_back
         item = self.find(call.name, call.input)
@@ -243,13 +265,20 @@ class AskRunner:
         if not decision.allowed:
             return self._end(item, "refused", decision.reason or "turned off")
         try:
-            out = await toolbox.carry_out(call)
+            with from_home() if (item.saved_call or {}).get("home") else nullcontext():
+                out = await toolbox.carry_out(call)
         except RpcError as err:
             return self._end(item, "failed", err.message)
         except Exception:
             log.exception("an answered call failed")
             return self._end(item, "failed", "the call raised an error")
         self._end(item, "approved", result=out if isinstance(out, str) else "")
+
+    def _told_home(self, item: OpenItem, token: str | None) -> None:
+        """A Home card ended: Home reads how (a token, None when clean) and reloads."""
+        if self.home_ended is not None:
+            call = _call(item)
+            self.home_ended(call.name, call.input, token)
 
     def _end(self, item: OpenItem, outcome: str, reason: str = "", result: str = "") -> None:
         """Close the item and wake Scout with what happened; he words it."""
@@ -268,7 +297,19 @@ class AskRunner:
             facts["reason"] = reason
         if outcome == "approved":
             facts["result"] = result
-        self._emit(Event("ask_ended", "scout", facts, caused_by=item.caused_by, task=item.task_id))
+        if (item.saved_call or {}).get("home"):
+            token = None
+            if outcome == "approved":
+                token = _result_token(result)
+            elif outcome == "refused":
+                token = "denied" if reason == "the person said no" else "refused"
+            else:
+                token = "failed"
+            self._told_home(item, token)
+        else:
+            self._emit(
+                Event("ask_ended", "scout", facts, caused_by=item.caused_by, task=item.task_id)
+            )
 
     # ---- deadline and restart ----
 
@@ -328,6 +369,9 @@ class AskRunner:
         summary = summarise(call.text, call.name, call.input)
         self._record_ask(item, "expired", "none", "no answer")
         self._drop_new_task(item, "no answer")
+        if (item.saved_call or {}).get("home"):
+            self._told_home(item, "lapsed")
+            return
         facts: dict[str, str | int] = {
             "ask": item.id,
             "tool": call.name,
@@ -380,9 +424,12 @@ class AskRunner:
             self._asks.card_closed(item.id)
         back: list[OpenItem] = []
         for item in self._items.list_open(kind=KIND):
+            # Home's setup cards are the page's to show, not Scout's to hear about.
+            is_home = (item.saved_call or {}).get("home")
             try:
                 if not self._asks.is_open(item.id) and await self._show_again(item):
-                    back.append(item)
+                    if not is_home:
+                        back.append(item)
                     continue
             except Exception:  # one card that cannot be built must not hide the others
                 log.exception("an open ask could not be shown again: %s", item.id)
@@ -390,7 +437,8 @@ class AskRunner:
             # A card up already may have opened while no screen showed it: told if it is newer
             # than the absence.
             if (
-                away_s is not None
+                not is_home
+                and away_s is not None
                 and item.created_at >= since
                 and self._items.get(item.id).state == "open"
             ):

@@ -435,9 +435,7 @@ class AskBodies:
 def holds_over(bodies) -> Holds:
     """The hold of expert and tool asks over these bodies, on its own throwaway database."""
     work = fresh_work()
-    return Holds(
-        Asks(bodies, work), work, OpenItems(Memory(":memory:").db, lambda: datetime.now(UTC))
-    )
+    return Holds(Asks(bodies), work, OpenItems(Memory(":memory:").db, lambda: datetime.now(UTC)))
 
 
 def opened_asks(bodies):
