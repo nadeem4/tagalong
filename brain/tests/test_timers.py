@@ -7,7 +7,7 @@ second.
 import asyncio
 from datetime import UTC, datetime, timedelta
 
-from job_rows import add_timer
+from job_rows import add_timer, tasks_for
 
 from brain.events import EventLog
 from brain.masking import Masker
@@ -94,6 +94,38 @@ def test_one_failing_fire_does_not_stop_the_next_row(monkeypatch):
     assert [e.payload["note"] for e in events] == ["second"]
     assert work.get(first.id).state == "planned"
     assert work.get(second.id).state == "done"
+
+
+def _with_task(repeat_s=None):
+    """A timer row under a new Later, and everything needed to fire it for real."""
+    memory = Memory(":memory:")
+    log = EventLog(memory.db, Masker(lambda: []), Clock())
+    work = WorkStore(memory.db, Clock())
+    timers = Timers(work, lambda event, **kw: log.post(event, **kw), Clock())
+    tasks = tasks_for(memory)
+    tid = tasks.open("later", "desktop-1", title="stretch")
+    tasks.wait(tid)
+    row = work.create("timer", "stretch", state="planned", due_at=T0, task_id=tid)
+    work.set_repeat(row.id, repeat_s)
+    return timers, log, tasks, tid
+
+
+def test_a_repeating_timer_is_a_repeating_later_task():
+    timers, log, tasks, tid = _with_task(repeat_s=600)
+    timers.fire_due()
+    assert [e.task for e in log.ready()] == [tid]
+    log.finish([e.id for e in log.ready()], "handled")
+    tasks.settle()
+    assert tasks.get(tid).state == "waiting"  # a repeating timer is still planned
+
+
+def test_a_one_off_later_ends_done_once_its_fire_is_told():
+    timers, log, tasks, tid = _with_task()
+    timers.fire_due()
+    assert tasks.settle() == []  # the fire is not told yet
+    log.finish([e.id for e in log.ready()], "handled")
+    assert tasks.settle() == [tid]
+    assert tasks.get(tid).state == "done"
 
 
 def test_cancelling_a_fired_but_untold_timer_ends_its_news():

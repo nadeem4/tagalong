@@ -27,6 +27,13 @@ def job_told(memory: Memory, job_id: str) -> bool:
     )
 
 
+def tasks_for(memory: Memory):
+    """A Tasks over the memory's database."""
+    from brain.tasks import Tasks
+
+    return Tasks(memory.db, lambda text: text, lambda: datetime.now(UTC))
+
+
 def end_job(records: JobRecords, job_id: str, state: str = "done") -> None:
     """End every running part of a job the way a finished run would (done, error or stopped)."""
     for part in records.parts_of(job_id):

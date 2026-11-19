@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 
 from brain.store import tasks as store
 from brain.store.db import transaction, utc_text
+from brain.store.memory import MemoryRefused
 from brain.store.work import TITLE_CAP
 from brain.tools import _fence_safe
 
@@ -66,6 +67,18 @@ class Tasks:
         caused by it. With no cause (Scout on its own) the source is `scout`."""
         source = (None if cause is None else store.event_source(self._db, cause)) or "scout"
         return self.open(kind, source, caused_by=cause, title=title)
+
+    def claim(self, given: object, cause: str | None, kind: str, title: str) -> str:
+        """The task a tool call works for: the open one named, or a new `kind` task for the turn
+        that took `cause`. The caller waits it once what it set going has started."""
+        if given is None:
+            id = self.for_turn(cause, kind, title)
+        else:
+            row = store.get(self._db, given) if isinstance(given, str) else None
+            if row is None or row.state not in ("open", "waiting"):
+                raise MemoryRefused(f"no open task {given}.")
+            id = row.id
+        return id
 
     def timers_of(self, id: str) -> list[str]:
         return store.timers_of(self._db, id)

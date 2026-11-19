@@ -16,6 +16,14 @@ from brain.open_items import OpenItem, OpenItemRefused, OpenItems
 
 log = logging.getLogger(__name__)
 
+# (task_id the call named or None, a title) -> the task its news is told under. The brain's
+# session makes one; a command line with no brain has none.
+Claim = Callable[[object, str], str | None]
+
+
+def no_task(given: object, title: str) -> None:
+    return None
+
 
 @dataclass(frozen=True)
 class Flight:

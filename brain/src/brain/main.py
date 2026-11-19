@@ -169,6 +169,8 @@ async def _run() -> None:
         config.data_dir, experts, real_open_terminal, emit_event, setup_items, notify=bodies.notify
     )
     progress = SetupProgress(emit_event)
+    # The session exists later; a setup call joins its turn's task, or opens a Do for it.
+    claim = lambda given, title: session.claim_task(given, "do", title)  # noqa: E731
     expert_tools, reinstall, stop_installs = expert_setup_tools(
         config.data_dir,
         registry,
@@ -180,6 +182,7 @@ async def _run() -> None:
         progress.emit,
         bodies.notify,
         setup_items,
+        claim,
     )
     app_tools, stop_watches = app_setup_tools(
         config.data_dir,
@@ -195,8 +198,9 @@ async def _run() -> None:
         os.environ,
         emit_event,
         setup_items,
+        claim=claim,
     )
-    login = login_tools(config.data_dir, logins)
+    login = login_tools(config.data_dir, logins, claim)
 
     updates = Updates(
         config.data_dir,

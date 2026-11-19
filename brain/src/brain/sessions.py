@@ -49,7 +49,6 @@ from brain.events import (
     EventLog,
     from_body,
     from_connect,
-    is_internal,
 )
 from brain.expert_apps import ExpertApps
 from brain.experts import ExpertHosts, ExpertRun
@@ -305,8 +304,7 @@ class Session:
             steps_max_bytes=job_steps_max_bytes,
             setup_facts=setup_facts,
             emit=self._emit_job_event,
-            turn_cause=lambda: self._turn_cause,
-            body_of=self._cause_body,
+            task_source=self.tasks.source_of,
             finish_news=self.events.finish_matching,
             on_timers_changed=lambda: timers.changed(),
             outputs=outputs,
@@ -352,9 +350,9 @@ class Session:
             + voice_tools(lambda: self.voice)
             + stt_tools(memory.db, stt_default, notify, lambda: self.voice and self.voice.reload())
             + tts_tools(memory.db, notify, self._pick_voice, voice_dir, self._voice_download)
-            + expert_tools(self.jobs, self.owner_turn)
+            + expert_tools(self.jobs, self.tasks, lambda: self._turn_cause)
             + work_tools(self.records.work, self.jobs, timers.changed)
-            + timer_tools(self.records, timers, now, lambda: self._turn_cause)
+            + timer_tools(self.records, timers, now, lambda: self._turn_cause, self.tasks)
             + task_tools(self.tasks, timers, self.jobs.running_for, lambda: self._turn_cause)
             + timer_home_tools(self.records.work, timers)
             + output_tools(outputs)
@@ -397,7 +395,7 @@ class Session:
             save_mode,
             self._asks,
             self.engine,
-            owner_turn=lambda turn_id: self._owner_turn and turn_id == self._turn_id,
+            person_task=self.person_task,
             on_call=self._on_tool_call,
             outputs=outputs,
             runner=self.ask_runner,
@@ -428,7 +426,6 @@ class Session:
         self._turn_id: str | None = None
         # True while the running turn is the owner's: they started it, or they typed into it.
         # A wake turn stays Scout's own until then, so its follow-ups still ask.
-        self._owner_turn = False
         self._said = ""  # the owner's words in the running turn: evidence for dates in remember
         self._task: asyncio.Task | None = None
         # Set when the owner talks over the running turn: it stops at once and winds down by itself.
@@ -616,13 +613,6 @@ class Session:
         """The body showing that turn while it runs, "brain" when it is over."""
         return (self._turn_body if turn_id == self._turn_id else None) or BRAIN
 
-    def _cause_body(self, cause: str | None) -> str:
-        if cause is None:
-            return BRAIN
-        if self._busy() and self._turn_body is not None:
-            return self._turn_body
-        return self.events.origin_body(cause, lambda s: not is_internal(s)) or BRAIN
-
     def _card_answered(self, ask_id: str, option: str, body_id: str) -> None:
         self.presence.touch(body_id)  # the person is at the body that answered
         self.ask_runner.answered(ask_id, option, body_id)
@@ -786,9 +776,20 @@ class Session:
         except Exception:
             log.exception("could not mark the cut-off request")
 
-    def owner_turn(self) -> bool:
-        """True while the running turn is the owner's, so a follow-up in it needs no ask."""
-        return self._owner_turn and self._busy()
+    def claim_task(self, given: object, kind: str, title: str) -> str:
+        """The task a setup call works for: the open one it named, else a new one for this turn.
+        It waits on what the call sets going."""
+        id = self.tasks.claim(given, self._turn_cause, kind, title)
+        self.tasks.wait(id)
+        return id
+
+    def person_task(self, turn_id: str | None) -> bool:
+        """True while this turn runs and its first event is a person's say, so a follow-up in it
+        needs no ask. A body's wake, a timer or a job's news is not a person."""
+        if turn_id is None or turn_id != self._turn_id or not self._busy():
+            return False
+        row = self.events.get(self._turn_cause) if self._turn_cause else None
+        return row is not None and row.kind == "say"
 
     def ready(self) -> bool:
         return getattr(self._model, "ready", True)  # fakes and other models need no key
@@ -948,10 +949,11 @@ class Session:
         )
 
     def _emit_job_event(self, event: Event, **hooks) -> None:
-        """Post a job's event, caused by the event the handing-off turn took."""
+        """Post a job's event under the job's task, caused by the event that handed it off."""
         job = event.source[4:] if event.source.startswith("job:") else ""
-        cause = self.jobs.cause(job) if job else None
-        self.post_event(replace(event, caused_by=cause), **hooks)
+        task = self.jobs.task_of(job) if job else None
+        cause = self.jobs.caused_by(job) if job else None
+        self.post_event(replace(event, caused_by=cause, task=task), **hooks)
 
     def _on_tool_call(
         self,
@@ -1092,7 +1094,8 @@ class Session:
                 "job_question",
                 f"job:{job_id}",
                 {"job": job_id, "message": what},
-                caused_by=self.jobs.cause(job_id),
+                caused_by=self.jobs.caused_by(job_id),
+                task=self.jobs.task_of(job_id),
             )
         )
 
@@ -1116,7 +1119,6 @@ class Session:
         self._ear_due = False
         self._turn_job = None
         self._stop = stop = asyncio.Event()
-        self._owner_turn = by_person
         # Only the person's typed words count as date evidence, never body context or parts.
         self._said = said if by_person else ""
         self._turn_body = body_id
@@ -1155,9 +1157,6 @@ class Session:
                 said = user_content(params, read_aloud=self._wants_speech(body_id, params))
                 blocks += self._of_event(row, said)
                 self._speak(turn_id, body_id, params)
-                # Their words reached the model, so a follow-up from here on is theirs; one
-                # already in flight when they joined still asks.
-                self._owner_turn = True
             return blocks
 
         def spoken_notify(method: str, params: dict) -> None:
@@ -1349,7 +1348,6 @@ class Session:
             self._turn_id = None
             self._turn_cause = None  # a later outside-turn ask must not inherit this say's cause
             self._turn_job = None
-            self._owner_turn = False
             self._task = None
         self._last_turn = turn_id
         self._save_new(body_kind)  # the closing reply; earlier steps were saved as they ended

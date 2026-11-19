@@ -20,7 +20,7 @@ from typing import Literal
 
 from brain.asks import Answer, Asks
 from brain.config import DEFAULT_JOB_STEPS_MAX_BYTES, DEFAULT_JOB_STEPS_MAX_ENTRIES
-from brain.events import Event
+from brain.events import Event, is_internal
 from brain.experts import ExpertHosts, ExpertRun, PermissionRequest, Question, QuietFacts
 from brain.guards import Guards
 from brain.job_activity import PAGE_LIMIT, JobActivity, _clip, activity_line, activity_summary
@@ -117,8 +117,7 @@ class Jobs:
         engine: Engine | None = None,
         guards: Guards | None = None,
         on_away: Callable[[str, str], None] = lambda job_id, what: None,
-        turn_cause: Callable[[], str | None] = lambda: None,
-        body_of: Callable[[str | None], str] = lambda event_id: BRAIN,
+        task_source: Callable[[str | None], str | None] = lambda task: None,
         setup_facts: Callable[[], Awaitable[dict]] | None = None,
         emit: Callable[[Event], None] = lambda event: None,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
@@ -131,9 +130,7 @@ class Jobs:
         steps_max_entries: int = DEFAULT_JOB_STEPS_MAX_ENTRIES,
         steps_max_bytes: int = DEFAULT_JOB_STEPS_MAX_BYTES,
     ) -> None:
-        self._turn_cause = turn_cause  # the event the running turn took
-        self._body_of = body_of  # event id -> the body its news goes back to
-        self._causes: dict[str, str] = {}  # job -> the event the turn that handed it off took
+        self._task_source = task_source  # task id -> where it came from (a body, or not)
         self._items = items  # an expert's permission ask is a live-only item; None: none kept
         self._steps_max_entries = steps_max_entries  # caps of one job's step log (settings)
         self._steps_max_bytes = steps_max_bytes
@@ -300,8 +297,13 @@ class Jobs:
         job: str | None = None,
         title: str | None = None,
         apps: Sequence[str] = (),
+        task_id: str | None = None,
+        caused_by: str | None = None,
     ) -> JobId:
         """Hand the task to an expert once the user picks a mode. Returns the job id.
+
+        task_id is the task the job belongs to and caused_by the event the hand-off came from:
+        the job's news is told under them.
 
         continue_job reopens that finished job's session (same expert, same folder); when the
         expert cannot, a fresh session starts and the result says why. The caller
@@ -332,9 +334,6 @@ class Jobs:
             found = self._records.last_part_for(chosen.id, str(path))
             earlier, earlier_part = found if found else (None, None)
         job_id = job or uuid.uuid4().hex[:8]
-        cause = self._turn_cause()  # the turn that handed it off
-        if cause is not None:
-            self._causes.setdefault(job_id, cause)
         started = await self._start_part(
             job_id,
             chosen,
@@ -344,6 +343,8 @@ class Jobs:
             earlier_part=earlier_part,
             new_job=job is None,
             apps=offered,
+            task_id=task_id,
+            caused_by=caused_by,
         )
         if earlier and earlier_part:
             # An explicit carry-on closes whatever a restart, shutdown or stop left behind. The
@@ -402,6 +403,8 @@ class Jobs:
         new_job: bool = True,
         apps: tuple[str, ...] = (),
         redo: WorkRow | None = None,
+        task_id: str | None = None,
+        caused_by: str | None = None,
     ) -> JobId:
         """The one seam that starts an expert run: a new job's first part, or (new_job False) a
         further part of an existing job. redo is a part's own row, already active, run again in
@@ -455,13 +458,24 @@ class Jobs:
                 mode_id = self._redo_mode(job_id, by_name.values())
             kept = apps
             if mode_id is None:
-                mode_id, kept = await self._hand_off_mode(chosen, task, path, by_name, apps)
+                mode_id, kept = await self._hand_off_mode(
+                    chosen, task, path, by_name, apps, self._person_task(task_id)
+                )
                 await run.keep_apps(kept)
             if redo is not None:
                 pass  # the row exists and is active; the run attaches to it
             elif new_job:
                 parent = earlier.id if earlier else None
-                self._records.add_job(job_id, chosen.id, task, str(path), mode_id, parent)
+                self._records.add_job(
+                    job_id,
+                    chosen.id,
+                    task,
+                    str(path),
+                    mode_id,
+                    parent,
+                    task_id=task_id,
+                    caused_by=caused_by,
+                )
             else:
                 # Scout may have closed the job while the start awaited the expert or the card.
                 current = self._records.get_job(job_id)
@@ -552,10 +566,12 @@ class Jobs:
         path: Path,
         by_name: dict[str, str],
         apps: tuple[str, ...],
+        person: bool,
     ) -> tuple[str, tuple[str, ...]]:
         """The mode to start in, and the apps kept. The card is the owner's own question; the
         engine is asked only when apps ride along, so the person's pick is logged. Apps on the
-        card are the person's to approve, so nothing but the person answers for them."""
+        card are the person's to approve, so nothing but the person answers for them. A task no
+        person started (a timer, a job's news) is always shown the card."""
         kept = apps
 
         async def card() -> PersonAnswer:
@@ -597,7 +613,7 @@ class Jobs:
                 group_key=f"{_prefix(chosen.id)}:{path}",
                 summary=summarise(task, "hand_off", facts),
                 input=facts,
-                tier=Tier.ask,
+                tier=Tier.ask if person else Tier.person_only,
                 how_to_ask=card,
                 can_allow_once=False,  # only the person answers for apps
                 offer=False,
@@ -783,7 +799,7 @@ class Jobs:
                 0, int((self._now() - began).total_seconds() // 60)
             )
         event_facts.update(self.wake_facts(job_id))
-        self._emit(Event("job_quiet", f"job:{job_id}", event_facts))
+        self._news("job_quiet", job_id, event_facts)
 
     def _step_failed(self, job_id: str, entry: ActivityEntry) -> None:
         """A command failed: tell Scout the facts (batched and capped by the runner)."""
@@ -794,7 +810,19 @@ class Jobs:
             "exit": "" if entry.exit is None else entry.exit,
         }
         facts.update(self.wake_facts(job_id))
-        self._emit(Event("job_step_failed", f"job:{job_id}", facts))
+        self._news("job_step_failed", job_id, facts)
+
+    def _news(self, kind: str, job_id: str, facts: dict) -> None:
+        """Post a job's news under its task, caused by the event that handed the job off."""
+        self._emit(
+            Event(
+                kind,
+                f"job:{job_id}",
+                facts,
+                caused_by=self.caused_by(job_id),
+                task=self.task_of(job_id),
+            )
+        )
 
     def wake_facts(self, job_id: str) -> dict[str, str]:
         """Facts every job wake carries: a short summary of what the job did, read from its
@@ -868,13 +896,21 @@ class Jobs:
         """The jobs with a part running under this task."""
         return [j.id for j in self._records.running_jobs() if self.task_of(j.id) == task]
 
-    def cause(self, job_id: str | None) -> str | None:
+    def caused_by(self, job_id: str | None) -> str | None:
         """The event the turn that handed this job off took: its news is caused by it."""
-        return self._causes.get(job_id or "")
+        goal = self._records.work.get(job_id) if job_id else None
+        return ((goal and goal.input) or {}).get("caused_by")
 
-    def origin(self, job_id: str | None) -> str:
-        """The body that started this job; its news and questions go back there."""
-        return self._body_of(self.cause(job_id))
+    def _person_task(self, task: str | None) -> bool:
+        """Whether a person started the task: its source is a body, not a timer or a job."""
+        source = self._task_source(task)
+        return source is not None and not is_internal(source)
+
+    def _item_body(self, job_id: str | None) -> str:
+        """The body its task came from, or the brain: where an expert's ask is shown (T2c drops
+        the column this fills)."""
+        task = self.task_of(job_id)
+        return (self._task_source(task) or BRAIN) if self._person_task(task) else BRAIN
 
     def _changed(self) -> None:
         self._notify("changed", {"what": "jobs"})
@@ -928,7 +964,7 @@ class Jobs:
             if self._items is None:
                 return await person()
             self._items.open(
-                "expert_ask", self.origin(job_id), live_only=True, job_id=job_id, id=ask_id
+                "expert_ask", self._item_body(job_id), live_only=True, job_id=job_id, id=ask_id
             )
             try:
                 answer = await person()

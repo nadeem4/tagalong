@@ -150,7 +150,11 @@ class Timers:
                 facts["state"] = home_state(parent.state)
             facts.update(self._job_facts(row.parent_id))
         event = Event(
-            "timer", f"timer:{row.id}", facts, caused_by=(row.input or {}).get("caused_by")
+            "timer",
+            f"timer:{row.id}",
+            facts,
+            caused_by=(row.input or {}).get("caused_by"),
+            task=row.task_id,
         )
         self._emit(event, then=then)
 

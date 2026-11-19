@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import pytest
 from ask_log import approvals_on, list_approvals, work_on
 from fake_engine import FakeEngine
-from job_rows import fresh_work
+from job_rows import fresh_work, tasks_for
 
 from brain.asks import Asks
 from brain.bodies import Bodies
@@ -1108,7 +1108,9 @@ def nudger(mem, check=None, owner=False, online=("desktop",), offers=None):
     from brain.tools import expert_tools
 
     jobs = NudgeJobs()
-    tools = [t for t in expert_tools(jobs, lambda: owner) if t[0].name == "tell_expert"]
+    tools = [
+        t for t in expert_tools(jobs, tasks_for(mem), lambda: None) if t[0].name == "tell_expert"
+    ]
     sent = []
     bodies = AskBodies(online)
     approvals = approvals_on(mem, lambda m, p: sent.append((m, p)), lambda: NOW)
@@ -1125,7 +1127,7 @@ def nudger(mem, check=None, owner=False, online=("desktop",), offers=None):
         stored.__setitem__,
         Asks(bodies, fresh_work()),
         engine,
-        owner_turn=lambda turn_id: owner and turn_id == "t1",
+        person_task=lambda turn_id: owner and turn_id == "t1",
     )
     return box, jobs, bodies, stored
 
@@ -1407,7 +1409,7 @@ def _engine_box(decision, spec_=None, stored=None, owner=False):
         stored.__setitem__,
         asks,
         engine,
-        owner_turn=lambda turn_id: owner,
+        person_task=lambda turn_id: owner,
     )
     return box, source, engine
 
@@ -1462,7 +1464,7 @@ async def test_off_tool_is_refused_before_the_engine():
     assert engine.requests == [] and source.ran == []
 
 
-async def test_follow_up_on_the_owners_turn_skips_the_engine():
+async def test_follow_up_skips_the_ask_only_on_a_person_task():
     box, _, engine = _engine_box(
         Decision("deny", "denied"),
         ToolSpec("t", "t tool", {"type": "object"}, follow_up=True),
@@ -1470,6 +1472,14 @@ async def test_follow_up_on_the_owners_turn_skips_the_engine():
     )
     assert await box.run(call_with_text("t")) == "ran t"
     assert engine.requests == []
+    box, _, engine = _engine_box(
+        Decision("deny", "denied"),
+        ToolSpec("t", "t tool", {"type": "object"}, follow_up=True),
+        owner=False,
+    )
+    with pytest.raises(RpcError):
+        await box.run(call_with_text("t"))
+    assert len(engine.requests) == 1
 
 
 async def test_home_caller_skips_the_gate():

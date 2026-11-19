@@ -298,16 +298,23 @@ async def hand_off(session, folder) -> str:
     async def pick(_expert):
         return SimpleNamespace(id="claude_code")
 
-    async def start_part(job_id, *_a, **_k):
+    async def start_part(job_id, chosen, task, path, *, task_id=None, caused_by=None, **_k):
+        # What the real seam records for the job; only the expert launch is faked.
+        session.jobs._records.add_job(
+            job_id, chosen.id, task, str(path), "plan", task_id=task_id, caused_by=caused_by
+        )
         return JobId(job_id)
 
     session.jobs._pick = pick
     session.jobs._start_part = start_part
-    return str(await session.jobs.start("fix it", str(folder)))
+    # What the hand_off tool passes: the event the running turn took.
+    return str(await session.jobs.start("fix it", str(folder), caused_by=session._turn_cause))
 
 
 def job_ended_cause(session, memory, job_id):
-    session.jobs._on_finished(end_job(memory, job_id))
+    records = session.jobs._records
+    records.update_part(job_id, "p1", state="done", reason="end_turn", report="all good")
+    session.jobs._on_finished(records.get_job(job_id))
     row = next(r for r in session.events.ready() if r.kind == "job_ended")
     assert row.source == f"job:{job_id}"
     return row.caused_by

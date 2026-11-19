@@ -168,6 +168,7 @@ class LoginDriver:
         self._notify = notify or (lambda *_: None)
         self._items = items
         self._flights = Flights(items, "signin")
+        self._tasks: dict[str, str | None] = {}  # expert id -> the task its news is told under
 
     async def check(self, expert: InstalledExpert) -> LoginState:
         """Is the expert logged in? Starts a session and sends no prompt."""
@@ -185,10 +186,15 @@ class LoginDriver:
         except Exception:  # cannot start or answer: we do not know
             return Unknown()
 
-    def start(self, expert: InstalledExpert) -> tuple[OpenItem, bool]:
+    def running(self, expert_id: str) -> bool:
+        return self._flights.has(expert_id)
+
+    def start(self, expert: InstalledExpert, task: str | None = None) -> tuple[OpenItem, bool]:
         """Begin a sign-in and return at once with its open item (and whether it joined one
         already running). Every check and the window run in the background; the end arrives
-        as one `setup_login` event."""
+        as one `setup_login` event, told under `task` (a joined sign-in keeps its own)."""
+        if not self._flights.has(expert.id):
+            self._tasks[expert.id] = task
         flight = self._flights.start(expert.id, lambda: self._run(expert))
         return flight.item, flight.joined
 
@@ -270,5 +276,7 @@ class LoginDriver:
             facts["detail"] = detail
         if command:
             facts["command"] = command
-        self._emit(Event("setup_login", f"setup:{expert_id}", facts))
+        self._emit(
+            Event("setup_login", f"setup:{expert_id}", facts, task=self._tasks.get(expert_id))
+        )
         self._notify("changed", {"what": "setup"})  # Home's chip and the tour reload

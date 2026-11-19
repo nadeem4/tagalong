@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 from ask_log import approvals_on
-from job_rows import end_job, fresh_work, records_for
+from job_rows import end_job, fresh_work, records_for, tasks_for
 
 from brain.bodies import Bodies
 from brain.guardrails import Budget
@@ -277,13 +277,14 @@ def home(mem, tmp_path):
         notify("changed", {"what": "permissions"})  # as Session does
 
     jobs = FakeJobs()
-    owner = {"turn": True}  # whether the running turn is the owner's
+    cause = {"id": None}  # the event the running turn took
+    tasks = tasks_for(mem)
     tools = (
         brain_tools(mem, notify)
         + home_tools(budget, lambda: box)
         + model_tools(mem.db, "claude-sonnet-5-5", notify)
         + stt_tools(mem.db, (None, None), notify, lambda: None)
-        + expert_tools(jobs, lambda: owner["turn"])
+        + expert_tools(jobs, tasks, lambda: cause["id"])
     )
     box = Toolbox(
         [BrainSource(tools), BodySource(bodies)], partial(rules.permission_modes, mem.db), save_mode
@@ -294,7 +295,14 @@ def home(mem, tmp_path):
         return await handlers[name](args or {})
 
     return SimpleNamespace(
-        run=run, sent=sent, bodies=bodies, box=box, budget=budget, jobs=jobs, owner=owner
+        run=run,
+        sent=sent,
+        bodies=bodies,
+        box=box,
+        budget=budget,
+        jobs=jobs,
+        cause=cause,
+        tasks=tasks,
     )
 
 
@@ -332,8 +340,12 @@ class FakeJobs:
         job=None,
         title=None,
         apps=(),
+        task_id=None,
+        caused_by=None,
     ):
         self.apps = apps
+        self.task_id = task_id
+        self.caused_by = caused_by
         self.calls.append(("start", task, folder, expert, continue_job))
         self.fresh = fresh
         self.job, self.title = job, title
@@ -433,6 +445,7 @@ def test_expert_model_tool_schemas(home):
         "title",
         "job",
         "apps",
+        "task_id",
     }
     assert tools["hand_off"]["properties"]["apps"]["type"] == "array"
     assert tools["hand_off"]["properties"]["fresh"]["type"] == "boolean"
@@ -448,6 +461,7 @@ async def test_hand_off_reaches_jobs_start(home):
     out = await home.run("hand_off", {"task": "fix the bug", "folder": "C:/proj"})
     assert home.jobs.calls == [("start", "fix the bug", "C:/proj", None, None)]
     assert json.loads(out) == {
+        "task": home.jobs.task_id,
         "job": "ab12cd34",
         "session": "fresh",
         "why_fresh": None,
@@ -455,6 +469,31 @@ async def test_hand_off_reaches_jobs_start(home):
         "part": "p1",
         "title": None,
     }
+
+
+async def test_hand_off_without_a_task_opens_a_do_task_caused_by_the_say(home, mem):
+    from brain.store import events as store_events
+    from brain.store.events import EventRow
+
+    store_events.insert(
+        mem.db,
+        EventRow(id="e1", kind="say", at="2026-01-01T11:00:00+00:00", source="desktop-1"),
+    )
+    home.cause["id"] = "e1"
+    await home.run("hand_off", {"task": "fix the bug", "folder": "C:/proj"})
+    row = home.tasks.get(home.jobs.task_id)
+    assert (row.kind, row.source, row.caused_by, row.state) == ("do", "desktop-1", "e1", "waiting")
+    assert row.title == "fix the bug"
+
+
+async def test_hand_off_with_a_task_keeps_it(home):
+    tid = home.tasks.open("do", "desktop-1", title="the build")
+    await home.run("hand_off", {"task": "t", "folder": "C:/p", "task_id": tid})
+    assert home.jobs.task_id == tid
+    assert home.tasks.get(tid).state == "waiting"
+    with pytest.raises(MemoryRefused, match="no open task nope"):
+        await home.run("hand_off", {"task": "t", "folder": "C:/p", "task_id": "nope"})
+    assert len(home.jobs.calls) == 1
 
 
 async def test_hand_off_result_states_the_chosen_mode(home):
@@ -477,13 +516,12 @@ async def test_home_permission_list_shows_tell_expert_as_ask(home):
     assert rows["tell_expert"]["mode"] == "ask"
 
 
-async def test_a_wake_turn_cannot_start_a_hand_off(home):
-    # No person started this turn (a job ended, a timer fired): Scout may not start work.
-    home.owner["turn"] = False
+async def test_a_wake_turn_can_hand_off_through_the_card(home):
+    # A job ended or a timer fired: Scout may start work; the card (jobs.py) is what asks.
     for args in ({}, {"continue_job": "old1"}):
         out = await home.run("hand_off", {"task": "t", "folder": "C:/p", **args})
-        assert out == "hand_off refused: only a message from the person can start a job."
-    assert home.jobs.calls == []
+        assert "refused" not in out
+    assert len(home.jobs.calls) == 2
 
 
 async def test_hand_off_continue_job_reports_the_session_facts(home):
@@ -491,6 +529,7 @@ async def test_hand_off_continue_job_reports_the_session_facts(home):
     out = await home.run("hand_off", {"task": "t", "folder": "C:/p", "continue_job": "old1"})
     assert home.jobs.calls == [("start", "t", "C:/p", None, "old1")]
     assert json.loads(out) == {
+        "task": home.jobs.task_id,
         "job": "n1",
         "session": "fresh",
         "why_fresh": "expert cannot reopen sessions",
@@ -501,6 +540,7 @@ async def test_hand_off_continue_job_reports_the_session_facts(home):
     home.jobs.started = JobId("n2", "continued", None, "n1")
     out = await home.run("hand_off", {"task": "t", "folder": "C:/p", "continue_job": "n1"})
     assert json.loads(out) == {
+        "task": home.jobs.task_id,
         "job": "n2",
         "session": "continued",
         "why_fresh": None,
@@ -1048,13 +1088,15 @@ def records(mem):
 def trun(mem):
     records = records_for(mem, lambda: _T0)
     fake = _FakeTimers(records.work)
-    pairs = timer_tools(records, fake, lambda: _T0)
+    tasks = tasks_for(mem)
+    pairs = timer_tools(records, fake, lambda: _T0, lambda: None, tasks)
     handlers = {spec.name: handler for spec, handler in pairs}
 
     async def call(name, args):
         return await handlers[name](args)
 
     call.fake = fake
+    call.tasks = tasks
     call.records = records
     call.work = records.work
     call.specs = {spec.name: spec for spec, _ in pairs}
@@ -1069,9 +1111,31 @@ def _due(row):
     return datetime.datetime.fromisoformat(row.due_at)
 
 
+async def test_a_job_timer_belongs_to_the_jobs_task(trun, records):
+    tid = trun.tasks.open("do", "desktop-1")
+    records.add_job("j1", "a", "t", "f", "m", task_id=tid)
+    await trun("set_timer", {"note": "n", "in_minutes": 10, "job": "j1"})
+    assert _timers(trun)[0].task_id == tid
+
+
+async def test_a_timer_with_no_task_opens_a_later_titled_with_the_note(trun):
+    await trun("set_timer", {"note": "stretch", "in_minutes": 10})
+    row = _timers(trun)[0]
+    task = trun.tasks.get(row.task_id)
+    assert (task.kind, task.title, task.state) == ("later", "stretch", "waiting")
+
+
+async def test_a_timer_with_an_unknown_task_is_refused(trun):
+    with pytest.raises(MemoryRefused, match="no open task zz"):
+        await trun("set_timer", {"note": "n", "in_minutes": 10, "task_id": "zz"})
+    assert _timers(trun) == []
+
+
 async def test_set_timer_records_the_event_of_the_turn_that_set_it(mem):
     records = records_for(mem, lambda: _T0)
-    pairs = timer_tools(records, _FakeTimers(records.work), lambda: _T0, lambda: "ev1")
+    pairs = timer_tools(
+        records, _FakeTimers(records.work), lambda: _T0, lambda: "ev1", tasks_for(mem)
+    )
     handlers = {spec.name: handler for spec, handler in pairs}
     await handlers["set_timer"]({"note": "x", "in_minutes": 5})
     [row] = records.work.of_kind("timer", ["planned"])
@@ -1236,7 +1300,7 @@ async def test_timer_tool_modes(trun):
 
 async def test_set_timer_with_a_naive_clock_still_gets_an_aware_time(mem):
     naive = lambda: datetime.datetime(2026, 10, 28, 9, 0)  # noqa: E731
-    pairs = timer_tools(records_for(mem, naive), _FakeTimers(), naive)
+    pairs = timer_tools(records_for(mem, naive), _FakeTimers(), naive, lambda: None, tasks_for(mem))
     handlers = {s.name: h for s, h in pairs}
     out = await handlers["set_timer"]({"note": "n", "in_minutes": 5})
     assert out.startswith("timer ")
@@ -1768,8 +1832,8 @@ def test_built_in_defaults_match_the_spec_table(mem):
     tools = (
         brain_tools(mem)
         + output_tools(OutputStore(mem, Guards(), 10))
-        + timer_tools(records_for(mem), _FakeTimers(), lambda: _T0)
-        + expert_tools(jobs, lambda: True)
+        + timer_tools(records_for(mem), _FakeTimers(), lambda: _T0, lambda: None, tasks_for(mem))
+        + expert_tools(jobs, tasks_for(mem), lambda: None)
     )
     box = Toolbox(
         [BrainSource(tools)],

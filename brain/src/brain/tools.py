@@ -19,7 +19,7 @@ from contextlib import suppress
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol
 
 from anthropic import AsyncAnthropic, AuthenticationError, PermissionDeniedError
 
@@ -50,6 +50,9 @@ from brain.tool_words import GROUPS, Group, fallback, words_for
 from brain.toolbox import SEP, Handler, Toolbox, ToolSpec
 from brain.voice import NoSample, VoiceHooks
 from brain.voice.tts import AUTO, auto_voice, voice_by_id
+
+if TYPE_CHECKING:  # tasks.py imports this module
+    from brain.tasks import Tasks
 
 log = logging.getLogger("brain")
 
@@ -360,10 +363,12 @@ def timer_tools(
     records: JobRecords,
     timers: Timers,
     now: Callable[[], datetime],
-    cause: Callable[[], str | None] = lambda: None,
+    cause: Callable[[], str | None],
+    tasks: "Tasks",
 ) -> list[tuple[ToolSpec, Handler]]:
     """Scout's timers and watches, kept as work rows. Times are stored in UTC; answers echo the
-    owner's offset. `cause` is the event the running turn took: the fired timer's `caused_by`."""
+    owner's offset. `cause` is the event the running turn took: the fired timer's `caused_by`.
+    A timer hangs off a task: the one named by task_id, its job's, else a new Later."""
     work = records.work
 
     def aware_now() -> datetime:
@@ -388,13 +393,22 @@ def timer_tools(
             raise MemoryRefused(f"{tool} needs a note of 1 to {TIMER_NOTE_MAX} characters.")
         return note
 
-    def create_row(kind: str, note: str, when: datetime, repeat_s: int | None, parent_id=None):
+    def create_row(
+        kind: str,
+        note: str,
+        when: datetime,
+        repeat_s: int | None,
+        parent_id=None,
+        task_id: str | None = None,
+    ):
         # The title is capped; a longer note is kept whole in the input.
         caused_by = cause()
         saved: dict = {"caused_by": caused_by} if caused_by else {}
         if len(note) > TITLE_CAP:
             saved["note"] = work.mask(note)
-        row = work.create(kind, note, parent_id=parent_id, due_at=when, input=saved or None)
+        row = work.create(
+            kind, note, parent_id=parent_id, due_at=when, input=saved or None, task_id=task_id
+        )
         work.set_repeat(row.id, repeat_s)
         timers.changed()
         return row
@@ -408,6 +422,10 @@ def timer_tools(
     def of_kind(kind: str, tid: str) -> WorkRow | None:
         row = work.get(tid)
         return row if row is not None and row.kind == kind else None
+
+    def jobs_task(job_id: str) -> str | None:
+        goal = work.get(job_id)
+        return goal.task_id if goal else None
 
     async def set_timer(args: dict) -> str:
         note = note_arg("set_timer", args)
@@ -444,7 +462,14 @@ def timer_tools(
                 raise MemoryRefused(f"no job with id {job_id}.")
             if job.state != "active":
                 raise MemoryRefused(f"job {job_id} is not running ({home_state(job.state)}).")
-        row = create_row("timer", note, when, repeat * 60 if repeat else None, job_id)
+        given = args.get("task_id")
+        if given is None and job_id is not None:
+            task_id = jobs_task(job_id)  # the job's own task; none for a job from before tasks
+        else:
+            task_id = tasks.claim(given, cause(), "later", note)
+        row = create_row("timer", note, when, repeat * 60 if repeat else None, job_id, task_id)
+        if task_id:
+            tasks.wait(task_id)
         local = when.astimezone(current.tzinfo)
         out = f"timer {row.id} set for {local.isoformat(timespec='seconds')}"
         return out + (f", repeats every {repeat} minutes" if repeat else "")
@@ -560,6 +585,11 @@ def timer_tools(
                             "type": "string",
                             "description": "A running job's id: the wake then carries that "
                             "job's watch list, state and activity summary.",
+                        },
+                        "task_id": {
+                            "type": "string",
+                            "description": "An open task's id; a timer with none opens a Later "
+                            "task (or joins its job's task).",
                         },
                     },
                     "required": ["note"],
@@ -809,20 +839,21 @@ def work_tools(
     ]
 
 
-def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolSpec, Handler]]:
+def expert_tools(
+    jobs: Jobs, tasks: "Tasks", cause: Callable[[], str | None]
+) -> list[tuple[ToolSpec, Handler]]:
     """Scout's hand-off tools. A refusal (JobError) is a plain line for Scout; Home's stop_job
-    raises it as an RpcError so the body shows the same words. owner_turn says whether the
-    running turn is the owner's: only then may hand_off start a job."""
+    raises it as an RpcError so the body shows the same words. A job hangs off a task: the
+    one named by task_id, else a new Do task for the turn. Whether a person started that task
+    decides if the hand-off card may be skipped (jobs.py), not whether Scout may start work."""
 
     async def hand_off(args: dict) -> str:
         _need_text("hand_off", args, "task", "folder")
-        if not owner_turn():
-            # A wake (job ended, timer) never starts work: a stopped job restarted by itself
-            # cost real money. Scout tells the person and waits for their say.
-            return "hand_off refused: only a message from the person can start a job."
         apps = args.get("apps", [])
         if not isinstance(apps, list) or not all(isinstance(a, str) for a in apps):
             return "hand_off needs apps to be a list of connected app ids."
+        given = args.get("task_id")
+        tid = tasks.claim(given, cause(), "do", args["task"])
         try:
             job_id = await jobs.start(
                 args["task"],
@@ -833,12 +864,18 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 job=_text_arg(args, "job"),
                 title=_text_arg(args, "title"),
                 apps=apps,
+                task_id=tid,
+                caused_by=cause(),
             )
         except JobError as err:
+            if given is None:
+                tasks.end(tid, "stopped", reason="the hand-off was refused")
             # Setup facts (ids and numbers) are facts only; Scout words them. Else the plain line.
             return json.dumps(err.facts) if err.facts else str(err)
+        tasks.wait(tid)
         # Facts only; Scout words them. Without a continue, the session is simply fresh.
         result = {
+            "task": tid,
             "job": str(job_id),
             "session": getattr(job_id, "session", "fresh"),
             "why_fresh": getattr(job_id, "why_fresh", None),
@@ -964,8 +1001,10 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                 "Then call watch_job with what you expect. A job is your piece of work: give a new "
                 "one a short title in your own words, and to start another part under a job "
                 "that is still open (another expert, or a next step) pass its id as job. Close "
-                "the job with close_job when you judge the work done. Returns JSON: the job id, "
-                "part, title, session (continued or fresh), why_fresh and parent_job.",
+                "the job with close_job when you judge the work done. The job belongs to a task: "
+                "pass task_id to put it under an open task, else a new Do task opens for this "
+                "turn. Returns JSON: the task, the job id, part, title, session (continued or "
+                "fresh), why_fresh and parent_job.",
                 {
                     "type": "object",
                     "properties": {
@@ -995,6 +1034,10 @@ def expert_tools(jobs: Jobs, owner_turn: Callable[[], bool]) -> list[tuple[ToolS
                             "type": "array",
                             "items": {"type": "string"},
                             "description": "Connected app ids the job needs; none by default.",
+                        },
+                        "task_id": {
+                            "type": "string",
+                            "description": "An open task's id to run the job under; optional.",
                         },
                     },
                     "required": ["task", "folder"],
