@@ -11,7 +11,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 
 from brain.events import PERSON_KINDS, Event
-from brain.open_items import OpenItems
+from brain.open_items import OpenItem, OpenItems
 from brain.store import tasks as store
 from brain.store.db import transaction, utc_text
 from brain.store.memory import MemoryRefused
@@ -105,6 +105,19 @@ class Tasks:
         """Whether a person started the task: the event that caused it is a person's."""
         row = None if id is None else store.get(self._db, id)
         return row is not None and self.person_cause(row.caused_by)
+
+    def card_fields(self, item: OpenItem) -> dict | None:
+        """What a card of this item carries for its task: the task, and when it will be looked at
+        again. None for no task or an Ask task: the person never sees that one."""
+        row = None if item.task_id is None else self.get(item.task_id)
+        if row is None or row.kind == "ask":
+            return None
+        return {
+            "task": {"id": row.id, "title": row.title},
+            "check_back_at": item.check_back_at.isoformat() if item.check_back_at else None,
+            "check_back_by": item.check_back_by,
+            "urgent": item.urgent,
+        }
 
     def source_of(self, id: str | None) -> str | None:
         row = None if id is None else store.get(self._db, id)

@@ -12,7 +12,7 @@ import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from brain.store import open_items as store
 from brain.store.db import utc_text
@@ -90,6 +90,18 @@ def _item(s: store.StoredItem) -> OpenItem:
         s.reason,
         s.window_s,
     )
+
+
+def at_time(at: "datetime | str | None") -> datetime | None:
+    """A body's ISO time (or a datetime) as an aware datetime; None when absent or unreadable."""
+    if isinstance(at, str):
+        try:
+            at = datetime.fromisoformat(at)
+        except ValueError:
+            return None
+    if at is not None and at.tzinfo is None:
+        at = at.replace(tzinfo=UTC)
+    return at
 
 
 class OpenItems:

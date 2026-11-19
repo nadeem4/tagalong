@@ -13,14 +13,14 @@ import json
 import logging
 from collections.abc import Callable
 from dataclasses import replace
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from brain.approvals import Approvals
 from brain.asks import Asks
 from brain.events import Event
 from brain.mind.turn import Call
-from brain.open_items import DEADLINE_S, OpenItem, OpenItemRefused, OpenItems
+from brain.open_items import DEADLINE_S, OpenItem, OpenItemRefused, OpenItems, at_time
 from brain.permission import NEW_TASK_ARG, AskRequest, PersonAnswer, Tier, summarise
 from brain.protocol import RpcError
 from brain.store.work import TransitionRefused
@@ -48,18 +48,6 @@ def _call(item: OpenItem) -> Call:
         turn="",
         text=saved.get("text") or "",
     )
-
-
-def _time(at: "datetime | str | None") -> datetime | None:
-    """A body's ISO time (or a datetime) as an aware datetime; None when absent or unreadable."""
-    if isinstance(at, str):
-        try:
-            at = datetime.fromisoformat(at)
-        except ValueError:
-            return None
-    if at is not None and at.tzinfo is None:
-        at = at.replace(tzinfo=UTC)
-    return at
 
 
 class AskRunner:
@@ -135,7 +123,7 @@ class AskRunner:
             self._raw[item.id] = call
         self._asks.show(
             item.id, replace(call, input=req.input), req.tool, req.tier is not Tier.ask,
-            self._card_task(item),
+            self._tasks_of.card_fields(item),
         )  # fmt: skip
         self.changed()
         return item
@@ -150,18 +138,6 @@ class AskRunner:
             if c.get("name") == saved["name"] and _bare(c.get("input") or {}) == want:
                 return item
         return None
-
-    def _card_task(self, item: OpenItem) -> dict | None:
-        """The fields a task's card carries: the task, and when it will be looked at again."""
-        row = None if item.task_id is None else self._tasks_of.get(item.task_id)
-        if row is None or row.kind == "ask":
-            return None  # the person never sees an Ask task: its card is a plain card
-        return {
-            "task": {"id": row.id, "title": row.title},
-            "check_back_at": item.check_back_at.isoformat() if item.check_back_at else None,
-            "check_back_by": item.check_back_by,
-            "urgent": item.urgent,
-        }
 
     def _reschedule(self, item: OpenItem) -> None:
         if item.check_back_at is not None and item.check_back_by is not None:
@@ -190,7 +166,7 @@ class AskRunner:
         session, so it starts no turn): the saved call runs, whatever became of the turn. Not now
         only moves the check-back; Stop task ends the task."""
         if option == "not_now":
-            self._not_now(ask_id, _time(check_back_at), body_id)
+            self._not_now(ask_id, at_time(check_back_at), body_id)
         else:
             self._spawn(self._answer(ask_id, option, body_id))
 
