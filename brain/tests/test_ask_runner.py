@@ -10,6 +10,7 @@ import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from job_rows import no_hooks
 
 from brain import permission
 from brain.approvals import Approvals
@@ -104,6 +105,7 @@ class Rig:
             lambda name: self.stored.__setitem__(name, "auto"),
         )
         self.holds = Holds(self.asks, self.work, self.items, self.tasks)
+        self.tasks.hooks = no_hooks(close_cards=self.holds.close)
         self.runner = AskRunner(
             self.items,
             self.asks,

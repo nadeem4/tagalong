@@ -285,7 +285,10 @@ export interface HostBridge {
    * question. Separate from approveTool because these options are not allow/always/deny; a
    * task card's `not_now` and `stop_task` go this way too.
    */
-  answerJobAsk(approvalId: string, answer: { option: string; text?: string }): Promise<void>;
+  answerJobAsk(
+    approvalId: string,
+    answer: { option: string; text?: string; checkBackAt?: string },
+  ): Promise<void>;
   /**
    * Home's Connections page: the apps the brain keeps (MCP). They reject with "brain offline"
    * while the brain is away.
@@ -439,6 +442,8 @@ export interface HostBridge {
   listJobs(): Promise<JobRow[]>;
   /** Stops one running job; rejects when the brain refuses (already ended, say). */
   stopJob(job: string): Promise<void>;
+  /** Stops a whole task (its jobs, timers and cards); rejects when the brain refuses (unknown task). */
+  stopTask(task: string): Promise<void>;
   /** A job's steps after `afterRev` (0 for all); rejects for an unknown job. */
   jobActivity(job: string, afterRev: number): Promise<JobActivityPage>;
   /** One part's report (masked by the brain), or null if it has none; rejects for an unknown part. */

@@ -19,8 +19,18 @@ export const MAX_BUTTON_TITLE = 20;
 export const MAX_BUTTON_BODY = 1024;
 
 const BUTTON_ID = /^ask:(.+):(\d+)$/;
-// "yes" and "no" stand for the confirm options when the ask has them.
-const SYNONYMS: Record<string, string> = { yes: 'allow', no: 'deny' };
+// "yes" and "no" stand for the confirm options when the ask has them; a task card's two extra
+// options are the brain's names, so the phone shows and accepts them in plain words. A typed
+// time is not read: Not now takes the brain's default wait.
+const SYNONYMS: Record<string, string> = {
+  yes: 'allow',
+  no: 'deny',
+  'not now': 'not_now',
+  stop: 'stop_task',
+  'stop the task': 'stop_task',
+};
+const LABELS: Record<string, string> = { not_now: 'Not now', stop_task: 'Stop the task' };
+const label = (option: string): string => LABELS[option] ?? option;
 
 export class AskDesk {
   // Insertion order. `epoch` counts the replies sent to the phone before the ask was shown: a
@@ -38,23 +48,23 @@ export class AskDesk {
       `Scout wants to use ${ask.tool ?? 'a tool'}${
         ask.input === undefined ? '' : ` with ${JSON.stringify(ask.input)}`
       }`;
-    const titles = ask.options.map((o) => o.toLowerCase());
+    const titles = ask.options.map((o) => label(o).toLowerCase());
     const fitsButtons =
       !ask.free_text &&
       said.length > 0 &&
       ask.text.length <= MAX_BUTTON_BODY &&
       ask.options.length >= 1 &&
       ask.options.length <= MAX_BUTTONS &&
-      ask.options.every((o) => o.length <= MAX_BUTTON_TITLE) &&
+      ask.options.every((o) => label(o).length <= MAX_BUTTON_TITLE) &&
       new Set(titles).size === titles.length;
     if (fitsButtons) {
       return {
         kind: 'buttons',
         body: ask.text,
-        buttons: ask.options.map((title, i) => ({ id: `ask:${ask.id}:${i}`, title })),
+        buttons: ask.options.map((o, i) => ({ id: `ask:${ask.id}:${i}`, title: label(o) })),
       };
     }
-    const list = ask.options.map((o, i) => `${i + 1}. ${o}`).join('\n');
+    const list = ask.options.map((o, i) => `${i + 1}. ${label(o)}`).join('\n');
     const tail = ask.free_text ? '\n\nType your reply: it is the answer.' : '';
     return { kind: 'text', body: `${text}\n\n${list}${tail}` };
   }
@@ -98,7 +108,10 @@ export class AskDesk {
 function match(ask: OpenAsk, said: string): Answer | null {
   if (ask.free_text) return { ask: ask.id, option: ask.options[0] ?? '', text: said };
   const word = said.toLowerCase();
-  const wanted = SYNONYMS[word] ?? word;
+  // The synonym stands only when the card has that option; else the word is its own option.
+  const synonym = SYNONYMS[word];
+  const wanted =
+    synonym !== undefined && ask.options.some((o) => o.toLowerCase() === synonym) ? synonym : word;
   const byNumber = /^\d+$/.test(word) ? ask.options[Number(word) - 1] : undefined;
   const option = byNumber ?? ask.options.find((o) => o.toLowerCase() === wanted);
   return option === undefined ? null : { ask: ask.id, option };

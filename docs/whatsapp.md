@@ -80,7 +80,7 @@ rule is per body.
 
 - **Buttons or a list.** An ask is sent as reply buttons only when it has one to three options,
   each at most 20 characters and different from the others, a text of 1 to 1024 characters, and
-  does not take a typed answer. Anything else is sent as numbered text (`1. allow`), split like a
+  does not take a typed answer. Anything else is sent as numbered text (`1. allow`; a task card has four options, so it is numbered text, and its `not_now` and `stop_task` read "Not now" and "Stop the task", which a typed "not now" or "stop" answers; a typed time is not read, so Not now takes the brain's 30-minute wait), split like a
   reply if it is long; a question that takes a typed answer adds a line saying the typed reply is the
   answer. An ask with no text says which tool it wants to use and with what input. The limits are
   constants in `asks.ts` marked "verify at build" against Meta's docs, like the 24-hour window and

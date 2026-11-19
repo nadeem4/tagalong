@@ -227,6 +227,16 @@ class WorkStore:
             args += list(states)
         return self._select(where, args, "created_at, rowid")
 
+    def of_task(self, task_id: str, kinds: Sequence[str]) -> list[WorkRow]:
+        """The rows of these kinds that belong to the task and have not ended."""
+        marks = ",".join("?" * len(kinds))
+        return self._select(
+            f"task_id = ? AND kind IN ({marks})"
+            " AND state IN ('planned','active','blocked','paused')",
+            (task_id, *kinds),
+            "created_at, rowid",
+        )
+
     def open_roots(self) -> list[WorkRow]:
         return self._select(
             "parent_id IS NULL AND state IN ('planned','active','blocked','paused')"

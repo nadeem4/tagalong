@@ -94,6 +94,13 @@ export const ConnectorConfirmParams = z.object({
   recommended: z.string().optional(),
   /** An install ask's card facts (who made it, where it runs, how it signs in), as the brain sent them. */
   facts: z.record(z.string(), z.unknown()).optional(),
+  /** The task this card belongs to: its title leads the card. */
+  task: z.object({ id: z.string(), title: z.string().optional() }).optional(),
+  /** When Scout will look at this card again (ISO), and who chose the time. */
+  checkBackAt: z.string().optional(),
+  checkBackBy: z.enum(['scout', 'person']).optional(),
+  /** The brain marked the ask urgent. */
+  urgent: z.boolean().optional(),
 });
 export type ConnectorConfirmParams = z.infer<typeof ConnectorConfirmParams>;
 

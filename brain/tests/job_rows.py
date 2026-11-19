@@ -6,6 +6,7 @@ from brain.job_records import JobRecords
 from brain.memory import Memory
 from brain.store import events as event_rows
 from brain.store.work import WorkStore
+from brain.tasks import TaskStopHooks
 
 _WORK = {"done": "done", "error": "failed", "stopped": "cancelled"}
 
@@ -32,6 +33,22 @@ def tasks_for(memory: Memory):
     from brain.tasks import Tasks
 
     return Tasks(memory.db, lambda text: text, lambda: datetime.now(UTC))
+
+
+def no_hooks(**over) -> TaskStopHooks:
+    """Stop hooks that do nothing, but for the ones a test names."""
+
+    async def no_jobs(task_id: str) -> None:
+        return None
+
+    base = dict(
+        stop_jobs=no_jobs,
+        cancel_rows=lambda t: None,
+        close_cards=lambda ids: None,
+        finish_events=lambda t: None,
+        cancel_turn_if_only=lambda ids: None,
+    )
+    return TaskStopHooks(**{**base, **over})
 
 
 def end_job(records: JobRecords, job_id: str, state: str = "done") -> None:

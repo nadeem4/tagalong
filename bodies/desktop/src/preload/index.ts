@@ -85,8 +85,10 @@ const bridge: PreloadBridge = {
   openConfirms: () => ipcRenderer.invoke(IPC.openConfirms) as Promise<TurnEvent[]>,
   approveTool: (approvalId: string, decision: 'once' | 'always' | 'deny') =>
     ipcRenderer.invoke(IPC.approveTool, approvalId, decision) as Promise<void>,
-  answerJobAsk: (approvalId: string, answer: { option: string; text?: string }) =>
-    ipcRenderer.invoke(IPC.answerJobAsk, approvalId, answer) as Promise<void>,
+  answerJobAsk: (
+    approvalId: string,
+    answer: { option: string; text?: string; checkBackAt?: string },
+  ) => ipcRenderer.invoke(IPC.answerJobAsk, approvalId, answer) as Promise<void>,
   listConnections: () => ipcRenderer.invoke(IPC.listConnections) as Promise<AppsList>,
   setupOverview: (query?: string, cursor?: string) =>
     ipcRenderer.invoke(IPC.setupOverview, query, cursor) as Promise<SetupOverview>,
@@ -161,6 +163,7 @@ const bridge: PreloadBridge = {
   copyBrainDetails: () => ipcRenderer.invoke(IPC.brainCopyDetails) as Promise<void>,
   listJobs: () => ipcRenderer.invoke(IPC.listJobs) as Promise<JobRow[]>,
   stopJob: (job: string) => ipcRenderer.invoke(IPC.stopJob, job) as Promise<void>,
+  stopTask: (task: string) => ipcRenderer.invoke(IPC.stopTask, task) as Promise<void>,
   jobActivity: (job: string, afterRev: number) =>
     ipcRenderer.invoke(IPC.jobActivity, job, afterRev) as Promise<JobActivityPage>,
   jobReport: (job: string, part: string) =>

@@ -204,3 +204,10 @@ def sweep(db: sqlite3.Connection, before: str) -> int:
     return db.execute(
         "DELETE FROM events WHERE state='handled' AND handled_at<?", (before,)
     ).rowcount
+
+
+def new_ids_of_task(db: sqlite3.Connection, task_id: str) -> list[str]:
+    """The news still waiting for a task. Events a turn holds (`taken`) are left to its end."""
+    return [
+        r[0] for r in db.execute("SELECT id FROM events WHERE task=? AND state='new'", (task_id,))
+    ]

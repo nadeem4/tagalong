@@ -574,7 +574,7 @@ next section.
    `test_answer_after_the_turn_was_cancelled_still_runs_the_call`). A Deny after the tool was set to
    Auto still refuses (`test_deny_wins_even_when_the_tool_became_auto_since`).
    5b. **Action:** ask Scout for a change tool and say it may wait 1 hour for you; leave the card
-   unanswered. The card shows **Not now** and **Stop task**. After 40 minutes Scout may
+   unanswered. The card shows the task's title, **Not now** and **Stop the task**, and "Checking back at" a time you can change. After 40 minutes Scout may
    remind you once (`card_due`). After the hour, open Home, Approvals.
    **Expected:** the card is gone on every open body, the call never ran, Scout says it expired,
    and the history shows an **Expired** row with `decided_by: "none"` and reason `no answer`
@@ -584,9 +584,15 @@ next section.
    **Expected:** the card stays open and no turn starts; Scout checks back in 30 minutes
    (`card_due`, once; held in quiet hours unless the ask was urgent). A time you set is not moved
    when Scout asks again with `check_back_minutes`.
-   5b3. **Action:** on a task's open card press **Stop task**.
-   **Expected:** the task ends and its cards close on every body; nothing runs, and Scout hears
-   `task_stop` and does not carry on with the task.
+   5b2a. **Action:** on a task's open card press **Change time**, pick a time and press **Set time**.
+   **Expected:** the card stays, now reads "Checking back at" your time with a "Set by you" chip, and
+   Scout does not move it.
+   5b3. **Action:** on a task's open card press **Stop the task**; on WhatsApp reply `stop`.
+   **Expected:** no second question; the task ends and its cards close on every body; its running
+   job is killed, a queued job never starts, its timers are gone and so are tasks it started;
+   nothing runs, and Scout hears `task_stop` and does not carry on with the task. The same from Home
+   (`task_stop`) ends the same way. On WhatsApp, a task card is numbered text with all four options
+   and a typed `not now` answers Not now.
    5a. **Action:** set a change tool to **Auto** on Home, then let Scout run it.
    **Expected:** it runs with no ask, and `list_approvals` has an `approved` row with
    `decided_by: "rule"` (`test_stored_auto_run_is_logged_as_rule`). A Claude Code permission ask
@@ -2788,7 +2794,7 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 3. Allow the card: the job starts and the expert can use the app, a change
    still asks, and Home's Approvals shows the hand-off row naming the app.
 4. `hand_off` with an app that is off or unknown is refused in plain words and no card appears.
-5. Hand-off card buttons: Allow starts the job; Deny starts nothing and the task ends stopped; Not now keeps the card and moves its check-back; Stop task closes the card and ends the task.
+5. Hand-off card buttons: Allow starts the job; Deny starts nothing and the task ends stopped; Not now keeps the card and moves its check-back; Stop the task closes the card and ends the task.
 6. An open hand-off card does not block Scout: say something new, or let a job's news arrive. Scout answers at once and the card stays.
 7. Ask Scout to hand off in a mode that does not exist: nothing starts, and Scout names the modes the expert offers.
 

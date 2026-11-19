@@ -156,6 +156,9 @@ class Jobs:
         self._scout_steps: dict[str, JobActivity] = {}  # job -> writer of Scout's own steps
         self._reserved: dict[str, set[str]] = {}  # job -> part ids promised to starts in flight
         self._starting = 0  # hand-offs waiting on their ask also hold a slot
+        self._stopped: set[str] = (
+            set()
+        )  # tasks stopped while a start is in flight; pruned when none is
         self._progress_sent: dict[str, float] = {}
         self._activity_sent: dict[str, float] = {}
         self._activity_trailing: dict[str, asyncio.Task] = {}
@@ -458,6 +461,10 @@ class Jobs:
             else:
                 mode_id = self._pick_mode(mode, modes, run.default_mode)
                 await run.keep_apps(apps)
+            # After the last await before the row exists, so a stop that landed meanwhile (no
+            # row yet to cancel) still refuses the start.
+            if (task_id or self.task_of(job_id)) in self._stopped:
+                raise JobError("the task was stopped, so nothing was started")
             if redo is not None:
                 pass  # the row exists and is active; the run attaches to it
             elif new_job:
@@ -516,6 +523,7 @@ class Jobs:
                 self._reserved.get(job_id, set()).discard(part)
             if slot_held:
                 self._starting -= 1
+            self._prune_stopped()
             if not handed_off:
                 await run.close()
 
@@ -618,6 +626,25 @@ class Jobs:
             if activity := self._activity.get(job_id, {}).get(stopped_part):
                 activity.stopping()  # the cancelled ask's rejection must not read as a failure
             await run.stop()
+
+    async def stop_task(self, task_id: str) -> None:
+        """The task was stopped: every running part of its jobs is stopped and its goals are
+        cancelled. A start still waiting on its expert is refused when the expert is up, so
+        nothing starts after this returns."""
+        self._stopped.add(task_id)
+        work = self._records.work
+        for goal in work.of_task(task_id, ("goal",)):
+            if self._runs.get(goal.id):
+                await self.stop(goal.id)
+            with suppress(TransitionRefused):  # stopping the parts may already have ended it
+                work.transition(goal.id, "cancelled", reason="task stopped")
+        self._prune_stopped()
+
+    def _prune_stopped(self) -> None:
+        """The stopped set only guards starts still in flight; with none, a new start for a
+        stopped task is refused by its task state, so the ids can go."""
+        if self._starting == 0:
+            self._stopped.clear()
 
     async def shutdown(self) -> None:
         """Stop every running job before the brain exits; one stuck run must not block the rest."""

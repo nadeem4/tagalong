@@ -445,3 +445,15 @@ def test_a_cancelled_timers_new_event_is_finished_not_told():
     assert len(log.ready()) == 2
     timers.cancel(t.id, "cancelled by Scout")
     assert [r.source for r in log.ready()] == [f"timer:{other.id}"]  # only that timer's news ended
+
+
+def test_cancel_task_cancels_the_open_timers_and_watches_of_that_task_only():
+    timers, work, _c, _e = make()
+    one = work.create("timer", "a", state="planned", due_at=T0, task_id="k1")
+    watch = work.create("watch", "b", state="planned", due_at=T0, task_id="k1")
+    paused = work.create("timer", "c", state="paused", due_at=T0, task_id="k1")
+    other = work.create("timer", "d", state="planned", due_at=T0, task_id="k2")
+    timers.cancel_task("k1")
+    assert [work.get(r.id).state for r in (one, watch, paused)] == ["cancelled"] * 3
+    assert work.get(other.id).state == "planned"
+    timers.cancel_task("k1")  # nothing left: quiet

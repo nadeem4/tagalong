@@ -16,7 +16,7 @@ import pytest
 from ask_log import approvals_on, list_approvals
 from fake_clock import FakeClock
 from fake_engine import FakeEngine
-from job_rows import add_timer, end_job, tasks_for
+from job_rows import add_timer, end_job, no_hooks, tasks_for
 
 from brain.asks import AskExpired, Asks
 from brain.events import Event, EventLog
@@ -224,6 +224,9 @@ class Rig:
         self.asks_real = Asks(asks)
         self.tasks = Tasks(self.memory.db, lambda text: text, lambda: self.wall, items=self.items)
         self.holds = Holds(self.asks_real, self.records.work, self.items, self.tasks)
+        self.tasks.hooks = no_hooks(
+            close_cards=self.holds.close, stop_jobs=lambda t: self.jobs.stop_task(t)
+        )
         self.jobs = Jobs(
             self.records,
             self.holds,
@@ -646,6 +649,98 @@ async def test_stop_closes_open_asks_and_marks_stopped(make_rig):
         await rig.jobs.stop(job_id)
     with pytest.raises(JobError, match="no job"):
         await rig.jobs.stop("nope")
+
+
+async def test_stop_task_kills_its_running_job_and_leaves_other_tasks_alone(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.tasks.open("do", "desktop", id="k1")
+    rig.tasks.open("do", "desktop", id="k2")
+    mine = await rig.jobs.start("one", str(rig.folder), task_id="k1")
+    other = await rig.jobs.start("two", str(rig.folder), task_id="k2")
+    await rig.jobs.stop_task("k1")
+    assert rig.records.get_job(str(mine)).state == "cancelled"
+    assert not alive(rig.runs[0])
+    assert [j.id for j in rig.records.running_jobs()] == [str(other)]
+    await rig.jobs.stop_task("k1")  # nothing left to stop: quiet
+
+
+async def test_stop_task_cancels_a_planned_goal_of_the_task(make_rig):
+    rig = make_rig(FakeAsks())
+    rig.records.work.create("goal", "later", id="g1", state="planned", task_id="k1")
+    await rig.jobs.stop_task("k1")
+    assert rig.records.work.get("g1").state == "cancelled"
+
+
+async def test_stop_of_a_queued_job_cancels_it_and_it_never_starts(make_rig, monkeypatch):
+    # The expert process is coming up (no run row yet) when the task is stopped.
+    rig = make_rig(FakeAsks())
+    gate = asyncio.Event()
+    real = ExpertRun.start
+
+    async def slow(self, *args, **kw):
+        await gate.wait()
+        return await real(self, *args, **kw)
+
+    monkeypatch.setattr(ExpertRun, "start", slow)
+    starting = asyncio.ensure_future(rig.jobs.start("go", str(rig.folder), task_id="k1"))
+    await until(lambda: rig.jobs.starting == 1)
+    await rig.jobs.stop_task("k1")
+    gate.set()
+    with pytest.raises(JobError, match="stopped"):
+        await starting
+    assert rig.records.list_jobs() == [] and rig.jobs.starting == 0
+    assert not any(alive(run) for run in rig.runs)
+
+
+async def test_stop_while_the_apps_are_kept_means_it_never_starts(make_rig, monkeypatch):
+    # No goal row exists yet while the expert's apps are narrowed, so only the flag can catch it.
+    rig = make_rig(FakeAsks())
+    gate, entered = asyncio.Event(), asyncio.Event()
+    real = ExpertRun.keep_apps
+
+    async def slow(self, kept):
+        entered.set()
+        await gate.wait()
+        return await real(self, kept)
+
+    monkeypatch.setattr(ExpertRun, "keep_apps", slow)
+    starting = asyncio.ensure_future(rig.jobs.start("go", str(rig.folder), task_id="k1"))
+    await asyncio.wait_for(entered.wait(), 10)
+    await rig.jobs.stop_task("k1")
+    gate.set()
+    with pytest.raises(JobError, match="stopped"):
+        await starting
+    assert rig.records.list_jobs() == [] and rig.jobs.starting == 0
+    await until(lambda: not any(alive(run) for run in rig.runs))
+
+
+async def test_stop_while_the_mode_is_set_means_nothing_is_driven(make_rig, monkeypatch):
+    # The row and run exist, the expert is being told its mode: the stop must not be lost.
+    rig = make_rig(FakeAsks(), shared=True)  # a warm host: release leaves its connection up
+    gate, entered = asyncio.Event(), asyncio.Event()
+    real = ExpertRun.begin
+
+    async def slow(self, mode_id, task):
+        conn = self._host.conn
+        set_mode = conn.set_session_mode
+
+        async def gated(**kw):  # the stop lands while the expert is told its mode
+            entered.set()
+            await gate.wait()
+            return await set_mode(**kw)
+
+        conn.set_session_mode = gated
+        return await real(self, mode_id, task)
+
+    monkeypatch.setattr(ExpertRun, "begin", slow)
+    starting = asyncio.ensure_future(rig.jobs.start("go", str(rig.folder), task_id="k1"))
+    await asyncio.wait_for(entered.wait(), 10)
+    await rig.jobs.stop_task("k1")
+    gate.set()
+    with pytest.raises(JobError, match="stopped"):
+        await starting
+    assert rig.records.running_jobs() == [] and rig.jobs._runs == {}
+    await until(lambda: not any(alive(run) for run in rig.runs))
 
 
 async def test_list_returns_the_last_twenty_newest_first_with_progress(make_rig):
@@ -2901,7 +2996,7 @@ async def test_stopping_the_job_cancels_its_held_cards(make_rig):
 async def test_stop_the_task_on_an_expert_card_ends_the_task_and_the_card(make_rig):
     rig, job, card = await task_job(make_rig)
     rig.asks_real.answer(card["ask_id"], "stop_task", "desktop")
-    assert rig.tasks.get("k1").state == "stopped"
+    await until(lambda: rig.tasks.get("k1").state == "stopped")
     assert not rig.asks.open_ids  # the person's own answer took the card down
     await until(lambda: any("outcome" in f.get("result", {}) for f in rig.frames()))
     reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))

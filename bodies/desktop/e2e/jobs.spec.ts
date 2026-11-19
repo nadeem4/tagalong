@@ -84,10 +84,12 @@ test('a hand-off asks to start, a relayed permission and a question with no turn
   const handOff = panel.getByRole('region', { name: 'Allow hand_off?' });
   await expect(handOff).toBeVisible({ timeout: 30_000 });
   await expect(handOff).toContainText('C:/work/app');
-  // The card names the apps it would hand over; it also offers Not now and Stop task.
+  // The card names its task and the apps it would hand over; it offers Not now and Stop the task.
   await expect(handOff).toContainText('Linear, Mail');
   await expect(handOff.getByRole('button', { name: 'Not now', exact: true })).toBeVisible();
-  await expect(handOff.getByRole('button', { name: 'Stop task', exact: true })).toBeVisible();
+  await expect(handOff.getByRole('button', { name: 'Stop the task', exact: true })).toBeVisible();
+  await expect(handOff).toContainText('Fix the build');
+  await expect(handOff).toContainText('Checking back at');
   await handOff.getByRole('button', { name: 'Allow', exact: true }).click();
 
   const relayed = panel.getByRole('region', { name: 'Claude Code asks' });

@@ -9,6 +9,7 @@ it is the log entry; it ends with the answer, the cancel or the job.
 """
 
 import asyncio
+import logging
 import uuid
 from contextlib import suppress
 from dataclasses import dataclass
@@ -19,6 +20,8 @@ from brain.mind.turn import Call
 from brain.open_items import OpenItemRefused, OpenItems, at_time
 from brain.protocol import ErrorCode, RpcError
 from brain.store.work import State, TransitionRefused, WorkStore
+
+_log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:  # tasks imports tools, which imports jobs, which holds this
     from brain.tasks import Tasks
@@ -45,6 +48,7 @@ class Holds:
         self._items = items
         self._tasks = tasks
         self._held: dict[str, _Held] = {}
+        self._stopping: set[asyncio.Task] = set()  # held so a running stop is not collected
         asks.register("expert_ask", self._answered)
         asks.register("question", self._answered)
         work.on_transition(self._row_ended)
@@ -184,10 +188,23 @@ class Holds:
             held.future.set_result(Reply(option, text))
 
     def _stop_task(self, ask_id: str, body_id: str) -> None:
-        """The person ended the task from this card: the task ends and every card it held goes."""
+        """The person ended the task from this card: the task ends (its jobs, timers and other
+        cards with it). The answer is sync, so the stop runs as its own task."""
         item = self._items.get(ask_id)
-        closed = self._tasks.stop(item.task_id, body_id) if item and item.task_id else []
-        self.close(list(dict.fromkeys([ask_id, *closed])))
+        task = asyncio.get_running_loop().create_task(self._stop(ask_id, item, body_id))
+        self._stopping.add(task)
+        task.add_done_callback(self._stopping.discard)
+
+    async def _stop(self, ask_id: str, item, body_id: str) -> None:
+        try:
+            if item and item.task_id and self._tasks:
+                await self._tasks.stop(item.task_id, body_id)
+        except Exception:
+            _log.exception("stopping the task from card %s", ask_id)
+        finally:
+            # No task to stop, it was over already, or the stop failed: this card still goes.
+            if ask_id in self._held:
+                self._cancel(ask_id)
 
     def _row_ended(self, work_id: str, kind: str, to: str) -> None:
         """The row ended from outside (its job closed, or a restart scan): the wait is done."""

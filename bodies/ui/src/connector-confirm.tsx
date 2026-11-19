@@ -9,7 +9,7 @@ import { useState } from 'react';
 import type { ConnectorConfirmParams } from './shapes';
 
 type Decision = 'once' | 'always' | 'deny';
-export type JobAnswer = { option: string; text?: string };
+export type JobAnswer = { option: string; text?: string; checkBackAt?: string };
 
 /** `gmail__send_message` reads "send message": the app is on its own row, and underscores are not words. */
 const toolLabel = (tool: string): string =>
@@ -20,6 +20,72 @@ const factLabel = (key: string): string =>
   key === 'body' ? 'Says' : key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
 
 const GATE_OPTIONS = new Set(['allow', 'always', 'deny', 'not_now', 'stop_task']);
+
+/** The two task options carry the brain's names; the person reads plain words. */
+const optionLabel = (option: string): string =>
+  option === 'not_now' ? 'Not now' : option === 'stop_task' ? 'Stop the task' : option;
+
+const pad = (n: number): string => String(n).padStart(2, '0');
+const clock = (d: Date): string => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+/** The next time the clock reads `hhmm`: today if still ahead, else tomorrow. */
+function nextAt(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number);
+  const at = new Date();
+  at.setHours(h ?? 0, m ?? 0, 0, 0);
+  if (at.getTime() <= Date.now()) at.setDate(at.getDate() + 1);
+  return at.toISOString();
+}
+
+/**
+ * A task card's head: the task's title, then when Scout checks back, with a way to move it.
+ * Choosing a time answers Not now with that time; the brain keeps the card until then.
+ */
+function TaskNote({
+  confirm,
+  onReply,
+}: {
+  confirm: ConnectorConfirmParams;
+  onReply: (answer: JobAnswer) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const at = confirm.checkBackAt === undefined ? null : new Date(confirm.checkBackAt);
+  const [time, setTime] = useState(at === null ? '' : clock(at));
+  return (
+    <>
+      {confirm.task?.title !== undefined && <p className="card-task">{confirm.task.title}</p>}
+      {at !== null && !Number.isNaN(at.getTime()) && (
+        <div className="card-checkback">
+          <span className="card-brief">Checking back at {clock(at)}</span>
+          {confirm.checkBackBy === 'person' && <span className="card-chip">Set by you</span>}
+          {!editing && (
+            <button type="button" className="bubble-quiet" onClick={() => setEditing(true)}>
+              Change time
+            </button>
+          )}
+          {editing && (
+            <>
+              <input
+                type="time"
+                aria-label="Check back at"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+              />
+              <button
+                type="button"
+                className="bubble-quiet"
+                disabled={time === ''}
+                onClick={() => onReply({ option: 'not_now', checkBackAt: nextAt(time) })}
+              >
+                Set time
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
 
 /**
  * Built like the hand-off card: what will happen, then Not now, Always allow and Allow.
@@ -68,6 +134,7 @@ export function ConnectorConfirmCard({
         : options[0];
     return (
       <section className="card" aria-label={`${confirm.app} asks`}>
+        <TaskNote confirm={confirm} onReply={onReply} />
         <div className="card-head">
           <p className="bubble-text" style={{ whiteSpace: 'pre-line' }}>
             {confirm.summary}
@@ -95,7 +162,7 @@ export function ConnectorConfirmCard({
               onClick={() => onReply({ option })}
             >
               <span className="bubble-radio" aria-hidden="true" />
-              <span className="bubble-choice-text">{option}</span>
+              <span className="bubble-choice-text">{optionLabel(option)}</span>
               {option === confirm.recommended && (
                 <>
                   {' '}
@@ -126,6 +193,7 @@ export function ConnectorConfirmCard({
       className="card"
       aria-label={isAsk ? `Allow ${confirm.tool}?` : `Change something in ${confirm.app}?`}
     >
+      <TaskNote confirm={confirm} onReply={onReply} />
       <div className="card-head">
         <p className="bubble-text" style={isAsk ? { whiteSpace: 'pre-line' } : undefined}>
           {isAsk ? what : `Change in ${confirm.app} — allow?`}
@@ -179,7 +247,7 @@ export function ConnectorConfirmCard({
             className="bubble-quiet"
             onClick={() => onReply({ option: 'stop_task' })}
           >
-            Stop task
+            Stop the task
           </button>
         )}
         {ofTask && (

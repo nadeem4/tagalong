@@ -120,6 +120,8 @@ export interface FakeHostBridge extends HostBridge {
   jobs: JobRow[];
   /** Every stopJob call's job id, in order. */
   readonly jobStops: readonly string[];
+  /** Every stopTask call's task id, in order. */
+  readonly taskStops: readonly string[];
   /** How many times Retry was pressed on the brain setup line. */
   readonly setupRetries: () => number;
   /** The brain card's calls in order: `restart`, `restart-after-work`, `open-folder`, `open-log`, `copy-details`. */
@@ -151,7 +153,12 @@ export interface FakeHostBridge extends HostBridge {
   /** Every answer to a connector confirm card, in order. */
   readonly approvals: readonly { approvalId: string; decision: 'once' | 'always' | 'deny' }[];
   /** Every answer to a Claude Code job's ask (its own option, or typed text), in order. */
-  readonly jobAnswers: readonly { approvalId: string; option: string; text?: string }[];
+  readonly jobAnswers: readonly {
+    approvalId: string;
+    option: string;
+    text?: string;
+    checkBackAt?: string;
+  }[];
   /** The brain's apps; a test edits them, then emits `connections.changed`. */
   apps: AppInfo[];
   readonly addedConnections: readonly AppAddParams[];
@@ -289,7 +296,8 @@ export function createFakeHostBridge(
   const asks: AskInput[] = [];
   const interrupts: string[] = [];
   const approvals: { approvalId: string; decision: 'once' | 'always' | 'deny' }[] = [];
-  const jobAnswers: { approvalId: string; option: string; text?: string }[] = [];
+  const jobAnswers: { approvalId: string; option: string; text?: string; checkBackAt?: string }[] =
+    [];
   const addedConnections: AppAddParams[] = [];
   const enabledCalls: { id: string; enabled: boolean }[] = [];
   const restarts: string[] = [];
@@ -304,6 +312,7 @@ export function createFakeHostBridge(
   const whatsappChanges: WhatsAppChange[] = [];
   const readingCalls: string[] = [];
   const jobStops: string[] = [];
+  const taskStops: string[] = [];
   let setupRetries = 0;
   const brainActions: string[] = [];
   const activityCalls: [string, number][] = [];
@@ -627,6 +636,7 @@ export function createFakeHostBridge(
     },
     jobs: (options.jobs ?? []).map((row) => ({ ...row })),
     jobStops,
+    taskStops,
     setupRetries: () => setupRetries,
     brainActions,
     usageSummary() {
@@ -800,6 +810,10 @@ export function createFakeHostBridge(
     },
     stopJob(job) {
       jobStops.push(job);
+      return Promise.resolve();
+    },
+    stopTask(task) {
+      taskStops.push(task);
       return Promise.resolve();
     },
     jobActivity(job, afterRev) {

@@ -134,6 +134,11 @@ class Timers:
         self.changed()
         return True
 
+    def cancel_task(self, task_id: str) -> None:
+        """The task was stopped: its timers and watches that have not ended are cancelled."""
+        for row in self._work.of_task(task_id, ("timer", "watch")):
+            self.cancel(row.id, "task stopped")
+
     def _emit_one(
         self,
         row: WorkRow,

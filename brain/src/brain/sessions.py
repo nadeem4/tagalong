@@ -113,7 +113,7 @@ from brain.store.db import transaction
 from brain.store.events import EventRow
 from brain.store.work import TransitionRefused, WorkRow, WorkStore
 from brain.task_tools import task_tools
-from brain.tasks import Tasks
+from brain.tasks import Tasks, TaskStopHooks
 from brain.timers import Timers
 from brain.timers_home import timer_home_tools
 from brain.toolbox import SEP, BodySource, BrainSource, Handler, Toolbox, ToolSpec
@@ -402,6 +402,14 @@ class Session:
             self._turn_task,
             lambda turn: self._turn_cause if turn and turn == self._turn_id else None,
             self.holds.close,
+        )
+        # Everything that stops with a task now exists (spec 6.13).
+        self.tasks.hooks = TaskStopHooks(
+            stop_jobs=self.jobs.stop_task,
+            cancel_rows=timers.cancel_task,
+            close_cards=self.ask_runner.close_cards,
+            finish_events=lambda task: events.finish_task(task, "stopped"),
+            cancel_turn_if_only=self.runner.cancel_if_only,
         )
         self._asks.on_item_answer = self._card_answered
         self._asks.register(
