@@ -224,16 +224,16 @@ export class BrainClient {
   }
 
   /**
-   * The answer to a job's ask: one of its own option names, or typed text for a question. A
-   * hand-off card also sends the apps the person kept.
+   * The answer to an ask: one of its own option names, or typed text for a question. `not_now`
+   * may carry the time (ISO) to look again.
    */
-  answerWith(ask: string, option: string, text?: string, apps?: string[]): Promise<void> {
+  answerWith(ask: string, option: string, text?: string, checkBackAt?: string): Promise<void> {
     if (this.status !== 'online') return Promise.reject(new BrainOffline());
     const params = {
       ask,
       option,
       ...(text === undefined ? {} : { text }),
-      ...(apps === undefined ? {} : { apps }),
+      ...(checkBackAt === undefined ? {} : { check_back_at: checkBackAt }),
     };
     return this.request('answer', params).then(() => undefined);
   }

@@ -127,12 +127,17 @@ export type CallParams = z.infer<typeof CallParams>;
 export const CallResult = z.object({ output: z.array(Part) });
 export type CallResult = z.infer<typeof CallResult>;
 
-export const AnswerParams = z.object({
-  ask: Id,
-  option: z.string(),
-  text: z.string().optional(),
-  apps: z.array(z.string()).optional(),
-});
+export const AnswerParams = z
+  .object({
+    ask: Id,
+    option: z.string(),
+    text: z.string().optional(),
+    check_back_at: z.string().optional(),
+  })
+  .refine(
+    (a) => a.check_back_at === undefined || a.option === 'not_now',
+    'check_back_at goes only with not_now',
+  );
 export type AnswerParams = z.infer<typeof AnswerParams>;
 
 export const CancelTurnParams = z.object({ turn: Id });

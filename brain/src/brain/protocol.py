@@ -270,7 +270,13 @@ class AnswerParams(Model):
     ask: Id
     option: str
     text: str | None = None
-    apps: list[str] | None = None  # a hand-off card's kept apps; the brain starts with only these
+    check_back_at: str | None = None  # ISO time to look again; only with not_now
+
+    @model_validator(mode="after")
+    def _check_back_with_not_now(self) -> "AnswerParams":
+        if self.check_back_at is not None and self.option != "not_now":
+            raise ValueError("check_back_at goes only with not_now")
+        return self
 
 
 class CancelTurnParams(Model):
