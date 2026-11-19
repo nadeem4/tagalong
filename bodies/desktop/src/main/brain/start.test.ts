@@ -1,4 +1,5 @@
 /** Tests for startBrain: where it dials, that it starts at once, and the tools it declares. */
+import { hostname } from 'node:os';
 import { describe, expect, it } from 'vitest';
 import type { CaptureExclusions } from '../../shared/settings';
 import { startBrain } from './start';
@@ -31,6 +32,7 @@ function setup(env: NodeJS.ProcessEnv) {
     onNotification: noop,
     onStatus: noop,
     onResync: noop,
+    bodyId: 'desktop-a1b2c3',
   });
   brain.stop();
   return urls;
@@ -43,6 +45,33 @@ describe('startBrain', () => {
 
   it('dials TAGALONG_BRAIN_ADDR when it is set', () => {
     expect(setup({ TAGALONG_BRAIN_ADDR: '10.0.0.5:9000' })).toEqual(['ws://10.0.0.5:9000']);
+  });
+
+  it('sends the PC name as the body name', () => {
+    const sent: string[] = [];
+    let open: () => void = noop;
+    const brain = startBrain({
+      ...tools,
+      env: {},
+      openSocket: (): BrainSocket => ({
+        send: (data) => void sent.push(data),
+        close: noop,
+        onOpen: (f) => void (open = f),
+        onMessage: noop,
+        onClose: noop,
+      }),
+      onNotification: noop,
+      onStatus: noop,
+      onResync: noop,
+      bodyId: 'desktop-a1b2c3',
+    });
+    open();
+    expect(JSON.parse(sent[0] as string).params.body).toEqual({
+      id: 'desktop-a1b2c3',
+      kind: 'desktop',
+      name: hostname(),
+    });
+    brain.stop();
   });
 
   it('declares the window tools in hello and answers use for them', async () => {
@@ -62,6 +91,7 @@ describe('startBrain', () => {
       onNotification: noop,
       onStatus: noop,
       onResync: noop,
+      bodyId: 'desktop-a1b2c3',
     });
     open();
     const hello = JSON.parse(sent[0] as string);

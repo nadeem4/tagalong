@@ -2,6 +2,7 @@
  * Settings on disk. Contains `SettingsStore` (settings.json with atomic saves, a .bak and a
  * .corrupt copy) and SETTINGS_FILENAME. The brain keeps no settings; this file is the desktop's.
  */
+import { randomBytes } from 'node:crypto';
 import { copyFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Settings, SettingsPatch } from '../shared/settings';
@@ -91,4 +92,16 @@ export class SettingsStore {
     }
     return { ok: true, settings: parsed.data, exists: true };
   }
+}
+
+/**
+ * This install's body id: `desktop-` and six hex digits, made the first time it is read and
+ * saved. Two PCs get two ids, so the brain keeps both connected; a restart keeps the same one.
+ */
+export function readOrMakeBodyId(store: SettingsStore): string {
+  const saved = store.get().bodyId;
+  if (saved !== undefined) return saved;
+  const id = `desktop-${randomBytes(3).toString('hex')}`;
+  store.set({ bodyId: id });
+  return id;
 }

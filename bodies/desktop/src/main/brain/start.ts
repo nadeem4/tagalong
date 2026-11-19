@@ -3,6 +3,7 @@
  * listens on (TAGALONG_BRAIN_ADDR, the same variable; launch.ts starts a local brain first
  * if none runs) and BrainClient keeps retrying while it is down. It declares the window and file body tools.
  */
+import { hostname } from 'node:os';
 import { BrainClient } from '@tagalong/contract';
 import type { BrainClientOptions, BrainSocket } from '@tagalong/contract';
 import type { CaptureExclusions } from '../../shared/settings';
@@ -27,6 +28,8 @@ type StartBrainOptions = Pick<
   files: FileDeps;
   /** How Scout reads the screen: detection, the language install and telling the brain. */
   reading: ReadingDeps;
+  /** This install's body id (`readOrMakeBodyId`); the brain keeps one body per id. */
+  bodyId: string;
   env?: NodeJS.ProcessEnv;
   /** Tests pass a fake; the app uses the global WebSocket. */
   openSocket?: BrainClientOptions['openSocket'];
@@ -49,6 +52,7 @@ function webSocket(url: string): BrainSocket {
 
 export function startBrain(options: StartBrainOptions): BrainClient {
   const {
+    bodyId,
     env = process.env,
     openSocket = webSocket,
     platform,
@@ -63,7 +67,8 @@ export function startBrain(options: StartBrainOptions): BrainClient {
   const brain = new BrainClient({
     ...handlers,
     addr: env.TAGALONG_BRAIN_ADDR ?? DEFAULT_ADDR,
-    body: { id: 'desktop', kind: 'desktop', name: 'Desktop' },
+    // The PC's name is shown to the person, so two desktops can be told apart.
+    body: { id: bodyId, kind: 'desktop', name: hostname() },
     tools: () => tools,
     openSocket,
     onUse: (tool, input) => run(tool, input),

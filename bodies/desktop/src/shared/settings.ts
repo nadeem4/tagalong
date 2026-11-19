@@ -23,6 +23,9 @@ export const TALK_KEY_LABELS: { readonly [K in TalkKey]: string } = {
   ScrollLock: 'Scroll Lock',
 };
 
+/** What the contract allows a body id to be (`hello.body.id`). */
+export const BODY_ID_PATTERN = /^[a-z0-9-]{1,32}$/;
+
 /** Default value for every setting, in one place so the patch schema can stay defaults-free. */
 export const SETTINGS_DEFAULTS = {
   hotkeys: {
@@ -141,6 +144,11 @@ const settingsFields = {
   listening: z.object({ always: z.boolean() }),
   /** Set by Finish or Skip (with a key) only. */
   walkthrough: z.object({ done: z.boolean() }),
+  /**
+   * This install's body id, made once and kept. A saved id that breaks the contract's pattern
+   * reads as absent (the rest of the file stays), so `readOrMakeBodyId` makes a new one.
+   */
+  bodyId: z.string().regex(BODY_ID_PATTERN).optional().catch(undefined),
   /** Folders Scout may list, read and change. Empty means the file tools refuse. */
   fileFolders: z.array(folderEntry),
 };
@@ -156,6 +164,7 @@ export const Settings = z.object({
   voice: settingsFields.voice.prefault({ ...SETTINGS_DEFAULTS.voice }),
   listening: settingsFields.listening.prefault({ ...SETTINGS_DEFAULTS.listening }),
   walkthrough: settingsFields.walkthrough.prefault({ ...SETTINGS_DEFAULTS.walkthrough }),
+  bodyId: settingsFields.bodyId,
   fileFolders: settingsFields.fileFolders.prefault([]),
 });
 export type Settings = z.infer<typeof Settings>;

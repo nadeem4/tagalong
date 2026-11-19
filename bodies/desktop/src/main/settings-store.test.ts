@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SETTINGS_DEFAULTS } from '../shared/settings';
-import { SETTINGS_FILENAME, SettingsStore } from './settings-store';
+import { SETTINGS_FILENAME, SettingsStore, readOrMakeBodyId } from './settings-store';
 
 let dataDir: string;
 let file: string;
@@ -28,6 +28,23 @@ describe('SettingsStore walkthrough', () => {
     const store = new SettingsStore(dataDir);
     store.set({ walkthrough: { done: true } });
     expect(new SettingsStore(dataDir).get().walkthrough.done).toBe(true);
+  });
+});
+
+describe('readOrMakeBodyId', () => {
+  it('keeps the same install id across restarts', () => {
+    const first = readOrMakeBodyId(new SettingsStore(dataDir));
+    expect(first).toMatch(/^desktop-[0-9a-f]{6}$/);
+    expect(readOrMakeBodyId(new SettingsStore(dataDir))).toBe(first);
+  });
+
+  it('replaces a saved id that does not match the pattern, keeping the other settings', () => {
+    writeFileSync(file, JSON.stringify({ bodyId: 'BAD ID!', walkthrough: { done: true } }), 'utf8');
+    const id = readOrMakeBodyId(new SettingsStore(dataDir));
+    expect(id).toMatch(/^desktop-[0-9a-f]{6}$/);
+    const saved = new SettingsStore(dataDir).get();
+    expect(saved.bodyId).toBe(id);
+    expect(saved.walkthrough.done).toBe(true);
   });
 });
 
