@@ -343,7 +343,7 @@ local MCP server hosted by the brain (`expert_apps.py`, `127.0.0.1`, random port
 per job part) that lists only those apps' tools. Every call runs through the same gate as Scout's
 (Ask, Auto, Off, preferences) and is logged in Approvals with the job id; answers are masked and
 capped. The token ends with the job part. Scout names the apps in `hand_off`; the card lists them,
-the person may remove some, and the job gets only the rest. See [the bridge](../brain/README.md#apps-for-an-expert-the-bridge).
+the person may remove some, and the job gets only the rest. See [the bridge](../brain/experts.md#the-expert-to-apps-bridge).
 
 ## On a job's timeline
 

@@ -163,7 +163,7 @@ own rules. The extension's public privacy policy, for the Chrome Web Store, is
   Stripe keys), login tokens (JWTs), private key blocks, the password in a connection string, the
   values of `PASSWORD=`, `SECRET=`, `TOKEN=` and `API_KEY=` settings, and card numbers become a
   marker such as `[hidden: API key]`, so the pet knows something was there without seeing it.
-- **Experts.** Claude Code runs in the folder you name, on your own Claude login, through the Agent Client Protocol. Each thing it wants to do that needs permission comes back to you as an ask (see [brain.md](../brain/README.md#experts)). A note you ask Scout to pass to a working expert
+- **Experts.** Claude Code runs in the folder you name, on your own Claude login, through the Agent Client Protocol. Each thing it wants to do that needs permission comes back to you as an ask (see [brain.md](../brain/experts.md)). A note you ask Scout to pass to a working expert
   (`tell_expert`) leaves the machine to that expert like the brief did.
 - **A monitor with an excluded window on it.** Tagalong never photographs a whole screen, only
   one listed window at a time, and a window on the exclusion list is refused before any pixel is

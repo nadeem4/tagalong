@@ -409,7 +409,7 @@ has already changed (`expect=`), so two writers on one row never overwrite each 
   The retry columns are used by Scout's goal `tool_call` rows (`safe_to_retry` comes from the
   tool's effect and name, `error_kind` from `retry.classify`) and by `expert_call` restarts;
   `Timers` reruns the due ones, and a step that gives up emits `work_failed`
-  (see [brain.md](../brain/README.md#retries-and-give-ups)).
+  (see [brain.md](../brain/experts.md#retries-and-give-ups)).
 - Resume scan at start (`resume_scan`, run by `Jobs.startup`): open asks and questions expire
   ("brain restarted"); an active expert call with a saved session whose expert can reload it
   becomes `blocked` (Scout is told and offers to carry on), any other `failed`; an active tool

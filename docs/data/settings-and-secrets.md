@@ -228,7 +228,7 @@ directory, `%APPDATA%\Tagalong` on Windows. The brain keeps its own data directo
 
 Tool permissions (Off, Ask or Auto per tool, shown in Home → Settings → Permissions) are not settings
 here: they are brain state in the `rules` table of `tagalong.db`, read and set through the
-brain's `list_permissions` and `set_permission` (see [brain.md](../brain/README.md#permissions-and-asks)).
+brain's `list_permissions` and `set_permission` (see [brain.md](../brain/permissions.md)).
 Home shows them in groups the brain names, collapsed until opened, in plain words, with a search box.
 
 **Scout's model** (Settings, right after the key) is not in `settings.json`: the brain owns it. The
