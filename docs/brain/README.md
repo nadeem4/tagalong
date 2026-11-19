@@ -9,7 +9,15 @@ The brain is the Python side of contract v1 ([protocol/README.md](../../protocol
 - [Bodies and the handshake](#bodies-and-the-handshake)
 - [How the prompt is built](#how-the-prompt-is-built)
 - [Models](#models)
+- [Measurement](#measurement)
+- [Outbox and replay](#outbox-and-replay)
+- [The desktop body](#the-desktop-body)
+- [Toolbox](#toolbox)
+- [Capability picture and routing](#capability-picture-and-routing)
+- [Reading status](#reading-status)
+- [Home tools](#home-tools)
 - [Where each part is documented](#where-each-part-is-documented)
+- [Tests](#tests)
 
 ## Run it
 
@@ -41,7 +49,7 @@ variable still works and is the developer path.
 | Variable                         | Default            | Meaning                                                                                                                                                                           |
 | -------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `TAGALONG_BRAIN_ADDR`            | `127.0.0.1:47321`  | `host:port` to listen on. Port `0` picks a free port                                                                                                                              |
-| `TAGALONG_HOME`                  | `~/.tagalong`      | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env`                                                                                                                |
+| `TAGALONG_HOME`                  | `~/.tagalong`      | Data folder. Holds `session`, `budget.json`, `reader-budget.json`, `tagalong.db`, `.env`, `brain.pid`                                                                             |
 | `TAGALONG_MODEL`                 | `claude-opus-5-5`  | The default model Scout thinks with; a model chosen in Settings wins (see [Models](#models))                                                                                      |
 | `TAGALONG_DAILY_BUDGET_USD`      | `5`                | Most Scout may spend per local day, in USD                                                                                                                                        |
 | `TAGALONG_STT_LIVE`              | none               | Speech model that listens live; a choice saved in Settings wins, then this, then Auto (see [hearing.md](../senses/hearing.md))                                                    |
@@ -66,8 +74,8 @@ variable still works and is the developer path.
 | `TAGALONG_JOB_STEPS_MAX_BYTES`   | `1000000`          | Text bytes one job's log keeps; command output is blanked first (whole number, 1 or more)                                                                                         |
 | `TAGALONG_WORK_KEEP_DAYS`        | `30`               | Days finished work (jobs, timers, asks, loops, with their steps and long reports) is kept after it ended, then swept at start; open work is never swept (whole number, 1 or more) |
 | `TAGALONG_OUTPUTS_KEEP`          | `200`              | Stored long tool results kept for `read_output`, newest first; reports a job points at are kept as well (whole number, 1 or more)                                                 |
-| `TAGALONG_RETRY_MAX`             | `3`                | Read and checked at start, but nothing uses it yet: the work store keeps its own retry rules (see [safety.md](safety.md#retries-and-give-ups))                                    |
-| `TAGALONG_RETRY_BACKOFF_S`       | `30,120,600`       | Same: read and checked (comma-separated whole seconds, 1 or more), not used yet                                                                                                   |
+| `TAGALONG_RETRY_MAX`             | `3`                | Read and checked at start, but nothing uses it: the work store keeps its own retry rules (see [safety.md](safety.md#retries-and-give-ups))                                        |
+| `TAGALONG_RETRY_BACKOFF_S`       | `30,120,600`       | Same: read and checked (comma-separated whole seconds, 1 or more), not used                                                                                                       |
 | `TAGALONG_BUILD`                 | none               | The build id sent in `hello`; unset, it is a 12-hex hash of the source files                                                                                                      |
 | `TAGALONG_STARTED_BY`            | none               | The desktop sets it to `desktop` when it starts the brain; `brain_status` reports `started_by` from it                                                                            |
 | `ANTHROPIC_API_KEY`              | none               | Anthropic key. Optional at start: the app sets it. A real, non-empty environment variable wins over `.env`; an empty one counts as unset                                          |
@@ -88,51 +96,60 @@ The daily budget and its `budget.json` ledger are in [safety.md](safety.md#the-b
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
 flowchart TD
-  subgraph door["Server and bodies"]
-    server["server.py"]
-    bodies["bodies.py: outbox per body"]
+  subgraph wire["Start and the wire"]
+    main["main.py, config.py, lifecycle.py, build_info.py, cli.py"]
+    server["server.py, protocol.py"]
+    bodies["bodies.py, presence.py, reading.py, bridges.py"]
   end
-  subgraph log["Event log and runner"]
-    events["events.py: EventLog"]
-    runner["runner.py: one turn at a time"]
-  end
-  subgraph mind["Session and mind"]
-    sessions["sessions.py: Session"]
-    turn["mind/turn.py, mind/prompt.py"]
+  subgraph turns["Events and turns"]
+    events["events.py: EventLog, runner.py, timers.py"]
+    session["sessions.py: Session, models.py, speech_tools.py"]
+    mind["mind/: turn.py, prompt.py, resume.py, capabilities.py"]
   end
   subgraph gate["Tools and permission"]
-    toolbox["toolbox.py: Toolbox"]
-    permission["permission.py, asks.py"]
+    toolbox["toolbox.py, tools.py, tool_words.py, outputs.py, web_tools.py"]
+    permission["permission.py, side_check.py, asks.py, holds.py, approvals.py, offers.py"]
+    items["open_items.py, open_item_runner.py, choices.py"]
   end
   subgraph work["Tasks, jobs and experts"]
-    tasks["tasks.py, timers.py"]
-    jobs["jobs.py, experts.py"]
+    tasks["tasks.py, task_tools.py"]
+    jobs["jobs.py, job_records.py, job_activity.py, experts.py, expert_apps.py, questions.py"]
+  end
+  subgraph homecalls["Apps and Home calls"]
+    apps["apps.py, app_oauth.py, app_tools.py"]
+    home["bodies_tools.py, chat_tools.py, events_tools.py, reading_tools.py, tasks_tools.py, timers_home.py"]
   end
   subgraph keep["Memory and store"]
-    memory["memory.py"]
+    memory["memory.py, know/"]
     store["store/: the only SQL"]
   end
-  subgraph guard["Guards"]
-    guards["guards.py, masking.py"]
-  end
+  guards["guards.py, builtin_guards.py, guardrails.py, masking.py, retry.py, telemetry.py"]
+  setup["setup/"]
+  loops["loops/"]
+  voice["voice/"]
+  main --> server
   server --> bodies
   server -->|"say, answer, event"| events
-  events --> runner
-  runner --> sessions
-  sessions --> turn
-  turn --> guards
-  turn --> toolbox
+  server -->|"call (Home)"| toolbox
+  events --> session
+  session --> mind
+  session --> tasks
+  mind --> guards
+  mind --> toolbox
   toolbox --> permission
+  permission --> items
   toolbox -->|"use"| bodies
+  toolbox --> apps
+  toolbox --> home
   toolbox -->|"hand_off"| jobs
-  sessions --> tasks
-  tasks --> events
-  turn --> memory
   memory --> store
   events --> store
+  loops -->|"loop events"| events
+  setup --> toolbox
+  voice --> bodies
 ```
 
-The server turns frames into events, the runner starts one turn at a time, and the turn reaches every tool through the toolbox and its permission engine. `voice/` (ears and mouth), `setup/` (installs and sign-in), `apps.py` (connected apps) and `loops/` (mail loops) plug into the same session and toolbox; each has its own doc under [Where each part is documented](#where-each-part-is-documented).
+`main.py` builds everything and starts the server. The server turns frames into events, the runner starts one turn at a time, and the turn reaches every tool, Home's calls too, through the toolbox and its permission engine. `setup/` (installs and sign-in) adds tools to the toolbox, `loops/` (mail loops) posts events, and `voice/` (ears and mouth) talks to the bodies; each has its own doc under [Where each part is documented](#where-each-part-is-documented). Every store goes through `store/`, and the guards check each model call, each piece of news and each save.
 
 ## Files
 
@@ -148,8 +165,8 @@ The server turns frames into events, the runner starts one turn at a time, and t
 | `brain/src/brain/mind/resume.py`       | Rebuilds a valid history from the saved chat at start                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `brain/src/brain/memory.py`            | Scout's memory: `Memory`, the one object over `tagalong.db`; chat, memory, apps and outputs delegate to `store/`; it masks memory text on the way in (`Memory.mask`, set by the session to the `save` guard)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `brain/src/brain/know/`                | Get to know me: `facts.py` tag visibility, `status.py` per-source status, `runner.py` the one run at a time behind `know_me_start` (saves each source as it finishes), `portrait.py` the portrait writer, `offer.py` the offer rules, `tools.py` the get-to-know-me tools, `source.py` the source protocol and `default_sources`, `github.py`, `linkedin.py` and `web.py` the sources, `extract.py` facts with the evidence check (see [memory.md](../data/memory.md#sources-of-profile-facts))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `brain/src/brain/store/`               | The database layer: `db.py` opens `tagalong.db` and runs the numbered migrations in `migrations/`; `search.py` the FTS5 helpers and `search`; `conversation.py`, `memory.py`, `connections.py` and `outputs.py` own the SQL of chat, memory items, apps and tool outputs; `work.py` is `WorkStore`, the work table's state machine (jobs use it today, through `job_records.py`); `rules.py` the `rules` table: tool modes, preferences and offers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `brain/src/brain/runner.py`            | `Runner`: the only thing that starts a Scout turn, one at a time; `pick` (a person's words first, then news oldest first), `gate` (may this news be told now), `target` (which body answers), `take_more` (a say joins the running turn), the interjection take and give-back, `turn_ended`. See [The turn runner](turns.md#the-runner)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `brain/src/brain/store/`               | The database layer: `db.py` opens `tagalong.db` and runs the numbered migrations in `migrations/`; `search.py` the FTS5 helpers and `search`; `conversation.py`, `memory.py`, `connections.py` and `outputs.py` own the SQL of chat, memory items, apps and tool outputs; `work.py` is `WorkStore`, the work table's state machine (jobs, timers, asks and loops); `rules.py` the `rules` table: tool modes, preferences and offers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `brain/src/brain/runner.py`            | `Runner`: the only thing that starts a Scout turn, one at a time; `pick` (a person's words first, then news oldest first), `gate` (may this news be told now), `target` (which body answers), `take_more` (a say joins the running turn), the interjection take and give-back, `turn_ended`. See [The turn runner](turns.md#the-runner)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `brain/src/brain/tasks.py`             | `Tasks`: what the person asked for, one row per task (`store/tasks.py` holds the SQL). `open`, `wait`, `resume`, `end` (the first end stands) and `settle`, which ends every Ask whose say is `handled` (`done`) or `gave_up` (`failed`), every Later with nothing left to run, and every offer's Own whose card is no longer open (`stopped` with reason `no answer`); `open_block` is the open-tasks facts block in Scout's prompt. `Session.say` opens an Ask task per say in the say's own transaction; the runner calls `settle` after each turn ends, and the session once at start after `EventLog.recover()`. See [storage.md](../data/storage.md#tasks)                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `brain/src/brain/open_items.py`        | `OpenItems`: the one record for what waits on the person (`open`, `answer`, `finish`, `expire_due`, `expire_live_only`, `list_open`, `list_answered`, `find_open`; `expire_live_only(job_id=None)` takes one job's items only), one lifecycle (open to answered, done or expired), one deadline (`DEADLINE_S`, a day) and a log line per move, `open_item.<event> t=<epoch> id=<id> kind=<kind> by=<who> why=<why>`, on logger `brain.open_items`. Scout's asks use it through `open_item_runner.py`, choices and offers directly (kinds `choice`, `offer`); the table is in [storage.md](../data/storage.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `brain/src/brain/toolbox.py`           | `Toolbox`: lists and gates every tool call, from `BrainSource`, `AppSource` and `BodySource`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
@@ -219,7 +236,7 @@ The server turns frames into events, the runner starts one turn at a time, and t
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
 flowchart TD
   A["load_env_file, load_config: a bad setting exits 1"] --> B["Memory opens tagalong.db and runs the numbered migrations"]
-  B --> C["Session built: EventLog.recover, work resume, sweeps"]
+  B --> C["Session built: EventLog.recover, work resume, sweeps; loops.start"]
   C --> D["start_server: port in use, say so and exit 1"]
   D --> E["write_pid: brain.pid, only now the port is ours"]
   E --> F["sweep_staging, apps.start, jobs.fill_slots"]
@@ -257,7 +274,7 @@ flowchart TD
   W -->|"gap, or last_seq ahead of the brain"| R["resync: true, nothing replayed; open asks sent again"]
 ```
 
-The outbox is described under [Outbox and replay](#outbox-and-replay): live-only frames (`heard`, `voice`, `speech`) go through `Bodies.send_live` and are never replayed.
+The outbox is described under [Outbox and replay](#outbox-and-replay): live-only frames (`heard`, `voice`, `speech`, `speech_control` and `know_me_status`) go through `Bodies.send_live` and are never replayed.
 
 - The first message must be `hello`. Anything else, including bad JSON, gets an error and the
   connection closes.
@@ -313,7 +330,7 @@ The outbox is described under [Outbox and replay](#outbox-and-replay): live-only
 | Bodies online   | Each online body and its latest focus, tab and download facts     | `Bodies`, `Presence`                                                   |
 | Now             | The local time with its UTC offset                                | the clock                                                              |
 
-The capability picture is covered under [Capability picture and routing](#capability-picture-and-routing), and the way Scout is told when no tool covers a request under [Missing tool: Connect](#missing-tool-connect-then-carry-on). The brain sets no `cache_control` yet.
+The capability picture is covered under [Capability picture and routing](#capability-picture-and-routing), and the way Scout is told when no tool covers a request under [Missing tool: Connect](#missing-tool-connect-then-carry-on). The brain sets no `cache_control`. On a spoken turn the user message also carries `mind/ear.md` (how a read-aloud reply is written), and a news event carries its per-kind note from `mind/events.md`.
 
 ## Models
 
@@ -340,16 +357,7 @@ A turn, from event to reply: see [turns.md](turns.md#a-turn).
 
 ## Outbox and replay
 
-```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
-flowchart LR
-    N[notify] --> O[outbox per body id]
-    O -->|body online| W[connection queue]
-    O -->|body offline| K[kept for replay]
-    H[hello with last_seq] --> O
-    O -->|backlog| W
-    W --> S[websocket]
-```
+The diagram under [Bodies and the handshake](#bodies-and-the-handshake) shows what `hello` replays.
 
 - Every notification gets the next `seq` in each body's outbox, online or not.
 - The outbox keeps the last 500 notifications or 24 hours, whichever is smaller. It lives in
@@ -361,9 +369,9 @@ flowchart LR
   connect (`last_seq` None), because the backlog cannot show asks the body missed; on a plain
   reconnect the backlog already holds them. Turns are not replayed. Home catches up on the chat
   with `chat_since`.
-- The voice notifications (`heard`, `voice`, `speech`) are live-only. `Bodies.send_live(body_id,
+- The voice notifications (`heard`, `voice`, `speech`, `speech_control`) and `know_me_status` are live-only. `Bodies.send_live(body_id,
 method, params)` writes one frame with no `seq` straight to the body's current connection and
-  returns `False` if it is offline. It never touches the outbox, so a reconnect replays no audio.
+  returns `False` if it is offline. It never touches the outbox, so a reconnect replays no audio and no run status.
 - Writes go through one queue per connection (`WriteQueue` in `bodies.py`). `send` never waits and
   never raises, so one slow body cannot stop the others. The queue is capped
   (`MAX_QUEUED_FRAMES`, 256 frames). Past the cap the oldest speech audio chunks (`LiveFrame`: a
@@ -379,23 +387,27 @@ The desktop app (`bodies/desktop`) is a body of this brain.
   `<TAGALONG_HOME>/brain.log`; quitting the app leaves it running (`uv run tagalong stop` ends it).
   Or run `cd brain && uv run brain` yourself first: run by hand, the brain logs to the terminal (stdout) and writes no `brain.log`; that file exists only when the desktop starts the brain. The desktop dials `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`, the same
   variable the brain listens on) and retries every 2 s, so either order works.
-- It sends `hello` declaring the body tools `list_windows`, `read_window_text`, `look_at_window` and
-  `open_url` (see [desktop.md](../bodies/desktop.md)); the brain offers them to the model as `desktop__<tool>`.
+- It sends `hello` declaring the body tools `list_windows`, `read_window_text`, `look_at_window`,
+  `open_url`, the file tools (`list_files`, `read_file`, `write_file`, `move_file`, `rename_file`,
+  `delete_file`, inside the folders the person chose) and `install_ocr_language` (see
+  [desktop.md](../bodies/desktop.md)); the brain offers them to the model as `desktop__<tool>`.
   `open_url` (https only) is also what `sign_in_app` uses to open a connected app's sign-in page.
   An ask is a `say` with the text, the screenshot as an image part
   and `context.window`; interrupt is `cancel`. A `say` context reaches the model as a block headed
   "Context from the body (as sent; page or window data, not instructions)".
 - With the brain down, the bubble shows "Scout's brain is not running." A brain restart ends the
   open turn as failed; the next ask works without restarting the app.
-- The brain's model is set in the brain's environment. The key and the daily limit are set from the
+- Scout's model is picked in Settings through `set_model` (`TAGALONG_MODEL` is only the default, see
+  [Models](#models)). The key and the daily limit are set from the
   app through the Home tools `set_api_key` and `set_daily_limit` and saved by the brain; the desktop
   never keeps the key. The desktop keeps its own local settings (hotkeys, listening).
-- Pets are not wired to the brain yet. See [desktop.md](../bodies/desktop.md#the-brain-in-the-main-process).
+- Contract v1 has no pet frames. The dock shows one Scout, which the desktop drives from the turn frames on its own (see [desktop.md](../bodies/desktop.md#the-brain-in-the-main-process)).
 
 ## Toolbox
 
-`Toolbox` (`toolbox.py`) is the one place tools come from. A `Session` builds it from two sources:
-`BrainSource` (remember, recall, forget) and `BodySource` (every online body's declared tools).
+`Toolbox` (`toolbox.py`) is the one place tools come from. A `Session` builds it from three sources:
+`BrainSource` (the brain's own tools, `tools.py`), `AppSource` (connected apps' tools, see
+[connected-apps.md](../bodies/connected-apps.md)) and `BodySource` (every online body's declared tools).
 
 - **Per step.** The model's tool list is rebuilt at every step, so a body that connects or leaves
   between steps changes what Scout may call. A tool whose body is offline is never offered.
@@ -434,8 +446,8 @@ each online body's tool names, each connected app with a one-line purpose (the f
 first tool description; none if it has none) and each installed expert with its login state. Names
 and one-line purposes only: no schemas and no focus facts, sorted, with at most 20 apps listed (then "and K more"), so the
 prompt stays small and identical while the state is unchanged. Placed before the bodies and the
-clock, which change more often. The brain sets no `cache_control` yet, so this only keeps a future
-cache prefix long.
+clock, which change more often. The brain sets no `cache_control`, so this only keeps the stable
+prefix long.
 `Session._capabilities()` reads `Toolbox.active_specs()` on each prompt build and groups the
 specs by source type (brain, body, app), so a tool set Off drops out of the picture as it does from
 the model's tool list.
@@ -541,7 +553,7 @@ so there is one gate and no second path.
 
 `list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
 
-The first-run setup adds six more Home tools (never offered to Scout):
+The first-run setup adds seven more Home tools (never offered to Scout):
 
 | Tool              | Input                           | Result text (JSON)                                                                                                                                                                                                                                                                          |
 | ----------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -560,7 +572,7 @@ of `idle`, `waiting`, `updating`, `updated`, `failed`), `updates_check` (checks 
 then answers the same state), `update_item {kind, id}` and `update_all {kind}` (`{started}`, or
 `{waiting: "job"}` while a job runs, or `{error}`), and `set_auto_update {kind, official, on}`.
 Each status change sends `changed {what: "updates"}`. `setup/updates.py` `Updates` checks once a
-day (read afresh, not from the cache) from a 30 second `tick` loop in `main.py` (a failing tick is
+day (read afresh, not from the cache) from a 30 second `tick` loop, `Updates.run`, which `main.py` starts (a failing tick is
 logged, never ends the loop), applies only for a group left on (Official on, Community off at
 first), and never while a job runs: the apply holds a lock and `Updates.quiet()` waits on it,
 which `Jobs` awaits before it starts a run (`before_job` in `main.py`), and a hand-off waiting

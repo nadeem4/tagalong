@@ -86,7 +86,7 @@ Secrets become `[secret]` before they are saved. The `save` hook runs `masking.p
 flowchart TD
     A["text about to be stored or logged"] --> B{which path?}
     B -->|"chat messages"| C["Session._save_new: mask_message on a copy"]
-    B -->|"approval summary and input, job result and progress"| D["Approvals, Jobs._end, Jobs._progress: mask_json"]
+    B -->|"approvals, jobs, work rows, tasks, tool outputs, loop text"| D["mask_json"]
     B -->|"memory text"| E["Memory.mask on save"]
     B -->|"a log line"| F["SecretLogFilter on every log handler"]
     C --> G["save guard: Guards.run('save')"]
@@ -95,16 +95,18 @@ flowchart TD
     G --> H["Masker: exact stored secret values (8+ chars) and key shapes become [secret]"]
     F --> H
     H --> I["written: tagalong.db, brain.log"]
-    G -->|"a guard raises or blocks"| J["[withheld] stored instead"]
+    G -->|"a guard raises or blocks"| J["[withheld] stored instead; memory refuses the save"]
 ```
 
 The `Masker` replaces exact stored secret values of 8 or more characters and common key shapes with `[secret]`; its list of values is cached for 1 second. The log filter calls the masker directly, not the runner, because the runner logs.
 
 - `Session._save_new` saves a masked copy of the new chat messages while `history` keeps the real values for the live turn.
-- A guard that raises or blocks stores `[withheld]` instead of the raw text.
+- A guard that raises or blocks stores `[withheld]` instead of the raw text. Memory is the exception: `Memory.remember` and `save_source_facts` raise `MemoryRefused` and store nothing, since a `[withheld]` memory would be noise.
+- `mask_json` masks the string leaves of a value. It covers the approval log, jobs and their steps, every work row (timers, asks, loops through `WorkStore`), tasks and the stored long tool outputs (`OutputStore`).
+- `EventLog` masks each event's payload with the `Masker` before it is saved; if masking fails, that text is saved as `[withheld]`.
 - `mask_message` leaves the values of structural keys (`role`, `type`, `id`, `tool_use_id`, `name`, `signature`) alone on a message, its content blocks and the blocks inside a tool result's content, so a saved chat always rebuilds. A `name` or `id` inside a tool's input is still masked.
 - `Session._save_new` drops a `thinking` block from the saved copy when masking would change it (a message left empty is saved with empty content). `redacted_thinking` blocks are kept.
-- Each turn's saved batch is tagged with the kind of body it was shown on (`messages.body`, the `BODY_*` constants in `protocol.py`). `Session._start_turn` reads the turn body's `kind` once, so it holds even if the body leaves first. A turn with no body (a wake) or no longer-online body reads `desktop`. Nothing reads the column yet.
+- Each turn's saved batch is tagged with the kind of body it was shown on (`messages.body`, the `BODY_*` constants in `protocol.py`). `Session._start_turn` reads the turn body's `kind` once, so it holds even if the body leaves first. A turn with no body (a wake) or no longer-online body reads `desktop`. Nothing reads the column.
 
 What is masked on disk and what is not is in [privacy.md](../data/privacy.md#what-is-masked-on-disk-what-is-not). How memory text is masked on save is in [memory.md](../data/memory.md#masking-on-save).
 
@@ -115,7 +117,7 @@ What is masked on disk and what is not is in [privacy.md](../data/privacy.md#wha
 - `Budget.spend(usage, model)` adds the tokens at the model's rate from `PRICES` (input, output, cache write, cache read, USD per million tokens). A model not in the table is priced like Opus, so a typo can never make spending look free.
 - Web searches count too: `usage.server_tool_use.web_search_requests` times `WEB_SEARCH_USD` (0.01). A missing field counts none. Fetching a page has no fee of its own; its text is billed as input tokens.
 - `Budget.allows()` is true while `spent` is under the limit. The `daily_budget` guard turns a spent day into `stop` with code `over_budget` on `model_call`, and keeps the runner's gate shut on `emit`, so queued news waits in the log (see [turns.md](turns.md)).
-- The limit is `TAGALONG_DAILY_BUDGET_USD`; Home can change it (`Budget.limit` has a setter).
+- The limit starts at `TAGALONG_DAILY_BUDGET_USD`. Home's `set_daily_limit` saves the new value to `.env` and sets `Budget.limit`, so it applies at once, with no restart.
 - Mail reading has its own ledger, `reader-budget.json`, with its own allowance `TAGALONG_READER_DAILY_USD` and model `TAGALONG_READER_MODEL` (see [loops.md](loops.md)). `main.py` builds both.
 
 ## Retries and give-ups
@@ -197,7 +199,7 @@ The cap is a transport guardrail only. How to present a long result (gist first,
 - `without_server_blocks` drops the server blocks and text citations from the copy written to disk. The live history keeps them.
 - A message that loses any block also loses all its `thinking` and `redacted_thinking` blocks (`without_thinking`; masking a thinking block does the same), because the API rejects a thinking run with a hole in it.
 - In place of the dropped search blocks the save keeps one short text note (`[Searched the web for "q". Read <url>. Sources: Title (url); ...]`, from the `server_tool_use` input and the `web_search_tool_result` content; at most 5 queries, pages and sources, 120 characters each), so a restarted Scout still knows it searched. The note is saved text, so it is masked too. A message with only server blocks and no search or fetch among them is saved with empty content.
-- `rebuild_history` (see [turns.md](turns.md)) drops server blocks too, which heals chats saved before this rule (an orphaned result makes the API reject every request). It also drops thinking from every message it rebuilds, because the API only accepts thinking cut from the front of a history. A resumed chat holds the answer text only, masked like any other message, and thinking restarts with the next turn. An assistant message left empty (a silent reply) is dropped together with the turn-start message it answered, never given a stand-in text the model would copy; roles still alternate.
+- `rebuild_history` (see [turns.md](turns.md)) drops server blocks too, so a saved chat holding an orphaned server result still loads (such a result makes the API reject every request). It also drops thinking from every message it rebuilds, because the API only accepts thinking cut from the front of a history. A resumed chat holds the answer text only, masked like any other message, and thinking restarts with the next turn. An assistant message left empty (a silent reply) is dropped together with the turn-start message it answered, never given a stand-in text the model would copy; roles still alternate.
 
 **Modes.** Ask is meaningless for them, since they never reach the gate. `Toolbox.set_mode` refuses `ask` for a spec with `server_tool`, `list_permissions` rows carry `server_tool`, and Home shows only Off and Auto.
 

@@ -22,7 +22,7 @@ Installing an expert or an app, and signing an expert in, are `person_only` tool
 
 - `paths.py`: where Tagalong keeps its own Node, expert packages, the registry cache and the installed-experts list, all under `TAGALONG_HOME`.
 - `tools.py`: Scout's three looking tools, plus `setup_facts`, the facts a refused `hand_off` carries (see [experts.md](experts.md)).
-- `home_tools.py`: Home's setup tools for the Connections page and the tour (see Home tools in [README.md](README.md)).
+- `home_tools.py`: Home's setup tools for the Connections page and the tour (see [Home tools](README.md#home-tools)).
 
 ## Looking at the machine
 
@@ -39,7 +39,7 @@ Installing an expert or an app, and signing an expert in, are `person_only` tool
 - Only the first MCP page is read. `more: true` in the result says the registry has more pages; `find_apps` takes the next cursor.
 - `net.http_fetch` is the real `Fetch`. It streams chunks and raises on a non-200 or on a redirect away from https.
 
-`trust.py` decides who is Official. An app is Official when its registry namespace is the service's own reversed domain (`com.notion` is Notion's); the registry proves a namespace by DNS or HTTP. A GitHub login (`io.github.*`) proves only who the user is, so it never counts. An expert is Official only when its vendor is on a short allowlist (`EXPERT_VENDORS`). Everything else is Community.
+`trust.py` decides who is Official. An app is Official when its registry namespace is the service's own reversed domain (`com.notion` is Notion's); the registry proves a namespace by DNS or HTTP. A GitHub login (`io.github.*`) proves only who the user is, so it never counts. `is_official_app` also requires a two-label namespace (a third label, like `com.example.tools`, is never Official) and a name after the slash made only of that domain's label and generic words (`mcp`, `server`, `remote`, `official`, `hosted`), so `com.notion/mcp` is Official but a third party's `com.mcparmory/notion` is not. `OFFICIAL_APPS` is an allowlist of full ids that break the pattern but are the service's own; it is empty. An expert is Official only when its vendor is on a short allowlist (`EXPERT_VENDORS`). Everything else is Community.
 
 `grouping.py` groups the results per service so Home shows one card per service, Official first. Only `trust.is_official_app` decides who heads a group; a lookalike title cannot take the top spot.
 
@@ -169,7 +169,7 @@ The check runs once a day and reads the registries afresh, because a cached answ
 | `install <expert>`  | Prints what the Allow card shows (id, version, folder, the Node download), then asks `[y/N]`.                                                                                                                      |
 | `apps add <app>`    | The same for an app from the MCP registry.                                                                                                                                                                         |
 | `login <expert>`    | Runs the same `LoginDriver` as Scout's tool: a terminal window or the expert's own browser step, then waits. Where no window can open it prints the command to run yourself.                                       |
-| `stop`              | Ends the brain the desktop left running (see Start-up and shutdown in [README.md](README.md)).                                                                                                                     |
+| `stop`              | Ends the brain the desktop left running (see [How the brain starts and stops](README.md#how-the-brain-starts-and-stops)).                                                                                          |
 | `perf [--since 1h]` | Step timings and cancelled asks, read from `brain.log`.                                                                                                                                                            |
 
 `--yes` skips the question. With no terminal to answer on and no `--yes`, the command prints "Run again with --yes to go ahead without a prompt." and exits 1. A failure prints `failed: <kind>: <detail>` and exits 1; a usage error exits 2.
