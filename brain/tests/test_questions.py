@@ -6,6 +6,7 @@ import asyncio
 
 import pytest
 from job_rows import fresh_work
+from test_holds import Rig
 
 from brain.experts import Question, QuestionField
 from brain.questions import ScoutQuestions
@@ -272,3 +273,21 @@ async def test_a_question_scout_cannot_answer_goes_to_the_owner_at_once():
     sq = ScoutQuestions(emit, fresh_work(), lambda: False)
     assert await sq.ask("j1", _q()) is None
     assert emit.calls == []
+
+
+async def test_the_card_answer_event_releases_the_expert():
+    # Scout passes the question; it goes to the person on a held card, and the card's answer
+    # (an event handled by code, no turn) is what releases the waiting expert.
+    rig = Rig()
+    job = rig.job()
+    emit = _Emit()
+    sq = ScoutQuestions(emit, rig.work, lambda: True)
+    asking = await _ask(sq, emit, job=job)
+    sq.pass_to_user(emit.id())
+    assert await asking is None
+    waiting = rig.ask(job_id=job, free_text=True)
+    card = await rig.card()
+    assert not waiting.done()
+    rig.asks.answer(card["id"], "A", "desktop")
+    assert await waiting == ("A", None)
+    assert rig.saved == [(card["id"], "A", "desktop")]

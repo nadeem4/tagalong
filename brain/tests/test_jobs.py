@@ -2852,6 +2852,62 @@ async def test_answer_after_a_stop_is_refused_as_expired(make_rig):
     assert err.value.reason == "expired"
 
 
+async def test_an_expert_permission_request_does_not_block_the_turn_and_keeps_the_slot(
+    make_rig,
+):
+    rig = make_rig(FakeAsks(None), ASK_STEPS, max_running=1)
+    job = await rig.jobs.start("go", str(rig.folder))  # start returns; the request waits
+    await until(lambda: expert_items(rig))
+    assert rig.asks.open_ids and not rig.finished
+    assert [j.id for j in rig.records.running_jobs()] == [str(job)]
+    with pytest.raises(JobError, match="already running"):  # the waiting job holds its slot
+        await rig.jobs.start("two", str(rig.folder))
+    rig.asks_real.answer(rig.asks.opened[0]["ask_id"], "Yes", "desktop")  # no deadline: any time
+    await until(lambda: rig.finished)
+    reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))
+    assert reply["result"]["outcome"] == {"outcome": "selected", "optionId": "allow-once"}
+
+
+async def task_job(make_rig, script=(None,)):
+    """A job of the task k1 with its expert's request on a card nobody has answered."""
+    rig = make_rig(FakeAsks(*script), ASK_STEPS)
+    rig.tasks.open("do", "desktop", id="k1", title="Fix the build")
+    job = await rig.jobs.start("go", str(rig.folder), task_id="k1")
+    await until(lambda: expert_items(rig) and rig.asks.opened)
+    return rig, str(job), rig.asks.opened[0]
+
+
+async def test_not_now_on_an_expert_card_leaves_the_job_waiting(make_rig):
+    rig, job, card = await task_job(make_rig)
+    assert card["options"][-2:] == ["not_now", "stop_task"]
+    rig.asks_real.answer(card["ask_id"], "not_now", "desktop", None, "2026-12-01T09:00:00+00:00")
+    item = rig.items.get(card["ask_id"])
+    assert (item.state, item.check_back_by) == ("open", "person")
+    assert item.check_back_at == datetime(2026, 12, 1, 9, 0, tzinfo=UTC)
+    assert rig.asks.open_ids == {card["ask_id"]} and not rig.finished  # still waiting
+    assert [j.id for j in rig.records.running_jobs()] == [job]
+    rig.asks_real.answer(card["ask_id"], "Yes", "desktop")  # and still answerable
+    await until(lambda: rig.finished)
+
+
+async def test_stopping_the_job_cancels_its_held_cards(make_rig):
+    rig, job, card = await task_job(make_rig)
+    await rig.jobs.stop(job)
+    assert rig.asks.closed_by_cancel == [card["ask_id"]] and not rig.asks.open_ids
+    assert rig.items.get(card["ask_id"]).state == "expired"
+    assert rig.records.get_job(job).state == "cancelled"
+
+
+async def test_stop_the_task_on_an_expert_card_ends_the_task_and_the_card(make_rig):
+    rig, job, card = await task_job(make_rig)
+    rig.asks_real.answer(card["ask_id"], "stop_task", "desktop")
+    assert rig.tasks.get("k1").state == "stopped"
+    assert not rig.asks.open_ids  # the person's own answer took the card down
+    await until(lambda: any("outcome" in f.get("result", {}) for f in rig.frames()))
+    reply = next(f for f in rig.frames() if "outcome" in f.get("result", {}))
+    assert reply["result"]["outcome"] == {"outcome": "cancelled"}  # the expert is told
+
+
 class GrantAll:
     name = "standing_rule"
 
