@@ -48,7 +48,7 @@ appears as a short structured answer plus an offer of the rest.
 
 A reply longer than the brain's replay window cannot be replayed to a body that was away, so the
 reconnect carries `resync: true`. The desktop then reads the saved chat (`chat_since`) and shows each
-assistant reply saved while its link was down, once, as a `pet.remark`: the quiet line and the bubble
+assistant reply saved after the last one it saw, once, as a `pet.remark`: the quiet line and the bubble
 render it like any wake's words, so this component has no new state. A turn cut off by the lost link
 still shows its "lost the thread" error beside it.
 

@@ -34,6 +34,7 @@ async def test_chat_since_shape_and_limit_cap(rig):
         "role": "assistant",
         "text": "m59",
         "source": "desktop",
+        "body": "desktop",
         "at": AT,
     }
     assert len(json.loads(await handler({"limit": 500}))["messages"]) == 50

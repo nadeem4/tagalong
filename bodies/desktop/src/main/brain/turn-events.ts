@@ -17,7 +17,7 @@ export interface SavedChatMessage {
   id: string;
   role: string;
   text: string;
-  at: string;
+  body: string;
 }
 
 export function createTurnEvents(petId: () => string, session: () => string | null = () => null) {
@@ -239,18 +239,22 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
       return lastChatId === undefined ? undefined : String(lastChatId);
     },
 
+    /** Rows already on screen (a turn that streamed live): the anchor moves past them, no remark. */
+    seen(messages: SavedChatMessage[]): void {
+      for (const m of messages) lastChatId = Math.max(lastChatId ?? 0, Number(m.id));
+    },
+
     /**
-     * After a resync: the assistant messages the brain saved while the link was down (`awayAt`,
-     * ms) that were not shown yet, each as a remark. A turn cut off by the lost link also gets
-     * its error from resync(); the saved reply arrives beside it.
+     * After a resync: the assistant replies the brain saved after the anchor, said on the
+     * desktop and not shown yet, each as a remark. A turn cut off by the lost link also gets its
+     * error from resync(); the saved reply arrives beside it.
      */
-    caughtUp(messages: SavedChatMessage[], awayAt: number): TurnEvent[] {
+    caughtUp(messages: SavedChatMessage[]): TurnEvent[] {
       const events: TurnEvent[] = [];
       for (const m of messages) {
-        const id = Number(m.id);
-        if (lastChatId !== undefined && id <= lastChatId) continue;
-        lastChatId = id;
-        if (m.role !== 'assistant' || m.text.trim() === '' || Date.parse(m.at) < awayAt) continue;
+        if (lastChatId !== undefined && Number(m.id) <= lastChatId) continue;
+        lastChatId = Number(m.id);
+        if (m.role !== 'assistant' || m.body !== 'desktop' || m.text.trim() === '') continue;
         events.push({
           type: 'pet.remark',
           remarkId: crypto.randomUUID(),

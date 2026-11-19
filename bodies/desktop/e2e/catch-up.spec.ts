@@ -49,18 +49,25 @@ async function windowFor(name: string): Promise<Page> {
   throw new Error(`no ${name} window appeared`);
 }
 
-const REPLY = 'The long answer you asked for, saved while you were away.';
+const FIRST = 'The long answer you asked for, saved while you were away.';
+const SECOND = 'Another long answer, saved during a second drop.';
 
-test('the bubble shows a reply saved while the link was down', async () => {
+test('the bubble shows each reply saved while the link was down, once', async () => {
   const panel = await windowFor('panel');
   await panel.evaluate(() => window.tagalongHost.hidePanel());
-  // Wait for the first link, so the drop is a real online to offline step.
   await expect.poll(() => brain.hellos, { timeout: 30_000 }).toBeGreaterThan(0);
-  brain.dropWithSavedReply(REPLY);
+  // The link comes up: the desktop notes the newest saved reply (none yet).
+  await expect.poll(() => brain.chatSinceCalls.length).toBeGreaterThan(0);
+  expect(brain.chatSinceCalls[0]).toEqual({ limit: 1 });
 
+  brain.dropWithSavedReply(FIRST);
   const line = panel.getByRole('button', { name: 'Ask Scout something' });
   await expect(line).toBeVisible({ timeout: 30_000 });
   await line.click();
-  await expect(panel.getByText(REPLY)).toBeVisible();
-  expect(brain.chatSinceCalls).toEqual([{}]);
+  await expect(panel.getByText(FIRST)).toBeVisible();
+
+  brain.dropWithSavedReply(SECOND);
+  await expect(panel.getByText(SECOND)).toBeVisible({ timeout: 30_000 });
+  // The second catch-up asked after the first reply's id, so the first is not read (or shown) again.
+  expect(brain.chatSinceCalls.at(-1)).toEqual({ after_id: '1' });
 });

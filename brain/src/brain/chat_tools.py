@@ -19,7 +19,14 @@ def chat_tools(db: sqlite3.Connection) -> list[tuple[ToolSpec, Handler]]:
         after = int(raw) if isinstance(raw, str) and raw.isdigit() else None
         rows, more = conversation.since(db, after, limit)
         messages = [
-            {"id": str(r.id), "role": r.role, "text": r.text, "source": r.source, "at": r.at}
+            {
+                "id": str(r.id),
+                "role": r.role,
+                "text": r.text,
+                "source": r.source,
+                "body": r.body,
+                "at": r.at,
+            }
             for r in rows
         ]
         return json.dumps({"messages": messages, "more": more})

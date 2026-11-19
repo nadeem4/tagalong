@@ -116,17 +116,24 @@ class ChatRow:
     role: str
     text: str
     source: str | None
+    body: str
     at: str
 
 
 def since(db: sqlite3.Connection, after_id: int | None, limit: int) -> tuple[list[ChatRow], bool]:
-    """Saved messages with words, oldest first: those after `after_id`, or the last `limit` when
-    it is None or names no row. `more` is true when rows were left out."""
+    """The assistant replies a body may show, oldest first: those after `after_id` (the oldest
+    `limit` of them, page on with the last id), or the last `limit` when it is None or names no
+    row. Rows that call a tool are left out: their words are mid-turn ("Let me check"), and the
+    saved rows carry no turn link to pick a turn's last one another way. `more` is true when
+    rows were left out."""
     known = (
         after_id is not None
         and db.execute("SELECT 1 FROM messages WHERE id=?", (after_id,)).fetchone()
     )
-    cols = "SELECT id, role, text, source, at FROM messages WHERE cut=0 AND text!=''"
+    cols = (
+        "SELECT id, role, text, source, body, at FROM messages WHERE cut=0 AND text!=''"
+        " AND role='assistant' AND content_json NOT LIKE '%\"tool_use\"%'"
+    )
     if known:
         rows = db.execute(f"{cols} AND id>? ORDER BY id LIMIT ?", (after_id, limit + 1)).fetchall()
         more = len(rows) > limit

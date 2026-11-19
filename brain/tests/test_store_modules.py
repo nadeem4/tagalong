@@ -111,6 +111,29 @@ def test_since_reports_more_when_limited(tmp_path):
     assert [r.text for r in rows] == ["m1", "m2"] and more
 
 
+def test_since_pages_from_the_oldest_after_the_id(tmp_path):
+    db = _db(tmp_path)
+    ids = _chat(db, 30)
+    first, more = conversation.since(db, ids[0], 20)
+    assert more and first[-1].id == ids[20]
+    rest, more = conversation.since(db, first[-1].id, 20)
+    assert [r.id for r in rest] == ids[21:] and not more
+
+
+def test_since_returns_only_final_assistant_rows_with_their_body(tmp_path):
+    db = _db(tmp_path)
+    tool = {"type": "tool_use", "id": "t1", "name": "x", "input": {}}
+    msgs = [
+        {"role": "user", "content": "hi"},
+        {"role": "assistant", "content": [{"type": "text", "text": "Let me check"}, tool]},
+        {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t1", "content": "r"}]},
+        {"role": "assistant", "content": [{"type": "text", "text": "Done."}]},
+    ]
+    conversation.save_messages(db, msgs, AT, "whatsapp")
+    rows, _ = conversation.since(db, None, 10)
+    assert [(r.text, r.body) for r in rows] == [("Done.", "whatsapp")]
+
+
 def test_since_an_unknown_id_acts_as_none(tmp_path):
     db = _db(tmp_path)
     _chat(db, 3)

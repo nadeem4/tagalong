@@ -440,7 +440,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   let seq = 0;
   let turns = 0;
   // The brain's saved chat, for `chat_since`, and whether the next hello says resync.
-  const savedChat: { id: string; role: string; text: string; source: string; at: string }[] = [];
+  const savedChat: { id: string; role: string; text: string; source: string; body: string }[] = [];
   const chatSinceCalls: Record<string, unknown>[] = [];
   let resyncNext = false;
   let hellos = 0;
@@ -961,6 +961,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             part?: string;
             after_rev?: number;
             after_id?: string;
+            limit?: number;
             id?: number;
             filter?: string;
             usd?: number;
@@ -979,9 +980,13 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         };
         let value: unknown = {};
         if (params.tool === 'chat_since') {
+          // Like the brain: with an id, the oldest rows after it and whether more are left; without, the last few.
           chatSinceCalls.push(params.input ?? {});
-          const after = Number(params.input?.after_id ?? 0);
-          value = { messages: savedChat.filter((m) => Number(m.id) > after), more: false };
+          const limit = Number(params.input?.limit ?? 20);
+          const after = params.input?.after_id;
+          const rest = savedChat.filter((m) => after === undefined || Number(m.id) > Number(after));
+          const messages = after === undefined ? rest.slice(-limit) : rest.slice(0, limit);
+          value = { messages, more: after !== undefined && rest.length > messages.length };
         } else if (params.tool === 'list_jobs') {
           // Like the brain: Scout's copy of a long result is cut with an ellipsis.
           value = {
@@ -1652,13 +1657,12 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
       return hellos;
     },
     dropWithSavedReply: (text) => {
-      // Saved a moment after the link drops; later than the drop so the desktop counts it as new.
       savedChat.push({
         id: String(savedChat.length + 1),
         role: 'assistant',
         text,
         source: 'desktop',
-        at: new Date(Date.now() + 5_000).toISOString(),
+        body: 'desktop',
       });
       resyncNext = true;
       for (const client of server.clients) client.terminate();

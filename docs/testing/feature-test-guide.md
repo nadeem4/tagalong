@@ -3107,5 +3107,5 @@ Automated: `cd brain && uv run pytest tests/test_events.py tests/test_runner.py 
 
 ## Catch up after a resync (automated on the fake brain; by hand with the real brain)
 
-1. **Automated.** `pnpm --filter @tagalong/desktop test:e2e e2e/catch-up.spec.ts` drops the link, saves a reply on the fake brain and answers `resync: true`. **Expected:** the bubble shows the reply once and `chat_since` was called once with no `after_id`.
+1. **Automated.** `pnpm --filter @tagalong/desktop test:e2e e2e/catch-up.spec.ts` drops the link twice, saving a reply each time, and answers `resync: true`. **Expected:** the bubble shows each reply; the second catch-up calls `chat_since` with `after_id` of the first reply.
 2. **By hand.** With the real brain and the desktop open, put the PC to sleep or disconnect the network, let a long reply finish on WhatsApp (or ask something long and disconnect mid-reply), then reconnect. **Expected:** after the reconnect the reply appears in the bubble once; a second reconnect does not show it again.
