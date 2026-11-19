@@ -179,7 +179,7 @@ export function ConnectionsPanel() {
         if (error !== undefined) {
           outcome = { ...(SETUP_REFUSALS[error] ?? SETUP_FAILED), added: false };
         } else if (card !== undefined) {
-          outcome = { text: CARD_OPEN, error: false, added: false };
+          outcome = { text: CARD_OPEN, error: false, added: false, waiting: true };
         } else if (state === 'waiting') {
           outcome = { text: LOGIN_WAITING, error: false, added: false };
         } else if (added !== undefined) {

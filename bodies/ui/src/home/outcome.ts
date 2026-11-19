@@ -9,16 +9,18 @@ export interface Outcome {
   error: boolean;
   /** True when the thing was added: its button is replaced by the words. Otherwise the button stays. */
   added: boolean;
+  /** True while a card is up: these are the only words a setup change clears. */
+  waiting?: boolean;
 }
 
-/** `answered` changes when the brain says a setup moved on (a card answered): the words wait no more. */
+/** `answered` changes when the brain says a setup moved on (a card answered): words waiting on a card go. */
 export function useOutcomes(answered = 0) {
   const [outcomes, setOutcomes] = useState<ReadonlyMap<string, Outcome>>(new Map());
   const seen = useRef(answered);
   useEffect(() => {
     if (seen.current === answered) return;
     seen.current = answered;
-    setOutcomes(new Map());
+    setOutcomes((now) => new Map([...now].filter(([, o]) => o.waiting !== true)));
   }, [answered]);
   /** Runs an add and files its outcome under the row's id. */
   const track = async (id: string, call: Promise<Outcome | null>): Promise<void> => {

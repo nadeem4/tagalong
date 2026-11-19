@@ -207,6 +207,16 @@ describe('Experts tab: add an expert', () => {
     expect(screen.queryByText('Answer the card to add it.')).toBeNull();
   });
 
+  it('a row that is not waiting on a card keeps its words when setup changes', async () => {
+    const bridge = await open({ browseExperts: [CODEX], showMoreFrom: 1 }, { error: 'denied' });
+    await click(screen.getByRole('button', { name: 'Add Codex' }));
+    await act(async () => {
+      bridge.emitChanged('setup');
+      await Promise.resolve();
+    });
+    expect(within(rowOf('Codex')).getByText('Okay, nothing was changed.')).toBeVisible();
+  });
+
   it('an app whose card ended badly says so in the page’s words', async () => {
     const bridge = await open({ browseExperts: [], showMoreFrom: 0 });
     bridge.setup = { ...bridge.setup, failed: { expert: 'io.x/y', error: 'denied', kind: 'app' } };
