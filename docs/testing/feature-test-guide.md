@@ -654,7 +654,9 @@ history and preferences with `call` as in the section above.
 5. **Action:** start over (a fresh data folder), approve three commands as in step 1, then press
    **Keep asking**. Approve more commands in the same folder over the next days.
    **Expected:** no new offer for that folder for 7 days (`TAGALONG_KEEP_ASKING_DAYS`). No
-   preference is saved. Set the values lower in `.env` to check this faster.
+   preference is saved. Set the values lower in `.env` to check this faster. The offer's task
+   (`tasks`, kind `own`) shows `declined`; after **Yes, auto-approve** it shows `done`; an offer
+   never answered shows `stopped` with reason `no answer`, never `done`.
 6. **Action:** with a preference saved, trigger a locked tool (one that asks until unlocked on Home) while the
    built-in "Always ask me before risky actions" default still exists.
    **Expected:** it still asks you. Scout does not look at it, and no preference
