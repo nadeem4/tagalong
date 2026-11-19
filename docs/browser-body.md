@@ -86,7 +86,7 @@ The extension's content security policy allows `connect-src ws:` and nothing els
 
 ## Identity
 
-The body id is `<browser>-<4 random chars>`, for example `chrome-7k2f` or `edge-q9x1`. The browser
+The body id is `<browser>-<4 random chars>`, for example `chrome-7k2f` or `edge-q9x1` (unique per install, as the contract asks of every body). The browser
 is read from the user agent brands: `chrome`, `edge`, `brave`, `opera`, `vivaldi`, `arc`, or
 `chromium` when none matches; the display name is Chrome, Edge, and so on. The id is made once and
 kept as `bodyId` in `chrome.storage.local`, so a restart keeps it and a second browser profile has

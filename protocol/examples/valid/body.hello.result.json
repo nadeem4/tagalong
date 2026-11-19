@@ -1,5 +1,5 @@
 {
   "jsonrpc": "2.0",
   "id": 1,
-  "result": { "protocol": 1, "session": "s1", "tools": [], "seq": 0, "resync": false }
+  "result": { "protocol": 2, "session": "s1", "tools": [], "seq": 0, "resync": false }
 }
