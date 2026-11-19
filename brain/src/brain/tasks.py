@@ -231,8 +231,8 @@ class Tasks:
             _log.exception("stopping task %s: %s", task, what)
 
     def settle(self) -> list[str]:
-        """End every Ask whose say is over, every Later with nothing left to run and every Own
-        with no open item and no news."""
+        """End every Ask whose say is over, every Later with nothing left to run and every offer's
+        Own whose card is no longer open."""
         ended = []
         with transaction(self._db):
             at = utc_text(self._now())

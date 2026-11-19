@@ -709,7 +709,7 @@ columns and drops `work.source_message_id` (never written).
   `store/tasks.py`. The first end of a task stands; a second `end` changes nothing.
 - Ended by one sweep, not by hooks: `Tasks.settle()` ends an open Ask `done` when its say is
   `handled` and `failed` when it is `gave_up`, a Later with no live work row and no `new` or
-  `taken` event `done`, and an Own with no open item and no event `stopped` (reason `no answer`).
+  `taken` event `done`, and an offer's Own that had an item, has none open and no event `stopped` (reason `no answer`).
   An offer's Own ends on its answer first: `done`, `declined` or `stopped`. The runner
   calls it after every turn ends, and the session at start after `EventLog.recover()`, so a
   crash cannot leave one open.

@@ -114,8 +114,16 @@ def test_settle_ends_what_the_sweeps_name(tasks, db):
     assert tasks.get(ask).state == "done" and tasks.get(later).state == "done"
 
 
-def test_settle_stops_a_bare_own_task_as_no_answer(tasks):
+def test_settle_leaves_an_own_task_scout_started_itself(tasks):
+    own = tasks.for_turn(None, "own", "keep an eye on the build")  # task_start: no item, no event
+    assert tasks.settle() == [] and tasks.get(own).state == "open"
+
+
+def test_settle_stops_an_offers_own_task_whose_card_lapsed_as_no_answer(tasks, db):
     own = tasks.open("own", "scout")
+    items = OpenItems(db, lambda: NOW)
+    item = items.open("offer", task_id=own)
+    items.expire(item.id, "deadline")
     assert tasks.settle() == [own]
     row = tasks.get(own)
     assert (row.state, row.end_reason) == ("stopped", "no answer")

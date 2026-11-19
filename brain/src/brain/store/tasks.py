@@ -128,11 +128,13 @@ def laters_to_settle(db: sqlite3.Connection) -> list[str]:
 
 
 def owns_to_settle(db: sqlite3.Connection) -> list[str]:
-    """Open or waiting Owns with nothing waiting on the person and no event: an offer whose card
-    lapsed or never opened. An offer's Own carries no events and ends on its answer."""
+    """Open or waiting Owns that had an item and have none open now and no event: an offer whose
+    card lapsed. An offer's Own ends on its answer; an Own Scout started itself (`task_start`)
+    never had an item and is left alone."""
     rows = db.execute(
         "SELECT t.id FROM tasks t WHERE t.kind='own' AND t.state IN ('open','waiting')"
         " AND NOT EXISTS (SELECT 1 FROM events e WHERE e.task=t.id)"
+        " AND EXISTS (SELECT 1 FROM open_items i WHERE i.task_id=t.id)"
         " AND NOT EXISTS (SELECT 1 FROM open_items i WHERE i.task_id=t.id AND i.state='open')"
         " ORDER BY t.created_at, t.rowid"
     ).fetchall()

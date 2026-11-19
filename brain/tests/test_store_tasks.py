@@ -104,13 +104,13 @@ def test_owns_to_settle_skips_an_own_task_with_an_open_item_or_an_event(db):
     assert tasks.owns_to_settle(db) == []
 
 
-def test_owns_to_settle_stops_a_bare_own_and_one_whose_offer_expired(db):
+def test_owns_to_settle_stops_only_an_own_whose_offer_item_expired(db):
     tasks.insert(db, task("bare", kind="own"))
     tasks.insert(db, task("lapsed", kind="own"))
     tasks.insert(db, task("waiting", kind="own"))
     _item(db, "i1", "lapsed", "expired")
     _item(db, "i2", "waiting", "open")
-    assert tasks.owns_to_settle(db) == ["bare", "lapsed"]
+    assert tasks.owns_to_settle(db) == ["lapsed"]  # "bare" is a task_start Own: never swept
 
 
 def test_owns_to_settle_leaves_a_watch_task_with_handled_events(db):
