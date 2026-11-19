@@ -1091,3 +1091,12 @@ async def test_next_pause_news_is_held_while_another_body_still_talks():
     await ticks()
     assert rig.turns() == [["n1"]]
     await rig.runner.stop()
+
+
+async def test_next_pause_news_is_held_while_a_single_desktop_is_paused():
+    rig = LoopRig()
+    rig.presence.speech("desktop", "paused")
+    rig.news("n1")
+    await ticks()
+    assert rig.session.started == [] and rig.session.told == []
+    await rig.runner.stop()

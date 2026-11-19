@@ -61,10 +61,13 @@ class Presence:
 
     def at_break(self) -> bool:
         """Whether the speech playing now sits between two sentences: every body that reports
-        is at a break (a paused body is silent between sentences too, so one left paused cannot
-        block the rest), so one body's break never cuts across another still talking."""
+        is at a break and at least one is at a `sentence_break`. A paused body (the person talking
+        over Scout, maybe mid-sentence) does not hold the others back, but alone is no break."""
         if self._reported:
-            return all(s in ("sentence_break", "paused") for s in self._reported.values())
+            states = self._reported.values()
+            return "sentence_break" in states and all(
+                s in ("sentence_break", "paused") for s in states
+            )
         return self._mouth == "sentence_break"
 
     def heard(self, body_id: str) -> tuple[str, int]:

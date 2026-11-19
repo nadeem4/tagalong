@@ -174,3 +174,10 @@ def test_a_paused_body_counts_as_at_a_break():
     assert rig.p.at_break()
     rig.p.speech("b", "talking")
     assert not rig.p.at_break()
+
+
+def test_a_body_paused_alone_is_not_at_a_break():
+    rig = Rig()
+    rig.p.speech("a", "paused")  # the person talking over Scout, maybe mid-sentence
+    assert not rig.p.at_break()
+    assert not rig.p.break_seen()
