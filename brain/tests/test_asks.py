@@ -580,3 +580,43 @@ async def test_cancel_close_is_logged_with_reason_cancelled(caplog):
         await task
     [closed] = [ln for ln in _ask_lines(caplog) if ln.startswith("ask.closed")]
     assert f"id={params['id']}" in closed and "why=cancelled" in closed
+
+
+def test_a_task_card_adds_not_now_and_stop_task_after_its_own_options():
+    bodies = FakeBodies()
+    asks = Asks(bodies, fresh_work())
+    asks.show("a0", call(), "desktop__x", True, {"task": None})
+    task = {
+        "task": {"id": "k1", "title": "Fix it"},
+        "check_back_at": "2026-11-11T09:30:00+00:00",
+        "check_back_by": "scout",
+        "urgent": True,
+    }
+    asks.show("a1", call(), "desktop__x", False, task)
+    [(_, no_task), (_, with_task)] = bodies.sent
+    assert no_task["options"] == ["allow", "deny"] and "task" not in no_task
+    assert with_task["options"] == ["allow", "always", "deny", "not_now", "stop_task"]
+    assert with_task["task"] == {"id": "k1", "title": "Fix it"}
+    assert (with_task["check_back_at"], with_task["check_back_by"], with_task["urgent"]) == (
+        "2026-11-11T09:30:00+00:00",
+        "scout",
+        True,
+    )
+
+
+def test_not_now_keeps_the_card_open_and_shows_the_new_time():
+    bodies = FakeBodies()
+    asks = Asks(bodies, fresh_work())
+    told = []
+    asks.on_item_answer = lambda *a: told.append(a)
+    asks.show("a1", call(), "desktop__x", True, {"task": {"id": "k1", "title": None}})
+    asks.answer("a1", "not_now", "desktop", check_back_at="2026-11-11T11:00:00+00:00")
+    assert told == [("a1", "not_now", "desktop", "2026-11-11T11:00:00+00:00")]
+    assert asks.is_open("a1")
+    asks.reschedule("a1", "2026-11-11T11:00:00+00:00", "person")
+    last = bodies.sent[-1][1]
+    assert (last["state"], last["check_back_at"], last["check_back_by"]) == (
+        "open",
+        "2026-11-11T11:00:00+00:00",
+        "person",
+    )

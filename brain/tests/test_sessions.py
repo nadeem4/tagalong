@@ -2094,7 +2094,7 @@ async def test_answer_to_an_expired_expert_ask_says_it_expired():
     bodies.notify = lambda m, p: None
     memory = Memory(":memory:")
     session = make_session(Reactive(["hi"]), Open(), bodies, 10, memory)
-    item = session.items.open("expert_ask", "brain", live_only=True, job_id="j1")
+    item = session.items.open("expert_ask", live_only=True, job_id="j1")
     session.items.expire_live_only(job_id="j1")  # its expert is gone
     with pytest.raises(RpcError, match="expired") as err:
         session.answer(item.id, "allow", "desktop")
@@ -2105,7 +2105,7 @@ async def test_answer_to_an_expired_scout_ask_keeps_the_plain_not_found():
     bodies = Bodies()
     bodies.notify = lambda m, p: None
     session = make_session(Reactive(["hi"]), Open(), bodies, 10, Memory(":memory:"))
-    item = session.items.open("ask", "brain")
+    item = session.items.open("ask")
     session.items.expire(item.id, "deadline")
     with pytest.raises(RpcError, match="no open ask"):
         session.answer(item.id, "allow", "desktop")

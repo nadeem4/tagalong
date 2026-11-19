@@ -351,6 +351,18 @@ class ToolParams(Model):
 
 # always is offered only for tools the user has not locked; the brain decides when.
 CONFIRM_OPTIONS = (["allow", "deny"], ["allow", "always", "deny"])
+TASK_OPTIONS = ["not_now", "stop_task"]  # a card that belongs to a task adds these last
+
+
+def _confirm_options(options: list[str]) -> bool:
+    return options in CONFIRM_OPTIONS or (
+        options[-2:] == TASK_OPTIONS and options[:-2] in CONFIRM_OPTIONS
+    )
+
+
+class AskTask(Model):
+    id: Id
+    title: str | None = None
 
 
 class AskOpen(Model):
@@ -365,6 +377,10 @@ class AskOpen(Model):
     input: Input | None = None
     free_text: bool | None = None
     recommended: str | None = None
+    task: AskTask | None = None
+    check_back_at: str | None = None
+    check_back_by: Literal["scout", "person"] | None = None
+    urgent: bool | None = None
 
     @model_validator(mode="after")
     def _recommended_offered(self) -> "AskOpen":
@@ -375,11 +391,12 @@ class AskOpen(Model):
     @model_validator(mode="after")
     def _confirm_shape(self) -> "AskOpen":
         if self.confirm and (
-            self.tool is None or self.input is None or self.options not in CONFIRM_OPTIONS
+            self.tool is None or self.input is None or not _confirm_options(self.options)
         ):
             raise ValueError(
                 "a confirm ask needs tool, input and options "
-                '["allow","deny"] or ["allow","always","deny"]'
+                '["allow","deny"] or ["allow","always","deny"], then "not_now" and '
+                '"stop_task" on a task card'
             )
         return self
 

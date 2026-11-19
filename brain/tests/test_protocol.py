@@ -405,6 +405,29 @@ def test_answer_carries_an_optional_kept_apps_list():
         answer.model_validate({"ask": "a1", "option": "Plan", "apps": "lin"})
 
 
+def test_ask_open_carries_task_and_check_back():
+    params = {
+        "seq": 1,
+        "id": "a",
+        "state": "open",
+        "text": "t",
+        "options": ["allow", "deny", "not_now", "stop_task"],
+        "confirm": True,
+        "tool": "x",
+        "input": {},
+        "task": {"id": "k1"},
+        "check_back_at": "2026-11-16T15:30:00+00:00",
+        "check_back_by": "person",
+        "urgent": True,
+    }
+    ask = AskOpen.model_validate(params)
+    assert (ask.task.id, ask.check_back_by, ask.urgent) == ("k1", "person", True)
+    with pytest.raises(ValidationError):
+        AskOpen.model_validate({**params, "options": ["allow", "deny", "stop_task", "not_now"]})
+    with pytest.raises(ValidationError):
+        AskOpen.model_validate({**params, "check_back_by": "robot"})
+
+
 def test_ask_open_accepts_free_text_and_recommended():
     params = {"seq": 1, "id": "a", "state": "open", "text": "t", "options": ["x", "y"]}
     ask = AskOpen.model_validate({**params, "free_text": True, "recommended": "y"})

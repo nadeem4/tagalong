@@ -35,6 +35,8 @@ SUMMARY_MAX = 200
 
 # A Scout ask waits for the person: Scout may name how long, but never outside these bounds.
 ASK_WAIT_ARG = "ask_wait_hours"
+CHECK_BACK_ARG = "check_back_minutes"  # when Scout wants the card looked at again
+URGENT_ARG = "urgent"  # the card may reach the person in quiet hours
 ASK_WAIT_DEFAULT = timedelta(days=3)
 ASK_WAIT_MIN = timedelta(hours=1)
 ASK_WAIT_MAX = timedelta(days=7)
@@ -50,6 +52,26 @@ def ask_wait(value: object) -> timedelta:
     if value <= ASK_WAIT_MIN / timedelta(hours=1):
         return ASK_WAIT_MIN
     return timedelta(hours=value)
+
+
+@dataclass(frozen=True)
+class Hold:
+    """How a Scout ask waits: for how long, when to look at it again, and how loudly."""
+
+    wait: timedelta
+    check_back: timedelta | None = None
+    urgent: bool = False
+
+
+def hold_from(args: dict) -> Hold:
+    """The model's three optional arguments, clamped; a bad one is left out."""
+    minutes = args.get(CHECK_BACK_ARG)
+    ok = isinstance(minutes, int | float) and not isinstance(minutes, bool) and minutes > 0
+    return Hold(
+        ask_wait(args.get(ASK_WAIT_ARG)),
+        timedelta(minutes=min(minutes, ASK_WAIT_MAX / timedelta(minutes=1))) if ok else None,
+        args.get(URGENT_ARG) is True,
+    )
 
 
 class Tier(StrEnum):

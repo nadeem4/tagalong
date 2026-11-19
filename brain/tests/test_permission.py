@@ -564,6 +564,20 @@ def test_ask_wait_default_and_bounds():
     assert (ASK_WAIT_MIN, ASK_WAIT_MAX) == (timedelta(hours=1), timedelta(days=7))
 
 
+def test_hold_reads_check_back_and_urgent_and_drops_bad_ones():
+    from brain.permission import hold_from
+
+    hold = hold_from({"check_back_minutes": 10, "urgent": True, "ask_wait_hours": 2})
+    assert (hold.wait, hold.check_back, hold.urgent) == (
+        timedelta(hours=2),
+        timedelta(minutes=10),
+        True,
+    )
+    bad = hold_from({"check_back_minutes": "soon", "urgent": "yes"})
+    assert (bad.wait, bad.check_back, bad.urgent) == (ASK_WAIT_DEFAULT, None, False)
+    assert hold_from({"check_back_minutes": 10**9}).check_back == ASK_WAIT_MAX
+
+
 async def test_an_expired_ask_logs_its_reason(mem):
     rig = Rig(mem, [Fake("person", Refusal("expired", "no answer"))])
     d = await rig.engine.decide(req())

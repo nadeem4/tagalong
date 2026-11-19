@@ -53,8 +53,8 @@ class Asks:
         self._bodies = bodies
         self._work = work
         self._open: dict[str, _Open] = {}
-        # Told (ask id, option, body id) when a card without a waiter is answered.
-        self.on_item_answer: Callable[[str, str, str], None] = lambda *_: None
+        # Told (ask id, option, body id, check_back_at) when a card without a waiter is answered.
+        self.on_item_answer: Callable[..., None] = lambda *_: None
         work.on_transition(self._row_ended)
 
     def anyone_online(self) -> bool:
@@ -76,12 +76,28 @@ class Asks:
         entry = _Open(params, asyncio.get_running_loop().create_future())
         return (await self._wait(entry, None, parent_id)).option or "deny"
 
-    def show(self, ask_id: str, call: Call, spec_name: str, locked: bool) -> None:
+    def show(
+        self, ask_id: str, call: Call, spec_name: str, locked: bool, task: dict | None = None
+    ) -> None:
         """Put Scout's permission card on screen with nothing waiting on it. It belongs to no
-        turn, so ending a turn never touches it; its answer goes to `on_item_answer`."""
-        entry = _Open(self._card(call, spec_name, locked, ask_id), None)
-        self._publish(entry)
+        turn, so ending a turn never touches it; its answer goes to `on_item_answer`. A card of a
+        task (`task`: its id and title, with the check-back and urgent fields) adds Not now and
+        Stop task after its own options."""
+        params = self._card(call, spec_name, locked, ask_id)
+        if task and task.get("task"):
+            params["options"] = [*params["options"], "not_now", "stop_task"]
+            # Optional fields are left out, never null, on the wire.
+            params.update({k: v for k, v in task.items() if v is not None})
+            params["task"] = {k: v for k, v in task["task"].items() if v is not None}
+        self._publish(_Open(params, None))
         ask_event("opened", ask_id, "brain", spec_name)
+
+    def reschedule(self, ask_id: str, check_back_at: str, check_back_by: str) -> None:
+        """Not now: the card stays open and every body is shown when it will be looked at again."""
+        entry = self._open.get(ask_id)
+        if entry is not None:
+            entry.params.update(check_back_at=check_back_at, check_back_by=check_back_by)
+            self._bodies.notify("ask", entry.params)
 
     @staticmethod
     def _card(call: Call, spec_name: str, locked: bool, ask_id: str) -> dict:
@@ -183,6 +199,7 @@ class Asks:
         body_id: str,
         text: str | None = None,
         apps: Iterable[str] | None = None,
+        check_back_at: str | None = None,
     ) -> None:
         entry = self._open.get(ask_id)
         # A done future means the wait was cancelled or timed out and is about to close.
@@ -190,6 +207,10 @@ class Asks:
             raise RpcError(ErrorCode.not_found, f"no open ask {ask_id}")
         if option not in entry.params["options"] and not (entry.free_text and text):
             raise RpcError(ErrorCode.invalid_params, f"{option} is not offered by this ask")
+        if option == "not_now" and entry.future is None:
+            ask_event("answered", ask_id, body_id, option)
+            self.on_item_answer(ask_id, option, body_id, check_back_at)
+            return  # the card stays up; the open item moves its check-back and calls reschedule
         del self._open[ask_id]
         if entry.future is not None:
             entry.future.set_result(Answer(option, text, None if apps is None else tuple(apps)))
@@ -197,7 +218,7 @@ class Asks:
         self._bodies.notify("ask", {**closed, "option": option, "by": body_id})
         ask_event("answered", ask_id, body_id, option)
         if entry.future is None:
-            self.on_item_answer(ask_id, option, body_id)
+            self.on_item_answer(ask_id, option, body_id, None)
         else:
             self._end_row(ask_id, "done", "answered", {"option": option})
 
