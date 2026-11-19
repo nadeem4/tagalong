@@ -4,8 +4,10 @@ A tool call that needs the person's yes opens an `ask` open item holding the cal
 on screen; the turn is told the ask is open and goes on. The answer, whenever it comes (even
 after the turn ended or the brain restarted), runs the saved call through the same gate: the
 floor and the person's answer, then the tool, and wakes Scout with the facts. A card of a task
-also offers Not now (look again later) and Stop task. It ends an ask at its deadline, wakes Scout
-when its check-back comes, and on a body's return shows cards again and tells Scout which wait.
+also offers Not now (look again later) and Stop task. A card Home's setup page opens (`home`)
+runs as a Home press and tells Scout nothing: the install's own news does. It ends an ask at its
+deadline, wakes Scout when its check-back comes, and on a body's return shows cards again and
+tells Scout which wait.
 """
 
 import asyncio
@@ -13,6 +15,7 @@ import json
 import logging
 from collections.abc import Callable
 from dataclasses import replace
+from contextlib import nullcontext
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
@@ -23,6 +26,7 @@ from brain.mind.turn import Call
 from brain.open_items import DEADLINE_S, OpenItem, OpenItemRefused, OpenItems, at_time
 from brain.permission import NEW_TASK_ARG, AskRequest, PersonAnswer, Tier, summarise
 from brain.protocol import RpcError
+from brain.setup.flights import from_home
 from brain.store.work import TransitionRefused
 from brain.tasks import Tasks
 
@@ -89,6 +93,7 @@ class AskRunner:
         *,
         check_back: timedelta | None = None,
         urgent: bool = False,
+        home: bool = False,
     ) -> OpenItem:
         """Save the call as an open item and put its card on screen. The same call again is the
         item already open, with no second card; Scout's new check-back moves the old one, unless
@@ -100,6 +105,7 @@ class AskRunner:
             **saved,
             "source": req.source,
             "masked": saved != raw,
+            **({"home": True} if home else {}),
         }
         at = None if check_back is None else self._now() + check_back
         item = self.find(call.name, call.input)
@@ -243,7 +249,8 @@ class AskRunner:
         if not decision.allowed:
             return self._end(item, "refused", decision.reason or "turned off")
         try:
-            out = await toolbox.carry_out(call)
+            with from_home() if (item.saved_call or {}).get("home") else nullcontext():
+                out = await toolbox.carry_out(call)
         except RpcError as err:
             return self._end(item, "failed", err.message)
         except Exception:
@@ -268,7 +275,10 @@ class AskRunner:
             facts["reason"] = reason
         if outcome == "approved":
             facts["result"] = result
-        self._emit(Event("ask_ended", "scout", facts, caused_by=item.caused_by, task=item.task_id))
+        if not (item.saved_call or {}).get("home"):
+            self._emit(
+                Event("ask_ended", "scout", facts, caused_by=item.caused_by, task=item.task_id)
+            )
 
     # ---- deadline and restart ----
 
@@ -328,6 +338,8 @@ class AskRunner:
         summary = summarise(call.text, call.name, call.input)
         self._record_ask(item, "expired", "none", "no answer")
         self._drop_new_task(item, "no answer")
+        if (item.saved_call or {}).get("home"):
+            return
         facts: dict[str, str | int] = {
             "ask": item.id,
             "tool": call.name,

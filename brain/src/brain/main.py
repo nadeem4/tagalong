@@ -300,7 +300,7 @@ async def _run() -> None:
             inspect_machine,
             lambda: all_experts(experts, config.expert_cmd),
             lambda: home_app_rows(memory.list_apps(), lambda i: apps.status(i).state),
-            lambda **kw: session.asks.open(**kw),
+            lambda tool, args: session.open_card(tool, args),
             lambda **kw: session.approvals.record(**kw),
             expert_tools + app_tools + login,
             progress,

@@ -32,6 +32,7 @@ from brain.protocol import ErrorCode, RpcError
 from brain.store import rules
 from brain.store.work import WorkStore
 from brain.tasks import Tasks
+from brain.setup.flights import not_for_home
 from brain.toolbox import Toolbox, ToolSpec
 
 NOW = datetime(2026, 11, 11, 9, 0, 0, tzinfo=UTC)
@@ -784,3 +785,42 @@ async def test_the_saved_cause_survives_a_restart():
     await again.settle()
     ended = [e for e in again.events if e.kind == "ask_ended"]
     assert ended and ended[0].caused_by == "evt-ask-turn"
+
+
+async def _home_card(rig, n=1):
+    home = Call(id=f"h{n}", name="t", input={"n": n}, turn="", text="")
+    spec, kind = rig.box.spec_named("t")
+    req = await rig.box.ask_request(home, spec, kind, job_id=None, ask_id=f"x{n}")
+    return rig.runner.open(home, req, timedelta(hours=1), home=True)
+
+
+async def test_a_home_card_runs_as_a_press_and_does_not_wake_scout():
+    # Home's setup card: the answer runs the saved call as a Home press (it opens no task), and
+    # the install's own news tells the story, so Scout is not woken for it.
+    rig = Rig()
+    pressed: list[str | None] = []
+    claim = not_for_home(lambda given, title: "task")
+
+    async def run(call, tool):
+        pressed.append(claim(None, "install"))
+        return "ran"
+
+    rig.source.run = run
+    item = await _home_card(rig)
+    assert rig.asks.is_open(item.id)
+    rig.asks.answer(item.id, "allow", "desktop")
+    await rig.settle()
+    assert pressed == [None] and rig.items.get(item.id).state == "done"
+    assert rig.events == []
+
+
+async def test_a_home_card_that_is_denied_or_lapses_tells_scout_nothing():
+    rig = Rig()
+    denied = await _home_card(rig)
+    rig.asks.answer(denied.id, "deny", "desktop")
+    await rig.settle()
+    assert rig.items.get(denied.id).state == "done" and rig.events == []
+    lapsed = await _home_card(rig, 2)
+    rig.clock[0] = NOW + timedelta(hours=2)
+    rig.runner.fire_due()
+    assert rig.items.get(lapsed.id).state == "expired" and rig.events == []

@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-from brain.asks import ASK_TIMEOUT_S, Answer
 from brain.events import Event
 from brain.permission import Tier
 from brain.protocol import ErrorCode, RpcError
@@ -70,13 +69,12 @@ class Rig:
         installed=(),
         apps=(),
         offline=False,
-        answer="allow",
         card=None,
         mcp=None,
         why=None,
         acp=None,
         fail_on=None,
-    ):  # answer None: nobody online
+    ):
         async def get(url: str) -> bytes:
             self.urls.append(url)
             if offline or (fail_on and fail_on in url):
@@ -85,13 +83,13 @@ class Rig:
 
         self.urls: list[str] = []
         self.progress = SetupProgress(lambda event: None)
-        self.asked: list[dict] = []
+        self.asked: list[tuple[str, dict]] = []
         self.recorded: list[dict] = []
         self.ran: list[tuple[str, dict]] = []
 
-        async def ask(**kw):
-            self.asked.append(kw)
-            return Answer(answer)
+        async def open_card(tool, args):
+            self.asked.append((tool, args))
+            return f"card{len(self.asked)}"
 
         async def inspect():
             return Machine("windows", "x64", None, None, None, None, None)
@@ -111,7 +109,7 @@ class Rig:
             inspect,
             lambda: list(installed),
             lambda: list(apps),
-            ask,
+            open_card,
             lambda **kw: self.recorded.append(kw),
             [inner("install_expert"), inner("login_expert"), inner("install_app")],
             self.progress,
@@ -170,25 +168,18 @@ async def test_overview_works_offline_with_no_cache_as_stale(tmp_path):
     assert out["experts"][0]["state"] == "ready"
 
 
-async def test_approved_false_opens_the_card_with_empty_text_and_facts(tmp_path):
+async def test_approved_false_opens_the_card_and_returns_at_once(tmp_path):
     rig = Rig(tmp_path)
     out = await rig.call("setup_expert", {"id": "claude-acp", "approved": False})
-    (asked,) = rig.asked
-    assert asked["text"] == "" and asked["tool"] == "install_expert"
-    assert asked["input"] == {"id": "claude-acp", "node_download": "22.1"}
-    assert out == {"started": "claude-acp"}
+    # Nothing waits: the card's answer runs the install later, by event.
+    assert out == {"card": "card1"}
+    assert rig.asked == [("install_expert", {"id": "claude-acp"})] and rig.ran == []
 
 
 async def test_approved_true_skips_the_card(tmp_path):
     rig = Rig(tmp_path)
     await rig.call("setup_expert", {"id": "claude-acp", "approved": True})
     assert rig.asked == [] and rig.ran == [("install_expert", {"id": "claude-acp"})]
-
-
-async def test_deny_leaves_nothing_installed(tmp_path):
-    rig = Rig(tmp_path, answer="deny")
-    out = await rig.call("setup_expert", {"id": "claude-acp", "approved": False})
-    assert out["error"] == "denied" and rig.ran == []
 
 
 async def test_an_installed_expert_that_needs_login_logs_in(tmp_path):
@@ -205,9 +196,9 @@ async def test_a_ready_expert_is_left_alone(tmp_path):
 
 async def test_setup_app_asks_with_install_app_and_runs_it(tmp_path):
     rig = Rig(tmp_path)
-    await rig.call("setup_app", {"id": "acme/cloud", "approved": False})
-    assert rig.asked[0]["tool"] == "install_app"
-    assert rig.ran == [("install_app", {"id": "acme/cloud"})]
+    out = await rig.call("setup_app", {"id": "acme/cloud", "approved": False})
+    assert out == {"card": "card1"} and rig.asked == [("install_app", {"id": "acme/cloud"})]
+    assert rig.ran == []
 
 
 async def test_a_card_failure_is_a_tool_error_and_nothing_runs(tmp_path):
@@ -268,41 +259,10 @@ async def test_a_failed_install_is_reported_until_the_next_try(tmp_path):
     assert (await rig.call("setup_overview"))["failed"] is None
 
 
-async def test_the_card_waits_as_long_as_the_gates_ask(tmp_path):
-    rig = Rig(tmp_path)
-    await rig.call("setup_expert", {"id": "claude-acp", "approved": False})
-    assert rig.asked[0]["timeout"] == ASK_TIMEOUT_S
-
-
 async def test_setup_app_opens_the_card_even_when_approved_is_sent(tmp_path):
     rig = Rig(tmp_path)
     await rig.call("setup_app", {"id": "acme/cloud", "approved": True})
-    assert len(rig.asked) == 1 and rig.ran == [("install_app", {"id": "acme/cloud"})]
-
-
-async def test_an_answered_card_is_recorded_like_the_gate_does(tmp_path):
-    rig = Rig(tmp_path)
-    await rig.call("setup_expert", {"id": "claude-acp", "approved": False})
-    (row,) = rig.recorded
-    assert (row["tool"], row["outcome"], row["source"]) == (
-        "install_expert",
-        "approved",
-        "scout_tool",
-    )
-    assert row["group_key"] == "install_expert" and row["input"]["id"] == "claude-acp"
-
-
-async def test_a_denied_card_is_recorded_as_refused(tmp_path):
-    rig = Rig(tmp_path, answer="deny")
-    await rig.call("setup_expert", {"id": "claude-acp", "approved": False})
-    assert [r["outcome"] for r in rig.recorded] == ["refused"]
-
-
-async def test_a_card_nobody_answered_is_recorded_as_no_one(tmp_path):
-    rig = Rig(tmp_path, answer=None)
-    out = await rig.call("setup_expert", {"id": "claude-acp", "approved": False})
-    assert out["error"] == "denied"
-    assert [r["outcome"] for r in rig.recorded] == ["no_one"]
+    assert rig.asked == [("install_app", {"id": "acme/cloud"})] and rig.ran == []
 
 
 async def test_the_tours_own_press_records_nothing(tmp_path):
@@ -314,30 +274,6 @@ async def test_the_tours_own_press_records_nothing(tmp_path):
 async def test_browse_apps_skips_apps_already_added(tmp_path):
     rig = Rig(tmp_path, apps=[{"id": "a1", "name": "cloud", "state": "ready"}])
     assert (await rig.call("setup_overview"))["browse_apps"] == []
-
-
-async def test_a_card_that_times_out_is_recorded_and_raised(tmp_path):
-    rig = Rig(tmp_path)
-
-    async def slow(**kw):
-        raise RpcError(ErrorCode.timeout, "nobody answered the ask in time")
-
-    # swap the stub ask for one that times out
-    tools = home_setup_tools(
-        Registry(tmp_path, lambda url: None),
-        lambda: None,
-        lambda: [],
-        lambda: [],
-        slow,
-        lambda **kw: rig.recorded.append(kw),
-        [(ToolSpec("install_expert", "d", {}, effect="change"), lambda a: None)],
-        rig.progress,
-        FakeWhy(),
-    )
-    handler = {spec.name: h for spec, h in tools}["setup_expert"]
-    with pytest.raises(RpcError):
-        await handler({"id": "x", "approved": False})
-    assert [r["outcome"] for r in rig.recorded] == ["timed_out"]
 
 
 async def official_card(args):
@@ -357,14 +293,7 @@ async def test_home_official_connect_skips_the_card(tmp_path):
 async def test_home_community_connect_without_confirm_still_asks(tmp_path):
     rig = Rig(tmp_path, card=community_card)
     await rig.call("setup_app", {"id": "io.github.bob/x", "approved": True})
-    assert len(rig.asked) == 1 and rig.asked[0]["input"]["community"] is True
-    assert rig.ran == [("install_app", {"id": "io.github.bob/x"})]  # the answer was allow
-
-
-async def test_home_community_denied_check_card_installs_nothing(tmp_path):
-    rig = Rig(tmp_path, card=community_card, answer="deny")
-    out = await rig.call("setup_app", {"id": "io.github.bob/x", "approved": True})
-    assert out["error"] == "denied" and rig.ran == []
+    assert rig.asked == [("install_app", {"id": "io.github.bob/x"})] and rig.ran == []
 
 
 async def test_home_community_connect_anyway_installs_without_second_card(tmp_path):
@@ -602,15 +531,15 @@ async def test_a_home_install_opens_no_task_but_scouts_does(tmp_path):
     async def inspect():
         return Machine("windows", "x64", None, None, None, None, None)
 
-    async def ask(**kw):
-        return Answer("allow")
+    async def open_card(tool, args):
+        return "card1"
 
     tools = home_setup_tools(
         Registry(tmp_path, lambda url: None),
         inspect,
         lambda: [],
         lambda: [],
-        ask,
+        open_card,
         lambda **kw: None,
         [(ToolSpec("install_expert", "d", {}, effect="change", card=None), run)],
         SetupProgress(lambda event: None),

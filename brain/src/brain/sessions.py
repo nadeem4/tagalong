@@ -81,7 +81,14 @@ from brain.offers import Offers, OfferSettings
 from brain.open_item_runner import AskRunner
 from brain.open_items import OpenItems
 from brain.outputs import OutputStore
-from brain.permission import Engine, Person, SideCheckDecider, StandingRule, stored_auto_rules
+from brain.permission import (
+    ASK_WAIT_MIN,
+    Engine,
+    Person,
+    SideCheckDecider,
+    StandingRule,
+    stored_auto_rules,
+)
 from brain.presence import Presence
 from brain.protocol import (
     BODY_DESKTOP,
@@ -630,6 +637,16 @@ class Session:
             else None
         )
         return None if row is None else row.task
+
+    async def open_card(self, tool: str, args: dict) -> str:
+        """Home's setup card for `tool`: put it up and return its id. The person's answer, whenever
+        it comes, runs the install through the same gate as Scout's, as a Home press."""
+        spec, kind = self.toolbox.spec_named(tool) or (None, "")
+        if spec is None:
+            raise RpcError(ErrorCode.unknown_tool, f"No tool named {tool}.")
+        call = Call(id=f"home:{uuid.uuid4().hex}", name=tool, input=args, turn="", text="")
+        req = await self.toolbox.ask_request(call, spec, kind, job_id=None, ask_id=call.id)
+        return self.ask_runner.open(call, req, ASK_WAIT_MIN, home=True).id
 
     def _card_answered(self, ask_id: str, option: str, body_id: str) -> None:
         """Every card answer is saved as a `card_answer` event that code handles, so it starts no
