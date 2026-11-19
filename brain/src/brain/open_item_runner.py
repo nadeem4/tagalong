@@ -13,14 +13,14 @@ import json
 import logging
 from collections.abc import Callable
 from dataclasses import replace
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from brain.approvals import Approvals
 from brain.asks import Asks
 from brain.events import Event
 from brain.mind.turn import Call
-from brain.open_items import DEADLINE_S, OpenItem, OpenItemRefused, OpenItems
+from brain.open_items import DEADLINE_S, OpenItem, OpenItemRefused, OpenItems, at_time
 from brain.permission import NEW_TASK_ARG, AskRequest, PersonAnswer, Tier, summarise
 from brain.protocol import RpcError
 from brain.store.work import TransitionRefused
@@ -50,18 +50,6 @@ def _call(item: OpenItem) -> Call:
     )
 
 
-def _time(at: "datetime | str | None") -> datetime | None:
-    """A body's ISO time (or a datetime) as an aware datetime; None when absent or unreadable."""
-    if isinstance(at, str):
-        try:
-            at = datetime.fromisoformat(at)
-        except ValueError:
-            return None
-    if at is not None and at.tzinfo is None:
-        at = at.replace(tzinfo=UTC)
-    return at
-
-
 class AskRunner:
     def __init__(
         self,
@@ -74,7 +62,10 @@ class AskRunner:
         tasks: Tasks,
         task: Callable[[str], str | None] = lambda turn: None,
         cause: Callable[[str], str | None] = lambda turn: None,
+        close_cards: Callable[[list[str]], None] | None = None,
     ) -> None:
+        # Stop the task closes the task's other cards; `Holds.close` also releases a held expert's.
+        self._close_cards = close_cards or self._close_on_bodies
         self._cause = cause  # turn id -> the event that turn took, None outside it: the ask's cause
         self._task = task  # turn id -> the task the turn works on: the card belongs to it
         self._tasks_of = tasks
@@ -135,7 +126,7 @@ class AskRunner:
             self._raw[item.id] = call
         self._asks.show(
             item.id, replace(call, input=req.input), req.tool, req.tier is not Tier.ask,
-            self._card_task(item),
+            self._tasks_of.card_fields(item),
         )  # fmt: skip
         self.changed()
         return item
@@ -150,18 +141,6 @@ class AskRunner:
             if c.get("name") == saved["name"] and _bare(c.get("input") or {}) == want:
                 return item
         return None
-
-    def _card_task(self, item: OpenItem) -> dict | None:
-        """The fields a task's card carries: the task, and when it will be looked at again."""
-        row = None if item.task_id is None else self._tasks_of.get(item.task_id)
-        if row is None or row.kind == "ask":
-            return None  # the person never sees an Ask task: its card is a plain card
-        return {
-            "task": {"id": row.id, "title": row.title},
-            "check_back_at": item.check_back_at.isoformat() if item.check_back_at else None,
-            "check_back_by": item.check_back_by,
-            "urgent": item.urgent,
-        }
 
     def _reschedule(self, item: OpenItem) -> None:
         if item.check_back_at is not None and item.check_back_by is not None:
@@ -190,7 +169,7 @@ class AskRunner:
         session, so it starts no turn): the saved call runs, whatever became of the turn. Not now
         only moves the check-back; Stop task ends the task."""
         if option == "not_now":
-            self._not_now(ask_id, _time(check_back_at), body_id)
+            self._not_now(ask_id, at_time(check_back_at), body_id)
         else:
             self._spawn(self._answer(ask_id, option, body_id))
 
@@ -231,8 +210,12 @@ class AskRunner:
             self._end(item, "refused", "the person stopped the task, but it was already over")
         for other in closed:
             self._raw.pop(other, None)
-            self._asks.card_closed(other)
+        self._close_cards(closed)
         self.changed()
+
+    def _close_on_bodies(self, ids: list[str]) -> None:
+        for one in ids:
+            self._asks.card_closed(one)
 
     async def _carry_out(self, item: OpenItem, option: str) -> None:
         call = _call(item)

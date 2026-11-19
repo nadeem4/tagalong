@@ -13,7 +13,7 @@ for every body. How the person's choice counts (approved, refused) is written by
 
 import asyncio
 import uuid
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from brain.bodies import Bodies
@@ -67,22 +67,6 @@ class Asks:
     def anyone_online(self) -> bool:
         return bool(self._bodies.display_ids())  # a body that shows nothing cannot be asked
 
-    async def permission(
-        self,
-        call: Call,
-        spec_name: str,
-        locked: bool,
-        *,
-        ask_id: str | None = None,
-        parent_id: str | None = None,
-    ) -> str:
-        params = self._card(call, spec_name, locked, ask_id or uuid.uuid4().hex)
-        # An expert's call belongs to no turn of Scout's.
-        if call.turn:
-            params["turn"] = call.turn
-        entry = _Open(params, asyncio.get_running_loop().create_future())
-        return (await self._wait(entry, None, parent_id)).option or "deny"
-
     def show(
         self, ask_id: str, call: Call, spec_name: str, locked: bool, task: dict | None = None
     ) -> None:
@@ -91,13 +75,17 @@ class Asks:
         task (`task`: its id and title, with the check-back and urgent fields) adds Not now and
         Stop task after its own options."""
         params = self._card(call, spec_name, locked, ask_id)
+        self._with_task(params, task)
+        ask_event("opened", ask_id, "brain", spec_name)
+        self._publish(_Open(params, None, kind="ask"))
+
+    @staticmethod
+    def _with_task(params: dict, task: dict | None) -> None:
         if task and task.get("task"):
             params["options"] = [*params["options"], "not_now", "stop_task"]
             # Optional fields are left out, never null, on the wire.
             params.update({k: v for k, v in task.items() if v is not None})
             params["task"] = {k: v for k, v in task["task"].items() if v is not None}
-        self._publish(_Open(params, None, kind="ask"))
-        ask_event("opened", ask_id, "brain", spec_name)
 
     def register(self, kind: str, handler: Handler) -> None:
         """The code that takes the answer of every card of this kind."""
@@ -114,9 +102,11 @@ class Asks:
         input: dict | None = None,
         free_text: bool = False,
         recommended: str | None = None,
+        confirm: bool = False,
+        task: dict | None = None,
     ) -> None:
         """Put a card on screen and return: its open item takes the answer, whenever it comes, by
-        the handler of its kind. Nothing waits here."""
+        the handler of its kind. Nothing waits here. `task` is a task card's fields (see `show`)."""
         if recommended is not None and recommended not in options:
             raise ValueError("recommended must be one of the options")
         params: dict = {"id": ask_id, "state": "open", "text": text, "options": options}
@@ -129,6 +119,9 @@ class Asks:
             params["tool"] = tool
         if input is not None:
             params["input"] = input
+        if confirm:
+            params["confirm"] = True  # the fixed allow, always, deny card of a tool call
+        self._with_task(params, task)
         self._publish(_Open(params, None, free_text, kind))
         ask_event("opened", ask_id, "brain", tool or kind)
 
@@ -163,7 +156,6 @@ class Asks:
         ask_id: str | None = None,
         recommended: str | None = None,
         parent_id: str | None = None,
-        stay_open: bool = False,
     ) -> Answer:
         # No turn and no confirm: a job's ask can outlive turns, and confirm asks only
         # allow the fixed allow/always/deny sets. Waits until closed unless timeout is given.
@@ -171,9 +163,8 @@ class Asks:
             raise ValueError(f"ask {ask_id} is already open")
         if recommended is not None and recommended not in options:
             raise ValueError("recommended must be one of the options")
-        # A question or card is told to the person later by other means; a job's permission
-        # ask says `stay_open` and waits for somebody to come back.
-        if not stay_open and not self.anyone_online():
+        # A question or card is told to the person later by other means.
+        if not self.anyone_online():
             return Answer(None)
         params: dict = {"id": ask_id or uuid.uuid4().hex, "state": "open", "text": text}
         params["options"] = options
@@ -220,18 +211,6 @@ class Asks:
         if shown:
             ask_event("shown", ask_id, ",".join(shown))
 
-    def cancel_all(self, ask_ids: Iterable[str]) -> None:
-        """Close the named open asks as cancelled; their waiters get a cancelled error."""
-        for ask_id in ask_ids:
-            entry = self._open.get(ask_id)
-            # A done future means its waiter was cancelled or timed out; it closes the ask itself.
-            if entry is not None and entry.future is not None and not entry.future.done():
-                del self._open[ask_id]
-                ask_event("closed", ask_id, "brain", "cancelled")
-                entry.future.set_exception(RpcError(ErrorCode.cancelled, "the ask was cancelled"))
-                self._bodies.notify("ask", {"id": ask_id, "state": "closed", "reason": "cancelled"})
-                self._end_row(ask_id, "expired", "ask cancelled")
-
     def answer(
         self,
         ask_id: str,
@@ -269,6 +248,12 @@ class Asks:
         if self._open.pop(ask_id, None) is not None:
             ask_event("closed", ask_id, "brain", reason)
             self._bodies.notify("ask", {"id": ask_id, "state": "closed", "reason": "timeout"})
+
+    def cancel(self, ask_id: str) -> None:
+        """The wait behind a card was cancelled: close the card for every body."""
+        if self._open.pop(ask_id, None) is not None:
+            ask_event("closed", ask_id, "brain", "cancelled")
+            self._bodies.notify("ask", {"id": ask_id, "state": "closed", "reason": "cancelled"})
 
     def close_answered(self, ask_id: str, by: str) -> None:
         """Close a card that has no waiter because something other than a body answered it (Scout's
@@ -309,7 +294,9 @@ class Asks:
 
     def _row_ended(self, work_id: str, kind: str, to: str) -> None:
         """The row ended from outside (its job closed, or a restart scan): the waiter is done."""
-        entry = self._open.pop(work_id, None) if kind == "ask" else None
+        entry = self._open.get(work_id) if kind == "ask" else None
+        if entry is not None and entry.future is not None:  # a card's owner closes it itself
+            del self._open[work_id]
         if entry is not None and entry.future is not None and not entry.future.done():
             row = self._work.get(work_id)
             why = (row.end_reason if row is not None and row.end_reason else to).removeprefix(

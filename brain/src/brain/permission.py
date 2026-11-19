@@ -22,8 +22,8 @@ from brain.store.rules import Preference
 
 if TYPE_CHECKING:
     from brain.approvals import Approvals
-    from brain.asks import Answer, Asks
     from brain.experts import PermissionOption
+    from brain.holds import Holds, Reply
     from brain.mind.turn import Call
     from brain.offers import Offers
     from brain.side_check import SideCheck
@@ -134,10 +134,6 @@ def resolve_mode(spec: "ToolSpec", stored: str | None) -> Literal["off", "ask", 
 class PersonAnswer:
     choice: Literal["allow", "always", "deny"]
     option_id: str | None = None
-
-
-class NoOneThere(Exception):
-    """Raised by an asker when a turn-bound card finds nobody displaying to ask."""
 
 
 class AskOpen(Exception):
@@ -261,8 +257,6 @@ class Person:
             return None
         try:
             answer = await req.how_to_ask()
-        except NoOneThere:
-            return Refusal("no_one", "nobody online")
         except AskExpired as err:
             return Refusal("expired", err.reason)
         except RpcError as err:
@@ -278,7 +272,7 @@ class Person:
 
 
 def tool_asker(
-    asks: "Asks",
+    holds: "Holds",
     call: "Call",
     tool: str,
     tier: Tier,
@@ -288,14 +282,14 @@ def tool_asker(
     async def ask() -> PersonAnswer:
         # Only a plain `ask` tier offers "always"; every stricter tier is asked every time.
         locked = tier is not Tier.ask
-        choice = await asks.permission(call, tool, locked, ask_id=ask_id, parent_id=parent_id)
+        choice = await holds.permission(call, tool, locked, ask_id=ask_id, parent_id=parent_id)
         return PersonAnswer(choice)  # type: ignore[arg-type]
 
     return ask
 
 
 def expert_asker(
-    open_ask: "Callable[..., Awaitable[Answer]]",
+    ask: "Callable[..., Awaitable[Reply]]",
     tool: str,
     input: dict,
     options: "Sequence[PermissionOption]",
@@ -304,16 +298,14 @@ def expert_asker(
     """The expert's own option names go on the card; the pick maps back to its option id here."""
     by_name = {o.name: o for o in options}
 
-    async def ask() -> PersonAnswer:
-        answer = await open_ask(
+    async def person() -> PersonAnswer:
+        answer = await ask(
             ask_id=ask_id, text="", tool=tool, input=input, options=[o.name for o in options]
         )
-        if answer.option is None:
-            raise NoOneThere
         picked = by_name[answer.option]  # Asks.answer only takes an offered option
         return PersonAnswer("allow" if picked.kind.startswith("allow") else "deny", picked.id)
 
-    return ask
+    return person
 
 
 # --- the engine ---------------------------------------------------------------

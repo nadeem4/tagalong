@@ -18,11 +18,11 @@ from functools import partial
 from pathlib import Path
 from typing import Literal
 
-from brain.asks import Answer, Asks
 from brain.config import DEFAULT_JOB_STEPS_MAX_BYTES, DEFAULT_JOB_STEPS_MAX_ENTRIES
 from brain.events import Event
 from brain.experts import ExpertHosts, ExpertRun, PermissionRequest, Question, QuietFacts
 from brain.guards import Guards
+from brain.holds import Holds
 from brain.job_activity import PAGE_LIMIT, JobActivity, _clip, activity_line, activity_summary
 from brain.job_records import Job, JobPart, JobRecords, home_state
 from brain.masking import mask_json
@@ -31,7 +31,6 @@ from brain.outputs import OutputStore, preview
 from brain.permission import (
     AskRequest,
     Engine,
-    NoOneThere,
     Tier,
     expert_asker,
     summarise,
@@ -104,7 +103,7 @@ class Jobs:
     def __init__(
         self,
         records: JobRecords,
-        asks: Asks,
+        holds: Holds,
         notify: Callable[[str, dict], None],
         experts: Callable[[], list[InstalledExpert]],
         make_run: Callable[..., ExpertRun],
@@ -139,7 +138,7 @@ class Jobs:
         self._finish_news = finish_news  # ends the waiting news of a job that is over
         self._records = records  # the jobs themselves: goal and expert-call rows
         self._setup_facts = setup_facts  # machine and registry facts for a setup refusal
-        self._asks = asks
+        self._holds = holds
         self._notify = notify
         self._experts = experts  # read afresh: an install adds one while the brain runs
         # Called with the expert, then the job id and the callbacks as keywords.
@@ -157,7 +156,6 @@ class Jobs:
         self._scout_steps: dict[str, JobActivity] = {}  # job -> writer of Scout's own steps
         self._reserved: dict[str, set[str]] = {}  # job -> part ids promised to starts in flight
         self._starting = 0  # hand-offs waiting on their ask also hold a slot
-        self._ask_ids: dict[tuple[str, str], set[str]] = {}  # (job, part) -> its open asks
         self._progress_sent: dict[str, float] = {}
         self._activity_sent: dict[str, float] = {}
         self._activity_trailing: dict[str, asyncio.Task] = {}
@@ -851,26 +849,6 @@ class Jobs:
     def _changed(self) -> None:
         self._notify("changed", {"what": "jobs"})
 
-    async def _open_ask(self, *, job_id: str | None = None, part: str = "p1", **kw) -> Answer:
-        """Open an ask and raise its RpcError, so callers can tell a timeout from a cancel."""
-        ask_id = kw.pop("ask_id", None) or uuid.uuid4().hex
-        key = (job_id, part)
-        if job_id is not None:
-            self._ask_ids.setdefault(key, set()).add(ask_id)
-        try:
-            return await self._asks.open(ask_id=ask_id, parent_id=job_id, **kw)
-        finally:
-            if job_id is not None:
-                self._ask_ids.get(key, set()).discard(ask_id)
-
-    async def _ask_or_none(self, **kw) -> Answer | None:
-        """Open an ask; None when nobody can answer (offline, timed out, cancelled)."""
-        try:
-            answer = await self._open_ask(**kw)
-        except RpcError:
-            return None
-        return answer if answer.option is not None else None
-
     def _agent_of(self, job: Job | None, part: str) -> str:
         """The expert that runs this part (a job's parts may use different experts)."""
         found = next((p for p in job.parts if p.id == part), None) if job else None
@@ -888,37 +866,12 @@ class Jobs:
         tool = f"{agent}:{request.title}"
         ask_id = uuid.uuid4().hex  # the ask's work row is also its log entry
         person = expert_asker(
-            partial(self._open_ask, job_id=job_id, part=part, stay_open=True),
+            partial(self._holds.ask, kind="expert_ask", job_id=job_id, part=part),
             tool,
             request.input,
             request.options,
             ask_id,
         )
-
-        async def ask_person():
-            # Only what waits on the person is an item, so a rule's or Scout's grant leaves none.
-            if self._items is None:
-                return await person()
-            self._items.open(
-                "expert_ask",
-                task_id=self.task_of(job_id),
-                caused_by=self.caused_by(job_id),
-                live_only=True,
-                job_id=job_id,
-                id=ask_id,
-            )
-            try:
-                answer = await person()
-            except NoOneThere:  # the ask timed out or was passed: nobody answered
-                with suppress(OpenItemRefused):
-                    self._items.expire(ask_id, "no_answer")
-                raise
-            except BaseException:  # the part stopped or the ask failed: nobody can answer now
-                with suppress(OpenItemRefused):
-                    self._items.expire(ask_id, "process_ended")
-                raise
-            self._items.finish(ask_id, "answered")
-            return answer
 
         def scouted(by: str) -> None:
             # Scout's yes came first: the item is answered, not ended with the process.
@@ -936,7 +889,7 @@ class Jobs:
                 summary=summarise(request.title, tool, request.input),
                 input=request.input,
                 tier=Tier.ask,
-                how_to_ask=ask_person,
+                how_to_ask=person,
                 settled=scouted,
                 job_id=job_id,
                 ask_id=ask_id,
@@ -950,7 +903,7 @@ class Jobs:
         return decision.option_id  # the person's reject; None when nobody picked
 
     async def _question(self, job_id: str, question: Question, part: str = "p1") -> dict | None:
-        if self._scout is not None and self._asks.anyone_online():
+        if self._scout is not None and self._holds.anyone_online():
             # Scout answers when he can; None (passed, dropped, wake over) means ask the user.
             scout_content = await self._scout.ask(job_id, question)
             if part not in self._runs.get(job_id, {}):  # the part ended while Scout thought
@@ -958,18 +911,26 @@ class Jobs:
             if scout_content is not None:
                 self._changed()
                 return scout_content
+        if not self._holds.anyone_online():
+            self._on_away(job_id, question.message)
+            self._changed()
+            return None
         content: dict = {}
         for field in question.fields:
             # A lone question's text is the message; several carry theirs in the description.
             text = field.description or (
                 question.message if len(question.fields) == 1 else field.title
             )
-            answer = await self._ask_or_none(
-                job_id=job_id, part=part, text=text, options=field.options, free_text=True
-            )
-            if answer is None:
-                if not self._asks.anyone_online():
-                    self._on_away(job_id, question.message)
+            try:
+                answer = await self._holds.ask(
+                    kind="question",
+                    job_id=job_id,
+                    part=part,
+                    text=text,
+                    options=field.options,
+                    free_text=True,
+                )
+            except RpcError:  # the part or task ended while the question waited
                 self._changed()
                 return None
             if answer.text:
@@ -1034,7 +995,7 @@ class Jobs:
     def _forget(self, job_id: str, part: str) -> bool:
         """Drop a finished part's run, activity and asks. True when the job has none left running:
         then its notes, timers and Scout questions go too."""
-        self._asks.cancel_all(self._ask_ids.pop((job_id, part), set()))
+        self._holds.cancel_part(job_id, part)
         for books in (self._runs, self._activity):
             books.get(job_id, {}).pop(part, None)
             if not books.get(job_id, True):
