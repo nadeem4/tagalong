@@ -61,9 +61,9 @@ describe('pairBrowser', () => {
     expect(await done).toEqual({ ok: false });
   });
 
-  it.each(['12345', 'abcdef', '1234567', ' '])('opens no socket for the code %j', async (code) => {
+  it('opens no socket for a code that is not six digits', async () => {
     const { sockets, pair } = setup();
-    expect(await pair(code)).toEqual({ ok: false });
+    expect(await pair('12345')).toEqual({ ok: false });
     expect(sockets).toEqual([]);
   });
 

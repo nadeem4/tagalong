@@ -22,14 +22,17 @@ const closers: (() => void)[] = [];
 afterEach(() => closers.splice(0).forEach((close) => close()));
 
 async function serve(cert: string, key: string) {
+  let requests = 0;
   const https = createServer({ cert: pem(cert), key: pem(key) });
+  https.on('request', () => requests++);
+  https.on('upgrade', () => requests++);
   const wss = new WebSocketServer({ server: https });
   await new Promise<void>((resolve) => https.listen(0, '127.0.0.1', resolve));
   closers.push(() => {
     wss.clients.forEach((c) => c.terminate());
     https.close();
   });
-  return { port: (https.address() as AddressInfo).port };
+  return { port: (https.address() as AddressInfo).port, requests: () => requests };
 }
 
 /** Resolves "open" or "closed", whichever the socket reaches first. */
@@ -56,6 +59,7 @@ describe('pinnedSocket', () => {
     const sock = pinnedSocket(`wss://127.0.0.1:${s.port}`, fingerprintOf(pem('cert')));
     expect(await outcome(sock)).toBe('closed');
     expect(sock.mismatch()).toBe(true);
+    expect(s.requests()).toBe(0);
   });
 
   it('does not call a dead address a different brain', async () => {
@@ -64,8 +68,7 @@ describe('pinnedSocket', () => {
     expect(sock.mismatch()).toBe(false);
   });
 
-  it('refuses a ws:// url and a malformed pin', () => {
+  it('refuses a ws:// url', () => {
     expect(() => pinnedSocket('ws://127.0.0.1:1', 'a'.repeat(64))).toThrow();
-    expect(() => pinnedSocket('wss://127.0.0.1:1', 'xyz')).toThrow();
   });
 });

@@ -5,7 +5,7 @@
  * A mismatch closes the socket before anything is sent; there is no plain ws fallback.
  */
 import { createHash } from 'node:crypto';
-import type { TLSSocket } from 'node:tls';
+import { connect } from 'node:tls';
 import WebSocket from 'ws';
 import type { BrainSocket } from '@tagalong/contract';
 
@@ -16,18 +16,24 @@ export interface PinnedSocket extends BrainSocket {
 
 export function pinnedSocket(url: string, fingerprint: string): PinnedSocket {
   if (!url.startsWith('wss://')) throw new Error('a remote brain is reached over wss only');
-  if (!/^[0-9a-f]{64}$/i.test(fingerprint)) throw new Error('the fingerprint is not 64 hex digits');
   const pin = fingerprint.toLowerCase();
-  const ws = new WebSocket(url, { rejectUnauthorized: false });
   let trusted = false;
   let mismatch = false;
-  // Node skips checkServerIdentity once the self-signed chain fails, so the pin is checked on the
-  // upgrade, before 'open': no hello, and no token, is ever sent to a brain that fails it.
-  ws.on('upgrade', (res) => {
-    const cert = (res.socket as TLSSocket).getPeerCertificate();
-    trusted = cert.raw !== undefined && createHash('sha256').update(cert.raw).digest('hex') === pin;
-    mismatch = !trusted;
-    if (!trusted) ws.terminate();
+  // Node skips checkServerIdentity once the self-signed chain fails, so the pin is checked when
+  // the handshake finishes, before the http upgrade is written: no hello, and no token, is ever
+  // sent to a brain that fails it.
+  const ws = new WebSocket(url, {
+    rejectUnauthorized: false,
+    createConnection: (options, onConnect) => {
+      const socket = connect(options, onConnect);
+      socket.once('secureConnect', () => {
+        const { raw } = socket.getPeerCertificate();
+        trusted = raw !== undefined && createHash('sha256').update(raw).digest('hex') === pin;
+        mismatch = !trusted;
+        if (!trusted) socket.destroy();
+      });
+      return socket;
+    },
   });
   // An error is always followed by close, which is where reconnecting starts.
   ws.on('error', () => undefined);

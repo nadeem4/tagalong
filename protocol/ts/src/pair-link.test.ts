@@ -27,12 +27,11 @@ describe('parsePairLink', () => {
 });
 
 describe('dialOrder', () => {
-  it('tries last good, saved, found on the network, then tailnet, without duplicates', () => {
-    expect(dialOrder({ addrs: ['a:1', 'b:2'], lastGood: 'b:2' }, ['c:3', 'a:1'], ['d:4'])).toEqual([
+  it('tries last good, saved, then found on the network, without duplicates', () => {
+    expect(dialOrder({ addrs: ['a:1', 'b:2'], lastGood: 'b:2' }, ['c:3', 'a:1'])).toEqual([
       'b:2',
       'a:1',
       'c:3',
-      'd:4',
     ]);
   });
 });

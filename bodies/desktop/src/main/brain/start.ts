@@ -77,7 +77,7 @@ export function startBrain(options: StartBrainOptions): BrainClient {
   // reaches the brain is remembered first. Nothing here ever falls back from wss to ws.
   let tried = 0;
   const nextAddr = (): string => {
-    const order = dialOrder(link.get(), found(), []);
+    const order = dialOrder(link.get(), found());
     return order[tried++ % order.length] ?? '';
   };
   const { tools, run } = bodyTools(platform, exclusions, onCapture, openExternal, files, reading);

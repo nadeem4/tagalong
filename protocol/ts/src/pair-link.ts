@@ -4,6 +4,8 @@
  * contract package stays free of Node and browser globals.
  */
 import { z } from 'zod';
+import type { BrainSocket } from './brain-client.js';
+import { PairResult } from './messages.js';
 
 export interface PairLink {
   addr: string;
@@ -34,13 +36,55 @@ export function parsePairLink(text: string): PairLink | null {
   return parsed.success ? parsed.data : null;
 }
 
-/** Last good address, then the saved ones, then brains found on the network, then tailnet ones. */
-export function dialOrder(link: BrainLink, found: string[], tailnet: string[]): string[] {
-  const all = [
-    ...(link.lastGood === undefined ? [] : [link.lastGood]),
-    ...link.addrs,
-    ...found,
-    ...tailnet,
-  ];
+/** Last good address, then the saved ones, then brains found on the network. */
+export function dialOrder(link: BrainLink, found: string[]): string[] {
+  const all = [...(link.lastGood === undefined ? [] : [link.lastGood]), ...link.addrs, ...found];
   return [...new Set(all)];
+}
+
+export type PairReply =
+  | { ok: true; token: string }
+  | { ok: false; reason: 'refused' | 'closed' | 'timeout' };
+
+/**
+ * Sends `pair` as the first message on an open socket and waits for the brain's answer.
+ * The socket is closed on every outcome; the caller decides what each refusal means.
+ */
+export function pairOverSocket(
+  socket: BrainSocket,
+  code: string,
+  device: { name: string; kind: 'desktop' | 'browser' },
+  timeoutMs: number,
+): Promise<PairReply> {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (outcome: PairReply): void => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      socket.close();
+      resolve(outcome);
+    };
+    const timer = setTimeout(() => finish({ ok: false, reason: 'timeout' }), timeoutMs);
+    socket.onOpen(() =>
+      socket.send(
+        JSON.stringify({ jsonrpc: '2.0', id: 'pair-1', method: 'pair', params: { code, device } }),
+      ),
+    );
+    socket.onMessage((data) => {
+      let msg: { error?: unknown; result?: unknown };
+      try {
+        msg = JSON.parse(data) as typeof msg;
+      } catch {
+        return;
+      }
+      const result = PairResult.safeParse(msg.result);
+      finish(
+        msg.error === undefined && result.success
+          ? { ok: true, token: result.data.token }
+          : { ok: false, reason: 'refused' },
+      );
+    });
+    socket.onClose(() => finish({ ok: false, reason: 'closed' }));
+  });
 }
