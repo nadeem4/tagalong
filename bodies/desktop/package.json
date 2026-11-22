@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@nut-tree-fork/nut-js": "4.2.6",
+    "bonjour-service": "1.4.4",
     "get-windows": "9.3.0",
     "uiohook-napi": "1.5.5",
     "ws": "8.21.3"
