@@ -10,9 +10,10 @@ from pathlib import Path
 import pytest
 from event_log import make_session
 from know_fakes import FakeModel, budget
-from test_server import Open, ScriptedModel, call, hello, request
+from test_server import TOKEN, Open, ScriptedModel, call, hello, request
 from websockets.asyncio.client import connect
 
+from brain.auth import Authenticator
 from brain.bodies import Bodies
 from brain.know.runner import KnowMeRunner
 from brain.memory import Memory
@@ -101,7 +102,7 @@ async def know_env():
     session = make_session(
         ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"), know_sources=[]
     )
-    server = await start_server("127.0.0.1", 0, bodies, "s1", session)
+    server = await start_server("127.0.0.1", 0, bodies, "s1", session, auth=Authenticator(TOKEN))
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     yield session, url
     server.close()

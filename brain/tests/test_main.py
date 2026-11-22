@@ -494,7 +494,7 @@ def test_bridge_starts_after_the_server_and_stops_at_shutdown(monkeypatch, tmp_p
             calls.append("serving")
             raise RuntimeError("stop")
 
-    async def start_server(*args):
+    async def start_server(*args, **kwargs):
         return Server()
 
     monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
@@ -508,7 +508,7 @@ def test_bridge_starts_after_the_server_and_stops_at_shutdown(monkeypatch, tmp_p
 
 
 def test_whatsapp_secrets_are_masked_in_logs(monkeypatch, tmp_path):
-    async def start_server(*args):
+    async def start_server(*args, **kwargs):
         logging.getLogger("brain.bridge").error(
             "leak %s to %s", "wa-token-0123456789", "15551234567"
         )

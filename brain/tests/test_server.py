@@ -15,6 +15,7 @@ from event_log import make_session
 from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed
 
+from brain.auth import Authenticator
 from brain.bodies import Bodies
 from brain.memory import Memory
 from brain.mind.turn import Final
@@ -23,6 +24,7 @@ from brain.sessions import Session
 from brain.tools import KeySettings
 
 KEY = "sk-ant-example-not-a-real-key"
+TOKEN = "t0k-local-test-token"
 
 
 async def fake_check(key):
@@ -43,8 +45,8 @@ CLICK = {
 }
 
 
-def hello(last_seq=None, protocol=2, req_id=1):
-    params = {"protocol": protocol, "body": DESKTOP, "tools": [TOOL]}
+def hello(last_seq=None, protocol=3, req_id=1):
+    params = {"protocol": protocol, "token": TOKEN, "body": DESKTOP, "tools": [TOOL]}
     if last_seq is not None:
         params["last_seq"] = last_seq
     return {"jsonrpc": "2.0", "id": req_id, "method": "hello", "params": params}
@@ -68,7 +70,7 @@ async def env(tmp_path):
     session = make_session(
         ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"), keys=keys
     )
-    server = await start_server("127.0.0.1", 0, bodies, "s1", session)
+    server = await start_server("127.0.0.1", 0, bodies, "s1", session, auth=Authenticator(TOKEN))
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     yield bodies, url
     server.close()
@@ -91,7 +93,7 @@ async def test_hello_ok(env):
         reply = await call(ws, hello())
         result = reply["result"]
         assert {k: v for k, v in result.items() if k != "tools"} == {
-            "protocol": 2,
+            "protocol": 3,
             "session": "s1",
             "seq": 0,
             "resync": False,
@@ -102,7 +104,9 @@ async def test_hello_ok(env):
 async def test_hello_result_carries_version_and_build(tmp_path):
     bodies = Bodies()
     session = make_session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
-    server = await start_server("127.0.0.1", 0, bodies, "s1", session, ("0.1.0", "abc123abc123"))
+    server = await start_server(
+        "127.0.0.1", 0, bodies, "s1", session, ("0.1.0", "abc123abc123"), auth=Authenticator(TOKEN)
+    )
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     try:
         async with connect(url) as ws:
@@ -127,7 +131,7 @@ async def test_version_mismatch_closes(env):
     async with connect(url) as ws:
         reply = await call(ws, hello(protocol=1))
         assert reply["error"]["code"] == -32000
-        assert reply["error"]["data"] == {"protocol": 2}
+        assert reply["error"]["data"] == {"protocol": 3}
         await assert_closed(ws)
 
 
@@ -138,7 +142,7 @@ async def test_version_checked_before_shape(env):
     async with connect(url) as ws:
         reply = await call(ws, frame)
         assert reply["error"]["code"] == -32000
-        assert reply["error"]["data"] == {"protocol": 2}
+        assert reply["error"]["data"] == {"protocol": 3}
         await assert_closed(ws)
 
 
@@ -197,7 +201,7 @@ async def event_env():
     session = make_session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
     seen = []
     session.body_event = lambda body_id, name, data: seen.append((body_id, name, data))
-    server = await start_server("127.0.0.1", 0, bodies, "s1", session)
+    server = await start_server("127.0.0.1", 0, bodies, "s1", session, auth=Authenticator(TOKEN))
     return server, f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}", seen
 
 
@@ -232,7 +236,7 @@ async def test_speech_state_frames_feed_presence():
     session = make_session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
     session.presence.speech = rec.speech
     session.presence.speech_gone = rec.speech_gone
-    server = await start_server("127.0.0.1", 0, bodies, "s1", session)
+    server = await start_server("127.0.0.1", 0, bodies, "s1", session, auth=Authenticator(TOKEN))
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     try:
         async with connect(url) as ws:
@@ -265,7 +269,7 @@ async def test_speech_state_frames_feed_presence():
 async def test_a_reconnect_clears_the_old_connections_speech_state():
     bodies = Bodies()
     session = make_session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
-    server = await start_server("127.0.0.1", 0, bodies, "s1", session)
+    server = await start_server("127.0.0.1", 0, bodies, "s1", session, auth=Authenticator(TOKEN))
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     try:
         async with connect(url) as first:
@@ -393,7 +397,7 @@ async def chat():
     gate = asyncio.Event()
     bodies = Bodies()
     session = make_session(ScriptedModel(gate), Open(), bodies, 10, Memory(":memory:"))
-    server = await start_server("127.0.0.1", 0, bodies, "s1", session)
+    server = await start_server("127.0.0.1", 0, bodies, "s1", session, auth=Authenticator(TOKEN))
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     yield url, gate
     server.close()
@@ -528,7 +532,7 @@ async def tool_env():
     model = ToolModel()
     bodies = Bodies()
     session = make_session(model, Open(), bodies, 10, Memory(":memory:"))
-    server = await start_server("127.0.0.1", 0, bodies, "s1", session)
+    server = await start_server("127.0.0.1", 0, bodies, "s1", session, auth=Authenticator(TOKEN))
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     yield url, model
     server.close()
@@ -630,7 +634,7 @@ async def ask_env():
     model = ToolModel(tool="desktop__click")
     bodies = Bodies()
     session = make_session(model, Open(), bodies, 10, Memory(":memory:"))
-    server = await start_server("127.0.0.1", 0, bodies, "s1", session)
+    server = await start_server("127.0.0.1", 0, bodies, "s1", session, auth=Authenticator(TOKEN))
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     yield url, model
     server.close()
@@ -978,7 +982,7 @@ async def test_slow_call_does_not_block_a_use_response(tool_env, monkeypatch):
 async def test_answer_text_reaches_the_ask():
     bodies = Bodies()
     session = make_session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
-    server = await start_server("127.0.0.1", 0, bodies, "s1", session)
+    server = await start_server("127.0.0.1", 0, bodies, "s1", session, auth=Authenticator(TOKEN))
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     try:
         async with connect(url) as ws:
@@ -1029,7 +1033,7 @@ async def voice_env(voice=None):
     bodies = Bodies()
     session = make_session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
     session.voice = voice
-    server = await start_server("127.0.0.1", 0, bodies, "s1", session)
+    server = await start_server("127.0.0.1", 0, bodies, "s1", session, auth=Authenticator(TOKEN))
     return server, f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
 
 
@@ -1214,7 +1218,7 @@ async def test_without_a_voice_listen_is_method_not_found_and_notifications_are_
 async def test_a_body_disconnect_drops_its_reading():
     bodies = Bodies()
     session = make_session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
-    server = await start_server("127.0.0.1", 0, bodies, "s1", session)
+    server = await start_server("127.0.0.1", 0, bodies, "s1", session, auth=Authenticator(TOKEN))
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     row = {
         "capability": "window-text",
