@@ -434,6 +434,7 @@ async def _run() -> None:
         memory.close()
         if network_server:
             network_server.close()
+            await network_server.wait_closed()
         clear_pid(config.data_dir, os.getpid())
 
 

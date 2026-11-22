@@ -49,3 +49,8 @@ export async function saveName(storage: StorageArea, name: string): Promise<void
 export async function saveToken(storage: StorageArea, token: string): Promise<void> {
   await storage.set(TOKEN_KEY, token.trim());
 }
+
+/** The keys a saved change to which makes the body dial again. */
+export function restartsBody(changes: Record<string, unknown>, area: string): boolean {
+  return area === 'local' && [ADDR_KEY, NAME_KEY, TOKEN_KEY].some((key) => key in changes);
+}

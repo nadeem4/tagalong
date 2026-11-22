@@ -15,7 +15,7 @@ function setup(overrides: Partial<BodyDeps> = {}) {
   const sockets: FakeBrainSocket[] = [];
   const micLog: string[] = [];
   const deps: BodyDeps = {
-    storage: memoryStorage(),
+    storage: memoryStorage({ brainToken: 't0k' }),
     session: memoryStorage(),
     ...CHROME,
     tabs: {
@@ -111,7 +111,7 @@ describe('the browser body', () => {
   });
 
   it('hello_says_display_false', async () => {
-    const { body, sockets } = setup({ storage: memoryStorage({ brainToken: 't0k' }) });
+    const { body, sockets } = setup();
     await body.start();
     sockets[0]!.open();
     await settle();

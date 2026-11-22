@@ -416,7 +416,7 @@ def test_main_shuts_apps_down_before_memory_closes(monkeypatch, tmp_path):
         order.append("apps")
         await real_shutdown(self)
 
-    async def stop(*args):
+    async def stop(*args, **kwargs):
         raise RuntimeError("stop")
 
     monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
@@ -452,7 +452,7 @@ def test_main_boots_despite_a_hanging_app(monkeypatch, tmp_path):
             booted.append(True)
             raise RuntimeError("stop")
 
-    async def start(*args):
+    async def start(*args, **kwargs):
         return Server()
 
     monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))

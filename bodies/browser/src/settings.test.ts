@@ -5,7 +5,15 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { StorageArea } from './layer/api';
-import { DEFAULT_ADDR, parseAddr, readSettings, saveAddr, saveName, saveToken } from './settings';
+import {
+  DEFAULT_ADDR,
+  parseAddr,
+  restartsBody,
+  readSettings,
+  saveAddr,
+  saveName,
+  saveToken,
+} from './settings';
 
 function memory(): StorageArea {
   const data = new Map<string, unknown>();
@@ -67,5 +75,16 @@ describe('token', () => {
     const storage = memory();
     await saveToken(storage, '  pair-code  ');
     expect((await readSettings(storage)).token).toBe('pair-code');
+  });
+});
+
+describe('restartsBody', () => {
+  it.each(['brainAddr', 'bodyName', 'brainToken'])('a changed %s redials', (key) => {
+    expect(restartsBody({ [key]: {} }, 'local')).toBe(true);
+  });
+
+  it('ignores other keys and other areas', () => {
+    expect(restartsBody({ other: {} }, 'local')).toBe(false);
+    expect(restartsBody({ brainToken: {} }, 'session')).toBe(false);
   });
 });
