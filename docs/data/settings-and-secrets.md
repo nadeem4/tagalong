@@ -304,6 +304,10 @@ it), and is never printed. `tagalong doctor` says only whether a key is set.
 
 `tagalong.db` holds the paired devices (`devices`) and one-time pairing codes (`pair_codes`). Only the SHA-256 of a device token or a code is stored, so the database cannot be used to log in; the token is shown once, on the device that paired. A pairing link carries the code and the certificate fingerprint, so treat it like a password for 10 minutes. See [storage.md](storage.md#devices-and-pairing).
 
+## A remembered remote brain
+
+The desktop keeps the brain it paired with under `brain` in `settings.json`: the mode, the addresses, the certificate fingerprint and the last address that worked. These are not secret. The device token is not there: it is sealed with Electron `safeStorage` (`link-store.ts`) and stored as base64 text only after sealing. When the OS cannot seal it, pairing fails and the desktop stays on the local brain rather than write the token in the clear.
+
 ## Privacy notes
 
 The settings file holds no secrets, and `hideSecrets` keeps them out of the log. See

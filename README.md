@@ -123,7 +123,9 @@ brain to be running. `uv run tagalong perf` prints how long the brain's steps ta
 
 To use the brain from another device, set `TAGALONG_NETWORK=1`, start the brain, then run
 `uv run tagalong pair`: it prints a QR and a `tagalong://pair?...` link, valid 10 minutes and once. The
-brain accepts only device tokens on that network port, and Home can rename or revoke a device.
+brain accepts only device tokens on that network port, and Home can rename or revoke a device. A
+desktop paired to it dials it over `wss`, pinned to the certificate in the link, and does not start a
+brain of its own.
 
 Upgrading: if you installed the Claude Code adapter globally with npm before, set
 `TAGALONG_EXPERT_CMD=claude-agent-acp` to keep using it, or let Scout install it.
@@ -390,8 +392,8 @@ body for the Python brain, so a brain must be running (`pnpm dev:desktop` starts
    browser**. The installer ships it in `%LOCALAPPDATA%\Programs\Tagalong\resources\extension`.
    From source, build it with `pnpm --filter @tagalong/browser build` and choose
    `bodies/browser/dist`.
-3. Click the toolbar button, paste the pairing code (the contents of `<TAGALONG_HOME>/local-token`,
-   `~/.tagalong/local-token` by default) and see the link; change the brain's address or name the
+3. Run `uv run tagalong pair --kind browser`, click the toolbar button, type the 6-digit code and press
+   Pair, then see the link; change the brain's address or name the
    browser there too.
 
 Ask Scout about your tabs. The first time it needs something (your tabs, a site, your history and

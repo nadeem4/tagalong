@@ -389,7 +389,7 @@ message `{type: 'status'}` and shows:
   not reachable", or "Needs an update: this browser add-on is older than the brain", or "Scout needs a pairing code";
 - the **Brain address** (`host:port` only, default `127.0.0.1:47321`; a bad value is refused and not
   saved);
-- the **Pairing code**: the token the brain accepts, sent in every `hello` (the local token for a brain on this PC, found in `<TAGALONG_HOME>/local-token`);
+- the **Pairing code** and a **Pair** button: the 6-digit code from `uv run tagalong pair --kind browser` (`src/pair.ts`). The add-on sends it as a `pair` request to `ws://127.0.0.1:<port>` only (any other address is refused before a socket opens), saves the device token it gets back as `brainToken`, and the saved token restarts the body. A wrong, used or expired code shows "That code did not work";
 - the **Name** of this browser;
 - a **Turn on right-click** button, shown until `contextMenus` is granted, with a line saying how to
   ask from the page;

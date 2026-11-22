@@ -535,8 +535,21 @@ By hand:
 
 1. Start the brain and open the desktop: it connects (the desktop reads `~/.tagalong/local-token`).
 2. Delete `local-token` while the brain runs and restart only the desktop: it stays offline until the brain restarts and writes the file again.
-3. In the browser add-on's popup, with no pairing code saved the body shows offline and keeps redialing without sending a hello; paste the contents of `local-token` and save: it redials at once and connects. A wrong code shows "Scout needs a pairing code".
+3. In the browser add-on's popup, with no pairing code saved the body shows offline and keeps redialing without sending a hello; run `uv run tagalong pair --kind browser`, type the code and press Pair: it redials at once and connects. A wrong code shows "That code did not work".
 4. `TAGALONG_NETWORK=1 uv run brain`: the log shows a second listener on 47323, and `brain_status` reports the certificate fingerprint.
+
+## A desktop on a remote brain (BA3)
+
+Automated: `protocol/ts/src/pair-link.test.ts`; the desktop's `src/main/brain/` (`pinned-socket`, `link-store`, `discover`, `launch`, `start` tests), `src/main/ipc/pair.test.ts` and `brain-status.test.ts`; `brain/tests/test_brain_status_host.py`, `test_pair_cli.py`; the browser's `src/pair.test.ts`.
+
+By hand (two machines, or one machine and a second user's desktop):
+
+1. Brain machine: `TAGALONG_NETWORK=1 uv run tagalong pair`. Copy the link.
+2. Desktop (no local brain wanted): call `window.tagalong.pairWithLink(link)` from the devtools console. **Expected:** `{ ok: true }`, the desktop connects, and no `uv run brain` process starts on it.
+3. Run the pairing again with a link made after changing the brain's `identity/` folder (a different certificate). **Expected:** `wrong_brain`, and the saved link is unchanged.
+4. On the brain card of the remote desktop, restart and open-folder do nothing; on the brain's own machine they work.
+5. On the brain, revoke the device (Home's `device_revoke`). **Expected:** the desktop goes offline at once and stays offline.
+6. Browser: `uv run tagalong pair --kind browser`, type the 6 digits in the add-on popup and press Pair. **Expected:** "Paired." and the popup shows connected. Set the address to another machine's: Pair does nothing.
 
 ## Permission engine (unit tests only)
 

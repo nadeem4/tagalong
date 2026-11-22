@@ -189,7 +189,12 @@ describe('startBrain with a paired remote brain', () => {
       env: {},
       retryMs: 1,
       openSocket: (url): BrainSocket => {
-        const entry = { url, open: noop, drop: noop, message: noop as (data: string) => void };
+        const entry = {
+          url,
+          open: noop as () => void,
+          drop: noop as () => void,
+          message: noop as (data: string) => void,
+        };
         sockets.push(entry);
         return {
           send: (data) => void sent.push(data),

@@ -28,7 +28,11 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 | `src/main/brain/start.ts`                        | `startBrain`: builds and starts the `BrainClient` on the global `WebSocket`; address from `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`); declares the window body tools                               |
 | `src/main/brain/launch.ts`                       | `launchBrain`: spawns `uv run brain` in `brain/` when the address is local and nothing answers; detached (hidden on Windows), output to `brain.log`, never stopped                                        |
 | `src/main/brain/build-id.ts`, `version-check.ts` | `ownBuild` (app version, or the dev source hash) and `decideUpdate`: current, restart, ask or terminal                                                                                                    |
-| `src/main/ipc/brain-status.ts`                   | `createBrainStatus`: the brain card's facts, quiet restart, restart after work; `registerBrainStatusIpc`                                                                                                  |
+| `src/main/brain/pinned-socket.ts`                | `pinnedSocket(url, fp)`: a `wss` socket that accepts only the certificate with that SHA-256, checked on upgrade; `mismatch()` tells a wrong brain from an unreachable one                                 |
+| `src/main/brain/link-store.ts`                   | `LinkStore`: the saved remote brain (addresses, fingerprint, last good address) in settings and its device token sealed with `safeStorage`                                                                |
+| `src/main/brain/discover.ts`                     | `discoverBrains`, `bonjourBrowse`: brains announcing `_tagalong._tcp` on the home network, names and addresses only                                                                                       |
+| `src/main/ipc/pair.ts`                           | `pairWithLink`: redeems a `tagalong://pair` link over the pinned socket and saves the link; `registerPairIpc` (discover, pair, forget)                                                                    |
+| `src/main/ipc/brain-status.ts`                   | `createBrainStatus`: the brain card's facts (with the brain's host and whether this desktop is on it), quiet restart, restart after work; `registerBrainStatusIpc`                                        |
 | `build/installer.nsh`                            | NSIS hooks that stop a running brain before install and uninstall                                                                                                                                         |
 | `src/main/brain/body-tools.ts`                   | `bodyTools(platform, exclusions, onCapture)`: the body tools declared in `hello` and their `run`                                                                                                          |
 | `src/main/brain/body-events.ts`                  | `createBackSender`, `frontWindow`, `startFocusWatch`, `readAloudEvent`, `readingEvent`: the `back`, `focus`, `read_aloud` and `reading` events sent to the brain                                          |
@@ -210,6 +214,20 @@ flowchart TD
 Notice that the desktop never stops a brain it did not start, and never stops one on quit. The packaged
 app sets uv's folders under `TAGALONG_HOME` (`packagedEnv`) and passes its version as `TAGALONG_BUILD`.
 The decision table is under [Brain version check and restart](#brain-version-check-and-restart).
+
+### A remote brain
+
+With a saved remote link (`settings.brain.mode === 'remote'`) the desktop dials `wss` instead of the
+local `ws`. It tries the last good address, then the saved ones, then brains found by mDNS
+(`discover.ts`), then the tailnet (none yet), one per attempt, and remembers the one that said
+hello. The socket is `pinnedSocket`: it trusts only the certificate whose SHA-256 is in the link, so
+a different certificate is refused and the desktop never falls back to plain `ws` or sends its token.
+The device token the brain issued at pairing is sealed with Electron `safeStorage` (`link-store.ts`)
+and is never in `settings.json`. `launchBrain` spawns nothing while the link is remote. A brain's
+`brain_status` says `local: false` when this desktop is not on its machine, and then the brain card's
+restart and open-folder do nothing. `pairWithLink` (`ipc/pair.ts`) turns a pasted or scanned link into
+a saved remote link and reconnects; `forgetBrain` returns to the local brain. Both are on the
+preload's `tagalong` object (`discoverBrains`, `pairWithLink`, `forgetBrain`); no screen uses them yet.
 
 ### The brain in the main process
 

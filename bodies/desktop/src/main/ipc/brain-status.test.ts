@@ -270,7 +270,7 @@ describe('a brain on another machine', () => {
     expect((await status.card()).update).toBe('none');
   });
 
-  it('opens no data folder, while a local brain's still opens', async () => {
+  it('opens no data folder, while a local brain still opens it', async () => {
     const remote = setup({ wire: REMOTE });
     await remote.status.openFolder();
     expect(remote.opened).toEqual([]);
