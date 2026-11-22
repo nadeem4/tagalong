@@ -1,5 +1,9 @@
 """`tagalong pair`: a QR and a link from a terminal, with no brain running."""
 
+import os
+import subprocess
+import sys
+
 from test_cli import Rig
 
 from brain.store.db import open_db
@@ -35,3 +39,20 @@ def test_pair_for_a_node_makes_a_node_code(tmp_path):
     rig.go("pair", "--kind", "node", env={"TAGALONG_NETWORK": "1"}, **HOST)
     kinds = open_db(tmp_path / "tagalong.db").execute("SELECT kind FROM pair_codes").fetchall()
     assert kinds == [("node",)]
+
+
+def test_the_qr_prints_on_a_console_that_is_not_utf8(tmp_path):
+    env = {
+        **os.environ,
+        "TAGALONG_HOME": str(tmp_path),
+        "TAGALONG_NETWORK": "1",
+        "PYTHONIOENCODING": "cp1252",
+    }
+    done = subprocess.run(
+        [sys.executable, "-c", "import sys; from brain.cli import main; sys.exit(main(['pair']))"],
+        env=env,
+        capture_output=True,
+        timeout=60,
+    )
+    assert done.returncode == 0, done.stderr.decode()
+    assert b"tagalong://pair?" in done.stdout

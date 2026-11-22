@@ -210,6 +210,8 @@ def _pair(config, kind: str, host_addr: Callable[[], str], out) -> None:
         lambda: f"{host_addr()}:{config.network_port}",
     )
     offer = pairing.make_code(kind)
+    if out is print:  # the QR is block characters that a Windows code page cannot print
+        sys.stdout.reconfigure(encoding="utf-8")
     out(render_qr(offer.link))
     out(offer.link)
     out("Valid for 10 minutes, one use. Open it on the other machine's Tagalong.")
