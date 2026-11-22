@@ -143,6 +143,11 @@ export const IPC = {
   brainOpenFolder: 'tagalong:brain:open-folder',
   brainOpenLog: 'tagalong:brain:open-log',
   brainCopyDetails: 'tagalong:brain:copy-details',
+  // Pairing with a brain on another machine: the ones found on the home network, the link the
+  // owner pasted, and going back to the brain on this PC.
+  pairDiscover: 'tagalong:pair:discover',
+  pairWithLink: 'tagalong:pair:with-link',
+  pairForget: 'tagalong:pair:forget',
   // Home's Approvals page: the decision history and the preferences Scout follows.
   listApprovals: 'tagalong:approvals:list',
   listPreferences: 'tagalong:approvals:preferences:list',
@@ -304,7 +309,22 @@ export type PreloadBridge = Omit<
  * anything specific to this host lives here instead, so a component can never grow a
  * dependency on something the Chrome host will not have.
  */
+/** A brain announcing itself on the home network; never trusted until paired. */
+export interface FoundBrain {
+  name: string;
+  addr: string;
+}
+
+export type PairOutcome =
+  { ok: true } | { ok: false; reason: 'bad_link' | 'wrong_brain' | 'refused' | 'unreachable' };
+
 export interface TagalongHostApi {
+  /** Brains on the home network, by name and address. */
+  discoverBrains(): Promise<FoundBrain[]>;
+  /** Pairs with the brain a pasted `tagalong://pair` link names; on success the desktop dials it. */
+  pairWithLink(text: string): Promise<PairOutcome>;
+  /** Forgets the paired brain and goes back to the one on this PC. */
+  forgetBrain(): Promise<void>;
   getContext(): Promise<ContextSnapshot | null>;
   onContext(handler: (snapshot: ContextSnapshot | null) => void): () => void;
   /** Fires on every capture the host makes, so the avatar can badge it and the panel can

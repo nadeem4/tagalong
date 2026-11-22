@@ -4,6 +4,7 @@
  * owner made on that brain, whose fingerprint the desktop then pins.
  */
 import { Bonjour } from 'bonjour-service';
+import type { FoundBrain } from '../../shared/ipc';
 
 export interface Announcement {
   name: string;
@@ -15,11 +16,6 @@ export interface Announcement {
 
 /** Starts browsing, calls `onUp` for each announcement, and returns the function that stops. */
 export type BrowseFn = (onUp: (announcement: Announcement) => void) => () => void;
-
-export interface FoundBrain {
-  name: string;
-  addr: string;
-}
 
 const DEFAULT_TIMEOUT_MS = 3000;
 

@@ -10,8 +10,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { BrainSocket } from '@tagalong/contract';
 import { pinnedSocket } from './pinned-socket';
+import type { PinnedSocket } from './pinned-socket';
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 const pem = (name: string) => readFileSync(join(dir, `${name}.pem`));
@@ -33,7 +33,7 @@ async function serve(cert: string, key: string) {
 }
 
 /** Resolves "open" or "closed", whichever the socket reaches first. */
-function outcome(sock: BrainSocket): Promise<'open' | 'closed'> {
+function outcome(sock: PinnedSocket): Promise<'open' | 'closed'> {
   return new Promise((resolve) => {
     sock.onOpen(() => resolve('open'));
     sock.onClose(() => resolve('closed'));
@@ -55,6 +55,13 @@ describe('pinnedSocket', () => {
     const s = await serve('other-cert', 'other-key');
     const sock = pinnedSocket(`wss://127.0.0.1:${s.port}`, fingerprintOf(pem('cert')));
     expect(await outcome(sock)).toBe('closed');
+    expect(sock.mismatch()).toBe(true);
+  });
+
+  it('does not call a dead address a different brain', async () => {
+    const sock = pinnedSocket('wss://127.0.0.1:1', fingerprintOf(pem('cert')));
+    expect(await outcome(sock)).toBe('closed');
+    expect(sock.mismatch()).toBe(false);
   });
 
   it('refuses a ws:// url and a malformed pin', () => {
