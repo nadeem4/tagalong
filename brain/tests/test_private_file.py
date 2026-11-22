@@ -1,5 +1,6 @@
 """write_private: owner-only secrets on POSIX and Windows; the Windows call is faked."""
 
+import subprocess
 import sys
 
 import pytest
@@ -15,22 +16,26 @@ def test_posix_file_is_0600(tmp_path):
     assert p.stat().st_mode & 0o777 == 0o600
 
 
-def test_windows_strips_inherited_access_with_icacls(tmp_path):
+def test_windows_keeps_full_control_for_the_current_user_only(tmp_path, monkeypatch):
     calls = []
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setenv("USERNAME", "alice")
+    monkeypatch.setattr(subprocess, "run", lambda argv, **kw: calls.append(argv))
     p = tmp_path / "secret"
-    write_private(p, "x", platform="win32", run=lambda argv, **kw: calls.append(argv))
+    write_private(p, "x")
     assert p.read_text() == "x"
-    assert calls[0][0] == "icacls"
     assert "/inheritance:r" in calls[0]
-    assert any(a.endswith(":F") for a in calls[0])  # the current user keeps full control
+    assert "alice:F" in calls[0]
 
 
-def test_failure_to_lock_down_raises_and_removes_the_file(tmp_path):
-    p = tmp_path / "secret"
-
+def test_failure_to_lock_down_raises_and_removes_the_file(tmp_path, monkeypatch):
     def boom(argv, **kw):
         raise OSError("no icacls")
 
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setenv("USERNAME", "alice")
+    monkeypatch.setattr(subprocess, "run", boom)
+    p = tmp_path / "secret"
     with pytest.raises(OSError):
-        write_private(p, "x", platform="win32", run=boom)
+        write_private(p, "x")
     assert not p.exists()
