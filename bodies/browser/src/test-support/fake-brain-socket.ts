@@ -46,7 +46,7 @@ export class FakeBrainSocket implements BrainSocket {
     this.receive({
       jsonrpc: '2.0',
       id: this.request('hello')?.['id'],
-      result: { protocol: 1, session: 's1', tools: [], seq: 0, resync: false },
+      result: { protocol: 3, session: 's1', tools: [], seq: 0, resync: false },
     });
   }
 }

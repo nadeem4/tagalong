@@ -129,6 +129,7 @@ export function createBridge(deps: BridgeDeps): {
   const client = new BrainClient({
     addr: config.brainAddr,
     body: BODY,
+    token: () => config.localToken,
     tools: () => [],
     openSocket,
     onNotification,

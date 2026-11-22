@@ -1,10 +1,20 @@
 /** Tests for launchBrain: when it spawns `uv run brain`, what it passes, and that it never stops it. */
 import type { SpawnOptions } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { brainLogPath, isLocal, launchBrain, packagedEnv, probeAddr, stopBrain } from './launch';
+import {
+  brainLogPath,
+  isLocal,
+  launchBrain,
+  packagedEnv,
+  probeAddr,
+  readLocalToken,
+  stopBrain,
+} from './launch';
 import type { LaunchOptions } from './launch';
 
 class FakeChild extends EventEmitter {
@@ -391,5 +401,17 @@ describe('probeAddr', () => {
     expect(await probeAddr(`127.0.0.1:${port}`)).toBe(true);
     await new Promise((r) => server.close(r));
     expect(await probeAddr(`127.0.0.1:${port}`)).toBe(false);
+  });
+});
+
+describe('readLocalToken', () => {
+  it('reads the local token from the home folder', () => {
+    const home = mkdtempSync(join(tmpdir(), 'tg-'));
+    writeFileSync(join(home, 'local-token'), 'abc\n');
+    expect(readLocalToken({ TAGALONG_HOME: home }, '/nope')).toBe('abc');
+  });
+
+  it('is null when the brain has not written it yet', () => {
+    expect(readLocalToken({ TAGALONG_HOME: join(tmpdir(), 'tg-missing') }, '/nope')).toBeNull();
   });
 });

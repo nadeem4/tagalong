@@ -1,5 +1,7 @@
 /** Tests for startBrain: where it dials, that it starts at once, and the tools it declares. */
-import { hostname } from 'node:os';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { hostname, tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { CaptureExclusions } from '../../shared/settings';
 import { startBrain } from './start';
@@ -71,6 +73,31 @@ describe('startBrain', () => {
       kind: 'desktop',
       name: hostname(),
     });
+    brain.stop();
+  });
+
+  it('sends the local token from the home folder in hello', () => {
+    const home = mkdtempSync(join(tmpdir(), 'tg-'));
+    writeFileSync(join(home, 'local-token'), 'tok-from-file\n');
+    const sent: string[] = [];
+    let open: () => void = noop;
+    const brain = startBrain({
+      ...tools,
+      env: { TAGALONG_HOME: home },
+      openSocket: (): BrainSocket => ({
+        send: (data) => void sent.push(data),
+        close: noop,
+        onOpen: (f) => void (open = f),
+        onMessage: noop,
+        onClose: noop,
+      }),
+      onNotification: noop,
+      onStatus: noop,
+      onResync: noop,
+      bodyId: 'desktop-a1b2c3',
+    });
+    open();
+    expect(JSON.parse(sent[0] as string).params.token).toBe('tok-from-file');
     brain.stop();
   });
 

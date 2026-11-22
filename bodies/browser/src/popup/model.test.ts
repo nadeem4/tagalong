@@ -25,6 +25,7 @@ describe('statusLine', () => {
     expect(statusLine('connecting')).toBe("Connecting to Scout's brain...");
     expect(statusLine('online')).toBe("Connected to Scout's brain");
     expect(statusLine('offline')).toBe("Scout's brain is not reachable");
+    expect(statusLine('unauthorized')).toBe('Scout needs a pairing code');
     expect(statusLine('outdated')).toBe(
       'Needs an update: this browser add-on is older than the brain',
     );

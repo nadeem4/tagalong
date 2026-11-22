@@ -9,6 +9,7 @@ export const DEFAULT_ADDR = '127.0.0.1:47321';
 
 export const ADDR_KEY = 'brainAddr';
 export const NAME_KEY = 'bodyName';
+export const TOKEN_KEY = 'brainToken';
 const MAX_NAME = 32;
 const ADDR_PATTERN = /^([A-Za-z0-9.-]+):(\d{1,5})$/;
 
@@ -23,12 +24,14 @@ export function parseAddr(input: string): string | null {
 
 export async function readSettings(
   storage: StorageArea,
-): Promise<{ addr: string; name: string | null }> {
+): Promise<{ addr: string; name: string | null; token: string }> {
   const addr = await storage.get(ADDR_KEY);
   const name = await storage.get(NAME_KEY);
+  const token = await storage.get(TOKEN_KEY);
   return {
     addr: typeof addr === 'string' && parseAddr(addr) !== null ? addr : DEFAULT_ADDR,
     name: typeof name === 'string' && name !== '' ? name : null,
+    token: typeof token === 'string' ? token : '',
   };
 }
 
@@ -41,4 +44,8 @@ export async function saveAddr(storage: StorageArea, addr: string): Promise<bool
 
 export async function saveName(storage: StorageArea, name: string): Promise<void> {
   await storage.set(NAME_KEY, name.trim().slice(0, MAX_NAME).trim());
+}
+
+export async function saveToken(storage: StorageArea, token: string): Promise<void> {
+  await storage.set(TOKEN_KEY, token.trim());
 }

@@ -102,8 +102,16 @@ describe('the browser body', () => {
     expect(params.tools.map((t) => t.name)).toContain('tabs');
   });
 
+  it('hello_carries_the_saved_token', async () => {
+    const { body, sockets } = setup({ storage: memoryStorage({ brainToken: 'pair-code' }) });
+    await body.start();
+    sockets[0]!.open();
+    await settle();
+    expect(sockets[0]!.request('hello')?.['params']).toMatchObject({ token: 'pair-code' });
+  });
+
   it('hello_says_display_false', async () => {
-    const { body, sockets } = setup();
+    const { body, sockets } = setup({ storage: memoryStorage({ brainToken: 't0k' }) });
     await body.start();
     sockets[0]!.open();
     await settle();

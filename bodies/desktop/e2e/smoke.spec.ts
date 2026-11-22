@@ -13,6 +13,7 @@ import type { ElectronApplication, Page } from '@playwright/test';
 import type {} from '../src/shared/ipc';
 import { closeApp } from './fixtures/close-app';
 import { seedSettings } from './fixtures/seed-settings';
+import { launchEnv } from './fixtures/launch-env';
 import { startFakeBrain, type FakeBrain } from './fixtures/fake-brain';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -40,7 +41,7 @@ test.beforeAll(async () => {
     // Fake providers keep the smoke test offline and deterministic: no API key, no
     // network, and a scripted answer that always streams the same way.
     env: {
-      ...process.env,
+      ...launchEnv(),
       // The desktop dials this brain; nothing else answers a turn now.
       TAGALONG_BRAIN_ADDR: brain.addr,
       // The mic is Chromium's fake device; the fake brain answers the frames with a fixed question.

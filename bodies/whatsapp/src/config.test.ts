@@ -10,12 +10,14 @@ const FULL = {
   TAGALONG_WHATSAPP_ALLOWED_NUMBER: '15550001111',
   TAGALONG_WHATSAPP_PORT: '5000',
   TAGALONG_BRAIN_ADDR: '10.0.0.2:9',
+  TAGALONG_LOCAL_TOKEN: 'local-tok',
 };
 
 describe('readConfig', () => {
   test('test_reads_all_values', () => {
     expect(readConfig(FULL)).toEqual({
       brainAddr: '10.0.0.2:9',
+      localToken: 'local-tok',
       accessToken: 'tok-secret',
       appSecret: 'app-secret',
       verifyToken: 'verify-me',

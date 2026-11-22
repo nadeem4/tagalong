@@ -11,6 +11,7 @@ import type { WhatsAppConfig } from './config';
 
 const CONFIG: WhatsAppConfig = {
   brainAddr: '127.0.0.1:1',
+  localToken: 'local-tok',
   accessToken: 'tok',
   appSecret: 'app-secret',
   verifyToken: 'v',
@@ -37,7 +38,7 @@ class FakeBrain {
       if (msg.method === 'hello') {
         const resync = this.resyncNext;
         this.resyncNext = false;
-        this.respond(msg.id, { protocol: 2, session: 's1', tools: [], seq: this.seq, resync });
+        this.respond(msg.id, { protocol: 3, session: 's1', tools: [], seq: this.seq, resync });
       } else if (msg.method === 'say') {
         this.respond(msg.id, {});
       } else if (msg.method === 'answer') {
@@ -191,7 +192,8 @@ describe('bridge', () => {
     await online(brain);
     const hello = brain.sent.find((m) => m.method === 'hello');
     expect(hello?.params).toEqual({
-      protocol: 2,
+      protocol: 3,
+      token: 'local-tok',
       body: { id: 'whatsapp', kind: 'whatsapp', name: 'WhatsApp' },
       tools: [],
     });

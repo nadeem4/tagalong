@@ -14,6 +14,7 @@ import type { ElectronApplication, Page } from '@playwright/test';
 import type {} from '../src/shared/ipc';
 import { closeApp } from './fixtures/close-app';
 import { seedSettings } from './fixtures/seed-settings';
+import { launchEnv } from './fixtures/launch-env';
 import { startFakeBrain, type FakeBrain } from './fixtures/fake-brain';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -29,7 +30,7 @@ test.beforeAll(async () => {
     args: ['.', `--user-data-dir=${dataDir}`],
     cwd: appDir,
     env: {
-      ...process.env,
+      ...launchEnv(),
       TAGALONG_BRAIN_ADDR: brain.addr,
     },
   });

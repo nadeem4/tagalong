@@ -13,6 +13,7 @@ import type {} from '../src/shared/ipc';
 import { closeApp } from './fixtures/close-app';
 import { startFakeBrain, type FakeBrain } from './fixtures/fake-brain';
 import { seedSettings } from './fixtures/seed-settings';
+import { launchEnv } from './fixtures/launch-env';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -28,7 +29,7 @@ test.beforeAll(async () => {
   app = await electron.launch({
     args: ['.', `--user-data-dir=${dataDir}`],
     cwd: appDir,
-    env: { ...process.env, TAGALONG_BRAIN_ADDR: brain.addr },
+    env: { ...launchEnv(), TAGALONG_BRAIN_ADDR: brain.addr },
   });
 });
 
