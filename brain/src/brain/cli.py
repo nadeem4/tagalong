@@ -22,10 +22,13 @@ from typing import NoReturn, TextIO
 
 from brain.apps import AppError, TokenFile
 from brain.config import load_config, load_env_file, upsert_env_value
+from brain.discovery import lan_address
 from brain.events import Event
+from brain.identity import load_or_create_identity
 from brain.lifecycle import pid_path, stop_real_brain
 from brain.memory import Memory
 from brain.open_items import OpenItems
+from brain.pairing import NETWORK_KINDS, build_pairing, render_qr
 from brain.setup.apps import add_registry_app, app_card
 from brain.setup.facts import Machine, RunCmd, inspect, real_run_cmd
 from brain.setup.install import (
@@ -80,6 +83,8 @@ def _parser() -> argparse.ArgumentParser:
     add = apps.add_parser("add", help="add an app from the MCP registry")
     add.add_argument("app_id")
     add.add_argument("--yes", action="store_true", help="skip the question")
+    pair = sub.add_parser("pair", help="make a one-time code to pair another machine")
+    pair.add_argument("--kind", choices=sorted(NETWORK_KINDS), default="desktop")
     login = sub.add_parser("login", help="log an installed expert in")
     login.add_argument("expert_id")
     return p
@@ -100,11 +105,13 @@ def main(
     stdin: TextIO | None = None,
     stop: Callable[[Path], str] = stop_real_brain,
     now: Callable[[], float] = time.time,
+    host_addr: Callable[[], str] = lan_address,
 ) -> int:
     """Every outside thing is a parameter, so tests run on fakes. Exits 0 ok, 1 failed, 2 usage."""
     args = _parser().parse_args(argv)  # a usage error exits 2 here
     env = os.environ if env is None else env
-    home = load_config(env).data_dir
+    config = load_config(env)
+    home = config.data_dir
     load_env_file(home, env)  # the brain reads the same .env
     run = run or partial(real_run_cmd, timeout=NPM_TIMEOUT_S)
     machine = inspect_fn or partial(inspect, home, run)
@@ -118,6 +125,8 @@ def main(
             _stop(home, stop, out)
         elif args.cmd == "perf":
             _perf(home, args.since, now(), out)
+        elif args.cmd == "pair":
+            _pair(config, args.kind, host_addr, out)
         elif args.cmd == "key":
             _key(home, env, args.stdin, stdin, secret, out)
         elif args.cmd == "install":
@@ -178,6 +187,26 @@ def _perf(home: Path, since: str, now: float, out) -> None:
     if not steps:
         out(f"No timings in the last {since}.")
     out(f"asks closed by cancel: {cancelled}")
+
+
+def _pair(config, kind: str, host_addr: Callable[[], str], out) -> None:
+    if not config.network:
+        raise _Fail(
+            "Network access is off, so no other machine can reach this brain. Set "
+            f"TAGALONG_NETWORK=1 (in {config.data_dir / '.env'} or the environment), start the "
+            "brain, then run this again."
+        )
+    db = open_db(config.data_dir / "tagalong.db")
+
+    _, pairing = build_pairing(
+        db, load_or_create_identity(config.data_dir), config.network_port, host_addr
+    )
+    offer = pairing.make_code(kind)
+    if out is print:  # the QR is block characters that a Windows code page cannot print
+        sys.stdout.reconfigure(encoding="utf-8")
+    out(render_qr(offer.link))
+    out(offer.link)
+    out("Valid for 10 minutes, one use. Open it on the other machine's Tagalong.")
 
 
 def _stop(home: Path, stop: Callable[[Path], str], out) -> None:

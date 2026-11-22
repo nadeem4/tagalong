@@ -503,6 +503,10 @@ Nothing runs until you ask. When you do, Scout reads only what you point it at:
   reading off and deletes every held loop and the place it had reached in your mail. Turning the
   switch off alone stops reading and keeps what is held.
 
+## Paired devices
+
+With `TAGALONG_NETWORK=1` the brain listens for your other devices and announces itself on your home network (mDNS: the service type, version and a host name only; nothing about you). A device joins only with a one-time code you make (`tagalong pair` or Home), valid 10 minutes and once. The brain keeps each device's name, kind, when it paired and when it was last seen, and only a hash of its token. You can rename or revoke a device in Home; revoking cuts it off at once.
+
 ## What Scout remembers: see it, delete it
 
 Scout keeps what it learns about you (facts, preferences, and short summaries of long

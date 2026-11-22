@@ -16,6 +16,7 @@ import base64
 import json
 import logging
 import ssl
+from collections.abc import Callable
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
@@ -39,6 +40,8 @@ from brain.protocol import (
     KnowMeStartResult,
     ListenParams,
     MicParams,
+    PairParams,
+    PairResult,
     RpcError,
     SayParams,
     SayResult,
@@ -48,6 +51,8 @@ from brain.protocol import (
 from brain.sessions import Session
 
 MAX_FRAME = 28_000_000
+
+Redeem = Callable[[str, str, str], tuple[str, str] | None]
 KNOW_ME_PDF_MAX = 10 * 1024 * 1024  # decoded bytes
 VOICE_METHODS = {"listen", "mic", "unlisten", "hush"}
 log = logging.getLogger("brain")
@@ -112,6 +117,7 @@ async def _handler(
     session: Session,
     build: tuple[str, str] | None,
     auth: Authenticator,
+    redeem: Redeem | None,
 ) -> None:
     peer = _Peer()
     writer = asyncio.create_task(_writer(ws, peer))
@@ -129,6 +135,9 @@ async def _handler(
             method = message.get("method")
             req_id = _usable_id(message)
             if body_id is None:
+                if method == "pair":  # one attempt per connection, whatever the answer
+                    peer.send(_pair(message, req_id, redeem))
+                    break
                 if method != "hello":  # method may be None for a response
                     peer.send(_error(req_id, ErrorCode.invalid_request, "hello must come first"))
                     break
@@ -217,6 +226,20 @@ def _speech_state(message: dict, body_id: str, session: Session) -> None:
     session.presence.speech(body_id, _SPEECH_STATES[params.state], params.turn, params.n)
 
 
+def _pair(message: dict, req_id: Any, redeem: Redeem | None) -> str:
+    if redeem is None:
+        return _error(req_id, ErrorCode.method_not_found, "Unknown method: pair")
+    try:
+        params = PairParams.model_validate(message.get("params"))
+    except ValidationError:
+        # Fixed text: the pydantic error quotes the params, and they hold the code.
+        return _error(req_id, ErrorCode.invalid_params, "pair needs a code and a device.")
+    paired = redeem(params.code, params.device.name, params.device.kind)
+    if paired is None:
+        return _error(req_id, ErrorCode.unauthorized, "That code did not work.")
+    return _result(req_id, PairResult(device_id=paired[0], token=paired[1]))
+
+
 def _hello(
     message: dict,
     req_id: Any,
@@ -239,7 +262,8 @@ def _hello(
         peer.send(_error(req_id, ErrorCode.version_mismatch, "Unsupported protocol", data))
         return None
     token = raw.get("token") if isinstance(raw, dict) else None
-    if not isinstance(token, str) or auth.identify(token) is None:
+    principal = auth.identify(token) if isinstance(token, str) else None
+    if principal is None:
         peer.send(_error(req_id, ErrorCode.unauthorized, "Unknown or revoked token"))
         return None
     try:
@@ -247,7 +271,10 @@ def _hello(
     except ValidationError as exc:
         peer.send(_error(req_id, ErrorCode.invalid_params, str(exc)))
         return None
-    joined = bodies.connect(params.body, params.tools, peer, params.last_seq)
+    joined = bodies.connect(params.body, params.tools, peer, params.last_seq, principal)
+    if joined is None:
+        peer.send(_error(req_id, ErrorCode.unauthorized, "That body id belongs to another device"))
+        return None
     result = HelloResult(
         protocol=PROTOCOL,
         session=session_id,
@@ -453,11 +480,13 @@ async def start_server(
     *,
     auth: Authenticator,
     ssl_context: ssl.SSLContext | None = None,
+    redeem: Redeem | None = None,
 ) -> Server:
     """`build` is (version, build id), told to every body in hello; None leaves them out.
-    `ssl_context` makes the listener wss."""
+    `ssl_context` makes the listener wss. `redeem` turns on the pre-hello `pair` request
+    and carries what this listener may pair: (code, name, kind) to (device id, token) or None."""
 
     async def handler(ws: ServerConnection) -> None:
-        await _handler(ws, bodies, session_id, session, build, auth)
+        await _handler(ws, bodies, session_id, session, build, auth, redeem)
 
     return await serve(handler, host, port, max_size=MAX_FRAME, ssl=ssl_context)

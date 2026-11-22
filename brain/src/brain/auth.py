@@ -22,17 +22,22 @@ class DeviceCheck(Protocol):
     def verify(self, token: str) -> Principal | None: ...
 
 
-_LOCAL = Principal(key="local", name="this computer", kind="local", local=True)
+LOCAL = Principal(key="local", name="this computer", kind="local", local=True)
 
 
 class Authenticator:
-    def __init__(self, local_token: str, devices: DeviceCheck | None = None) -> None:
-        self._local = local_token.encode()
+    def __init__(self, local_token: str | None, devices: DeviceCheck | None = None) -> None:
+        self._local = local_token.encode() if local_token else None
         self._devices = devices
 
     def identify(self, token: str) -> Principal | None:
         if not token:
             return None
-        if hmac.compare_digest(token.encode(), self._local):
-            return _LOCAL
+        if self._local and hmac.compare_digest(token.encode(), self._local):
+            return LOCAL
         return self._devices.verify(token) if self._devices else None
+
+
+def listener_auth(local_token: str, devices: DeviceCheck) -> tuple[Authenticator, Authenticator]:
+    """(loopback, network): the local token opens only the loopback listener."""
+    return Authenticator(local_token, devices), Authenticator(None, devices)

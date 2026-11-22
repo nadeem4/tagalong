@@ -13,6 +13,7 @@ from fake_engine import FakeEngine
 from job_rows import fresh_work, tasks_for
 
 from brain.asks import Asks
+from brain.auth import LOCAL
 from brain.bodies import Bodies
 from brain.holds import Holds
 from brain.memory import Memory
@@ -177,7 +178,7 @@ class AutoPeer:
 def connect(bodies, body_id, tools=("see_screen",), output=()):
     peer = AutoPeer(bodies, body_id, list(output))
     decl = [Tool(name=n, description=f"{n} d", input_schema={"type": "object"}) for n in tools]
-    bodies.connect(Body(id=body_id, kind="desktop", name=body_id), decl, peer, None)
+    bodies.connect(Body(id=body_id, kind="desktop", name=body_id), decl, peer, None, LOCAL)
     return peer
 
 
@@ -323,7 +324,11 @@ def test_body_tool_effect_read_is_auto():
     bodies = Bodies()
     decl = [Tool(name="look", description="d", input_schema={"type": "object"}, effect="read")]
     bodies.connect(
-        Body(id="desktop", kind="desktop", name="d"), decl, AutoPeer(bodies, "desktop", []), None
+        Body(id="desktop", kind="desktop", name="d"),
+        decl,
+        AutoPeer(bodies, "desktop", []),
+        None,
+        LOCAL,
     )
     (s,) = BodySource(bodies).specs()
     assert body_box(bodies).mode(s) == "auto"
@@ -333,7 +338,11 @@ def test_body_tool_confirm_true_is_locked():
     bodies = Bodies()
     decl = [Tool(name="rm", description="d", input_schema={"type": "object"}, confirm=True)]
     bodies.connect(
-        Body(id="desktop", kind="desktop", name="d"), decl, AutoPeer(bodies, "desktop", []), None
+        Body(id="desktop", kind="desktop", name="d"),
+        decl,
+        AutoPeer(bodies, "desktop", []),
+        None,
+        LOCAL,
     )
     (s,) = BodySource(bodies).specs()
     assert s.tier is Tier.locked
@@ -344,7 +353,11 @@ def test_body_tool_confirm_always_is_person_only_and_always_asks():
     bodies = Bodies()
     decl = [Tool(name="rm", description="d", input_schema={"type": "object"}, confirm="always")]
     bodies.connect(
-        Body(id="desktop", kind="desktop", name="d"), decl, AutoPeer(bodies, "desktop", []), None
+        Body(id="desktop", kind="desktop", name="d"),
+        decl,
+        AutoPeer(bodies, "desktop", []),
+        None,
+        LOCAL,
     )
     (s,) = BodySource(bodies).specs()
     assert s.tier is Tier.person_only
@@ -1381,7 +1394,11 @@ def test_install_ocr_language_declared_always_is_person_only_with_no_new_gate():
         )
     ]
     bodies.connect(
-        Body(id="desktop", kind="desktop", name="d"), decl, AutoPeer(bodies, "desktop", []), None
+        Body(id="desktop", kind="desktop", name="d"),
+        decl,
+        AutoPeer(bodies, "desktop", []),
+        None,
+        LOCAL,
     )
     (s,) = BodySource(bodies).specs()
     assert s.tier is Tier.person_only

@@ -8,6 +8,7 @@ import asyncio
 import errno
 import logging
 import os
+import socket
 import sys
 import time
 from collections.abc import Callable
@@ -16,15 +17,18 @@ from functools import partial
 from pathlib import Path
 
 from anthropic import AsyncAnthropic
+from zeroconf.asyncio import AsyncZeroconf
 
 from brain.apps import Apps, TokenFile
-from brain.auth import Authenticator
+from brain.auth import listener_auth
 from brain.bodies import Bodies
 from brain.bodies_tools import bodies_tools
 from brain.bridges import ENTRY, WHATSAPP_SECRETS, BridgeSupervisor, private_node, real_spawn
 from brain.build_info import app_version, build_id
 from brain.chat_tools import chat_tools
 from brain.config import in_quiet_hours, load_config, load_env_file, session_id
+from brain.device_tools import device_tools
+from brain.discovery import Advertiser, lan_address
 from brain.events import EventLog
 from brain.events_tools import events_tools
 from brain.experts import ExpertHosts
@@ -44,6 +48,7 @@ from brain.models import chosen as chosen_model
 from brain.models import model_name
 from brain.offers import OfferSettings
 from brain.open_items import OpenItems
+from brain.pairing import LOOPBACK_KINDS, NETWORK_KINDS, build_pairing
 from brain.server import start_server
 from brain.sessions import Session
 from brain.setup.apps import app_setup_tools
@@ -146,7 +151,15 @@ async def _run() -> None:
     tokens = TokenFile(config.data_dir)
     apps = Apps(memory, bodies.notify, os.environ, tokens=tokens, data_dir=config.data_dir)
     local_token = load_or_create_local_token(config.data_dir)
-    auth = Authenticator(local_token)
+    identity = load_or_create_identity(config.data_dir)
+
+    devices, pairing = build_pairing(
+        memory.db,
+        identity,
+        config.network_port,
+        on_revoke=lambda device_id: bodies.drop_principal(f"device:{device_id}"),
+    )
+    auth, network_auth = listener_auth(local_token, devices)
     secrets = cached(
         lambda: [
             local_token,
@@ -256,7 +269,7 @@ async def _run() -> None:
             "addr": f"{config.host}:{config.port}",
             "network": config.network,
             "network_port": config.network_port,
-            "fingerprint": identity.fingerprint if identity else None,
+            "fingerprint": identity.fingerprint if config.network else None,
             "data_dir": str(config.data_dir),
             "log_path": str(config.data_dir / "brain.log"),
             "places": [{"id": b.id, "kind": b.kind, "name": b.name} for b in bodies.online()],
@@ -304,6 +317,7 @@ async def _run() -> None:
         + loop_tools(loops)
         + brain_status_tools(brain_status)
         + home_update_tools(updates)
+        + device_tools(devices, pairing, config.network)
         + bodies_tools(
             bodies, lambda: bridges, config.data_dir, os.environ, bodies.notify, secrets.clear
         )
@@ -325,8 +339,8 @@ async def _run() -> None:
     session.ask_runner.home_ended = home_end_reporter(progress, bodies.notify)
     bridges: BridgeSupervisor | None = None  # built once the brain's port is known
     update_loop: asyncio.Task | None = None
-    identity = None  # made with the network listener, which TAGALONG_NETWORK=1 turns on
     network_server = None
+    advertiser: Advertiser | None = None
     lag_watch: asyncio.Task | None = None
     perf_dump: asyncio.Task | None = None
     voice = VoiceService(  # models load on first listen and first spoken turn
@@ -364,13 +378,17 @@ async def _run() -> None:
             session_id(config.data_dir),
             session,
             (app_version(), build),
-            auth=auth,
             **kwargs,
         )
 
     try:
         try:
-            server = await serve(config.host, config.port)
+            server = await serve(
+                config.host,
+                config.port,
+                auth=auth,
+                redeem=partial(pairing.redeem, kinds=LOOPBACK_KINDS),
+            )
         except OSError as err:  # WSAEADDRINUSE (10048) on Windows, EADDRINUSE elsewhere
             if err.errno not in (getattr(errno, "WSAEADDRINUSE", 10048), errno.EADDRINUSE):
                 raise
@@ -384,10 +402,19 @@ async def _run() -> None:
         # Only now, with the port ours: a second brain that failed to bind must not touch it.
         write_pid(config.data_dir, os.getpid(), real_started(os.getpid()))
         if config.network:
-            identity = load_or_create_identity(config.data_dir)
             network_server = await serve(
-                "0.0.0.0", config.network_port, ssl_context=server_ssl_context(identity)
+                "0.0.0.0",
+                config.network_port,
+                auth=network_auth,
+                ssl_context=server_ssl_context(identity),
+                redeem=partial(pairing.redeem, kinds=NETWORK_KINDS),
             )
+            advertiser = Advertiser(AsyncZeroconf)
+            try:
+                await advertiser.start(socket.gethostname(), config.network_port, lan_address())
+            except OSError as err:  # no usable interface: devices can still pair by link
+                log.warning("not announcing this brain on the home network: %s", err)
+                advertiser = None
         await asyncio.to_thread(
             sweep_staging, config.data_dir
         )  # an install a killed brain left half-staged
@@ -432,6 +459,8 @@ async def _run() -> None:
         await apps.shutdown()
         await session.stop_background()  # tools a talked-over turn left running end here
         memory.close()
+        if advertiser is not None:
+            await advertiser.stop()
         if network_server:
             network_server.close()
             await network_server.wait_closed()

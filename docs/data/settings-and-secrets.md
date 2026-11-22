@@ -300,6 +300,10 @@ it), and is never printed. `tagalong doctor` says only whether a key is set.
   and marks a refused one (`SettingsFieldError`,
   `bodies/desktop/src/renderer/src/settings-form.ts`).
 
+## Paired devices
+
+`tagalong.db` holds the paired devices (`devices`) and one-time pairing codes (`pair_codes`). Only the SHA-256 of a device token or a code is stored, so the database cannot be used to log in; the token is shown once, on the device that paired. A pairing link carries the code and the certificate fingerprint, so treat it like a password for 10 minutes. See [storage.md](storage.md#devices-and-pairing).
+
 ## Privacy notes
 
 The settings file holds no secrets, and `hideSecrets` keeps them out of the log. See

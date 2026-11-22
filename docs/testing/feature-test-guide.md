@@ -3156,3 +3156,14 @@ Automated: `cd brain && uv run pytest tests/test_events.py tests/test_runner.py 
 
 1. **Automated.** `pnpm --filter @tagalong/desktop test:e2e e2e/catch-up.spec.ts` drops the link twice, saving a reply each time, and answers `resync: true`. **Expected:** the bubble shows each reply; the second catch-up calls `chat_since` with `after_id` of the first reply.
 2. **By hand.** With the real brain and the desktop open, put the PC to sleep or disconnect the network, let a long reply finish on WhatsApp (or ask something long and disconnect mid-reply), then reconnect. **Expected:** after the reconnect the reply appears in the bubble once; a second reconnect does not show it again.
+
+## Pair another device (automated; the network part by hand)
+
+Automated: `brain/tests/test_devices.py`, `test_pairing.py` (one use, expiry, five wrong codes lock the right one out, a kind-bound code), `test_server_pairing.py` (`pair` before `hello`, loopback takes only browser codes, revoke closes the connection and a reconnect gets `unauthorized`), `test_auth.py` (the network listener takes device tokens and not the local token), `test_pair_cli.py`, `test_discovery.py` and `test_device_tools.py` (`pair_make` refuses non-browser kinds with the network off).
+
+By hand, with two machines on one network:
+
+1. On the brain machine set `TAGALONG_NETWORK=1`, start the brain, run `cd brain && uv run tagalong pair`. A QR and a `tagalong://pair?...` link print; with the network off it says so and exits.
+2. Redeem the link from the other machine within 10 minutes: it gets a device token and connects. The same link a second time is refused.
+3. In Home, list devices: the new one shows; rename it; revoke it. Its connection closes at once and a reconnect is refused.
+4. The brain machine's own `local-token` must not work against port 47323.

@@ -172,6 +172,24 @@ class HelloResult(Model):
     build: str | None = None
 
 
+DeviceKind = Literal["desktop", "browser", "node", "mcp_client"]
+
+
+class PairDevice(Model):
+    name: Annotated[str, Field(min_length=1, max_length=40)]
+    kind: DeviceKind
+
+
+class PairParams(Model):
+    code: str = Field(min_length=1)
+    device: PairDevice
+
+
+class PairResult(Model):
+    device_id: Id
+    token: str
+
+
 class ToolsParams(Model):
     tools: list[Tool]
 
@@ -539,6 +557,7 @@ type MethodMap = dict[str, tuple[type[BaseModel], type[BaseModel] | None]]
 
 BODY_TO_BRAIN: MethodMap = {
     "hello": (HelloParams, HelloResult),
+    "pair": (PairParams, PairResult),
     "tools": (ToolsParams, EmptyResult),
     "say": (SayParams, SayResult),
     "event": (EventParams, None),

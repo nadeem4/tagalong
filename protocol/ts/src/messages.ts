@@ -39,6 +39,18 @@ export const HelloResult = z.object({
 });
 export type HelloResult = z.infer<typeof HelloResult>;
 
+export const PairParams = z.object({
+  code: z.string().min(1),
+  device: z.object({
+    name: z.string().min(1).max(40),
+    kind: z.enum(['desktop', 'browser', 'node', 'mcp_client']),
+  }),
+});
+export type PairParams = z.infer<typeof PairParams>;
+
+export const PairResult = z.object({ device_id: Id, token: z.string() });
+export type PairResult = z.infer<typeof PairResult>;
+
 export const ToolsParams = z.object({ tools: z.array(Tool) });
 export type ToolsParams = z.infer<typeof ToolsParams>;
 
@@ -374,6 +386,7 @@ export interface MethodSchemas {
 
 export const bodyToBrain = {
   hello: { params: HelloParams, result: HelloResult },
+  pair: { params: PairParams, result: PairResult },
   tools: { params: ToolsParams, result: EmptyResult },
   say: { params: SayParams, result: SayResult },
   event: { params: EventParams },

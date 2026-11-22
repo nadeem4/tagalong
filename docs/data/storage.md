@@ -627,6 +627,14 @@ How far each app's mail has been read.
 - Retention: everything goes on `wipe`.
 - Masked: no.
 
+## Devices and pairing
+
+Migration 0041. Code reaches these tables only through `store/devices.py`.
+
+- `devices`: `id`, `name`, `kind` (desktop, browser, node, mcp_client), `token_hash` (SHA-256, unique; the token itself is never stored), `paired_at`, `last_seen`, `revoked_at`. A revoked row stays for the record and no longer verifies.
+- `pair_codes`: `id`, `secret_hash` (SHA-256, unique), `kind`, `expires_at`, `used_at`. A code lives 10 minutes and is redeemed once by a single conditional update; expired rows are deleted.
+- `pair_failures`: `at`. One row per refused code, counted over the last minute for the rate limit; older rows are deleted at the next redeem. Indexed on `at`.
+
 ## Rules and approvals
 
 ### rules

@@ -121,6 +121,10 @@ missing, and `tagalong key set`, `install <expert>`, `login <expert>` and `apps 
 same setup from a terminal (see [docs/development.md](docs/development.md)); none of them needs the
 brain to be running. `uv run tagalong perf` prints how long the brain's steps take.
 
+To use the brain from another device, set `TAGALONG_NETWORK=1`, start the brain, then run
+`uv run tagalong pair`: it prints a QR and a `tagalong://pair?...` link, valid 10 minutes and once. The
+brain accepts only device tokens on that network port, and Home can rename or revoke a device.
+
 Upgrading: if you installed the Claude Code adapter globally with npm before, set
 `TAGALONG_EXPERT_CMD=claude-agent-acp` to keep using it, or let Scout install it.
 
