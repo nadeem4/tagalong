@@ -276,9 +276,12 @@ export class BrainClient {
       await this.seqLoad;
       if (this.socket !== socket) return;
     }
+    const token = this.options.token();
+    // No token yet (the brain has not written it): dial again rather than get refused for good.
+    if (token === '') return socket.close();
     const params = {
       protocol: PROTOCOL,
-      token: this.options.token(),
+      token,
       body: this.options.body,
       tools: this.options.tools(),
       ...(this.lastSeq === null ? {} : { last_seq: this.lastSeq }),

@@ -70,8 +70,8 @@ export function startBrain(options: StartBrainOptions): BrainClient {
     addr: env.TAGALONG_BRAIN_ADDR ?? DEFAULT_ADDR,
     // The PC's name is shown to the person, so two desktops can be told apart.
     body: { id: bodyId, kind: 'desktop', name: hostname() },
-    // Read on every dial: a brain started after the desktop writes the file late, and an empty
-    // token is refused, so the client simply tries again.
+    // Read on every dial: a brain started after the desktop writes the file late, and the
+    // client does not say hello without a token, so it dials again.
     token: () => readLocalToken(env, homedir()) ?? '',
     tools: () => tools,
     openSocket,

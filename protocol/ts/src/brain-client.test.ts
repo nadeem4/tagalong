@@ -313,6 +313,22 @@ describe('BrainClient', () => {
     expect(sockets[1]!.sent[0]!.params.token).toBe('second');
   });
 
+  it('an empty token sends no hello, closes, and dials again until the token appears', async () => {
+    let token = '';
+    const { sockets, statuses, client } = setup(100, { token: () => token });
+    client.start();
+    sockets[0]!.opens();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sockets[0]!.sent).toHaveLength(0);
+    expect(sockets[0]!.closed).toBe(true);
+    sockets[0]!.drop();
+    expect(statuses.at(-1)).not.toBe('unauthorized');
+    token = 'late';
+    await vi.advanceTimersByTimeAsync(100);
+    sockets[1]!.opens();
+    expect(sockets[1]!.sent[0]!.params.token).toBe('late');
+  });
+
   it('socket close: pending say rejects BrainOffline, status offline, retries after retryMs', async () => {
     const { client, s, sockets, statuses } = await online(500);
     const p = client.say({ id: 'e1', text: 'hi' });
