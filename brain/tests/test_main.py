@@ -752,6 +752,9 @@ def _spy_listeners(monkeypatch, tmp_path):
         def close(self):
             pass
 
+        async def wait_closed(self):
+            pass
+
         async def serve_forever(self):
             raise RuntimeError("stop")
 
