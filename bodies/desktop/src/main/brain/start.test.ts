@@ -22,6 +22,12 @@ const tools = {
   },
 };
 
+function homeWithToken(token = 'tok'): NodeJS.ProcessEnv {
+  const home = mkdtempSync(join(tmpdir(), 'tg-'));
+  writeFileSync(join(home, 'local-token'), token);
+  return { TAGALONG_HOME: home };
+}
+
 function setup(env: NodeJS.ProcessEnv) {
   const urls: string[] = [];
   const brain = startBrain({
@@ -54,7 +60,7 @@ describe('startBrain', () => {
     let open: () => void = noop;
     const brain = startBrain({
       ...tools,
-      env: {},
+      env: homeWithToken(),
       openSocket: (): BrainSocket => ({
         send: (data) => void sent.push(data),
         close: noop,
@@ -77,13 +83,11 @@ describe('startBrain', () => {
   });
 
   it('sends the local token from the home folder in hello', () => {
-    const home = mkdtempSync(join(tmpdir(), 'tg-'));
-    writeFileSync(join(home, 'local-token'), 'tok-from-file\n');
     const sent: string[] = [];
     let open: () => void = noop;
     const brain = startBrain({
       ...tools,
-      env: { TAGALONG_HOME: home },
+      env: homeWithToken('tok-from-file\n'),
       openSocket: (): BrainSocket => ({
         send: (data) => void sent.push(data),
         close: noop,
@@ -107,7 +111,7 @@ describe('startBrain', () => {
     let open: () => void = noop;
     const brain = startBrain({
       ...tools,
-      env: {},
+      env: homeWithToken(),
       openSocket: (): BrainSocket => ({
         send: (data) => void sent.push(data),
         close: noop,
