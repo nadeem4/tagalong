@@ -20,6 +20,7 @@ export type EmptyResult = z.infer<typeof EmptyResult>;
 
 export const HelloParams = z.object({
   protocol: z.int(),
+  token: z.string().min(1),
   body: Body,
   tools: z.array(Tool),
   last_seq: HandshakeSeq.optional(),
