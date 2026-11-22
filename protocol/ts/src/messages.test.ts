@@ -44,6 +44,7 @@ describe('method maps', () => {
   it('has literal body to brain method names', () => {
     expectTypeOf<BodyToBrainMethod>().toEqualTypeOf<
       | 'hello'
+      | 'pair'
       | 'tools'
       | 'say'
       | 'event'
