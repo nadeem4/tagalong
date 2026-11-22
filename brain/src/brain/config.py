@@ -23,6 +23,7 @@ DEFAULT_READER_DAILY_USD = 0.5
 DEFAULT_LOOP_POLL_S = 300  # how often a switched-on mail app is read for loops
 DEFAULT_LOOP_STALE_DAYS = 7  # a held loop untouched this long goes to one stale wake
 DEFAULT_STEP_CAP = 25
+DEFAULT_NETWORK_PORT = 47323  # the encrypted listener, when switched on
 DEFAULT_LOOP_LAG_MS = 200  # a blocked event loop longer than this is logged
 DEFAULT_JOB_QUIET_MIN = 20.0
 DEFAULT_EXPERT_IDLE_S = 300.0
@@ -73,6 +74,8 @@ class Config:
     job_steps_max_bytes: int = DEFAULT_JOB_STEPS_MAX_BYTES
     build: str | None = None  # the app's version when packaged; None in a dev checkout
     started_by: Literal["desktop", "person"] = "person"  # who owns the process
+    network: bool = False  # also listen for bodies on other machines, over wss
+    network_port: int = DEFAULT_NETWORK_PORT
 
 
 def split_command(cmd: str, posix: bool | None = None) -> list[str]:
@@ -148,6 +151,8 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
         ),
         build=env.get("TAGALONG_BUILD") or None,
         started_by="desktop" if env.get("TAGALONG_STARTED_BY") == "desktop" else "person",
+        network=env.get("TAGALONG_NETWORK") == "1",
+        network_port=_positive_int(env, "TAGALONG_NETWORK_PORT", DEFAULT_NETWORK_PORT),
     )
 
 

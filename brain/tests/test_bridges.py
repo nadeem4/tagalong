@@ -87,6 +87,7 @@ class Rig:
         self.supervisor = BridgeSupervisor(
             env=self.env,
             brain_addr="127.0.0.1:47321",
+            local_token="tok",
             entry=self.entry,
             ensure_node=self._node,
             spawn=self._spawn,
@@ -133,11 +134,21 @@ def test_settings_complete_only_with_the_five_values():
 def test_child_env_has_only_the_bridge_values(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-should-not-leak-0000")
     monkeypatch.setenv("PATH", "p")
-    env = WhatsAppSettings.from_env({**ON, "SOMETHING_ELSE": "x"}).child_env("127.0.0.1:47321")
+    env = WhatsAppSettings.from_env({**ON, "SOMETHING_ELSE": "x"}).child_env(
+        "127.0.0.1:47321", local_token="tok"
+    )
     assert env["TAGALONG_BRAIN_ADDR"] == "127.0.0.1:47321"
+    assert env["TAGALONG_LOCAL_TOKEN"] == "tok"
     assert env["TAGALONG_WHATSAPP_PORT"] == str(DEFAULT_PORT)
     assert env["TAGALONG_WHATSAPP_ACCESS_TOKEN"] == SECRETS["TAGALONG_WHATSAPP_ACCESS_TOKEN"]
-    allowed = {*SECRETS, "TAGALONG_BRAIN_ADDR", "TAGALONG_WHATSAPP_PORT", "PATH", "SystemRoot"}
+    allowed = {
+        *SECRETS,
+        "TAGALONG_BRAIN_ADDR",
+        "TAGALONG_LOCAL_TOKEN",
+        "TAGALONG_WHATSAPP_PORT",
+        "PATH",
+        "SystemRoot",
+    }
     assert set(env) <= allowed
     assert "ANTHROPIC_API_KEY" not in env and "SOMETHING_ELSE" not in env
 

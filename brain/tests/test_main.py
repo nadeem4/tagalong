@@ -24,7 +24,7 @@ def test_missing_api_key_starts_and_logs_one_line(monkeypatch, tmp_path, caplog)
     class Stop(Exception):
         pass
 
-    async def stop(*args):
+    async def stop(*args, **kwargs):
         raise Stop
 
     monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
@@ -54,7 +54,7 @@ def test_main_opens_db_under_data_dir(monkeypatch, tmp_path):
     class Stop(Exception):
         pass
 
-    async def stop(*args):
+    async def stop(*args, **kwargs):
         raise Stop
 
     monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
@@ -71,7 +71,7 @@ def test_main_sets_up_voice_without_loading_any_model(monkeypatch, tmp_path):
 
     seen = {}
 
-    async def stop(host, port, bodies, session_id, session, build):
+    async def stop(host, port, bodies, session_id, session, build, **kwargs):
         seen["voice"] = session.voice
         raise Stop
 
@@ -97,7 +97,7 @@ def test_start_fills_the_job_slots_after_the_resume_scan(monkeypatch, tmp_path):
         async def serve_forever(self):
             raise Stop
 
-    async def serve(*args):
+    async def serve(*args, **kwargs):
         return Server()
 
     seen = []
@@ -197,7 +197,7 @@ def test_run_masks_the_root_log_handlers(monkeypatch, tmp_path):
     root.addHandler(handler)
     before = {h: list(h.filters) for h in root.handlers}
 
-    async def stop(*args):
+    async def stop(*args, **kwargs):
         raise RuntimeError("stop")
 
     monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
@@ -223,7 +223,7 @@ def test_memory_closed_on_shutdown(monkeypatch, tmp_path):
             closed.append(True)
             super().close()
 
-    async def stop(*args):
+    async def stop(*args, **kwargs):
         raise RuntimeError("stop")
 
     monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
@@ -249,7 +249,7 @@ def test_start_sweeps_install_staging_once_the_port_is_ours(monkeypatch, tmp_pat
         async def serve_forever(self):
             raise Stop
 
-    async def listen(*args):
+    async def listen(*args, **kwargs):
         return Server()
 
     swept = []
@@ -268,7 +268,7 @@ def _key_source(monkeypatch, tmp_path, env_key, file_key):
 
     seen = {}
 
-    async def stop(host, port, bodies, session_id, session, build):
+    async def stop(host, port, bodies, session_id, session, build, **kwargs):
         seen["status"] = json.loads(await session.call_home("key_status", {}))
         seen["session"] = session
         raise Stop
@@ -295,7 +295,7 @@ def test_home_has_the_bodies_tools(monkeypatch, tmp_path):
 
     seen = {}
 
-    async def stop(host, port, bodies, session_id, session, build):
+    async def stop(host, port, bodies, session_id, session, build, **kwargs):
         seen["bodies"] = json.loads(await session.call_home("bodies_status", {}))
         seen["wa"] = json.loads(await session.call_home("whatsapp_status", {}))
         raise Stop
@@ -361,7 +361,7 @@ def test_accepting_a_key_clears_the_masker_cache(monkeypatch, tmp_path):
     class Stop(Exception):
         pass
 
-    async def stop(host, port, bodies, session_id, session, build):
+    async def stop(host, port, bodies, session_id, session, build, **kwargs):
         await session.call_home("set_api_key", {"key": "sk-ant-example-new-key"})
         raise Stop
 
@@ -379,7 +379,7 @@ def test_accepting_a_key_clears_the_masker_cache(monkeypatch, tmp_path):
 def test_setup_tools_are_scouts_and_not_offered_to_home(monkeypatch, tmp_path):
     seen = []
 
-    async def stop(host, port, bodies, sid, session, build):
+    async def stop(host, port, bodies, sid, session, build, **kwargs):
         seen.append(session)
         raise RuntimeError("stop")
 
@@ -405,7 +405,7 @@ def test_main_starts_the_loop_service(monkeypatch, tmp_path):
     started = []
     monkeypatch.setattr(main.LoopService, "start", lambda self: started.append(self))
 
-    async def stop(*args):
+    async def stop(*args, **kwargs):
         raise RuntimeError("stop")
 
     monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
@@ -443,7 +443,7 @@ def test_main_writes_and_clears_the_pid_file(monkeypatch, tmp_path):
             seen["pid"] = (tmp_path / "brain.pid").read_text().split()[0]
             raise RuntimeError("stop")
 
-    async def bound(*args):
+    async def bound(*args, **kwargs):
         assert not (tmp_path / "brain.pid").exists()  # written only once the port is ours
         return Server()
 
@@ -459,7 +459,7 @@ def test_main_writes_and_clears_the_pid_file(monkeypatch, tmp_path):
 def test_a_second_brain_that_cannot_bind_leaves_the_first_pid_file(monkeypatch, tmp_path):
     (tmp_path / "brain.pid").write_text("999999 t1")
 
-    async def stop(*args):
+    async def stop(*args, **kwargs):
         raise OSError("address in use")
 
     monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
@@ -541,7 +541,7 @@ def test_whatsapp_secrets_are_masked_in_logs(monkeypatch, tmp_path):
 def test_busy_port_is_one_plain_line_and_exit_1(code, monkeypatch, tmp_path, caplog):
     (tmp_path / "brain.pid").write_text("12345 first-brain")  # the running brain's file
 
-    async def busy(*args):
+    async def busy(*args, **kwargs):
         raise OSError(code, "address already in use")
 
     monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
@@ -558,7 +558,7 @@ def test_busy_port_is_one_plain_line_and_exit_1(code, monkeypatch, tmp_path, cap
 
 
 def test_other_bind_errors_are_not_called_a_busy_port(monkeypatch, tmp_path, caplog):
-    async def denied(*args):
+    async def denied(*args, **kwargs):
         raise OSError(errno.EACCES, "permission denied")
 
     monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
@@ -604,7 +604,7 @@ def test_status_marks_work_running_while_a_job_runs(monkeypatch, tmp_path):
 
     seen = {}
 
-    async def stop(host, port, bodies, session_id, session, build):
+    async def stop(host, port, bodies, session_id, session, build, **kwargs):
         seen["idle"] = json.loads(await session.call_home("brain_status", {}))
         session.records.add_job("j1", "claude-code", "fix it", str(tmp_path), "ask")
         seen["busy"] = json.loads(await session.call_home("brain_status", {}))
@@ -650,7 +650,7 @@ class _Hang:
 def _stop_mid_turn(model, said, seen):
     """A server stand-in: a desktop says something, its turn starts, then the brain stops."""
 
-    async def start(host, port, bodies, session_id, session, build):
+    async def start(host, port, bodies, session_id, session, build, **kwargs):
         session._model = model
         join(session, "desktop")
         await session.say("desktop", said)
@@ -693,7 +693,7 @@ def test_a_say_survives_a_stop_and_restart(monkeypatch, tmp_path):
     answer = Gate(["hi there"])
     state = {}
 
-    async def restart(host, port, bodies, session_id, session, build):
+    async def restart(host, port, bodies, session_id, session, build, **kwargs):
         session._model = answer
         state["first"] = session.events.get(said.id).state
         join(session, "desktop")
@@ -727,7 +727,7 @@ def test_shutdown_stops_the_turn_before_anything_can_post_news(monkeypatch, tmp_
 
         return tools, reinstall, stop_installs
 
-    async def start(host, port, bodies, session_id, session, build):
+    async def start(host, port, bodies, session_id, session, build, **kwargs):
         raise _Stop
 
     monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
@@ -737,3 +737,50 @@ def test_shutdown_stops_the_turn_before_anything_can_post_news(monkeypatch, tmp_
     with pytest.raises(_Stop):
         asyncio.run(_run())
     assert order == ["stop_turn", "stop_installs"]
+
+
+def _spy_listeners(monkeypatch, tmp_path):
+    started = []
+
+    class Sock:
+        def getsockname(self):
+            return ("0.0.0.0", 1)
+
+    class Server:
+        sockets = [Sock()]
+
+        def close(self):
+            pass
+
+        async def serve_forever(self):
+            raise RuntimeError("stop")
+
+    async def start_server(host, port, *args, **kwargs):
+        started.append((host, port, kwargs))
+        return Server()
+
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake")
+    monkeypatch.delenv("TAGALONG_BRAIN_ADDR", raising=False)
+    monkeypatch.delenv("TAGALONG_NETWORK", raising=False)
+    monkeypatch.setattr(main, "start_server", start_server)
+    return started
+
+
+def test_only_the_loopback_listener_runs_by_default(monkeypatch, tmp_path):
+    started = _spy_listeners(monkeypatch, tmp_path)
+    with pytest.raises(RuntimeError):
+        asyncio.run(_run())
+    assert [(h, p) for h, p, _ in started] == [("127.0.0.1", 47321)]
+    assert "ssl_context" not in started[0][2]
+    assert (tmp_path / "local-token").exists()
+
+
+def test_network_switch_adds_an_encrypted_listener(monkeypatch, tmp_path):
+    started = _spy_listeners(monkeypatch, tmp_path)
+    monkeypatch.setenv("TAGALONG_NETWORK", "1")
+    with pytest.raises(RuntimeError):
+        asyncio.run(_run())
+    assert [(h, p) for h, p, _ in started] == [("127.0.0.1", 47321), ("0.0.0.0", 47323)]
+    assert started[1][2]["ssl_context"] is not None
+    assert (tmp_path / "identity" / "cert.pem").exists()

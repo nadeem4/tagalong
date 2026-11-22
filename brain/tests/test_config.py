@@ -396,3 +396,15 @@ def test_stt_choice_env_names():
     assert (load_config({}).stt_live, load_config({}).stt_final) == (None, None)
     cfg = load_config({"TAGALONG_STT_LIVE": "moonshine-small", "TAGALONG_STT_FINAL": "off"})
     assert (cfg.stt_live, cfg.stt_final) == ("moonshine-small", "off")
+
+
+def test_network_is_off_by_default(tmp_path):
+    cfg = load_config({"TAGALONG_HOME": str(tmp_path)})
+    assert cfg.network is False and cfg.network_port == 47323
+
+
+def test_network_switch_and_port(tmp_path):
+    cfg = load_config(
+        {"TAGALONG_HOME": str(tmp_path), "TAGALONG_NETWORK": "1", "TAGALONG_NETWORK_PORT": "50000"}
+    )
+    assert cfg.network is True and cfg.network_port == 50000
