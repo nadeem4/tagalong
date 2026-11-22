@@ -22,7 +22,6 @@ from brain.protocol import (
     ErrorCode,
     ErrorObject,
     FocusData,
-    HelloParams,
     ReadAloudData,
     ReadingData,
     SayParams,
@@ -533,14 +532,3 @@ def test_answer_check_back_only_with_not_now():
     assert answer.model_validate({"ask": "a", "option": "not_now", "check_back_at": at})
     with pytest.raises(ValidationError):
         answer.model_validate({"ask": "a", "option": "allow", "check_back_at": at})
-
-
-def test_hello_requires_a_token():
-    base = {
-        "protocol": 3,
-        "body": {"id": "desktop-a1b2c3", "kind": "desktop", "name": "PC"},
-        "tools": [],
-    }
-    with pytest.raises(ValidationError):
-        HelloParams.model_validate(base)
-    assert HelloParams.model_validate({**base, "token": "t"}).token == "t"

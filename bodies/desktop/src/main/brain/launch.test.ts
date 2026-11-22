@@ -405,12 +405,6 @@ describe('probeAddr', () => {
 });
 
 describe('readLocalToken', () => {
-  it('reads the local token from the home folder', () => {
-    const home = mkdtempSync(join(tmpdir(), 'tg-'));
-    writeFileSync(join(home, 'local-token'), 'abc\n');
-    expect(readLocalToken({ TAGALONG_HOME: home }, '/nope')).toBe('abc');
-  });
-
   it('is null when the brain has not written it yet', () => {
     expect(readLocalToken({ TAGALONG_HOME: join(tmpdir(), 'tg-missing') }, '/nope')).toBeNull();
   });

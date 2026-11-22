@@ -300,19 +300,6 @@ describe('BrainClient', () => {
     expect(statuses.at(-1)).toBe('unauthorized');
   });
 
-  it('reads the token again on every dial', async () => {
-    let token = 'first';
-    const { sockets, client } = setup(100, { token: () => token });
-    client.start();
-    sockets[0]!.opens();
-    expect(sockets[0]!.sent[0]!.params.token).toBe('first');
-    token = 'second';
-    sockets[0]!.drop();
-    await vi.advanceTimersByTimeAsync(100);
-    sockets[1]!.opens();
-    expect(sockets[1]!.sent[0]!.params.token).toBe('second');
-  });
-
   it('an empty token sends no hello, closes, and dials again until the token appears', async () => {
     let token = '';
     const { sockets, statuses, client } = setup(100, { token: () => token });

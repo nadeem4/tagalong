@@ -228,7 +228,8 @@ def _hello(
     auth: Authenticator,
 ) -> str | None:
     """Join the body and queue the result, the backlog, then any open asks it cannot have;
-    None means hello failed. The token is checked before the body joins, and never logged."""
+    None means hello failed. The token is checked before the shape, so an unauthenticated
+    caller gets no validation text; it is never logged."""
     raw = message.get("params")
     # Check the version first: a future protocol may change the shape, and its body
     # should learn "mismatch", not "invalid params".
@@ -237,13 +238,14 @@ def _hello(
         data = {"protocol": PROTOCOL}
         peer.send(_error(req_id, ErrorCode.version_mismatch, "Unsupported protocol", data))
         return None
+    token = raw.get("token") if isinstance(raw, dict) else None
+    if not isinstance(token, str) or auth.identify(token) is None:
+        peer.send(_error(req_id, ErrorCode.unauthorized, "Unknown or revoked token"))
+        return None
     try:
         params = HelloParams.model_validate(raw)
     except ValidationError as exc:
         peer.send(_error(req_id, ErrorCode.invalid_params, str(exc)))
-        return None
-    if auth.identify(params.token) is None:
-        peer.send(_error(req_id, ErrorCode.unauthorized, "Unknown or revoked token"))
         return None
     joined = bodies.connect(params.body, params.tools, peer, params.last_seq)
     result = HelloResult(

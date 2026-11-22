@@ -535,7 +535,7 @@ By hand:
 
 1. Start the brain and open the desktop: it connects (the desktop reads `~/.tagalong/local-token`).
 2. Delete `local-token` while the brain runs and restart only the desktop: it stays offline until the brain restarts and writes the file again.
-3. In the browser add-on's popup, with no pairing code the status says "Scout needs a pairing code"; paste the contents of `local-token` and it connects.
+3. In the browser add-on's popup, with no pairing code saved the body shows offline and keeps redialing without sending a hello; paste the contents of `local-token` and save: it redials at once and connects. A wrong code shows "Scout needs a pairing code".
 4. `TAGALONG_NETWORK=1 uv run brain`: the log shows a second listener on 47323, and `brain_status` reports the certificate fingerprint.
 
 ## Permission engine (unit tests only)

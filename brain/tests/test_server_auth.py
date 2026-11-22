@@ -101,3 +101,17 @@ async def test_wss_listener_serves_hello_and_refuses_plain_ws(make_env, tmp_path
         async with connect(f"ws://127.0.0.1:{port}") as ws:
             await ws.send(frame("good"))
             await ws.recv()
+
+
+@pytest.mark.parametrize("token", [None, "", 7])
+async def test_a_hello_without_a_usable_token_is_unauthorized_and_echoes_nothing(make_env, token):
+    _, port = await make_env(Authenticator("good"))
+    message = json.loads(frame(token))
+    if token is None:
+        del message["params"]["token"]
+    message["params"]["body"] = {"id": "UPPER-secret-input"}
+    async with connect(f"ws://127.0.0.1:{port}") as ws:
+        await ws.send(json.dumps(message))
+        reply = await ws.recv()
+    assert json.loads(reply)["error"]["code"] == -32009
+    assert "UPPER-secret-input" not in reply
