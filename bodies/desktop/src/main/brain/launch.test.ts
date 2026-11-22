@@ -12,6 +12,7 @@ import {
   packagedEnv,
   probeAddr,
   readLocalToken,
+  runTagalong,
   stopBrain,
 } from './launch';
 import type { LaunchOptions } from './launch';
@@ -414,5 +415,27 @@ describe('probeAddr', () => {
 describe('readLocalToken', () => {
   it('is null when the brain has not written it yet', () => {
     expect(readLocalToken({ TAGALONG_HOME: join(tmpdir(), 'tg-missing') }, '/nope')).toBeNull();
+  });
+});
+
+describe('runTagalong', () => {
+  it('runs a tagalong command with the brain env and returns its exit code and output', async () => {
+    const { options, spawned } = setup({ env: { KEEP: '1' }, uv: 'C:/uv.exe' });
+    const spawn: LaunchOptions['spawn'] = (cmd, args, opts) => {
+      const child = options.spawn(cmd, args, opts) as unknown as FakeChild;
+      queueMicrotask(() => {
+        child.stdout.emit('data', Buffer.from('installed\n'));
+        child.emit('exit', 0);
+      });
+      return child as never;
+    };
+    expect(await runTagalong({ ...options, spawn }, ['service', 'status'])).toEqual({
+      code: 0,
+      out: 'installed\n',
+    });
+    expect(spawned[0]).toMatchObject({
+      cmd: 'C:/uv.exe',
+      args: ['run', '--no-sync', 'tagalong', 'service', 'status'],
+    });
   });
 });

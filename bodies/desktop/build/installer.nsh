@@ -2,6 +2,8 @@
 ; never meets a brain still holding them. The brain writes "<pid> <start time>" to brain.pid in
 ; its data folder (TAGALONG_HOME, else %USERPROFILE%\.tagalong); a missing file means no brain.
 ; Pids are reused, so taskkill only matches a Python process: a stale file never ends a stranger.
+; The brain service (`tagalong service install`, a scheduled task named TagalongBrain) is
+; ended first, or its restart-on-failure would bring the brain back.
 
 !macro tagalongStopBrain id
   Push $0
@@ -9,6 +11,8 @@
   Push $2
   Push $3
   Push $4
+  nsExec::Exec 'schtasks /End /TN "TagalongBrain"'
+  Pop $0
   ReadEnvStr $0 "TAGALONG_HOME"
   StrCmp $0 "" 0 +2
   StrCpy $0 "$PROFILE\.tagalong"
@@ -47,4 +51,15 @@
 
 !macro customUnInit
   !insertmacro tagalongStopBrain uninstall
+!macroend
+
+; A service that was installed starts again on the new files; without one this fails harmlessly.
+!macro customInstall
+  nsExec::Exec 'schtasks /Run /TN "TagalongBrain"'
+  Pop $0
+!macroend
+
+!macro customUnInstall
+  nsExec::Exec 'schtasks /Delete /TN "TagalongBrain" /F'
+  Pop $0
 !macroend
