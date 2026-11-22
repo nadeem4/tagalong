@@ -195,7 +195,9 @@ describe('the browser body', () => {
   });
 
   it('the_popup_name_overrides_the_default_name', async () => {
-    const { body, sockets } = setup({ storage: memoryStorage({ bodyName: 'Work Chrome' }) });
+    const { body, sockets } = setup({
+      storage: memoryStorage({ bodyName: 'Work Chrome', brainToken: 't0k' }),
+    });
     await body.start();
     sockets[0]!.open();
     await settle();
