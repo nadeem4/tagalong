@@ -1,6 +1,6 @@
 # The Python brain
 
-The brain is the Python side of contract v1 ([protocol/README.md](../../protocol/README.md)). Bodies connect, declare their tools, catch up on missed notifications and talk to Scout: `say` starts a turn and the reply streams back. Scout uses the tools bodies declare and asks the person first before a tool that changes something. This page is the overview and the home of the sections that have no doc of their own; read it first, then the doc for the part you are working on.
+The brain is the Python side of contract v3 ([protocol/README.md](../../protocol/README.md)). Bodies connect, declare their tools, catch up on missed notifications and talk to Scout: `say` starts a turn and the reply streams back. Scout uses the tools bodies declare and asks the person first before a tool that changes something. This page is the overview and the home of the sections that have no doc of their own; read it first, then the doc for the part you are working on.
 
 - [Run it](#run-it)
 - [Module map](#module-map)
@@ -48,6 +48,8 @@ variable still works and is the developer path.
 
 | Variable                         | Default            | Meaning                                                                                                                                                                           |
 | -------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TAGALONG_NETWORK`               | off                | `1` also listens, encrypted (wss) on `0.0.0.0`, for bodies on other devices. See [safety](safety.md#who-may-connect)                                                              |
+| `TAGALONG_NETWORK_PORT`          | `47323`            | Port of that listener                                                                                                                                                             |
 | `TAGALONG_BRAIN_ADDR`            | `127.0.0.1:47321`  | `host:port` to listen on. Port `0` picks a free port                                                                                                                              |
 | `TAGALONG_HOME`                  | `~/.tagalong`      | Data folder. Holds `session`, `budget.json`, `reader-budget.json`, `tagalong.db`, `.env`, `brain.pid`                                                                             |
 | `TAGALONG_MODEL`                 | `claude-opus-5-5`  | The default model Scout thinks with; a model chosen in Settings wins (see [Models](#models))                                                                                      |

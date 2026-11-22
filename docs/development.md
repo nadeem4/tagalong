@@ -299,9 +299,9 @@ focused window against the capture exclusions in settings (password managers and
 credential prompts by default); when one matches, no picture is taken at all and the bubble is told
 that capture is blocked here, naming only the exclusion entry that matched.
 
-### No pairing token
+### The token on every hello
 
-The Python brain has no pairing token: it is single user and listens on `127.0.0.1`. A body's `hello` carries the protocol version, its id, kind and name, its tools and an optional `last_seq` (see [protocol/README.md](../protocol/README.md)). The desktop shows no pairing step.
+The brain makes a local token at start (`<TAGALONG_HOME>/local-token`, owner-only) and refuses a `hello` without a good one (`unauthorized`, -32009). The desktop reads the file on every dial; the brain gives the WhatsApp bridge `TAGALONG_LOCAL_TOKEN`; the browser add-on keeps a pairing code in its popup. The Electron specs seed a temp `TAGALONG_HOME` with the token their fake brain expects (`e2e/fixtures/launch-env.ts`). `TAGALONG_NETWORK=1` adds a second, encrypted listener (see [safety](brain/safety.md#who-may-connect)). A body's `hello` carries the protocol version, its token, its id, kind and name, its tools and an optional `last_seq` (see [protocol/README.md](../protocol/README.md)). The desktop shows no pairing step.
 
 The data directory is `%APPDATA%\Tagalong` on Windows, which is `productName` in
 `bodies/desktop/package.json`: Electron derives it from there, and changing it moves everyone's
@@ -359,6 +359,7 @@ listed in `.env.example` and described in [brain/README.md](brain/README.md).
 | Variable                | Status                                                                                                                                                                                                                                   |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `TAGALONG_BRAIN_ADDR`   | **Read** (`brain/start.ts`). Host:port the desktop dials for the brain; default `127.0.0.1:47321`. The brain reads the same name for where it listens.                                                                                   |
+| `TAGALONG_HOME`         | **Read** (`brain/launch.ts`). The data folder; the desktop reads the brain's `local-token` from it for every `hello`; the Electron specs point it at a temp folder.                                                                      |
 | `TAGALONG_START_BRAIN`  | **Read** (`brain/launch.ts`). `0` stops the desktop starting a local brain when none is running; the Electron specs that need the brain down set it.                                                                                     |
 | `ELECTRON_RENDERER_URL` | **Read** (`windows/page.ts`). The dev server's address, set by `electron-vite` under `pnpm dev:desktop`; the packaged app loads its files instead.                                                                                       |
 | `TAGALONG_FAKE_MIC=1`   | **Read** (`main/index.ts`). Chromium's fake microphone stands in for a real one (`use-fake-device-for-media-stream`). The brain does the hearing, so the specs' fake brain scripts what it heard. The smoke and listening suites set it. |

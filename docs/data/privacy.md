@@ -126,7 +126,7 @@ brain on this computer it never leaves it. The browser only listens: the answer 
 desktop.
 
 The body can only open websockets, to the brain (`127.0.0.1:47321` unless you change it in the
-popup). It keeps on this browser the brain's address, a name for the browser and its body id (local
+popup). It keeps on this browser the brain's address, a name for the browser, the pairing code the brain accepts and its body id (all in local
 storage), and the number of the last message it received (session storage, which Chrome clears when
 the browser closes). It keeps no pages, tabs or conversations. The toolbar popup lists what you have
 allowed, and Chrome's extension page can remove any of it. What the brain does with a page it was given follows the brain's

@@ -70,7 +70,21 @@ flowchart TB
   SETUP --> FILES
 ```
 
-A body connects to the brain and nothing else, each over its own websocket to `ws://127.0.0.1:47321` (`TAGALONG_BRAIN_ADDR`); the WhatsApp bridge is a Node process the brain itself starts (`bridges.py`), and it alone reaches the internet, to Meta. Everything a person says or that happens (a timer, a finished job) is saved in the event log first, and the runner starts one turn at a time from it. A turn talks to the model over HTTPS, runs tools through the toolbox (body tools over the same websocket, apps over MCP), and hands real work to an expert over ACP; an expert reaches the apps it was granted back through the toolbox, over a loopback MCP server (`expert_apps.py`). Memory, tasks and events live in `tagalong.db`; keys, logs and downloaded models live in the files under `TAGALONG_HOME`.
+A body connects to the brain and nothing else, each over its own websocket to `ws://127.0.0.1:47321` (`TAGALONG_BRAIN_ADDR`) and each proving itself with a token in `hello`; the WhatsApp bridge is a Node process the brain itself starts (`bridges.py`), and it alone reaches the internet, to Meta. Everything a person says or that happens (a timer, a finished job) is saved in the event log first, and the runner starts one turn at a time from it. A turn talks to the model over HTTPS, runs tools through the toolbox (body tools over the same websocket, apps over MCP), and hands real work to an expert over ACP; an expert reaches the apps it was granted back through the toolbox, over a loopback MCP server (`expert_apps.py`). Memory, tasks and events live in `tagalong.db`; keys, logs and downloaded models live in the files under `TAGALONG_HOME`.
+
+### The two listeners
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "arrowheadColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "actorBkg": "#ffffff", "actorBorder": "#000000", "actorTextColor": "#000000", "actorLineColor": "#808080", "signalColor": "#808080", "signalTextColor": "#808080", "sequenceNumberColor": "#ffffff", "labelBoxBkgColor": "#ffffff", "labelBoxBorderColor": "#808080", "labelTextColor": "#000000", "loopTextColor": "#808080", "noteBkgColor": "#f7f7f7", "noteBorderColor": "#808080", "noteTextColor": "#000000", "activationBkgColor": "#f7f7f7", "activationBorderColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}, "themeCSS": ".relationshipLabelBox{opacity:1} .relationshipLabelBox rect{opacity:1}"}}%%
+flowchart LR
+  LB["Desktop, browser add-on, WhatsApp bridge on this PC"] -- "ws, local token" --> L1["Loopback listener 127.0.0.1:47321"]
+  RB["Body on another device"] -- "wss, pinned certificate, token" --> L2["Network listener 0.0.0.0:47323 (TAGALONG_NETWORK=1)"]
+  L1 --> H["hello: version, then token, then join"]
+  L2 --> H
+  H --> BR["Brain"]
+```
+
+The local token is `<TAGALONG_HOME>/local-token`, made by the brain at start and readable only by you. Every `hello` carries a token and the brain refuses an unknown one with `unauthorized` (-32009) and closes the link. The second listener is off unless `TAGALONG_NETWORK=1`; it speaks TLS with a self-signed certificate (`identity/cert.pem` in the data folder) that a body pins by its SHA-256 fingerprint instead of trusting a certificate authority.
 
 ## Processes and how they start
 

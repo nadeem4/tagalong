@@ -29,7 +29,7 @@ Release targets: none (the Windows installer ships by pushing a v* tag; release.
 The brain is Python; the TypeScript apps are bodies.
 
 - A Python brain (brain/) talks to TypeScript bodies (bodies/desktop, bodies/browser, bodies/whatsapp) over the contract in protocol/README.md.
-- Bodies talk only to the brain. Single user.
+- Bodies talk only to the brain, each with a token in `hello` (local token file on this PC; opt-in encrypted listener for other devices, `TAGALONG_NETWORK=1`). Single user.
 - Plans, the current slice and the feature queue live in `.plan/` (local, see `.plan/STATE.md`); Notion is the dashboard only.
 
 ## Commands

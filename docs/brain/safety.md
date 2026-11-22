@@ -3,6 +3,7 @@
 The brain's safety nets that are not about asking the person: the guard runner, secret masking, the daily budget, retries, the cap on long tool output, and the web tools. Read it before you add a guard, a spend, or anything that saves text. Who may approve a tool call is in [permissions.md](permissions.md).
 
 - [Guards](#guards)
+- [Who may connect](#who-may-connect)
 - [Masking secrets](#masking-secrets)
 - [The budget](#the-budget)
 - [Retries and give-ups](#retries-and-give-ups)
@@ -76,6 +77,12 @@ One function, one test, one `add` in `sessions.py`:
 3. Register it with `guards.add(...)`. `sessions.py` calls `spend_guards(budget, step_cap)`, which adds the built-ins in order; a new guard gets one more `add` there, with its settings passed in (never import `config`).
 
 The limits are `TAGALONG_DAILY_BUDGET_USD` and `TAGALONG_STEP_CAP` (see Run it in [README.md](README.md#run-it)). The turn timeout `TAGALONG_TURN_TIMEOUT_S` is a plain argument to the turn loop, not a guard (see [turns.md](turns.md)).
+
+## Who may connect
+
+Every body's `hello` carries a token, checked by `auth.py` before the body joins (`bodies.connect` is not reached for a refused hello). The local token is made at start (`local_token.py`) and saved in `<TAGALONG_HOME>/local-token`, readable only by the owner (`private_file.py`: mode 0600, or `icacls` on Windows); the desktop reads the file and the brain passes it to the WhatsApp bridge as `TAGALONG_LOCAL_TOKEN`. An empty or unknown token gets `unauthorized` (-32009) and the connection closes. Tokens are compared in constant time, added to the masker so they never reach the log or saved text, and never logged.
+
+With `TAGALONG_NETWORK=1` a second listener takes bodies from other devices on `TAGALONG_NETWORK_PORT` (default 47323) over TLS. Its self-signed certificate and key live in `identity/` in the data folder (`identity.py`); a body pins the certificate's SHA-256 fingerprint, which `brain_status` reports. The loopback listener stays plain `ws`.
 
 ## Masking secrets
 

@@ -9,6 +9,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Configuration](#configuration)
 - [Scout's brain](#scouts-brain)
 - [Python brain: talk to Scout](#python-brain-talk-to-scout)
+- [The secure link: a token on every hello](#the-secure-link-a-token-on-every-hello-automated-then-a-quick-check)
 - [The desktop on the Python brain](#the-desktop-on-the-python-brain)
 - [Hand off to Claude Code (real brain, real Claude Code)](#hand-off-to-claude-code-real-brain-real-claude-code)
 - [Claude Code asks Scout first (real brain, real Claude Code)](#claude-code-asks-scout-first-real-brain-real-claude-code)
@@ -525,6 +526,17 @@ Answer a `choose` card and an offer card: each is saved as a handled `card_answe
 5. **Action:** after an answer, tell Scout to keep it as a preference.
    **Expected:** an Allow or Deny card with the sentence. Allow adds it under Home, Approvals;
    Deny saves nothing. A later question shows Scout acting under it, and an install still asks first.
+
+## The secure link: a token on every hello (automated, then a quick check)
+
+Automated: `brain/tests/test_auth.py`, `test_server_auth.py` (good token joins, a bad one gets `unauthorized` and is closed, wss serves a hello and plain ws to that port fails), `test_identity.py`, `test_local_token.py`, `test_private_file.py`; `protocol/ts` (`brain-client.test.ts`: no retry after `unauthorized`); the desktop's `launch.test.ts` and `start.test.ts`.
+
+By hand:
+
+1. Start the brain and open the desktop: it connects (the desktop reads `~/.tagalong/local-token`).
+2. Delete `local-token` while the brain runs and restart only the desktop: it stays offline until the brain restarts and writes the file again.
+3. In the browser add-on's popup, with no pairing code the status says "Scout needs a pairing code"; paste the contents of `local-token` and it connects.
+4. `TAGALONG_NETWORK=1 uv run brain`: the log shows a second listener on 47323, and `brain_status` reports the certificate fingerprint.
 
 ## Permission engine (unit tests only)
 

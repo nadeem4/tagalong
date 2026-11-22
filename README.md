@@ -386,8 +386,9 @@ body for the Python brain, so a brain must be running (`pnpm dev:desktop` starts
    browser**. The installer ships it in `%LOCALAPPDATA%\Programs\Tagalong\resources\extension`.
    From source, build it with `pnpm --filter @tagalong/browser build` and choose
    `bodies/browser/dist`.
-3. Nothing to paste: it dials `127.0.0.1:47321`. Click the toolbar button to see the link, change
-   the brain's address or name the browser.
+3. Click the toolbar button, paste the pairing code (the contents of `<TAGALONG_HOME>/local-token`,
+   `~/.tagalong/local-token` by default) and see the link; change the brain's address or name the
+   browser there too.
 
 Ask Scout about your tabs. The first time it needs something (your tabs, a site, your history and
 so on), a small window asks you. More in
