@@ -43,7 +43,7 @@ async function launch(tourDone: boolean): Promise<void> {
     args: ['.', `--user-data-dir=${dataDir}`],
     cwd: appDir,
     env: {
-      ...launchEnv(),
+      ...launchEnv(dataDir),
       TAGALONG_BRAIN_ADDR: brain.addr,
       TAGALONG_START_BRAIN: '0',
       TAGALONG_FAKE_MIC: '1',

@@ -22,13 +22,11 @@ let brain: FakeBrain;
 
 test.beforeAll(async () => {
   brain = await startFakeBrain();
+  const dataDir = seedSettings(mkdtempSync(join(tmpdir(), 'tagalong-keypause-')));
   app = await electron.launch({
-    args: [
-      '.',
-      `--user-data-dir=${seedSettings(mkdtempSync(join(tmpdir(), 'tagalong-keypause-')))}`,
-    ],
+    args: ['.', `--user-data-dir=${dataDir}`],
     cwd: appDir,
-    env: { ...launchEnv(), TAGALONG_BRAIN_ADDR: brain.addr, TAGALONG_FAKE_MIC: '1' },
+    env: { ...launchEnv(dataDir), TAGALONG_BRAIN_ADDR: brain.addr, TAGALONG_FAKE_MIC: '1' },
   });
 });
 

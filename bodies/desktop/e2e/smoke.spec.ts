@@ -33,15 +33,16 @@ test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async () => {
   brain = await startFakeBrain();
+  const dataDir = seedSettings(mkdtempSync(join(tmpdir(), 'tagalong-smoke-')));
   app = await electron.launch({
     // A fresh profile every run, so a developer's own pets and settings never change what this
     // suite sees.
-    args: ['.', `--user-data-dir=${seedSettings(mkdtempSync(join(tmpdir(), 'tagalong-smoke-')))}`],
+    args: ['.', `--user-data-dir=${dataDir}`],
     cwd: appDir,
     // Fake providers keep the smoke test offline and deterministic: no API key, no
     // network, and a scripted answer that always streams the same way.
     env: {
-      ...launchEnv(),
+      ...launchEnv(dataDir),
       // The desktop dials this brain; nothing else answers a turn now.
       TAGALONG_BRAIN_ADDR: brain.addr,
       // The mic is Chromium's fake device; the fake brain answers the frames with a fixed question.

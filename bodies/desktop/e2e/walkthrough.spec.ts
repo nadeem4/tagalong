@@ -44,7 +44,7 @@ async function launch(addr: string, extraArgs: string[] = [], dir = dataDir): Pr
   app = await electron.launch({
     args: ['.', `--user-data-dir=${dataDir}`, ...extraArgs],
     cwd: appDir,
-    env: { ...launchEnv(), TAGALONG_BRAIN_ADDR: addr, TAGALONG_START_BRAIN: '0' },
+    env: { ...launchEnv(dataDir), TAGALONG_BRAIN_ADDR: addr, TAGALONG_START_BRAIN: '0' },
   });
 }
 

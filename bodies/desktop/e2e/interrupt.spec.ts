@@ -21,15 +21,13 @@ let brain: FakeBrain;
 
 test.beforeAll(async () => {
   brain = await startFakeBrain();
+  const dataDir = seedSettings(mkdtempSync(join(tmpdir(), 'tagalong-interrupt-')));
   app = await electron.launch({
     // A fresh profile: Always listening is off at launch, as on a new install.
-    args: [
-      '.',
-      `--user-data-dir=${seedSettings(mkdtempSync(join(tmpdir(), 'tagalong-interrupt-')))}`,
-    ],
+    args: ['.', `--user-data-dir=${dataDir}`],
     cwd: appDir,
     env: {
-      ...launchEnv(),
+      ...launchEnv(dataDir),
       TAGALONG_BRAIN_ADDR: brain.addr,
       TAGALONG_FAKE_MIC: '1',
     },

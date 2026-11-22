@@ -43,7 +43,7 @@ async function launch(seeded: boolean): Promise<void> {
   app = await electron.launch({
     args: ['.', `--user-data-dir=${dataDir}`],
     cwd: appDir,
-    env: { ...launchEnv(), TAGALONG_BRAIN_ADDR: brain.addr, TAGALONG_START_BRAIN: '0' },
+    env: { ...launchEnv(dataDir), TAGALONG_BRAIN_ADDR: brain.addr, TAGALONG_START_BRAIN: '0' },
   });
 }
 

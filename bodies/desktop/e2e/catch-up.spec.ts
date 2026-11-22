@@ -27,7 +27,7 @@ test.beforeAll(async () => {
   app = await electron.launch({
     args: ['.', `--user-data-dir=${dataDir}`],
     cwd: appDir,
-    env: { ...launchEnv(), TAGALONG_BRAIN_ADDR: brain.addr },
+    env: { ...launchEnv(dataDir), TAGALONG_BRAIN_ADDR: brain.addr },
   });
 });
 

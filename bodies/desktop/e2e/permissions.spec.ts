@@ -30,7 +30,7 @@ test.beforeAll(async () => {
     args: ['.', `--user-data-dir=${dataDir}`],
     cwd: appDir,
     env: {
-      ...launchEnv(),
+      ...launchEnv(dataDir),
       TAGALONG_BRAIN_ADDR: brain.addr,
     },
   });

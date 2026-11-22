@@ -24,6 +24,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import type { AddressInfo } from 'node:net';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { ErrorCode } from '@tagalong/contract';
 import { E2E_LOCAL_TOKEN } from './launch-env';
 import { ownBuild } from '../../src/main/brain/build-id';
 
@@ -715,7 +716,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           JSON.stringify({
             jsonrpc: '2.0',
             id: msg.id,
-            error: { code: -32009, message: 'Unknown token' },
+            error: { code: ErrorCode.unauthorized, message: 'Unknown token' },
           }),
         );
         socket.close();
