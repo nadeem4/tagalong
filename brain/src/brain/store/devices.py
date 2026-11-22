@@ -52,13 +52,20 @@ def insert_pair_code(
     )
 
 
-def redeem_pair_code(db: sqlite3.Connection, secret_hash: str, now: str) -> tuple[str, str] | None:
-    """(id, kind) of the code, spent in the same statement that finds it."""
-    return db.execute(
-        "UPDATE pair_codes SET used_at=? WHERE secret_hash=? AND used_at IS NULL"
-        " AND expires_at>? RETURNING id, kind",
-        (now, secret_hash, now),
-    ).fetchone()
+def redeem_pair_code(db: sqlite3.Connection, secret_hash: str, kind: str, now: str) -> bool:
+    """Spend the code in the same statement that finds it, so two redeems cannot both win."""
+    return (
+        db.execute(
+            "UPDATE pair_codes SET used_at=? WHERE secret_hash=? AND kind=? AND used_at IS NULL"
+            " AND expires_at>?",
+            (now, secret_hash, kind, now),
+        ).rowcount
+        > 0
+    )
+
+
+def delete_expired_codes(db: sqlite3.Connection, now: str) -> None:
+    db.execute("DELETE FROM pair_codes WHERE expires_at<=?", (now,))
 
 
 def record_failure(db: sqlite3.Connection, now: str) -> None:
