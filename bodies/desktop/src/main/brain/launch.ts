@@ -1,7 +1,7 @@
 /**
  * Starts the brain for the desktop: unless it is paired with a remote brain, when the brain
- * address is local and nothing answers there, runs `uv run brain` from the brain/ folder, detached (hidden on Windows), its output going to
- * <TAGALONG_HOME>/brain.log. Packaged, it runs `uv sync` first (the first-run install) and
+ * address is local and nothing answers there, runs `uv run brain` from the brain/ folder,
+ * detached (hidden on Windows), its output going to <TAGALONG_HOME>/brain.log. Packaged, it runs `uv sync` first (the first-run install) and
  * reports installing/failed. Quitting the app never stops the brain; only a restart for a
  * version update does (`stopBrain`, never for a brain the person started themselves).
  * A start failure only logs: the client retries.

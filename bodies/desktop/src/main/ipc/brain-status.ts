@@ -108,11 +108,6 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
     };
   }
 
-  /** A brain on another machine is neither restarted nor opened from here. */
-  async function elsewhere(): Promise<boolean> {
-    return (await facts())?.local === false;
-  }
-
   async function stopAndStart(): Promise<boolean> {
     if (!(await deps.stop())) return false;
     await deps.relaunch();
@@ -190,8 +185,10 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
     restartAfterWork,
     check,
     jobsChanged,
+    // A brain on another machine is neither restarted nor opened from here.
     openFolder: async () => {
-      if (!(await elsewhere())) await deps.openPath((await card()).dataDir);
+      const { local, dataDir } = await card();
+      if (local !== false) await deps.openPath(dataDir);
     },
     openLog: async () => deps.openPath((await card()).logPath),
     copyDetails,

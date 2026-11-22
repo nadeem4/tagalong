@@ -60,7 +60,7 @@ export class SettingsStore {
     return this.#save(Settings.parse({ ...this.get(), bodyId }));
   }
 
-  /** The one way to write the brain link: main only, never through a settings patch. */
+  /** Main only, never through a settings patch. */
   setBrain(brain: BrainSettings): Settings {
     return this.#save(Settings.parse({ ...this.get(), brain }));
   }

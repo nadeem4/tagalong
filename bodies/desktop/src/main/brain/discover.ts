@@ -14,7 +14,6 @@ export interface Announcement {
   addresses: string[];
 }
 
-/** Starts browsing, calls `onUp` for each announcement, and returns the function that stops. */
 export type BrowseFn = (onUp: (announcement: Announcement) => void) => () => void;
 
 const DEFAULT_TIMEOUT_MS = 3000;
@@ -38,7 +37,6 @@ export function discoverBrains(opts: {
   });
 }
 
-/** The real browse, on the machine's multicast DNS. */
 export const bonjourBrowse: BrowseFn = (onUp) => {
   const bonjour = new Bonjour();
   const browser = bonjour.find({ type: 'tagalong' }, (service) =>

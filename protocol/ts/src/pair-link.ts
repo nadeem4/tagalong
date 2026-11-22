@@ -16,7 +16,6 @@ export interface PairLink {
 export interface BrainLink {
   addrs: string[];
   lastGood?: string;
-  fp?: string;
 }
 
 const Addr = z.string().regex(/^[A-Za-z0-9.-]+:\d{1,5}$|^\[[0-9A-Fa-f:]+\]:\d{1,5}$/);
@@ -43,8 +42,7 @@ export function dialOrder(link: BrainLink, found: string[]): string[] {
 }
 
 export type PairReply =
-  | { ok: true; token: string }
-  | { ok: false; reason: 'refused' | 'closed' | 'timeout' };
+  { ok: true; token: string } | { ok: false; reason: 'refused' | 'closed' | 'timeout' };
 
 /**
  * Sends `pair` as the first message on an open socket and waits for the brain's answer.

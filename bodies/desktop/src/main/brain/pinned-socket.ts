@@ -5,7 +5,8 @@
  * A mismatch closes the socket before anything is sent; there is no plain ws fallback.
  */
 import { createHash } from 'node:crypto';
-import { connect } from 'node:tls';
+import type { NetConnectOpts, createConnection as NetConnect } from 'node:net';
+import { connect, type ConnectionOptions } from 'node:tls';
 import WebSocket from 'ws';
 import type { BrainSocket } from '@tagalong/contract';
 
@@ -24,8 +25,8 @@ export function pinnedSocket(url: string, fingerprint: string): PinnedSocket {
   // sent to a brain that fails it.
   const ws = new WebSocket(url, {
     rejectUnauthorized: false,
-    createConnection: (options, onConnect) => {
-      const socket = connect(options, onConnect);
+    createConnection: ((options: NetConnectOpts, onConnect?: () => void) => {
+      const socket = connect(options as ConnectionOptions, onConnect);
       socket.once('secureConnect', () => {
         const { raw } = socket.getPeerCertificate();
         trusted = raw !== undefined && createHash('sha256').update(raw).digest('hex') === pin;
@@ -33,7 +34,7 @@ export function pinnedSocket(url: string, fingerprint: string): PinnedSocket {
         if (!trusted) socket.destroy();
       });
       return socket;
-    },
+    }) as unknown as typeof NetConnect, // ws types this as net's; for wss it is handed tls options
   });
   // An error is always followed by close, which is where reconnecting starts.
   ws.on('error', () => undefined);

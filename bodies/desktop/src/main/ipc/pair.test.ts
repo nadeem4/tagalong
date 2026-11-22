@@ -43,7 +43,10 @@ function setup(script: Script) {
   const urls: string[] = [];
   let sock: Fake | undefined;
   const deps: PairDeps = {
-    link: { saveRemote: (l, token) => void saved.push({ link: l, token }), forget: () => undefined },
+    link: {
+      saveRemote: (l, token) => void saved.push({ link: l, token }),
+      forget: () => undefined,
+    },
     openSocket: (url) => {
       urls.push(url);
       sock = new Fake();

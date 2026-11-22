@@ -55,8 +55,8 @@ export const SETTINGS_DEFAULTS = {
   walkthrough: { done: false },
   /** The folders Scout's file tools may touch. None until the person names one. */
   fileFolders: [] as string[],
-  /** Talks to the brain on this PC. A paired remote brain is saved by main only. */
-  brain: { mode: 'local', addrs: [] as string[] },
+  /** No addresses: the brain on this PC. A paired remote brain is saved by main only. */
+  brain: { addrs: [] as string[] },
 } as const;
 
 /** Bounds on the speaking speed. Outside them speech stops sounding like speech. */
@@ -165,14 +165,13 @@ const bodyIdField = z.string().regex(BODY_ID_PATTERN).optional().catch(undefined
  */
 const brainField = z
   .object({
-    mode: z.enum(['local', 'remote']),
     addrs: z.array(z.string()),
     lastGood: z.string().optional(),
     fp: z.string().optional(),
     token: z.string().optional(),
   })
-  .prefault({ mode: 'local', addrs: [] })
-  .catch(() => ({ mode: 'local' as const, addrs: [] }));
+  .prefault({ ...SETTINGS_DEFAULTS.brain })
+  .catch(() => ({ ...SETTINGS_DEFAULTS.brain }));
 export type BrainSettings = z.infer<typeof brainField>;
 
 /** Unknown keys in settings.json are dropped on parse. */

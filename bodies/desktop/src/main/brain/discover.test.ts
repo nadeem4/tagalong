@@ -18,12 +18,15 @@ const browsing =
   };
 
 describe('discoverBrains', () => {
-  it('lists each brain by name and address and merges the same address', async () => {
+  it('lists each brain by name and address, merging the same address and skipping other services', async () => {
     const found = await discoverBrains({
       browse: browsing(
         brain('Desk', '192.168.1.5'),
         brain('Desk (2)', '192.168.1.5'),
         brain('Study', '192.168.1.9'),
+        { ...brain('Printer', '192.168.1.7'), type: '_ipp._tcp' },
+        { ...brain('NoPort', '192.168.1.8'), port: 0 },
+        { ...brain('NoAddr', '192.168.1.8'), addresses: [] },
       ),
       timeoutMs: 5,
     });
@@ -31,18 +34,6 @@ describe('discoverBrains', () => {
       { name: 'Desk', addr: '192.168.1.5:47323' },
       { name: 'Study', addr: '192.168.1.9:47323' },
     ]);
-  });
-
-  it('ignores other services and a service with no port or address', async () => {
-    const found = await discoverBrains({
-      browse: browsing(
-        { ...brain('Printer', '192.168.1.7'), type: '_ipp._tcp' },
-        { ...brain('NoPort', '192.168.1.8'), port: 0 },
-        { ...brain('NoAddr', '192.168.1.8'), addresses: [] },
-      ),
-      timeoutMs: 5,
-    });
-    expect(found).toEqual([]);
   });
 
   it('resolves after the timeout with what it has and stops browsing', async () => {

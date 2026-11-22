@@ -16,7 +16,7 @@ describe('registerBrainLinkIpc', () => {
     );
     registerBrainLinkIpc(ipc.handle, {
       brain: {
-        addr: '127.0.0.1:47321',
+        url: 'ws://127.0.0.1:47321',
         get link() {
           return link;
         },
@@ -48,7 +48,7 @@ describe('registerBrainLinkIpc', () => {
       },
       () => undefined,
     );
-    registerBrainLinkIpc(ipc.handle, { brain: { addr: 'x:1', link: 'online' }, setup });
+    registerBrainLinkIpc(ipc.handle, { brain: { url: 'ws://x:1', link: 'online' }, setup });
     await ipc.invoke(IPC.brainSetupRetry);
     expect(launches).toBe(0);
     outcome = 'failed';
@@ -69,7 +69,7 @@ describe('Start brain', () => {
       async () => void launches++,
       () => undefined,
     );
-    registerBrainLinkIpc(ipc.handle, { brain: { addr: 'x:1', link: 'offline' }, setup });
+    registerBrainLinkIpc(ipc.handle, { brain: { url: 'ws://x:1', link: 'offline' }, setup });
     await ipc.invoke(IPC.brainSetupRetry);
     expect(launches).toBe(1);
   });

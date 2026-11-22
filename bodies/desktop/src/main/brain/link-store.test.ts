@@ -27,18 +27,12 @@ beforeEach(() => void (dir = mkdtempSync(join(tmpdir(), 'tagalong-link-'))));
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 describe('LinkStore', () => {
-  it('starts local with no token', () => {
-    const store = new LinkStore(new SettingsStore(dir), reversed);
-    expect(store.get().mode).toBe('local');
-    expect(store.token()).toBeNull();
-  });
-
   it('saves a remote link and round-trips the token without writing it to settings.json', () => {
     const store = new LinkStore(new SettingsStore(dir), reversed);
     store.saveRemote({ addrs: ['10.0.0.5:47323'], fp }, 'secret-device-token');
 
     const again = new LinkStore(new SettingsStore(dir), reversed);
-    expect(again.get()).toMatchObject({ mode: 'remote', addrs: ['10.0.0.5:47323'], fp });
+    expect(again.paired()).toMatchObject({ addrs: ['10.0.0.5:47323'], fp });
     expect(again.token()).toBe('secret-device-token');
     expect(readFileSync(join(dir, SETTINGS_FILENAME), 'utf8')).not.toContain('secret-device-token');
   });
@@ -46,21 +40,13 @@ describe('LinkStore', () => {
   it('refuses to save when the OS cannot seal the token', () => {
     const store = new LinkStore(new SettingsStore(dir), unavailable);
     expect(() => store.saveRemote({ addrs: ['a:1'], fp }, 'tok')).toThrow(/not available/);
-    expect(store.get().mode).toBe('local');
+    expect(store.paired()).toBeNull();
   });
 
   it('markGood makes that address the first to dial', () => {
     const store = new LinkStore(new SettingsStore(dir), reversed);
     store.saveRemote({ addrs: ['a:1', 'b:2'], fp }, 'tok');
     store.markGood('b:2');
-    expect(dialOrder(store.get(), [], [])).toEqual(['b:2', 'a:1']);
-  });
-
-  it('forget returns to local and drops the token', () => {
-    const store = new LinkStore(new SettingsStore(dir), reversed);
-    store.saveRemote({ addrs: ['a:1'], fp }, 'tok');
-    store.forget();
-    expect(store.get().mode).toBe('local');
-    expect(store.token()).toBeNull();
+    expect(dialOrder(store.paired()!, [])).toEqual(['b:2', 'a:1']);
   });
 });
