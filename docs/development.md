@@ -235,7 +235,7 @@ pnpm dev:desktop
 
 The desktop dials the brain at `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`) and retries every 2 s. It spawns `uv run brain` (cwd `brain/`) only when the address is local and
 nothing answers there, detached, with its output in `<TAGALONG_HOME>/brain.log`. The desktop never stops a brain, so it
-keeps running after quit; end it with `cd brain && uv run tagalong stop`. A brain you started
+keeps running after quit; end it with `cd brain && uv run tagalong stop`. To have the brain start at logon with no desktop open, run `cd brain && uv run tagalong service install` (also `remove` and `status`): a Windows scheduled task named `TagalongBrain`, a macOS launchd agent or a Linux systemd user unit, plus `TAGALONG_NETWORK=1` saved in `.env`. It uses the default data folder, so leave `TAGALONG_HOME` unset when installing. The unit text is covered by golden files in `brain/tests/fixtures/service/`; tests never register a real service. A brain you started
 yourself (`cd brain && uv run brain`) is used as is. Set `TAGALONG_START_BRAIN=0` to stop
 the desktop starting one.
 
