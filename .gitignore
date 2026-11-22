@@ -46,3 +46,6 @@ docs/superpowers/
 __pycache__/
 .pytest_cache/
 .ruff_cache/
+
+# pytest-testmon dependency data (local, picks affected brain tests)
+.testmondata*

@@ -185,6 +185,17 @@ before pushing Markdown.
 A newer push to a pull request cancels the run still going for the older one. Every push to `main`
 runs in its own concurrency group, so none is cancelled or dropped from the queue.
 
+`.github/workflows/check.yml` adds a `check` job on pull requests: it runs
+`scripts/check_pr.py --full`, which checks the branch name, rejects slop comments and emoji in the
+diff, warns when code changed without docs, and runs the full `Check command:` from `CLAUDE.md`.
+
+Before a push, the `.githooks/pre-push` hook (set up by `git config core.hooksPath .githooks`) runs
+`scripts/check_pr.py` against `origin/main`. It runs only the `Check [paths]:` lines in `CLAUDE.md`
+that match the changed files: brain changes run ruff and `pytest --testmon` (only the tests the
+change touches; its data is the gitignored `.testmondata`), TypeScript changes run lint, format,
+typecheck and `vitest run --changed origin/main`, docs run nothing. A changed file that no line
+matches runs the full `Check command:`.
+
 A unit test that only works on Windows uses `it.runIf(process.platform === 'win32')` (or
 `describe.skipIf`), and its file joins the "Windows-only unit tests" step in `ci.yml`, so it still
 runs somewhere.

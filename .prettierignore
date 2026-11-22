@@ -7,5 +7,8 @@ pnpm-lock.yaml
 release/
 .impeccable/
 CLAUDE.local.md
+CLAUDE.md
 .claude/worktrees/
 .superpowers/
+.plan/
+.worktrees/
