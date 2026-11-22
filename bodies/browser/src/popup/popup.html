@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- Toolbar popup: brain status, the mic button, address and name, and what the person allowed.
+<!-- Toolbar popup: brain status, the mic button, address and name, pairing, and what the person allowed.
      The logic is in popup.ts; this file is only the markup. -->
 <html lang="en">
   <head>
@@ -19,8 +19,10 @@
     <input id="addr" type="text" spellcheck="false" autocomplete="off" />
     <p id="addr-error" class="error" role="alert" hidden></p>
 
-    <label for="token">Pairing code</label>
-    <input id="token" type="password" spellcheck="false" autocomplete="off" />
+    <label for="code">Pairing code</label>
+    <input id="code" type="text" inputmode="numeric" maxlength="6" autocomplete="off" />
+    <button id="pair" type="button">Pair</button>
+    <p id="pair-line" class="muted" role="status"></p>
 
     <label for="name">Name for this browser</label>
     <input id="name" type="text" maxlength="32" autocomplete="off" />

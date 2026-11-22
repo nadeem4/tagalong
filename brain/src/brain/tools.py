@@ -13,6 +13,7 @@ import json
 import logging
 import math
 import re
+import socket
 import sqlite3
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
@@ -1349,12 +1350,15 @@ def clean_key(raw: object) -> str | None:
     return key
 
 
-def brain_status_tools(status: Callable[[], dict]) -> list[tuple[ToolSpec, Handler]]:
+def brain_status_tools(
+    status: Callable[[], dict], caller_is_local: Callable[[], bool]
+) -> list[tuple[ToolSpec, Handler]]:
     """Home's brain_status: the facts on the Scout's brain card (version, build, process,
-    folders, places, whether a job runs). main builds `status`; this only serves it."""
+    folders, places, whether a job runs). main builds `status`; this adds the machine's name and
+    whether the asking body is on it, so a remote desktop knows not to offer a restart."""
 
     async def brain_status(args: dict) -> str:
-        return json.dumps(status())
+        return json.dumps({**status(), "host": socket.gethostname(), "local": caller_is_local()})
 
     return [
         (

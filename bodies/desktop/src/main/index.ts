@@ -18,6 +18,7 @@ import {
   dialog,
   ipcMain,
   powerMonitor,
+  safeStorage,
   shell,
 } from 'electron';
 import { ContextSnapshot } from '@tagalong/ui/shapes';
@@ -47,8 +48,12 @@ import { callJson } from './brain/call-json';
 import { createChatSync } from './brain/chat-sync';
 import { createTurnEvents } from './brain/turn-events';
 import { startBrain } from './brain/start';
+import { bonjourBrowse, discoverBrains } from './brain/discover';
+import { LinkStore } from './brain/link-store';
+import { pinnedSocket } from './brain/pinned-socket';
+import { registerPairIpc } from './ipc/pair';
 import { startingGate } from './brain/starting-gate';
-import { homedir } from 'node:os';
+import { homedir, hostname } from 'node:os';
 import { ownBuild } from './brain/build-id';
 import { brainLogPath, dataDir as brainDataDir, realLaunch, realStop } from './brain/launch';
 import type { RealLaunch } from './brain/launch';
@@ -134,6 +139,8 @@ import type { CaptureNotice } from '../shared/ipc';
 interface Desktop {
   /** The connection to the brain; always there, offline until the brain answers. */
   brain: BrainClient;
+  /** Which brain it dials: the one on this PC, or the one paired from another machine. */
+  link: LinkStore;
   platform: Platform;
   settingsStore: SettingsStore;
   /** The settings the running app is using; refreshed whenever they are saved. */
@@ -175,6 +182,7 @@ const brainRun = (): RealLaunch => ({
     : resolve(app.getAppPath(), '..', '..', 'brain'),
   packaged: app.isPackaged ? { uv: join(process.resourcesPath, 'uv', 'uv.exe') } : undefined,
   appVersion: app.getVersion(),
+  remote: () => desktop?.link.paired() != null,
 });
 /** The status marks, set before the first launch; the launch can report before that. */
 let startingMarks: StatusMarks | null = null;
@@ -274,6 +282,15 @@ async function start(): Promise<void> {
   const dataDir = app.getPath('userData');
   const settingsStore = new SettingsStore(dataDir);
   const settings = settingsStore.get();
+  const link = new LinkStore(settingsStore, {
+    available: () => safeStorage.isEncryptionAvailable(),
+    encrypt: (text) => {
+      if (!safeStorage.isEncryptionAvailable())
+        throw new Error('this PC cannot keep a secret safely');
+      return safeStorage.encryptString(text);
+    },
+    decrypt: (data) => safeStorage.decryptString(data),
+  });
   // From the saved setting, before any window opens, so the mark on Scout shows from the
   // first second listening is on.
   const listening = new AlwaysListening(settings.listening.always);
@@ -286,9 +303,6 @@ async function start(): Promise<void> {
   // "Listening" on Scout for a few seconds: the mark, not a spoken line, says it is on.
   markListening(statusMarks, listening);
 
-  // Start the brain if none is running; the client below dials it and retries. Packaged, the
-  // first start installs it first (uv sync) and Home shows that as it goes.
-  void brainSetup.retry();
   const turnEvents = createTurnEvents(
     () => SCOUT_ID,
     () => brain.session,
@@ -319,6 +333,8 @@ async function start(): Promise<void> {
   };
   const brain = startBrain({
     bodyId: readOrMakeBodyId(settingsStore),
+    link,
+    search: async () => (await discoverBrains({ browse: bonjourBrowse })).map((b) => b.addr),
     platform,
     exclusions: () => desktop?.settings.captureExclusions ?? settings.captureExclusions,
     onCapture: announceCapture,
@@ -424,6 +440,7 @@ async function start(): Promise<void> {
 
   desktop = {
     brain,
+    link,
     platform,
     settingsStore,
     settings,
@@ -476,6 +493,10 @@ async function start(): Promise<void> {
       marks: statusMarks,
     }),
   };
+
+  // Start the brain if none is running; the client dials it and retries. Packaged, the first
+  // start installs it first (uv sync) and Home shows that as it goes.
+  void brainSetup.retry();
 
   // The avatar greys its eye and the tray shows a checkmark, so both follow one state
   // rather than each remembering to ask.
@@ -1052,6 +1073,18 @@ function registerIpc(): void {
   registerBodiesIpc(handle, { brain: required().brain });
   registerJobsIpc(handle, { brain: required().brain });
   registerApprovalsIpc(handle, { brain: required().brain });
+  registerPairIpc(handle, {
+    link: required().link,
+    openSocket: pinnedSocket,
+    log: (line) => console.warn(line),
+    deviceName: hostname(),
+    discover: () => discoverBrains({ browse: bonjourBrowse }),
+    reconnect: () => {
+      void brainSetup.retry();
+      required().brain.stop();
+      required().brain.start();
+    },
+  });
   registerBrainLinkIpc(handle, { brain: required().brain, setup: brainSetup });
   if (brainControl !== null) registerBrainStatusIpc(handle, brainControl);
   registerSettingsIpc(handle, {

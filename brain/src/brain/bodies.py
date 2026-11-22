@@ -16,6 +16,7 @@ import logging
 import time
 from collections import deque
 from collections.abc import Callable
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -23,6 +24,9 @@ from brain.auth import Principal
 from brain.protocol import BODY_WHATSAPP, LIMITS, Body, ErrorCode, RpcError, Tool
 
 log = logging.getLogger("brain")
+
+# The body whose `call` a Home tool is serving, for tools that answer differently per caller.
+CALLER: ContextVar[str | None] = ContextVar("caller", default=None)
 
 
 # Frames a connection may hold before the oldest speech audio chunks are dropped. Audio is the
@@ -131,6 +135,7 @@ class _Online:
     body: Body
     tools: list[Tool]
     peer: Peer
+    local: bool  # connected on the brain's own machine (the loopback listener)
 
 
 class Bodies:
@@ -168,7 +173,7 @@ class Bodies:
         if old is not None:
             old.peer.close()
             self._fail_pending(old.peer)
-        self._online[body.id] = _Online(body, tools, peer)
+        self._online[body.id] = _Online(body, tools, peer, principal.local)
         self._known[body.id] = tools
         self._names[body.id] = body.name
         gone_at = self._offline_at.pop(body.id, None)
@@ -264,6 +269,10 @@ class Bodies:
     def body(self, body_id: str) -> Body | None:
         current = self._online.get(body_id)
         return current.body if current is not None else None
+
+    def is_local(self, body_id: str | None) -> bool:
+        current = self._online.get(body_id) if body_id is not None else None
+        return current is not None and current.local
 
     def is_online(self, body_id: str) -> bool:
         return body_id in self._online

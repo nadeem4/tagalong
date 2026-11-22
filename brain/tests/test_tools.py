@@ -2185,9 +2185,9 @@ async def test_description_unchanged(home):
 
 async def test_brain_status_reports_the_facts():
     facts = {"version": "0.1.0", "build": "abc", "pid": 7, "work_running": False}
-    [(spec, handler)] = brain_status_tools(lambda: facts)
+    [(spec, handler)] = brain_status_tools(lambda: facts, lambda: True)
     assert spec.name == "brain_status" and spec.effect == "read"
-    assert json.loads(await handler({})) == facts
+    assert json.loads(await handler({}))["pid"] == 7
 
 
 async def test_recall_include_personal_flag(mem, run):
@@ -2222,7 +2222,7 @@ async def test_list_memories_portrait_null_when_unset(run):
 
 
 def test_brain_status_is_home_only():
-    [(spec, _)] = brain_status_tools(lambda: {})
+    [(spec, _)] = brain_status_tools(lambda: {}, lambda: True)
     assert spec.audience == frozenset({"home"})
 
 

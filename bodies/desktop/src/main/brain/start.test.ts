@@ -2,14 +2,21 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CaptureExclusions } from '../../shared/settings';
 import { startBrain } from './start';
 import type { BrainSocket } from '@tagalong/contract';
 import type { Platform } from '../platform/index';
 
 const noop = () => undefined;
+const localLink = {
+  paired: () => null,
+  token: () => null,
+  markGood: noop,
+};
 const tools = {
+  link: localLink,
+  search: async () => [] as string[],
   platform: { listWindows: async () => ({ windows: [] }) } as unknown as Platform,
   exclusions: () => ({}) as CaptureExclusions,
   onCapture: noop,
@@ -150,6 +157,121 @@ describe('startBrain', () => {
       id: 'b1',
       result: { output: [{ type: 'text' }] },
     });
+    brain.stop();
+  });
+});
+
+describe('startBrain with a paired remote brain', () => {
+  const fp = 'ef'.repeat(64 / 2);
+  afterEach(() => vi.useRealTimers());
+
+  function remote(over: { search?: () => Promise<string[]> } = {}) {
+    vi.useFakeTimers();
+    const good: string[] = [];
+    let paired: { addrs: string[]; lastGood: string; fp: string } = {
+      addrs: ['10.0.0.5:47323', '100.64.0.2:47323'],
+      lastGood: '100.64.0.2:47323',
+      fp,
+    };
+    const link = {
+      paired: () => paired,
+      token: () => 'device-token',
+      markGood: (addr: string) => void good.push(addr),
+    };
+    const sockets: {
+      url: string;
+      open: () => void;
+      drop: () => void;
+      message: (data: string) => void;
+    }[] = [];
+    const sent: string[] = [];
+    const statuses: string[] = [];
+    const search = vi.fn(over.search ?? (async () => [] as string[]));
+    const brain = startBrain({
+      ...tools,
+      link,
+      search,
+      env: {},
+      openSocket: (url): BrainSocket => {
+        const entry = {
+          url,
+          open: noop as () => void,
+          drop: noop as () => void,
+          message: noop as (data: string) => void,
+        };
+        sockets.push(entry);
+        return {
+          send: (data) => void sent.push(data),
+          close: noop,
+          onOpen: (f) => void (entry.open = f),
+          onMessage: (f) => void (entry.message = f),
+          onClose: (f) => void (entry.drop = f),
+        };
+      },
+      onNotification: noop,
+      onStatus: (status) => void statuses.push(status),
+      onResync: noop,
+      bodyId: 'desktop-a1b2c3',
+    });
+    const message = (data: object) => void sockets.at(-1)!.message(JSON.stringify(data));
+    const fail = async (): Promise<void> => {
+      sockets.at(-1)!.drop();
+      await vi.advanceTimersByTimeAsync(2000);
+    };
+    const pair = (next: typeof paired): void => void (paired = next);
+    return { brain, sockets, sent, good, message, search, fail, pair };
+  }
+
+  it('dials wss on the last good address first with the device token, and remembers the one that said hello', () => {
+    const { brain, sockets, sent, good, message } = remote();
+    sockets[0]!.open();
+    expect(sockets[0]!.url).toBe('wss://100.64.0.2:47323');
+    const hello = JSON.parse(sent[0] as string);
+    expect(hello.params.token).toBe('device-token');
+    message({
+      jsonrpc: '2.0',
+      id: hello.id,
+      result: { protocol: 3, session: 's', tools: [], seq: 0, resync: false },
+    });
+    expect(good).toEqual(['100.64.0.2:47323']);
+    brain.stop();
+  });
+
+  it('moves to the next address when one fails, and never marks a failed one good', async () => {
+    const { brain, sockets, good, fail } = remote();
+    await fail();
+    expect(sockets.map((s) => s.url)).toEqual(['wss://100.64.0.2:47323', 'wss://10.0.0.5:47323']);
+    expect(good).toEqual([]);
+    brain.stop();
+  });
+
+  it('looks for brains on the network only after every saved address failed, at most every 30 seconds', async () => {
+    const { brain, sockets, search, fail } = remote({ search: async () => ['192.168.1.9:47323'] });
+    expect(search).not.toHaveBeenCalled();
+    await fail();
+    expect(search).not.toHaveBeenCalled();
+    await fail();
+    expect(search).toHaveBeenCalledTimes(1);
+    await fail();
+    await fail();
+    expect(sockets.map((s) => s.url)).toContain('wss://192.168.1.9:47323');
+    expect(search).toHaveBeenCalledTimes(1);
+    brain.stop();
+  });
+
+  it('starts over from the first address when the link is replaced', async () => {
+    const { brain, sockets, fail, pair } = remote();
+    pair({ addrs: ['10.9.9.9:47323'], lastGood: '10.9.9.9:47323', fp });
+    await fail();
+    expect(sockets.at(-1)!.url).toBe('wss://10.9.9.9:47323');
+    brain.stop();
+  });
+
+  it('does not count a stop as a failed dial, so the last good address is still first', () => {
+    const { brain, sockets } = remote();
+    brain.stop();
+    brain.start();
+    expect(sockets.at(-1)!.url).toBe('wss://100.64.0.2:47323');
     brain.stop();
   });
 });

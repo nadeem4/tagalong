@@ -37,9 +37,16 @@ export interface SeqStore {
   save(seq: number): void;
 }
 
-export interface BrainClientOptions {
+/** Where to dial: `wss` for a brain on another machine (its openSocket pins the certificate). */
+export interface DialTarget {
+  scheme: 'ws' | 'wss';
   /** "host:port" */
   addr: string;
+}
+
+export interface BrainClientOptions {
+  /** Asked on every dial and again for the Home card; the answer holds until a dial fails. */
+  target: () => DialTarget;
   /** Who this body is, sent in hello as given; its id prefixes request ids. */
   body: Body;
   /** Defaults to memory only, so a new client starts without a last_seq. */
@@ -98,7 +105,12 @@ export class BrainClient {
 
   /** "host:port" the client dials, for the Home card that says where the brain is. */
   get addr(): string {
-    return this.options.addr;
+    return this.options.target().addr;
+  }
+
+  get url(): string {
+    const { scheme, addr } = this.options.target();
+    return `${scheme}://${addr}`;
   }
 
   /** Where the link stands now; offline until start() has tried. */
@@ -255,7 +267,7 @@ export class BrainClient {
 
   private connect(): void {
     this.setStatus('connecting');
-    const socket = this.options.openSocket(`ws://${this.options.addr}`);
+    const socket = this.options.openSocket(this.url);
     this.socket = socket;
     // A superseded socket may still fire late events; they must not touch current state.
     socket.onOpen(() => this.socket === socket && void this.hello(socket));

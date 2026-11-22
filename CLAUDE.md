@@ -46,12 +46,12 @@ The brain is Python; the TypeScript apps are bodies.
 
 ## Layout
 
-- protocol/: the contract between the brain and the bodies (README.md is the source of truth, examples/ shared by both test suites, ts/ the zod package `@tagalong/contract`)
+- protocol/: the contract between the brain and the bodies (README.md is the source of truth, examples/ shared by both test suites, ts/ the zod package `@tagalong/contract`, incl. `pair-link.ts`)
 - brain/: the Python brain (uv project); start at `src/brain/main.py` and `server.py`; module map in docs/brain/README.md
 - bodies/ui: shared React UI (Home, tour, settings, voice, bubble); `src/shapes` holds React-free shapes
 - bodies/mascot: `@tagalong/mascot`, the WebGL mascot engine (docs/bodies/mascot.md)
-- bodies/desktop: Electron body; main process in `src/main/` (brain link, IPC, windows, tools)
-- bodies/browser: Chromium MV3 browser body (popup voice, offscreen mic)
+- bodies/desktop: Electron body; main process in `src/main/` (brain link incl. the pinned remote link in `brain/pinned-socket.ts`, `link-store.ts`, `discover.ts`, IPC incl. `ipc/pair.ts`, windows, tools)
+- bodies/browser: Chromium MV3 browser body (popup voice and pairing in `src/pair.ts`, offscreen mic)
 - bodies/whatsapp: WhatsApp body, bundled to one `dist/index.js` the brain runs
 - docs/: one doc per subsystem in brain/, senses/, bodies/, data/; docs/layout.md has every file
 - scripts/check_pr.py and .githooks/pre-push: the pre-push check

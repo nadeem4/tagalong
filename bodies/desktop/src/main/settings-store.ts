@@ -6,6 +6,7 @@ import { randomBytes } from 'node:crypto';
 import { copyFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Settings, SettingsPatch } from '../shared/settings';
+import type { BrainSettings } from '../shared/settings';
 
 /** The settings file a host finds next to the database in its data dir. */
 export const SETTINGS_FILENAME = 'settings.json';
@@ -57,6 +58,11 @@ export class SettingsStore {
   /** The one way to write the install id: main only, never through a settings patch. */
   setBodyId(bodyId: string): Settings {
     return this.#save(Settings.parse({ ...this.get(), bodyId }));
+  }
+
+  /** Main only, never through a settings patch. */
+  setBrain(brain: BrainSettings): Settings {
+    return this.#save(Settings.parse({ ...this.get(), brain }));
   }
 
   #save(merged: Settings): Settings {

@@ -13,6 +13,7 @@ describe('Settings', () => {
   it('has exactly the live keys', () => {
     expect(Object.keys(Settings.parse({})).sort()).toEqual([
       'avatar',
+      'brain',
       'captureExclusions',
       'fileFolders',
       'hotkeys',

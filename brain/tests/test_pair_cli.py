@@ -42,3 +42,12 @@ def test_the_qr_prints_on_a_console_that_is_not_utf8(tmp_path):
     )
     assert done.returncode == 0, done.stderr.decode()
     assert b"tagalong://pair?" in done.stdout
+
+
+def test_pair_for_the_browser_prints_a_six_digit_code_and_needs_no_network(tmp_path):
+    rig = Rig(tmp_path)
+    assert rig.go("pair", "--kind", "browser", **HOST) == 0
+    code = next(w for w in rig.text.split() if len(w) == 6 and w.isdigit())
+    assert "tagalong://" not in rig.text
+    kinds = open_db(tmp_path / "tagalong.db").execute("SELECT kind FROM pair_codes").fetchall()
+    assert kinds == [("browser",)] and code

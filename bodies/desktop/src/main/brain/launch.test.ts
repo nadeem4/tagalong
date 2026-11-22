@@ -54,6 +54,7 @@ function setup(over: Partial<LaunchOptions> = {}) {
     platform: 'linux',
     onSetup: (state) => void setups.push(state),
     onStarting: (on) => void starts.push(on),
+    remote: () => false,
     ...over,
   };
   return { options, spawned, children, err, opened, closed, setups, starts };
@@ -98,6 +99,13 @@ describe('launchBrain onStarting', () => {
   it('no onStarting when a brain already runs', async () => {
     const { options, starts } = setup({ probe: async () => true });
     await launchBrain(options);
+    expect(starts).toEqual([]);
+  });
+
+  it('never spawns for a paired remote brain, even when TAGALONG_START_BRAIN is unset', async () => {
+    const { options, spawned, starts } = setup({ remote: () => true });
+    await launchBrain(options);
+    expect(spawned).toEqual([]);
     expect(starts).toEqual([]);
   });
 

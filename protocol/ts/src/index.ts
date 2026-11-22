@@ -6,3 +6,4 @@
 export * from './shapes.js';
 export * from './messages.js';
 export * from './brain-client.js';
+export * from './pair-link.js';

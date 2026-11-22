@@ -7,7 +7,8 @@ import '@fontsource/onest/latin-400.css';
 import '@fontsource/onest/latin-600.css';
 import type { WorkerStatus } from '../body';
 import { browserName, detectBrowser } from '../identity';
-import { chromeStorage as storage } from '../layer/chromium';
+import { chromeStorage as storage, webSocket } from '../layer/chromium';
+import { pairBrowser } from '../pair';
 import { originPattern } from '../permissions';
 import { DEFAULT_ADDR, readSettings, saveAddr, saveName, saveToken } from '../settings';
 import {
@@ -26,7 +27,9 @@ import type { VoiceView } from '../voice/voice-session';
 
 const statusEl = document.getElementById('status') as HTMLElement;
 const addrEl = document.getElementById('addr') as HTMLInputElement;
-const tokenEl = document.getElementById('token') as HTMLInputElement;
+const codeEl = document.getElementById('code') as HTMLInputElement;
+const pairEl = document.getElementById('pair') as HTMLButtonElement;
+const pairLine = document.getElementById('pair-line') as HTMLElement;
 const addrError = document.getElementById('addr-error') as HTMLElement;
 const nameEl = document.getElementById('name') as HTMLInputElement;
 const grantsEl = document.getElementById('grants') as HTMLElement;
@@ -118,7 +121,6 @@ async function init(): Promise<void> {
   addrEl.value = settings.addr;
   addrEl.placeholder = DEFAULT_ADDR;
   nameEl.value = settings.name ?? '';
-  tokenEl.value = settings.token;
   // userAgentData is not in the DOM typings yet.
   const data = (navigator as { userAgentData?: { brands: { brand: string }[] } }).userAgentData;
   const brands = (data?.brands ?? []).map((b) => b.brand);
@@ -131,7 +133,23 @@ async function init(): Promise<void> {
     });
   });
   nameEl.addEventListener('change', () => void saveName(storage, nameEl.value));
-  tokenEl.addEventListener('change', () => void saveToken(storage, tokenEl.value));
+  pairEl.addEventListener('click', () => {
+    pairLine.textContent = 'Pairing...';
+    void readSettings(storage)
+      .then((now) =>
+        pairBrowser(
+          { openSocket: webSocket, addr: now.addr, name: now.name ?? nameEl.placeholder },
+          codeEl.value,
+        ),
+      )
+      .then(async (outcome) => {
+        if (outcome.ok) await saveToken(storage, outcome.token);
+        codeEl.value = '';
+        pairLine.textContent = outcome.ok
+          ? 'Paired.'
+          : 'That code did not work. Run "tagalong pair --kind browser" for a new one.';
+      });
+  });
   // The request has to run inside this click; the worker adds the menu item when it is granted.
   rightClickEl.addEventListener('click', () => {
     chrome.permissions

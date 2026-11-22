@@ -127,7 +127,7 @@ export function createBridge(deps: BridgeDeps): {
   };
 
   const client = new BrainClient({
-    addr: config.brainAddr,
+    target: () => ({ scheme: 'ws', addr: config.brainAddr }),
     body: BODY,
     token: () => config.localToken,
     tools: () => [],
