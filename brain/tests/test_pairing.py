@@ -9,7 +9,7 @@ import pytest
 from brain.devices import Devices
 from brain.identity import load_or_create_identity
 from brain.pairing import Pairing
-from brain.store.db import open_db
+from brain.store.db import open_db, utc_text
 
 
 class Clock:
@@ -17,7 +17,7 @@ class Clock:
         self.t = datetime(2026, 11, 21, tzinfo=UTC)
 
     def __call__(self):
-        return self.t.strftime("%Y-%m-%dT%H:%M:%SZ")
+        return utc_text(self.t)
 
     def advance(self, **kw):
         self.t += timedelta(**kw)

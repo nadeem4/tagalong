@@ -12,16 +12,16 @@ import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 from brain.devices import Devices
 from brain.identity import Identity
 from brain.store import devices as store
+from brain.store.db import utc_text
 
 CODE_LIFE = timedelta(minutes=10)
 FAILURE_WINDOW = timedelta(minutes=1)
 MAX_FAILURES = 5
-_TIME = "%Y-%m-%dT%H:%M:%SZ"
 
 
 @dataclass(frozen=True)
@@ -56,7 +56,7 @@ class Pairing:
         secret = (
             f"{secrets.randbelow(10**6):06d}" if kind == "browser" else secrets.token_urlsafe(24)
         )
-        expires_at = (datetime.strptime(now, _TIME) + CODE_LIFE).strftime(_TIME)
+        expires_at = utc_text(datetime.fromisoformat(now) + CODE_LIFE)
         store.insert_pair_code(
             self._db,
             id=secrets.token_hex(8),
@@ -64,12 +64,16 @@ class Pairing:
             kind=kind,
             expires_at=expires_at,
         )
-        query = urlencode({"addr": self._addr(), "fp": self._identity.fingerprint, "code": secret})
+        query = urlencode(
+            {"addr": self._addr(), "fp": self._identity.fingerprint, "code": secret},
+            safe=":",
+            quote_via=quote,
+        )
         return PairOffer(f"tagalong://pair?{query}", secret, expires_at)
 
     def redeem(self, code: str, name: str, kind: str, *, loopback: bool) -> tuple[str, str] | None:
         now = self._now()
-        since = (datetime.strptime(now, _TIME) - FAILURE_WINDOW).strftime(_TIME)
+        since = utc_text(datetime.fromisoformat(now) - FAILURE_WINDOW)
         if store.count_recent_failures(self._db, since) >= MAX_FAILURES:
             return None
         if loopback == (kind == "browser") and store.redeem_pair_code(
