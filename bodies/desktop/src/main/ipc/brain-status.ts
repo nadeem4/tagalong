@@ -19,7 +19,7 @@ const Wire = z.object({
   build: z.string(),
   pid: z.number(),
   started_at: z.string(),
-  started_by: z.enum(['desktop', 'person']),
+  started_by: z.enum(['desktop', 'person', 'service']),
   data_dir: z.string(),
   log_path: z.string(),
   places: z.array(z.object({ id: z.string(), kind: z.string(), name: z.string() })),
@@ -45,6 +45,8 @@ export interface BrainStatusDeps {
   stop: () => Promise<boolean>;
   /** Starts it again (the setup's retry). */
   relaunch: () => Promise<void>;
+  /** For a brain the logon service runs: removes the service, syncs the app's files, installs it again. */
+  restartService: () => Promise<boolean>;
   openPath: (path: string) => Promise<void>;
   copy: (text: string) => void;
   log: (line: string) => void;
@@ -108,7 +110,8 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
     };
   }
 
-  async function stopAndStart(): Promise<boolean> {
+  async function stopAndStart(startedBy: Facts['started_by'] | undefined): Promise<boolean> {
+    if (startedBy === 'service') return deps.restartService();
     if (!(await deps.stop())) return false;
     await deps.relaunch();
     return true;
@@ -120,7 +123,7 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
     if (f?.started_by === 'person') {
       throw new Error('You started the brain yourself, so restart it in your terminal.');
     }
-    if (!(await stopAndStart())) throw new Error('Scout could not restart the brain.');
+    if (!(await stopAndStart(f?.started_by))) throw new Error('Scout could not restart the brain.');
   }
 
   async function restartAfterWork(): Promise<void> {
@@ -156,7 +159,7 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
       deps.log(
         `the brain is older than the app (${theirs.version ?? 'no version'} against ${ours.version}); restarting it once`,
       );
-      update = (await stopAndStart()) ? 'none' : 'ready';
+      update = (await stopAndStart(f?.started_by)) ? 'none' : 'ready';
     } else {
       update = action === 'current' ? 'none' : action === 'terminal' ? 'terminal' : 'ready';
     }

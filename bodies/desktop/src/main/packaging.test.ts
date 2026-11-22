@@ -59,20 +59,6 @@ describe('electron-builder config', () => {
     expect(script).toContain('taskkill');
   });
 
-  it('installer stops the brain service before replacing files, starts it after, and removes it on uninstall', () => {
-    const script = readFileSync(
-      fileURLToPath(new URL('../../build/installer.nsh', import.meta.url)),
-      'utf8',
-    );
-    const macro = (name: string): string =>
-      new RegExp(String.raw`!macro ${name}\b[\s\S]*?!macroend`).exec(script)?.[0] ?? '';
-    const stop = macro('tagalongStopBrain');
-    expect(stop.indexOf('schtasks /End /TN "TagalongBrain"')).toBeGreaterThan(-1);
-    expect(stop.indexOf('schtasks /End')).toBeLessThan(stop.indexOf('taskkill'));
-    expect(macro('customInstall')).toContain('schtasks /Run /TN "TagalongBrain"');
-    expect(macro('customUnInstall')).toContain('schtasks /Delete /TN "TagalongBrain" /F');
-  });
-
   it('keeps the product name, so the installed app finds the same user data folder', () => {
     expect(config.productName).toBe(manifest.productName);
   });

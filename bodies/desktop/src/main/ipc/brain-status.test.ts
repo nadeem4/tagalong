@@ -28,6 +28,7 @@ function setup(over: { wire?: object | 'missing'; link?: string; hello?: object 
   const log: string[] = [];
   const stops: number[] = [];
   const relaunches: number[] = [];
+  const reinstalls: number[] = [];
   const copied: string[] = [];
   const opened: string[] = [];
   let wire = over.wire ?? WIRE;
@@ -44,6 +45,7 @@ function setup(over: { wire?: object | 'missing'; link?: string; hello?: object 
     fallback: { dataDir: 'C:/fallback', logPath: 'C:/fallback/brain.log' },
     stop: () => Promise.resolve(stops.push(1) > 0),
     relaunch: () => Promise.resolve(void relaunches.push(1)),
+    restartService: () => Promise.resolve(reinstalls.push(1) > 0),
     openPath: (path) => Promise.resolve(void opened.push(path)),
     copy: (text) => void copied.push(text),
     log: (line) => void log.push(line),
@@ -55,6 +57,7 @@ function setup(over: { wire?: object | 'missing'; link?: string; hello?: object 
     log,
     stops,
     relaunches,
+    reinstalls,
     copied,
     opened,
     setWire: (next: object | 'missing') => (wire = next),
@@ -182,6 +185,17 @@ describe('check on hello', () => {
     expect(stops).toHaveLength(1);
     expect(relaunches).toHaveLength(1);
     expect(log).toHaveLength(1);
+  });
+
+  it('an older brain the logon service runs is reinstalled, not stopped and relaunched', async () => {
+    const { status, stops, relaunches, reinstalls } = setup({
+      wire: { ...WIRE, started_by: 'service' },
+    });
+    await status.check({ version: '0.9.1', build: 'old' });
+    expect(reinstalls).toHaveLength(1);
+    expect(stops).toHaveLength(0);
+    expect(relaunches).toHaveLength(0);
+    expect((await status.card()).update).toBe('none');
   });
 
   it('a second mismatch in the same run shows the banner instead of restarting', async () => {

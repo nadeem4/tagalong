@@ -60,6 +60,7 @@ import {
   brainLogPath,
   dataDir as brainDataDir,
   realLaunch,
+  realRestartService,
   realRunTagalong,
   realStop,
 } from './brain/launch';
@@ -435,6 +436,7 @@ async function start(): Promise<void> {
     },
     stop: () => realStop(run),
     relaunch: () => brainSetup.retry(),
+    restartService: () => realRestartService(run),
     openPath: async (path) => void (await shell.openPath(path)),
     copy: (text) => clipboard.writeText(text),
     log: (line) => console.warn(line),

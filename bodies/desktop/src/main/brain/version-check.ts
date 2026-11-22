@@ -13,7 +13,7 @@ export interface BuildId {
 
 export interface UpdateFacts {
   /** Who started the brain; null when it could not say (an old brain has no brain_status). */
-  startedBy: 'desktop' | 'person' | null;
+  startedBy: 'desktop' | 'person' | 'service' | null;
   workRunning: boolean;
   /** One quiet restart per app run: a second mismatch means the restart did not fix it. */
   restartedThisRun: boolean;

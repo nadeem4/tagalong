@@ -12,6 +12,7 @@ import {
   packagedEnv,
   probeAddr,
   readLocalToken,
+  restartService,
   runTagalong,
   stopBrain,
 } from './launch';
@@ -437,5 +438,40 @@ describe('runTagalong', () => {
       cmd: 'C:/uv.exe',
       args: ['run', '--no-sync', 'tagalong', 'service', 'status'],
     });
+  });
+});
+
+describe('restartService', () => {
+  const ok = (code: number) => ({ code, out: '' });
+
+  it('removes the service, syncs, then installs it again', async () => {
+    const steps: string[] = [];
+    const done = await restartService(
+      (args) => {
+        steps.push(args.join(' '));
+        return Promise.resolve(ok(0));
+      },
+      () => Promise.resolve(steps.push('sync') > 0),
+    );
+    expect(done).toBe(true);
+    expect(steps).toEqual(['service remove', 'sync', 'service install']);
+  });
+
+  it('does not install again when the sync failed', async () => {
+    const steps: string[] = [];
+    const done = await restartService(
+      (args) => {
+        steps.push(args.join(' '));
+        return Promise.resolve(ok(0));
+      },
+      () => Promise.resolve(false),
+    );
+    expect(done).toBe(false);
+    expect(steps).toEqual(['service remove']);
+  });
+
+  it('is not done when the install was refused', async () => {
+    const run = (args: string[]) => Promise.resolve(ok(args[1] === 'install' ? 1 : 0));
+    expect(await restartService(run, () => Promise.resolve(true))).toBe(false);
   });
 });

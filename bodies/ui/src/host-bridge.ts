@@ -241,7 +241,7 @@ export interface BrainCard {
   appBuild: string;
   /** ISO, UTC. */
   startedAt: string | null;
-  startedBy: 'desktop' | 'person' | null;
+  startedBy: 'desktop' | 'person' | 'service' | null;
   addr: string;
   pid: number | null;
   dataDir: string;

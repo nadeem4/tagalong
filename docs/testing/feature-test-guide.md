@@ -3172,13 +3172,13 @@ Automated: `cd brain && uv run pytest tests/test_events.py tests/test_runner.py 
 
 ## Brain as a logon service (automated; the install by hand on the owner's PC)
 
-Automated: `brain/tests/test_service.py` (rendered Windows, macOS and Linux unit text against golden files, the OS calls on a fake runner), `test_service_cli.py`, `test_server.py` (`hello.addrs`), `test_discovery.py` (Tailscale addresses); in the desktop `src/main/ipc/brain-service.test.ts`, `src/main/brain/launch.test.ts` (`runTagalong`), `link-store.test.ts` and `start.test.ts` (saving `addrs`), `src/main/packaging.test.ts` (the installer ends, starts and deletes the task).
+Automated: `brain/tests/test_service.py` (rendered Windows, macOS and Linux unit text against golden files, the OS calls on a fake runner), `test_service_cli.py` (the network switch saved before the install starts the brain, put back when the OS refuses), `test_main.py` (`service_main`, tailnet addresses read per hello), `test_server.py` (`hello.addrs`), `test_discovery.py` (Tailscale addresses); in the desktop `src/main/ipc/brain-service.test.ts`, `src/main/brain/launch.test.ts` (`runTagalong`), `link-store.test.ts` and `start.test.ts` (saving `addrs`), `launch.test.ts` (`restartService`) and `ipc/brain-status.test.ts` (a service brain is reinstalled on a version mismatch).
 
 By hand on the owner's PC (never on a machine whose scheduled tasks matter):
 
 1. `cd brain && uv run tagalong service status`. **Expected:** `not installed`.
-2. `uv run tagalong service install`. **Expected:** it says installed and that it turned the network listener on; `TAGALONG_NETWORK=1` is in `<TAGALONG_HOME>/.env`; the brain is running (`uv run tagalong perf` finds `brain.log`, or the desktop connects) with no desktop open.
-3. Sign out and in again with the desktop closed. **Expected:** the brain is running.
+2. `uv run tagalong service install`. **Expected:** it says installed and that it turned the network listener on; `TAGALONG_NETWORK=1` is in `<TAGALONG_HOME>/.env`; the brain is running (`uv run tagalong perf` finds `brain.log`, which holds the service brain's output, or the desktop connects) with no desktop open and no console window; Home's brain card does not say you started it from a terminal.
+3. Sign out and in again with the desktop closed. **Expected:** the brain is running and no console window opened.
 4. `uv run tagalong service remove`. **Expected:** `service status` prints `not installed` and the brain stops (`uv run tagalong stop` says it is not running).
 5. With Tailscale up on the brain machine, pair a desktop and connect. **Expected:** the desktop's saved addresses gain the `100.x.y.z:47323` address.
 
