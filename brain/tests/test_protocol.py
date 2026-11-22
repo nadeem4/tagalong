@@ -20,6 +20,7 @@ from brain.protocol import (
     Body,
     DownloadData,
     ErrorCode,
+    HelloParams,
     ErrorObject,
     FocusData,
     ReadAloudData,
@@ -92,7 +93,7 @@ def test_every_method_has_examples(origin):
 
 
 def test_constants():
-    assert PROTOCOL == 2
+    assert PROTOCOL == 3
     assert LIMITS == {
         "part_bytes": 5_000_000,
         "message_bytes": 20_000_000,
@@ -118,6 +119,7 @@ def test_error_codes():
         "body_offline": -32006,
         "tool_failed": -32007,
         "over_limit": -32008,
+        "unauthorized": -32009,
     }
 
 
@@ -139,12 +141,17 @@ def test_body_id_length_edges():
 
 
 def test_strict_types():
-    hello = {"protocol": True, "body": {"id": "d", "kind": "k", "name": "n"}, "tools": []}
+    hello = {
+        "protocol": True,
+        "token": "t",
+        "body": {"id": "d", "kind": "k", "name": "n"},
+        "tools": [],
+    }
     params = BODY_TO_BRAIN["hello"][0]
     with pytest.raises(ValidationError):
         params.model_validate(hello)
     # A newer protocol number is a valid message; the server answers version_mismatch.
-    params.model_validate({**hello, "protocol": 2})
+    params.model_validate({**hello, "protocol": 4})
 
 
 def test_seq_bounds():
@@ -526,3 +533,14 @@ def test_answer_check_back_only_with_not_now():
     assert answer.model_validate({"ask": "a", "option": "not_now", "check_back_at": at})
     with pytest.raises(ValidationError):
         answer.model_validate({"ask": "a", "option": "allow", "check_back_at": at})
+
+
+def test_hello_requires_a_token():
+    base = {
+        "protocol": 3,
+        "body": {"id": "desktop-a1b2c3", "kind": "desktop", "name": "PC"},
+        "tools": [],
+    }
+    with pytest.raises(ValidationError):
+        HelloParams.model_validate(base)
+    assert HelloParams.model_validate({**base, "token": "t"}).token == "t"

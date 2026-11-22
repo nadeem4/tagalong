@@ -1,4 +1,4 @@
-"""Contract v1 (protocol/README.md) as pydantic models: shapes, params and results.
+"""Contract v3 (protocol/README.md) as pydantic models: shapes, params and results.
 
 The README wins on any disagreement. Models are strict (no "1" for 1, no true for 1),
 frozen, and ignore unknown fields so a newer peer's extra keys never break parsing.
@@ -17,7 +17,7 @@ from pydantic import (
     model_validator,
 )
 
-PROTOCOL = 2
+PROTOCOL = 3
 
 # The kinds of body a turn can be shown on (`Body.kind`), as saved with each message.
 BODY_DESKTOP = "desktop"
@@ -48,6 +48,7 @@ class ErrorCode(IntEnum):
     body_offline = -32006
     tool_failed = -32007
     over_limit = -32008
+    unauthorized = -32009
 
 
 class RpcError(Exception):
@@ -154,6 +155,7 @@ class EmptyResult(Model):
 # `protocol` is any int so a newer body gets version_mismatch from the handler, not a schema error.
 class HelloParams(Model):
     protocol: int
+    token: str = Field(min_length=1)
     body: Body
     tools: list[Tool]
     last_seq: HandshakeSeq | None = None

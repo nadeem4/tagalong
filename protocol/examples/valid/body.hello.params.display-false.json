@@ -3,7 +3,8 @@
   "id": 1,
   "method": "hello",
   "params": {
-    "protocol": 1,
+    "protocol": 3,
+    "token": "t0k",
     "body": { "id": "chrome-ab12", "kind": "browser", "name": "Chrome", "display": false },
     "tools": []
   }
