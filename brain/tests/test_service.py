@@ -89,6 +89,11 @@ def test_windows_install_registers_a_logon_task_from_a_utf16_file_and_starts_it(
     ]
 
 
+def test_a_log_path_with_a_percent_is_escaped_for_systemd(tmp_path):
+    svc = Service("linux", EXE["linux"], tmp_path / "u", Calls(), log="/home/me/100%/brain.log")
+    assert "StandardOutput=append:/home/me/100%%/brain.log" in svc.unit_text()
+
+
 def test_linux_install_enables_the_unit(tmp_path):
     runner = Calls()
     service(tmp_path, "linux", runner).install()

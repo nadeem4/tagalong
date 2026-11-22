@@ -457,7 +457,7 @@ describe('restartService', () => {
     expect(steps).toEqual(['service remove', 'sync', 'service install']);
   });
 
-  it('does not install again when the sync failed', async () => {
+  it('still installs again when the sync failed, so the logon choice is kept', async () => {
     const steps: string[] = [];
     const done = await restartService(
       (args) => {
@@ -467,7 +467,7 @@ describe('restartService', () => {
       () => Promise.resolve(false),
     );
     expect(done).toBe(false);
-    expect(steps).toEqual(['service remove']);
+    expect(steps).toEqual(['service remove', 'service install']);
   });
 
   it('is not done when the install was refused', async () => {

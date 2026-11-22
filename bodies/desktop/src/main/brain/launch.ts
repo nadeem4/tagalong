@@ -289,8 +289,9 @@ export async function restartService(
   sync: () => Promise<boolean>,
 ): Promise<boolean> {
   await run(['service', 'remove']);
-  if (!(await sync())) return false;
-  return (await run(['service', 'install'])).code === 0;
+  const synced = await sync();
+  const installed = (await run(['service', 'install'])).code === 0;
+  return synced && installed;
 }
 
 export function realRestartService(real: RealLaunch): Promise<boolean> {

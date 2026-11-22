@@ -165,12 +165,13 @@ def _macos(s: Service) -> str:
     return _MACOS.format(label=LABEL, exe=escape(s.exe), env=env, log=escape(s.log))
 
 
-def _linux(s: Service) -> str:
-    def quoted(value: str) -> str:
-        return value.replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%")
+def _quoted(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%")
 
-    env = "".join(f'Environment="{k}={quoted(v)}"\n' for k, v in s.env.items())
-    return _LINUX.format(exe=shlex.quote(s.exe), env=env, log=s.log)
+
+def _linux(s: Service) -> str:
+    env = "".join(f'Environment="{k}={_quoted(v)}"\n' for k, v in s.env.items())
+    return _LINUX.format(exe=shlex.quote(s.exe), env=env, log=_quoted(s.log))
 
 
 @dataclass(frozen=True)

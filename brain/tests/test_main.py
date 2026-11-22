@@ -822,3 +822,22 @@ def test_the_service_entry_takes_its_environment_from_arguments_and_logs_to_brai
         sys.stdout, sys.stderr = out, err
     assert seen == {"home": str(tmp_path), "by": "service"}
     assert "hello" in (tmp_path / "brain.log").read_text(encoding="utf-8")
+
+
+def test_hide_console_gives_the_process_a_console_then_hides_it():
+    calls = []
+
+    class Kernel32:
+        def AllocConsole(self):
+            calls.append("alloc")
+
+        def GetConsoleWindow(self):
+            calls.append("get")
+            return 77
+
+    class User32:
+        def ShowWindow(self, hwnd, how):
+            calls.append(("show", hwnd, how))
+
+    main.hide_console(Kernel32(), User32())
+    assert calls == ["alloc", "get", ("show", 77, 0)]

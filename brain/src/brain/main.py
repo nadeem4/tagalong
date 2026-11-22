@@ -478,6 +478,14 @@ def main() -> None:
         pass
 
 
+def hide_console(kernel32, user32) -> None:
+    """A GUI-subsystem process has no console, so every console child it starts would open its
+    own window; a hidden console of its own is inherited by them instead."""
+    kernel32.AllocConsole()
+    hwnd = kernel32.GetConsoleWindow()
+    user32.ShowWindow(hwnd, 0)  # SW_HIDE
+
+
 def service_main(argv: list[str] | None = None) -> None:
     """The logon service's windowless launcher (`brain-service`). It has no console and gets no
     environment from the task, so it takes KEY=VALUE arguments and writes to brain.log."""
