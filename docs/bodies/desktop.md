@@ -29,7 +29,7 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 | `src/main/brain/launch.ts`                       | `launchBrain`: spawns `uv run brain` in `brain/` when the address is local and nothing answers; detached (hidden on Windows), output to `brain.log`, never stopped                                                     |
 | `src/main/brain/build-id.ts`, `version-check.ts` | `ownBuild` (app version, or the dev source hash) and `decideUpdate`: current, restart, ask or terminal                                                                                                                 |
 | `src/main/brain/pinned-socket.ts`                | `pinnedSocket(url, fp)`: a `wss` socket that accepts only the certificate with that SHA-256, checked when the TLS handshake ends, before any HTTP is written; `mismatch()` tells a wrong brain from an unreachable one |
-| `src/main/brain/link-store.ts`                   | `LinkStore`: the saved remote brain (addresses, fingerprint, last good address) in settings and its device token sealed with `safeStorage`                                                                             |
+| `src/main/brain/link-store.ts`                   | `LinkStore`: the saved remote brain (addresses, fingerprint, last good address) in settings and its device token sealed with `safeStorage`; `canSeal()` says whether the OS can seal                                   |
 | `src/main/brain/discover.ts`                     | `discoverBrains`, `bonjourBrowse`: brains announcing `_tagalong._tcp` on the home network, names and addresses only                                                                                                    |
 | `src/main/ipc/pair.ts`                           | `pairWithLink`: redeems a `tagalong://pair` link over the pinned socket (`pairOverSocket` from the contract) and saves the link; `registerPairIpc` (discover, pair, forget)                                            |
 | `src/main/ipc/brain-status.ts`                   | `createBrainStatus`: the brain card's facts (with the brain's host and whether this desktop is on it), quiet restart, restart after work; `registerBrainStatusIpc`                                                     |
@@ -229,6 +229,10 @@ and is never in `settings.json`. `launchBrain` spawns nothing while the link is 
 restart and open-folder do nothing. `pairWithLink` (`ipc/pair.ts`) turns a pasted or scanned link into
 a saved remote link and reconnects; `forgetBrain` returns to the local brain. Both are on the
 preload's `tagalong` object (`discoverBrains`, `pairWithLink`, `forgetBrain`); no screen uses them yet.
+`pairWithLink` answers `{ ok: false, reason }` with `bad_link`, `cannot_seal` (the OS cannot seal the
+token; checked before any socket opens, so the code is not spent), `wrong_brain`, `refused` or
+`unreachable`. A saved token that cannot be decrypted counts as no token, so the client closes and
+dials again.
 
 ### The brain in the main process
 

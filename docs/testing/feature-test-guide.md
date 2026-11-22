@@ -546,10 +546,10 @@ By hand (two machines, or one machine and a second user's desktop):
 
 1. Brain machine: `TAGALONG_NETWORK=1 uv run tagalong pair`. Copy the link.
 2. Desktop (no local brain wanted): call `window.tagalong.pairWithLink(link)` from the devtools console. **Expected:** `{ ok: true }`, the desktop connects, and no `uv run brain` process starts on it.
-3. Run the pairing again with a link made after changing the brain's `identity/` folder (a different certificate). **Expected:** `wrong_brain`, and the saved link is unchanged.
+3. Run the pairing again with a link made after changing the brain's `identity/` folder (a different certificate). **Expected:** `wrong_brain`, and the saved link is unchanged. On a PC where the OS cannot keep secrets (`safeStorage` unavailable) pairing returns `cannot_seal` without opening a socket, so the code is not spent.
 4. On the brain card of the remote desktop, restart and open-folder do nothing; on the brain's own machine they work.
 5. On the brain, revoke the device (Home's `device_revoke`). **Expected:** the desktop goes offline at once and stays offline.
-6. Browser: `uv run tagalong pair --kind browser`, type the 6 digits in the add-on popup and press Pair. **Expected:** "Paired." and the popup shows connected. Set the address to another machine's: Pair does nothing.
+6. Browser: `uv run tagalong pair --kind browser`, type the 6 digits in the add-on popup and press Pair. **Expected:** "Paired." and the popup shows connected. Set the address to another machine's: the popup shows "That code did not work…" and nothing is saved.
 
 ## Permission engine (unit tests only)
 
