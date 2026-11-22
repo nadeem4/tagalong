@@ -14,9 +14,9 @@ Product intent: bodies/PRODUCT.md. Visual design: bodies/DESIGN.md (both under b
 
 ## Check and release
 
-Check command: pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && cd brain && uv run ruff check && uv run ruff format --check && uv run pytest -q
+Check command: pnpm typecheck && pnpm lint && pnpm format:check && cd brain && uv run ruff check && uv run ruff format --check
 
-Only what a change touches runs before a push (`scripts/check_pr.py` reads these lines; an unlisted path runs the full Check command):
+Before a push only the lines matching the changed files run (`scripts/check_pr.py` reads them; an unlisted path runs the Check command). Full test suites run in CI (ci.yml):
 
 Check [brain/*, protocol/*]: cd brain && uv run ruff check && uv run ruff format --check && uv run pytest --testmon -q
 Check [protocol/*, bodies/*]: pnpm typecheck && pnpm lint && pnpm format:check && pnpm exec vitest run --changed origin/main
