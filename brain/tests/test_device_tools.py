@@ -38,7 +38,9 @@ async def test_list_shows_devices_without_any_token(rig):
     _, token = rig.devices.create("Laptop", "desktop")
     reply = await rig.run("devices_list")
     assert [d["name"] for d in reply["devices"]] == ["Laptop"]
-    assert token not in json.dumps(reply) and "token_hash" not in json.dumps(reply)
+    keys = {"id", "name", "kind", "paired_at", "last_seen", "revoked_at"}
+    assert set(reply["devices"][0]) == keys
+    assert token not in json.dumps(reply)
 
 
 async def test_rename_changes_the_name(rig):

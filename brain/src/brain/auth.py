@@ -1,7 +1,7 @@
 """Who is calling: a hello token becomes a Principal, or None.
 
 The local token is the one in the home folder; a DeviceCheck (paired devices) is asked for
-anything else. A listener that must not honour the local token is given none.
+anything else.
 """
 
 import hmac

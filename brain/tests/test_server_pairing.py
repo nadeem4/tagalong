@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from functools import partial
 
 import pytest
 from event_log import make_session
@@ -15,7 +16,7 @@ from brain.bodies import Bodies
 from brain.devices import Devices
 from brain.identity import load_or_create_identity
 from brain.memory import Memory
-from brain.pairing import Pairing
+from brain.pairing import LOOPBACK_KINDS, NETWORK_KINDS, Pairing
 from brain.server import start_server
 from brain.store.db import open_db
 
@@ -61,8 +62,9 @@ async def make_env(tmp_path):
             "s1",
             session,
             auth=Authenticator(None, env.devices),
-            pairing=env.pairing if offer_pairing else None,
-            loopback=loopback,
+            redeem=partial(env.pairing.redeem, kinds=LOOPBACK_KINDS if loopback else NETWORK_KINDS)
+            if offer_pairing
+            else None,
         )
         servers.append(server)
         env.url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"

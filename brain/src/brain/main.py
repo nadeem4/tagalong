@@ -28,8 +28,7 @@ from brain.build_info import app_version, build_id
 from brain.chat_tools import chat_tools
 from brain.config import in_quiet_hours, load_config, load_env_file, session_id
 from brain.device_tools import device_tools
-from brain.devices import Devices
-from brain.discovery import Advertiser
+from brain.discovery import Advertiser, lan_address
 from brain.events import EventLog
 from brain.events_tools import events_tools
 from brain.experts import ExpertHosts
@@ -49,8 +48,7 @@ from brain.models import chosen as chosen_model
 from brain.models import model_name
 from brain.offers import OfferSettings
 from brain.open_items import OpenItems
-from brain.pair_cli import lan_address
-from brain.pairing import Pairing
+from brain.pairing import LOOPBACK_KINDS, NETWORK_KINDS, build_pairing
 from brain.server import start_server
 from brain.sessions import Session
 from brain.setup.apps import app_setup_tools
@@ -74,7 +72,6 @@ from brain.setup.terminal import real_open_terminal
 from brain.setup.tools import setup_facts, setup_tools
 from brain.setup.updates import Updates
 from brain.setup.why import WhyPick
-from brain.store.db import utc_text
 from brain.store.work import WorkStore
 from brain.telemetry import LoopLagMonitor, dump_timings
 from brain.tools import KeySettings, anthropic_check, brain_status_tools
@@ -156,17 +153,14 @@ async def _run() -> None:
     local_token = load_or_create_local_token(config.data_dir)
     identity = load_or_create_identity(config.data_dir)
 
-    def utc_now() -> str:
-        return utc_text(datetime.now(UTC))
-
-    devices = Devices(
-        memory.db, utc_now, on_revoke=lambda device_id: bodies.drop_principal(f"device:{device_id}")
-    )
-    pairing = Pairing(
-        memory.db, devices, identity, utc_now, lambda: f"{lan_address()}:{config.network_port}"
+    devices, pairing = build_pairing(
+        memory.db,
+        identity,
+        config.network_port,
+        on_revoke=lambda device_id: bodies.drop_principal(f"device:{device_id}"),
     )
     auth = Authenticator(local_token, devices)
-    network_auth = Authenticator(None, devices)  # the local token never works from another machine
+    network_auth = Authenticator(None, devices)
     secrets = cached(
         lambda: [
             local_token,
@@ -385,13 +379,17 @@ async def _run() -> None:
             session_id(config.data_dir),
             session,
             (app_version(), build),
-            pairing=pairing,
             **kwargs,
         )
 
     try:
         try:
-            server = await serve(config.host, config.port, auth=auth)
+            server = await serve(
+                config.host,
+                config.port,
+                auth=auth,
+                redeem=partial(pairing.redeem, kinds=LOOPBACK_KINDS),
+            )
         except OSError as err:  # WSAEADDRINUSE (10048) on Windows, EADDRINUSE elsewhere
             if err.errno not in (getattr(errno, "WSAEADDRINUSE", 10048), errno.EADDRINUSE):
                 raise
@@ -410,7 +408,7 @@ async def _run() -> None:
                 config.network_port,
                 auth=network_auth,
                 ssl_context=server_ssl_context(identity),
-                loopback=False,
+                redeem=partial(pairing.redeem, kinds=NETWORK_KINDS),
             )
             advertiser = Advertiser(AsyncZeroconf)
             try:

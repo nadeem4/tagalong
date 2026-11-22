@@ -16,6 +16,7 @@ import base64
 import json
 import logging
 import ssl
+from collections.abc import Callable
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
@@ -24,7 +25,6 @@ from websockets.exceptions import ConnectionClosed
 
 from brain.auth import Authenticator
 from brain.bodies import Bodies, WriteQueue
-from brain.pairing import Pairing
 from brain.protocol import (
     LIMITS,
     PROTOCOL,
@@ -51,6 +51,8 @@ from brain.protocol import (
 from brain.sessions import Session
 
 MAX_FRAME = 28_000_000
+
+Redeem = Callable[[str, str, str], tuple[str, str] | None]
 KNOW_ME_PDF_MAX = 10 * 1024 * 1024  # decoded bytes
 VOICE_METHODS = {"listen", "mic", "unlisten", "hush"}
 log = logging.getLogger("brain")
@@ -115,8 +117,7 @@ async def _handler(
     session: Session,
     build: tuple[str, str] | None,
     auth: Authenticator,
-    pairing: Pairing | None,
-    loopback: bool,
+    redeem: Redeem | None,
 ) -> None:
     peer = _Peer()
     writer = asyncio.create_task(_writer(ws, peer))
@@ -135,7 +136,7 @@ async def _handler(
             req_id = _usable_id(message)
             if body_id is None:
                 if method == "pair":  # one attempt per connection, whatever the answer
-                    peer.send(_pair(message, req_id, pairing, loopback))
+                    peer.send(_pair(message, req_id, redeem))
                     break
                 if method != "hello":  # method may be None for a response
                     peer.send(_error(req_id, ErrorCode.invalid_request, "hello must come first"))
@@ -225,15 +226,15 @@ def _speech_state(message: dict, body_id: str, session: Session) -> None:
     session.presence.speech(body_id, _SPEECH_STATES[params.state], params.turn, params.n)
 
 
-def _pair(message: dict, req_id: Any, pairing: Pairing | None, loopback: bool) -> str:
-    if pairing is None:
+def _pair(message: dict, req_id: Any, redeem: Redeem | None) -> str:
+    if redeem is None:
         return _error(req_id, ErrorCode.method_not_found, "Unknown method: pair")
     try:
         params = PairParams.model_validate(message.get("params"))
     except ValidationError:
         # Fixed text: the pydantic error quotes the params, and they hold the code.
         return _error(req_id, ErrorCode.invalid_params, "pair needs a code and a device.")
-    paired = pairing.redeem(params.code, params.device.name, params.device.kind, loopback=loopback)
+    paired = redeem(params.code, params.device.name, params.device.kind)
     if paired is None:
         return _error(req_id, ErrorCode.unauthorized, "That code did not work.")
     return _result(req_id, PairResult(device_id=paired[0], token=paired[1]))
@@ -479,15 +480,13 @@ async def start_server(
     *,
     auth: Authenticator,
     ssl_context: ssl.SSLContext | None = None,
-    pairing: Pairing | None = None,
-    loopback: bool = True,
+    redeem: Redeem | None = None,
 ) -> Server:
     """`build` is (version, build id), told to every body in hello; None leaves them out.
-    `ssl_context` makes the listener wss. `pairing` turns on the pre-hello `pair` request;
-    `loopback` says this listener is the one for bodies on the brain's own machine, where only
-    the browser add-on's short code pairs and everywhere else only the other kinds do."""
+    `ssl_context` makes the listener wss. `redeem` turns on the pre-hello `pair` request
+    and carries what this listener may pair: (code, name, kind) to (device id, token) or None."""
 
     async def handler(ws: ServerConnection) -> None:
-        await _handler(ws, bodies, session_id, session, build, auth, pairing, loopback)
+        await _handler(ws, bodies, session_id, session, build, auth, redeem)
 
     return await serve(handler, host, port, max_size=MAX_FRAME, ssl=ssl_context)

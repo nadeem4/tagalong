@@ -141,3 +141,7 @@ def transaction(db: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
 def utc_text(at: datetime) -> str:
     """Whole seconds in UTC, so stored text sorts the same as the instants it names."""
     return at.astimezone(UTC).isoformat(timespec="seconds")
+
+
+def utc_now_text() -> str:
+    return utc_text(datetime.now(UTC))

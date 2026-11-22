@@ -2,7 +2,7 @@
 
 import sqlite3
 
-DEVICE_COLUMNS = "id, name, kind, paired_at, last_seen, revoked_at"
+_DEVICE_COLUMNS = "id, name, kind, paired_at, last_seen, revoked_at"
 
 
 def insert_device(
@@ -22,8 +22,10 @@ def device_by_token_hash(db: sqlite3.Connection, token_hash: str) -> tuple[str, 
     ).fetchone()
 
 
-def list_devices(db: sqlite3.Connection) -> list[tuple]:
-    return db.execute(f"SELECT {DEVICE_COLUMNS} FROM devices ORDER BY paired_at, id").fetchall()
+def list_devices(db: sqlite3.Connection) -> list[dict]:
+    cursor = db.execute(f"SELECT {_DEVICE_COLUMNS} FROM devices ORDER BY paired_at, id")
+    names = [column[0] for column in cursor.description]
+    return [dict(zip(names, row, strict=True)) for row in cursor]
 
 
 def rename_device(db: sqlite3.Connection, id: str, name: str) -> bool:
@@ -70,6 +72,10 @@ def delete_expired_codes(db: sqlite3.Connection, now: str) -> None:
 
 def record_failure(db: sqlite3.Connection, now: str) -> None:
     db.execute("INSERT INTO pair_failures(at) VALUES (?)", (now,))
+
+
+def delete_old_failures(db: sqlite3.Connection, since: str) -> None:
+    db.execute("DELETE FROM pair_failures WHERE at<?", (since,))
 
 
 def count_recent_failures(db: sqlite3.Connection, since: str) -> int:

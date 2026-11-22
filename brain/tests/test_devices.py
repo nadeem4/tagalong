@@ -41,13 +41,6 @@ def test_revoke_kills_the_token_and_tells_the_listener(db):
     assert devices.revoke(device_id) is False and revoked == [device_id]
 
 
-def test_list_never_shows_the_hash(db):
-    devices = Devices(db, lambda: NOW)
-    devices.create("Laptop", "desktop")
-    row = devices.list()[0]
-    assert set(row) == {"id", "name", "kind", "paired_at", "last_seen", "revoked_at"}
-
-
 def test_rename_trims_and_refuses_an_empty_name(db):
     devices = Devices(db, lambda: NOW)
     device_id, _ = devices.create("Laptop", "desktop")

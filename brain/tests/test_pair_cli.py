@@ -11,12 +11,14 @@ from brain.store.db import open_db
 HOST = {"host_addr": lambda: "192.168.1.5"}
 
 
-def test_pair_prints_a_link_and_a_qr(tmp_path):
+def test_pair_prints_a_link_and_a_qr_for_the_asked_kind(tmp_path):
     rig = Rig(tmp_path)
-    assert rig.go("pair", env={"TAGALONG_NETWORK": "1"}, **HOST) == 0
+    assert rig.go("pair", "--kind", "node", env={"TAGALONG_NETWORK": "1"}, **HOST) == 0
     assert "tagalong://pair?addr=192.168.1.5:47323" in rig.text
     assert "10 minutes" in rig.text
     assert "\u2588" in rig.text or "\u2580" in rig.text
+    kinds = open_db(tmp_path / "tagalong.db").execute("SELECT kind FROM pair_codes").fetchall()
+    assert kinds == [("node",)]
 
 
 def test_pair_says_how_to_turn_the_network_on_when_it_is_off(tmp_path):
@@ -30,15 +32,11 @@ def test_the_code_in_the_link_is_stored_only_hashed(tmp_path):
     rig.go("pair", env={"TAGALONG_NETWORK": "1"}, **HOST)
     link = next(line for line in rig.lines if line.startswith("tagalong://"))
     secret = link.split("code=")[1]
-    stored = open_db(tmp_path / "tagalong.db").execute("SELECT secret_hash FROM pair_codes")
-    assert [r[0] for r in stored] != [secret] and secret not in "".join(r[0] for r in stored)
-
-
-def test_pair_for_a_node_makes_a_node_code(tmp_path):
-    rig = Rig(tmp_path)
-    rig.go("pair", "--kind", "node", env={"TAGALONG_NETWORK": "1"}, **HOST)
-    kinds = open_db(tmp_path / "tagalong.db").execute("SELECT kind FROM pair_codes").fetchall()
-    assert kinds == [("node",)]
+    db = open_db(tmp_path / "tagalong.db")
+    (stored,) = db.execute("SELECT secret_hash FROM pair_codes").fetchone()
+    assert stored != secret
+    rows = db.execute("SELECT * FROM pair_codes").fetchall()
+    assert secret not in "".join(str(c) for row in rows for c in row)
 
 
 def test_the_qr_prints_on_a_console_that_is_not_utf8(tmp_path):

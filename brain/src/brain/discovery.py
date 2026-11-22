@@ -1,4 +1,5 @@
-"""Announce the brain on the home network (mDNS) so a device can offer it by name.
+"""Announce the brain on the home network (mDNS) so a device can offer it by name, and find the
+address to announce.
 
 Only a name and the protocol version are announced: the certificate fingerprint travels in the
 pairing link, never on the network where anyone could read it.
@@ -11,6 +12,19 @@ from zeroconf import ServiceInfo
 from zeroconf.asyncio import AsyncZeroconf
 
 SERVICE_TYPE = "_tagalong._tcp.local."
+
+
+def lan_address() -> str:
+    """This machine's address on the local network. A UDP connect sends no packet; it only makes
+    the OS pick the interface it would use. Loopback when there is none."""
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        probe.connect(("10.255.255.255", 1))
+        return probe.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+    finally:
+        probe.close()
 
 
 class Advertiser:

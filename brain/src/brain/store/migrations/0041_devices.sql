@@ -17,3 +17,4 @@ CREATE TABLE pair_codes (
   used_at TEXT
 );
 CREATE TABLE pair_failures (at TEXT NOT NULL);
+CREATE INDEX pair_failures_at ON pair_failures(at);

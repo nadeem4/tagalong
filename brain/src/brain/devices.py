@@ -10,8 +10,8 @@ from brain.auth import Principal
 from brain.store import devices as store
 
 
-def _hash(token: str) -> str:
-    return hashlib.sha256(token.encode()).hexdigest()
+def hash_secret(secret: str) -> str:
+    return hashlib.sha256(secret.encode()).hexdigest()
 
 
 class Devices:
@@ -29,12 +29,17 @@ class Devices:
         device_id = secrets.token_hex(8)
         token = secrets.token_urlsafe(32)
         store.insert_device(
-            self._db, id=device_id, name=name, kind=kind, token_hash=_hash(token), now=self._now()
+            self._db,
+            id=device_id,
+            name=name,
+            kind=kind,
+            token_hash=hash_secret(token),
+            now=self._now(),
         )
         return device_id, token
 
     def verify(self, token: str) -> Principal | None:
-        row = store.device_by_token_hash(self._db, _hash(token))
+        row = store.device_by_token_hash(self._db, hash_secret(token))
         if row is None:
             return None
         device_id, name, kind = row
@@ -44,8 +49,7 @@ class Devices:
         )
 
     def list(self) -> list[dict]:
-        keys = [c.strip() for c in store.DEVICE_COLUMNS.split(",")]
-        return [dict(zip(keys, row, strict=True)) for row in store.list_devices(self._db)]
+        return store.list_devices(self._db)
 
     def rename(self, device_id: str, name: str) -> bool:
         name = name.strip()

@@ -22,14 +22,13 @@ from typing import NoReturn, TextIO
 
 from brain.apps import AppError, TokenFile
 from brain.config import load_config, load_env_file, upsert_env_value
-from brain.devices import Devices
+from brain.discovery import lan_address
 from brain.events import Event
 from brain.identity import load_or_create_identity
 from brain.lifecycle import pid_path, stop_real_brain
 from brain.memory import Memory
 from brain.open_items import OpenItems
-from brain.pair_cli import lan_address, render_qr
-from brain.pairing import Pairing
+from brain.pairing import NETWORK_KINDS, build_pairing, render_qr
 from brain.setup.apps import add_registry_app, app_card
 from brain.setup.facts import Machine, RunCmd, inspect, real_run_cmd
 from brain.setup.install import (
@@ -43,7 +42,7 @@ from brain.setup.net import GetJson, http_fetch, real_get_json
 from brain.setup.registry import Registry, RegistryEntry, RegistryUnavailable
 from brain.setup.store import ExpertStore, all_experts
 from brain.setup.terminal import OpenTerminal, real_open_terminal
-from brain.store.db import open_db, utc_text
+from brain.store.db import open_db
 from brain.tools import KEY_NAME, clean_key
 from brain.voice.models import Fetch
 
@@ -85,7 +84,7 @@ def _parser() -> argparse.ArgumentParser:
     add.add_argument("app_id")
     add.add_argument("--yes", action="store_true", help="skip the question")
     pair = sub.add_parser("pair", help="make a one-time code to pair another machine")
-    pair.add_argument("--kind", choices=["desktop", "node"], default="desktop")
+    pair.add_argument("--kind", choices=sorted(NETWORK_KINDS), default="desktop")
     login = sub.add_parser("login", help="log an installed expert in")
     login.add_argument("expert_id")
     return p
@@ -199,15 +198,8 @@ def _pair(config, kind: str, host_addr: Callable[[], str], out) -> None:
         )
     db = open_db(config.data_dir / "tagalong.db")
 
-    def now() -> str:
-        return utc_text(datetime.now(UTC))
-
-    pairing = Pairing(
-        db,
-        Devices(db, now),
-        load_or_create_identity(config.data_dir),
-        now,
-        lambda: f"{host_addr()}:{config.network_port}",
+    _, pairing = build_pairing(
+        db, load_or_create_identity(config.data_dir), config.network_port, host_addr
     )
     offer = pairing.make_code(kind)
     if out is print:  # the QR is block characters that a Windows code page cannot print
