@@ -50,7 +50,7 @@ export async function saveToken(storage: StorageArea, token: string): Promise<vo
   await storage.set(TOKEN_KEY, token.trim());
 }
 
-/** The keys a saved change to which makes the body dial again. */
+/** A saved address, name or pairing code makes the body dial again. */
 export function restartsBody(changes: Record<string, unknown>, area: string): boolean {
   return area === 'local' && [ADDR_KEY, NAME_KEY, TOKEN_KEY].some((key) => key in changes);
 }

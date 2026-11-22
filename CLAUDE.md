@@ -66,4 +66,5 @@ The brain is Python; the TypeScript apps are bodies.
 - Every file opens with a 2-6 line header; comments explain why, not history.
 - Conventional Commits, e.g. feat(desktop): ...
 - Docs are part of done: README.md, the matching docs/ subsystem doc, and docs/testing/feature-test-guide.md. A contract change also updates protocol/README.md, protocol/examples, protocol/ts and brain/src/brain/protocol.py together.
+- A change to a shared signature or a contract field runs the full suites of every package that fakes it (brain pytest, each body's vitest) before review; targeted runs miss fakes in untouched test files.
 - CI: branch protection on main requires build (Linux), brain (Linux) and e2e (Windows); docs-only PRs skip all three.
