@@ -147,7 +147,6 @@ async def _run() -> None:
     apps = Apps(memory, bodies.notify, os.environ, tokens=tokens, data_dir=config.data_dir)
     local_token = load_or_create_local_token(config.data_dir)
     auth = Authenticator(local_token)
-    identity = load_or_create_identity(config.data_dir) if config.network else None
     secrets = cached(
         lambda: [
             local_token,
@@ -326,6 +325,7 @@ async def _run() -> None:
     session.ask_runner.home_ended = home_end_reporter(progress, bodies.notify)
     bridges: BridgeSupervisor | None = None  # built once the brain's port is known
     update_loop: asyncio.Task | None = None
+    identity = None  # made with the network listener, which TAGALONG_NETWORK=1 turns on
     network_server = None
     lag_watch: asyncio.Task | None = None
     perf_dump: asyncio.Task | None = None
@@ -355,17 +355,22 @@ async def _run() -> None:
     loops.tasks = updates.tasks = session.tasks  # the Watch tasks of mail and update checks
     session.watch_stops += [loops.task_stopped, updates.task_stopped]
     loops.start()  # wakes Scout for a loop already due, and arms the next one
+
+    def serve(host: str, port: int, **kwargs):
+        return start_server(
+            host,
+            port,
+            bodies,
+            session_id(config.data_dir),
+            session,
+            (app_version(), build),
+            auth=auth,
+            **kwargs,
+        )
+
     try:
         try:
-            server = await start_server(
-                config.host,
-                config.port,
-                bodies,
-                session_id(config.data_dir),
-                session,
-                (app_version(), build),
-                auth=auth,
-            )
+            server = await serve(config.host, config.port)
         except OSError as err:  # WSAEADDRINUSE (10048) on Windows, EADDRINUSE elsewhere
             if err.errno not in (getattr(errno, "WSAEADDRINUSE", 10048), errno.EADDRINUSE):
                 raise
@@ -378,16 +383,10 @@ async def _run() -> None:
             sys.exit(1)
         # Only now, with the port ours: a second brain that failed to bind must not touch it.
         write_pid(config.data_dir, os.getpid(), real_started(os.getpid()))
-        if identity:
-            network_server = await start_server(
-                "0.0.0.0",
-                config.network_port,
-                bodies,
-                session_id(config.data_dir),
-                session,
-                (app_version(), build),
-                auth=auth,
-                ssl_context=server_ssl_context(identity),
+        if config.network:
+            identity = load_or_create_identity(config.data_dir)
+            network_server = await serve(
+                "0.0.0.0", config.network_port, ssl_context=server_ssl_context(identity)
             )
         await asyncio.to_thread(
             sweep_staging, config.data_dir
