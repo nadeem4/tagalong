@@ -36,7 +36,7 @@ type StartBrainOptions = Pick<
   bodyId: string;
   env?: NodeJS.ProcessEnv;
   /** Which brain this desktop is paired with, and the device token for a remote one. */
-  link: Pick<LinkStore, 'paired' | 'token' | 'markGood'>;
+  link: Pick<LinkStore, 'paired' | 'token' | 'markGood' | 'addAddrs'>;
   /** Addresses of brains on the home network; asked only after every saved address has failed. */
   search: () => Promise<string[]>;
   /** Tests pass a fake; the app uses the global WebSocket, or the pinned socket for a remote brain. */
@@ -113,6 +113,10 @@ export function startBrain(options: StartBrainOptions): BrainClient {
   const { tools, run } = bodyTools(platform, exclusions, onCapture, openExternal, files, reading);
   const brain = new BrainClient({
     ...handlers,
+    onHello: (hello) => {
+      if (hello.addrs !== undefined) link.addAddrs(hello.addrs);
+      handlers.onHello?.(hello);
+    },
     onStatus: (status) => {
       const paired = link.paired();
       if (paired !== null && status === 'online') {

@@ -36,6 +36,8 @@ export const HelloResult = z.object({
   // The brain's own version and build; absent on a brain older than the version check.
   version: z.string().optional(),
   build: z.string().optional(),
+  // Other host:port addresses the brain can be dialed at (its tailnet address).
+  addrs: z.array(z.string()).optional(),
 });
 export type HelloResult = z.infer<typeof HelloResult>;
 

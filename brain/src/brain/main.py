@@ -28,7 +28,7 @@ from brain.build_info import app_version, build_id
 from brain.chat_tools import chat_tools
 from brain.config import in_quiet_hours, load_config, load_env_file, session_id
 from brain.device_tools import device_tools
-from brain.discovery import Advertiser, lan_address
+from brain.discovery import Advertiser, lan_address, tailnet_addresses
 from brain.events import EventLog
 from brain.events_tools import events_tools
 from brain.experts import ExpertHosts
@@ -408,6 +408,7 @@ async def _run() -> None:
                 auth=network_auth,
                 ssl_context=server_ssl_context(identity),
                 redeem=partial(pairing.redeem, kinds=NETWORK_KINDS),
+                addrs=lambda: [f"{a}:{config.network_port}" for a in tailnet_addresses()],
             )
             advertiser = Advertiser(AsyncZeroconf)
             try:

@@ -118,6 +118,7 @@ async def _handler(
     build: tuple[str, str] | None,
     auth: Authenticator,
     redeem: Redeem | None,
+    addrs: Callable[[], list[str]],
 ) -> None:
     peer = _Peer()
     writer = asyncio.create_task(_writer(ws, peer))
@@ -141,7 +142,9 @@ async def _handler(
                 if method != "hello":  # method may be None for a response
                     peer.send(_error(req_id, ErrorCode.invalid_request, "hello must come first"))
                     break
-                body_id = _hello(message, req_id, peer, bodies, session_id, session, build, auth)
+                body_id = _hello(
+                    message, req_id, peer, bodies, session_id, session, build, auth, addrs()
+                )
                 if body_id is None:
                     break
                 # A new connection of this body: what an older one reported no longer holds.
@@ -249,6 +252,7 @@ def _hello(
     session: Session,
     build: tuple[str, str] | None,
     auth: Authenticator,
+    addrs: list[str],
 ) -> str | None:
     """Join the body and queue the result, the backlog, then any open asks it cannot have;
     None means hello failed. The token is checked before the shape, so an unauthenticated
@@ -282,6 +286,7 @@ def _hello(
         seq=joined.seq,
         resync=joined.resync,
         **({"version": build[0], "build": build[1]} if build else {}),
+        **({"addrs": addrs} if addrs else {}),
     )
     peer.send(_result(req_id, result))
     for frame in joined.backlog:
@@ -482,12 +487,14 @@ async def start_server(
     auth: Authenticator,
     ssl_context: ssl.SSLContext | None = None,
     redeem: Redeem | None = None,
+    addrs: Callable[[], list[str]] = list,
 ) -> Server:
     """`build` is (version, build id), told to every body in hello; None leaves them out.
     `ssl_context` makes the listener wss. `redeem` turns on the pre-hello `pair` request
-    and carries what this listener may pair: (code, name, kind) to (device id, token) or None."""
+    and carries what this listener may pair: (code, name, kind) to (device id, token) or None.
+    `addrs` gives the other addresses this brain can be dialed at, told to every body in hello."""
 
     async def handler(ws: ServerConnection) -> None:
-        await _handler(ws, bodies, session_id, session, build, auth, redeem)
+        await _handler(ws, bodies, session_id, session, build, auth, redeem, addrs)
 
     return await serve(handler, host, port, max_size=MAX_FRAME, ssl=ssl_context)

@@ -170,6 +170,9 @@ class HelloResult(Model):
     # The brain's own version and build; the desktop compares them to its own.
     version: str | None = None
     build: str | None = None
+    # Other `host:port` addresses this brain can be dialed at (its tailnet address); the
+    # desktop adds them to the ones it already tries.
+    addrs: list[str] | None = None
 
 
 DeviceKind = Literal["desktop", "browser", "node", "mcp_client"]

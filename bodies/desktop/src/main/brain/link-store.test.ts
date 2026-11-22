@@ -60,4 +60,13 @@ describe('LinkStore', () => {
     store.markGood('b:2');
     expect(dialOrder(store.paired()!, [])).toEqual(['b:2', 'a:1']);
   });
+
+  it('adds addresses the brain told us once, keeping the saved order and the last good', () => {
+    const store = new LinkStore(new SettingsStore(dir), reversed);
+    store.saveRemote({ addrs: ['a:1'], fp }, 'tok');
+    store.markGood('a:1');
+    store.addAddrs(['100.64.0.7:47323', 'a:1']);
+    expect(store.paired()).toMatchObject({ addrs: ['a:1', '100.64.0.7:47323'], lastGood: 'a:1' });
+    expect(store.token()).toBe('tok');
+  });
 });

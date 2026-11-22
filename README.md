@@ -125,7 +125,13 @@ To use the brain from another device, set `TAGALONG_NETWORK=1`, start the brain,
 `uv run tagalong pair`: it prints a QR and a `tagalong://pair?...` link, valid 10 minutes and once. The
 brain accepts only device tokens on that network port, and Home can rename or revoke a device. A
 desktop paired to it dials it over `wss`, pinned to the certificate in the link, and does not start a
-brain of its own.
+brain of its own. If the machine has a Tailscale address, the brain lists it in `hello` and a paired
+desktop saves it, so the brain stays reachable away from home.
+
+To keep the brain running without the desktop window, run `uv run tagalong service install`: it
+registers a per-user task that starts the brain at logon (a Windows scheduled task, a macOS launchd
+agent or a Linux systemd user unit) and saves `TAGALONG_NETWORK=1` in `.env`. `service status` prints
+installed or not installed, and `service remove` stops it. The service uses the default data folder.
 
 Upgrading: if you installed the Claude Code adapter globally with npm before, set
 `TAGALONG_EXPERT_CMD=claude-agent-acp` to keep using it, or let Scout install it.

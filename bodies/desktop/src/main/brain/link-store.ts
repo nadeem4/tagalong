@@ -42,6 +42,14 @@ export class LinkStore {
       this.settings.setBrain({ ...this.settings.get().brain, lastGood: addr });
   }
 
+  /** Addresses the brain lists in hello (its tailnet address), after the ones already saved. */
+  addAddrs(addrs: string[]): void {
+    const current = this.settings.get().brain;
+    const merged = [...new Set([...current.addrs, ...addrs])];
+    if (this.paired() === null || merged.length === current.addrs.length) return;
+    this.settings.setBrain({ ...current, addrs: merged });
+  }
+
   forget(): void {
     this.settings.setBrain({ addrs: [] });
   }
