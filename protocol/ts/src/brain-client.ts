@@ -38,8 +38,10 @@ export interface SeqStore {
 }
 
 export interface BrainClientOptions {
-  /** "host:port" */
-  addr: string;
+  /** "host:port"; a function is asked again on every dial, so a body can try several brains. */
+  addr: string | (() => string);
+  /** `wss` for a brain on another machine (the openSocket pins its certificate). Default `ws`. */
+  scheme?: () => 'ws' | 'wss';
   /** Who this body is, sent in hello as given; its id prefixes request ids. */
   body: Body;
   /** Defaults to memory only, so a new client starts without a last_seq. */
@@ -88,17 +90,20 @@ export class BrainClient {
   private keepaliveTimer: ReturnType<typeof setInterval> | undefined;
   private pending = new Map<string, Pending>();
   private retryTimer: ReturnType<typeof setTimeout> | undefined;
+  private dialed: string;
   private knowMeListeners = new Set<(s: KnowMeStatusParams) => void>();
 
-  constructor(private readonly options: BrainClientOptions) {}
+  constructor(private readonly options: BrainClientOptions) {
+    this.dialed = typeof options.addr === 'string' ? options.addr : '';
+  }
 
   get session(): string | null {
     return this.sessionId;
   }
 
-  /** "host:port" the client dials, for the Home card that says where the brain is. */
+  /** "host:port" the client dials (the last one, for a function), for the Home card that says where the brain is. */
   get addr(): string {
-    return this.options.addr;
+    return this.dialed;
   }
 
   /** Where the link stands now; offline until start() has tried. */
@@ -255,7 +260,9 @@ export class BrainClient {
 
   private connect(): void {
     this.setStatus('connecting');
-    const socket = this.options.openSocket(`ws://${this.options.addr}`);
+    const { addr, scheme } = this.options;
+    this.dialed = typeof addr === 'string' ? addr : addr();
+    const socket = this.options.openSocket(`${scheme?.() ?? 'ws'}://${this.dialed}`);
     this.socket = socket;
     // A superseded socket may still fire late events; they must not touch current state.
     socket.onOpen(() => this.socket === socket && void this.hello(socket));

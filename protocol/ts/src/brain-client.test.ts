@@ -176,6 +176,20 @@ describe('BrainClient', () => {
     expect(client.link).toBe('offline');
   });
 
+  it('asks for the address and scheme again on every dial', async () => {
+    const addrs = ['a:1', 'b:2'];
+    let n = 0;
+    const { client, sockets, urls } = setup(10, {
+      addr: () => addrs[n++ % 2]!,
+      scheme: () => 'wss',
+    });
+    client.start();
+    sockets[0]!.drop();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(urls).toEqual(['wss://a:1', 'wss://b:2']);
+    expect(client.addr).toBe('b:2');
+  });
+
   it('say resolves with the SayResult for its id', async () => {
     const { client, s } = await online();
     const p = client.say({ id: 'e1', text: 'hi' });

@@ -1,6 +1,6 @@
 /**
- * Starts the brain for the desktop: when the brain address is local and nothing answers
- * there, runs `uv run brain` from the brain/ folder, detached (hidden on Windows), its output going to
+ * Starts the brain for the desktop: unless it is paired with a remote brain, when the brain
+ * address is local and nothing answers there, runs `uv run brain` from the brain/ folder, detached (hidden on Windows), its output going to
  * <TAGALONG_HOME>/brain.log. Packaged, it runs `uv sync` first (the first-run install) and
  * reports installing/failed. Quitting the app never stops the brain; only a restart for a
  * version update does (`stopBrain`, never for a brain the person started themselves).
@@ -42,6 +42,8 @@ export interface LaunchOptions {
   exists: (path: string) => boolean;
   spawn: (command: string, args: string[], options: SpawnOptions) => ChildProcess;
   log: { warn: (line: string) => void };
+  /** True when the desktop is paired with a brain on another machine: there is nothing to start. */
+  remote: () => boolean;
 }
 
 /** The brain's own data folder rule (config.py): TAGALONG_HOME, else ~/.tagalong. */
@@ -113,6 +115,7 @@ export interface RealLaunch {
   onSetup?: (state: SetupState) => void;
   onStarting?: (on: boolean) => void;
   env?: NodeJS.ProcessEnv;
+  remote: () => boolean;
 }
 
 /** The env the brain runs with: the packaged one carries uv's folders and the build id. */
@@ -151,6 +154,7 @@ export function realLaunch(real: RealLaunch): Promise<void> {
     exists: existsSync,
     spawn: nodeSpawn,
     log: { warn: (line) => console.warn(line) },
+    remote: real.remote,
   });
 }
 
@@ -176,9 +180,9 @@ export async function launchBrain(options: LaunchOptions): Promise<void> {
   const { env, brainDir, uv, sync, platform, onSetup, onStarting, logPath } = options;
   const { openLog, closeLog, probe } = options;
   const { exists, spawn } = options;
-  const { log } = options;
+  const { log, remote } = options;
   const addr = env.TAGALONG_BRAIN_ADDR ?? DEFAULT_ADDR;
-  if (env.TAGALONG_START_BRAIN === '0' || !isLocal(addr)) return;
+  if (env.TAGALONG_START_BRAIN === '0' || remote() || !isLocal(addr)) return;
   if (!exists(join(brainDir, 'pyproject.toml'))) return;
   if (await probe(addr)) return;
 

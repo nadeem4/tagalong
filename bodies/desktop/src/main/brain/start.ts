@@ -4,13 +4,15 @@
  * if none runs) and BrainClient keeps retrying while it is down. It declares the window and file body tools.
  */
 import { homedir, hostname } from 'node:os';
-import { BrainClient } from '@tagalong/contract';
+import { BrainClient, dialOrder } from '@tagalong/contract';
 import type { BrainClientOptions, BrainSocket } from '@tagalong/contract';
 import type { CaptureExclusions } from '../../shared/settings';
 import type { CaptureNotice } from '../../shared/ipc';
 import type { Platform } from '../platform/index';
 import { bodyTools } from './body-tools';
+import type { LinkStore } from './link-store';
 import { readLocalToken } from './launch';
+import { pinnedSocket } from './pinned-socket';
 import type { ReadingDeps } from './body-tools';
 import type { FileDeps } from '../tools/files';
 
@@ -18,7 +20,7 @@ const DEFAULT_ADDR = '127.0.0.1:47321';
 
 type StartBrainOptions = Pick<
   BrainClientOptions,
-  'onNotification' | 'onStatus' | 'onResync' | 'onHello'
+  'onNotification' | 'onStatus' | 'onResync' | 'onHello' | 'retryMs'
 > & {
   platform: Platform;
   exclusions: () => CaptureExclusions;
@@ -32,7 +34,11 @@ type StartBrainOptions = Pick<
   /** This install's body id (`readOrMakeBodyId`); the brain keeps one body per id. */
   bodyId: string;
   env?: NodeJS.ProcessEnv;
-  /** Tests pass a fake; the app uses the global WebSocket. */
+  /** Which brain this desktop is paired with, and the device token for a remote one. */
+  link: Pick<LinkStore, 'get' | 'token' | 'markGood'>;
+  /** Addresses of brains seen on the home network, tried after the saved ones. */
+  found: () => string[];
+  /** Tests pass a fake; the app uses the global WebSocket, or the pinned socket for a remote brain. */
   openSocket?: BrainClientOptions['openSocket'];
 };
 
@@ -55,7 +61,9 @@ export function startBrain(options: StartBrainOptions): BrainClient {
   const {
     bodyId,
     env = process.env,
-    openSocket = webSocket,
+    link,
+    found,
+    openSocket,
     platform,
     exclusions,
     onCapture,
@@ -64,17 +72,38 @@ export function startBrain(options: StartBrainOptions): BrainClient {
     reading,
     ...handlers
   } = options;
+  const remote = () => link.get().mode === 'remote';
+  // A dial that fails (or a certificate that differs) moves on to the next address; one that
+  // reaches the brain is remembered first. Nothing here ever falls back from wss to ws.
+  let tried = 0;
+  const nextAddr = (): string => {
+    const order = dialOrder(link.get(), found(), []);
+    return order[tried++ % order.length] ?? '';
+  };
   const { tools, run } = bodyTools(platform, exclusions, onCapture, openExternal, files, reading);
   const brain = new BrainClient({
     ...handlers,
-    addr: env.TAGALONG_BRAIN_ADDR ?? DEFAULT_ADDR,
+    onStatus: (status) => {
+      if (status === 'online' && remote()) {
+        link.markGood(brain.addr);
+        tried = 0;
+      }
+      handlers.onStatus(status);
+    },
+    addr: () => (remote() ? nextAddr() : (env.TAGALONG_BRAIN_ADDR ?? DEFAULT_ADDR)),
+    scheme: () => (remote() ? 'wss' : 'ws'),
     // The PC's name is shown to the person, so two desktops can be told apart.
     body: { id: bodyId, kind: 'desktop', name: hostname() },
     // Read on every dial: a brain started after the desktop writes the file late, and the
     // client does not say hello without a token, so it dials again.
-    token: () => readLocalToken(env, homedir()) ?? '',
+    token: () => (remote() ? link.token() : readLocalToken(env, homedir())) ?? '',
     tools: () => tools,
-    openSocket,
+    openSocket:
+      openSocket ??
+      ((url) => {
+        const { fp } = link.get();
+        return remote() && fp !== undefined ? pinnedSocket(url, fp) : webSocket(url);
+      }),
     onUse: (tool, input) => run(tool, input),
   });
   brain.start();

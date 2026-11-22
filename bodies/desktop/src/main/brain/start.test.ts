@@ -9,7 +9,14 @@ import type { BrainSocket } from '@tagalong/contract';
 import type { Platform } from '../platform/index';
 
 const noop = () => undefined;
+const localLink = {
+  get: () => ({ mode: 'local' as const, addrs: [] }),
+  token: () => null,
+  markGood: noop,
+};
 const tools = {
+  link: localLink,
+  found: () => [],
   platform: { listWindows: async () => ({ windows: [] }) } as unknown as Platform,
   exclusions: () => ({}) as CaptureExclusions,
   onCapture: noop,
@@ -150,6 +157,89 @@ describe('startBrain', () => {
       id: 'b1',
       result: { output: [{ type: 'text' }] },
     });
+    brain.stop();
+  });
+});
+
+describe('startBrain with a paired remote brain', () => {
+  const fp = 'ef'.repeat(64 / 2);
+  function remote(over: { found?: string[] } = {}) {
+    const good: string[] = [];
+    const link = {
+      get: () => ({
+        mode: 'remote' as const,
+        addrs: ['10.0.0.5:47323', '100.64.0.2:47323'],
+        lastGood: '100.64.0.2:47323',
+        fp,
+      }),
+      token: () => 'device-token',
+      markGood: (addr: string) => void good.push(addr),
+    };
+    const sockets: {
+      url: string;
+      open: () => void;
+      drop: () => void;
+      message: (data: string) => void;
+    }[] = [];
+    const sent: string[] = [];
+    const brain = startBrain({
+      ...tools,
+      link,
+      found: () => over.found ?? [],
+      env: {},
+      retryMs: 1,
+      openSocket: (url): BrainSocket => {
+        const entry = { url, open: noop, drop: noop, message: noop as (data: string) => void };
+        sockets.push(entry);
+        return {
+          send: (data) => void sent.push(data),
+          close: noop,
+          onOpen: (f) => void (entry.open = f),
+          onMessage: (f) => void (entry.message = f),
+          onClose: (f) => void (entry.drop = f),
+        };
+      },
+      onNotification: noop,
+      onStatus: noop,
+      onResync: noop,
+      bodyId: 'desktop-a1b2c3',
+    });
+    const message = (data: object) => void sockets.at(-1)!.message(JSON.stringify(data));
+    return { brain, sockets, sent, good, message };
+  }
+
+  it('dials wss on the last good address first, with the device token', () => {
+    const { brain, sockets, sent } = remote();
+    sockets[0]!.open();
+    expect(sockets[0]!.url).toBe('wss://100.64.0.2:47323');
+    expect(JSON.parse(sent[0] as string).params.token).toBe('device-token');
+    brain.stop();
+  });
+
+  it('remembers the address that said hello as the one to dial first', () => {
+    const { brain, sockets, sent, good, message } = remote();
+    sockets[0]!.open();
+    message({
+      jsonrpc: '2.0',
+      id: JSON.parse(sent[0] as string).id,
+      result: { protocol: 3, session: 's', tools: [], seq: 0, resync: false },
+    });
+    expect(good).toEqual(['100.64.0.2:47323']);
+    brain.stop();
+  });
+
+  it('moves to the next address when one fails, and never marks a failed one good', async () => {
+    const { brain, sockets, good } = remote({ found: ['192.168.1.9:47323'] });
+    sockets[0]!.drop();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    sockets[1]!.drop();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(sockets.map((s) => s.url)).toEqual([
+      'wss://100.64.0.2:47323',
+      'wss://10.0.0.5:47323',
+      'wss://192.168.1.9:47323',
+    ]);
+    expect(good).toEqual([]);
     brain.stop();
   });
 });
