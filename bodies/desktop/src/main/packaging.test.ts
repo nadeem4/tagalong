@@ -64,11 +64,13 @@ describe('electron-builder config', () => {
       fileURLToPath(new URL('../../build/installer.nsh', import.meta.url)),
       'utf8',
     );
-    expect(script).toContain('schtasks /End /TN "TagalongBrain"');
-    expect(script).toContain('schtasks /Run /TN "TagalongBrain"');
-    expect(script).toContain('schtasks /Delete /TN "TagalongBrain" /F');
-    expect(script).toMatch(/!macro customInstall[\s\S]*schtasks \/Run/);
-    expect(script).toMatch(/!macro customUnInstall[\s\S]*schtasks \/Delete/);
+    const macro = (name: string): string =>
+      new RegExp(String.raw`!macro ${name}\b[\s\S]*?!macroend`).exec(script)?.[0] ?? '';
+    const stop = macro('tagalongStopBrain');
+    expect(stop.indexOf('schtasks /End /TN "TagalongBrain"')).toBeGreaterThan(-1);
+    expect(stop.indexOf('schtasks /End')).toBeLessThan(stop.indexOf('taskkill'));
+    expect(macro('customInstall')).toContain('schtasks /Run /TN "TagalongBrain"');
+    expect(macro('customUnInstall')).toContain('schtasks /Delete /TN "TagalongBrain" /F');
   });
 
   it('keeps the product name, so the installed app finds the same user data folder', () => {

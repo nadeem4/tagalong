@@ -131,7 +131,9 @@ desktop saves it, so the brain stays reachable away from home.
 To keep the brain running without the desktop window, run `uv run tagalong service install`: it
 registers a per-user task that starts the brain at logon (a Windows scheduled task, a macOS launchd
 agent or a Linux systemd user unit) and saves `TAGALONG_NETWORK=1` in `.env`. `service status` prints
-installed or not installed, and `service remove` stops it. The service uses the default data folder.
+installed or not installed, and `service remove` stops it. A non-default `TAGALONG_HOME` is written into
+the unit, so the service uses the same data folder. Install prints that it turned the network listener
+on; `remove` leaves `TAGALONG_NETWORK=1` in `.env`, so delete that line to turn it off.
 
 Upgrading: if you installed the Claude Code adapter globally with npm before, set
 `TAGALONG_EXPERT_CMD=claude-agent-acp` to keep using it, or let Scout install it.

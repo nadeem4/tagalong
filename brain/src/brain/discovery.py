@@ -36,7 +36,7 @@ def tailnet_addresses(ips: Iterable[str] | None = None) -> list[str]:
     """This machine's Tailscale addresses, from its interfaces unless `ips` is given."""
     if ips is None:
         ips = [ip.ip for adapter in ifaddr.get_adapters() for ip in adapter.ips if ip.is_IPv4]
-    return [ip for ip in ips if ":" not in ip and ipaddress.ip_address(ip) in _TAILNET]
+    return [ip for ip in ips if ipaddress.ip_address(ip) in _TAILNET]
 
 
 class Advertiser:

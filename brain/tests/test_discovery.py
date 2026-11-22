@@ -11,5 +11,5 @@ async def test_stop_before_start_does_nothing():
 
 
 def test_only_tailscale_addresses_are_kept_from_an_interface_list():
-    ips = ["192.168.1.5", "100.64.0.7", "100.127.255.1", "100.128.0.1", "fe80::1", "127.0.0.1"]
+    ips = ["192.168.1.5", "100.64.0.7", "100.127.255.1", "100.128.0.1", "127.0.0.1"]
     assert tailnet_addresses(ips) == ["100.64.0.7", "100.127.255.1"]

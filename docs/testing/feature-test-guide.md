@@ -3177,7 +3177,7 @@ Automated: `brain/tests/test_service.py` (rendered Windows, macOS and Linux unit
 By hand on the owner's PC (never on a machine whose scheduled tasks matter):
 
 1. `cd brain && uv run tagalong service status`. **Expected:** `not installed`.
-2. `uv run tagalong service install`. **Expected:** it says installed; `TAGALONG_NETWORK=1` is in `<TAGALONG_HOME>/.env`; the brain is running (`uv run tagalong perf` finds `brain.log`, or the desktop connects) with no desktop open.
+2. `uv run tagalong service install`. **Expected:** it says installed and that it turned the network listener on; `TAGALONG_NETWORK=1` is in `<TAGALONG_HOME>/.env`; the brain is running (`uv run tagalong perf` finds `brain.log`, or the desktop connects) with no desktop open.
 3. Sign out and in again with the desktop closed. **Expected:** the brain is running.
 4. `uv run tagalong service remove`. **Expected:** `service status` prints `not installed` and the brain stops (`uv run tagalong stop` says it is not running).
 5. With Tailscale up on the brain machine, pair a desktop and connect. **Expected:** the desktop's saved addresses gain the `100.x.y.z:47323` address.

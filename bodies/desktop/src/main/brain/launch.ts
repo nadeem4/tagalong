@@ -123,44 +123,37 @@ function brainEnv({ packaged, appVersion, env = process.env }: RealLaunch): Node
   return packaged ? packagedEnv(env, homedir(), appVersion) : env;
 }
 
-/** `runTagalong` with the app's real spawn and the same env the launch used. */
-export function realRunTagalong(
-  real: RealLaunch,
-  args: string[],
-): Promise<{ code: number; out: string }> {
-  return runTagalong(
-    {
-      env: brainEnv(real),
-      brainDir: real.brainDir,
-      uv: real.packaged?.uv ?? 'uv',
-      spawn: nodeSpawn,
-    },
-    args,
-  );
-}
-
-/** `stopBrain` with the app's real spawn and the same env the launch used. */
-export function realStop(real: RealLaunch): Promise<boolean> {
-  return stopBrain({
+/** What every real uv command needs: the env the launch used, the brain folder, uv and the real spawn. */
+function uvOptions(real: RealLaunch): Pick<LaunchOptions, 'env' | 'brainDir' | 'uv' | 'spawn'> {
+  return {
     env: brainEnv(real),
     brainDir: real.brainDir,
     uv: real.packaged?.uv ?? 'uv',
     spawn: nodeSpawn,
-  });
+  };
+}
+
+export function realRunTagalong(
+  real: RealLaunch,
+  args: string[],
+): Promise<{ code: number; out: string }> {
+  return runTagalong(uvOptions(real), args);
+}
+
+export function realStop(real: RealLaunch): Promise<boolean> {
+  return stopBrain(uvOptions(real));
 }
 
 export function realLaunch(real: RealLaunch): Promise<void> {
-  const { brainDir, packaged, onSetup = () => undefined, onStarting = () => undefined } = real;
-  const env = brainEnv(real);
+  const { packaged, onSetup = () => undefined, onStarting = () => undefined } = real;
+  const uv = uvOptions(real);
   return launchBrain({
-    env,
-    brainDir,
-    uv: packaged?.uv ?? 'uv',
+    ...uv,
     sync: packaged !== undefined,
     platform: process.platform,
     onSetup,
     onStarting,
-    logPath: brainLogPath(env, homedir()),
+    logPath: brainLogPath(uv.env, homedir()),
     openLog: (path) => {
       mkdirSync(dirname(path), { recursive: true });
       return openSync(path, 'a');
@@ -168,7 +161,6 @@ export function realLaunch(real: RealLaunch): Promise<void> {
     closeLog: closeSync,
     probe: probeAddr,
     exists: existsSync,
-    spawn: nodeSpawn,
     log: { warn: (line) => console.warn(line) },
     remote: real.remote,
   });
@@ -181,18 +173,14 @@ export function realLaunch(real: RealLaunch): Promise<void> {
 export function stopBrain(
   options: Pick<LaunchOptions, 'env' | 'brainDir' | 'uv' | 'spawn'>,
 ): Promise<boolean> {
-  const { env, brainDir, uv, spawn } = options;
-  // Never sync here: a sync rewrites .venv/Scripts/brain.exe, which the running brain holds
-  // open on Windows, so uv would fail before `tagalong stop` runs. The relaunch syncs instead.
-  const args = ['run', '--no-sync', 'tagalong', 'stop'];
-  return new Promise((resolve) => {
-    const child = spawn(uv, args, { cwd: brainDir, env, stdio: 'ignore', windowsHide: true });
-    child.once('error', () => resolve(false));
-    child.once('exit', (code) => resolve(code === 0));
-  });
+  return runTagalong(options, ['stop']).then(({ code }) => code === 0);
 }
 
-/** One `tagalong` command through uv, never syncing (see stopBrain); its exit code and output. */
+/**
+ * One `tagalong` command through uv; its exit code and output. Never syncs: a sync rewrites
+ * .venv/Scripts/brain.exe, which the running brain holds open on Windows, so uv would fail before
+ * `tagalong stop` runs. The relaunch syncs instead.
+ */
 export function runTagalong(
   options: Pick<LaunchOptions, 'env' | 'brainDir' | 'uv' | 'spawn'>,
   args: string[],

@@ -1,0 +1,11 @@
+[Unit]
+Description=Tagalong brain
+
+[Service]
+ExecStart=/home/me/venv/bin/brain
+Environment="TAGALONG_HOME=/home/me/tag home"
+Restart=on-failure
+RestartSec=60
+
+[Install]
+WantedBy=default.target

@@ -46,8 +46,7 @@ _WINDOWS = """<?xml version="1.0" encoding="UTF-16"?>
   </Settings>
   <Actions Context="Author">
     <Exec>
-      <Command>{exe}</Command>
-    </Exec>
+{exec}    </Exec>
   </Actions>
 </Task>
 """
@@ -62,7 +61,7 @@ _MACOS = """<?xml version="1.0" encoding="UTF-8"?>
   <array>
     <string>{exe}</string>
   </array>
-  <key>RunAtLoad</key>
+{env}  <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
   <true/>
@@ -75,7 +74,7 @@ Description=Tagalong brain
 
 [Service]
 ExecStart={exe}
-Restart=on-failure
+{env}Restart=on-failure
 RestartSec=60
 
 [Install]
@@ -89,7 +88,9 @@ class ServiceError(Exception):
 
 def real_run(argv: list[str]) -> tuple[int, str]:
     try:
-        done = subprocess.run(argv, capture_output=True, text=True, timeout=60)
+        done = subprocess.run(
+            argv, capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL
+        )
     except (OSError, subprocess.TimeoutExpired) as err:
         return 127, str(err)
     return done.returncode, (done.stdout + done.stderr).strip()
@@ -97,84 +98,129 @@ def real_run(argv: list[str]) -> tuple[int, str]:
 
 @dataclass(frozen=True)
 class Service:
-    """`exe` is the brain's launcher; `data_dir` holds the Windows task file."""
+    """`exe` is the brain's launcher and `path` where the unit file goes. A `home` other than
+    the default is written into the unit so the logon brain uses the same data folder; `domain`
+    is the launchd session the agent loads into."""
 
     os: Os
     exe: str
-    user_home: Path
-    data_dir: Path
-    uid: int
+    path: Path
     run: Runner
+    home: str | None = None
+    domain: str = ""
 
     def unit_text(self) -> str:
-        if self.os == "windows":
-            return _WINDOWS.format(exe=escape(self.exe))
-        if self.os == "macos":
-            return _MACOS.format(label=LABEL, exe=escape(self.exe))
-        return _LINUX.format(exe=shlex.quote(self.exe))
-
-    def _path(self) -> Path:
-        if self.os == "windows":
-            return self.data_dir / "service" / f"{TASK}.xml"
-        if self.os == "macos":
-            return self.user_home / "Library" / "LaunchAgents" / f"{LABEL}.plist"
-        return self.user_home / ".config" / "systemd" / "user" / UNIT
+        return _SPECS[self.os].render(self.exe, self.home)
 
     def install(self) -> None:
-        path = self._path()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        # Task Scheduler reads the file as UTF-16, which its XML header says.
-        path.write_text(self.unit_text(), encoding="utf-16" if self.os == "windows" else "utf-8")
-        steps = {
-            "windows": [
-                ["schtasks", "/Create", "/TN", TASK, "/XML", str(path), "/F"],
-                ["schtasks", "/Run", "/TN", TASK],
-            ],
-            "macos": [["launchctl", "bootstrap", f"gui/{self.uid}", str(path)]],
-            "linux": [
-                ["systemctl", "--user", "daemon-reload"],
-                ["systemctl", "--user", "enable", "--now", UNIT],
-            ],
-        }[self.os]
-        for argv in steps:
+        spec = _SPECS[self.os]
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(self.unit_text(), encoding=spec.encoding)
+        for argv in spec.install(self):
             code, output = self.run(argv)
             if code != 0:
                 raise ServiceError(output or f"{argv[0]} exited with {code}")
 
     def remove(self) -> None:
         """Nothing installed is already the goal, so the OS's complaint is not an error."""
-        steps = {
-            "windows": [
-                ["schtasks", "/End", "/TN", TASK],
-                ["schtasks", "/Delete", "/TN", TASK, "/F"],
-            ],
-            "macos": [["launchctl", "bootout", f"gui/{self.uid}/{LABEL}"]],
-            "linux": [["systemctl", "--user", "disable", "--now", UNIT]],
-        }[self.os]
-        for argv in steps:
+        spec = _SPECS[self.os]
+        for argv in spec.remove(self):
             self.run(argv)
-        self._path().unlink(missing_ok=True)
-        if self.os == "linux":
-            self.run(["systemctl", "--user", "daemon-reload"])
+        self.path.unlink(missing_ok=True)
+        for argv in spec.after_remove:
+            self.run(argv)
 
     def installed(self) -> bool:
-        query = {
-            "windows": ["schtasks", "/Query", "/TN", TASK],
-            "macos": ["launchctl", "print", f"gui/{self.uid}/{LABEL}"],
-            "linux": ["systemctl", "--user", "is-enabled", UNIT],
-        }[self.os]
-        return self.run(query)[0] == 0
+        return self.run(_SPECS[self.os].query(self))[0] == 0
+
+
+def _windows(exe: str, home: str | None) -> str:
+    if home is None:
+        run = f"      <Command>{escape(exe)}</Command>\n"
+    else:
+        # Task Scheduler has no environment, so cmd sets it; /s keeps the outer quotes meaningful.
+        line = f'/d /s /c ""set "TAGALONG_HOME={home}" && "{exe}""'
+        run = f"      <Command>cmd.exe</Command>\n      <Arguments>{escape(line)}</Arguments>\n"
+    return _WINDOWS.format(exec=run)
+
+
+def _macos(exe: str, home: str | None) -> str:
+    env = ""
+    if home is not None:
+        env = (
+            "  <key>EnvironmentVariables</key>\n  <dict>\n    <key>TAGALONG_HOME</key>\n"
+            f"    <string>{escape(home)}</string>\n  </dict>\n"
+        )
+    return _MACOS.format(label=LABEL, exe=escape(exe), env=env)
+
+
+def _linux(exe: str, home: str | None) -> str:
+    env = ""
+    if home is not None:
+        quoted = home.replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%")
+        env = f'Environment="TAGALONG_HOME={quoted}"\n'
+    return _LINUX.format(exe=shlex.quote(exe), env=env)
+
+
+@dataclass(frozen=True)
+class _Spec:
+    render: Callable[[str, str | None], str]
+    encoding: str
+    install: Callable[[Service], list[list[str]]]
+    remove: Callable[[Service], list[list[str]]]
+    query: Callable[[Service], list[str]]
+    after_remove: tuple[list[str], ...] = ()
+
+
+_SPECS: dict[Os, _Spec] = {
+    "windows": _Spec(
+        _windows,
+        "utf-16",  # Task Scheduler reads the file as UTF-16, which its XML header says
+        lambda s: [
+            ["schtasks", "/Create", "/TN", TASK, "/XML", str(s.path), "/F"],
+            ["schtasks", "/Run", "/TN", TASK],
+        ],
+        lambda s: [["schtasks", "/End", "/TN", TASK], ["schtasks", "/Delete", "/TN", TASK, "/F"]],
+        lambda s: ["schtasks", "/Query", "/TN", TASK],
+    ),
+    "macos": _Spec(
+        _macos,
+        "utf-8",
+        lambda s: [["launchctl", "bootstrap", s.domain, str(s.path)]],
+        lambda s: [["launchctl", "bootout", f"{s.domain}/{LABEL}"]],
+        lambda s: ["launchctl", "print", f"{s.domain}/{LABEL}"],
+    ),
+    "linux": _Spec(
+        _linux,
+        "utf-8",
+        lambda s: [
+            ["systemctl", "--user", "daemon-reload"],
+            ["systemctl", "--user", "enable", "--now", UNIT],
+        ],
+        lambda s: [["systemctl", "--user", "disable", "--now", UNIT]],
+        lambda s: ["systemctl", "--user", "is-enabled", UNIT],
+        after_remove=(["systemctl", "--user", "daemon-reload"],),
+    ),
+}
 
 
 def real_service(data_dir: Path) -> Service:
     """This machine's service; the launcher is the `brain` script beside the running Python."""
-    os_name: Os = {"win32": "windows", "darwin": "macos"}.get(sys.platform, "linux")  # type: ignore[assignment]
+    os_name: Os = (
+        "windows" if sys.platform == "win32" else "macos" if sys.platform == "darwin" else "linux"
+    )
+    user = Path.home()
+    path = {
+        "windows": data_dir / "service" / f"{TASK}.xml",
+        "macos": user / "Library" / "LaunchAgents" / f"{LABEL}.plist",
+        "linux": user / ".config" / "systemd" / "user" / UNIT,
+    }[os_name]
     launcher = "brain.exe" if os_name == "windows" else "brain"
     return Service(
         os_name,
         str(Path(sys.executable).parent / launcher),
-        user_home=Path.home(),
-        data_dir=data_dir,
-        uid=os.getuid() if hasattr(os, "getuid") else 0,
-        run=real_run,
+        path,
+        real_run,
+        home=None if data_dir == user / ".tagalong" else str(data_dir),
+        domain=f"gui/{os.getuid()}" if os_name == "macos" else "",
     )

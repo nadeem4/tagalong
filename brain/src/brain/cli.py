@@ -233,6 +233,7 @@ def _service(action: str, service: Service, home: Path, env, out) -> None:
         # The service reads this at start, so other devices can reach it without the desktop.
         upsert_env_value(home, "TAGALONG_NETWORK", "1", env)
         out("Installed: the brain starts at logon, with network access on for other devices.")
+        out("Turned the network listener on (TAGALONG_NETWORK=1 in .env).")
         out("Pair a device with `tagalong pair`.")
 
 

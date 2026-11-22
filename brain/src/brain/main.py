@@ -402,13 +402,14 @@ async def _run() -> None:
         # Only now, with the port ours: a second brain that failed to bind must not touch it.
         write_pid(config.data_dir, os.getpid(), real_started(os.getpid()))
         if config.network:
+            tailnet = [f"{a}:{config.network_port}" for a in tailnet_addresses()]
             network_server = await serve(
                 "0.0.0.0",
                 config.network_port,
                 auth=network_auth,
                 ssl_context=server_ssl_context(identity),
                 redeem=partial(pairing.redeem, kinds=NETWORK_KINDS),
-                addrs=lambda: [f"{a}:{config.network_port}" for a in tailnet_addresses()],
+                addrs=lambda: tailnet,
             )
             advertiser = Advertiser(AsyncZeroconf)
             try:
