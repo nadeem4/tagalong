@@ -20,7 +20,7 @@ from anthropic import AsyncAnthropic
 from zeroconf.asyncio import AsyncZeroconf
 
 from brain.apps import Apps, TokenFile
-from brain.auth import Authenticator
+from brain.auth import listener_auth
 from brain.bodies import Bodies
 from brain.bodies_tools import bodies_tools
 from brain.bridges import ENTRY, WHATSAPP_SECRETS, BridgeSupervisor, private_node, real_spawn
@@ -159,8 +159,7 @@ async def _run() -> None:
         config.network_port,
         on_revoke=lambda device_id: bodies.drop_principal(f"device:{device_id}"),
     )
-    auth = Authenticator(local_token, devices)
-    network_auth = Authenticator(None, devices)
+    auth, network_auth = listener_auth(local_token, devices)
     secrets = cached(
         lambda: [
             local_token,
@@ -318,7 +317,7 @@ async def _run() -> None:
         + loop_tools(loops)
         + brain_status_tools(brain_status)
         + home_update_tools(updates)
-        + device_tools(devices, pairing)
+        + device_tools(devices, pairing, config.network)
         + bodies_tools(
             bodies, lambda: bridges, config.data_dir, os.environ, bodies.notify, secrets.clear
         )

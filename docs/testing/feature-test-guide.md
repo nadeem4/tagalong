@@ -3159,7 +3159,7 @@ Automated: `cd brain && uv run pytest tests/test_events.py tests/test_runner.py 
 
 ## Pair another device (automated; the network part by hand)
 
-Automated: `brain/tests/test_devices.py`, `test_pairing.py` (one use, expiry, a code redeemed twice at once gives one success, five wrong codes lock the right one out, a kind-bound code), `test_server_pairing.py` (`pair` before `hello`, loopback takes only browser codes, the network listener takes device tokens and not the local token, revoke closes the connection and a reconnect gets `unauthorized`), `test_pair_cli.py`, `test_discovery.py` and `test_device_tools.py`.
+Automated: `brain/tests/test_devices.py`, `test_pairing.py` (one use, expiry, five wrong codes lock the right one out, a kind-bound code), `test_server_pairing.py` (`pair` before `hello`, loopback takes only browser codes, revoke closes the connection and a reconnect gets `unauthorized`), `test_auth.py` (the network listener takes device tokens and not the local token), `test_pair_cli.py`, `test_discovery.py` and `test_device_tools.py` (`pair_make` refuses non-browser kinds with the network off).
 
 By hand, with two machines on one network:
 

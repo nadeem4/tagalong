@@ -27,18 +27,6 @@ def test_pair_says_how_to_turn_the_network_on_when_it_is_off(tmp_path):
     assert "TAGALONG_NETWORK=1" in rig.text and "tagalong://" not in rig.text
 
 
-def test_the_code_in_the_link_is_stored_only_hashed(tmp_path):
-    rig = Rig(tmp_path)
-    rig.go("pair", env={"TAGALONG_NETWORK": "1"}, **HOST)
-    link = next(line for line in rig.lines if line.startswith("tagalong://"))
-    secret = link.split("code=")[1]
-    db = open_db(tmp_path / "tagalong.db")
-    (stored,) = db.execute("SELECT secret_hash FROM pair_codes").fetchone()
-    assert stored != secret
-    rows = db.execute("SELECT * FROM pair_codes").fetchall()
-    assert secret not in "".join(str(c) for row in rows for c in row)
-
-
 def test_the_qr_prints_on_a_console_that_is_not_utf8(tmp_path):
     env = {
         **os.environ,

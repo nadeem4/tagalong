@@ -141,7 +141,7 @@ class Bodies:
         self._online: dict[str, _Online] = {}
         self._known: dict[str, list[Tool]] = {}  # last declared tools, kept after disconnect
         self._names: dict[str, str] = {}  # each body's declared name, kept after disconnect
-        self._owners: dict[str, str] = {}  # the principal each body id belongs to
+        self._owners: dict[str, str] = {}
         self._pending: dict[str, tuple[Peer, asyncio.Future[list[dict]]]] = {}
         self._next_id = 0
         # Session sets this: (body id, seconds it was away, None if unknown) so a wake that

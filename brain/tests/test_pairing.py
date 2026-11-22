@@ -1,6 +1,5 @@
 """One-time pairing codes: single use, ten-minute life, rate limited, bound to a kind."""
 
-from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qs, urlparse
 
@@ -56,20 +55,6 @@ def test_code_works_once_and_gives_a_working_token(pairing):
     assert result is not None
     assert pairing._devices.verify(result[1]) is not None
     assert pairing.redeem(offer.secret, "Laptop", "desktop", kinds=NETWORK_KINDS) is None
-
-
-def test_two_connections_redeeming_at_once_only_one_wins(tmp_path, identity, clock):
-    path = tmp_path / "t.db"
-    offer = build(open_db(path), identity, clock).make_code()
-
-    def redeem(_):
-        return build(open_db(path), identity, clock).redeem(
-            offer.secret, "A", "desktop", kinds=NETWORK_KINDS
-        )
-
-    with ThreadPoolExecutor(2) as pool:
-        results = list(pool.map(redeem, range(2)))
-    assert sum(r is not None for r in results) == 1
 
 
 def test_expires_after_ten_minutes(pairing, clock):

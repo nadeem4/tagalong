@@ -21,7 +21,9 @@ def _device_id(args: dict) -> str:
     return device_id
 
 
-def device_tools(devices: Devices, pairing: Pairing) -> list[tuple[ToolSpec, Handler]]:
+def device_tools(
+    devices: Devices, pairing: Pairing, network: bool
+) -> list[tuple[ToolSpec, Handler]]:
     async def devices_list(args: dict) -> str:
         return json.dumps({"devices": devices.list()})
 
@@ -42,6 +44,12 @@ def device_tools(devices: Devices, pairing: Pairing) -> list[tuple[ToolSpec, Han
             raise RpcError(
                 ErrorCode.invalid_params,
                 "kind must be " + ", ".join(PAIR_KINDS[:-1]) + " or " + PAIR_KINDS[-1] + ".",
+            )
+        if kind != "browser" and not network:
+            raise RpcError(
+                ErrorCode.invalid_params,
+                "Network access is off, so only the browser add-on can pair. Set "
+                "TAGALONG_NETWORK=1 and restart the brain.",
             )
         offer = pairing.make_code(kind)
         return json.dumps(

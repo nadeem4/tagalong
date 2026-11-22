@@ -36,3 +36,8 @@ class Authenticator:
         if self._local and hmac.compare_digest(token.encode(), self._local):
             return LOCAL
         return self._devices.verify(token) if self._devices else None
+
+
+def listener_auth(local_token: str, devices: DeviceCheck) -> tuple[Authenticator, Authenticator]:
+    """(loopback, network): the local token opens only the loopback listener."""
+    return Authenticator(local_token, devices), Authenticator(None, devices)
