@@ -18,6 +18,7 @@ from pathlib import Path
 from anthropic import AsyncAnthropic
 
 from brain.apps import Apps, TokenFile
+from brain.auth import Authenticator
 from brain.bodies import Bodies
 from brain.bodies_tools import bodies_tools
 from brain.bridges import ENTRY, WHATSAPP_SECRETS, BridgeSupervisor, private_node, real_spawn
@@ -27,7 +28,6 @@ from brain.config import in_quiet_hours, load_config, load_env_file, session_id
 from brain.events import EventLog
 from brain.events_tools import events_tools
 from brain.experts import ExpertHosts
-from brain.auth import Authenticator
 from brain.guardrails import Budget
 from brain.identity import load_or_create_identity, server_ssl_context
 from brain.lifecycle import clear_pid, real_started, write_pid

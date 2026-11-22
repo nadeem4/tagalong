@@ -7,15 +7,15 @@ import ssl
 
 import pytest
 from event_log import make_session
+from test_server import Open, ScriptedModel
 from websockets.asyncio.client import connect
-from websockets.exceptions import ConnectionClosed
+from websockets.exceptions import ConnectionClosed, WebSocketException
 
 from brain.auth import Authenticator
 from brain.bodies import Bodies
 from brain.identity import load_or_create_identity, server_ssl_context
 from brain.memory import Memory
 from brain.server import start_server
-from test_server import Open, ScriptedModel
 
 
 def frame(token, protocol=3, req_id=1):
@@ -97,7 +97,7 @@ async def test_wss_listener_serves_hello_and_refuses_plain_ws(make_env, tmp_path
     async with connect(f"wss://127.0.0.1:{port}", ssl=client) as ws:
         await ws.send(frame("good"))
         assert "result" in json.loads(await ws.recv())
-    with pytest.raises(Exception):
+    with pytest.raises((WebSocketException, OSError)):
         async with connect(f"ws://127.0.0.1:{port}") as ws:
             await ws.send(frame("good"))
             await ws.recv()
