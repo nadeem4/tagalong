@@ -3,7 +3,8 @@
   "id": 1,
   "method": "hello",
   "params": {
-    "protocol": 1,
+    "protocol": 3,
+    "token": "t0k",
     "body": { "id": "extension", "kind": "extension", "name": "Chrome" },
     "tools": [],
     "last_seq": 12

@@ -21,7 +21,7 @@ import {
 import { PermissionBroker } from './permissions';
 import type { WorkerQuery } from './popup/model';
 import { shouldRedial } from './reconnect';
-import { ADDR_KEY, NAME_KEY } from './settings';
+import { restartsBody } from './settings';
 import { tabFactSender } from './tab-facts';
 import { createMicControl, type MicMessage } from './voice/mic-control';
 import { watchPopupPort } from './voice/popup-port';
@@ -77,10 +77,9 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 void chrome.alarms.create(RECONNECT_ALARM, { periodInMinutes: 0.5 });
 
-// The popup saves the address or name; the body dials again with the new values.
+// The popup saves the address, name or pairing code; the body dials again with the new values.
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && (ADDR_KEY in changes || NAME_KEY in changes))
-    void body.restart().catch(() => undefined);
+  if (restartsBody(changes, area)) void body.restart().catch(() => undefined);
 });
 
 // Facts for Scout. They never prompt: a tab is only reported while the `tabs` permission is held

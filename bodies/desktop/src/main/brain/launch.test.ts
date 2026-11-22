@@ -2,9 +2,18 @@
 import type { SpawnOptions } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { createServer } from 'node:net';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { brainLogPath, isLocal, launchBrain, packagedEnv, probeAddr, stopBrain } from './launch';
+import {
+  brainLogPath,
+  isLocal,
+  launchBrain,
+  packagedEnv,
+  probeAddr,
+  readLocalToken,
+  stopBrain,
+} from './launch';
 import type { LaunchOptions } from './launch';
 
 class FakeChild extends EventEmitter {
@@ -391,5 +400,11 @@ describe('probeAddr', () => {
     expect(await probeAddr(`127.0.0.1:${port}`)).toBe(true);
     await new Promise((r) => server.close(r));
     expect(await probeAddr(`127.0.0.1:${port}`)).toBe(false);
+  });
+});
+
+describe('readLocalToken', () => {
+  it('is null when the brain has not written it yet', () => {
+    expect(readLocalToken({ TAGALONG_HOME: join(tmpdir(), 'tg-missing') }, '/nope')).toBeNull();
   });
 });

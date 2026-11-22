@@ -1,5 +1,5 @@
 /**
- * A body's end of contract v1, shared by the desktop and the browser: one websocket to the
+ * A body's end of contract v3, shared by the desktop and the browser: one websocket to the
  * brain, hello first, then say, cancel, the voice calls and the brain's notifications and
  * `use` requests.
  * It owns reconnecting, replay (last_seq) and an optional keepalive; what the notifications
@@ -21,7 +21,7 @@ import {
   type SpeechStateParams,
 } from './messages.js';
 
-export type BrainStatus = 'connecting' | 'online' | 'offline' | 'outdated';
+export type BrainStatus = 'connecting' | 'online' | 'offline' | 'outdated' | 'unauthorized';
 
 export interface BrainSocket {
   send(data: string): void;
@@ -46,6 +46,8 @@ export interface BrainClientOptions {
   seqStore?: SeqStore;
   /** Calls one of the brain's tools on a timer while online, to keep a sleepy host awake. */
   keepalive?: { everyMs: number; tool: string };
+  /** The token sent in hello, read on every dial: the local token file may appear after the first try. */
+  token: () => string;
   /** Body tools, sent in hello. */
   tools: () => Tool[];
   openSocket: (url: string) => BrainSocket;
@@ -116,7 +118,7 @@ export class BrainClient {
     this.failPending();
     this.socket?.close();
     this.socket = null;
-    if (this.status !== 'outdated') this.setStatus('offline');
+    if (this.status !== 'outdated' && this.status !== 'unauthorized') this.setStatus('offline');
   }
 
   say(params: SayParams): Promise<SayResult> {
@@ -274,8 +276,12 @@ export class BrainClient {
       await this.seqLoad;
       if (this.socket !== socket) return;
     }
+    const token = this.options.token();
+    // No token yet (the brain has not written it): dial again rather than get refused for good.
+    if (token === '') return socket.close();
     const params = {
       protocol: PROTOCOL,
+      token,
       body: this.options.body,
       tools: this.options.tools(),
       ...(this.lastSeq === null ? {} : { last_seq: this.lastSeq }),
@@ -302,6 +308,9 @@ export class BrainClient {
         if (e instanceof RpcError && e.code === ErrorCode.version_mismatch) {
           this.stopped = true;
           this.setStatus('outdated');
+        } else if (e instanceof RpcError && e.code === ErrorCode.unauthorized) {
+          this.stopped = true;
+          this.setStatus('unauthorized');
         }
         this.socket?.close();
       },
@@ -311,7 +320,7 @@ export class BrainClient {
   private closed(): void {
     this.socket = null;
     this.failPending();
-    if (this.status !== 'outdated') this.setStatus('offline');
+    if (this.status !== 'outdated' && this.status !== 'unauthorized') this.setStatus('offline');
     if (this.stopped) return;
     this.retryTimer = setTimeout(() => this.connect(), this.options.retryMs ?? 2000);
   }

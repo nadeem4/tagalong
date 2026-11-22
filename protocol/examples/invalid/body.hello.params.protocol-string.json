@@ -4,6 +4,7 @@
   "method": "hello",
   "params": {
     "protocol": "1",
+    "token": "t0k",
     "body": { "id": "desktop", "kind": "desktop", "name": "Desktop" },
     "tools": []
   }

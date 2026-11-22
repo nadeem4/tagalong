@@ -87,6 +87,9 @@ variable. "Positive" means at least 1.
 | `ANTHROPIC_API_KEY`                                              | none (Scout stays silent) | brain                           | Scout's key; the app saves it in `.env`; a real environment value wins              |
 | `TAGALONG_HOME`                                                  | `~/.tagalong`             | brain, desktop (`launch.ts`)    | The data folder; only the real environment can set it, since `.env` lives inside it |
 | `TAGALONG_BRAIN_ADDR`                                            | `127.0.0.1:47321`         | brain, desktop, WhatsApp bridge | Where the brain listens and where bodies dial                                       |
+| `TAGALONG_NETWORK`                                               | off                       | brain                           | `1` adds an encrypted (wss) listener for bodies on other devices                    |
+| `TAGALONG_NETWORK_PORT`                                          | `47323`                   | brain                           | Port of that listener                                                               |
+| `TAGALONG_LOCAL_TOKEN`                                           | none                      | WhatsApp bridge                 | The brain's local token, passed to the bridge it starts; never set by hand          |
 | `TAGALONG_MODEL`                                                 | `claude-opus-5-5`         | brain                           | Scout's model until Home saves a choice                                             |
 | `TAGALONG_STT_LIVE`                                              | auto                      | brain                           | Live speech model id, or auto, until Home saves a choice                            |
 | `TAGALONG_STT_FINAL`                                             | auto                      | brain                           | Final speech model id, auto or `off`, until Home saves a choice                     |
@@ -221,6 +224,8 @@ has its own masking for what it saves (see [privacy](privacy.md#what-is-masked-o
 | `SETTINGS_FILENAME`                   | `settings.json` | `bodies/desktop/src/main/settings-store.ts` |
 
 ## Storage
+
+The brain's data folder also holds `local-token` (the token local bodies send in `hello`, readable only by the owner) and, when `TAGALONG_NETWORK=1`, `identity/cert.pem` and `identity/key.pem` (the self-signed certificate and key of the encrypted listener). See [safety](../brain/safety.md#who-may-connect).
 
 `settings.json` (with `.tmp`, `.bak`, `.corrupt`) sits in the desktop's data
 directory, `%APPDATA%\Tagalong` on Windows. The brain keeps its own data directory (see

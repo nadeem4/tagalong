@@ -21,6 +21,7 @@ const STATUS_LINES: Record<BrainStatus, string> = {
   connecting: "Connecting to Scout's brain...",
   online: "Connected to Scout's brain",
   offline: "Scout's brain is not reachable",
+  unauthorized: 'Scout needs a pairing code',
   outdated: 'Needs an update: this browser add-on is older than the brain',
 };
 

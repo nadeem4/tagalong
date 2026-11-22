@@ -15,7 +15,7 @@ function setup(overrides: Partial<BodyDeps> = {}) {
   const sockets: FakeBrainSocket[] = [];
   const micLog: string[] = [];
   const deps: BodyDeps = {
-    storage: memoryStorage(),
+    storage: memoryStorage({ brainToken: 't0k' }),
     session: memoryStorage(),
     ...CHROME,
     tabs: {
@@ -100,6 +100,14 @@ describe('the browser body', () => {
     expect(params.body.kind).toBe('browser');
     expect(params.body.name).toBe('Chrome');
     expect(params.tools.map((t) => t.name)).toContain('tabs');
+  });
+
+  it('hello_carries_the_saved_token', async () => {
+    const { body, sockets } = setup({ storage: memoryStorage({ brainToken: 'pair-code' }) });
+    await body.start();
+    sockets[0]!.open();
+    await settle();
+    expect(sockets[0]!.request('hello')?.['params']).toMatchObject({ token: 'pair-code' });
   });
 
   it('hello_says_display_false', async () => {
@@ -187,7 +195,9 @@ describe('the browser body', () => {
   });
 
   it('the_popup_name_overrides_the_default_name', async () => {
-    const { body, sockets } = setup({ storage: memoryStorage({ bodyName: 'Work Chrome' }) });
+    const { body, sockets } = setup({
+      storage: memoryStorage({ bodyName: 'Work Chrome', brainToken: 't0k' }),
+    });
     await body.start();
     sockets[0]!.open();
     await settle();

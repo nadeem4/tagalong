@@ -5,7 +5,15 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { StorageArea } from './layer/api';
-import { DEFAULT_ADDR, parseAddr, readSettings, saveAddr, saveName } from './settings';
+import {
+  DEFAULT_ADDR,
+  parseAddr,
+  restartsBody,
+  readSettings,
+  saveAddr,
+  saveName,
+  saveToken,
+} from './settings';
 
 function memory(): StorageArea {
   const data = new Map<string, unknown>();
@@ -19,7 +27,7 @@ function memory(): StorageArea {
 
 describe('settings', () => {
   it('defaults_when_nothing_is_stored', async () => {
-    expect(await readSettings(memory())).toEqual({ addr: DEFAULT_ADDR, name: null });
+    expect(await readSettings(memory())).toEqual({ addr: DEFAULT_ADDR, name: null, token: '' });
     expect(DEFAULT_ADDR).toBe('127.0.0.1:47321');
   });
 
@@ -27,7 +35,8 @@ describe('settings', () => {
     const storage = memory();
     await storage.set('brainAddr', 'ws://nope');
     await storage.set('bodyName', 42);
-    expect(await readSettings(storage)).toEqual({ addr: DEFAULT_ADDR, name: null });
+    await storage.set('brainToken', 7);
+    expect(await readSettings(storage)).toEqual({ addr: DEFAULT_ADDR, name: null, token: '' });
   });
 
   it.each([
@@ -58,5 +67,24 @@ describe('settings', () => {
     expect((await readSettings(storage)).name).toBe('x'.repeat(32));
     await saveName(storage, '   ');
     expect((await readSettings(storage)).name).toBeNull();
+  });
+});
+
+describe('token', () => {
+  it('saveToken_stores_it_trimmed_for_the_next_hello', async () => {
+    const storage = memory();
+    await saveToken(storage, '  pair-code  ');
+    expect((await readSettings(storage)).token).toBe('pair-code');
+  });
+});
+
+describe('restartsBody', () => {
+  it.each(['brainAddr', 'bodyName', 'brainToken'])('a changed %s redials', (key) => {
+    expect(restartsBody({ [key]: {} }, 'local')).toBe(true);
+  });
+
+  it('ignores other keys and other areas', () => {
+    expect(restartsBody({ other: {} }, 'local')).toBe(false);
+    expect(restartsBody({ brainToken: {} }, 'session')).toBe(false);
   });
 });

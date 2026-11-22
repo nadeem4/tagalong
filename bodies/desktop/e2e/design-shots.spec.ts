@@ -13,6 +13,7 @@ import { sourceHash } from '../src/main/brain/build-id';
 import { closeApp } from './fixtures/close-app';
 import { freePort } from './fixtures/free-port';
 import { seedSettings } from './fixtures/seed-settings';
+import { launchEnv } from './fixtures/launch-env';
 import { startFakeBrain, type FakeBrain } from './fixtures/fake-brain';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -90,7 +91,7 @@ for (const scene of SCENES) {
         args: ['.', `--user-data-dir=${dataDir}`],
         cwd: appDir,
         env: {
-          ...process.env,
+          ...launchEnv(dataDir),
           TAGALONG_BRAIN_ADDR: addr,
           ...(scene.offline === true ? { TAGALONG_START_BRAIN: '0' } : {}),
         },
@@ -138,7 +139,7 @@ test.describe('E3 chat', () => {
     app = await electron.launch({
       args: ['.', `--user-data-dir=${dataDir}`],
       cwd: appDir,
-      env: { ...process.env, TAGALONG_BRAIN_ADDR: brain.addr },
+      env: { ...launchEnv(dataDir), TAGALONG_BRAIN_ADDR: brain.addr },
     });
   });
 
@@ -374,7 +375,7 @@ test('D5 connections', async () => {
   const app = await electron.launch({
     args: ['.', `--user-data-dir=${dataDir}`],
     cwd: appDir,
-    env: { ...process.env, TAGALONG_BRAIN_ADDR: brain.addr },
+    env: { ...launchEnv(dataDir), TAGALONG_BRAIN_ADDR: brain.addr },
   });
   try {
     const find = async (name: string): Promise<Page> => {
@@ -519,7 +520,7 @@ test('E1 updates', async () => {
   const app = await electron.launch({
     args: ['.', `--user-data-dir=${dataDir}`],
     cwd: appDir,
-    env: { ...process.env, TAGALONG_BRAIN_ADDR: brain.addr },
+    env: { ...launchEnv(dataDir), TAGALONG_BRAIN_ADDR: brain.addr },
   });
   try {
     const find = async (name: string): Promise<Page> => {
@@ -660,7 +661,7 @@ test('E1 experts updates', async () => {
   const app = await electron.launch({
     args: ['.', `--user-data-dir=${dataDir}`],
     cwd: appDir,
-    env: { ...process.env, TAGALONG_BRAIN_ADDR: brain.addr },
+    env: { ...launchEnv(dataDir), TAGALONG_BRAIN_ADDR: brain.addr },
   });
   try {
     const find = async (name: string): Promise<Page> => {
@@ -767,7 +768,7 @@ test('E5 model states', async () => {
   const app = await electron.launch({
     args: ['.', `--user-data-dir=${dataDir}`],
     cwd: appDir,
-    env: { ...process.env, TAGALONG_BRAIN_ADDR: brain.addr },
+    env: { ...launchEnv(dataDir), TAGALONG_BRAIN_ADDR: brain.addr },
   });
   try {
     const find = async (name: string): Promise<Page> => {
@@ -816,7 +817,7 @@ async function launchShot(options: Parameters<typeof startFakeBrain>[0], setting
   const app = await electron.launch({
     args: ['.', `--user-data-dir=${dataDir}`],
     cwd: appDir,
-    env: { ...process.env, TAGALONG_BRAIN_ADDR: brain.addr, TAGALONG_START_BRAIN: '0' },
+    env: { ...launchEnv(dataDir), TAGALONG_BRAIN_ADDR: brain.addr, TAGALONG_START_BRAIN: '0' },
   });
   const find = async (name: string): Promise<Page> => {
     for (let attempt = 0; attempt < 120; attempt += 1) {

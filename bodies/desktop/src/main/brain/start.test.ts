@@ -1,5 +1,7 @@
 /** Tests for startBrain: where it dials, that it starts at once, and the tools it declares. */
-import { hostname } from 'node:os';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { hostname, tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { CaptureExclusions } from '../../shared/settings';
 import { startBrain } from './start';
@@ -19,6 +21,12 @@ const tools = {
     push: noop,
   },
 };
+
+function homeWithToken(token = 'tok'): NodeJS.ProcessEnv {
+  const home = mkdtempSync(join(tmpdir(), 'tg-'));
+  writeFileSync(join(home, 'local-token'), token);
+  return { TAGALONG_HOME: home };
+}
 
 function setup(env: NodeJS.ProcessEnv) {
   const urls: string[] = [];
@@ -52,7 +60,7 @@ describe('startBrain', () => {
     let open: () => void = noop;
     const brain = startBrain({
       ...tools,
-      env: {},
+      env: homeWithToken(),
       openSocket: (): BrainSocket => ({
         send: (data) => void sent.push(data),
         close: noop,
@@ -74,13 +82,36 @@ describe('startBrain', () => {
     brain.stop();
   });
 
+  it('sends the local token from the home folder in hello', () => {
+    const sent: string[] = [];
+    let open: () => void = noop;
+    const brain = startBrain({
+      ...tools,
+      env: homeWithToken('tok-from-file\n'),
+      openSocket: (): BrainSocket => ({
+        send: (data) => void sent.push(data),
+        close: noop,
+        onOpen: (f) => void (open = f),
+        onMessage: noop,
+        onClose: noop,
+      }),
+      onNotification: noop,
+      onStatus: noop,
+      onResync: noop,
+      bodyId: 'desktop-a1b2c3',
+    });
+    open();
+    expect(JSON.parse(sent[0] as string).params.token).toBe('tok-from-file');
+    brain.stop();
+  });
+
   it('declares the window tools in hello and answers use for them', async () => {
     const sent: string[] = [];
     let message: (data: string) => void = noop;
     let open: () => void = noop;
     const brain = startBrain({
       ...tools,
-      env: {},
+      env: homeWithToken(),
       openSocket: (): BrainSocket => ({
         send: (data) => void sent.push(data),
         close: noop,

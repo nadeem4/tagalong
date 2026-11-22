@@ -386,9 +386,10 @@ The toolbar button opens `popup/popup.html`. It asks the worker for its state wi
 message `{type: 'status'}` and shows:
 
 - a status line: "Connecting to Scout's brain...", "Connected to Scout's brain", "Scout's brain is
-  not reachable", or "Needs an update: this browser add-on is older than the brain";
+  not reachable", or "Needs an update: this browser add-on is older than the brain", or "Scout needs a pairing code";
 - the **Brain address** (`host:port` only, default `127.0.0.1:47321`; a bad value is refused and not
   saved);
+- the **Pairing code**: the token the brain accepts, sent in every `hello` (the local token for a brain on this PC, found in `<TAGALONG_HOME>/local-token`);
 - the **Name** of this browser;
 - a **Turn on right-click** button, shown until `contextMenus` is granted, with a line saying how to
   ask from the page;

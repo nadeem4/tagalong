@@ -1,5 +1,5 @@
 /**
- * A scripted brain for the e2e suites: a real websocket server speaking contract v1, so the
+ * A scripted brain for the e2e suites: a real websocket server speaking contract v3, so the
  * desktop's whole path (BrainClient, turn events, bubble) runs without Python or a model.
  * It answers hello, Home's permission, jobs, apps and approvals tools (`call`), then every say with the same short reply. A say that mentions "permission"
  * first opens one confirm ask and holds the turn until the desktop answers it, as the real
@@ -24,6 +24,8 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import type { AddressInfo } from 'node:net';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { ErrorCode } from '@tagalong/contract';
+import { E2E_LOCAL_TOKEN } from './launch-env';
 import { ownBuild } from '../../src/main/brain/build-id';
 
 /**
@@ -50,6 +52,8 @@ export interface FakeBrainOptions {
   environment?: boolean;
   /** Listen here instead of on a free port, so a spec can start the brain after the app. */
   port?: number;
+  /** The token hello must carry (default: the one `launchEnv` seeds); any other gets `unauthorized`. */
+  token?: string;
   /** What hello says of the brain's version and build (default: the app's own, a current brain). */
   hello?: { version: string; build: string };
   /** After `setup_expert` the install stays at this percent (the tour's "Installing…" row). */
@@ -704,9 +708,21 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         notify('reply', { ...base, delta: msg.error?.message ?? 'The windows were listed.' });
         notify('reply', { ...base, done: true });
         notify('turn', { ...base, state: 'ended', reason: 'done' });
+      } else if (
+        msg.method === 'hello' &&
+        (msg.params as { token?: string } | undefined)?.token !== (options.token ?? E2E_LOCAL_TOKEN)
+      ) {
+        socket.send(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            id: msg.id,
+            error: { code: ErrorCode.unauthorized, message: 'Unknown token' },
+          }),
+        );
+        socket.close();
       } else if (msg.method === 'hello') {
         const result = {
-          protocol: 1,
+          protocol: 3,
           session: 's1',
           tools: [],
           seq,

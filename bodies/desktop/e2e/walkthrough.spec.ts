@@ -15,6 +15,7 @@ import { closeApp } from './fixtures/close-app';
 import { startFakeBrain, type FakeBrain, type FakeBrainOptions } from './fixtures/fake-brain';
 import { freePort } from './fixtures/free-port';
 import { seedSettings } from './fixtures/seed-settings';
+import { launchEnv } from './fixtures/launch-env';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FAKE_KEY = 'sk-ant-example-not-a-real-key';
@@ -43,7 +44,7 @@ async function launch(addr: string, extraArgs: string[] = [], dir = dataDir): Pr
   app = await electron.launch({
     args: ['.', `--user-data-dir=${dataDir}`, ...extraArgs],
     cwd: appDir,
-    env: { ...process.env, TAGALONG_BRAIN_ADDR: addr, TAGALONG_START_BRAIN: '0' },
+    env: { ...launchEnv(dataDir), TAGALONG_BRAIN_ADDR: addr, TAGALONG_START_BRAIN: '0' },
   });
 }
 

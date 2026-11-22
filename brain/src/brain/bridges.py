@@ -57,10 +57,11 @@ class WhatsAppSettings:
     def complete(self) -> bool:
         return all(self.values.get(k) for k in _SECRETS)
 
-    def child_env(self, brain_addr: str) -> dict[str, str]:
+    def child_env(self, brain_addr: str, local_token: str) -> dict[str, str]:
         # Never the brain's own environment: the bridge must not see the Anthropic key.
         env = {k: self.values[k] for k in _SECRETS}
         env["TAGALONG_BRAIN_ADDR"] = brain_addr
+        env["TAGALONG_LOCAL_TOKEN"] = local_token
         env["TAGALONG_WHATSAPP_PORT"] = self.values.get("TAGALONG_WHATSAPP_PORT") or str(
             DEFAULT_PORT
         )
@@ -130,6 +131,7 @@ class BridgeSupervisor:
         *,
         env: MutableMapping[str, str],
         brain_addr: str,
+        local_token: str,
         entry: Path,
         ensure_node: Callable[[], Awaitable[Path]],
         spawn: Spawn,
@@ -139,6 +141,7 @@ class BridgeSupervisor:
     ) -> None:
         self._env = env
         self._addr = brain_addr
+        self._token = local_token
         self._entry = entry
         self._ensure_node = ensure_node
         self._spawn = spawn
@@ -189,7 +192,7 @@ class BridgeSupervisor:
             log.warning("no Node for the WhatsApp bridge: %s", err)
             self.state = "node_failed"
             return
-        env = settings.child_env(self._addr)
+        env = settings.child_env(self._addr, self._token)
         wait = 1.0
         while True:
             started = self._clock()

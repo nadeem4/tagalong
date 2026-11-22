@@ -5,6 +5,7 @@
 
 export interface WhatsAppConfig {
   brainAddr: string;
+  localToken: string;
   accessToken: string;
   appSecret: string;
   verifyToken: string;
@@ -34,6 +35,7 @@ export function readConfig(env: NodeJS.ProcessEnv): WhatsAppConfig {
   const port = Number(env.TAGALONG_WHATSAPP_PORT);
   return {
     brainAddr: env.TAGALONG_BRAIN_ADDR || DEFAULT_BRAIN_ADDR,
+    localToken: env.TAGALONG_LOCAL_TOKEN ?? '',
     accessToken: value(REQUIRED.accessToken),
     appSecret: value(REQUIRED.appSecret),
     verifyToken: value(REQUIRED.verifyToken),

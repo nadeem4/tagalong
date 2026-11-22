@@ -9,7 +9,7 @@ import type { WorkerStatus } from '../body';
 import { browserName, detectBrowser } from '../identity';
 import { chromeStorage as storage } from '../layer/chromium';
 import { originPattern } from '../permissions';
-import { DEFAULT_ADDR, readSettings, saveAddr, saveName } from '../settings';
+import { DEFAULT_ADDR, readSettings, saveAddr, saveName, saveToken } from '../settings';
 import {
   ALL_SITES,
   grantRows,
@@ -26,6 +26,7 @@ import type { VoiceView } from '../voice/voice-session';
 
 const statusEl = document.getElementById('status') as HTMLElement;
 const addrEl = document.getElementById('addr') as HTMLInputElement;
+const tokenEl = document.getElementById('token') as HTMLInputElement;
 const addrError = document.getElementById('addr-error') as HTMLElement;
 const nameEl = document.getElementById('name') as HTMLInputElement;
 const grantsEl = document.getElementById('grants') as HTMLElement;
@@ -117,6 +118,7 @@ async function init(): Promise<void> {
   addrEl.value = settings.addr;
   addrEl.placeholder = DEFAULT_ADDR;
   nameEl.value = settings.name ?? '';
+  tokenEl.value = settings.token;
   // userAgentData is not in the DOM typings yet.
   const data = (navigator as { userAgentData?: { brands: { brand: string }[] } }).userAgentData;
   const brands = (data?.brands ?? []).map((b) => b.brand);
@@ -129,6 +131,7 @@ async function init(): Promise<void> {
     });
   });
   nameEl.addEventListener('change', () => void saveName(storage, nameEl.value));
+  tokenEl.addEventListener('change', () => void saveToken(storage, tokenEl.value));
   // The request has to run inside this click; the worker adds the menu item when it is granted.
   rightClickEl.addEventListener('click', () => {
     chrome.permissions

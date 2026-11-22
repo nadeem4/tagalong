@@ -92,7 +92,7 @@ def test_every_method_has_examples(origin):
 
 
 def test_constants():
-    assert PROTOCOL == 2
+    assert PROTOCOL == 3
     assert LIMITS == {
         "part_bytes": 5_000_000,
         "message_bytes": 20_000_000,
@@ -118,6 +118,7 @@ def test_error_codes():
         "body_offline": -32006,
         "tool_failed": -32007,
         "over_limit": -32008,
+        "unauthorized": -32009,
     }
 
 
@@ -139,12 +140,17 @@ def test_body_id_length_edges():
 
 
 def test_strict_types():
-    hello = {"protocol": True, "body": {"id": "d", "kind": "k", "name": "n"}, "tools": []}
+    hello = {
+        "protocol": True,
+        "token": "t",
+        "body": {"id": "d", "kind": "k", "name": "n"},
+        "tools": [],
+    }
     params = BODY_TO_BRAIN["hello"][0]
     with pytest.raises(ValidationError):
         params.model_validate(hello)
     # A newer protocol number is a valid message; the server answers version_mismatch.
-    params.model_validate({**hello, "protocol": 2})
+    params.model_validate({**hello, "protocol": 4})
 
 
 def test_seq_bounds():

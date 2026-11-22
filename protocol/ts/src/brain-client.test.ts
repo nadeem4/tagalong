@@ -54,7 +54,7 @@ const tools: Tool[] = [{ name: 'see_screen', description: 'look', input_schema: 
 const helloOk = (id: string, resync = false) => ({
   jsonrpc: '2.0',
   id,
-  result: { protocol: 2, session: 's1', tools: [], seq: 0, resync },
+  result: { protocol: 3, session: 's1', tools: [], seq: 0, resync },
 });
 
 const desktop = { id: 'desktop', kind: 'desktop', name: 'Desktop' };
@@ -69,6 +69,7 @@ function setup(retryMs?: number, extra: Partial<BrainClientOptions> = {}) {
   const client = new BrainClient({
     addr: '127.0.0.1:47321',
     body: desktop,
+    token: () => 't0k',
     tools: () => tools,
     openSocket: (url) => {
       urls.push(url);
@@ -107,7 +108,7 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
 describe('BrainClient', () => {
-  it('sends hello first with protocol 2, body desktop, tools from options, no last_seq on first connect', () => {
+  it('sends hello first with protocol 3, the token, body desktop, tools from options, no last_seq on first connect', () => {
     const { client, sockets, urls, statuses } = setup();
     client.start();
     expect(urls).toEqual(['ws://127.0.0.1:47321']);
@@ -118,7 +119,12 @@ describe('BrainClient', () => {
         jsonrpc: '2.0',
         id: 'desktop-1',
         method: 'hello',
-        params: { protocol: 2, body: { id: 'desktop', kind: 'desktop', name: 'Desktop' }, tools },
+        params: {
+          protocol: 3,
+          token: 't0k',
+          body: { id: 'desktop', kind: 'desktop', name: 'Desktop' },
+          tools,
+        },
       },
     ]);
   });
@@ -134,7 +140,7 @@ describe('BrainClient', () => {
       jsonrpc: '2.0',
       id: s.sent[0]!.id,
       result: {
-        protocol: 2,
+        protocol: 3,
         session: 's1',
         tools: [],
         seq: 0,
@@ -270,7 +276,7 @@ describe('BrainClient', () => {
     s.receive({
       jsonrpc: '2.0',
       id: s.sent[0]!.id,
-      error: { code: -32000, message: 'protocol', data: { protocol: 2 } },
+      error: { code: -32000, message: 'protocol', data: { protocol: 3 } },
     });
     await vi.advanceTimersByTimeAsync(0);
     expect(statuses.at(-1)).toBe('outdated');
@@ -278,6 +284,36 @@ describe('BrainClient', () => {
     vi.advanceTimersByTime(10_000);
     expect(sockets).toHaveLength(1);
     expect(statuses.at(-1)).toBe('outdated');
+  });
+
+  it('unauthorized on hello: status unauthorized, no retry', async () => {
+    const { sockets, statuses, client } = setup(100);
+    client.start();
+    const s = sockets[0]!;
+    s.opens();
+    s.receive({ jsonrpc: '2.0', id: s.sent[0]!.id, error: { code: -32009, message: 'no' } });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(statuses.at(-1)).toBe('unauthorized');
+    s.drop();
+    vi.advanceTimersByTime(10_000);
+    expect(sockets).toHaveLength(1);
+    expect(statuses.at(-1)).toBe('unauthorized');
+  });
+
+  it('an empty token sends no hello, closes, and dials again until the token appears', async () => {
+    let token = '';
+    const { sockets, statuses, client } = setup(100, { token: () => token });
+    client.start();
+    sockets[0]!.opens();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sockets[0]!.sent).toHaveLength(0);
+    expect(sockets[0]!.closed).toBe(true);
+    sockets[0]!.drop();
+    expect(statuses.at(-1)).not.toBe('unauthorized');
+    token = 'late';
+    await vi.advanceTimersByTimeAsync(100);
+    sockets[1]!.opens();
+    expect(sockets[1]!.sent[0]!.params.token).toBe('late');
   });
 
   it('socket close: pending say rejects BrainOffline, status offline, retries after retryMs', async () => {
@@ -517,7 +553,7 @@ describe('BrainClient', () => {
     s2.receive({
       jsonrpc: '2.0',
       id: s2.sent[0]!.id,
-      result: { protocol: 2, session: 's1', tools: [], seq: 1, resync: true },
+      result: { protocol: 3, session: 's1', tools: [], seq: 1, resync: true },
     });
     s2.receive(turn(2));
     expect(resyncs).toHaveLength(1);
@@ -530,6 +566,7 @@ describe('BrainClient', () => {
     const c = new BrainClient({
       addr: 'x:1',
       body: desktop,
+      token: () => 't0k',
       tools: () => tools,
       openSocket: () => {
         const sock = new FakeSocket();
@@ -547,7 +584,7 @@ describe('BrainClient', () => {
     sock.receive({
       jsonrpc: '2.0',
       id: sock.sent[0]!.id,
-      result: { protocol: 2, session: 's1', tools: [], seq: 0, resync: true },
+      result: { protocol: 3, session: 's1', tools: [], seq: 0, resync: true },
     });
     sock.receive(turn(1));
     expect(order).toEqual(['resync', 'note']);
@@ -656,7 +693,7 @@ describe('BrainClient as a shared body client', () => {
     s2.receive({
       jsonrpc: '2.0',
       id: s2.sent[0]!.id,
-      result: { protocol: 2, session: 's1', tools: [], seq: 40, resync: true },
+      result: { protocol: 3, session: 's1', tools: [], seq: 40, resync: true },
     });
     expect(saved).toEqual([7, 40]);
   });

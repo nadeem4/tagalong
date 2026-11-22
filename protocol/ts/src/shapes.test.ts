@@ -8,8 +8,8 @@ import { Body, ErrorCode, ErrorObject, LIMITS, PROTOCOL, Part, Tool } from './sh
 const tool = (name: string) => ({ name, description: 'd', input_schema: {} });
 
 describe('shapes', () => {
-  it('is protocol 2', () => {
-    expect(PROTOCOL).toBe(2);
+  it('is protocol 3', () => {
+    expect(PROTOCOL).toBe(3);
   });
 
   it('exports the limits from the spec', () => {
@@ -37,6 +37,7 @@ describe('shapes', () => {
       body_offline: -32006,
       tool_failed: -32007,
       over_limit: -32008,
+      unauthorized: -32009,
     });
   });
 

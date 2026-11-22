@@ -1,4 +1,5 @@
-"""Websocket server for contract v1: hello, tools, error replies and the per-connection writer.
+"""Websocket server for contract v3: hello (token checked first), tools, error replies and the
+per-connection writer.
 
 Each connection owns one bounded queue drained by a single writer task, so Peer.send never raises
 or awaits (Bodies.notify loops over peers) and the hello result always precedes its backlog.
@@ -14,12 +15,14 @@ import asyncio
 import base64
 import json
 import logging
+import ssl
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
 from websockets.asyncio.server import Server, ServerConnection, serve
 from websockets.exceptions import ConnectionClosed
 
+from brain.auth import Authenticator
 from brain.bodies import Bodies, WriteQueue
 from brain.protocol import (
     LIMITS,
@@ -108,6 +111,7 @@ async def _handler(
     session_id: str,
     session: Session,
     build: tuple[str, str] | None,
+    auth: Authenticator,
 ) -> None:
     peer = _Peer()
     writer = asyncio.create_task(_writer(ws, peer))
@@ -128,7 +132,7 @@ async def _handler(
                 if method != "hello":  # method may be None for a response
                     peer.send(_error(req_id, ErrorCode.invalid_request, "hello must come first"))
                     break
-                body_id = _hello(message, req_id, peer, bodies, session_id, session, build)
+                body_id = _hello(message, req_id, peer, bodies, session_id, session, build, auth)
                 if body_id is None:
                     break
                 # A new connection of this body: what an older one reported no longer holds.
@@ -221,9 +225,11 @@ def _hello(
     session_id: str,
     session: Session,
     build: tuple[str, str] | None,
+    auth: Authenticator,
 ) -> str | None:
     """Join the body and queue the result, the backlog, then any open asks it cannot have;
-    None means hello failed."""
+    None means hello failed. The token is checked before the shape, so an unauthenticated
+    caller gets no validation text; it is never logged."""
     raw = message.get("params")
     # Check the version first: a future protocol may change the shape, and its body
     # should learn "mismatch", not "invalid params".
@@ -231,6 +237,10 @@ def _hello(
     if isinstance(version, int) and not isinstance(version, bool) and version != PROTOCOL:
         data = {"protocol": PROTOCOL}
         peer.send(_error(req_id, ErrorCode.version_mismatch, "Unsupported protocol", data))
+        return None
+    token = raw.get("token") if isinstance(raw, dict) else None
+    if not isinstance(token, str) or auth.identify(token) is None:
+        peer.send(_error(req_id, ErrorCode.unauthorized, "Unknown or revoked token"))
         return None
     try:
         params = HelloParams.model_validate(raw)
@@ -440,10 +450,14 @@ async def start_server(
     session_id: str,
     session: Session,
     build: tuple[str, str] | None = None,
+    *,
+    auth: Authenticator,
+    ssl_context: ssl.SSLContext | None = None,
 ) -> Server:
-    """`build` is (version, build id), told to every body in hello; None leaves them out."""
+    """`build` is (version, build id), told to every body in hello; None leaves them out.
+    `ssl_context` makes the listener wss."""
 
     async def handler(ws: ServerConnection) -> None:
-        await _handler(ws, bodies, session_id, session, build)
+        await _handler(ws, bodies, session_id, session, build, auth)
 
-    return await serve(handler, host, port, max_size=MAX_FRAME)
+    return await serve(handler, host, port, max_size=MAX_FRAME, ssl=ssl_context)

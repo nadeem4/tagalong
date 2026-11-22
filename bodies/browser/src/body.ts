@@ -132,6 +132,7 @@ export function createBody(deps: BodyDeps): BrowserBody {
     ]);
     client = new BrainClient({
       addr: settings.addr,
+      token: () => settings.token,
       // display: false because the browser shows no answers; the brain routes them elsewhere.
       body: { id, kind: 'browser', name, display: false },
       seqStore: {

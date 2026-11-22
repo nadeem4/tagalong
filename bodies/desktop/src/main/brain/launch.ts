@@ -8,7 +8,7 @@
  */
 import { spawn as nodeSpawn } from 'node:child_process';
 import type { ChildProcess, SpawnOptions } from 'node:child_process';
-import { closeSync, existsSync, mkdirSync, openSync } from 'node:fs';
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync } from 'node:fs';
 import { connect } from 'node:net';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -47,6 +47,15 @@ export interface LaunchOptions {
 /** The brain's own data folder rule (config.py): TAGALONG_HOME, else ~/.tagalong. */
 export function dataDir(env: NodeJS.ProcessEnv, home: string): string {
   return env.TAGALONG_HOME || join(home, '.tagalong');
+}
+
+/** The token the brain makes for bodies on this machine; null until the brain has written it. */
+export function readLocalToken(env: NodeJS.ProcessEnv, home: string): string | null {
+  try {
+    return readFileSync(join(dataDir(env, home), 'local-token'), 'utf8').trim();
+  } catch {
+    return null;
+  }
 }
 
 export function brainLogPath(env: NodeJS.ProcessEnv, home: string): string {

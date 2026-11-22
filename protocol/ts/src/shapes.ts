@@ -5,7 +5,7 @@
  */
 import { z } from 'zod';
 
-export const PROTOCOL = 2;
+export const PROTOCOL = 3;
 
 export const LIMITS = {
   partBytes: 5_000_000,
@@ -34,6 +34,7 @@ export const ErrorCode = {
   body_offline: -32006,
   tool_failed: -32007,
   over_limit: -32008,
+  unauthorized: -32009,
 } as const;
 
 const errorCodes: readonly number[] = Object.values(ErrorCode);

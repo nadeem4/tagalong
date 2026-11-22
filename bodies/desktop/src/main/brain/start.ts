@@ -3,13 +3,14 @@
  * listens on (TAGALONG_BRAIN_ADDR, the same variable; launch.ts starts a local brain first
  * if none runs) and BrainClient keeps retrying while it is down. It declares the window and file body tools.
  */
-import { hostname } from 'node:os';
+import { homedir, hostname } from 'node:os';
 import { BrainClient } from '@tagalong/contract';
 import type { BrainClientOptions, BrainSocket } from '@tagalong/contract';
 import type { CaptureExclusions } from '../../shared/settings';
 import type { CaptureNotice } from '../../shared/ipc';
 import type { Platform } from '../platform/index';
 import { bodyTools } from './body-tools';
+import { readLocalToken } from './launch';
 import type { ReadingDeps } from './body-tools';
 import type { FileDeps } from '../tools/files';
 
@@ -69,6 +70,9 @@ export function startBrain(options: StartBrainOptions): BrainClient {
     addr: env.TAGALONG_BRAIN_ADDR ?? DEFAULT_ADDR,
     // The PC's name is shown to the person, so two desktops can be told apart.
     body: { id: bodyId, kind: 'desktop', name: hostname() },
+    // Read on every dial: a brain started after the desktop writes the file late, and the
+    // client does not say hello without a token, so it dials again.
+    token: () => readLocalToken(env, homedir()) ?? '',
     tools: () => tools,
     openSocket,
     onUse: (tool, input) => run(tool, input),

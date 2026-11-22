@@ -3,7 +3,7 @@
 ## Purpose
 
 `bodies/whatsapp` is a small Node program that makes WhatsApp a body for the Python brain. You
-message Scout from your phone; the bridge says it to the brain over contract v2 and sends Scout's
+message Scout from your phone; the bridge says it to the brain over contract v3 and sends Scout's
 finished answer back to the same chat. It holds no brain of its own and adds no frame to the
 contract: it is an ordinary body whose `kind` is `whatsapp`. This page covers the bridge core
 (webhook, send, window) and asks answered from the phone. Home's Places page and the one-time Meta setup are below.
@@ -140,7 +140,7 @@ The brain reads seven variables (`WHATSAPP_VARS` in `bridges.py`) and passes the
 | `TAGALONG_WHATSAPP_ALLOWED_NUMBER`  | The one phone allowed to talk to Scout (not secret)    |
 | `TAGALONG_WHATSAPP_PORT`            | Webhook port on 127.0.0.1, default 47322               |
 
-The bridge also reads `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`). A missing required value stops the bridge with a plain message that names the variable and
+The bridge also reads `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`) and `TAGALONG_LOCAL_TOKEN`, which the brain sets when it starts the bridge and the bridge sends as the token in `hello`. A missing required value stops the bridge with a plain message that names the variable and
 never shows a value.
 
 ## Files
@@ -153,7 +153,7 @@ never shows a value.
 | `src/asks.ts`                   | `AskDesk`: open asks, buttons or numbered text, which ask a reply answers |
 | `src/split.ts`                  | `splitReply`                                                              |
 | `src/window.ts`                 | the 24-hour window                                                        |
-| `src/bridge.ts`                 | `createBridge`: the contract v2 body                                      |
+| `src/bridge.ts`                 | `createBridge`: the contract v3 body                                      |
 | `src/index.ts`                  | the entry: real websocket, stdin pipe, SIGTERM                            |
 | `vite.config.ts`                | bundles everything (contract and zod included) into `dist/index.js`       |
 

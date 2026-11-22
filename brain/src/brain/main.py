@@ -18,6 +18,7 @@ from pathlib import Path
 from anthropic import AsyncAnthropic
 
 from brain.apps import Apps, TokenFile
+from brain.auth import Authenticator
 from brain.bodies import Bodies
 from brain.bodies_tools import bodies_tools
 from brain.bridges import ENTRY, WHATSAPP_SECRETS, BridgeSupervisor, private_node, real_spawn
@@ -28,7 +29,9 @@ from brain.events import EventLog
 from brain.events_tools import events_tools
 from brain.experts import ExpertHosts
 from brain.guardrails import Budget
+from brain.identity import load_or_create_identity, server_ssl_context
 from brain.lifecycle import clear_pid, real_started, write_pid
+from brain.local_token import load_or_create_local_token
 from brain.loops.home_tools import loop_home_tools
 from brain.loops.reader import HaikuReader
 from brain.loops.service import LoopService
@@ -142,8 +145,11 @@ async def _run() -> None:
     experts = ExpertStore(config.data_dir)
     tokens = TokenFile(config.data_dir)
     apps = Apps(memory, bodies.notify, os.environ, tokens=tokens, data_dir=config.data_dir)
+    local_token = load_or_create_local_token(config.data_dir)
+    auth = Authenticator(local_token)
     secrets = cached(
         lambda: [
+            local_token,
             *apps.secret_values(),
             os.environ.get("ANTHROPIC_API_KEY"),
             *(os.environ.get(name) for name in WHATSAPP_SECRETS),  # the bridge's output is logged
@@ -248,6 +254,9 @@ async def _run() -> None:
             "started_at": started_at,
             "started_by": config.started_by,
             "addr": f"{config.host}:{config.port}",
+            "network": config.network,
+            "network_port": config.network_port,
+            "fingerprint": identity.fingerprint if identity else None,
             "data_dir": str(config.data_dir),
             "log_path": str(config.data_dir / "brain.log"),
             "places": [{"id": b.id, "kind": b.kind, "name": b.name} for b in bodies.online()],
@@ -316,6 +325,8 @@ async def _run() -> None:
     session.ask_runner.home_ended = home_end_reporter(progress, bodies.notify)
     bridges: BridgeSupervisor | None = None  # built once the brain's port is known
     update_loop: asyncio.Task | None = None
+    identity = None  # made with the network listener, which TAGALONG_NETWORK=1 turns on
+    network_server = None
     lag_watch: asyncio.Task | None = None
     perf_dump: asyncio.Task | None = None
     voice = VoiceService(  # models load on first listen and first spoken turn
@@ -344,16 +355,22 @@ async def _run() -> None:
     loops.tasks = updates.tasks = session.tasks  # the Watch tasks of mail and update checks
     session.watch_stops += [loops.task_stopped, updates.task_stopped]
     loops.start()  # wakes Scout for a loop already due, and arms the next one
+
+    def serve(host: str, port: int, **kwargs):
+        return start_server(
+            host,
+            port,
+            bodies,
+            session_id(config.data_dir),
+            session,
+            (app_version(), build),
+            auth=auth,
+            **kwargs,
+        )
+
     try:
         try:
-            server = await start_server(
-                config.host,
-                config.port,
-                bodies,
-                session_id(config.data_dir),
-                session,
-                (app_version(), build),
-            )
+            server = await serve(config.host, config.port)
         except OSError as err:  # WSAEADDRINUSE (10048) on Windows, EADDRINUSE elsewhere
             if err.errno not in (getattr(errno, "WSAEADDRINUSE", 10048), errno.EADDRINUSE):
                 raise
@@ -366,6 +383,11 @@ async def _run() -> None:
             sys.exit(1)
         # Only now, with the port ours: a second brain that failed to bind must not touch it.
         write_pid(config.data_dir, os.getpid(), real_started(os.getpid()))
+        if config.network:
+            identity = load_or_create_identity(config.data_dir)
+            network_server = await serve(
+                "0.0.0.0", config.network_port, ssl_context=server_ssl_context(identity)
+            )
         await asyncio.to_thread(
             sweep_staging, config.data_dir
         )  # an install a killed brain left half-staged
@@ -375,6 +397,7 @@ async def _run() -> None:
         bridges = BridgeSupervisor(  # the WhatsApp bridge; runs only when on and set up
             env=os.environ,
             brain_addr=f"127.0.0.1:{port}",  # the bridge is local, whatever host we listen on
+            local_token=local_token,
             entry=ENTRY,
             ensure_node=private_node(config.data_dir, inspect_machine),
             spawn=real_spawn,
@@ -384,6 +407,8 @@ async def _run() -> None:
         lag_watch = asyncio.ensure_future(LoopLagMonitor(config.loop_lag_ms / 1000).run())
         perf_dump = asyncio.ensure_future(dump_timings())  # `tagalong perf` reads these lines
         log.info("brain listening on ws://%s:%d", config.host, port)
+        if network_server:
+            log.info("brain listening on wss://0.0.0.0:%d", config.network_port)
         await server.serve_forever()
     finally:
         # The runner stops first: the running turn's events wait for the next run, and news
@@ -407,6 +432,9 @@ async def _run() -> None:
         await apps.shutdown()
         await session.stop_background()  # tools a talked-over turn left running end here
         memory.close()
+        if network_server:
+            network_server.close()
+            await network_server.wait_closed()
         clear_pid(config.data_dir, os.getpid())
 
 
