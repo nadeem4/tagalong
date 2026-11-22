@@ -84,6 +84,14 @@ Every body's `hello` carries a token, checked by `auth.py` before the body joins
 
 With `TAGALONG_NETWORK=1` a second listener takes bodies from other devices on `TAGALONG_NETWORK_PORT` (default 47323) over TLS. Its self-signed certificate and key live in `identity/` in the data folder (`identity.py`); a body pins the certificate's SHA-256 fingerprint, which `brain_status` reports. The loopback listener stays plain `ws`.
 
+The network listener accepts device tokens only, never the local token: a leaked local-token file on one machine cannot be used from another.
+
+### Pairing a device
+
+A device earns its token with a one-time code. `uv run tagalong pair` (works with no brain running, needs `TAGALONG_NETWORK=1`) or Home's `pair_make` gives a QR and a `tagalong://pair?addr=...&fp=...&code=...` link. The code lasts 10 minutes and works once (one atomic SQL update, so two simultaneous redeems give one success); only its SHA-256 is stored (`pair_codes`). Five wrong codes in a minute lock redemption for that minute, even for the right code. The device sends the code in a `pair` request before `hello` and gets a long random device token back; the brain stores only the token's SHA-256 (`devices`) and closes the connection after the reply, and the device then reconnects with `hello`. A code is bound to a kind, so a desktop code cannot make a browser device. The browser add-on pairs over loopback with a 6-digit code (loopback accepts only that kind; the network listener refuses it). A device owns the body ids it joins with, so another device cannot take over its id (`unauthorized`).
+
+Home's `devices_list`, `device_rename` and `device_revoke` manage paired devices. Revoking closes that device's live connections immediately and its next `hello` gets `unauthorized`. No typed (SPAKE2) code is offered: no maintained Node SPAKE2 library exists, so pairing is QR or link only (see [protocol/README.md](../../protocol/README.md#pairing)).
+
 ## Masking secrets
 
 Secrets become `[secret]` before they are saved. The `save` hook runs `masking.py` over everything that is written to disk or to a log. The live turn and the side-check prompt are not masked, because Scout needs the real values to work.
