@@ -19,6 +19,7 @@ Before changing a feature, read its doc and run its section of [testing/feature-
 | [architecture.md](architecture.md)             | The at-a-glance diagram, processes and start-up, packages, one request  |
 | [principles.md](principles.md)                 | One brain and many bodies, what code decides versus what the model does |
 | [development.md](development.md)               | Build, run, test, package, CI and the conventions                       |
+| [layout.md](layout.md)                         | Where each part of the repository lives, file by file                   |
 | [../protocol/README.md](../protocol/README.md) | Contract v1 between the brain and the bodies: the source of truth       |
 
 ## brain/

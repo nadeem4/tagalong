@@ -1,0 +1,22 @@
+name: check
+
+on:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --locked
+        working-directory: brain
+      - run: python scripts/check_pr.py --base origin/${{ github.base_ref }} --branch ${{ github.head_ref }} --full
