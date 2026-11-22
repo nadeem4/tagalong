@@ -7,8 +7,8 @@ import os
 import shlex
 import subprocess
 import sys
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 from xml.sax.saxutils import escape
@@ -61,10 +61,20 @@ _MACOS = """<?xml version="1.0" encoding="UTF-8"?>
   <array>
     <string>{exe}</string>
   </array>
-{env}  <key>RunAtLoad</key>
+  <key>EnvironmentVariables</key>
+  <dict>
+{env}  </dict>
+  <key>StandardOutPath</key>
+  <string>{log}</string>
+  <key>StandardErrorPath</key>
+  <string>{log}</string>
+  <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
-  <true/>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
 </dict>
 </plist>
 """
@@ -74,7 +84,9 @@ Description=Tagalong brain
 
 [Service]
 ExecStart={exe}
-{env}Restart=on-failure
+{env}StandardOutput=append:{log}
+StandardError=append:{log}
+Restart=on-failure
 RestartSec=60
 
 [Install]
@@ -98,24 +110,28 @@ def real_run(argv: list[str]) -> tuple[int, str]:
 
 @dataclass(frozen=True)
 class Service:
-    """`exe` is the brain's launcher and `path` where the unit file goes. A `home` other than
-    the default is written into the unit so the logon brain uses the same data folder; `domain`
-    is the launchd session the agent loads into."""
+    """`exe` is the brain's launcher and `path` where the unit file goes. `env` is written into
+    the unit, so the logon brain sees the data folder, build and starter the installer saw. `log`
+    is where launchd and systemd append the output (the Windows launcher opens brain.log itself);
+    `domain` is the launchd session the agent loads into."""
 
     os: Os
     exe: str
     path: Path
     run: Runner
-    home: str | None = None
+    env: Mapping[str, str] = field(default_factory=dict)
+    log: str = ""
     domain: str = ""
 
     def unit_text(self) -> str:
-        return _SPECS[self.os].render(self.exe, self.home)
+        return _SPECS[self.os].render(self)
 
     def install(self) -> None:
         spec = _SPECS[self.os]
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(self.unit_text(), encoding=spec.encoding)
+        for argv in spec.before_install(self):
+            self.run(argv)
         for argv in spec.install(self):
             code, output = self.run(argv)
             if code != 0:
@@ -134,42 +150,38 @@ class Service:
         return self.run(_SPECS[self.os].query(self))[0] == 0
 
 
-def _windows(exe: str, home: str | None) -> str:
-    if home is None:
-        run = f"      <Command>{escape(exe)}</Command>\n"
-    else:
-        # Task Scheduler has no environment, so cmd sets it; /s keeps the outer quotes meaningful.
-        line = f'/d /s /c ""set "TAGALONG_HOME={home}" && "{exe}""'
-        run = f"      <Command>cmd.exe</Command>\n      <Arguments>{escape(line)}</Arguments>\n"
+def _windows(s: Service) -> str:
+    # The launcher is a windowless script that reads these as KEY=VALUE arguments: a cmd.exe
+    # wrapper to set the environment would open a console at every logon.
+    args = subprocess.list2cmdline([f"{k}={v}" for k, v in s.env.items()])
+    run = f"      <Command>{escape(s.exe)}</Command>\n      <Arguments>{escape(args)}</Arguments>\n"
     return _WINDOWS.format(exec=run)
 
 
-def _macos(exe: str, home: str | None) -> str:
-    env = ""
-    if home is not None:
-        env = (
-            "  <key>EnvironmentVariables</key>\n  <dict>\n    <key>TAGALONG_HOME</key>\n"
-            f"    <string>{escape(home)}</string>\n  </dict>\n"
-        )
-    return _MACOS.format(label=LABEL, exe=escape(exe), env=env)
+def _macos(s: Service) -> str:
+    env = "".join(
+        f"    <key>{escape(k)}</key>\n    <string>{escape(v)}</string>\n" for k, v in s.env.items()
+    )
+    return _MACOS.format(label=LABEL, exe=escape(s.exe), env=env, log=escape(s.log))
 
 
-def _linux(exe: str, home: str | None) -> str:
-    env = ""
-    if home is not None:
-        quoted = home.replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%")
-        env = f'Environment="TAGALONG_HOME={quoted}"\n'
-    return _LINUX.format(exe=shlex.quote(exe), env=env)
+def _linux(s: Service) -> str:
+    def quoted(value: str) -> str:
+        return value.replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%")
+
+    env = "".join(f'Environment="{k}={quoted(v)}"\n' for k, v in s.env.items())
+    return _LINUX.format(exe=shlex.quote(s.exe), env=env, log=s.log)
 
 
 @dataclass(frozen=True)
 class _Spec:
-    render: Callable[[str, str | None], str]
+    render: Callable[[Service], str]
     encoding: str
     install: Callable[[Service], list[list[str]]]
     remove: Callable[[Service], list[list[str]]]
     query: Callable[[Service], list[str]]
     after_remove: tuple[list[str], ...] = ()
+    before_install: Callable[[Service], list[list[str]]] = lambda s: []
 
 
 _SPECS: dict[Os, _Spec] = {
@@ -189,6 +201,7 @@ _SPECS: dict[Os, _Spec] = {
         lambda s: [["launchctl", "bootstrap", s.domain, str(s.path)]],
         lambda s: [["launchctl", "bootout", f"{s.domain}/{LABEL}"]],
         lambda s: ["launchctl", "print", f"{s.domain}/{LABEL}"],
+        before_install=lambda s: [["launchctl", "bootout", f"{s.domain}/{LABEL}"]],
     ),
     "linux": _Spec(
         _linux,
@@ -204,8 +217,9 @@ _SPECS: dict[Os, _Spec] = {
 }
 
 
-def real_service(data_dir: Path) -> Service:
-    """This machine's service; the launcher is the `brain` script beside the running Python."""
+def real_service(data_dir: Path, env: Mapping[str, str] = os.environ) -> Service:
+    """This machine's service. The launcher is beside the running Python; `env` is the
+    installing process's, whose build the unit pins so the desktop sees a packaged brain."""
     os_name: Os = (
         "windows" if sys.platform == "win32" else "macos" if sys.platform == "darwin" else "linux"
     )
@@ -215,12 +229,18 @@ def real_service(data_dir: Path) -> Service:
         "macos": user / "Library" / "LaunchAgents" / f"{LABEL}.plist",
         "linux": user / ".config" / "systemd" / "user" / UNIT,
     }[os_name]
-    launcher = "brain.exe" if os_name == "windows" else "brain"
+    launcher = "brain-service.exe" if os_name == "windows" else "brain"
+    unit_env = {
+        **({} if data_dir == user / ".tagalong" else {"TAGALONG_HOME": str(data_dir)}),
+        **({"TAGALONG_BUILD": env["TAGALONG_BUILD"]} if env.get("TAGALONG_BUILD") else {}),
+        "TAGALONG_STARTED_BY": "service",
+    }
     return Service(
         os_name,
         str(Path(sys.executable).parent / launcher),
         path,
         real_run,
-        home=None if data_dir == user / ".tagalong" else str(data_dir),
+        env=unit_env,
+        log=str(data_dir / "brain.log"),
         domain=f"gui/{os.getuid()}" if os_name == "macos" else "",
     )

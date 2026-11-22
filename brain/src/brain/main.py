@@ -402,14 +402,14 @@ async def _run() -> None:
         # Only now, with the port ours: a second brain that failed to bind must not touch it.
         write_pid(config.data_dir, os.getpid(), real_started(os.getpid()))
         if config.network:
-            tailnet = [f"{a}:{config.network_port}" for a in tailnet_addresses()]
             network_server = await serve(
                 "0.0.0.0",
                 config.network_port,
                 auth=network_auth,
                 ssl_context=server_ssl_context(identity),
                 redeem=partial(pairing.redeem, kinds=NETWORK_KINDS),
-                addrs=lambda: tailnet,
+                # Per hello: a logon brain starts before Tailscale has an address.
+                addrs=lambda: [f"{a}:{config.network_port}" for a in tailnet_addresses()],
             )
             advertiser = Advertiser(AsyncZeroconf)
             try:
@@ -476,3 +476,15 @@ def main() -> None:
         asyncio.run(_run())
     except KeyboardInterrupt:
         pass
+
+
+def service_main(argv: list[str] | None = None) -> None:
+    """The logon service's windowless launcher (`brain-service`). It has no console and gets no
+    environment from the task, so it takes KEY=VALUE arguments and writes to brain.log."""
+    for arg in sys.argv[1:] if argv is None else argv:
+        name, _, value = arg.partition("=")
+        os.environ[name] = value
+    home = load_config(os.environ).data_dir
+    home.mkdir(parents=True, exist_ok=True)
+    sys.stdout = sys.stderr = open(home / "brain.log", "a", encoding="utf-8", buffering=1)  # noqa: SIM115
+    main()

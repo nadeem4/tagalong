@@ -226,14 +226,21 @@ def _service(action: str, service: Service, home: Path, env, out) -> None:
         service.remove()
         out("Removed. The brain no longer starts at logon; network access stays as it was.")
     else:
+        # The brain reads this when the service starts it, so it must be saved first.
+        env_file = home / ".env"
+        before = env_file.read_bytes() if env_file.exists() else None
+        upsert_env_value(home, "TAGALONG_NETWORK", "1", env)
         try:
             service.install()
         except ServiceError as err:
+            if before is None:
+                env_file.unlink(missing_ok=True)
+            else:
+                env_file.write_bytes(before)
             raise _Fail(f"failed: {err}") from None
-        # The service reads this at start, so other devices can reach it without the desktop.
-        upsert_env_value(home, "TAGALONG_NETWORK", "1", env)
         out("Installed: the brain starts at logon, with network access on for other devices.")
         out("Turned the network listener on (TAGALONG_NETWORK=1 in .env).")
+        out("A brain already running gets the network listener when it restarts.")
         out("Pair a device with `tagalong pair`.")
 
 

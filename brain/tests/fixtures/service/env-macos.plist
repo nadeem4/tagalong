@@ -12,10 +12,21 @@
   <dict>
     <key>TAGALONG_HOME</key>
     <string>/Users/me/tag home</string>
+    <key>TAGALONG_BUILD</key>
+    <string>1.4.0</string>
+    <key>TAGALONG_STARTED_BY</key>
+    <string>service</string>
   </dict>
+  <key>StandardOutPath</key>
+  <string>/home/me/tag home/brain.log</string>
+  <key>StandardErrorPath</key>
+  <string>/home/me/tag home/brain.log</string>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
-  <true/>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
 </dict>
 </plist>

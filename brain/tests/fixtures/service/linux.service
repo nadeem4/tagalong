@@ -3,6 +3,9 @@ Description=Tagalong brain
 
 [Service]
 ExecStart=/home/me/venv/bin/brain
+Environment="TAGALONG_STARTED_BY=service"
+StandardOutput=append:/home/me/tag home/brain.log
+StandardError=append:/home/me/tag home/brain.log
 Restart=on-failure
 RestartSec=60
 

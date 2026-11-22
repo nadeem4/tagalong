@@ -24,7 +24,8 @@
   </Settings>
   <Actions Context="Author">
     <Exec>
-      <Command>C:\Users\me\venv\Scripts\brain.exe</Command>
+      <Command>C:\Users\me\venv\Scripts\brain-service.exe</Command>
+      <Arguments>TAGALONG_STARTED_BY=service</Arguments>
     </Exec>
   </Actions>
 </Task>

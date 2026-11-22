@@ -387,6 +387,10 @@ def test_started_by_desktop():
     assert load_config({"TAGALONG_STARTED_BY": "desktop"}).started_by == "desktop"
 
 
+def test_started_by_service():
+    assert load_config({"TAGALONG_STARTED_BY": "service"}).started_by == "service"
+
+
 def test_build_reads_env():
     assert load_config({}).build is None
     assert load_config({"TAGALONG_BUILD": "0.9.2"}).build == "0.9.2"

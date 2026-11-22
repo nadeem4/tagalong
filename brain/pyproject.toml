@@ -29,6 +29,9 @@ dependencies = [
 brain = "brain.main:main"
 tagalong = "brain.cli:main"
 
+[project.gui-scripts]
+brain-service = "brain.main:service_main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

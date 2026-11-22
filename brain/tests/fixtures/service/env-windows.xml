@@ -24,8 +24,8 @@
   </Settings>
   <Actions Context="Author">
     <Exec>
-      <Command>cmd.exe</Command>
-      <Arguments>/d /s /c ""set "TAGALONG_HOME=C:\Users\me\tag home" &amp;&amp; "C:\Users\me\venv\Scripts\brain.exe""</Arguments>
+      <Command>C:\Users\me\venv\Scripts\brain-service.exe</Command>
+      <Arguments>"TAGALONG_HOME=C:\Users\me\tag home" TAGALONG_BUILD=1.4.0 TAGALONG_STARTED_BY=service</Arguments>
     </Exec>
   </Actions>
 </Task>
