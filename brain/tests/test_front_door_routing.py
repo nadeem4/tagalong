@@ -29,6 +29,7 @@ from test_sessions import (
     wake_started,
 )
 
+from brain.auth import LOCAL
 from brain.events import EVENT_KINDS, Event
 from brain.jobs import JobId
 from brain.memory import Memory
@@ -115,7 +116,7 @@ async def test_cancelled_wake_news_is_handled():
 
 async def test_job_question_reaches_whatsapp_only_setup():
     session, sent = make(Gate(["asked"]), kinds=None, screen=False)
-    session._bodies.connect(Body(id="wa", kind="whatsapp", name="WA"), [], QuietPeer(), None)
+    session._bodies.connect(Body(id="wa", kind="whatsapp", name="WA"), [], QuietPeer(), None, LOCAL)
     session.post_event(Event("job_question", "scout", {"job": "j1", "message": "Which db?"}))
     await settle()
     assert wake_started(sent) == ["wa"]
@@ -146,7 +147,7 @@ async def test_post_refuses_a_kind_nobody_registered():
 async def test_whatsapp_event_reply_goes_to_whatsapp():
     session, sent = make(Gate(["got it"]), kinds=None)
     join(session, "desktop")
-    session._bodies.connect(Body(id="wa", kind="whatsapp", name="WA"), [], QuietPeer(), None)
+    session._bodies.connect(Body(id="wa", kind="whatsapp", name="WA"), [], QuietPeer(), None, LOCAL)
     session.presence.touch("desktop")  # a wake would otherwise go to the screen
     event = Event("back", "wa", {"body": "wa", "idle_seconds": 900})
     session._from_body(event)

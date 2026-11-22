@@ -36,6 +36,7 @@ from test_sessions import (
     tool_call,
 )
 
+from brain.auth import LOCAL
 from brain.bodies import Bodies
 from brain.chat_tools import chat_tools
 from brain.events import EventKind
@@ -381,8 +382,8 @@ async def test_6d_two_desktops_with_distinct_ids_both_stay_connected():
         Gate(["hello there"]), Open(), bodies, 10, Memory(":memory:"), kinds=NO_WAIT
     )
     one, two = RecordingPeer(), RecordingPeer()
-    bodies.connect(Body(id="desktop-aaaaaa", kind="desktop", name="PC one"), [], one, None)
-    bodies.connect(Body(id="desktop-bbbbbb", kind="desktop", name="PC two"), [], two, None)
+    bodies.connect(Body(id="desktop-aaaaaa", kind="desktop", name="PC one"), [], one, None, LOCAL)
+    bodies.connect(Body(id="desktop-bbbbbb", kind="desktop", name="PC two"), [], two, None, LOCAL)
     await session.say("desktop-aaaaaa", say("hi"))
     await idle(session)
     got = [sum('"turn"' in f for f in p.frames) for p in (one, two)]
@@ -409,12 +410,14 @@ async def test_6e_a_body_away_during_a_long_reply_resyncs_and_reads_it_from_the_
     session = make_session(Chatty(), Open(), bodies, 10, memory, kinds=NO_WAIT)
     peer = RecordingPeer()
     desk = Body(id="desktop", kind="desktop", name="PC")
-    bodies.connect(desk, [], peer, None)
-    bodies.connect(Body(id="whatsapp", kind="whatsapp", name="phone"), [], RecordingPeer(), None)
+    bodies.connect(desk, [], peer, None, LOCAL)
+    bodies.connect(
+        Body(id="whatsapp", kind="whatsapp", name="phone"), [], RecordingPeer(), None, LOCAL
+    )
     bodies.disconnect("desktop", peer)  # the laptop sleeps
     await session.say("whatsapp", say("write me a long answer"))
     await idle(session)
-    back = bodies.connect(desk, [], RecordingPeer(), 0)
+    back = bodies.connect(desk, [], RecordingPeer(), 0, LOCAL)
     assert back.resync  # 600 deltas are past the replay window
     ((_, handler),) = chat_tools(memory.db)
     out = json.loads(await handler({}))

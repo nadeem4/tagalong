@@ -131,7 +131,6 @@ class _Online:
     body: Body
     tools: list[Tool]
     peer: Peer
-    principal_key: str | None
 
 
 class Bodies:
@@ -159,20 +158,17 @@ class Bodies:
         tools: list[Tool],
         peer: Peer,
         last_seq: int | None,
-        principal: Principal | None = None,
+        principal: Principal,
     ) -> Joined | None:
         """None when the body id already belongs to another principal."""
-        if (
-            principal is not None
-            and self._owners.setdefault(body.id, principal.key) != principal.key
-        ):
+        if self._owners.setdefault(body.id, principal.key) != principal.key:
             return None
         box = self._outboxes.setdefault(body.id, Outbox())
         old = self._online.get(body.id)
         if old is not None:
             old.peer.close()
             self._fail_pending(old.peer)
-        self._online[body.id] = _Online(body, tools, peer, principal.key if principal else None)
+        self._online[body.id] = _Online(body, tools, peer)
         self._known[body.id] = tools
         self._names[body.id] = body.name
         gone_at = self._offline_at.pop(body.id, None)
@@ -190,9 +186,12 @@ class Bodies:
         return Joined(box.latest, False, missed)
 
     def drop_principal(self, key: str) -> None:
-        """Close every connection of a principal (a revoked device); each handler then cleans up."""
-        for online in list(self._online.values()):
-            if online.principal_key == key:
+        """Close every connection of a principal (a revoked device) and free its body ids; each
+        handler then cleans up."""
+        for body_id in [b for b, owner in self._owners.items() if owner == key]:
+            del self._owners[body_id]
+            online = self._online.get(body_id)
+            if online is not None:
                 online.peer.close()
 
     def is_current(self, body_id: str, peer: Peer) -> bool:

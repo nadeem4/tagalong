@@ -9,6 +9,7 @@ import json
 
 import pytest
 
+from brain.auth import LOCAL, Principal
 from brain.bodies import Bodies, Joined, LiveFrame, Outbox, WriteQueue
 from brain.protocol import Body, ErrorCode, RpcError, Tool
 
@@ -90,7 +91,7 @@ def test_resync_when_pruned_by_age():
 def test_connect_first_time():
     bodies = Bodies()
     peer = FakePeer()
-    joined = bodies.connect(body("a"), [tool("t")], peer, None)
+    joined = bodies.connect(body("a"), [tool("t")], peer, None, LOCAL)
     assert joined == Joined(0, False, [])
     assert bodies.online() == [body("a")]
     assert bodies.tools("a") == [tool("t")]
@@ -103,7 +104,7 @@ def test_a_raising_on_connect_does_not_break_connect():
         raise RuntimeError("wake failed")
 
     bodies.on_connect = boom
-    joined = bodies.connect(body("a"), [], FakePeer(), None)
+    joined = bodies.connect(body("a"), [], FakePeer(), None, LOCAL)
     assert joined == Joined(0, False, [])
     assert bodies.online() == [body("a")]
 
@@ -114,11 +115,11 @@ def test_connect_reports_seconds_away_after_a_disconnect():
     seen: list[tuple[str, float | None]] = []
     bodies.on_connect = lambda body_id, away: seen.append((body_id, away))
     peer = FakePeer()
-    bodies.connect(body("a"), [], peer, None)
+    bodies.connect(body("a"), [], peer, None, LOCAL)
     clock.now = 10.0
     bodies.disconnect("a", peer)
     clock.now = 70.0
-    bodies.connect(body("a"), [], FakePeer(), None)
+    bodies.connect(body("a"), [], FakePeer(), None, LOCAL)
     assert seen == [("a", None), ("a", 60.0)]
 
 
@@ -126,7 +127,7 @@ def test_first_connect_reports_none():
     bodies = Bodies()
     seen: list[float | None] = []
     bodies.on_connect = lambda body_id, away: seen.append(away)
-    bodies.connect(body("a"), [], FakePeer(), None)
+    bodies.connect(body("a"), [], FakePeer(), None, LOCAL)
     assert seen == [None]
 
 
@@ -135,9 +136,9 @@ def test_reconnect_on_an_online_id_reports_none():
     bodies = Bodies(clock=clock)
     seen: list[float | None] = []
     bodies.on_connect = lambda body_id, away: seen.append(away)
-    bodies.connect(body("a"), [], FakePeer(), None)
+    bodies.connect(body("a"), [], FakePeer(), None, LOCAL)
     clock.now = 500.0
-    bodies.connect(body("a"), [], FakePeer(), None)
+    bodies.connect(body("a"), [], FakePeer(), None, LOCAL)
     assert seen == [None, None]
 
 
@@ -147,26 +148,26 @@ def test_a_replaced_peer_disconnecting_does_not_start_the_away_clock():
     seen: list[float | None] = []
     bodies.on_connect = lambda body_id, away: seen.append(away)
     old, new = FakePeer(), FakePeer()
-    bodies.connect(body("a"), [], old, None)
-    bodies.connect(body("a"), [], new, None)
+    bodies.connect(body("a"), [], old, None, LOCAL)
+    bodies.connect(body("a"), [], new, None, LOCAL)
     clock.now = 100.0
     bodies.disconnect("a", old)  # replaced: the body is still online on `new`
     bodies.disconnect("a", new)
     clock.now = 130.0
-    bodies.connect(body("a"), [], FakePeer(), None)
+    bodies.connect(body("a"), [], FakePeer(), None, LOCAL)
     assert seen[-1] == 30.0
 
 
 def test_notify_reaches_online_and_queues_offline():
     bodies = Bodies()
     a, b = FakePeer(), FakePeer()
-    bodies.connect(body("a"), [], a, None)
-    bodies.connect(body("b"), [], b, None)
+    bodies.connect(body("a"), [], a, None, LOCAL)
+    bodies.connect(body("b"), [], b, None, LOCAL)
     bodies.disconnect("b", b)
     bodies.notify("say", {"text": "x"})
     assert seqs(a.frames) == [1]
     assert b.frames == []
-    joined = bodies.connect(body("b"), [], FakePeer(), 0)
+    joined = bodies.connect(body("b"), [], FakePeer(), 0, LOCAL)
     assert joined.seq == 1 and not joined.resync
     assert seqs(joined.backlog) == [1]
 
@@ -174,26 +175,26 @@ def test_notify_reaches_online_and_queues_offline():
 def test_reconnect_replays_missed():
     bodies = Bodies()
     peer = FakePeer()
-    bodies.connect(body("a"), [], peer, None)
+    bodies.connect(body("a"), [], peer, None, LOCAL)
     bodies.disconnect("a", peer)
     for _ in range(3):
         bodies.notify("m", {})
-    joined = bodies.connect(body("a"), [], FakePeer(), 0)
+    joined = bodies.connect(body("a"), [], FakePeer(), 0, LOCAL)
     assert joined.seq == 3
     assert seqs(joined.backlog) == [1, 2, 3]
 
 
 def test_connect_resync_when_ahead():
     bodies = Bodies()
-    joined = bodies.connect(body("a"), [], FakePeer(), 9)
+    joined = bodies.connect(body("a"), [], FakePeer(), 9, LOCAL)
     assert joined == Joined(0, True, [])
 
 
 def test_newer_connection_wins():
     bodies = Bodies()
     old, new = FakePeer(), FakePeer()
-    bodies.connect(body("a"), [], old, None)
-    bodies.connect(body("a"), [], new, None)
+    bodies.connect(body("a"), [], old, None, LOCAL)
+    bodies.connect(body("a"), [], new, None, LOCAL)
     assert old.closed and not new.closed
     bodies.disconnect("a", old)
     assert bodies.online() == [body("a")]
@@ -203,9 +204,9 @@ def test_newer_connection_wins():
 
 def test_set_tools_replaces():
     bodies = Bodies()
-    bodies.connect(body("a"), [tool("x")], FakePeer(), None)
+    bodies.connect(body("a"), [tool("x")], FakePeer(), None, LOCAL)
     peer = FakePeer()
-    bodies.connect(body("a"), [tool("x")], peer, None)
+    bodies.connect(body("a"), [tool("x")], peer, None, LOCAL)
     bodies.set_tools("a", peer, [tool("y")])
     assert bodies.tools("a") == [tool("y")]
 
@@ -213,8 +214,8 @@ def test_set_tools_replaces():
 def test_set_tools_from_stale_peer_is_ignored():
     bodies = Bodies()
     old, new = FakePeer(), FakePeer()
-    bodies.connect(body("a"), [tool("x")], old, None)
-    bodies.connect(body("a"), [tool("x")], new, None)
+    bodies.connect(body("a"), [tool("x")], old, None, LOCAL)
+    bodies.connect(body("a"), [tool("x")], new, None, LOCAL)
     bodies.set_tools("a", old, [tool("stale")])
     assert bodies.tools("a") == [tool("x")]
 
@@ -234,7 +235,7 @@ async def start_use(bodies: Bodies, peer: FakePeer, call_id="c1", timeout=30.0):
 
 def online(bodies: Bodies) -> FakePeer:
     peer = FakePeer()
-    bodies.connect(body("a"), [], peer, None)
+    bodies.connect(body("a"), [], peer, None, LOCAL)
     return peer
 
 
@@ -290,7 +291,7 @@ async def test_replaced_connection_fails_old_pending():
     bodies = Bodies()
     old = online(bodies)
     task, _ = await start_use(bodies, old)
-    bodies.connect(body("a"), [], FakePeer(), None)
+    bodies.connect(body("a"), [], FakePeer(), None, LOCAL)
     with pytest.raises(RpcError) as err:
         await task
     assert err.value.code == ErrorCode.body_offline
@@ -334,7 +335,7 @@ async def test_late_response_after_timeout_is_ignored():
 async def test_response_from_old_peer_is_ignored():
     bodies = Bodies()
     old = online(bodies)
-    bodies.connect(body("a"), [], new := FakePeer(), None)
+    bodies.connect(body("a"), [], new := FakePeer(), None, LOCAL)
     task, frame = await start_use(bodies, new)
     bodies.resolve("a", old, {"id": frame["id"], "result": OK})
     assert not task.done()
@@ -390,8 +391,8 @@ def test_unhashable_response_id_is_ignored():
 def test_notify_one_queues_for_offline_and_sends_to_online():
     bodies = Bodies()
     a, b = FakePeer(), FakePeer()
-    bodies.connect(body("a"), [], a, None)
-    bodies.connect(body("b"), [], b, None)
+    bodies.connect(body("a"), [], a, None, LOCAL)
+    bodies.connect(body("b"), [], b, None, LOCAL)
     bodies.disconnect("b", b)
     bodies.notify("say", {})  # seq 1 on both
     bodies.notify_one("a", "ask", {"id": "x"})
@@ -399,33 +400,39 @@ def test_notify_one_queues_for_offline_and_sends_to_online():
     assert seqs(a.frames) == [1, 2]
     assert json.loads(a.frames[1])["method"] == "ask"
     assert b.frames == []
-    assert bodies.connect(body("b"), [], FakePeer(), 1).backlog[0].count('"y"') == 1
+    assert bodies.connect(body("b"), [], FakePeer(), 1, LOCAL).backlog[0].count('"y"') == 1
 
 
 def test_online_ids_lists_connected_bodies():
     bodies = Bodies()
     peer = FakePeer()
-    bodies.connect(body("a"), [], peer, None)
-    bodies.connect(body("b"), [], FakePeer(), None)
+    bodies.connect(body("a"), [], peer, None, LOCAL)
+    bodies.connect(body("b"), [], FakePeer(), None, LOCAL)
     bodies.disconnect("b", peer)  # wrong peer: b stays online
     assert bodies.online_ids() == ["a", "b"]
 
 
 def test_display_ids_skip_display_false_bodies():
     bodies = Bodies()
-    bodies.connect(body("a"), [], FakePeer(), None)
-    bodies.connect(Body(id="b", kind="browser", name="b", display=False), [], FakePeer(), None)
-    bodies.connect(Body(id="c", kind="desktop", name="c", display=True), [], FakePeer(), None)
+    bodies.connect(body("a"), [], FakePeer(), None, LOCAL)
+    bodies.connect(
+        Body(id="b", kind="browser", name="b", display=False), [], FakePeer(), None, LOCAL
+    )
+    bodies.connect(
+        Body(id="c", kind="desktop", name="c", display=True), [], FakePeer(), None, LOCAL
+    )
     assert bodies.display_ids() == ["a", "c"]
     assert bodies.online_ids() == ["a", "b", "c"]
 
 
 def test_display_ids_put_the_phone_last_and_skip_display_less_bodies():
     bodies = Bodies()
-    bodies.connect(body("a"), [], FakePeer(), None)
-    bodies.connect(Body(id="b", kind="browser", name="b", display=False), [], FakePeer(), None)
-    bodies.connect(Body(id="w", kind="whatsapp", name="WhatsApp"), [], FakePeer(), None)
-    bodies.connect(Body(id="z", kind="desktop", name="z"), [], FakePeer(), None)
+    bodies.connect(body("a"), [], FakePeer(), None, LOCAL)
+    bodies.connect(
+        Body(id="b", kind="browser", name="b", display=False), [], FakePeer(), None, LOCAL
+    )
+    bodies.connect(Body(id="w", kind="whatsapp", name="WhatsApp"), [], FakePeer(), None, LOCAL)
+    bodies.connect(Body(id="z", kind="desktop", name="z"), [], FakePeer(), None, LOCAL)
     assert bodies.display_ids() == ["a", "z", "w"]  # screens first, the phone last
     assert bodies.is_phone("w") and not bodies.is_phone("a")
 
@@ -433,7 +440,7 @@ def test_display_ids_put_the_phone_last_and_skip_display_less_bodies():
 def test_body_lookup_is_online_only():
     bodies = Bodies()
     peer = FakePeer()
-    bodies.connect(body("a"), [], peer, None)
+    bodies.connect(body("a"), [], peer, None, LOCAL)
     assert bodies.body("a") == body("a")
     assert bodies.body("zzz") is None
     bodies.disconnect("a", peer)
@@ -443,7 +450,7 @@ def test_body_lookup_is_online_only():
 def test_known_tools_survive_disconnect():
     bodies = Bodies()
     peer = FakePeer()
-    bodies.connect(body("desktop"), [tool("see_screen")], peer, None)
+    bodies.connect(body("desktop"), [tool("see_screen")], peer, None, LOCAL)
     bodies.set_tools("desktop", peer, [tool("see_screen"), tool("type_text")])
     bodies.disconnect("desktop", peer)
     assert not bodies.is_online("desktop")
@@ -453,8 +460,8 @@ def test_known_tools_survive_disconnect():
 def test_known_tools_ignores_stale_peer_set_tools():
     bodies = Bodies()
     old, new = FakePeer(), FakePeer()
-    bodies.connect(body("desktop"), [tool("a")], old, None)
-    bodies.connect(body("desktop"), [tool("b")], new, None)
+    bodies.connect(body("desktop"), [tool("a")], old, None, LOCAL)
+    bodies.connect(body("desktop"), [tool("b")], new, None, LOCAL)
     bodies.set_tools("desktop", old, [tool("zzz")])
     assert [t.name for t in bodies.known_tools()["desktop"]] == ["b"]
 
@@ -462,24 +469,24 @@ def test_known_tools_ignores_stale_peer_set_tools():
 def test_send_live_has_no_seq_and_skips_the_outbox():
     bodies = Bodies()
     a, b = FakePeer(), FakePeer()
-    bodies.connect(body("a"), [], a, None)
-    bodies.connect(body("b"), [], b, None)
+    bodies.connect(body("a"), [], a, None, LOCAL)
+    bodies.connect(body("b"), [], b, None, LOCAL)
     assert bodies.send_live("a", "speech", {"turn": "t1", "done": True})
     assert [json.loads(f) for f in a.frames] == [
         {"jsonrpc": "2.0", "method": "speech", "params": {"turn": "t1", "done": True}}
     ]
     assert b.frames == []  # only the named body
-    assert bodies.connect(body("a"), [], FakePeer(), 0).backlog == []
+    assert bodies.connect(body("a"), [], FakePeer(), 0, LOCAL).backlog == []
 
 
 def test_send_live_never_replays_on_reconnect():
     bodies = Bodies()
     peer = FakePeer()
-    bodies.connect(body("a"), [], peer, None)
+    bodies.connect(body("a"), [], peer, None, LOCAL)
     bodies.notify("m", {})
     bodies.send_live("a", "speech", {"turn": "t", "text": "x"})
     bodies.disconnect("a", peer)
-    joined = bodies.connect(body("a"), [], FakePeer(), 0)
+    joined = bodies.connect(body("a"), [], FakePeer(), 0, LOCAL)
     assert joined.seq == 1 and not joined.resync
     assert [json.loads(f)["method"] for f in joined.backlog] == ["m"]
 
@@ -487,12 +494,12 @@ def test_send_live_never_replays_on_reconnect():
 def test_send_live_to_an_offline_body_sends_nothing_and_says_so():
     bodies = Bodies()
     peer = FakePeer()
-    bodies.connect(body("a"), [], peer, None)
+    bodies.connect(body("a"), [], peer, None, LOCAL)
     bodies.disconnect("a", peer)
     assert not bodies.send_live("a", "heard", {"event": "partial"})
     assert not bodies.send_live("nobody", "heard", {"event": "partial"})
     assert peer.frames == []
-    assert bodies.connect(body("a"), [], FakePeer(), 0).backlog == []
+    assert bodies.connect(body("a"), [], FakePeer(), 0, LOCAL).backlog == []
 
 
 async def drain(queue: WriteQueue, n: int) -> list[str]:
@@ -527,7 +534,7 @@ async def test_close_marker_is_delivered_after_queued_frames():
 def test_send_live_marks_a_speech_chunk_so_the_connection_may_drop_it():
     peer = FakePeer()
     bodies = Bodies()
-    bodies.connect(body("a"), [], peer, None)
+    bodies.connect(body("a"), [], peer, None, LOCAL)
     bodies.send_live("a", "speech", {"turn": "t", "text": "x", "pcm": "AAAA"})
     bodies.notify_one("a", "say", {"text": "hi"})
     assert isinstance(peer.frames[0], LiveFrame)
@@ -537,7 +544,7 @@ def test_send_live_marks_a_speech_chunk_so_the_connection_may_drop_it():
 def test_only_speech_audio_chunks_are_droppable():
     peer = FakePeer()
     bodies = Bodies()
-    bodies.connect(body("a"), [], peer, None)
+    bodies.connect(body("a"), [], peer, None, LOCAL)
     bodies.send_live("a", "speech", {"turn": "t", "text": "x", "pcm": "AAAA"})
     bodies.send_live("a", "speech", {"turn": "t", "text": "x"})
     bodies.send_live("a", "speech", {"turn": "t", "done": True})
@@ -550,7 +557,7 @@ async def test_voice_status_and_done_survive_past_the_cap():
     queue = WriteQueue(cap=2)
     peer = FakePeer()
     bodies = Bodies()
-    bodies.connect(body("a"), [], peer, None)
+    bodies.connect(body("a"), [], peer, None, LOCAL)
     bodies.send_live("a", "voice", {"status": "ready"})
     for _ in range(4):
         bodies.send_live("a", "speech", {"turn": "t", "text": "x", "pcm": "AAAA"})
@@ -559,3 +566,15 @@ async def test_voice_status_and_done_survive_past_the_cap():
         queue.put(frame)
     left = [json.loads(await queue.get())["params"] for _ in range(2)]
     assert left == [{"status": "ready"}, {"turn": "t", "done": True}]
+
+
+def test_a_body_id_belongs_to_its_principal_until_that_principal_is_dropped():
+    bodies = Bodies()
+    first, second = FakePeer(), FakePeer()
+    one = Principal(key="device:1", name="A", kind="desktop", local=False, device_id="1")
+    two = Principal(key="device:2", name="B", kind="desktop", local=False, device_id="2")
+    bodies.connect(body("a"), [], first, None, one)
+    assert bodies.connect(body("a"), [], second, None, two) is None
+    bodies.drop_principal("device:1")
+    assert first.closed
+    assert bodies.connect(body("a"), [], second, None, two) is not None

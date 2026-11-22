@@ -12,6 +12,7 @@ from event_log import make_session
 from brain import main
 from brain.app_tools import AppSource, app_home_tools
 from brain.apps import AppRow, Apps, TokenFile
+from brain.auth import LOCAL
 from brain.bodies import Bodies
 from brain.memory import Memory
 from brain.mind.turn import Call
@@ -289,7 +290,7 @@ class OpenPeer:
 def body_with_tools(bodies, tools=("open_url",)):
     peer = OpenPeer(bodies)
     decl = [Tool(name=n, description="d", input_schema={"type": "object"}) for n in tools]
-    bodies.connect(Body(id="desktop", kind="desktop", name="d"), decl, peer, None)
+    bodies.connect(Body(id="desktop", kind="desktop", name="d"), decl, peer, None, LOCAL)
     return peer
 
 

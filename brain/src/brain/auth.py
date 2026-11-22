@@ -22,7 +22,7 @@ class DeviceCheck(Protocol):
     def verify(self, token: str) -> Principal | None: ...
 
 
-_LOCAL = Principal(key="local", name="this computer", kind="local", local=True)
+LOCAL = Principal(key="local", name="this computer", kind="local", local=True)
 
 
 class Authenticator:
@@ -34,5 +34,5 @@ class Authenticator:
         if not token:
             return None
         if self._local and hmac.compare_digest(token.encode(), self._local):
-            return _LOCAL
+            return LOCAL
         return self._devices.verify(token) if self._devices else None

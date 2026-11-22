@@ -16,6 +16,7 @@ from event_log import make_session
 from job_rows import add_timer, job_told, records_for
 
 import brain.sessions as sessions_module
+from brain.auth import LOCAL
 from brain.bodies import Bodies
 from brain.events import Event, EventKind, EventLog
 from brain.experts import PermissionOption, PermissionRequest, Question, QuestionField, QuietFacts
@@ -406,7 +407,7 @@ async def test_system_prompt_carries_the_capability_picture_of_live_state():
     )
     bodies.notify = lambda m, p: None
     tool = Tool(name="open_url", description="d", input_schema={"type": "object"})
-    bodies.connect(Body(id="desk", kind="desktop", name="PC"), [tool], QuietPeer(), None)
+    bodies.connect(Body(id="desk", kind="desktop", name="PC"), [tool], QuietPeer(), None, LOCAL)
     await session.say("desk", say("hello"))
     await finish(session)
     prompt = model.systems[0]
@@ -434,7 +435,7 @@ async def test_a_tool_set_off_is_absent_from_the_capability_picture():
         Tool(name="open_url", description="d", input_schema={"type": "object"}),
         Tool(name="tab_read", description="d", input_schema={"type": "object"}),
     ]
-    bodies.connect(Body(id="desk", kind="desktop", name="PC"), tools, QuietPeer(), None)
+    bodies.connect(Body(id="desk", kind="desktop", name="PC"), tools, QuietPeer(), None, LOCAL)
     for name in ("desk__open_url", "gmail__send_mail", "set_timer"):
         session.toolbox.set_mode(name, "off")
     await session.say("desk", say("hello"))
@@ -1310,7 +1311,7 @@ async def test_body_tools_offered_then_gone_after_disconnect():
     session, _ = make(model)
     tool = Tool(name="see_screen", description="d", input_schema={"type": "object"})
     body = Body(id="desktop", kind="desktop", name="Desktop")
-    session._bodies.connect(body, [tool], peer, None)
+    session._bodies.connect(body, [tool], peer, None, LOCAL)
     await session.say("desktop", say("hi"))
     await finish_quietly(session)
     first = [t["name"] for t in model.tools[0]]
@@ -1343,7 +1344,7 @@ class QuietPeer:
 
 def join(session, body_id):
     body = Body(id=body_id, kind=body_id, name=body_id)
-    session._bodies.connect(body, [], QuietPeer(), None)
+    session._bodies.connect(body, [], QuietPeer(), None, LOCAL)
 
 
 def wake_started(sent):
@@ -1415,7 +1416,7 @@ async def test_wake_goes_to_the_body_the_user_last_talked_to():
 
 def join_headless(session, body_id="browser"):
     body = Body(id=body_id, kind="browser", name=body_id, display=False)
-    session._bodies.connect(body, [], QuietPeer(), None)
+    session._bodies.connect(body, [], QuietPeer(), None, LOCAL)
 
 
 def turn_body(sent):
@@ -1821,10 +1822,10 @@ async def test_body_online_reaches_the_loops_service():
     session.loops = SeenLoops()
     peer = QuietPeer()
     body = Body(id="desktop", kind="desktop", name="desktop")
-    session._bodies.connect(body, [], peer, None)
+    session._bodies.connect(body, [], peer, None, LOCAL)
     session._bodies.disconnect("desktop", peer)
     clock.now = 700.0
-    session._bodies.connect(body, [], QuietPeer(), None)
+    session._bodies.connect(body, [], QuietPeer(), None, LOCAL)
     await settle()
     assert "body_online" in [e.kind for e in session.loops.seen]
 
@@ -1843,10 +1844,10 @@ async def test_body_online_after_ten_minutes_wakes_scout():
     session, sent = make(model, kinds=None, bodies=Bodies(clock=clock))
     peer = QuietPeer()
     body = Body(id="desktop", kind="desktop", name="desktop")
-    session._bodies.connect(body, [], peer, None)
+    session._bodies.connect(body, [], peer, None, LOCAL)
     session._bodies.disconnect("desktop", peer)
     clock.now = 700.0
-    session._bodies.connect(body, [], QuietPeer(), None)
+    session._bodies.connect(body, [], QuietPeer(), None, LOCAL)
     await idle(session)
     text = model.seen[-1][-1]["content"][-1]["text"]
     assert "Event: body_online" in text and "offline_seconds: 700" in text
@@ -1858,10 +1859,10 @@ async def _returns_after_an_hour(body_id, kind):
     session, sent = make(model, kinds=None, bodies=Bodies(clock=clock))
     peer = QuietPeer()
     body = Body(id=body_id, kind=kind, name=body_id)
-    session._bodies.connect(body, [], peer, None)
+    session._bodies.connect(body, [], peer, None, LOCAL)
     session._bodies.disconnect(body_id, peer)
     clock.now = 3600.0
-    session._bodies.connect(body, [], QuietPeer(), None)
+    session._bodies.connect(body, [], QuietPeer(), None, LOCAL)
     await idle(session)
     return model, session
 
@@ -1882,10 +1883,10 @@ async def test_body_online_after_a_short_gap_does_not():
     session, sent = make(Gate([]), kinds=None, bodies=Bodies(clock=clock))
     peer = QuietPeer()
     body = Body(id="desktop", kind="desktop", name="desktop")
-    session._bodies.connect(body, [], peer, None)
+    session._bodies.connect(body, [], peer, None, LOCAL)
     session._bodies.disconnect("desktop", peer)
     clock.now = 599.0
-    session._bodies.connect(body, [], QuietPeer(), None)
+    session._bodies.connect(body, [], QuietPeer(), None, LOCAL)
     await settle()
     assert states(sent) == []
 
@@ -2602,10 +2603,10 @@ async def test_read_aloud_survives_the_body_reconnecting():
     session.voice = voice = RecordingVoice()
     peer = QuietPeer()
     body = Body(id="desktop", kind="desktop", name="desktop")
-    session._bodies.connect(body, [], peer, None)
+    session._bodies.connect(body, [], peer, None, LOCAL)
     read_aloud(session, speed=1.5)
     session._bodies.disconnect("desktop", peer)
-    session._bodies.connect(body, [], QuietPeer(), None)
+    session._bodies.connect(body, [], QuietPeer(), None, LOCAL)
     result = await said(session, sent, "desktop", say("after the reconnect"))
     await finish_quietly(session)
     assert voice.calls[0] == ("spoken", result.turn, "desktop", 1.5)
@@ -3631,7 +3632,7 @@ async def test_return_with_a_display_less_body_does_nothing():
     join_headless(session)
     assert seen == []
     session._bodies.connect(
-        Body(id="desktop", kind="desktop", name="Desktop"), [], QuietPeer(), None
+        Body(id="desktop", kind="desktop", name="Desktop"), [], QuietPeer(), None, LOCAL
     )
     assert seen == ["desktop"]
 
@@ -3646,7 +3647,7 @@ def _saved_bodies(session):
 
 async def test_saved_messages_record_the_body_of_the_turn():
     session, _ = make(Gate(["hi"]))
-    session._bodies.connect(Body(id="wa", kind="whatsapp", name="WA"), [], QuietPeer(), None)
+    session._bodies.connect(Body(id="wa", kind="whatsapp", name="WA"), [], QuietPeer(), None, LOCAL)
     await session.say("wa", say("hello"))
     await finish(session)
     assert _saved_bodies(session) == ["whatsapp"]
@@ -3672,7 +3673,7 @@ async def test_a_turn_with_no_body_is_tagged_desktop():
 async def test_body_is_kept_if_the_body_leaves_before_the_turn_ends():
     peer = QuietPeer()
     session, _ = make(Gate(["hi"]))
-    session._bodies.connect(Body(id="wa", kind="whatsapp", name="WA"), [], peer, None)
+    session._bodies.connect(Body(id="wa", kind="whatsapp", name="WA"), [], peer, None, LOCAL)
     await session.say("wa", say("hello"))
     await settle()
     session._bodies.disconnect("wa", peer)

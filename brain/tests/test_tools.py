@@ -14,6 +14,7 @@ from ask_log import approvals_on
 from job_rows import end_job, records_for, tasks_for
 
 from brain.approvals import SENTENCE_MAX
+from brain.auth import LOCAL
 from brain.bodies import Bodies
 from brain.guardrails import Budget
 from brain.guards import Guards
@@ -1012,7 +1013,7 @@ def declare(bodies, body_id, *tools):
         )
         for n, e, confirm in tools
     ]
-    bodies.connect(Body(id=body_id, kind="desktop", name=body_id), decl, Quiet(), None)
+    bodies.connect(Body(id=body_id, kind="desktop", name=body_id), decl, Quiet(), None, LOCAL)
 
 
 def drop(bodies, body_id):
@@ -2065,6 +2066,7 @@ async def test_list_permissions_names_each_body_by_what_it_declared(home):
         [Tool(name="open_tab", description="d", input_schema={"type": "object"})],
         Quiet(),
         None,
+        LOCAL,
     )
     rows = {t["name"]: t for t in json.loads(await home.run("list_permissions"))["tools"]}
     assert rows["chrome__open_tab"]["source"] == "body:chrome"
