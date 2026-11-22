@@ -18,6 +18,7 @@ import {
   dialog,
   ipcMain,
   powerMonitor,
+  safeStorage,
   shell,
 } from 'electron';
 import { ContextSnapshot } from '@tagalong/ui/shapes';
@@ -47,8 +48,12 @@ import { callJson } from './brain/call-json';
 import { createChatSync } from './brain/chat-sync';
 import { createTurnEvents } from './brain/turn-events';
 import { startBrain } from './brain/start';
+import { bonjourBrowse, discoverBrains } from './brain/discover';
+import { LinkStore } from './brain/link-store';
+import { pinnedSocket } from './brain/pinned-socket';
+import { registerPairIpc } from './ipc/pair';
 import { startingGate } from './brain/starting-gate';
-import { homedir } from 'node:os';
+import { homedir, hostname } from 'node:os';
 import { ownBuild } from './brain/build-id';
 import { brainLogPath, dataDir as brainDataDir, realLaunch, realStop } from './brain/launch';
 import type { RealLaunch } from './brain/launch';
@@ -175,7 +180,11 @@ const brainRun = (): RealLaunch => ({
     : resolve(app.getAppPath(), '..', '..', 'brain'),
   packaged: app.isPackaged ? { uv: join(process.resourcesPath, 'uv', 'uv.exe') } : undefined,
   appVersion: app.getVersion(),
+  // A paired remote brain is never started from here.
+  remote: () => linkStore?.get().mode === 'remote',
 });
+/** Which brain this desktop dials; set once the settings are read. */
+let linkStore: LinkStore | null = null;
 /** The status marks, set before the first launch; the launch can report before that. */
 let startingMarks: StatusMarks | null = null;
 const startingGates = startingGate((on) => {
@@ -274,6 +283,26 @@ async function start(): Promise<void> {
   const dataDir = app.getPath('userData');
   const settingsStore = new SettingsStore(dataDir);
   const settings = settingsStore.get();
+  const links = new LinkStore(settingsStore, {
+    encrypt: (text) => {
+      if (!safeStorage.isEncryptionAvailable())
+        throw new Error('this PC cannot keep a secret safely');
+      return safeStorage.encryptString(text);
+    },
+    decrypt: (data) => safeStorage.decryptString(data),
+  });
+  linkStore = links;
+  // Brains seen on the home network, tried after the saved addresses of a paired brain.
+  let foundAddrs: string[] = [];
+  let looking = false;
+  const lookAround = (): void => {
+    if (looking || links.get().mode !== 'remote') return;
+    looking = true;
+    discoverBrains({ browse: bonjourBrowse })
+      .then((brains) => void (foundAddrs = brains.map((b) => b.addr)))
+      .catch(() => undefined)
+      .finally(() => void (looking = false));
+  };
   // From the saved setting, before any window opens, so the mark on Scout shows from the
   // first second listening is on.
   const listening = new AlwaysListening(settings.listening.always);
@@ -289,6 +318,7 @@ async function start(): Promise<void> {
   // Start the brain if none is running; the client below dials it and retries. Packaged, the
   // first start installs it first (uv sync) and Home shows that as it goes.
   void brainSetup.retry();
+  lookAround();
   const turnEvents = createTurnEvents(
     () => SCOUT_ID,
     () => brain.session,
@@ -319,6 +349,8 @@ async function start(): Promise<void> {
   };
   const brain = startBrain({
     bodyId: readOrMakeBodyId(settingsStore),
+    link: links,
+    found: () => foundAddrs,
     platform,
     exclusions: () => desktop?.settings.captureExclusions ?? settings.captureExclusions,
     onCapture: announceCapture,
@@ -377,6 +409,7 @@ async function start(): Promise<void> {
     onStatus: (status) => {
       brainStatus = status;
       markBrainLink(statusMarks, status);
+      if (status === 'offline') lookAround();
       if (status === 'online') void chatSync.online();
       // A listening session open when the link dropped asks the new connection to listen.
       if (status === 'online') {
@@ -1052,6 +1085,19 @@ function registerIpc(): void {
   registerBodiesIpc(handle, { brain: required().brain });
   registerJobsIpc(handle, { brain: required().brain });
   registerApprovalsIpc(handle, { brain: required().brain });
+  registerPairIpc(handle, {
+    link: linkStore!,
+    openSocket: pinnedSocket,
+    log: (line) => console.warn(line),
+    deviceName: () => hostname(),
+    forget: () => linkStore!.forget(),
+    discover: () => discoverBrains({ browse: bonjourBrowse }),
+    reconnect: () => {
+      void brainSetup.retry();
+      required().brain.stop();
+      required().brain.start();
+    },
+  });
   registerBrainLinkIpc(handle, { brain: required().brain, setup: brainSetup });
   if (brainControl !== null) registerBrainStatusIpc(handle, brainControl);
   registerSettingsIpc(handle, {
