@@ -19,6 +19,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
+from brain.auth import Principal
 from brain.protocol import BODY_WHATSAPP, LIMITS, Body, ErrorCode, RpcError, Tool
 
 log = logging.getLogger("brain")
@@ -130,6 +131,7 @@ class _Online:
     body: Body
     tools: list[Tool]
     peer: Peer
+    principal_key: str | None
 
 
 class Bodies:
@@ -140,6 +142,7 @@ class Bodies:
         self._online: dict[str, _Online] = {}
         self._known: dict[str, list[Tool]] = {}  # last declared tools, kept after disconnect
         self._names: dict[str, str] = {}  # each body's declared name, kept after disconnect
+        self._owners: dict[str, str] = {}  # the principal each body id belongs to
         self._pending: dict[str, tuple[Peer, asyncio.Future[list[dict]]]] = {}
         self._next_id = 0
         # Session sets this: (body id, seconds it was away, None if unknown) so a wake that
@@ -150,13 +153,26 @@ class Bodies:
         """The name a body declared, even after it left; its id if it never connected."""
         return self._names.get(body_id, body_id)
 
-    def connect(self, body: Body, tools: list[Tool], peer: Peer, last_seq: int | None) -> Joined:
+    def connect(
+        self,
+        body: Body,
+        tools: list[Tool],
+        peer: Peer,
+        last_seq: int | None,
+        principal: Principal | None = None,
+    ) -> Joined | None:
+        """None when the body id already belongs to another principal."""
+        if (
+            principal is not None
+            and self._owners.setdefault(body.id, principal.key) != principal.key
+        ):
+            return None
         box = self._outboxes.setdefault(body.id, Outbox())
         old = self._online.get(body.id)
         if old is not None:
             old.peer.close()
             self._fail_pending(old.peer)
-        self._online[body.id] = _Online(body, tools, peer)
+        self._online[body.id] = _Online(body, tools, peer, principal.key if principal else None)
         self._known[body.id] = tools
         self._names[body.id] = body.name
         gone_at = self._offline_at.pop(body.id, None)
@@ -172,6 +188,12 @@ class Bodies:
         if missed is None:
             return Joined(box.latest, True, [])
         return Joined(box.latest, False, missed)
+
+    def drop_principal(self, key: str) -> None:
+        """Close every connection of a principal (a revoked device); each handler then cleans up."""
+        for online in list(self._online.values()):
+            if online.principal_key == key:
+                online.peer.close()
 
     def is_current(self, body_id: str, peer: Peer) -> bool:
         current = self._online.get(body_id)

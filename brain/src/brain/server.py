@@ -24,6 +24,7 @@ from websockets.exceptions import ConnectionClosed
 
 from brain.auth import Authenticator
 from brain.bodies import Bodies, WriteQueue
+from brain.pairing import Pairing
 from brain.protocol import (
     LIMITS,
     PROTOCOL,
@@ -39,6 +40,8 @@ from brain.protocol import (
     KnowMeStartResult,
     ListenParams,
     MicParams,
+    PairParams,
+    PairResult,
     RpcError,
     SayParams,
     SayResult,
@@ -112,6 +115,8 @@ async def _handler(
     session: Session,
     build: tuple[str, str] | None,
     auth: Authenticator,
+    pairing: Pairing | None,
+    loopback: bool,
 ) -> None:
     peer = _Peer()
     writer = asyncio.create_task(_writer(ws, peer))
@@ -129,6 +134,9 @@ async def _handler(
             method = message.get("method")
             req_id = _usable_id(message)
             if body_id is None:
+                if method == "pair":  # one attempt per connection, whatever the answer
+                    peer.send(_pair(message, req_id, pairing, loopback))
+                    break
                 if method != "hello":  # method may be None for a response
                     peer.send(_error(req_id, ErrorCode.invalid_request, "hello must come first"))
                     break
@@ -217,6 +225,20 @@ def _speech_state(message: dict, body_id: str, session: Session) -> None:
     session.presence.speech(body_id, _SPEECH_STATES[params.state], params.turn, params.n)
 
 
+def _pair(message: dict, req_id: Any, pairing: Pairing | None, loopback: bool) -> str:
+    if pairing is None:
+        return _error(req_id, ErrorCode.method_not_found, "Unknown method: pair")
+    try:
+        params = PairParams.model_validate(message.get("params"))
+    except ValidationError:
+        # Fixed text: the pydantic error quotes the params, and they hold the code.
+        return _error(req_id, ErrorCode.invalid_params, "pair needs a code and a device.")
+    paired = pairing.redeem(params.code, params.device.name, params.device.kind, loopback=loopback)
+    if paired is None:
+        return _error(req_id, ErrorCode.unauthorized, "That code did not work.")
+    return _result(req_id, PairResult(device_id=paired[0], token=paired[1]))
+
+
 def _hello(
     message: dict,
     req_id: Any,
@@ -239,7 +261,8 @@ def _hello(
         peer.send(_error(req_id, ErrorCode.version_mismatch, "Unsupported protocol", data))
         return None
     token = raw.get("token") if isinstance(raw, dict) else None
-    if not isinstance(token, str) or auth.identify(token) is None:
+    principal = auth.identify(token) if isinstance(token, str) else None
+    if principal is None:
         peer.send(_error(req_id, ErrorCode.unauthorized, "Unknown or revoked token"))
         return None
     try:
@@ -247,7 +270,10 @@ def _hello(
     except ValidationError as exc:
         peer.send(_error(req_id, ErrorCode.invalid_params, str(exc)))
         return None
-    joined = bodies.connect(params.body, params.tools, peer, params.last_seq)
+    joined = bodies.connect(params.body, params.tools, peer, params.last_seq, principal)
+    if joined is None:
+        peer.send(_error(req_id, ErrorCode.unauthorized, "That body id belongs to another device"))
+        return None
     result = HelloResult(
         protocol=PROTOCOL,
         session=session_id,
@@ -453,11 +479,15 @@ async def start_server(
     *,
     auth: Authenticator,
     ssl_context: ssl.SSLContext | None = None,
+    pairing: Pairing | None = None,
+    loopback: bool = True,
 ) -> Server:
     """`build` is (version, build id), told to every body in hello; None leaves them out.
-    `ssl_context` makes the listener wss."""
+    `ssl_context` makes the listener wss. `pairing` turns on the pre-hello `pair` request;
+    `loopback` says this listener is the one for bodies on the brain's own machine, where only
+    the browser add-on's short code pairs and everywhere else only the other kinds do."""
 
     async def handler(ws: ServerConnection) -> None:
-        await _handler(ws, bodies, session_id, session, build, auth)
+        await _handler(ws, bodies, session_id, session, build, auth, pairing, loopback)
 
     return await serve(handler, host, port, max_size=MAX_FRAME, ssl=ssl_context)

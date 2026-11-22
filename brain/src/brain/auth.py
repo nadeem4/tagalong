@@ -1,7 +1,7 @@
 """Who is calling: a hello token becomes a Principal, or None.
 
 The local token is the one in the home folder; a DeviceCheck (paired devices) is asked for
-anything else.
+anything else. A listener that must not honour the local token is given none.
 """
 
 import hmac
@@ -26,13 +26,13 @@ _LOCAL = Principal(key="local", name="this computer", kind="local", local=True)
 
 
 class Authenticator:
-    def __init__(self, local_token: str, devices: DeviceCheck | None = None) -> None:
-        self._local = local_token.encode()
+    def __init__(self, local_token: str | None, devices: DeviceCheck | None = None) -> None:
+        self._local = local_token.encode() if local_token else None
         self._devices = devices
 
     def identify(self, token: str) -> Principal | None:
         if not token:
             return None
-        if hmac.compare_digest(token.encode(), self._local):
+        if self._local and hmac.compare_digest(token.encode(), self._local):
             return _LOCAL
         return self._devices.verify(token) if self._devices else None

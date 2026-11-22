@@ -25,3 +25,15 @@ def test_device_check_is_asked_when_local_does_not_match():
     a = Authenticator("abc", Fake())
     assert a.identify("dtok") == dev
     assert a.identify("nope") is None
+
+
+def test_without_a_local_token_only_devices_get_in():
+    dev = Principal(key="device:d1", name="Phone", kind="node", local=False, device_id="d1")
+
+    class Fake:
+        def verify(self, token):
+            return dev if token == "dtok" else None
+
+    a = Authenticator(None, Fake())
+    assert a.identify("dtok") == dev
+    assert a.identify("") is None and a.identify("abc") is None
