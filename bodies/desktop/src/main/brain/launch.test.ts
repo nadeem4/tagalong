@@ -1,7 +1,6 @@
 /** Tests for launchBrain: when it spawns `uv run brain`, what it passes, and that it never stops it. */
 import type { SpawnOptions } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { mkdtempSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
