@@ -55,6 +55,8 @@ export const SETTINGS_DEFAULTS = {
   walkthrough: { done: false },
   /** The folders Scout's file tools may touch. None until the person names one. */
   fileFolders: [] as string[],
+  /** Talks to the brain on this PC. A paired remote brain is saved by main only. */
+  brain: { mode: 'local', addrs: [] as string[] },
 } as const;
 
 /** Bounds on the speaking speed. Outside them speech stops sounding like speech. */
@@ -156,6 +158,23 @@ const settingsFields = {
  */
 const bodyIdField = z.string().regex(BODY_ID_PATTERN).optional().catch(undefined);
 
+/**
+ * Which brain this desktop talks to. Like `bodyId`, not in `settingsFields`: only main writes it
+ * (`SettingsStore.setBrain`), so a renderer patch cannot point the desktop at another brain.
+ * `token` is the device token sealed by the OS (base64), never the token itself.
+ */
+const brainField = z
+  .object({
+    mode: z.enum(['local', 'remote']),
+    addrs: z.array(z.string()),
+    lastGood: z.string().optional(),
+    fp: z.string().optional(),
+    token: z.string().optional(),
+  })
+  .prefault({ mode: 'local', addrs: [] })
+  .catch(() => ({ mode: 'local' as const, addrs: [] }));
+export type BrainSettings = z.infer<typeof brainField>;
+
 /** Unknown keys in settings.json are dropped on parse. */
 export const Settings = z.object({
   hotkeys: settingsFields.hotkeys.prefault({ ...SETTINGS_DEFAULTS.hotkeys }),
@@ -168,6 +187,7 @@ export const Settings = z.object({
   listening: settingsFields.listening.prefault({ ...SETTINGS_DEFAULTS.listening }),
   walkthrough: settingsFields.walkthrough.prefault({ ...SETTINGS_DEFAULTS.walkthrough }),
   bodyId: bodyIdField,
+  brain: brainField,
   fileFolders: settingsFields.fileFolders.prefault([]),
 });
 export type Settings = z.infer<typeof Settings>;
