@@ -7,6 +7,7 @@ import type { BrainLink } from '@tagalong/contract';
 import type { SettingsStore } from '../settings-store';
 
 export interface SecretBox {
+  available(): boolean;
   /** Throws when the OS cannot seal secrets. */
   encrypt(text: string): Buffer;
   decrypt(data: Buffer): string;
@@ -27,6 +28,10 @@ export class LinkStore {
     return { addrs, fp, ...(lastGood === undefined ? {} : { lastGood }) };
   }
 
+  canSeal(): boolean {
+    return this.secrets.available();
+  }
+
   saveRemote(link: { addrs: string[]; fp: string }, token: string): void {
     const sealed = this.secrets.encrypt(token).toString('base64');
     this.settings.setBrain({ ...link, token: sealed });
@@ -43,6 +48,11 @@ export class LinkStore {
 
   token(): string | null {
     const { token } = this.settings.get().brain;
-    return token === undefined ? null : this.secrets.decrypt(Buffer.from(token, 'base64'));
+    if (token === undefined) return null;
+    try {
+      return this.secrets.decrypt(Buffer.from(token, 'base64'));
+    } catch {
+      return null;
+    }
   }
 }

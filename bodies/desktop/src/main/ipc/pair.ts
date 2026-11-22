@@ -12,7 +12,7 @@ import type { PinnedSocket } from '../brain/pinned-socket';
 import type { IpcHandle } from './handle';
 
 export interface PairDeps {
-  link: Pick<LinkStore, 'saveRemote' | 'forget'>;
+  link: Pick<LinkStore, 'canSeal' | 'saveRemote' | 'forget'>;
   openSocket: (url: string, fingerprint: string) => PinnedSocket;
   /** Never given the code or the token. */
   log: (line: string) => void;
@@ -26,6 +26,7 @@ export async function pairWithLink(
 ): Promise<PairOutcome> {
   const parsed = parsePairLink(text);
   if (parsed === null) return { ok: false, reason: 'bad_link' };
+  if (!deps.link.canSeal()) return { ok: false, reason: 'cannot_seal' };
   const { addr, fp, code } = parsed;
   const socket = deps.openSocket(`wss://${addr}`, fp);
   const reply = await pairOverSocket(

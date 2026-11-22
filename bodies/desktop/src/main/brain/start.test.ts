@@ -261,10 +261,17 @@ describe('startBrain with a paired remote brain', () => {
 
   it('starts over from the first address when the link is replaced', async () => {
     const { brain, sockets, fail, pair } = remote();
-    await fail();
     pair({ addrs: ['10.9.9.9:47323'], lastGood: '10.9.9.9:47323', fp });
     await fail();
     expect(sockets.at(-1)!.url).toBe('wss://10.9.9.9:47323');
+    brain.stop();
+  });
+
+  it('does not count a stop as a failed dial, so the last good address is still first', () => {
+    const { brain, sockets } = remote();
+    brain.stop();
+    brain.start();
+    expect(sockets.at(-1)!.url).toBe('wss://100.64.0.2:47323');
     brain.stop();
   });
 });

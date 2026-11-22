@@ -9,10 +9,12 @@ import { LinkStore } from './link-store';
 import type { SecretBox } from './link-store';
 
 const reversed: SecretBox = {
+  available: () => true,
   encrypt: (text) => Buffer.from([...text].reverse().join('')),
   decrypt: (data) => [...data.toString()].reverse().join(''),
 };
 const unavailable: SecretBox = {
+  available: () => false,
   encrypt: () => {
     throw new Error('encryption is not available');
   },
@@ -35,6 +37,15 @@ describe('LinkStore', () => {
     expect(again.paired()).toMatchObject({ addrs: ['10.0.0.5:47323'], fp });
     expect(again.token()).toBe('secret-device-token');
     expect(readFileSync(join(dir, SETTINGS_FILENAME), 'utf8')).not.toContain('secret-device-token');
+
+    again.forget();
+    expect(again.paired()).toBeNull();
+  });
+
+  it('has no token to send when the saved one cannot be decrypted', () => {
+    const store = new LinkStore(new SettingsStore(dir), reversed);
+    store.saveRemote({ addrs: ['a:1'], fp }, 'tok');
+    expect(new LinkStore(new SettingsStore(dir), unavailable).token()).toBeNull();
   });
 
   it('refuses to save when the OS cannot seal the token', () => {

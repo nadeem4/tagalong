@@ -283,6 +283,7 @@ async function start(): Promise<void> {
   const settingsStore = new SettingsStore(dataDir);
   const settings = settingsStore.get();
   const link = new LinkStore(settingsStore, {
+    available: () => safeStorage.isEncryptionAvailable(),
     encrypt: (text) => {
       if (!safeStorage.isEncryptionAvailable())
         throw new Error('this PC cannot keep a secret safely');

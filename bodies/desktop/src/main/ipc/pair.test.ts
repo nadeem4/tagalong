@@ -37,13 +37,14 @@ class Fake implements PinnedSocket {
   }
 }
 
-function setup(script: Script) {
+function setup(script: Script, canSeal = true) {
   const saved: { link: unknown; token: string }[] = [];
   const logs: string[] = [];
   const urls: string[] = [];
   let sock: Fake | undefined;
   const deps: PairDeps = {
     link: {
+      canSeal: () => canSeal,
       saveRemote: (l, token) => void saved.push({ link: l, token }),
       forget: () => undefined,
     },
@@ -101,6 +102,13 @@ describe('pairWithLink', () => {
   it('says unreachable when nothing answers', async () => {
     const { deps, saved } = setup(() => undefined);
     expect(await pairWithLink(deps, link, 'My PC')).toEqual({ ok: false, reason: 'unreachable' });
+    expect(saved).toEqual([]);
+  });
+
+  it('says cannot_seal before opening a socket when the OS cannot keep the token', async () => {
+    const { deps, urls, saved } = setup(() => undefined, false);
+    expect(await pairWithLink(deps, link, 'My PC')).toEqual({ ok: false, reason: 'cannot_seal' });
+    expect(urls).toEqual([]);
     expect(saved).toEqual([]);
   });
 

@@ -316,7 +316,8 @@ export interface FoundBrain {
 }
 
 export type PairOutcome =
-  { ok: true } | { ok: false; reason: 'bad_link' | 'wrong_brain' | 'refused' | 'unreachable' };
+  | { ok: true }
+  | { ok: false; reason: 'bad_link' | 'cannot_seal' | 'wrong_brain' | 'refused' | 'unreachable' };
 
 export interface TagalongHostApi {
   /** Brains on the home network, by name and address. */

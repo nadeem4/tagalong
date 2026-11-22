@@ -109,6 +109,7 @@ export function startBrain(options: StartBrainOptions): BrainClient {
     return { scheme: 'wss', addr: cursor.order[cursor.tried] ?? '', fp: paired.fp };
   };
   let reached = false;
+  let stopping = false;
   const { tools, run } = bodyTools(platform, exclusions, onCapture, openExternal, files, reading);
   const brain = new BrainClient({
     ...handlers,
@@ -120,7 +121,7 @@ export function startBrain(options: StartBrainOptions): BrainClient {
         restart();
         cursor.found = [];
       } else if (paired !== null && status === 'offline') {
-        if (reached) reached = false;
+        if (reached || stopping) reached = false;
         else failed(paired);
       }
       handlers.onStatus(status);
@@ -140,6 +141,13 @@ export function startBrain(options: StartBrainOptions): BrainClient {
       }),
     onUse: (tool, input) => run(tool, input),
   });
+  const stop = brain.stop.bind(brain);
+  brain.stop = () => {
+    stopping = true;
+    stop();
+    stopping = false;
+    restart();
+  };
   brain.start();
   return brain;
 }
