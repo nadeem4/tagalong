@@ -49,11 +49,11 @@ export function createBrainSetup(
 
 export function registerBrainLinkIpc(
   handle: IpcHandle,
-  deps: { brain: { addr: string; link: BrainStatus }; setup: BrainSetup },
+  deps: { brain: { url: string; link: BrainStatus }; setup: BrainSetup },
 ): void {
   const { brain, setup } = deps;
   handle(IPC.brainLink, () => ({
-    addr: `ws://${brain.addr}`,
+    addr: brain.url,
     status: brain.link,
     setup: setup.state,
   }));

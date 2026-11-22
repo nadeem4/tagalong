@@ -248,6 +248,9 @@ export interface BrainCard {
   logPath: string;
   places: { id: string; kind: string; name: string }[];
   workRunning: boolean;
+  /** The machine the brain runs on, and whether this body is on it; absent from an older brain. */
+  host?: string;
+  local?: boolean;
 }
 
 export interface AskInput {

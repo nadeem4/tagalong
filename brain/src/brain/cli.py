@@ -28,7 +28,7 @@ from brain.identity import load_or_create_identity
 from brain.lifecycle import pid_path, stop_real_brain
 from brain.memory import Memory
 from brain.open_items import OpenItems
-from brain.pairing import NETWORK_KINDS, build_pairing, render_qr
+from brain.pairing import PAIR_KINDS, build_pairing, render_qr
 from brain.setup.apps import add_registry_app, app_card
 from brain.setup.facts import Machine, RunCmd, inspect, real_run_cmd
 from brain.setup.install import (
@@ -84,7 +84,7 @@ def _parser() -> argparse.ArgumentParser:
     add.add_argument("app_id")
     add.add_argument("--yes", action="store_true", help="skip the question")
     pair = sub.add_parser("pair", help="make a one-time code to pair another machine")
-    pair.add_argument("--kind", choices=sorted(NETWORK_KINDS), default="desktop")
+    pair.add_argument("--kind", choices=sorted(PAIR_KINDS), default="desktop")
     login = sub.add_parser("login", help="log an installed expert in")
     login.add_argument("expert_id")
     return p
@@ -190,7 +190,7 @@ def _perf(home: Path, since: str, now: float, out) -> None:
 
 
 def _pair(config, kind: str, host_addr: Callable[[], str], out) -> None:
-    if not config.network:
+    if kind != "browser" and not config.network:
         raise _Fail(
             "Network access is off, so no other machine can reach this brain. Set "
             f"TAGALONG_NETWORK=1 (in {config.data_dir / '.env'} or the environment), start the "
@@ -202,6 +202,10 @@ def _pair(config, kind: str, host_addr: Callable[[], str], out) -> None:
         db, load_or_create_identity(config.data_dir), config.network_port, host_addr
     )
     offer = pairing.make_code(kind)
+    if kind == "browser":  # redeemed on this machine only, so a code and no address
+        out(f"Browser code: {offer.secret}")
+        out("Valid for 10 minutes, one use. Type it into the add-on's popup.")
+        return
     if out is print:  # the QR is block characters that a Windows code page cannot print
         sys.stdout.reconfigure(encoding="utf-8")
     out(render_qr(offer.link))

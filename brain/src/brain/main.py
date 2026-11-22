@@ -21,7 +21,7 @@ from zeroconf.asyncio import AsyncZeroconf
 
 from brain.apps import Apps, TokenFile
 from brain.auth import listener_auth
-from brain.bodies import Bodies
+from brain.bodies import CALLER, Bodies
 from brain.bodies_tools import bodies_tools
 from brain.bridges import ENTRY, WHATSAPP_SECRETS, BridgeSupervisor, private_node, real_spawn
 from brain.build_info import app_version, build_id
@@ -315,7 +315,7 @@ async def _run() -> None:
         + events_tools(memory.db, lambda: datetime.now(UTC))
         + chat_tools(memory.db)
         + loop_tools(loops)
-        + brain_status_tools(brain_status)
+        + brain_status_tools(brain_status, lambda: bodies.is_local(CALLER.get()))
         + home_update_tools(updates)
         + device_tools(devices, pairing, config.network)
         + bodies_tools(

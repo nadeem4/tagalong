@@ -24,7 +24,7 @@ from websockets.asyncio.server import Server, ServerConnection, serve
 from websockets.exceptions import ConnectionClosed
 
 from brain.auth import Authenticator
-from brain.bodies import Bodies, WriteQueue
+from brain.bodies import CALLER, Bodies, WriteQueue
 from brain.protocol import (
     LIMITS,
     PROTOCOL,
@@ -161,7 +161,7 @@ async def _handler(
                 continue
             if method == "call":
                 if "id" in message:  # a notification has nowhere to reply
-                    task = asyncio.create_task(_call(message, req_id, peer, session))
+                    task = asyncio.create_task(_call(message, req_id, body_id, peer, session))
                     calls.add(task)
                     task.add_done_callback(calls.discard)
                 continue
@@ -293,7 +293,7 @@ def _hello(
     return params.body.id
 
 
-async def _call(message: dict, req_id: Any, peer: _Peer, session: Session) -> None:
+async def _call(message: dict, req_id: Any, body_id: str, peer: _Peer, session: Session) -> None:
     """Run a Home tool in its own task so a slow one never blocks the read loop, which must
     keep delivering `use` responses and answers."""
     try:
@@ -304,6 +304,7 @@ async def _call(message: dict, req_id: Any, peer: _Peer, session: Session) -> No
             raise RpcError(
                 ErrorCode.invalid_params, "call needs a tool and an input object."
             ) from None
+        CALLER.set(body_id)
         text = await session.call_home(params.tool, params.input)
         reply = _result(req_id, CallResult(output=[{"type": "text", "text": text}]))
     except ValidationError as exc:

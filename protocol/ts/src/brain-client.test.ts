@@ -67,7 +67,7 @@ function setup(retryMs?: number, extra: Partial<BrainClientOptions> = {}) {
   const resyncs: number[] = [];
   const onUse = vi.fn(async () => [{ type: 'text' as const, text: 'ok' }]);
   const client = new BrainClient({
-    addr: '127.0.0.1:47321',
+    target: () => ({ scheme: 'ws', addr: '127.0.0.1:47321' }),
     body: desktop,
     token: () => 't0k',
     tools: () => tools,
@@ -174,6 +174,18 @@ describe('BrainClient', () => {
     expect(client.link).toBe('online');
     s.drop();
     expect(client.link).toBe('offline');
+  });
+
+  it('asks where to dial again on every dial', async () => {
+    const addrs = ['a:1', 'b:2'];
+    let n = 0;
+    const { client, sockets, urls } = setup(10, {
+      target: () => ({ scheme: 'wss', addr: addrs[n++ % 2]! }),
+    });
+    client.start();
+    sockets[0]!.drop();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(urls).toEqual(['wss://a:1', 'wss://b:2']);
   });
 
   it('say resolves with the SayResult for its id', async () => {
@@ -564,7 +576,7 @@ describe('BrainClient', () => {
     const sockets: FakeSocket[] = [];
     const order: string[] = [];
     const c = new BrainClient({
-      addr: 'x:1',
+      target: () => ({ scheme: 'ws', addr: 'x:1' }),
       body: desktop,
       token: () => 't0k',
       tools: () => tools,

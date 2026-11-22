@@ -252,3 +252,30 @@ describe('registerBrainStatusIpc', () => {
     expect(await ipc.invoke(IPC.brainStatus)).toMatchObject({ status: 'running' });
   });
 });
+
+describe('a brain on another machine', () => {
+  const REMOTE = { ...WIRE, host: 'HOME-PC', local: false };
+
+  it('names its host on the card', async () => {
+    const { status } = setup({ wire: REMOTE });
+    expect(await status.card()).toMatchObject({ host: 'HOME-PC', local: false });
+  });
+
+  it('is not restarted, not even by an older build', async () => {
+    const { status, stops, relaunches } = setup({ wire: { ...REMOTE, version: '0.1.0' } });
+    await status.restart();
+    await status.check({ version: '0.1.0', build: 'old' });
+    expect(stops).toEqual([]);
+    expect(relaunches).toEqual([]);
+    expect((await status.card()).update).toBe('none');
+  });
+
+  it('opens no data folder, while a local brain still opens it', async () => {
+    const remote = setup({ wire: REMOTE });
+    await remote.status.openFolder();
+    expect(remote.opened).toEqual([]);
+    const local = setup({ wire: { ...WIRE, host: 'HOME-PC', local: true } });
+    await local.status.openFolder();
+    expect(local.opened).toEqual(['C:/Users/me/.tagalong']);
+  });
+});
