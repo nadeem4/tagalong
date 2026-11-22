@@ -5,7 +5,7 @@ anything else.
 """
 
 import hmac
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Protocol
 
 
@@ -26,18 +26,25 @@ LOCAL = Principal(key="local", name="this computer", kind="local", local=True)
 
 
 class Authenticator:
-    def __init__(self, local_token: str | None, devices: DeviceCheck | None = None) -> None:
+    def __init__(
+        self,
+        local_token: str | None,
+        devices: DeviceCheck | None = None,
+        loopback: bool = False,
+    ) -> None:
         self._local = local_token.encode() if local_token else None
         self._devices = devices
+        self._loopback = loopback  # a device on the loopback listener is on this machine
 
     def identify(self, token: str) -> Principal | None:
         if not token:
             return None
         if self._local and hmac.compare_digest(token.encode(), self._local):
             return LOCAL
-        return self._devices.verify(token) if self._devices else None
+        principal = self._devices.verify(token) if self._devices else None
+        return replace(principal, local=True) if principal and self._loopback else principal
 
 
 def listener_auth(local_token: str, devices: DeviceCheck) -> tuple[Authenticator, Authenticator]:
     """(loopback, network): the local token opens only the loopback listener."""
-    return Authenticator(local_token, devices), Authenticator(None, devices)
+    return Authenticator(local_token, devices, loopback=True), Authenticator(None, devices)

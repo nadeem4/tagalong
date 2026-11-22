@@ -26,6 +26,9 @@ const Wire = z.object({
   work_running: z.boolean(),
   // Optional: an older brain does not send it and must still give the card (and the restart check).
   model: z.string().optional(),
+  // Optional for the same reason: the machine the brain runs on, and whether this body is on it.
+  host: z.string().optional(),
+  local: z.boolean().optional(),
 });
 type Facts = z.infer<typeof Wire>;
 
@@ -100,7 +103,14 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
       logPath: f?.log_path ?? fallback.logPath,
       places: f?.places ?? [],
       workRunning: f?.work_running ?? false,
+      ...(f?.host !== undefined && { host: f.host }),
+      ...(f?.local !== undefined && { local: f.local }),
     };
+  }
+
+  /** A brain on another machine is neither restarted nor opened from here. */
+  async function elsewhere(): Promise<boolean> {
+    return (await facts())?.local === false;
   }
 
   async function stopAndStart(): Promise<boolean> {
@@ -110,7 +120,9 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
   }
 
   async function restart(): Promise<void> {
-    if ((await facts())?.started_by === 'person') {
+    const f = await facts();
+    if (f?.local === false) return;
+    if (f?.started_by === 'person') {
       throw new Error('You started the brain yourself, so restart it in your terminal.');
     }
     if (!(await stopAndStart())) throw new Error('Scout could not restart the brain.');
@@ -134,6 +146,11 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
   async function check(theirs: HelloBuild): Promise<void> {
     lastHello = theirs;
     const f = await facts();
+    if (f?.local === false) {
+      update = 'none';
+      deps.onChange();
+      return;
+    }
     const action = decideUpdate(ours, theirs, {
       startedBy: f?.started_by ?? null,
       workRunning: f?.work_running ?? false,
@@ -173,7 +190,9 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
     restartAfterWork,
     check,
     jobsChanged,
-    openFolder: async () => deps.openPath((await card()).dataDir),
+    openFolder: async () => {
+      if (!(await elsewhere())) await deps.openPath((await card()).dataDir);
+    },
     openLog: async () => deps.openPath((await card()).logPath),
     copyDetails,
   };

@@ -47,6 +47,7 @@ def test_the_network_listener_takes_device_tokens_and_not_the_local_token():
             return dev if token == "dtok" else None
 
     loopback, network = listener_auth("abc", Fake())
-    assert loopback.identify("abc").local and loopback.identify("dtok") == dev
+    assert loopback.identify("abc").local
+    assert loopback.identify("dtok").device_id == "d1" and loopback.identify("dtok").local
     assert network.identify("abc") is None
     assert network.identify("dtok") == dev
