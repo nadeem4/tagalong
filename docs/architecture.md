@@ -86,7 +86,7 @@ flowchart LR
 
 The local token is `<TAGALONG_HOME>/local-token`, made by the brain at start and readable only by you. Every `hello` carries a token and the brain refuses an unknown one with `unauthorized` (-32009) and closes the link. The second listener is off unless `TAGALONG_NETWORK=1`; it speaks TLS with a self-signed certificate (`identity/cert.pem` in the data folder) that a body pins by its SHA-256 fingerprint instead of trusting a certificate authority. That listener never honours the local token: another machine gets in only with a device token, which it earns by redeeming a one-time pairing code (`tagalong pair`, or Home's `pair_make`) and which Home can revoke at once. The brain also announces itself on the home network (mDNS `_tagalong._tcp`, version and name only) so a device can find it; see [safety.md](brain/safety.md#pairing-a-device).
 
-A desktop paired to a remote brain dials its addresses in order: the last one that worked, the saved ones, brains found by mDNS, then the tailnet (none yet). Each dial is `wss` through a pinned socket that trusts only the certificate in the pairing link, so a different certificate is refused and never retried as plain `ws`. A desktop with a saved remote link does not start a local brain.
+A desktop paired to a remote brain dials its addresses in order: the last one that worked, the saved ones, then brains found by mDNS (looked for only after every saved address failed, at most every 30 seconds). Each dial is `wss` through a pinned socket that trusts only the certificate in the pairing link, so a different certificate is refused and never retried as plain `ws`. A desktop with a saved remote link does not start a local brain.
 
 ## Processes and how they start
 

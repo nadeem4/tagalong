@@ -540,7 +540,7 @@ By hand:
 
 ## A desktop on a remote brain (BA3)
 
-Automated: `protocol/ts/src/pair-link.test.ts`; the desktop's `src/main/brain/` (`pinned-socket`, `link-store`, `discover`, `launch`, `start` tests), `src/main/ipc/pair.test.ts` and `brain-status.test.ts`; `brain/tests/test_brain_status_host.py`, `test_pair_cli.py`; the browser's `src/pair.test.ts`.
+Automated: `protocol/ts/src/pair-link.test.ts`; `protocol/ts/src/brain-client.test.ts`; the desktop's `src/main/brain/` (`pinned-socket`, `link-store`, `discover`, `launch`, `start` tests), `src/main/ipc/pair.test.ts` and `brain-status.test.ts`; `brain/tests/test_brain_status_host.py`, `test_pair_cli.py`; the browser's `src/pair.test.ts`.
 
 By hand (two machines, or one machine and a second user's desktop):
 
