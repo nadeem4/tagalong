@@ -104,7 +104,7 @@ AI_TOOLS = {
     "codex": f"run `codex mcp add tagalong -- {_BRIDGE} codex`",
     "cursor": (
         'add `"tagalong": {"command": "cmd", "args": ["/c", "tagalong", "memory-mcp", '
-        '"--client", "cursor"]}` under "mcpServers" in %USERPROFILE%\.cursor\mcp.json'
+        '"--client", "cursor"]}` under "mcpServers" in %USERPROFILE%\\.cursor\\mcp.json'
     ),
 }
 _TOOL_SCHEMA = {"type": "string", "enum": list(AI_TOOLS)}
