@@ -667,6 +667,15 @@ def test_home_tools_are_home_audience_contract_records():
 
 
 class _AppsStub:
+    def resolve(self, app_id):
+        return "brain"
+
+    async def ensure_at(self, app_id, where):
+        pass
+
+    def unavailable_line(self, app_id):
+        return None
+
     def __init__(self, state="connected"):
         self.state = state
 

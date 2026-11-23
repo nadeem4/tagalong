@@ -41,8 +41,12 @@ from brain.app_oauth import (
     OAuthError,
     make_provider,
 )
+from brain.pipes import mcp_streams
+from brain.placements import Choose, Placements, Unavailable, resolve_placement
+from brain.protocol import PipeSpec, RpcError
 
 if TYPE_CHECKING:
+    from brain.bodies import Bodies
     from brain.memory import Memory
 
 log = logging.getLogger("brain")
@@ -271,6 +275,7 @@ class _Slot:
     open_url: OpenUrl | None = None  # set only while a sign-in the user asked for is running
     signed_out: bool = False  # the server refused our sign-in mid-session
     settled: asyncio.Event = field(default_factory=asyncio.Event)  # first connect try is over
+    location: str = "brain"  # where its session runs: the brain or a node's body id
 
 
 def _root(exc: BaseException) -> BaseException:
@@ -318,7 +323,11 @@ class Apps:
         tokens: TokenFile | None = None,
         data_dir: Path | str | None = None,
         signin_timeout: float = 300,
+        placements: Placements | None = None,
+        bodies: "Bodies | None" = None,
     ) -> None:
+        self._placements = placements
+        self._bodies = bodies  # the nodes an app may be placed on
         self._memory = memory
         self._notify = notify
         self._env = env
@@ -328,6 +337,7 @@ class Apps:
         self._ping_interval = ping_interval  # how often an idle connection is checked alive
         self._tokens = tokens
         self._slots: dict[str, _Slot] = {}
+        self._background: set[asyncio.Task] = set()
 
     async def start(self) -> None:
         """Begin connecting every enabled app in the background and return at once."""
@@ -349,6 +359,69 @@ class Apps:
             pass
         return AppStatus(slot.state, slot.error)
 
+    def resolve(self, app_id: str) -> str:
+        """Where the app runs now; raises Choose when the person is to say, Unavailable when its
+        only place is a node that is not connected."""
+        slot = self._slots.get(app_id)
+        if slot is None or self._placements is None or self._bodies is None:
+            return "brain"
+        return resolve_placement(
+            self._placements.get("app", app_id),
+            self._bodies.is_online,
+            self._brain_can_run(slot.row),
+        )
+
+    def body_name(self, body_id: str) -> str:
+        return self._bodies.name(body_id) if self._bodies else body_id
+
+    def gone_line(self, app_name: str, body_id: str) -> str:
+        return f"{app_name} runs on {self.body_name(body_id)}, which is not connected right now."
+
+    def unavailable_line(self, app_id: str) -> str | None:
+        """The plain line for an app whose node is not connected; None for any other state."""
+        slot = self._slots.get(app_id)
+        if slot is None or slot.location == "brain" or slot.state == "connected":
+            return None
+        return slot.error or None
+
+    def _brain_can_run(self, row: AppRow) -> bool:
+        return row.transport == "http" or shutil.which(row.config["command"]) is not None
+
+    async def ensure_at(self, app_id: str, where: str) -> None:
+        """Move the app's session to `where` when it runs elsewhere, and wait for it to settle."""
+        slot = self._slots.get(app_id)
+        if slot is None or (slot.location == where and slot.state == "connected"):
+            return
+        await self._relaunch(app_id, where=where)
+        await self.wait_settled(app_id, self._connect_timeout + 5)
+
+    def body_changed(self, body_id: str) -> None:
+        """A node came or went: apps placed on it run again where they can now."""
+        for app_id, slot in list(self._slots.items()):
+            placed = self._placements.get("app", app_id) if self._placements else None
+            if (
+                placed is not None
+                and placed.body_id == body_id
+                and self._is_misplaced(app_id, slot)
+            ):
+                task = asyncio.get_running_loop().create_task(self._relaunch_quietly(app_id))
+                self._background.add(task)
+                task.add_done_callback(self._background.discard)
+
+    def _is_misplaced(self, app_id: str, slot: _Slot) -> bool:
+        try:
+            return slot.location != self.resolve(app_id) or slot.state == "error"
+        except Choose:
+            return False
+        except Unavailable:
+            return slot.state != "error"
+
+    async def _relaunch_quietly(self, app_id: str) -> None:
+        try:
+            await self._relaunch(app_id)
+        except AppError:
+            pass
+
     async def sign_in(self, app_id: str, open_url: OpenUrl) -> None:
         """Start a browser sign-in in the background; the outcome shows as the app's state."""
         row = next((r for r in self._memory.list_apps() if r.id == app_id), None)
@@ -360,7 +433,9 @@ class Apps:
             raise AppError("Sign-in is not set up in this brain.")
         await self._relaunch(app_id, open_url)
 
-    async def _relaunch(self, app_id: str, open_url: OpenUrl | None = None) -> None:
+    async def _relaunch(
+        self, app_id: str, open_url: OpenUrl | None = None, where: str | None = None
+    ) -> None:
         row = next((r for r in self._memory.list_apps() if r.id == app_id), None)
         old = self._slots.get(app_id)
         if row is None:
@@ -371,14 +446,20 @@ class Apps:
         if old is None:
             if open_url:
                 self._forget_oauth(app_id)
-            self._launch(row, open_url)
+            self._launch(row, open_url, where)
             return
         async with old.lock:  # shared by every slot of this app, so re-read the current one
             current = self._slots[app_id]
+            if (
+                where is not None
+                and current.location == where
+                and current.state in ("connecting", "connected")
+            ):
+                return  # a call before this one already moved it
             await self._stop(current)
             if open_url:  # a fresh sign-in starts clean: the old client id has the old port
                 self._forget_oauth(app_id)
-            self._launch(row, open_url)
+            self._launch(row, open_url, where)
 
     def secret_values(self) -> list[str]:
         """Every stored app secret, for masking; url_query params also count one by one."""
@@ -471,7 +552,9 @@ class Apps:
         slot.wake.set()
         return AppError(message)
 
-    def _launch(self, row: AppRow, open_url: OpenUrl | None = None) -> None:
+    def _launch(
+        self, row: AppRow, open_url: OpenUrl | None = None, where: str | None = None
+    ) -> None:
         old = self._slots.get(row.id)
         slot = _Slot(
             row,
@@ -483,8 +566,21 @@ class Apps:
         if not row.enabled:
             slot.settled.set()
             return
+        try:
+            slot.location = where or self._place(row)
+        except Unavailable as gone:
+            slot.location = gone.body_id
+            self._set(slot, "error", self.gone_line(row.name, gone.body_id))
+            return
         self._set(slot, "connecting")
         slot.task = asyncio.create_task(self._run(slot))
+
+    def _place(self, row: AppRow) -> str:
+        """Where a launch connects. An ask-me app starts on the brain; a call asks the person."""
+        try:
+            return self.resolve(row.id)
+        except Choose:
+            return "brain"
 
     def _set(self, slot: _Slot, state: str, error: str = "") -> None:
         if (slot.state, slot.error) != (state, error):
@@ -554,7 +650,9 @@ class Apps:
 
     async def _connect(self, stack: AsyncExitStack, slot: _Slot) -> ClientSession:
         row = slot.row
-        if row.transport == "stdio":
+        if slot.location != "brain":
+            read, write = await stack.enter_async_context(await self._node_streams(slot))
+        elif row.transport == "stdio":
             command = row.config["command"]
             exe = shutil.which(command)
             if exe is None:
@@ -592,6 +690,19 @@ class Apps:
         return await stack.enter_async_context(
             ClientSession(read, write, message_handler=on_message)
         )
+
+    async def _node_streams(self, slot: _Slot):
+        row = slot.row
+        if self._bodies is None or row.transport != "stdio":
+            raise AppError(f"{row.name} cannot run on another machine yet.")
+        spec = PipeSpec(command=row.config["command"], args=row.config.get("args", []))
+        try:
+            pipe = await self._bodies.open_pipe(slot.location, spec)
+        except RpcError as err:
+            raise AppError(
+                f"{row.name} could not start on {self._bodies.name(slot.location)}: {err.message}"
+            ) from None
+        return mcp_streams(pipe)
 
     def _secret(self, row: AppRow, key: str) -> str:
         value = self._tokens.get(key) if self._tokens else None

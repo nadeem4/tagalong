@@ -25,7 +25,7 @@ flowchart LR
 
 ## The allow-list
 
-The allow-list is the security boundary. It lives in `<TAGALONG_HOME>/node/allowlist.json` on the node's machine and holds entries of `command`, `args`, the resolved file `path` and the file's `sha256`. A `pipe_open` runs only when an entry matches the spec exactly (same command, same args in the same order), the command resolves to the same file, and that file still hashes to the recorded value. Anything else gets `denied` and nothing starts, even from a genuine brain with a valid token. A file that was updated or swapped no longer matches until the person approves it again. A damaged list file permits nothing.
+The allow-list is the security boundary. It lives in `<TAGALONG_HOME>/node/allowlist.json` on the node's machine and holds entries of `command`, `args`, the resolved file `path` and the file's `sha256`. A `pipe_open` runs only when an entry matches the spec exactly (same command, same args in the same order), the command resolves to the same file, and that file still hashes to the recorded value. Anything else gets `denied` and nothing starts, even from a genuine brain with a valid token. A file that was updated or swapped no longer matches until the person approves it again. A damaged list file permits nothing. The node starts the command as found on the path, not the file a link points to, so a venv's `python` link still finds its venv; the hash is checked on the target.
 
 Only the person on the node's machine adds an entry: `tagalong node allow <command> [-- args...]` there records the current hash. The brain has no message that adds or changes an entry. The list is per machine and not synced.
 
@@ -44,7 +44,7 @@ A hash covers the file the command resolves to, not what that file goes on to lo
 
 ## Not supported yet
 
-- A spec that is an HTTP MCP URL, and the browser add-on's loopback proxy: BA7 and BA10.
-- The brain-side pipe client (a `Pipe` the toolbox and expert host open over a node): the toolbox in BA7, the expert host in BA8.
+- A spec that is an HTTP MCP URL (an app with an http transport cannot be placed on a node yet), and the browser add-on's loopback proxy: BA10.
+- The expert host's use of the pipe client: BA8. The toolbox's use (an app's stdio MCP server over a node) is in place; see [Where an app runs](../bodies/connected-apps.md#where-an-app-runs).
 
 The node reuses the desktop's device token under body id `node-xxxxxx`, so it cannot be revoked apart from the desktop and its device kind is `desktop`.

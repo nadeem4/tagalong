@@ -38,6 +38,15 @@ def tool(name, read_only=None):
 
 
 class FakeApps:
+    def resolve(self, app_id):
+        return "brain"
+
+    async def ensure_at(self, app_id, where):
+        pass
+
+    def unavailable_line(self, app_id):
+        return None
+
     def __init__(self):
         self._tools = {
             "lin": [tool("list_issues", read_only=True), tool("create_issue")],

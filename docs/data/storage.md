@@ -854,6 +854,21 @@ gone.
 
 ## Apps
 
+### placements
+
+Where an app or expert runs (migration 0042). Code reaches it through `placements.py` `Placements`, which uses `store/placements.py` for the SQL.
+
+| Column        | Type | Meaning                                                     |
+| ------------- | ---- | ----------------------------------------------------------- |
+| `target_kind` | TEXT | `expert` or `app` (CHECK); with `target_id` the primary key |
+| `target_id`   | TEXT | The app or expert id                                        |
+| `mode`        | TEXT | `brain`, `body` or `both` (CHECK)                           |
+| `body_id`     | TEXT | The node's body id; null for `brain`                        |
+| `prefer`      | TEXT | `body`, `brain` or `ask` for `both`; null otherwise         |
+
+- Written by: Home's `placement_set` (`placement_tools.py`). Read by: `Apps` (at launch and per call).
+- Retention: until it is set again. No row means `brain`.
+
 ### apps
 
 Connected apps (MCP servers).

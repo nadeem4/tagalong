@@ -180,6 +180,9 @@ async def _handler(
                 if bodies.is_current(body_id, peer):
                     _speech_state(message, body_id, session)
                 continue
+            if method in ("pipe_data", "pipe_close"):  # a node's bytes; a notification
+                bodies.pipe_event(body_id, peer, method, message.get("params"))
+                continue
             try:
                 if method in VOICE_METHODS:
                     if not bodies.is_current(body_id, peer):

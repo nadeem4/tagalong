@@ -48,9 +48,10 @@ class Allowlist:
 
     def permits(self, spec: PipeSpec) -> str | None:
         """The file to run when an entry matches the spec and the file is unchanged."""
-        exe = _resolve(spec.command)
-        if exe is None:
+        found = shutil.which(spec.command)
+        if found is None:
             return None
+        exe = Path(found).resolve()
         digest = _sha256(exe)
         for entry in self._entries():
             if (
@@ -59,7 +60,9 @@ class Allowlist:
                 and digest is not None
                 and entry.get("sha256") == digest
             ):
-                return str(exe)
+                # The link, not its target: a venv's python is a link and only finds the venv
+                # when started through it. The target's hash is what was approved.
+                return found
         return None
 
     def _entries(self) -> list[dict]:

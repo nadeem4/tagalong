@@ -10,18 +10,31 @@ voice status frames are never dropped.
 """
 
 import asyncio
+import base64
 import contextlib
 import json
 import logging
 import time
+import uuid
 from collections import deque
 from collections.abc import Callable
 from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 from brain.auth import Principal
-from brain.protocol import BODY_WHATSAPP, LIMITS, Body, ErrorCode, RpcError, Tool
+from brain.pipes import Pipe
+from brain.protocol import (
+    BODY_WHATSAPP,
+    LIMITS,
+    Body,
+    ErrorCode,
+    PipeCloseParams,
+    PipeDataParams,
+    PipeSpec,
+    RpcError,
+    Tool,
+)
 
 log = logging.getLogger("brain")
 
@@ -147,7 +160,8 @@ class Bodies:
         self._known: dict[str, list[Tool]] = {}  # last declared tools, kept after disconnect
         self._names: dict[str, str] = {}  # each body's declared name, kept after disconnect
         self._owners: dict[str, str] = {}
-        self._pending: dict[str, tuple[Peer, asyncio.Future[list[dict]]]] = {}
+        self._pending: dict[str, tuple[Peer, asyncio.Future[dict]]] = {}
+        self._pipes: dict[str, tuple[str, Pipe]] = {}  # pipe id -> (body id, pipe)
         self._next_id = 0
         # Session sets this: (body id, seconds it was away, None if unknown) so a wake that
         # waited for a body can start and a long absence can be noticed.
@@ -209,6 +223,7 @@ class Bodies:
         if was_current:
             del self._online[body_id]
             self._offline_at[body_id] = self._clock()
+            self._end_pipes(body_id)
         self._fail_pending(peer)
         return was_current
 
@@ -280,36 +295,107 @@ class Bodies:
     async def use(
         self, body_id: str, call_id: str, tool: str, tool_input: dict, timeout: float = 30.0
     ) -> list[dict]:
+        result = await self._request(
+            body_id,
+            "use",
+            {"call": call_id, "tool": tool, "input": tool_input},
+            timeout,
+            cancel_call=call_id,
+            what=tool,
+        )
+        try:
+            return result["output"]
+        except (KeyError, TypeError):
+            raise RpcError(ErrorCode.tool_failed, "malformed response from body") from None
+
+    async def _request(
+        self,
+        body_id: str,
+        method: str,
+        params: dict,
+        timeout: float,
+        *,
+        cancel_call: str | None = None,
+        what: str = "",
+    ) -> dict:
         current = self._online.get(body_id)
         if current is None:
             raise RpcError(ErrorCode.body_offline, f"{body_id} is offline")
         peer = current.peer
         self._next_id += 1
         request_id = f"u{self._next_id}"
-        future: asyncio.Future[list[dict]] = asyncio.get_running_loop().create_future()
+        future: asyncio.Future[dict] = asyncio.get_running_loop().create_future()
         self._pending[request_id] = (peer, future)
         try:
             peer.send(
-                json.dumps(
-                    {
-                        "jsonrpc": "2.0",
-                        "id": request_id,
-                        "method": "use",
-                        "params": {"call": call_id, "tool": tool, "input": tool_input},
-                    }
-                )
+                json.dumps({"jsonrpc": "2.0", "id": request_id, "method": method, "params": params})
             )
             async with asyncio.timeout(timeout):
                 return await future
         except TimeoutError:
-            self._cancel(peer, call_id)
-            raise RpcError(ErrorCode.timeout, f"{tool} timed out after {timeout:g}s") from None
+            if cancel_call is not None:
+                self._cancel(peer, cancel_call)
+            name = what or method
+            raise RpcError(ErrorCode.timeout, f"{name} timed out after {timeout:g}s") from None
         except asyncio.CancelledError:
-            self._cancel(peer, call_id)
+            if cancel_call is not None:
+                self._cancel(peer, cancel_call)
             raise
         finally:
             # Always drop the entry so a late or duplicate response finds nothing to resolve.
             self._pending.pop(request_id, None)
+
+    async def open_pipe(self, body_id: str, spec: PipeSpec, timeout: float = 10.0) -> Pipe:
+        """Ask a node to start an allowed command; the node's refusal comes back as RpcError."""
+        pipe_id = uuid.uuid4().hex
+
+        def send(data: bytes) -> None:
+            encoded = base64.b64encode(data).decode()
+            self.send_live(body_id, "pipe_data", {"pipe": pipe_id, "data": encoded})
+
+        def close() -> None:
+            self._pipes.pop(pipe_id, None)
+            self.send_live(body_id, "pipe_close", {"pipe": pipe_id})
+
+        pipe = Pipe(send, close)
+        self._pipes[pipe_id] = (body_id, pipe)
+        try:
+            await self._request(
+                body_id, "pipe_open", {"pipe": pipe_id, "spec": spec.model_dump()}, timeout
+            )
+        except BaseException as exc:
+            self._pipes.pop(pipe_id, None)
+            if isinstance(exc, RpcError) and exc.code == ErrorCode.timeout:
+                self.send_live(body_id, "pipe_close", {"pipe": pipe_id})  # it may have started
+            raise
+        return pipe
+
+    def pipe_event(self, body_id: str, peer: Peer, method: str, params: Any) -> None:
+        """A node's pipe_data or pipe_close; only the node that owns the pipe may speak for it."""
+        if not self.is_current(body_id, peer):
+            return
+        try:
+            if method == "pipe_data":
+                data = PipeDataParams.model_validate(params)
+                if (pipe := self._owned_pipe(body_id, data.pipe)) is not None:
+                    pipe.feed(data.data)
+            elif method == "pipe_close":
+                closed = PipeCloseParams.model_validate(params)
+                if (pipe := self._owned_pipe(body_id, closed.pipe)) is not None:
+                    del self._pipes[closed.pipe]
+                    pipe.end()
+        except ValueError:
+            return
+
+    def _owned_pipe(self, body_id: str, pipe_id: str) -> Pipe | None:
+        owned = self._pipes.get(pipe_id)
+        return owned[1] if owned is not None and owned[0] == body_id else None
+
+    def _end_pipes(self, body_id: str) -> None:
+        for pipe_id, (owner, pipe) in list(self._pipes.items()):
+            if owner == body_id:
+                del self._pipes[pipe_id]
+                pipe.end()
 
     def resolve(self, body_id: str, peer: Peer, message: dict) -> None:
         # A body is untrusted input: a bad id is ignored, a bad shape fails only that call.
@@ -323,7 +409,7 @@ class Bodies:
         try:
             error = message.get("error")
             if error is None:
-                future.set_result(message["result"]["output"])
+                future.set_result(message["result"])
                 return
             try:
                 code = ErrorCode(error.get("code"))

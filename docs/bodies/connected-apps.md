@@ -372,6 +372,22 @@ per job part) that lists only those apps' tools. Every call runs through the sam
 capped. The token ends with the job part. Scout names the apps in `hand_off`; the card lists them,
 the person may remove some, and the job gets only the rest. See [the bridge](../brain/experts.md#the-expert-to-apps-bridge).
 
+## Where an app runs
+
+Each app has a placement (`placements.py`, table `placements`; see [storage](../data/storage.md#placements)): `brain` (the default), `body` (one named node) or `both` with a preference (`body`, `brain` or `ask`). `resolve_placement` is pure: it takes the placement, which bodies are online and whether the brain can run the command, and returns where this call runs or says why not.
+
+| Mode               | Node online                          | Node offline       |
+| ------------------ | ------------------------------------ | ------------------ |
+| brain              | brain                                | brain              |
+| body               | the node                             | unavailable        |
+| both, prefer body  | the node                             | brain              |
+| both, prefer brain | brain                                | brain              |
+| both, ask me       | one card per turn: Brain or the node | whichever is ready |
+
+Only a stdio app can run on a node: the brain opens a pipe to the node (`pipes.py`, `Bodies.open_pipe`), the node starts the command only if its own allow-list has it, and the MCP session runs over the pipe. The brain makes and reads every MCP message; the node moves bytes. An app that is unavailable (Body only, node offline) answers with a plain line, "{app} runs on {node}, which is not connected right now." Ask me asks once per turn for an app, not once per call; a call with no turn (an expert's or Home's) has no card to ask on, so it runs on the brain. When a node connects or goes, `Apps.body_changed` relaunches the apps that were placed on it or running there.
+
+A placement is not a permission: a call on a node still goes through the Toolbox gate first, so the rule is keyed by app and tool and is the same wherever the app runs. Home reads and sets placements with `placement_list` and `placement_set`; setting an app's placement restarts it. Scout cannot move an app.
+
 ## On a job's timeline
 
 When Scout calls an app's tool while working for a job (a wake about it, or after it handed work

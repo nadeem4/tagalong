@@ -71,3 +71,15 @@ def test_a_damaged_list_file_permits_nothing(exe, tmp_path):
     path.parent.mkdir()
     path.write_text("not json")
     assert Allowlist(path).permits(spec(exe)) is None
+
+
+def test_a_link_runs_as_the_link_so_a_venv_python_keeps_its_venv(allowlist, exe, tmp_path):
+    link = tmp_path / "python"
+    try:
+        link.symlink_to(exe)
+    except OSError:
+        pytest.skip("this machine cannot make symlinks")
+    allowlist.allow(spec(link))
+    assert allowlist.permits(spec(link)) == str(link)
+    exe.write_bytes(b"binary two")
+    assert allowlist.permits(spec(link)) is None
