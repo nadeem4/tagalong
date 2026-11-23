@@ -5,7 +5,6 @@ brain keeps all the protocol logic (ACP, MCP) and the node only moves bytes.
 
 import asyncio
 import base64
-import binascii
 import contextlib
 from collections.abc import Awaitable, Callable
 from typing import Protocol
@@ -84,7 +83,7 @@ class Pipes:
             return
         try:
             entry[0].write(base64.b64decode(data, validate=True))
-        except (binascii.Error, ValueError):
+        except ValueError:
             return
 
     async def close(self, pipe: str) -> None:
