@@ -13,7 +13,7 @@ from brain.protocol import PipeSpec
 
 
 class NotRunnable(Exception):
-    """The command is not an executable on this machine."""
+    pass
 
 
 def _resolve(command: str) -> Path | None:

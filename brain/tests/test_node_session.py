@@ -12,7 +12,7 @@ import pytest
 from brain.node.allowlist import Allowlist
 from brain.node.main import HelloRefused, NodeSession
 from brain.protocol import ErrorCode, PipeSpec
-from tests.test_node_pipes import FakeChild
+from tests.test_node_pipes import FakeChild, LingeringChild
 
 
 class FakeSocket:
@@ -42,7 +42,7 @@ class FakeSocket:
 
 
 class Rig:
-    def __init__(self, tmp_path: Path) -> None:
+    def __init__(self, tmp_path: Path, child_type: type[FakeChild] = FakeChild) -> None:
         self.exe = tmp_path / "expert.exe"
         self.exe.write_bytes(b"binary")
         self.allowlist = Allowlist(tmp_path / "allowlist.json")
@@ -50,7 +50,7 @@ class Rig:
         self.children: list[FakeChild] = []
 
         async def spawn(path: str, args: list[str]) -> FakeChild:
-            child = FakeChild()
+            child = child_type()
             self.children.append(child)
             return child
 
@@ -149,6 +149,31 @@ async def test_folder_check_says_whether_a_folder_is_here(rig, tmp_path):
     await rig.settle()
     assert rig.replies("f1")["result"] == {"exists": True}
     assert rig.replies("f2")["result"] == {"exists": False}
+
+
+async def test_a_close_of_a_stuck_child_does_not_stall_the_session(tmp_path):
+    rig = Rig(tmp_path, LingeringChild)
+    rig.start()
+    spec = PipeSpec(command=str(rig.exe))
+    rig.allowlist.allow(spec)
+    rig.ws.feed(
+        {"id": "p1", "method": "pipe_open", "params": {"pipe": "k1", "spec": spec.model_dump()}}
+    )
+    rig.ws.feed({"method": "pipe_close", "params": {"pipe": "k1"}})
+    rig.ws.feed({"id": "f1", "method": "folder_check", "params": {"path": str(tmp_path)}})
+    await asyncio.sleep(0.2)
+    assert rig.replies("f1")["result"] == {"exists": True}
+    await asyncio.wait_for(rig.finish(), timeout=2)
+
+
+async def test_a_notification_without_an_id_gets_no_reply_and_does_not_end_the_node(rig):
+    spec = PipeSpec(command=str(rig.exe))
+    rig.allowlist.allow(spec)
+    rig.ws.feed({"method": "pipe_open", "params": {"pipe": "k1", "spec": spec.model_dump()}})
+    rig.ws.feed({"id": "f1", "method": "folder_check", "params": {"path": str(rig.exe.parent)}})
+    await rig.settle()
+    assert not rig.task.done()
+    assert rig.replies("f1")["result"] == {"exists": True}
 
 
 async def test_losing_the_brain_kills_every_child(rig):

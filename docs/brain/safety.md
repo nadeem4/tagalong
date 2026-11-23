@@ -88,7 +88,7 @@ The network listener accepts device tokens only, never the local token: a leaked
 
 ### A node's allow-list
 
-A node (a body of kind `node` on the person's own PC) starts a process for the brain, so its own allow-list, not the brain's token, is the boundary. A `pipe_open` runs only when the node's `<TAGALONG_HOME>/node/allowlist.json` holds that exact command and arguments and the program's SHA-256 still matches; anything else is `denied`, even from a genuine brain. The brain cannot add or change an entry: the person runs `tagalong node allow` on that machine. See [node.md](node.md).
+A node (a body of kind `node` on the person's own PC) starts a process for the brain, so its own allow-list, not the brain's token, is the boundary. A `pipe_open` runs only when the node's `<TAGALONG_HOME>/node/allowlist.json` holds that exact command and arguments and the program's SHA-256 still matches; anything else is `denied`, even from a genuine brain. The brain cannot add or change an entry: the person runs `tagalong node allow` on that machine. The hash covers only the file the command resolves to (a `.cmd` shim, `npx`), not what that file goes on to load. See [node.md](node.md).
 
 ### Pairing a device
 

@@ -6,6 +6,10 @@ brain keeps all the protocol logic (ACP, MCP) and the node only moves bytes.
 import asyncio
 import base64
 import contextlib
+import os
+import signal
+import subprocess
+import sys
 from collections.abc import Awaitable, Callable
 from typing import Protocol
 
@@ -36,12 +40,19 @@ class _Process:
         self.stdout = proc.stdout
 
     def write(self, data: bytes) -> None:
-        if self._proc.stdin is not None:
-            self._proc.stdin.write(data)
+        self._proc.stdin.write(data)
 
     def kill(self) -> None:
+        # A .cmd shim or wrapper leaves a grandchild holding stdout, so the whole tree goes.
         with contextlib.suppress(ProcessLookupError):
-            self._proc.kill()
+            if sys.platform == "win32":
+                subprocess.Popen(
+                    ["taskkill", "/pid", str(self._proc.pid), "/T", "/F"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            else:
+                os.killpg(self._proc.pid, signal.SIGKILL)
 
     async def wait(self) -> int:
         return await self._proc.wait()
@@ -54,6 +65,7 @@ async def spawn_process(path: str, args: list[str]) -> Child:
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.DEVNULL,
+        start_new_session=sys.platform != "win32",
     )
     return _Process(proc)
 
@@ -91,6 +103,7 @@ class Pipes:
         if entry is None:
             return
         entry[0].kill()
+        entry[1].cancel()
         await asyncio.gather(entry[1], return_exceptions=True)
 
     async def close_all(self) -> None:

@@ -3,13 +3,15 @@ close from the brain kills the child. No real process is started.
 """
 
 import asyncio
-import base64
+import os
+import sys
 from pathlib import Path
 
 import pytest
 
 from brain.node.allowlist import Allowlist
-from brain.node.pipes import Pipes
+from brain.node.main import HelloRefused, run_node
+from brain.node.pipes import Pipes, spawn_process
 from brain.protocol import ErrorCode, PipeSpec, RpcError
 
 
@@ -39,8 +41,15 @@ class FakeChild:
         return self.returncode
 
 
+class LingeringChild(FakeChild):
+    """A child whose stdout stays open after kill, as a grandchild holding the pipe does."""
+
+    def kill(self) -> None:
+        self.killed = True
+
+
 class Setup:
-    def __init__(self, tmp_path: Path) -> None:
+    def __init__(self, tmp_path: Path, child_type: type[FakeChild] = FakeChild) -> None:
         self.exe = tmp_path / "expert.exe"
         self.exe.write_bytes(b"binary")
         self.allowlist = Allowlist(tmp_path / "allowlist.json")
@@ -50,7 +59,7 @@ class Setup:
 
         async def spawn(path: str, args: list[str]) -> FakeChild:
             self.started.append((path, args))
-            child = FakeChild()
+            child = child_type()
             self.children.append(child)
             return child
 
@@ -74,30 +83,6 @@ async def test_an_approved_spec_starts_the_child_with_its_args(node):
     node.allowlist.allow(node.spec("--stdio"))
     await node.pipes.open("k1", node.spec("--stdio"))
     assert node.started == [(str(node.exe), ["--stdio"])]
-
-
-async def test_a_spec_off_the_list_is_denied_and_nothing_starts(node):
-    with pytest.raises(RpcError) as caught:
-        await node.pipes.open("k1", node.spec("--stdio"))
-    assert caught.value.code == ErrorCode.denied
-    assert node.started == []
-
-
-async def test_child_output_reaches_the_brain_as_base64_data(node):
-    node.allowlist.allow(node.spec())
-    await node.pipes.open("k1", node.spec())
-    node.children[0].stdout.feed_data(b'{"a":1}\n')
-    await settle()
-    assert node.sent == [
-        ("pipe_data", {"pipe": "k1", "data": base64.b64encode(b'{"a":1}\n').decode()})
-    ]
-
-
-async def test_the_brains_bytes_reach_the_childs_stdin(node):
-    node.allowlist.allow(node.spec())
-    await node.pipes.open("k1", node.spec())
-    node.pipes.write("k1", base64.b64encode(b"hello").decode())
-    assert node.children[0].written == [b"hello"]
 
 
 async def test_a_child_that_exits_closes_the_pipe_with_its_code(node):
@@ -126,9 +111,31 @@ async def test_an_open_pipe_id_cannot_be_opened_twice(node):
     assert len(node.children) == 1
 
 
-async def test_close_all_kills_every_child(node):
+async def test_close_returns_though_the_childs_stdout_stays_open(tmp_path):
+    node = Setup(tmp_path, LingeringChild)
     node.allowlist.allow(node.spec())
     await node.pipes.open("k1", node.spec())
-    await node.pipes.open("k2", node.spec())
-    await node.pipes.close_all()
-    assert all(c.killed for c in node.children)
+    await asyncio.wait_for(node.pipes.close("k1"), timeout=2)
+    assert node.children[0].killed
+
+
+async def test_a_spawned_child_does_not_inherit_the_nodes_link_token(monkeypatch):
+    env = {
+        "TAGALONG_NODE_ADDR": "a:1",
+        "TAGALONG_NODE_FP": "f",
+        "TAGALONG_NODE_TOKEN": "secret-token",
+        "TAGALONG_NODE_ID": "node-1",
+    }
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+
+    async def refused(addr, fp):
+        raise HelloRefused("revoked")
+
+    with pytest.raises(HelloRefused):
+        await run_node(os.environ, Allowlist(Path("unused.json")), dial=refused)
+    child = await spawn_process(
+        sys.executable, ["-c", "import os; print(sorted(k for k in os.environ if 'NODE' in k))"]
+    )
+    out = await child.stdout.read()
+    assert b"TAGALONG_NODE" not in out

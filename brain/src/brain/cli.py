@@ -135,7 +135,8 @@ def main(
     env = os.environ if env is None else env
     config = load_config(env)
     home = config.data_dir
-    load_env_file(home, env)  # the brain reads the same .env
+    if args.cmd != "node":  # a node's children must not inherit the brain's keys
+        load_env_file(home, env)  # the brain reads the same .env
     config = load_config(env)
     run = run or partial(real_run_cmd, timeout=NPM_TIMEOUT_S)
     machine = inspect_fn or partial(inspect, home, run)
@@ -273,7 +274,9 @@ NODE_ENV = ("TAGALONG_NODE_ADDR", "TAGALONG_NODE_FP", "TAGALONG_NODE_TOKEN", "TA
 async def _node(args, home: Path, env, run_node, out) -> None:
     allowlist = Allowlist(home / "node" / "allowlist.json")
     if args.sub == "allow":
-        spec = PipeSpec(command=args.command, args=[a for a in args.args if a != "--"])
+        spec = PipeSpec(
+            command=args.command, args=args.args[1:] if args.args[:1] == ["--"] else args.args
+        )
         try:
             allowlist.allow(spec)
         except NotRunnable as err:

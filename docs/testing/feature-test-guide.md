@@ -3207,10 +3207,10 @@ By hand, with two machines on one network:
 
 ## The node (BA6; automated, the remote part by hand)
 
-Automated: `brain/tests/test_node_allowlist.py` (strict match: another command, other args, a changed or moved file are all refused), `test_node_pipes.py` (open, relay both ways, close, exit code), `test_node_session.py` (hello as kind `node`, denied spec, folder check), `test_node_link.py` (a wrong certificate is refused before any frame), `test_node_imports.py` (no voice models loaded), and `bodies/desktop/src/main/node/runner.test.ts` (starts when paired, restarts when the pairing changes, stops when local).
+Automated: `brain/tests/test_node_allowlist.py` (strict match: another command, other args or a changed file are all refused), `test_node_pipes.py` (open, relay both ways, close, exit code), `test_node_session.py` (hello as kind `node`, denied spec, folder check), `test_node_link.py` (a wrong certificate is refused before any frame), `test_node_imports.py` (no voice models loaded), and `bodies/desktop/src/main/node/runner.test.ts` (starts when paired, restarts when the pairing changes, stops when local; a node that crashed is started again at the next link status change, not at once).
 
 By hand, with a desktop paired to a brain on another machine:
 
-1. On the desktop's machine run `cd brain && uv run tagalong node allow <program> -- <args>`. **Expected:** it says the brain may now run it.
+1. On the desktop's machine run `cd brain && uv run tagalong node allow <program> -- <args>`, in the same environment the desktop starts the node with: `allow` resolves the command on the node's PATH, and a different PATH makes the node refuse it. **Expected:** it says the brain may now run it.
 2. Start the desktop. **Expected:** in Home's Bodies card a body of kind `node` appears for that machine.
 3. Quit the desktop. **Expected:** the node disappears and no `tagalong node run` process is left.

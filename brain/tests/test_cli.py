@@ -536,3 +536,26 @@ def test_node_run_stops_when_the_brain_refuses_its_token(tmp_path):
     env["TAGALONG_NODE_ID"] = "node-1"
     assert rig.go("node", "run", env=env, run_node=refused) == 1
     assert "refused" in rig.text
+
+
+def test_node_run_does_not_load_the_data_dir_env_file(tmp_path):
+    rig = Rig(tmp_path)
+    (rig.home / ".env").write_text("ANTHROPIC_API_KEY=sk-secret\n", encoding="utf-8")
+    seen: dict[str, str] = {}
+
+    async def capture(env, allowlist):
+        seen.update(env)
+
+    env = {k: "x" for k in ("TAGALONG_NODE_ADDR", "TAGALONG_NODE_FP", "TAGALONG_NODE_TOKEN")}
+    env["TAGALONG_NODE_ID"] = "node-1"
+    assert rig.go("node", "run", env=env, run_node=capture) == 0
+    assert "ANTHROPIC_API_KEY" not in seen
+
+
+def test_node_allow_keeps_a_double_dash_inside_the_args(tmp_path):
+    rig = Rig(tmp_path)
+    exe = rig.home / "expert.exe"
+    exe.write_bytes(b"binary")
+    assert rig.go("node", "allow", str(exe), "--", "--a", "--", "b") == 0
+    spec = PipeSpec(command=str(exe), args=["--a", "--", "b"])
+    assert Allowlist(rig.home / "node" / "allowlist.json").permits(spec) == str(exe)

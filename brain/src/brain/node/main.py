@@ -10,7 +10,7 @@ import json
 import logging
 import socket
 import ssl
-from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
+from collections.abc import AsyncIterator, Awaitable, Callable, MutableMapping
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -82,7 +82,7 @@ class NodeSession:
                         raise HelloRefused(str(message["error"].get("message", "refused")))
                     continue
                 reply = await self._handle(message, pipes)
-                if reply is not None:
+                if reply is not None and "id" in message:
                     out.put_nowait(json.dumps({"jsonrpc": "2.0", "id": message["id"], **reply}))
         finally:
             await pipes.close_all()
@@ -148,13 +148,14 @@ async def connect_pinned(addr: str, fingerprint: str) -> ClientConnection:
 
 
 async def run_node(
-    env: Mapping[str, str],
+    env: MutableMapping[str, str],
     allowlist: Allowlist,
     dial: Callable[[str, str], Awaitable[Any]] = connect_pinned,
 ) -> None:
-    """Stay connected until the brain refuses this node's token."""
-    addr, fingerprint = env["TAGALONG_NODE_ADDR"], env["TAGALONG_NODE_FP"]
-    token, body_id = env["TAGALONG_NODE_TOKEN"], env["TAGALONG_NODE_ID"]
+    """Stay connected until the brain refuses this node's token. The link variables are taken
+    out of `env` so no child process inherits the token."""
+    addr, fingerprint = env.pop("TAGALONG_NODE_ADDR"), env.pop("TAGALONG_NODE_FP")
+    token, body_id = env.pop("TAGALONG_NODE_TOKEN"), env.pop("TAGALONG_NODE_ID")
     session = NodeSession(allowlist)
     while True:
         try:
