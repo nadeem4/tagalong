@@ -57,7 +57,13 @@ import type {
   WhatsAppChange,
 } from '@tagalong/ui/shapes';
 import { IPC } from '../shared/ipc';
-import type { FoundBrain, PairOutcome, PreloadBridge } from '../shared/ipc';
+import type {
+  BrainServiceOutcome,
+  BrainServiceState,
+  FoundBrain,
+  PairOutcome,
+  PreloadBridge,
+} from '../shared/ipc';
 import { heldUntilHeard } from './held';
 import type {
   BrowserFolder,
@@ -222,6 +228,12 @@ const host: TagalongHostApi = {
   discoverBrains: () => ipcRenderer.invoke(IPC.pairDiscover) as Promise<FoundBrain[]>,
   pairWithLink: (text) => ipcRenderer.invoke(IPC.pairWithLink, text) as Promise<PairOutcome>,
   forgetBrain: () => ipcRenderer.invoke(IPC.pairForget) as Promise<void>,
+  installBrainService: () =>
+    ipcRenderer.invoke(IPC.brainServiceInstall) as Promise<BrainServiceOutcome>,
+  removeBrainService: () =>
+    ipcRenderer.invoke(IPC.brainServiceRemove) as Promise<BrainServiceOutcome>,
+  brainServiceStatus: () =>
+    ipcRenderer.invoke(IPC.brainServiceStatus) as Promise<BrainServiceState>,
   getContext: () => ipcRenderer.invoke(IPC.getContext) as Promise<ContextSnapshot | null>,
   onContext: (handler) => {
     const listener = (_event: IpcRendererEvent, snapshot: ContextSnapshot | null): void =>

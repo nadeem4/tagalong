@@ -29,6 +29,7 @@ from brain.lifecycle import pid_path, stop_real_brain
 from brain.memory import Memory
 from brain.open_items import OpenItems
 from brain.pairing import PAIR_KINDS, build_pairing, render_qr
+from brain.service import Service, ServiceError, real_service
 from brain.setup.apps import add_registry_app, app_card
 from brain.setup.facts import Machine, RunCmd, inspect, real_run_cmd
 from brain.setup.install import (
@@ -85,6 +86,8 @@ def _parser() -> argparse.ArgumentParser:
     add.add_argument("--yes", action="store_true", help="skip the question")
     pair = sub.add_parser("pair", help="make a one-time code to pair another machine")
     pair.add_argument("--kind", choices=sorted(PAIR_KINDS), default="desktop")
+    service = sub.add_parser("service", help="run the brain at logon, without the desktop")
+    service.add_argument("sub", choices=["install", "remove", "status"])
     login = sub.add_parser("login", help="log an installed expert in")
     login.add_argument("expert_id")
     return p
@@ -106,6 +109,7 @@ def main(
     stop: Callable[[Path], str] = stop_real_brain,
     now: Callable[[], float] = time.time,
     host_addr: Callable[[], str] = lan_address,
+    service_for: Callable[[Path], Service] = real_service,
 ) -> int:
     """Every outside thing is a parameter, so tests run on fakes. Exits 0 ok, 1 failed, 2 usage."""
     args = _parser().parse_args(argv)  # a usage error exits 2 here
@@ -127,6 +131,8 @@ def main(
             _perf(home, args.since, now(), out)
         elif args.cmd == "pair":
             _pair(config, args.kind, host_addr, out)
+        elif args.cmd == "service":
+            _service(args.sub, service_for(home), home, env, out)
         elif args.cmd == "key":
             _key(home, env, args.stdin, stdin, secret, out)
         elif args.cmd == "install":
@@ -211,6 +217,31 @@ def _pair(config, kind: str, host_addr: Callable[[], str], out) -> None:
     out(render_qr(offer.link))
     out(offer.link)
     out("Valid for 10 minutes, one use. Open it on the other machine's Tagalong.")
+
+
+def _service(action: str, service: Service, home: Path, env, out) -> None:
+    if action == "status":
+        out("installed" if service.installed() else "not installed")
+    elif action == "remove":
+        service.remove()
+        out("Removed. The brain no longer starts at logon; network access stays as it was.")
+    else:
+        # The brain reads this when the service starts it, so it must be saved first.
+        env_file = home / ".env"
+        before = env_file.read_bytes() if env_file.exists() else None
+        upsert_env_value(home, "TAGALONG_NETWORK", "1", env)
+        try:
+            service.install()
+        except ServiceError as err:
+            if before is None:
+                env_file.unlink(missing_ok=True)
+            else:
+                env_file.write_bytes(before)
+            raise _Fail(f"failed: {err}") from None
+        out("Installed: the brain starts at logon, with network access on for other devices.")
+        out("Turned the network listener on (TAGALONG_NETWORK=1 in .env).")
+        out("A brain already running gets the network listener when it restarts.")
+        out("Pair a device with `tagalong pair`.")
 
 
 def _stop(home: Path, stop: Callable[[Path], str], out) -> None:

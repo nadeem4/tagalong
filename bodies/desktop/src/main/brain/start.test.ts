@@ -13,6 +13,7 @@ const localLink = {
   paired: () => null,
   token: () => null,
   markGood: noop,
+  addAddrs: noop,
 };
 const tools = {
   link: localLink,
@@ -168,6 +169,7 @@ describe('startBrain with a paired remote brain', () => {
   function remote(over: { search?: () => Promise<string[]> } = {}) {
     vi.useFakeTimers();
     const good: string[] = [];
+    const added: string[][] = [];
     let paired: { addrs: string[]; lastGood: string; fp: string } = {
       addrs: ['10.0.0.5:47323', '100.64.0.2:47323'],
       lastGood: '100.64.0.2:47323',
@@ -177,6 +179,7 @@ describe('startBrain with a paired remote brain', () => {
       paired: () => paired,
       token: () => 'device-token',
       markGood: (addr: string) => void good.push(addr),
+      addAddrs: (addrs: string[]) => void added.push(addrs),
     };
     const sockets: {
       url: string;
@@ -219,7 +222,7 @@ describe('startBrain with a paired remote brain', () => {
       await vi.advanceTimersByTimeAsync(2000);
     };
     const pair = (next: typeof paired): void => void (paired = next);
-    return { brain, sockets, sent, good, message, search, fail, pair };
+    return { brain, sockets, sent, good, added, message, search, fail, pair };
   }
 
   it('dials wss on the last good address first with the device token, and remembers the one that said hello', () => {
@@ -234,6 +237,25 @@ describe('startBrain with a paired remote brain', () => {
       result: { protocol: 3, session: 's', tools: [], seq: 0, resync: false },
     });
     expect(good).toEqual(['100.64.0.2:47323']);
+    brain.stop();
+  });
+
+  it('saves the addresses the brain lists in hello', () => {
+    const { brain, sockets, sent, added, message } = remote();
+    sockets[0]!.open();
+    message({
+      jsonrpc: '2.0',
+      id: JSON.parse(sent[0] as string).id,
+      result: {
+        protocol: 3,
+        session: 's',
+        tools: [],
+        seq: 0,
+        resync: false,
+        addrs: ['100.64.0.7:47323'],
+      },
+    });
+    expect(added).toEqual([['100.64.0.7:47323']]);
     brain.stop();
   });
 

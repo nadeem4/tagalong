@@ -148,6 +148,10 @@ export const IPC = {
   pairDiscover: 'tagalong:pair:discover',
   pairWithLink: 'tagalong:pair:with-link',
   pairForget: 'tagalong:pair:forget',
+  // Making this PC the brain: the logon service that keeps it running without the window.
+  brainServiceInstall: 'tagalong:brain-service:install',
+  brainServiceRemove: 'tagalong:brain-service:remove',
+  brainServiceStatus: 'tagalong:brain-service:status',
   // Home's Approvals page: the decision history and the preferences Scout follows.
   listApprovals: 'tagalong:approvals:list',
   listPreferences: 'tagalong:approvals:preferences:list',
@@ -319,6 +323,9 @@ export type PairOutcome =
   | { ok: true }
   | { ok: false; reason: 'bad_link' | 'cannot_seal' | 'wrong_brain' | 'refused' | 'unreachable' };
 
+export type BrainServiceOutcome = { ok: true } | { ok: false; detail: string };
+export type BrainServiceState = 'installed' | 'not_installed' | 'unknown';
+
 export interface TagalongHostApi {
   /** Brains on the home network, by name and address. */
   discoverBrains(): Promise<FoundBrain[]>;
@@ -326,6 +333,10 @@ export interface TagalongHostApi {
   pairWithLink(text: string): Promise<PairOutcome>;
   /** Forgets the paired brain and goes back to the one on this PC. */
   forgetBrain(): Promise<void>;
+  /** Registers the brain to start at logon, with network access on for other devices. */
+  installBrainService(): Promise<BrainServiceOutcome>;
+  removeBrainService(): Promise<BrainServiceOutcome>;
+  brainServiceStatus(): Promise<BrainServiceState>;
   getContext(): Promise<ContextSnapshot | null>;
   onContext(handler: (snapshot: ContextSnapshot | null) => void): () => void;
   /** Fires on every capture the host makes, so the avatar can badge it and the panel can

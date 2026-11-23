@@ -117,7 +117,7 @@ variable. "Positive" means at least 1.
 | `TAGALONG_JOB_STEPS_MAX_ENTRIES`                                 | `2000`                    | brain                           | Steps one job's log keeps                                                           |
 | `TAGALONG_JOB_STEPS_MAX_BYTES`                                   | `1000000`                 | brain                           | Text bytes one job's log keeps                                                      |
 | `TAGALONG_BUILD`                                                 | none (a source hash)      | brain                           | Build id sent in `hello`; the packaged desktop sets it to the app version           |
-| `TAGALONG_STARTED_BY`                                            | `person`                  | brain                           | `desktop` when the desktop started the brain, so it may restart it                  |
+| `TAGALONG_STARTED_BY`                                            | `person`                  | brain                           | `desktop` or `service`: the desktop may restart this brain                          |
 | `TAGALONG_START_BRAIN`                                           | on                        | desktop                         | `0` stops the desktop from starting a local brain                                   |
 | `TAGALONG_FAKE_MIC`                                              | off                       | desktop                         | `1` points Chromium at a fake microphone (the e2e suites)                           |
 | `TAGALONG_WHATSAPP_ENABLED`                                      | off                       | brain                           | `1`, `true` or `yes` starts the WhatsApp bridge                                     |
@@ -300,13 +300,17 @@ it), and is never printed. `tagalong doctor` says only whether a key is set.
   and marks a refused one (`SettingsFieldError`,
   `bodies/desktop/src/renderer/src/settings-form.ts`).
 
+## The network switch
+
+`tagalong service install` saves `TAGALONG_NETWORK=1` in `<TAGALONG_HOME>/.env`, which the service's brain reads at start (the real environment still wins); install saves it before the brain starts. The unit also sets `TAGALONG_STARTED_BY=service`, `TAGALONG_BUILD` (when set at install) and `TAGALONG_HOME` (when not the default). `service remove` leaves the line, so the brain stays reachable by paired devices whenever it runs; delete the line to turn network access off.
+
 ## Paired devices
 
 `tagalong.db` holds the paired devices (`devices`) and one-time pairing codes (`pair_codes`). Only the SHA-256 of a device token or a code is stored, so the database cannot be used to log in; the token is shown once, on the device that paired. A pairing link carries the code and the certificate fingerprint, so treat it like a password for 10 minutes. See [storage.md](storage.md#devices-and-pairing).
 
 ## A remembered remote brain
 
-The desktop keeps the brain it paired with under `brain` in `settings.json`: the addresses (none means the brain on this PC), the certificate fingerprint and the last address that worked. These are not secret. The device token is not there: it is sealed with Electron `safeStorage` (`link-store.ts`) and stored as base64 text only after sealing. When the OS cannot seal it, pairing fails and the desktop stays on the local brain rather than write the token in the clear.
+The desktop keeps the brain it paired with under `brain` in `settings.json`: the addresses (none means the brain on this PC), the certificate fingerprint and the last address that worked. Addresses the brain lists in `hello` (its Tailscale address) are added after the saved ones. These are not secret. The device token is not there: it is sealed with Electron `safeStorage` (`link-store.ts`) and stored as base64 text only after sealing. When the OS cannot seal it, pairing fails and the desktop stays on the local brain rather than write the token in the clear.
 
 ## Privacy notes
 

@@ -118,6 +118,28 @@ async def test_hello_result_carries_version_and_build(tmp_path):
         await server.wait_closed()
 
 
+async def test_hello_result_lists_the_addresses_this_listener_is_reached_at(tmp_path):
+    bodies = Bodies()
+    session = make_session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
+    server = await start_server(
+        "127.0.0.1",
+        0,
+        bodies,
+        "s1",
+        session,
+        auth=Authenticator(TOKEN),
+        addrs=lambda: ["100.64.0.7:47323"],
+    )
+    url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+    try:
+        async with connect(url) as ws:
+            result = (await call(ws, hello()))["result"]
+        assert result["addrs"] == ["100.64.0.7:47323"]
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
 async def test_message_before_hello_closes(env):
     _, url = env
     async with connect(url) as ws:

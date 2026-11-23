@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>app.tagalong.brain</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/home/me/venv/bin/brain</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>TAGALONG_HOME</key>
+    <string>/Users/me/tag home</string>
+    <key>TAGALONG_BUILD</key>
+    <string>1.4.0</string>
+    <key>TAGALONG_STARTED_BY</key>
+    <string>service</string>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/home/me/tag home/brain.log</string>
+  <key>StandardErrorPath</key>
+  <string>/home/me/tag home/brain.log</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+</dict>
+</plist>

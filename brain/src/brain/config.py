@@ -73,7 +73,7 @@ class Config:
     job_steps_max_entries: int = DEFAULT_JOB_STEPS_MAX_ENTRIES
     job_steps_max_bytes: int = DEFAULT_JOB_STEPS_MAX_BYTES
     build: str | None = None  # the app's version when packaged; None in a dev checkout
-    started_by: Literal["desktop", "person"] = "person"  # who owns the process
+    started_by: Literal["desktop", "person", "service"] = "person"  # who owns the process
     network: bool = False  # also listen for bodies on other machines, over wss
     network_port: int = DEFAULT_NETWORK_PORT
 
@@ -150,7 +150,13 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
             env, "TAGALONG_JOB_STEPS_MAX_BYTES", DEFAULT_JOB_STEPS_MAX_BYTES
         ),
         build=env.get("TAGALONG_BUILD") or None,
-        started_by="desktop" if env.get("TAGALONG_STARTED_BY") == "desktop" else "person",
+        started_by=(
+            "desktop"
+            if env.get("TAGALONG_STARTED_BY") == "desktop"
+            else "service"
+            if env.get("TAGALONG_STARTED_BY") == "service"
+            else "person"
+        ),
         network=env.get("TAGALONG_NETWORK") == "1",
         network_port=_positive_int(env, "TAGALONG_NETWORK_PORT", DEFAULT_NETWORK_PORT),
     )

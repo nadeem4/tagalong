@@ -52,10 +52,18 @@ import { bonjourBrowse, discoverBrains } from './brain/discover';
 import { LinkStore } from './brain/link-store';
 import { pinnedSocket } from './brain/pinned-socket';
 import { registerPairIpc } from './ipc/pair';
+import { registerBrainServiceIpc } from './ipc/brain-service';
 import { startingGate } from './brain/starting-gate';
 import { homedir, hostname } from 'node:os';
 import { ownBuild } from './brain/build-id';
-import { brainLogPath, dataDir as brainDataDir, realLaunch, realStop } from './brain/launch';
+import {
+  brainLogPath,
+  dataDir as brainDataDir,
+  realLaunch,
+  realRestartService,
+  realRunTagalong,
+  realStop,
+} from './brain/launch';
 import type { RealLaunch } from './brain/launch';
 import { saveAvatarSpot } from './avatar-spot';
 import { offlineWatch } from './brain/offline-watch';
@@ -428,6 +436,7 @@ async function start(): Promise<void> {
     },
     stop: () => realStop(run),
     relaunch: () => brainSetup.retry(),
+    restartService: () => realRestartService(run),
     openPath: async (path) => void (await shell.openPath(path)),
     copy: (text) => clipboard.writeText(text),
     log: (line) => console.warn(line),
@@ -1085,6 +1094,7 @@ function registerIpc(): void {
       required().brain.start();
     },
   });
+  registerBrainServiceIpc(handle, { run: (args) => realRunTagalong(brainRun(), args) });
   registerBrainLinkIpc(handle, { brain: required().brain, setup: brainSetup });
   if (brainControl !== null) registerBrainStatusIpc(handle, brainControl);
   registerSettingsIpc(handle, {

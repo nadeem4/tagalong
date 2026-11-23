@@ -975,12 +975,12 @@ The brain's `hello` result names its `version` and `build`; the desktop knows it
 
 `brain/version-check.ts` (`decideUpdate`) is pure and decides what to do on every connect:
 
-| Facts                                                              | Action                                                                     |
-| ------------------------------------------------------------------ | -------------------------------------------------------------------------- |
-| Same version and build                                             | `current`                                                                  |
-| Brain started by the person (`TAGALONG_STARTED_BY` not `desktop`)  | `terminal`: tell the person to restart it in their terminal; never kill it |
-| Started by the desktop, no job running, not yet restarted this run | `restart`: stop it and start the new one, quietly, one log line            |
-| Started-by unknown, a job running, or already restarted this run   | `ask`: show the update prompt                                              |
+| Facts                                                                                   | Action                                                                                                                        |
+| --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Same version and build                                                                  | `current`                                                                                                                     |
+| Brain started by the person (`TAGALONG_STARTED_BY` not `desktop` or `service`)          | `terminal`: tell the person to restart it in their terminal; never kill it                                                    |
+| Started by the desktop or the logon service, no job running, not yet restarted this run | `restart`: stop it and start the new one, quietly, one log line (a service brain: remove the service, sync, install it again) |
+| Started-by unknown, a job running, or already restarted this run                        | `ask`: show the update prompt                                                                                                 |
 
 An old brain that says no version is never current and never loops: at most one quiet restart per
 app run. `ipc/brain-status.ts` (`createBrainStatus`) holds the state: the `brain_status` Home tool
@@ -1005,7 +1005,7 @@ covers a person-started old brain on the fake brain. The e2e fake brain's defaul
 app's own version and build (`e2e/fixtures/fake-brain.ts`), so ordinary specs see a current brain
 and no prompt; only the version specs pass an old `hello`.
 
-The Windows installer stops a running brain before it replaces or removes files:
+The Windows installer stops a running brain before it replaces or removes files (ending the `TagalongBrain` task first; it never starts the task again, the desktop does after it syncs):
 `build/installer.nsh` (`customInit`, `customUnInit`) reads `brain.pid` from `TAGALONG_HOME` (else
 `%USERPROFILE%\.tagalong`) and runs `taskkill` on that process id, only when it is a Python
 process, and ignores a missing file. This is checked by hand (see the feature test guide).

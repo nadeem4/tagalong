@@ -3170,6 +3170,18 @@ Automated: `cd brain && uv run pytest tests/test_events.py tests/test_runner.py 
 1. **Automated.** `pnpm --filter @tagalong/desktop test:e2e e2e/catch-up.spec.ts` drops the link twice, saving a reply each time, and answers `resync: true`. **Expected:** the bubble shows each reply; the second catch-up calls `chat_since` with `after_id` of the first reply.
 2. **By hand.** With the real brain and the desktop open, put the PC to sleep or disconnect the network, let a long reply finish on WhatsApp (or ask something long and disconnect mid-reply), then reconnect. **Expected:** after the reconnect the reply appears in the bubble once; a second reconnect does not show it again.
 
+## Brain as a logon service (automated; the install by hand on the owner's PC)
+
+Automated: `brain/tests/test_service.py` (rendered Windows, macOS and Linux unit text against golden files, the OS calls on a fake runner), `test_service_cli.py` (the network switch saved before the install starts the brain, put back when the OS refuses), `test_main.py` (`service_main`, tailnet addresses read per hello), `test_server.py` (`hello.addrs`), `test_discovery.py` (Tailscale addresses); in the desktop `src/main/ipc/brain-service.test.ts`, `src/main/brain/launch.test.ts` (`runTagalong`), `link-store.test.ts` and `start.test.ts` (saving `addrs`), `launch.test.ts` (`restartService`) and `ipc/brain-status.test.ts` (a service brain is reinstalled on a version mismatch).
+
+By hand on the owner's PC (never on a machine whose scheduled tasks matter):
+
+1. `cd brain && uv run tagalong service status`. **Expected:** `not installed`.
+2. `uv run tagalong service install`. **Expected:** it says installed and that it turned the network listener on; `TAGALONG_NETWORK=1` is in `<TAGALONG_HOME>/.env`; the brain is running (`uv run tagalong perf` finds `brain.log`, which holds the service brain's output, or the desktop connects) with no desktop open and no console window; Home's brain card does not say you started it from a terminal.
+3. Sign out and in again with the desktop closed. **Expected:** the brain is running and no console window opened.
+4. `uv run tagalong service remove`. **Expected:** `service status` prints `not installed` and the brain stops (`uv run tagalong stop` says it is not running).
+5. With Tailscale up on the brain machine, pair a desktop and connect. **Expected:** the desktop's saved addresses gain the `100.x.y.z:47323` address.
+
 ## Pair another device (automated; the network part by hand)
 
 Automated: `brain/tests/test_devices.py`, `test_pairing.py` (one use, expiry, five wrong codes lock the right one out, a kind-bound code), `test_server_pairing.py` (`pair` before `hello`, loopback takes only browser codes, revoke closes the connection and a reconnect gets `unauthorized`), `test_auth.py` (the network listener takes device tokens and not the local token), `test_pair_cli.py`, `test_discovery.py` and `test_device_tools.py` (`pair_make` refuses non-browser kinds with the network off).

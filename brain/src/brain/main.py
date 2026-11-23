@@ -5,6 +5,7 @@ so the library's own connection chatter stays quiet and only the brain's lines p
 """
 
 import asyncio
+import ctypes
 import errno
 import logging
 import os
@@ -28,7 +29,7 @@ from brain.build_info import app_version, build_id
 from brain.chat_tools import chat_tools
 from brain.config import in_quiet_hours, load_config, load_env_file, session_id
 from brain.device_tools import device_tools
-from brain.discovery import Advertiser, lan_address
+from brain.discovery import Advertiser, lan_address, tailnet_addresses
 from brain.events import EventLog
 from brain.events_tools import events_tools
 from brain.experts import ExpertHosts
@@ -408,6 +409,8 @@ async def _run() -> None:
                 auth=network_auth,
                 ssl_context=server_ssl_context(identity),
                 redeem=partial(pairing.redeem, kinds=NETWORK_KINDS),
+                # Per hello: a logon brain starts before Tailscale has an address.
+                addrs=lambda: [f"{a}:{config.network_port}" for a in tailnet_addresses()],
             )
             advertiser = Advertiser(AsyncZeroconf)
             try:
@@ -474,3 +477,20 @@ def main() -> None:
         asyncio.run(_run())
     except KeyboardInterrupt:
         pass
+
+
+def service_main(argv: list[str] | None = None) -> None:
+    """The logon service's windowless launcher (`brain-service`). It has no console and gets no
+    environment from the task, so it takes KEY=VALUE arguments and writes to brain.log."""
+    for arg in sys.argv[1:] if argv is None else argv:
+        name, _, value = arg.partition("=")
+        os.environ[name] = value
+    home = load_config(os.environ).data_dir
+    home.mkdir(parents=True, exist_ok=True)
+    if sys.platform == "win32":
+        # A windowless process has no console, so each console child (experts, the WhatsApp
+        # bridge) would open a window of its own; a hidden console here is inherited instead.
+        ctypes.windll.kernel32.AllocConsole()
+        ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 0)
+    sys.stdout = sys.stderr = open(home / "brain.log", "a", encoding="utf-8", buffering=1)  # noqa: SIM115
+    main()

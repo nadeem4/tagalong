@@ -123,28 +123,36 @@ function brainEnv({ packaged, appVersion, env = process.env }: RealLaunch): Node
   return packaged ? packagedEnv(env, homedir(), appVersion) : env;
 }
 
-/** `stopBrain` with the app's real spawn and the same env the launch used. */
-export function realStop(real: RealLaunch): Promise<boolean> {
-  return stopBrain({
+function uvOptions(real: RealLaunch): Pick<LaunchOptions, 'env' | 'brainDir' | 'uv' | 'spawn'> {
+  return {
     env: brainEnv(real),
     brainDir: real.brainDir,
     uv: real.packaged?.uv ?? 'uv',
     spawn: nodeSpawn,
-  });
+  };
+}
+
+export function realRunTagalong(
+  real: RealLaunch,
+  args: string[],
+): Promise<{ code: number; out: string }> {
+  return runTagalong(uvOptions(real), args);
+}
+
+export function realStop(real: RealLaunch): Promise<boolean> {
+  return stopBrain(uvOptions(real));
 }
 
 export function realLaunch(real: RealLaunch): Promise<void> {
-  const { brainDir, packaged, onSetup = () => undefined, onStarting = () => undefined } = real;
-  const env = brainEnv(real);
+  const { packaged, onSetup = () => undefined, onStarting = () => undefined } = real;
+  const uv = uvOptions(real);
   return launchBrain({
-    env,
-    brainDir,
-    uv: packaged?.uv ?? 'uv',
+    ...uv,
     sync: packaged !== undefined,
     platform: process.platform,
     onSetup,
     onStarting,
-    logPath: brainLogPath(env, homedir()),
+    logPath: brainLogPath(uv.env, homedir()),
     openLog: (path) => {
       mkdirSync(dirname(path), { recursive: true });
       return openSync(path, 'a');
@@ -152,7 +160,6 @@ export function realLaunch(real: RealLaunch): Promise<void> {
     closeLog: closeSync,
     probe: probeAddr,
     exists: existsSync,
-    spawn: nodeSpawn,
     log: { warn: (line) => console.warn(line) },
     remote: real.remote,
   });
@@ -165,14 +172,32 @@ export function realLaunch(real: RealLaunch): Promise<void> {
 export function stopBrain(
   options: Pick<LaunchOptions, 'env' | 'brainDir' | 'uv' | 'spawn'>,
 ): Promise<boolean> {
+  return runTagalong(options, ['stop']).then(({ code }) => code === 0);
+}
+
+/**
+ * One `tagalong` command through uv; its exit code and output. Never syncs: a sync rewrites
+ * .venv/Scripts/brain.exe, which the running brain holds open on Windows, so uv would fail before
+ * `tagalong stop` runs. The relaunch syncs instead.
+ */
+export function runTagalong(
+  options: Pick<LaunchOptions, 'env' | 'brainDir' | 'uv' | 'spawn'>,
+  args: string[],
+): Promise<{ code: number; out: string }> {
   const { env, brainDir, uv, spawn } = options;
-  // Never sync here: a sync rewrites .venv/Scripts/brain.exe, which the running brain holds
-  // open on Windows, so uv would fail before `tagalong stop` runs. The relaunch syncs instead.
-  const args = ['run', '--no-sync', 'tagalong', 'stop'];
   return new Promise((resolve) => {
-    const child = spawn(uv, args, { cwd: brainDir, env, stdio: 'ignore', windowsHide: true });
-    child.once('error', () => resolve(false));
-    child.once('exit', (code) => resolve(code === 0));
+    const child = spawn(uv, ['run', '--no-sync', 'tagalong', ...args], {
+      cwd: brainDir,
+      env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+    let out = '';
+    const collect = (chunk: Buffer): void => void (out += chunk.toString());
+    child.stdout?.on('data', collect);
+    child.stderr?.on('data', collect);
+    child.once('error', (error) => resolve({ code: 1, out: error.message }));
+    child.once('exit', (code) => resolve({ code: code ?? 1, out }));
   });
 }
 
@@ -189,7 +214,7 @@ export async function launchBrain(options: LaunchOptions): Promise<void> {
   onStarting(true);
   if (sync) {
     onSetup('installing');
-    if (!(await runSync())) {
+    if (!(await syncBrain(options))) {
       onSetup('failed');
       onStarting(false);
       return;
@@ -224,27 +249,67 @@ export async function launchBrain(options: LaunchOptions): Promise<void> {
   });
   // Unreferenced (and detached or hidden): quitting the app leaves the brain running.
   child.unref();
+}
 
-  /** `uv sync` with its output in brain.log and no timeout (the first download is slow). True when it finished cleanly. */
-  function runSync(): Promise<boolean> {
-    const syncFd = openLog(logPath);
-    return new Promise((resolve) => {
-      const child = spawn(uv, ['sync', '--frozen', '--no-dev'], {
-        cwd: brainDir,
-        env,
-        stdio: ['ignore', syncFd, syncFd],
-        windowsHide: true,
-      });
-      closeLog(syncFd);
-      let settled = false;
-      const done = (ok: boolean, why: string): void => {
-        if (settled) return;
-        settled = true;
-        if (!ok) log.warn(`could not install the brain (${why}); Home offers Retry`);
-        resolve(ok);
-      };
-      child.once('error', (error) => done(false, error.message));
-      child.once('exit', (code) => done(code === 0, `uv sync exited with code ${code}`));
+type SyncOptions = Pick<
+  LaunchOptions,
+  'env' | 'brainDir' | 'uv' | 'spawn' | 'openLog' | 'closeLog' | 'logPath' | 'log'
+>;
+
+/** `uv sync` with its output in brain.log and no timeout (the first download is slow). True when it finished cleanly. */
+export function syncBrain(options: SyncOptions): Promise<boolean> {
+  const { env, brainDir, uv, spawn, openLog, closeLog, logPath, log } = options;
+  const syncFd = openLog(logPath);
+  return new Promise((resolve) => {
+    const child = spawn(uv, ['sync', '--frozen', '--no-dev'], {
+      cwd: brainDir,
+      env,
+      stdio: ['ignore', syncFd, syncFd],
+      windowsHide: true,
     });
-  }
+    closeLog(syncFd);
+    let settled = false;
+    const done = (ok: boolean, why: string): void => {
+      if (settled) return;
+      settled = true;
+      if (!ok) log.warn(`could not install the brain (${why}); Home offers Retry`);
+      resolve(ok);
+    };
+    child.once('error', (error) => done(false, error.message));
+    child.once('exit', (code) => done(code === 0, `uv sync exited with code ${code}`));
+  });
+}
+
+/**
+ * Updates a brain the logon service runs: the service is removed (that ends the brain and frees
+ * its files), the app's files are synced, and installing the service again starts the new brain.
+ */
+export async function restartService(
+  run: (args: string[]) => Promise<{ code: number; out: string }>,
+  sync: () => Promise<boolean>,
+): Promise<boolean> {
+  await run(['service', 'remove']);
+  const synced = await sync();
+  const installed = (await run(['service', 'install'])).code === 0;
+  return synced && installed;
+}
+
+export function realRestartService(real: RealLaunch): Promise<boolean> {
+  const uv = uvOptions(real);
+  return restartService(
+    (args) => runTagalong(uv, args),
+    () =>
+      real.packaged === undefined
+        ? Promise.resolve(true)
+        : syncBrain({
+            ...uv,
+            logPath: brainLogPath(uv.env, homedir()),
+            openLog: (path) => {
+              mkdirSync(dirname(path), { recursive: true });
+              return openSync(path, 'a');
+            },
+            closeLog: closeSync,
+            log: { warn: (line) => console.warn(line) },
+          }),
+  );
 }

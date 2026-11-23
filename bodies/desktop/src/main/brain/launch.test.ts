@@ -12,6 +12,8 @@ import {
   packagedEnv,
   probeAddr,
   readLocalToken,
+  restartService,
+  runTagalong,
   stopBrain,
 } from './launch';
 import type { LaunchOptions } from './launch';
@@ -414,5 +416,62 @@ describe('probeAddr', () => {
 describe('readLocalToken', () => {
   it('is null when the brain has not written it yet', () => {
     expect(readLocalToken({ TAGALONG_HOME: join(tmpdir(), 'tg-missing') }, '/nope')).toBeNull();
+  });
+});
+
+describe('runTagalong', () => {
+  it('runs a tagalong command with the brain env and returns its exit code and output', async () => {
+    const { options, spawned } = setup({ env: { KEEP: '1' }, uv: 'C:/uv.exe' });
+    const spawn: LaunchOptions['spawn'] = (cmd, args, opts) => {
+      const child = options.spawn(cmd, args, opts) as unknown as FakeChild;
+      queueMicrotask(() => {
+        child.stdout.emit('data', Buffer.from('installed\n'));
+        child.emit('exit', 0);
+      });
+      return child as never;
+    };
+    expect(await runTagalong({ ...options, spawn }, ['service', 'status'])).toEqual({
+      code: 0,
+      out: 'installed\n',
+    });
+    expect(spawned[0]).toMatchObject({
+      cmd: 'C:/uv.exe',
+      args: ['run', '--no-sync', 'tagalong', 'service', 'status'],
+    });
+  });
+});
+
+describe('restartService', () => {
+  const ok = (code: number) => ({ code, out: '' });
+
+  it('removes the service, syncs, then installs it again', async () => {
+    const steps: string[] = [];
+    const done = await restartService(
+      (args) => {
+        steps.push(args.join(' '));
+        return Promise.resolve(ok(0));
+      },
+      () => Promise.resolve(steps.push('sync') > 0),
+    );
+    expect(done).toBe(true);
+    expect(steps).toEqual(['service remove', 'sync', 'service install']);
+  });
+
+  it('still installs again when the sync failed, so the logon choice is kept', async () => {
+    const steps: string[] = [];
+    const done = await restartService(
+      (args) => {
+        steps.push(args.join(' '));
+        return Promise.resolve(ok(0));
+      },
+      () => Promise.resolve(false),
+    );
+    expect(done).toBe(false);
+    expect(steps).toEqual(['service remove', 'service install']);
+  });
+
+  it('is not done when the install was refused', async () => {
+    const run = (args: string[]) => Promise.resolve(ok(args[1] === 'install' ? 1 : 0));
+    expect(await restartService(run, () => Promise.resolve(true))).toBe(false);
   });
 });

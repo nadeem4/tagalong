@@ -5,9 +5,11 @@ Only a name and the protocol version are announced: the certificate fingerprint 
 pairing link, never on the network where anyone could read it.
 """
 
+import ipaddress
 import socket
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 
+import ifaddr
 from zeroconf import ServiceInfo
 from zeroconf.asyncio import AsyncZeroconf
 
@@ -25,6 +27,16 @@ def lan_address() -> str:
         return "127.0.0.1"
     finally:
         probe.close()
+
+
+_TAILNET = ipaddress.ip_network("100.64.0.0/10")  # Tailscale's address range (carrier-grade NAT)
+
+
+def tailnet_addresses(ips: Iterable[str] | None = None) -> list[str]:
+    """This machine's Tailscale addresses, from its interfaces unless `ips` is given."""
+    if ips is None:
+        ips = [ip.ip for adapter in ifaddr.get_adapters() for ip in adapter.ips if ip.is_IPv4]
+    return [ip for ip in ips if ipaddress.ip_address(ip) in _TAILNET]
 
 
 class Advertiser:

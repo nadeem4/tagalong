@@ -11,6 +11,7 @@ dependencies = [
     "faster-whisper==1.2.1",
     "httpx2>=2.16.0",
     "kokoro-onnx==0.6.1",
+    "ifaddr==0.2.0",
     "mcp==2.3.0",
     "moonshine-voice==0.1.5",
     "numpy==2.5.4",
@@ -27,6 +28,9 @@ dependencies = [
 [project.scripts]
 brain = "brain.main:main"
 tagalong = "brain.cli:main"
+
+[project.gui-scripts]
+brain-service = "brain.main:service_main"
 
 [build-system]
 requires = ["hatchling"]

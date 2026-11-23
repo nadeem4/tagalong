@@ -1,6 +1,7 @@
 """Checks main refuses to start without an API key, and opens the memory db under the data dir."""
 
 import asyncio
+import ctypes
 import errno
 import io
 import json
@@ -787,3 +788,70 @@ def test_network_switch_adds_an_encrypted_listener(monkeypatch, tmp_path):
     assert [(h, p) for h, p, _ in started] == [("127.0.0.1", 47321), ("0.0.0.0", 47323)]
     assert started[1][2]["ssl_context"] is not None
     assert (tmp_path / "identity" / "cert.pem").exists()
+
+
+def test_the_network_listener_reads_the_tailnet_addresses_at_each_hello(monkeypatch, tmp_path):
+    started = _spy_listeners(monkeypatch, tmp_path)
+    monkeypatch.setenv("TAGALONG_NETWORK", "1")
+    seen: list[list[str]] = [[]]
+    monkeypatch.setattr(main, "tailnet_addresses", lambda: seen[0])
+    with pytest.raises(RuntimeError):
+        asyncio.run(_run())
+    addrs = started[1][2]["addrs"]
+    assert addrs() == []
+    seen[0] = ["100.64.0.7"]
+    assert addrs() == ["100.64.0.7:47323"]
+
+
+def test_the_service_entry_takes_its_environment_from_arguments_and_logs_to_brain_log(
+    monkeypatch, tmp_path
+):
+    seen = {}
+
+    def fake_main():
+        seen["home"] = os.environ["TAGALONG_HOME"]
+        seen["by"] = os.environ["TAGALONG_STARTED_BY"]
+        print("hello", file=sys.stderr)
+
+    monkeypatch.delenv("TAGALONG_HOME", raising=False)
+    monkeypatch.delenv("TAGALONG_STARTED_BY", raising=False)
+    monkeypatch.setattr(main, "main", fake_main)
+    out, err = sys.stdout, sys.stderr
+    try:
+        main.service_main([f"TAGALONG_HOME={tmp_path}", "TAGALONG_STARTED_BY=service"])
+    finally:
+        sys.stdout, sys.stderr = out, err
+    assert seen == {"home": str(tmp_path), "by": "service"}
+    assert "hello" in (tmp_path / "brain.log").read_text(encoding="utf-8")
+
+
+def test_the_service_entry_on_windows_hides_a_console_of_its_own_for_its_children(
+    monkeypatch, tmp_path
+):
+    calls = []
+
+    class Kernel32:
+        def AllocConsole(self):
+            calls.append("alloc")
+
+        def GetConsoleWindow(self):
+            calls.append("get")
+            return 77
+
+    class User32:
+        def ShowWindow(self, hwnd, how):
+            calls.append(("show", hwnd, how))
+
+    class Windll:
+        kernel32 = Kernel32()
+        user32 = User32()
+
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(ctypes, "windll", Windll(), raising=False)
+    monkeypatch.setattr(main, "main", lambda: calls.append("main"))
+    out, err = sys.stdout, sys.stderr
+    try:
+        main.service_main([f"TAGALONG_HOME={tmp_path}"])
+    finally:
+        sys.stdout, sys.stderr = out, err
+    assert calls == ["alloc", "get", ("show", 77, 0), "main"]
