@@ -33,6 +33,7 @@ Before changing a feature, read its doc and run its section of [testing/feature-
 | [brain/permissions.md](brain/permissions.md) | Tool modes, asks and the one permission engine                       |
 | [brain/setup.md](brain/setup.md)             | Installing experts and apps, the `tagalong` command                  |
 | [brain/safety.md](brain/safety.md)           | Budget, guards, masking and retries                                  |
+| [brain/server.md](brain/server.md)           | The brain on a server: `tagalong serve`, the install script, Docker  |
 | [brain/loops.md](brain/loops.md)             | Loops, mail and timers                                               |
 
 ## senses/

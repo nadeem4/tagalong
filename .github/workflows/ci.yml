@@ -99,6 +99,36 @@ jobs:
       - name: Test
         run: uv run pytest
 
+  # The server image: built, never pushed. Layers are cached between runs, so only a change to
+  # the brain's dependencies or code rebuilds them. Gated like `build`.
+  image:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.code == 'true') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          push: false
+          tags: tagalong:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Only the network port is exposed
+        run: |
+          test "$(docker image inspect tagalong:ci --format '{{json .Config.ExposedPorts}}')" = '{"47323/tcp":{}}'
+
+      - name: The first start prints a pairing link
+        run: |
+          timeout 30 docker run --rm -e TAGALONG_PUBLIC_HOST=example.test tagalong:ci > serve.log 2>&1 || true
+          grep -q 'tagalong://pair?addr=example.test:47323' serve.log
+
   # Only what needs Windows, and only once the Linux job is green.
   e2e:
     needs: build

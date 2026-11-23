@@ -3182,6 +3182,18 @@ By hand on the owner's PC (never on a machine whose scheduled tasks matter):
 4. `uv run tagalong service remove`. **Expected:** `service status` prints `not installed` and the brain stops (`uv run tagalong stop` says it is not running).
 5. With Tailscale up on the brain machine, pair a desktop and connect. **Expected:** the desktop's saved addresses gain the `100.x.y.z:47323` address.
 
+## Brain as a server (automated; the install and Docker by hand)
+
+Automated: `brain/tests/test_serve_cli.py` (`serve` saves the network switch, prints the link before the brain starts and only while no device is paired, `--install-service` installs and does not run the brain, `TAGALONG_PUBLIC_HOST` is the link's address, `update` runs `uv tool upgrade brain`). CI's `image` job builds the Dockerfile and checks that only 47323 is exposed and that the first start prints a link.
+
+By hand, on a spare machine or a throwaway account (never run an install script on a machine you care about):
+
+1. Run `install/install.sh` (or `install.ps1`). **Expected:** uv and the brain install, and it prints `tagalong key set` and `tagalong serve --install-service` as the next steps.
+2. `tagalong key set`, then `tagalong serve`. **Expected:** a QR and a `tagalong://pair?...` link print and the brain runs; stopping and running it again prints `Pair another device with tagalong pair`.
+3. From a second PC, open the link in the desktop. **Expected:** it connects to the server brain.
+4. `docker run -v tagalong:/data -p 47323:47323 -e TAGALONG_PUBLIC_HOST=<host> <image>`. **Expected:** the log shows a QR; `docker port <container>` lists 47323 only; pairing from another PC works.
+5. `tagalong update`. **Expected:** uv upgrades the brain and it says to restart.
+
 ## Pair another device (automated; the network part by hand)
 
 Automated: `brain/tests/test_devices.py`, `test_pairing.py` (one use, expiry, five wrong codes lock the right one out, a kind-bound code), `test_server_pairing.py` (`pair` before `hello`, loopback takes only browser codes, revoke closes the connection and a reconnect gets `unauthorized`), `test_auth.py` (the network listener takes device tokens and not the local token), `test_pair_cli.py`, `test_discovery.py` and `test_device_tools.py` (`pair_make` refuses non-browser kinds with the network off).
