@@ -157,6 +157,7 @@ async def _run() -> None:
     devices, pairing = build_pairing(
         memory.db,
         identity,
+        config.public_host,
         config.network_port,
         on_revoke=lambda device_id: bodies.drop_principal(f"device:{device_id}"),
     )

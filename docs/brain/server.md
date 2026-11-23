@@ -49,4 +49,4 @@ CI builds the image on every code change (the `image` job in `.github/workflows/
 
 ## The address in the pairing link
 
-The link names the machine by its LAN address. Behind Docker's network that is the container's address, which no other device can reach, so set `TAGALONG_PUBLIC_HOST` to the name or address devices should dial (the port is added). `tagalong pair` uses it too. It is read by the `tagalong` command only; the brain does not need it.
+The link names the machine by its LAN address. Behind Docker's network that is the container's address, which no other device can reach, so set `TAGALONG_PUBLIC_HOST` to the name or address devices should dial (the port is added). It is read once, into `Config.public_host`, and used by `tagalong serve`, `tagalong pair` and the pairing codes the running brain makes.

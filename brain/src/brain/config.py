@@ -76,6 +76,9 @@ class Config:
     started_by: Literal["desktop", "person", "service"] = "person"  # who owns the process
     network: bool = False  # also listen for bodies on other machines, over wss
     network_port: int = DEFAULT_NETWORK_PORT
+    public_host: str | None = (
+        None  # what a paired device dials, when this machine's LAN address is not it
+    )
 
 
 def split_command(cmd: str, posix: bool | None = None) -> list[str]:
@@ -159,6 +162,7 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
         ),
         network=env.get("TAGALONG_NETWORK") == "1",
         network_port=_positive_int(env, "TAGALONG_NETWORK_PORT", DEFAULT_NETWORK_PORT),
+        public_host=env.get("TAGALONG_PUBLIC_HOST") or None,
     )
 
 

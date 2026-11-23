@@ -113,7 +113,7 @@ def main(
     stdin: TextIO | None = None,
     stop: Callable[[Path], str] = stop_real_brain,
     now: Callable[[], float] = time.time,
-    host_addr: Callable[[], str] | None = None,
+    host_addr: Callable[[], str] = lan_address,
     service_for: Callable[[Path], Service] = real_service,
     run_brain: Callable[[], None] | None = None,
 ) -> int:
@@ -123,12 +123,11 @@ def main(
     config = load_config(env)
     home = config.data_dir
     load_env_file(home, env)  # the brain reads the same .env
+    config = load_config(env)
     run = run or partial(real_run_cmd, timeout=NPM_TIMEOUT_S)
     machine = inspect_fn or partial(inspect, home, run)
     reg = Registry(home, get_json)
     stdin = stdin or sys.stdin
-    # Behind Docker the machine's own address is the container's, which no other device can reach.
-    host_addr = host_addr or (lambda: env.get("TAGALONG_PUBLIC_HOST") or lan_address())
 
     async def go() -> None:
         if args.cmd == "doctor":
@@ -144,7 +143,7 @@ def main(
         elif args.cmd == "serve":
             _serve(args.install_service, config, service_for(home), env, host_addr, run_brain, out)
         elif args.cmd == "update":
-            await _update(run, out)
+            await _update(run, env, out)
         elif args.cmd == "key":
             _key(home, env, args.stdin, stdin, secret, out)
         elif args.cmd == "install":
@@ -215,8 +214,13 @@ def _pair(config, kind: str, host_addr: Callable[[], str], out) -> None:
             "brain, then run this again."
         )
     db = open_db(config.data_dir / "tagalong.db")
+
     _, pairing = build_pairing(
-        db, load_or_create_identity(config.data_dir), config.network_port, host_addr
+        db,
+        load_or_create_identity(config.data_dir),
+        config.public_host,
+        config.network_port,
+        host_addr,
     )
     offer = pairing.make_code(kind)
     if kind == "browser":  # redeemed on this machine only, so a code and no address
@@ -247,8 +251,8 @@ def _serve(install, config, service: Service, env, host_addr, run_brain, out) ->
         run_brain()
 
 
-async def _update(run: RunCmd, out) -> None:
-    done = await run(["uv", "tool", "upgrade", "brain"], os.environ, None)
+async def _update(run: RunCmd, env, out) -> None:
+    done = await run(["uv", "tool", "upgrade", "brain"], env, None)
     if done.code != 0:
         raise _Fail(f"The update failed: {(done.err or done.out).strip()}")
     out("Updated. A running brain uses the new version after `tagalong stop` and a restart.")

@@ -4,7 +4,7 @@
 FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 
 ENV UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy \
+    UV_NO_CACHE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONUTF8=1 \
     TAGALONG_HOME=/data \

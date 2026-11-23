@@ -97,9 +97,14 @@ class Pairing:
 def build_pairing(
     db: sqlite3.Connection,
     identity: Identity,
+    public_host: str | None,
     port: int,
     host_addr: Callable[[], str] = lan_address,
     on_revoke: Callable[[str], None] = lambda _id: None,
 ) -> tuple[Devices, Pairing]:
     devices = Devices(db, utc_now_text, on_revoke)
-    return devices, Pairing(db, devices, identity, utc_now_text, lambda: f"{host_addr()}:{port}")
+
+    def address() -> str:
+        return f"{public_host or host_addr()}:{port}"
+
+    return devices, Pairing(db, devices, identity, utc_now_text, address)
