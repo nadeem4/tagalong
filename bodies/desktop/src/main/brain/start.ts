@@ -11,13 +11,12 @@ import type { CaptureNotice } from '../../shared/ipc';
 import type { Platform } from '../platform/index';
 import { bodyTools } from './body-tools';
 import type { LinkStore, PairedLink } from './link-store';
-import { readLocalToken } from './launch';
+import { localBrainAddr, readLocalToken } from './launch';
 import { pinnedSocket } from './pinned-socket';
 import type { ReadingDeps } from './body-tools';
 import type { ConnectAiTool } from './body-tools';
 import type { FileDeps } from '../tools/files';
 
-const DEFAULT_ADDR = '127.0.0.1:47321';
 const SEARCH_EVERY_MS = 30_000;
 
 type StartBrainOptions = Pick<
@@ -103,7 +102,7 @@ export function startBrain(options: StartBrainOptions): BrainClient {
   };
   const dial = (): DialTarget & { fp?: string } => {
     const paired = link.paired();
-    if (paired === null) return { scheme: 'ws', addr: env.TAGALONG_BRAIN_ADDR ?? DEFAULT_ADDR };
+    if (paired === null) return { scheme: 'ws', addr: localBrainAddr(env) };
     const key = JSON.stringify([paired.addrs, paired.fp]);
     if (key !== cursor.key) {
       restart(key);

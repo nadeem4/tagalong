@@ -61,7 +61,7 @@ import { runCommand } from './tools/run-command';
 import { ownBuild } from './brain/build-id';
 import {
   brainLogPath,
-  DEFAULT_ADDR,
+  localBrainAddr,
   dataDir as brainDataDir,
   realLaunch,
   realRestartService,
@@ -365,7 +365,7 @@ async function start(): Promise<void> {
       brain: () => {
         const paired = link.paired();
         return paired === null
-          ? { addr: process.env.TAGALONG_BRAIN_ADDR ?? DEFAULT_ADDR, fingerprint: null }
+          ? { addr: localBrainAddr(process.env), fingerprint: null }
           : { addr: paired.lastGood ?? paired.addrs[0] ?? '', fingerprint: paired.fp };
       },
       run: runCommand,

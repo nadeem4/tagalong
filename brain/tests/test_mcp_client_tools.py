@@ -47,7 +47,7 @@ async def test_the_token_goes_to_the_desktop_and_never_to_the_model(tmp_path):
     answer = await handlers["connect_ai_tool"]({"tool": "claude-code", "personal": True})
     ((body_id, tool, given),) = bodies.used
     assert (body_id, tool) == ("desk", "connect_ai_tool")
-    assert given["tool"] == "claude-code" and given["name"] == "claude-code"
+    assert given["tool"] == "claude-code"
     principal = devices.verify(given["token"])
     assert (principal.kind, principal.name, principal.personal) == (
         "mcp_client",
@@ -104,3 +104,11 @@ async def test_show_me_gives_the_line_and_no_secret(tmp_path):
     text = await handlers["ai_tool_howto"]({"tool": "codex"})
     assert "`codex mcp add tagalong -- cmd /c tagalong memory-mcp --client codex`" in text
     assert "--pair" in text and devices.list() == []
+
+
+async def test_a_body_call_that_times_out_cuts_the_new_client_off_too(tmp_path):
+    bodies = FakeBodies([DESKTOP], local=["desk"], fail=TimeoutError())
+    devices, handlers = rig(tmp_path, bodies)
+    with pytest.raises(TimeoutError):
+        await handlers["connect_ai_tool"]({"tool": "codex"})
+    assert devices.verify(bodies.used[0][2]["token"]) is None

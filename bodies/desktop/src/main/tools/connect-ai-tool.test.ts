@@ -6,7 +6,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { connectAiTool, type RunResult } from './connect-ai-tool';
+import { connectAiTool, type RunOptions, type RunResult } from './connect-ai-tool';
 
 const TOKEN = 'secret-token-value';
 let dir: string;
@@ -14,7 +14,7 @@ let calls: { command: string; args: string[]; input?: string }[];
 let answers: (command: string, args: string[]) => Partial<RunResult>;
 
 function setup(windows = true) {
-  const run = async (command: string, args: string[], opts?: { input?: string }) => {
+  const run = async (command: string, args: string[], opts?: RunOptions) => {
     calls.push({ command, args, ...(opts?.input === undefined ? {} : { input: opts.input }) });
     return { code: 0, stdout: '', stderr: '', ...answers(command, args) };
   };
@@ -42,6 +42,21 @@ afterEach(() => rmSync(dir, { recursive: true, force: true }));
 const linkFile = (name: string) => join(dir, 'home', 'memory-clients', `${name}.json`);
 
 describe('connect_ai_tool', () => {
+  it('stops inside its budget when a command never returns, and writes no pairing file', async () => {
+    const connect = connectAiTool({
+      home: () => join(dir, 'home'),
+      brain: () => ({ addr: '127.0.0.1:47321', fingerprint: null }),
+      run: () => new Promise(() => undefined),
+      tagalong: { command: 'tagalong', args: [] },
+      cursorConfig: join(dir, '.cursor', 'mcp.json'),
+      windows: true,
+      user: 'me',
+      budgetMs: 100,
+    });
+    await expect(connect({ tool: 'codex', token: TOKEN })).rejects.toThrow(/too long/);
+    expect(existsSync(linkFile('codex'))).toBe(false);
+  });
+
   it('writes the pairing file and adds Claude Code at user scope', async () => {
     const out = await setup()({ tool: 'claude-code', token: TOKEN });
     expect(JSON.parse(readFileSync(linkFile('claude-code'), 'utf8'))).toEqual({

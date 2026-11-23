@@ -17,7 +17,7 @@ from brain.bodies import Bodies
 from brain.devices import Devices
 from brain.pairing import Pairing
 from brain.protocol import ErrorCode, RpcError
-from brain.toolbox import Handler, ToolSpec
+from brain.toolbox import BODY_TOOL_TIMEOUTS, Handler, ToolSpec
 
 _HOME = frozenset({"home"})
 KIND = "mcp_client"
@@ -135,10 +135,10 @@ def connect_ai_tool_tools(devices: Devices, bodies: Bodies) -> list[tuple[ToolSp
                 desktop.id,
                 uuid.uuid4().hex,
                 "connect_ai_tool",
-                {"tool": name, "name": name, "token": token},
-                timeout=90.0,
+                {"tool": name, "token": token},
+                timeout=BODY_TOOL_TIMEOUTS["connect_ai_tool"],
             )
-        except RpcError:
+        except Exception:
             devices.revoke(device_id)
             raise
         for old in devices.list():

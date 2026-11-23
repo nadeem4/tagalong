@@ -444,7 +444,7 @@ The desktop app (`bodies/desktop`) is a body of this brain.
 - **Gate step 3: ask.** A call from Scout to a tool whose mode is `ask` waits for a person (see
   [Permissions and asks](permissions.md#tool-modes-and-cards)). A call from Home skips this step. A tool never
   runs without passing the gate.
-- **Body calls.** `use` waits at most 30 s, except `install_ocr_language` (`BODY_TOOL_TIMEOUTS` in `toolbox.py`, 660 s: it must stay above the desktop's own 630 s so the body answers first with "still installing"). On timeout or when the turn is cancelled the brain
+- **Body calls.** `use` waits at most 30 s, except `connect_ai_tool` (90 s) and `install_ocr_language` (`BODY_TOOL_TIMEOUTS` in `toolbox.py`, 660 s: it must stay above the desktop's own 630 s so the body answers first with "still installing"). On timeout or when the turn is cancelled the brain
   sends the body `cancel {call}`. If the body disconnects mid-call the result says it went
   offline. Response frames from a body are resolved in the read loop by `Bodies.resolve`.
 - **Long text results.** Over `TAGALONG_TOOL_PREVIEW_CHARS` a text result reaches the model as a
