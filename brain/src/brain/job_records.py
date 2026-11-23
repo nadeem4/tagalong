@@ -47,6 +47,7 @@ class JobPart:
     started_at: str
     ended_at: str | None
     folder: str  # parts of one job may work in different folders
+    host: str = "brain"  # where it ran: "brain" or a node's body id
 
 
 @dataclass(frozen=True)
@@ -104,6 +105,7 @@ class JobRecords:
             started_at=call.created_at,
             ended_at=call.ended_at,
             folder=detail.get("folder") or "",
+            host=detail.get("host") or "brain",
         )
 
     def _job(self, goal: WorkRow) -> Job:
@@ -246,6 +248,7 @@ class JobRecords:
         *,
         task_id: str | None = None,
         caused_by: str | None = None,
+        host: str = "brain",
     ) -> Job:
         """A running job with its first part, p1: a new goal, or the planned goal of a queued
         hand-off, which starts now. It belongs to `task_id`; its news says which event the
@@ -264,13 +267,19 @@ class JobRecords:
         self.work.set_job_detail(id, folder=folder, mode=mode, task=task)
         if parent_job:
             self.work.add_event(id, "continued", {"from": parent_job})
-        self.add_part(id, agent, task, folder)
+        self.add_part(id, agent, task, folder, host=host)
         job = self.get_job(id)
         assert job is not None
         return job
 
     def add_part(
-        self, job_id: str, agent: str, task: str, folder: str, part_id: str | None = None
+        self,
+        job_id: str,
+        agent: str,
+        task: str,
+        folder: str,
+        part_id: str | None = None,
+        host: str = "brain",
     ) -> str:
         """Add a running part to a job; returns its id (p1, p2, ...). part_id is one the caller
         reserved earlier. A job held up by a failed part runs again."""
@@ -282,7 +291,7 @@ class JobRecords:
         self.work.create(
             "expert_call", task, parent_id=job_id, id=work_id, state="active", input={"task": task}
         )
-        self.work.set_job_detail(work_id, agent=agent, folder=folder)
+        self.work.set_job_detail(work_id, agent=agent, folder=folder, host=host)
         return part_id
 
     def _store_text(self, work_id: str, text: str) -> None:

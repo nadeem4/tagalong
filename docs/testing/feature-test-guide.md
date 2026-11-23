@@ -945,6 +945,16 @@ on fakes. To see it by hand, add a loop with an anchor to a test store and open 
 4. Ask me asks one card per turn for an app, not one per call.
 5. Home's `placement_set` saves a placement and restarts the app; a bad one is refused and nothing is saved.
 
+## Where an expert runs (automated only)
+
+`cd brain && uv run pytest tests/test_experts_transport.py tests/test_job_host.py -q` on a fake node that runs the fake ACP agent:
+
+1. An expert session works over a node pipe like over local stdio (a part records host `pc`); a command the node's allow-list lacks is refused with the `tagalong node allow` line for that machine, a path with a space, or an argument with `&`, in double quotes. Connected apps are refused for an expert on a node.
+2. A job part records its host; a follow-up resumes on that host even after the placement changed.
+3. With the host offline, the follow-up is refused as `host_offline`, an open item ("<expert> could not start: <host> was offline") is left, and no job starts elsewhere; the item closes when that node connects. A hand-off for a queued job is refused as busy, not a crash.
+4. A host that drops during a run holds the part blocked with its session and Scout gets a `job_ended` wake saying it is paused; a follow-up carries it on.
+5. A folder that exists only on the node is accepted when the expert is placed there and refused on the brain.
+
 ## Open items (automated only)
 
 Permission cards, choices, installs and sign-ins are open items, and Home's Tasks page shows them

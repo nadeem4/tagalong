@@ -24,6 +24,7 @@ _KINDS = {
     "choice": ("Question", "Scout is waiting for your choice"),
     "expert_ask": ("Expert request", "An expert wants your OK"),
     "offer": ("Offer", ""),
+    "host_offline": ("Waiting for a machine", ""),
 }
 
 
@@ -34,6 +35,8 @@ def _row(item: OpenItem, now: datetime) -> dict:
         line = summarise(saved.get("text") or "", saved.get("name") or "", saved.get("input") or {})
     elif item.kind == "offer":
         line = saved.get("sentence") or "An offer from Scout"
+    elif item.kind == "host_offline":
+        line = f"{saved.get('expert')} could not start: {saved.get('host')} was offline"
     return {
         "id": item.id,
         "kind": word,

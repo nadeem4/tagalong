@@ -4076,3 +4076,11 @@ async def test_the_start_up_sweep_removes_old_ended_tasks():
     memory.db.commit()
     make(Gate([]), memory, screen=False)
     assert memory.db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0] == 0
+
+
+def test_a_node_connecting_closes_the_host_offline_item_for_it():
+    session, _ = make(Gate([]), screen=False)
+    session.items.open("host_offline", saved_call={"expert": "claude-acp", "host": "pc"})
+    session.items.open("host_offline", saved_call={"expert": "claude-acp", "host": "other"})
+    join(session, "pc")
+    assert [i.saved_call["host"] for i in session.items.list_open("host_offline")] == ["other"]

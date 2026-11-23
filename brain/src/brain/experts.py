@@ -1,6 +1,7 @@
 """ExpertRun and ExpertHost: drive an expert in a folder over ACP, knowing nothing of asks or jobs.
 
-One adapter process per expert (the host) serves its sessions; one session per run, reported
+One adapter process per expert (the host) serves its sessions, started here or, for an expert
+placed on a node, as a command the node runs and pipes back; one session per run, reported
 through async callbacks: on_permission -> option id | None,
 on_question -> answer dict | None (None cancels), on_progress, on_end(done|error|stopped).
 Each expert's API key variables are stripped from the child so it runs on the user's own login.
@@ -31,6 +32,10 @@ from acp.schema import (
     RequestPermissionResponse,
 )
 
+from brain.bodies import Bodies
+from brain.pipes import Pipe
+from brain.placements import Choose, Placements, Unavailable, resolve_placement
+from brain.protocol import ErrorCode, PipeSpec, RpcError
 from brain.setup.env import expert_env
 
 _NO_MESSAGE = object()
@@ -132,6 +137,14 @@ async def kill_tree(process: asyncio.subprocess.Process) -> None:
     await process.wait()
 
 
+def _quoted(part: str) -> str:
+    """The node's own shell is often Windows', where a space or one of `&()^|<>"` needs double
+    quotes."""
+    if not any(c in part for c in ' &()^|<>"'):
+        return part
+    return '"' + part.replace('"', '\\"') + '"'
+
+
 class ExpertHosts:
     """The Jobs factory: one ExpertHost per installed expert, a session handle per job."""
 
@@ -142,7 +155,11 @@ class ExpertHosts:
         quiet_s: float = 1200.0,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         clock: Callable[[], float] = time.monotonic,
+        placements: Placements | None = None,
+        bodies: Bodies | None = None,
     ) -> None:
+        self._placements = placements
+        self._bodies = bodies
         self._idle_s = idle_s
         self._quiet_s = quiet_s
         # One sleep seam serves both the hosts' idle timers and the runs' quiet sleepers,
@@ -152,17 +169,64 @@ class ExpertHosts:
         self._hosts: dict[tuple, ExpertHost] = {}
         self.bridge = None  # ExpertApps, set once the toolbox exists; None: no expert gets apps
 
-    def __call__(self, expert, **callbacks) -> "ExpertRun":
+    def locate(self, expert, pinned: str | None = None) -> str:
+        """Where a job for this expert runs: its saved session's host when there is one (a job
+        never moves), else the expert's placement. Raises Unavailable for a node that is away."""
+        if self._bodies is None:
+            return "brain"
+        if pinned is not None:
+            if pinned != "brain" and not self._bodies.is_online(pinned):
+                raise Unavailable(pinned)
+            return pinned
+        placement = self._placements.get("expert", expert.id) if self._placements else None
+        try:
+            return resolve_placement(
+                placement, self._bodies.is_online, shutil.which(expert.command[0]) is not None
+            )
+        except Choose:
+            return "brain"
+
+    async def folder_exists(self, where: str, folder: str) -> bool:
+        return await self._bodies.folder_exists(where, folder)
+
+    def _open_pipe(self, where: str, expert) -> Callable[[PipeSpec], Awaitable[Pipe]]:
+        async def open_pipe(spec: PipeSpec) -> Pipe:
+            try:
+                return await self._bodies.open_pipe(where, spec)
+            except RpcError as err:
+                name = self._bodies.name(where)
+                if err.code == ErrorCode.denied:
+                    approve = f"tagalong node allow {_quoted(spec.command)}"
+                    if spec.args:
+                        approve += " -- " + " ".join(_quoted(a) for a in spec.args)
+                    raise ExpertError(
+                        f"{expert.name} is not approved on {name}. On that machine run: {approve}"
+                    ) from None
+                raise ExpertError(
+                    f"{expert.name} could not start on {name}: {err.message}"
+                ) from None
+
+        return open_pipe
+
+    def __call__(self, expert, *, host: str = "brain", **callbacks) -> "ExpertRun":
         # A private Node's dir goes first on the child's PATH so the adapter's own scripts find it.
-        path_first = Path(expert.command[0]).parent if expert.node == "private" else None
-        key = (expert.id, tuple(expert.command))  # a reinstall with a new command is a new host
-        host = self._hosts.get(key)
-        if host is None:
-            host = self._hosts[key] = ExpertHost(
-                expert.command, expert.id, path_first, idle_s=self._idle_s, sleep=self._sleep
+        path_first = (
+            Path(expert.command[0]).parent if expert.node == "private" and host == "brain" else None
+        )
+        # A reinstall with a new command is a new host; so is the same expert on another machine.
+        key = (expert.id, tuple(expert.command), host)
+        adapter = self._hosts.get(key)
+        if adapter is None:
+            adapter = self._hosts[key] = ExpertHost(
+                expert.command,
+                expert.id,
+                path_first,
+                idle_s=self._idle_s,
+                sleep=self._sleep,
+                open_pipe=None if host == "brain" else self._open_pipe(host, expert),
             )
         return ExpertRun(
-            host=host,
+            host=adapter,
             quiet_s=self._quiet_s,
             sleep=self._sleep,
             clock=self._clock,
@@ -172,7 +236,7 @@ class ExpertHosts:
 
     def can_resume(self, expert_id: str) -> bool | None:
         """Whether this expert's adapter reopens sessions; None until it has been started once."""
-        known = [h.can_resume for (id_, _), h in self._hosts.items() if id_ == expert_id]
+        known = [h.can_resume for (id_, _, _), h in self._hosts.items() if id_ == expert_id]
         return next((k for k in known if k is not None), None)
 
     async def shutdown(self) -> None:
@@ -204,7 +268,9 @@ class ExpertHost:
         # room for a cold start without waiting forever on an adapter that never answers.
         startup_timeout: float = 60.0,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        open_pipe: Callable[[PipeSpec], Awaitable[Pipe]] | None = None,
     ) -> None:
+        self._open_pipe = open_pipe  # None: the adapter is a local child process
         self._command = command
         self._expert_id = expert_id
         self._path_first = path_first
@@ -220,10 +286,21 @@ class ExpertHost:
         self._shutdown_task: asyncio.Future | None = None
         self.conn = None
         self.process: asyncio.subprocess.Process | None = None
+        self._pipe: Pipe | None = None
         self.can_resume: bool | None = None  # known after the first initialize
         self.http_mcp = False  # whether the agent takes an http MCP server; same moment
 
-    def _alive(self) -> bool:
+    @property
+    def on_node(self) -> bool:
+        return self._open_pipe is not None
+
+    @property
+    def lost_node(self) -> bool:
+        return self._pipe is not None and self._pipe.ended
+
+    def alive(self) -> bool:
+        if self._pipe is not None:
+            return not self._pipe.ended
         return self.process is not None and self.process.returncode is None
 
     async def open(self, run: "ExpertRun", folder: Path, resume: str | None) -> list[Mode]:
@@ -257,29 +334,12 @@ class ExpertHost:
         async with self._lock:
             if self._shutdown_task is not None:
                 await self._shutdown_task
-            if self._alive():
+            if self.alive():
                 return
             await self._shutdown()  # clear what a crashed process left behind
-            exe = shutil.which(self._command[0])
-            if exe is None:
-                raise ExpertError(f"command not found: {self._command[0]}")
-            # Explicit env: ours, minus the keys that would switch this expert off the user's login.
-            env = expert_env(self._expert_id, os.environ)
-            if self._path_first is not None:
-                env["PATH"] = str(self._path_first) + os.pathsep + env.get("PATH", "")
             self._stack = AsyncExitStack()
             try:
-                self.conn, self.process = await self._stack.enter_async_context(
-                    acp.spawn_agent_process(
-                        _Client(self),
-                        exe,
-                        *self._command[1:],
-                        env=env,
-                        # Nobody reads the adapter's stderr; a full pipe would stall it.
-                        transport_kwargs={"stderr": subprocess.DEVNULL},
-                        use_unstable_protocol=True,
-                    )
-                )
+                self.conn = await self._connect()
                 caps = ClientCapabilities(
                     elicitation=ElicitationCapabilities(form=ElicitationFormCapabilities()),
                     field_meta=CLIENT_META,
@@ -294,6 +354,53 @@ class ExpertHost:
             self.can_resume = bool(load)
             mcp = getattr(init.agent_capabilities, "mcp_capabilities", None)
             self.http_mcp = bool(getattr(mcp, "http", False))
+
+    async def _connect(self):
+        if self._open_pipe is not None:
+            return await self._connect_pipe()
+        exe = shutil.which(self._command[0])
+        if exe is None:
+            raise ExpertError(f"command not found: {self._command[0]}")
+        # Explicit env: ours, minus the keys that would switch this expert off the user's login.
+        env = expert_env(self._expert_id, os.environ)
+        if self._path_first is not None:
+            env["PATH"] = str(self._path_first) + os.pathsep + env.get("PATH", "")
+        conn, self.process = await self._stack.enter_async_context(
+            acp.spawn_agent_process(
+                _Client(self),
+                exe,
+                *self._command[1:],
+                env=env,
+                # Nobody reads the adapter's stderr; a full pipe would stall it.
+                transport_kwargs={"stderr": subprocess.DEVNULL},
+                use_unstable_protocol=True,
+            )
+        )
+        return conn
+
+    async def _connect_pipe(self):
+        """The adapter runs on a node; its stdout and stdin are the pipe's two directions."""
+        self._pipe = pipe = await self._open_pipe(
+            PipeSpec(command=self._command[0], args=self._command[1:])
+        )
+        reader = asyncio.StreamReader()
+
+        async def pump() -> None:
+            while (chunk := await pipe.read()) is not None:
+                reader.feed_data(chunk)
+            reader.feed_eof()
+
+        pumping = asyncio.ensure_future(pump())
+        self._stack.callback(pumping.cancel)
+        writer = asyncio.StreamWriter(
+            _PipeTransport(pipe),
+            asyncio.StreamReaderProtocol(reader),
+            reader,
+            asyncio.get_running_loop(),
+        )
+        conn = acp.connect_to_agent(_Client(self), writer, reader, use_unstable_protocol=True)
+        self._stack.push_async_callback(conn.close)
+        return conn
 
     async def _open_session(self, run: "ExpertRun", folder: Path, resume: str | None) -> list[Mode]:
         session = None
@@ -333,7 +440,7 @@ class ExpertHost:
             del self._sessions[run.session_id]
         if self._sessions or self._opening:
             return
-        if self._idle_s <= 0 or broken or not self._alive():
+        if self._idle_s <= 0 or broken or not self.alive():
             await self._shutdown()
         elif self._idle_task is None:
             self._idle_task = asyncio.ensure_future(self._stop_when_idle())
@@ -371,8 +478,10 @@ class ExpertHost:
 
     async def _do_shutdown(self) -> None:
         stack, self._stack = self._stack, None
-        process = self.process
+        process, pipe, self._pipe = self.process, self._pipe, None
         try:
+            if pipe is not None:
+                pipe.close()
             if process is not None:
                 with suppress(Exception):
                     process.stdin.close()  # the adapter exits by itself when stdin closes
@@ -450,6 +559,8 @@ class ExpertRun:
     async def apps_server(self) -> list:
         """The `mcp_servers` for this session: the bridge when apps were granted, else none."""
         if not self.apps or self._bridge is None:
+            return []
+        if self._host.on_node:  # the grant's address and token are the brain's own, not for a node
             return []
         if not self._host.http_mcp:
             log.warning("expert does not accept http MCP servers; apps not offered to it")
@@ -572,6 +683,8 @@ class ExpertRun:
         except Exception as exc:
             if self._stopping:
                 state, reason = "stopped", "stopped"
+            elif self._host.lost_node:
+                state, reason = "host_lost", "the machine it ran on dropped"
             else:
                 state, reason = (
                     "error",
@@ -627,10 +740,8 @@ class ExpertRun:
             self._quiet_from = self._clock()
             if self._asks:
                 continue
-            process = self._host.process
-            alive = process is not None and process.returncode is None
             try:
-                await self._on_quiet(QuietFacts(self._quiet_s, alive))
+                await self._on_quiet(QuietFacts(self._quiet_s, self._host.alive()))
             except Exception:
                 log.exception("expert on_quiet failed")
 
@@ -640,6 +751,23 @@ class ExpertRun:
             self.progress = ""
         self.progress += text
         await self._on_progress(self.progress)
+
+
+class _PipeTransport(asyncio.Transport):
+    """What ACP's StreamWriter writes to when the adapter is on the other end of a node pipe."""
+
+    def __init__(self, pipe: Pipe) -> None:
+        super().__init__()
+        self._pipe = pipe
+
+    def write(self, data: bytes) -> None:
+        self._pipe.write(data)
+
+    def is_closing(self) -> bool:
+        return self._pipe.ended
+
+    def close(self) -> None:
+        self._pipe.close()
 
 
 class _Client:

@@ -332,6 +332,7 @@ def test_work_job_keeps_task_folder_mode_agent(work):
         "task": "fix it",
         "approved_at": None,
         "rechecked_at": None,
+        "host": "brain",
     }
     assert work.job_detail("run1.p2")["agent"] == "claude-acp"
     assert work.job_detail("run1.p2")["folder"] == "C:/b"

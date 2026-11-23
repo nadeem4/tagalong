@@ -460,6 +460,7 @@ What a job row needs that `work` has no column for. One row per goal and per exp
 | `task`         | TEXT             | What was asked first (goal)                                                                                     |
 | `approved_at`  | TEXT NULL        | When an approved hand-off joined the queue (goal); orders the line, null for a job that started at once         |
 | `rechecked_at` | TEXT NULL        | When the person last said a held job still stands; the one-hour recheck counts from it, else from `approved_at` |
+| `host`         | TEXT             | Where an expert call ran: `brain` or a node's body id (migration 0043); a saved session resumes only there      |
 
 - Written by: `job_records.py` through `WorkStore.set_job_detail`.
 - Read by: `job_records.py` through `WorkStore.job_details`; the queue by `WorkStore.queued_goals` (`planned` goals with an `approved_at`, oldest first).
@@ -823,7 +824,7 @@ gone.
 | Column            | Type             | Meaning                                                                                        |
 | ----------------- | ---------------- | ---------------------------------------------------------------------------------------------- |
 | `id`              | TEXT PRIMARY KEY | A random hex id                                                                                |
-| `kind`            | TEXT             | `ask`, `choice`, `install`, `signin`, `expert_ask` or `offer` (CHECK)                          |
+| `kind`            | TEXT             | `ask`, `choice`, `install`, `signin`, `expert_ask`, `offer` or `host_offline` (CHECK)          |
 | `task_id`         | TEXT             | The task of the turn that opened it, or null; an expert's ask takes its job's task             |
 | `caused_by`       | TEXT             | The event the asking turn took (an expert's ask: its job's), or null                           |
 | `state`           | TEXT             | `open`, `answered`, `done` or `expired` (CHECK); default `open`                                |
@@ -866,7 +867,7 @@ Where an app or expert runs (migration 0042). Code reaches it through `placement
 | `body_id`     | TEXT | The node's body id; null for `brain`                        |
 | `prefer`      | TEXT | `body`, `brain` or `ask` for `both`; null otherwise         |
 
-- Written by: Home's `placement_set` (`placement_tools.py`). Read by: `Apps` (at launch and per call).
+- Written by: Home's `placement_set` (`placement_tools.py`). Read by: `Apps` (at launch and per call) and `ExpertHosts.locate` (per hand-off).
 - Retention: until it is set again. No row means `brain`.
 
 ### apps

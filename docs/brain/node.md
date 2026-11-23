@@ -45,6 +45,6 @@ A hash covers the file the command resolves to, not what that file goes on to lo
 ## Not supported yet
 
 - A spec that is an HTTP MCP URL (an app with an http transport cannot be placed on a node yet), and the browser add-on's loopback proxy: BA10.
-- The expert host's use of the pipe client: BA8. The toolbox's use (an app's stdio MCP server over a node) is in place; see [Where an app runs](../bodies/connected-apps.md#where-an-app-runs).
+- The brain does not install an expert on a node: it runs the expert's installed command there once the person has approved it. Both the toolbox's use (an app's stdio MCP server, [Where an app runs](../bodies/connected-apps.md#where-an-app-runs)) and the expert host's use ([Where an expert runs](experts.md#where-an-expert-runs)) go over a pipe.
 
 The node reuses the desktop's device token under body id `node-xxxxxx`, so it cannot be revoked apart from the desktop and its device kind is `desktop`.

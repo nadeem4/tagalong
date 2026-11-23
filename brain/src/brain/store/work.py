@@ -404,17 +404,19 @@ class WorkStore:
         task: str | None = None,
         approved_at: str | None = None,
         rechecked_at: str | None = None,
+        host: str | None = None,
     ) -> None:
         """Save the detail row; an argument left at None keeps what was saved."""
         self.db.execute(
-            "INSERT INTO work_job(work_id, agent, folder, mode, task, approved_at, rechecked_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO work_job(work_id, agent, folder, mode, task, approved_at, rechecked_at,"
+            " host) VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, 'brain'))"
             " ON CONFLICT(work_id) DO UPDATE SET agent = COALESCE(excluded.agent, agent),"
             " folder = COALESCE(excluded.folder, folder), mode = COALESCE(excluded.mode, mode),"
             " task = COALESCE(excluded.task, task),"
             " approved_at = COALESCE(excluded.approved_at, approved_at),"
-            " rechecked_at = COALESCE(excluded.rechecked_at, rechecked_at)",
-            (work_id, agent, folder, mode, task, approved_at, rechecked_at),
+            " rechecked_at = COALESCE(excluded.rechecked_at, rechecked_at),"
+            " host = COALESCE(?, host)",
+            (work_id, agent, folder, mode, task, approved_at, rechecked_at, host, host),
         )
 
     def set_text(self, id: str, summary: str | None, detail_id: str | None) -> None:
@@ -430,13 +432,22 @@ class WorkStore:
     def job_details(self, ids: Sequence[str]) -> dict[str, dict]:
         marks = ",".join("?" * len(ids))
         rows = self.db.execute(
-            "SELECT work_id, agent, folder, mode, task, approved_at, rechecked_at FROM work_job"
+            "SELECT work_id, agent, folder, mode, task, approved_at, rechecked_at, host"
+            " FROM work_job"
             f" WHERE work_id IN ({marks})",
             list(ids),
         )
         return {
-            w: {"agent": a, "folder": f, "mode": m, "task": t, "approved_at": p, "rechecked_at": r}
-            for w, a, f, m, t, p, r in rows
+            w: {
+                "agent": a,
+                "folder": f,
+                "mode": m,
+                "task": t,
+                "approved_at": p,
+                "rechecked_at": r,
+                "host": h,
+            }
+            for w, a, f, m, t, p, r, h in rows
         }
 
     def add_event(self, id: str, kind: str, data: dict | None = None) -> None:

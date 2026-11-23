@@ -29,6 +29,7 @@ from brain.masking import Masker, mask_secrets
 from brain.memory import Memory
 from brain.open_items import OpenItemRefused, OpenItems
 from brain.permission import Decision, Engine, Grant, Person, SideCheckDecider
+from brain.placements import Placements
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.store import InstalledExpert
 from brain.store import rules
@@ -181,6 +182,7 @@ class Rig:
         load: bool | str = False,
         apps=None,
         before_start=None,
+        bodies=None,
     ) -> None:
         self.bridge = FakeBridge()
         script = tmp_path / "script.json"
@@ -216,7 +218,10 @@ class Rig:
         self.engine = engine or Engine(deciders, self.approvals, self.offers, lambda name: None)
         # shared: the real factory, one warm adapter per expert; its idle wait never ends here.
         self.gate = asyncio.Event()
-        self.hosts = ExpertHosts(300, sleep=lambda s: self.gate.wait())
+        self.placements = Placements(self.memory.db)
+        self.hosts = ExpertHosts(
+            300, sleep=lambda s: self.gate.wait(), bodies=bodies, placements=self.placements
+        )
         self.records = JobRecords(
             WorkStore(self.memory.db, lambda: self.wall), self.memory.db, lambda: self.wall
         )
@@ -254,7 +259,7 @@ class Rig:
         self.emitted.append(event)
         self.events.post(event)
 
-    def make_run(self, expert, **callbacks) -> ExpertRun:
+    def make_run(self, expert, host="brain", **callbacks) -> ExpertRun:
         self.expert_ids.append(expert.id)
         host = ExpertHost(expert.command, expert.id, idle_s=0, grace=2)
         run = ExpertRun(
@@ -385,7 +390,7 @@ async def test_begin_failure_ends_the_row_as_error_kills_the_adapter_and_frees_t
     rig = make_rig(FakeAsks(), max_running=1)
     original = rig.make_run
 
-    def failing(expert, **callbacks):
+    def failing(expert, host="brain", **callbacks):
         run = original(expert, **callbacks)
 
         async def boom(mode_id, task):
@@ -410,7 +415,7 @@ async def test_start_failure_from_the_adapter_is_a_plain_message(make_rig):
     rig = make_rig(FakeAsks())
     original = rig.make_run
 
-    def failing(expert, **callbacks):
+    def failing(expert, host="brain", **callbacks):
         run = original(expert, **callbacks)
 
         async def refuse(folder, resume=None):
@@ -3167,7 +3172,7 @@ async def test_a_job_that_waited_behind_an_update_starts_the_updated_command(mak
     commands: list[list[str]] = []
     real = rig.jobs._make_run
 
-    def spy(expert, **callbacks):
+    def spy(expert, host="brain", **callbacks):
         commands.append(expert.command)
         return real(expert, **callbacks)
 

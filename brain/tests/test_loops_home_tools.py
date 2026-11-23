@@ -278,3 +278,11 @@ async def test_loops_state_has_no_held_open_items_and_loops_can_still_be_held(ri
     lp = rig.add()
     state = await rig.call("loops_state")
     assert [(x["id"], x["status"]) for x in state["loops"]] == [(lp.id, "held")]
+
+
+async def test_a_job_waiting_for_its_machine_shows_on_home(rig):
+    rig.items.open("host_offline", saved_call={"expert": "claude-acp", "host": "pc"})
+    rows = (await rig.call("loops_state"))["open_items"]
+    assert [(r["kind"], r["title"]) for r in rows] == [
+        ("Waiting for a machine", "claude-acp could not start: pc was offline")
+    ]

@@ -308,6 +308,14 @@ class Bodies:
         except (KeyError, TypeError):
             raise RpcError(ErrorCode.tool_failed, "malformed response from body") from None
 
+    async def folder_exists(self, body_id: str, path: str, timeout: float = 10.0) -> bool:
+        """Whether a folder exists on a node's machine; a node that cannot answer says no."""
+        try:
+            result = await self._request(body_id, "folder_check", {"path": path}, timeout)
+        except RpcError:
+            return False
+        return bool(result.get("exists"))
+
     async def _request(
         self,
         body_id: str,

@@ -996,6 +996,7 @@ class Session:
     def _on_connect(self, body_id: str, away: float | None) -> None:
         if self._apps is not None:
             self._apps.body_changed(body_id)
+        self.jobs.body_connected(body_id)
         kind = next((b.kind for b in self._bodies.online() if b.id == body_id), None)
         event = from_connect(body_id, away, kind)
         if event is not None:

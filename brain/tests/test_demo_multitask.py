@@ -167,7 +167,7 @@ async def test_3b_an_open_hand_off_card_does_not_block_new_says_and_news(tmp_pat
     folder.mkdir()
     clock, bridge, runs = FakeClock(), FakeBridge(), []
 
-    def make_run(expert, **callbacks):
+    def make_run(expert, host="brain", **callbacks):
         host = ExpertHost(expert.command, expert.id, idle_s=0, grace=2)
         run = ExpertRun(
             host=host, sleep=clock.sleep, clock=clock.clock, grace=2, bridge=bridge, **callbacks

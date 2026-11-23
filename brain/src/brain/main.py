@@ -294,7 +294,12 @@ async def _run() -> None:
         bodies,
         config.step_cap,
         memory,
-        make_run=ExpertHosts(config.expert_idle_s, quiet_s=config.job_quiet_min * 60),
+        make_run=ExpertHosts(
+            config.expert_idle_s,
+            quiet_s=config.job_quiet_min * 60,
+            placements=Placements(memory.db),
+            bodies=bodies,
+        ),
         experts=lambda: all_experts(experts, config.expert_cmd),
         apps=apps,
         before_job=updates.quiet,  # a job never starts in the middle of an update's swap

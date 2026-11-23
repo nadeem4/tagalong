@@ -35,6 +35,7 @@ from brain.permission import (
     expert_asker,
     summarise,
 )
+from brain.placements import Unavailable
 from brain.protocol import RpcError
 from brain.questions import ScoutQuestions
 from brain.setup.install import NODE_FLOOR
@@ -341,6 +342,7 @@ class Jobs:
             raise JobError("pass continue_job or fresh, not both")
         earlier = self._earlier(continue_job, folder, expert) if continue_job else None
         earlier_part = earlier.parts[-1] if earlier else None
+        existing = None
         if job is not None:
             existing = self._records.get_job(job)
             if existing is None:
@@ -350,11 +352,20 @@ class Jobs:
         chosen = await self._pick(earlier_part.agent if earlier_part else expert)
         offered = self._check_apps(apps)
         path = Path(folder)
-        if not (path.is_absolute() and path.is_dir()):
-            raise JobError(f"no folder at {folder}")
         if earlier is None and not fresh:
             found = self._records.last_part_for(chosen.id, str(path))
             earlier, earlier_part = found if found else (None, None)
+        pinned = earlier_part.host if earlier_part and earlier_part.session_id else None
+        if pinned is None and existing is not None:
+            pinned = existing.parts[0].host if existing.parts else None
+        try:
+            where = self._where(chosen, pinned)
+        except Unavailable as gone:
+            raise await self._host_offline(
+                chosen, gone.body_id, folder, task, task_id, caused_by
+            ) from None
+        if not await self._folder_exists(where, folder):
+            raise JobError(f"no folder at {folder}")
         job_id = job or uuid.uuid4().hex[:8]
         clean = mask_json(self._guards, "job_title", title.strip()) if title else ""
         key = job_id if job is None else uuid.uuid4().hex  # one slot claim per start
@@ -374,6 +385,7 @@ class Jobs:
                     "resume": earlier_part
                     and {"job": earlier_part.job_id, "part": earlier_part.id},
                     "explicit": bool(continue_job),
+                    "host": where,
                 },
                 clean.strip(),
             )
@@ -384,6 +396,7 @@ class Jobs:
             path,
             earlier=earlier,
             earlier_part=earlier_part,
+            pinned=where,
             new_job=job is None,
             apps=offered,
             mode=mode,
@@ -398,6 +411,40 @@ class Jobs:
             saved = self._records.get_job(str(started))
             started.title = job_title(saved) if saved else None
         return started
+
+    def _where(self, chosen: InstalledExpert, pinned: str | None) -> str:
+        """The machine this part runs on: the one its job is pinned to (a job never moves), else
+        the expert's placement."""
+        if self._hosts is None:
+            return "brain"
+        return self._hosts.locate(chosen, pinned)
+
+    async def _folder_exists(self, where: str, folder: str) -> bool:
+        if where == "brain":
+            path = Path(folder)
+            return path.is_absolute() and path.is_dir()
+        return await self._hosts.folder_exists(where, folder)
+
+    async def _host_offline(
+        self,
+        chosen: InstalledExpert,
+        body_id: str,
+        folder: str,
+        task: str,
+        task_id: str | None,
+        caused_by: str | None,
+    ) -> JobError:
+        """The machine this job belongs to is away: leave an open item for it and refuse, as a
+        fact. Nothing starts anywhere else."""
+        call = {"expert": chosen.id, "host": body_id, "folder": folder, "task": task}
+        if self._items is not None and self._items.find_open("host_offline", call) is None:
+            self._items.open("host_offline", saved_call=call, task_id=task_id, caused_by=caused_by)
+        return await self._refusal(
+            f"{chosen.id} runs on {body_id}, which is not connected right now",
+            "host_offline",
+            chosen.id,
+            host=body_id,
+        )
 
     def _after_start(
         self,
@@ -475,6 +522,7 @@ class Jobs:
         *,
         earlier: Job | None = None,
         earlier_part: JobPart | None = None,
+        pinned: str | None = None,
         new_job: bool = True,
         apps: tuple[str, ...] = (),
         mode: str | None = None,
@@ -494,8 +542,13 @@ class Jobs:
             part = redo.id.split(".", 1)[1]
         else:
             part = "p1" if new_job else self._reserve_part(job_id)
+        try:
+            where = self._where(chosen, pinned)
+        except Unavailable as gone:
+            raise JobError(f"{chosen.id} runs on {gone.body_id}, which is not connected") from None
         run = self._make_run(
             chosen,
+            host=where,
             job_id=job_id,
             on_permission=lambda request: self._permission(job_id, request, part),
             on_question=lambda question: self._question(job_id, question, part),
@@ -538,13 +591,14 @@ class Jobs:
                     parent,
                     task_id=task_id,
                     caused_by=caused_by,
+                    host=where,
                 )
             else:
                 # Scout may have closed the job while the start awaited the expert or the card.
                 current = self._records.get_job(job_id)
                 if current is None or current.closed_at:
                     raise JobError(f"job {job_id} is closed; open a new job instead")
-                added = self._records.add_part(job_id, chosen.id, task, str(path), part)
+                added = self._records.add_part(job_id, chosen.id, task, str(path), part, where)
                 assert added == part
             self._runs.setdefault(job_id, {})[part] = run
             self._activity.setdefault(job_id, {})[part] = JobActivity(
@@ -607,6 +661,7 @@ class Jobs:
             part.task,
             Path(part.folder),
             earlier_part=part,
+            pinned=part.host,
             new_job=False,
             redo=row,
         )
@@ -746,6 +801,21 @@ class Jobs:
             parts = earlier.parts if earlier else []
             earlier_part = next((p for p in parts if p.id == resume.get("part")), None)
             self._check_apps(wants.get("apps") or (), settling=settling)  # one may be gone now
+            folder = detail.get("folder") or ""
+            pinned = wants.get("host")
+            try:
+                where = self._where(chosen, pinned)
+            except Unavailable as gone:
+                raise await self._host_offline(
+                    chosen,
+                    gone.body_id,
+                    folder,
+                    detail.get("task") or "",
+                    goal.task_id,
+                    wants.get("caused_by"),
+                ) from None
+            if not await self._folder_exists(where, folder):
+                raise JobError(f"no folder at {folder}")
             await self._start_part(
                 goal.id,
                 chosen,
@@ -753,6 +823,7 @@ class Jobs:
                 Path(detail.get("folder") or ""),
                 earlier=earlier if earlier_part else None,
                 earlier_part=earlier_part,
+                pinned=pinned,
                 apps=tuple(wants.get("apps") or ()),
                 mode=detail.get("mode"),
                 task_id=goal.task_id,
@@ -1048,7 +1119,10 @@ class Jobs:
 
     def note(self, job: Job) -> str:
         """The wake text for a finished job: its row and the summary of its steps."""
-        return job_note(job, self.wake_facts(job.id), self._outputs)
+        return self.note_with(job, {})
+
+    def note_with(self, job: Job, facts: dict[str, str]) -> str:
+        return job_note(job, {**facts, **self.wake_facts(job.id)}, self._outputs)
 
     def activity_line(self, job_id: str) -> str:
         """One line about a job's steps for list_jobs; empty when it recorded none."""
@@ -1275,19 +1349,65 @@ class Jobs:
         self._progress_sent.pop(job_id, None)
         return True
 
+    def _hold_lost(self, job_id: str, part: str, reason: str) -> bool:
+        """The machine a part ran on dropped: one with a saved session is held for Scout to carry
+        on, as the resume scan holds it, and False for one with none, which ends as failed."""
+        work = self._records.work
+        work_id = f"{job_id}.{part}"
+        row = work.get(work_id)
+        session = (row.checkpoint or {}).get("session_id") if row else None
+        if not session:
+            return False
+        try:
+            work.transition(work_id, "blocked", reason=reason)
+        except TransitionRefused:
+            return True  # the part had already ended: another writer got there first
+        work.add_event(work_id, "resumed", {"session_id": session})
+        activity = self._activity.get(job_id, {}).get(part)
+        if activity:
+            activity.end("stopped", reason)
+        if self._forget(job_id, part):
+            self._drop_stale_news(job_id)
+        job = self._records.get_job(job_id)
+        assert job is not None
+        host = next(p.host for p in job.parts if p.id == part)
+        paused = (
+            f"{host} dropped; the session is kept on that machine and carries on there "
+            "with the owner's yes once it is back"
+        )
+        self._news("job_ended", job_id, {"report": self.note_with(job, {"paused": paused})})
+        self._changed()
+        self.fill_slots()
+        return True
+
+    def body_connected(self, body_id: str) -> None:
+        """A machine is back: what waited for it is no longer waiting."""
+        if self._items is None:
+            return
+        for item in self._items.list_open("host_offline"):
+            if (item.saved_call or {}).get("host") == body_id:
+                self._items.finish(item.id, "host_back")
+
+    def _drop_stale_news(self, job_id: str) -> None:
+        """job_ended carries the same facts, so held failure and quiet news is stale now."""
+        self._finish_news("job_step_failed", f"job:{job_id}")
+        self._finish_news("job_quiet", f"job:{job_id}")
+        if self._scout is not None:
+            self._scout.cancel_job(job_id)
+
     async def _end(
         self, job_id: str, state: str, reason: str, result: str | None, part: str = "p1"
     ) -> None:
+        if state == "host_lost":
+            if self._hold_lost(job_id, part, reason):
+                return
+            state = "error"
         result = mask_json(self._guards, "job_result", result)
         job = self._settle(job_id, part, state, reason, result)
         activity = self._activity.get(job_id, {}).get(part)
         done = self._forget(job_id, part)
         if done:
-            # job_ended carries the same facts, so held failure and quiet news is stale now
-            self._finish_news("job_step_failed", f"job:{job_id}")
-            self._finish_news("job_quiet", f"job:{job_id}")
-            if self._scout is not None:
-                self._scout.cancel_job(job_id)
+            self._drop_stale_news(job_id)
         if activity:
             activity.end(state, reason)  # its change notice is the one, sent after the end row
             if done:
