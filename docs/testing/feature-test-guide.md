@@ -3246,3 +3246,14 @@ By hand, with a desktop paired to a brain on another machine:
 1. On the desktop's machine run `cd brain && uv run tagalong node allow <program> -- <args>`, in the same environment the desktop starts the node with: `allow` resolves the command on the node's PATH, and a different PATH makes the node refuse it. **Expected:** it says the brain may now run it.
 2. Start the desktop. **Expected:** in Home's Bodies card a body of kind `node` appears for that machine.
 3. Quit the desktop. **Expected:** the node disappears and no `tagalong node run` process is left.
+
+## Memory for other AI tools (BA10; automated, the real client by hand)
+
+Automated: `brain/tests/test_memory_mcp.py` (a real MCP client over loopback: only recall, remember and list_memories; revoke fails the next call; a body token is no key and a client token is no body login; personal facts, chat and summaries stay home; remember asks and a denial saves nothing; reads are masked; an Off tool is neither listed nor callable; every write is labelled `mcp:<client>` and a blank source is refused; the socket is bound to 127.0.0.1 and a foreign `Host` is refused; Scout's side-check cannot approve a remember; list_memories still returns facts under 200+ summaries; a full memory gives the client a plain refusal; Scout replacing or repeating a told note takes the label back; an expert's reads never return a personal fact; Home make, list, revoke; the experts' bridge offers the same tools) and `test_memory_prompt.py` (outside notes are shown as told by that tool, never as Scout's own).
+
+By hand, with Claude Code or Cursor on the brain's machine:
+
+1. In Home, make a client named for the tool. **Expected:** a URL ending `/mcp/memory` and a bearer, shown once.
+2. Add it to the tool as an HTTP MCP server with `Authorization: Bearer <token>`. **Expected:** it lists recall, remember and list_memories, no forget.
+3. Ask the tool to remember a note. **Expected:** Scout asks first; after Allow, the memory shows it labelled with the tool, and Scout speaks of it as told by that tool.
+4. Revoke the client in Home. **Expected:** the tool's next call is refused.

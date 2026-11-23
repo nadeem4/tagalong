@@ -13,7 +13,7 @@ from typing import Protocol
 class Principal:
     key: str  # "local" or "device:<id>"; a body id is bound to this
     name: str
-    kind: str  # "local" | desktop | browser | node | mcp_client
+    kind: str  # "local" | desktop | browser | node
     local: bool
     device_id: str | None = None
 

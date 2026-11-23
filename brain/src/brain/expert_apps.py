@@ -7,17 +7,15 @@ own sign-in and secrets stay here: the expert holds only a token that dies with 
 """
 
 import asyncio
-import contextlib
 import hmac
 import json
 import logging
 import secrets
-import socket
 import uuid
 from collections.abc import Callable, Sequence
+from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 
-import uvicorn
 from acp.schema import HttpHeader, HttpMcpServer
 from mcp import types
 from mcp.server import Server
@@ -25,19 +23,19 @@ from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from starlette.responses import PlainTextResponse
 
 from brain.app_tools import specs_for
+from brain.devices import McpClient
 from brain.guards import Guards
+from brain.loopback import serve_loopback
 from brain.masking import mask_json
+from brain.memory_mcp import MEMORY_TOOLS, call_memory_tool, list_memory_tools
 from brain.mind.turn import Call
 from brain.protocol import RpcError
 from brain.toolbox import Toolbox
 
 log = logging.getLogger("brain")
 
-
-class _Server(uvicorn.Server):
-    def capture_signals(self):
-        # The brain owns Ctrl+C; uvicorn must not take its signal handlers over.
-        return contextlib.nullcontext()
+# What an expert's own memory writes are labelled with; it never reads the personal facts.
+EXPERT_CLIENT = McpClient("expert", "expert", False)
 
 
 @dataclass
@@ -61,8 +59,7 @@ class ExpertApps:
         self._toolbox = toolbox
         self._guards = guards
         self._grants: dict[str, Grant] = {}  # token -> grant
-        self._server: _Server | None = None
-        self._serving: asyncio.Task | None = None
+        self._stack = AsyncExitStack()
         self._url = ""
 
     async def grant(self, job_id: str, app_ids: Sequence[str]) -> Grant:
@@ -97,10 +94,8 @@ class ExpertApps:
     async def shutdown(self) -> None:
         for grant in list(self._grants.values()):
             await self.revoke(grant)
-        if self._server is not None:
-            self._server.should_exit = True
-            await self._serving
-            self._server = self._serving = None
+        await self._stack.aclose()
+        self._url = ""
 
     async def _hold(self, grant: Grant, ready: asyncio.Event) -> None:
         async with grant.manager.run():
@@ -108,20 +103,10 @@ class ExpertApps:
             await grant._stop.wait()
 
     async def _ensure_server(self) -> None:
-        if self._server is not None:
+        if self._url:
             return
-        sock = socket.socket()
-        sock.bind(("127.0.0.1", 0))  # loopback only, a port the system picks
-        config = uvicorn.Config(
-            self._asgi, interface="asgi3", log_level="warning", lifespan="off", access_log=False
-        )
-        self._server = _Server(config)
-        self._url = f"http://127.0.0.1:{sock.getsockname()[1]}/mcp"
-        self._serving = asyncio.create_task(self._server.serve(sockets=[sock]))
-        while not self._server.started:
-            if self._serving.done():
-                self._serving.result()
-            await asyncio.sleep(0.01)
+        port = await self._stack.enter_async_context(serve_loopback(self._asgi))
+        self._url = f"http://127.0.0.1:{port}/mcp"
 
     async def _asgi(self, scope, receive, send) -> None:
         if scope["type"] != "http":
@@ -159,6 +144,7 @@ class ExpertApps:
                 types.Tool(name=s.name, description=s.description, input_schema=s.input_schema)
                 for s in self._specs(grant)
             ]
+            + list_memory_tools(self._toolbox())
         )
 
     async def _call(
@@ -173,10 +159,20 @@ class ExpertApps:
 
         if not grant.sent:
             return reply("Not available yet: the person has not sent this job.", True)
+        args = params.arguments or {}
+        if params.name in MEMORY_TOOLS:
+            return await call_memory_tool(
+                self._toolbox(),
+                self._guards,
+                EXPERT_CLIENT,
+                params.name,
+                args,
+                f"expert job {grant.job_id}",
+                grant.job_id,
+            )
         # A name outside the grant is simply not there, whatever app it belongs to.
         if params.name not in {s.name for s in self._specs(grant)}:
             return reply(f"No tool named {params.name}.", True)
-        args = params.arguments or {}
         # The ask's text is plain data (tool, input, job), so the person can see who wants what.
         text = f"{params.name} {json.dumps(args, sort_keys=True, separators=(',', ':'))}"
         call = Call(uuid.uuid4().hex, params.name, args, "", f"{text} (expert job {grant.job_id})")

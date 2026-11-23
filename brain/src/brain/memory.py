@@ -77,6 +77,7 @@ class Memory:
         category: str | None = None,
         start: str | None = None,
         end: str | None = None,
+        source: str = "chat",
     ) -> Item:
         at = self._now().isoformat()
         masked = self.mask(text)
@@ -97,6 +98,7 @@ class Memory:
             self._masked_category(category),
             start,
             end,
+            source,
         )
 
     def _masked_category(self, category: str | None) -> str | None:
@@ -109,8 +111,10 @@ class Memory:
     def forget(self, item_id: int) -> Item:
         return memory_store.forget(self._db, item_id)
 
-    def list_items(self, limit: int) -> list[Item]:
-        return memory_store.list_items(self._db, limit)
+    def list_items(
+        self, limit: int, include_personal: bool = True, facts_only: bool = False
+    ) -> list[Item]:
+        return memory_store.list_items(self._db, limit, include_personal, facts_only)
 
     def always_loaded(self) -> dict[str, list[Item]]:
         return memory_store.always_loaded(self._db)
@@ -191,7 +195,17 @@ class Memory:
         from_year: int | None = None,
         to_year: int | None = None,
         category: str | None = None,
+        facts_only: bool = False,
     ) -> list[Hit]:
         return search_store.search(
-            self._db, query, kind, limit, include_personal, year, from_year, to_year, category
+            self._db,
+            query,
+            kind,
+            limit,
+            include_personal,
+            year,
+            from_year,
+            to_year,
+            category,
+            facts_only,
         )

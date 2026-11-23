@@ -43,7 +43,9 @@ from brain.loops.service import LoopService
 from brain.loops.store import LoopStore
 from brain.loops.tools import loop_tools
 from brain.masking import Masker, SecretLogFilter, mask_json
+from brain.mcp_client_tools import mcp_client_tools
 from brain.memory import Memory
+from brain.memory_mcp import MemoryMcp, memory_client_tools
 from brain.mind.turn import AnthropicModel
 from brain.models import chosen as chosen_model
 from brain.models import model_name
@@ -334,6 +336,8 @@ async def _run() -> None:
         + brain_status_tools(brain_status, lambda: bodies.is_local(CALLER.get()))
         + home_update_tools(updates)
         + device_tools(devices, pairing, config.network)
+        + memory_client_tools(memory, bodies.notify)
+        + mcp_client_tools(devices, lambda: memory_mcp.url)
         + bodies_tools(
             bodies, lambda: bridges, config.data_dir, os.environ, bodies.notify, secrets.clear
         )
@@ -353,6 +357,7 @@ async def _run() -> None:
         ),
     )
     session.ask_runner.home_ended = home_end_reporter(progress, bodies.notify)
+    memory_mcp = MemoryMcp(devices, lambda: session.toolbox, session.guards, config.mcp_port)
     bridges: BridgeSupervisor | None = None  # built once the brain's port is known
     update_loop: asyncio.Task | None = None
     network_server = None
@@ -436,6 +441,10 @@ async def _run() -> None:
         await asyncio.to_thread(
             sweep_staging, config.data_dir
         )  # an install a killed brain left half-staged
+        try:
+            await memory_mcp.start()
+        except OSError as err:  # the brain still runs; other tools just cannot reach its memory
+            log.warning("memory endpoint off, port %d: %s", config.mcp_port, err)
         await apps.start()  # connects in the background, so a slow app never delays boot
         session.jobs.fill_slots(settling=True)  # approved jobs a restart left waiting
         port = server.sockets[0].getsockname()[1]
@@ -472,6 +481,7 @@ async def _run() -> None:
         await logins.stop()
         if bridges is not None:
             await bridges.stop()  # before the brain goes, so no bridge is left running
+        await memory_mcp.stop()
         await voice.close()
         await session.jobs.shutdown()
         await apps.shutdown()

@@ -437,6 +437,8 @@ class Toolbox:
     async def run(
         self, call: Call, caller: str = "scout", job_id: str | None = None
     ) -> str | list[dict]:
+        """`caller` is scout, home, expert, or `mcp:<client>` for another tool reading memory;
+        a tool's audience names the part before the colon."""
         found: list = []  # [spec, source kind, ran?] once a servable tool is matched
         # The wait is the model's to name for its own asks only; no tool, card or log sees it.
         args = call.input
@@ -466,7 +468,7 @@ class Toolbox:
         # Only what a model reads is capped: Home's own calls get their JSON whole.
         if (
             self._outputs is not None
-            and caller in ("scout", "expert")
+            and caller.partition(":")[0] in ("scout", "expert", "mcp")
             and isinstance(out, str)
             and call.name not in UNCAPPED
         ):
@@ -567,7 +569,7 @@ class Toolbox:
         for source in self.sources:
             for spec in source.specs():
                 if spec.name == call.name:
-                    if caller not in spec.audience:
+                    if caller.partition(":")[0] not in spec.audience:
                         raise RpcError(ErrorCode.unknown_tool, f"No tool named {call.name}.")
                     kind = getattr(source, "approval_source", "scout_tool")
                     found[:] = [spec, kind, False]

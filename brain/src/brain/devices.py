@@ -5,6 +5,7 @@ import hashlib
 import secrets
 import sqlite3
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from brain.auth import Principal
 from brain.store import devices as store
@@ -12,6 +13,13 @@ from brain.store import devices as store
 
 def hash_secret(secret: str) -> str:
     return hashlib.sha256(secret.encode()).hexdigest()
+
+
+@dataclass(frozen=True)
+class McpClient:
+    id: str
+    name: str
+    personal: bool  # may read the facts the owner keeps back
 
 
 class Devices:
@@ -25,7 +33,7 @@ class Devices:
         self._now = now
         self._on_revoke = on_revoke
 
-    def create(self, name: str, kind: str) -> tuple[str, str]:
+    def create(self, name: str, kind: str, personal: bool = False) -> tuple[str, str]:
         device_id = secrets.token_hex(8)
         token = secrets.token_urlsafe(32)
         store.insert_device(
@@ -35,8 +43,16 @@ class Devices:
             kind=kind,
             token_hash=hash_secret(token),
             now=self._now(),
+            personal=personal,
         )
         return device_id, token
+
+    def client(self, token: str) -> McpClient | None:
+        row = store.client_by_token_hash(self._db, hash_secret(token))
+        if row is None:
+            return None
+        store.touch_device(self._db, row[0], self._now())
+        return McpClient(*row)
 
     def verify(self, token: str) -> Principal | None:
         row = store.device_by_token_hash(self._db, hash_secret(token))

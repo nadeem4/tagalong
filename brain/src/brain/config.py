@@ -24,6 +24,7 @@ DEFAULT_LOOP_POLL_S = 300  # how often a switched-on mail app is read for loops
 DEFAULT_LOOP_STALE_DAYS = 7  # a held loop untouched this long goes to one stale wake
 DEFAULT_STEP_CAP = 25
 DEFAULT_NETWORK_PORT = 47323  # the encrypted listener, when switched on
+DEFAULT_MCP_PORT = 47324  # the memory endpoint for other AI tools, on loopback
 DEFAULT_LOOP_LAG_MS = 200  # a blocked event loop longer than this is logged
 DEFAULT_JOB_QUIET_MIN = 20.0
 DEFAULT_EXPERT_IDLE_S = 300.0
@@ -76,6 +77,7 @@ class Config:
     started_by: Literal["desktop", "person", "service"] = "person"  # who owns the process
     network: bool = False  # also listen for bodies on other machines, over wss
     network_port: int = DEFAULT_NETWORK_PORT
+    mcp_port: int = DEFAULT_MCP_PORT
     # what a paired device dials, when this machine's LAN address is not it
     public_host: str | None = None
 
@@ -161,6 +163,7 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
         ),
         network=env.get("TAGALONG_NETWORK") == "1",
         network_port=_positive_int(env, "TAGALONG_NETWORK_PORT", DEFAULT_NETWORK_PORT),
+        mcp_port=_positive_int(env, "TAGALONG_MCP_PORT", DEFAULT_MCP_PORT),
         public_host=env.get("TAGALONG_PUBLIC_HOST") or None,
     )
 

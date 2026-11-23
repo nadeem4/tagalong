@@ -2,24 +2,44 @@
 
 import sqlite3
 
-_DEVICE_COLUMNS = "id, name, kind, paired_at, last_seen, revoked_at"
+_DEVICE_COLUMNS = "id, name, kind, personal, paired_at, last_seen, revoked_at"
 
 
 def insert_device(
-    db: sqlite3.Connection, *, id: str, name: str, kind: str, token_hash: str, now: str
+    db: sqlite3.Connection,
+    *,
+    id: str,
+    name: str,
+    kind: str,
+    token_hash: str,
+    now: str,
+    personal: bool = False,
 ) -> None:
     db.execute(
-        "INSERT INTO devices(id, name, kind, token_hash, paired_at) VALUES (?, ?, ?, ?, ?)",
-        (id, name, kind, token_hash, now),
+        "INSERT INTO devices(id, name, kind, token_hash, paired_at, personal)"
+        " VALUES (?, ?, ?, ?, ?, ?)",
+        (id, name, kind, token_hash, now, personal),
     )
 
 
 def device_by_token_hash(db: sqlite3.Connection, token_hash: str) -> tuple[str, str, str] | None:
-    """(id, name, kind) of the live device holding this token."""
+    """(id, name, kind) of the live body device holding this token; a client of the memory
+    endpoint is not one."""
     return db.execute(
-        "SELECT id, name, kind FROM devices WHERE token_hash=? AND revoked_at IS NULL",
+        "SELECT id, name, kind FROM devices WHERE token_hash=? AND revoked_at IS NULL"
+        " AND kind != 'mcp_client'",
         (token_hash,),
     ).fetchone()
+
+
+def client_by_token_hash(db: sqlite3.Connection, token_hash: str) -> tuple[str, str, bool] | None:
+    """(id, name, personal) of the live memory client holding this token."""
+    row = db.execute(
+        "SELECT id, name, personal FROM devices WHERE token_hash=? AND revoked_at IS NULL"
+        " AND kind='mcp_client'",
+        (token_hash,),
+    ).fetchone()
+    return None if row is None else (row[0], row[1], bool(row[2]))
 
 
 def list_devices(db: sqlite3.Connection) -> list[dict]:

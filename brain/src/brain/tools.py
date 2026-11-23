@@ -33,6 +33,7 @@ from brain.job_records import JobPart, JobRecords, home_state
 from brain.jobs import JobError, Jobs, job_title
 from brain.know.facts import evidenced_span, normalise_category
 from brain.memory import Memory
+from brain.mind.prompt import outside_tool
 from brain.models import DEFAULT_MODEL_ID, MODELS, PROVIDER
 from brain.models import chosen as chosen_model
 from brain.models import save as save_model
@@ -85,6 +86,8 @@ def _line(hit: Hit) -> str:
         text = text[: CHAT_HIT_MAX_CHARS - 1] + "…"
     if hit.kind in _FENCED:
         text = f'<data kind="{hit.kind}">{_fence_safe(text)}</data>'
+    elif (tool := outside_tool(hit.source)) is not None:
+        text = f'<data kind="told by {tool}">{_fence_safe(text)}</data>'
     label = ", ".join(p for p in (hit.category, hit.span) if p)
     tag = f" [{label}]" if label else ""
     return f"{hit.ref} {hit.kind} {hit.at[:10]}{tag} {text}"
@@ -102,7 +105,7 @@ def format_hits(hits: list[Hit]) -> str:
 
 def _render(hits: list[Hit]) -> str:
     lines = [_line(h) for h in hits]
-    if any(h.kind in _FENCED for h in hits):
+    if any(h.kind in _FENCED or outside_tool(h.source) is not None for h in hits):
         lines.insert(0, _PREAMBLE)
     return "\n".join(lines)
 

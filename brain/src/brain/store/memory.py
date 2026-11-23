@@ -34,8 +34,15 @@ KINDS: dict[str, Kind] = {
 }
 
 
+OUTSIDE = "mcp:"  # a memory's source when another AI tool wrote it
+
+
 class MemoryRefused(Exception):
     """A refusal whose str() is the message the model sees."""
+
+
+class MemoryFull(MemoryRefused):
+    """A kind is at its cap."""
 
 
 @dataclass(frozen=True)
@@ -107,11 +114,14 @@ def remember(
     category: str | None = None,
     start: str | None = None,
     end: str | None = None,
+    source: str = "chat",
 ) -> Item:
     spec, text = _validate(kind, text)
+    if not source.strip():
+        raise MemoryRefused("A memory needs a source.")
     db.execute("BEGIN IMMEDIATE")
     try:
-        item = _write(db, spec, text, replaces, at, tag, evidence, category, start, end)
+        item = _write(db, spec, text, replaces, at, tag, evidence, category, start, end, source)
     except BaseException:
         db.execute("ROLLBACK")
         raise
@@ -130,6 +140,7 @@ def _write(
     category: str | None = None,
     start: str | None = None,
     end: str | None = None,
+    source: str = "chat",
 ) -> Item:
     # A chat fact with no tag stays free; a tag decides (personal is asked).
     tag = normalise_tag(tag) if tag.strip() else ""
@@ -140,19 +151,20 @@ def _write(
     ).fetchone()
     if replaces is None:
         if twin:
-            return _item(db, twin[0])  # type: ignore[return-value]
+            return _item(db, _keep_twin(db, twin[0], source))  # type: ignore[return-value]
         count = db.execute("SELECT count(*) FROM memories WHERE kind=?", (spec.name,)).fetchone()[0]
         if spec.max_items is not None and count >= spec.max_items:
-            raise MemoryRefused(
+            raise MemoryFull(
                 f"{spec.name} is full ({spec.max_items}). "
                 "Use replaces=<id> to update one or forget one first."
             )
         layer, period = _span_columns(start)
         cur = db.execute(
             "INSERT INTO memories(kind, text, created_at, updated_at, tag, evidence, visibility,"
-            " category, layer, period, span_start, span_end) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            " category, layer, period, span_start, span_end, source)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (spec.name, text, now, now, tag, evidence, visibility, category, layer, period)
-            + (start, end if start else None),
+            + (start, end if start else None, source),
         )
         return _item(db, cur.lastrowid)  # type: ignore[arg-type,return-value]
     old = _item(db, replaces)
@@ -161,7 +173,7 @@ def _write(
     if twin:
         # The new text already exists as another item: drop the old one, keep that one.
         db.execute("DELETE FROM memories WHERE id=?", (replaces,))
-        return _item(db, twin[0])  # type: ignore[return-value]
+        return _item(db, _keep_twin(db, twin[0], source))  # type: ignore[return-value]
     # Dates and category change only when passed; a new start replaces the old span whole.
     if start:
         layer, period = _span_columns(start)
@@ -170,11 +182,12 @@ def _write(
         layer, period = _span_columns(old.span_start)
         span = (old.span_start, old.span_end)
     db.execute(
-        "UPDATE memories SET text=?, updated_at=?, tag=?, evidence=?, visibility=?, category=?,"
-        " layer=?, period=?, span_start=?, span_end=? WHERE id=?",
+        "UPDATE memories SET text=?, updated_at=?, source=?, tag=?, evidence=?, visibility=?,"
+        " category=?, layer=?, period=?, span_start=?, span_end=? WHERE id=?",
         (
             text,
             now,
+            source if _told(old.source) and not _told(source) else old.source,
             tag or old.tag,
             evidence or old.evidence,
             visibility if tag else old.visibility,
@@ -186,6 +199,20 @@ def _write(
         ),
     )
     return _item(db, replaces)  # type: ignore[return-value]
+
+
+def _told(source: str) -> bool:
+    return source.startswith(OUTSIDE)
+
+
+def _keep_twin(db: sqlite3.Connection, twin_id: int, source: str) -> int:
+    """Scout saying what another tool told it makes the row Scout's; a tool never takes one."""
+    if not _told(source):
+        db.execute(
+            "UPDATE memories SET source=? WHERE id=? AND source LIKE ? || '%'",
+            (source, twin_id, OUTSIDE),
+        )
+    return twin_id
 
 
 def forget(db: sqlite3.Connection, item_id: int) -> Item:
@@ -322,9 +349,11 @@ def asked_topics(db: sqlite3.Connection) -> list[str]:
 
 
 def chat_facts(db: sqlite3.Connection) -> list[Item]:
-    """Free facts the person told Scout in chat (about_you); asked ones stay out."""
+    """Free facts the person told Scout in chat (about_you); asked ones and ones another tool
+    wrote stay out."""
     sql = (
-        f"SELECT {_COLUMNS} FROM memories WHERE kind='about_you' AND visibility='free' ORDER BY id"
+        f"SELECT {_COLUMNS} FROM memories WHERE kind='about_you' AND visibility='free'"
+        " AND source NOT LIKE 'mcp:%' ORDER BY id"
     )
     return [Item(*r) for r in db.execute(sql)]
 
@@ -356,10 +385,19 @@ def get_portrait(db: sqlite3.Connection) -> Item | None:
     return Item(*row) if row else None
 
 
-def list_items(db: sqlite3.Connection, limit: int) -> list[Item]:
-    """Every kind but the portrait, newest first (by last change); for Home's memory list."""
+def list_items(
+    db: sqlite3.Connection,
+    limit: int,
+    include_personal: bool = True,
+    facts_only: bool = False,
+) -> list[Item]:
+    """Every kind but the portrait, newest first (by last change); for Home's memory list.
+    `facts_only` leaves out the summaries, so they cannot fill the limit."""
+    asked = "" if include_personal else " AND visibility='free'"
+    if facts_only:
+        asked += " AND kind != 'summary'"
     rows = db.execute(
-        f"SELECT {_COLUMNS} FROM memories WHERE kind != 'portrait'"
+        f"SELECT {_COLUMNS} FROM memories WHERE kind != 'portrait'{asked}"
         " ORDER BY updated_at DESC, id DESC LIMIT ?",
         (limit,),
     ).fetchall()
