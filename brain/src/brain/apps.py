@@ -19,7 +19,7 @@ from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-from urllib.parse import parse_qsl, quote, unquote, urlparse, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, unquote, unquote_plus, urlparse, urlsplit, urlunsplit
 
 import httpx2
 from mcp import ClientSession
@@ -207,6 +207,18 @@ def merge_url_secret(url: str, secret: str) -> str:
             pairs.append(pair)
     query = "&".join(q for q in (parts.query, *pairs) if q)
     return urlunsplit((parts.scheme, netloc, parts.path, query, parts.fragment))
+
+
+def url_secret_values(secret: str) -> list[str]:
+    """The values a stored query string (and userinfo) holds, for scrubbing them from output."""
+    values = []
+    for pair in secret.split("&"):
+        raw = pair.partition("=")[2]
+        value = unquote(raw)
+        values += [raw, value, unquote_plus(raw)]
+        if pair.startswith(f"{_USERINFO}="):
+            values.append(value.partition(":")[2])
+    return [v for v in values if v]
 
 
 class TokenFile:
@@ -693,9 +705,13 @@ class Apps:
 
     async def _node_streams(self, slot: _Slot):
         row = slot.row
-        if self._bodies is None or row.transport != "stdio":
+        if self._bodies is None or (row.transport == "http" and row.auth != "none"):
             raise AppError(f"{row.name} cannot run on another machine yet.")
-        spec = PipeSpec(command=row.config["command"], args=row.config.get("args", []))
+        # The node adds this app's secrets from what its person entered there; none is sent.
+        if row.transport == "stdio":
+            spec = PipeSpec(command=row.config["command"], args=row.config.get("args", []))
+        else:
+            spec = PipeSpec(url=row.config["url"])
         try:
             pipe = await self._bodies.open_pipe(slot.location, spec)
         except RpcError as err:

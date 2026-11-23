@@ -387,10 +387,19 @@ export interface MethodSchemas {
 }
 
 // Node pipes: the brain asks a node to run an allowed command and relays its stdin and stdout.
-export const PipeSpec = z.object({
-  command: z.string().min(1),
-  args: z.array(z.string()).default([]),
-});
+// A spec names a command or the exact URL of an HTTP MCP server the node relays to; never a secret.
+export const PipeSpec = z
+  .object({
+    command: z.string().min(1).optional(),
+    args: z.array(z.string()).default([]),
+    url: z.string().min(1).optional(),
+  })
+  .refine((spec) => (spec.command === undefined) !== (spec.url === undefined), {
+    message: 'a spec names a command or a url, one of them',
+  })
+  .refine((spec) => spec.url === undefined || spec.args.length === 0, {
+    message: 'a url spec takes no args',
+  });
 export type PipeSpec = z.infer<typeof PipeSpec>;
 
 export const PipeOpenParams = z.object({ pipe: Id, spec: PipeSpec });

@@ -174,6 +174,10 @@ rules and the missing-key error are in [connected apps](../bodies/connected-apps
 Text saved to disk (chat, approvals, job results, logs) has these values, and key shapes, replaced
 by `[secret]`; see [privacy](privacy.md#what-is-masked-on-disk-what-is-not).
 
+### Secrets on a node
+
+An app placed on a node keeps its keys on that machine: `tagalong node allow --secret-env NAME ...` or `--url-secret` stores them in the node's `<TAGALONG_HOME>/node/allowlist.json` entry, and the brain's `app-tokens.json` is not read for it. See [the node](../brain/node.md#secrets-stay-on-the-node).
+
 ### WhatsApp values in the Python brain
 
 The seven `TAGALONG_WHATSAPP_*` variables (enabled, access token, app secret, verify token, phone

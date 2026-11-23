@@ -383,7 +383,7 @@ def test_login_where_no_window_can_open_prints_the_command(tmp_path, monkeypatch
 
     rig = Rig(tmp_path)
     assert rig.go("login", "claude-acp", open_terminal=none) == 1
-    assert "run this yourself" in rig.text and "--a" in rig.text
+    assert "on the machine the brain runs on" in rig.text and "--a" in rig.text
 
 
 def test_login_that_times_out_is_a_fact_not_a_traceback(tmp_path, monkeypatch):
@@ -561,3 +561,69 @@ def test_node_allow_keeps_a_double_dash_inside_the_args(tmp_path):
     assert rig.go("node", "allow", str(exe), "--", "--a", "--", "b") == 0
     spec = PipeSpec(command=str(exe), args=["--a", "--", "b"])
     assert Allowlist(rig.home / "node" / "allowlist.json").permits(spec) == str(exe)
+
+
+def test_node_allow_url_approves_that_exact_address_only(tmp_path):
+    rig = Rig(tmp_path)
+    assert rig.go("node", "allow", "--url", "https://mcp.example.com/mcp") == 0
+    allowlist = Allowlist(rig.home / "node" / "allowlist.json")
+    assert allowlist.permits(PipeSpec(url="https://mcp.example.com/mcp")) is not None
+
+
+def test_node_allow_asks_for_each_secret_here_and_never_prints_it(tmp_path):
+    rig = Rig(tmp_path)
+    exe = rig.home / "tool.exe"
+    exe.write_bytes(b"binary")
+    exe.chmod(0o755)
+    prompts: list[str] = []
+
+    def typed(prompt: str) -> str:
+        prompts.append(prompt)
+        return "hunter2-value"
+
+    assert rig.go("node", "allow", "--secret-env", "API_KEY", str(exe), secret=typed) == 0
+    assert "API_KEY" in prompts[0]
+    spec = PipeSpec(command=str(exe))
+    assert Allowlist(rig.home / "node" / "allowlist.json").secrets(spec).env == {
+        "API_KEY": "hunter2-value"
+    }
+    assert "hunter2-value" not in rig.text
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://mcp.example.com/mcp?api_key=abc",
+        "https://mcp.example.com/mcp?x=1&token=abc",
+        "https://user:pass@mcp.example.com/mcp",
+    ],
+)
+def test_node_allow_refuses_a_url_that_carries_its_secret_and_points_to_url_secret(tmp_path, url):
+    rig = Rig(tmp_path)
+    assert rig.go("node", "allow", "--url", url) == 1
+    assert "--url-secret" in " ".join(rig.lines)
+    assert not (rig.home / "node" / "allowlist.json").exists()
+
+
+def test_node_allow_url_secret_is_asked_for_here(tmp_path):
+    rig = Rig(tmp_path)
+    url = "https://mcp.example.com/mcp"
+    assert rig.go("node", "allow", "--url", url, "--url-secret", secret=lambda p: "key=abc") == 0
+    stored = Allowlist(rig.home / "node" / "allowlist.json").secrets(PipeSpec(url=url))
+    assert stored.url_query == "key=abc"
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ("node", "allow"),
+        ("node", "allow", "--url", "ftp://x.example.com/mcp"),
+        ("node", "allow", "--url", "https://x.example.com/mcp", "tool"),
+        ("node", "allow", "--url-secret", "tool"),
+        ("node", "allow", "--secret-env", "K", "--url", "https://x.example.com/mcp"),
+    ],
+)
+def test_node_allow_refuses_a_confused_request(tmp_path, argv):
+    rig = Rig(tmp_path)
+    assert rig.go(*argv, secret=lambda p: "v") == 1
+    assert not (rig.home / "node" / "allowlist.json").exists()

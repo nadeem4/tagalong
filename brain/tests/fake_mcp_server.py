@@ -113,6 +113,14 @@ if os.environ.get("FAKE_MAIL_FILE"):
     _add_mail_tools()
 
 
+if os.environ.get("FAKE_API_KEY"):
+
+    @server.tool()
+    def key_is_set() -> str:
+        """Whether the key reached this process, without ever returning it."""
+        return "yes"
+
+
 def main() -> None:
     pidfile = os.environ.get("FAKE_PIDFILE")
     if pidfile:

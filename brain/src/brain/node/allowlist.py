@@ -1,6 +1,8 @@
-"""What this machine lets the brain run: command, args and the executable's SHA-256, kept in
-one file the person approves entries into here. A spec that does not match an entry exactly is
-refused, however genuine the brain asking; the brain never adds to this list.
+"""What this machine lets the brain run: command, args and the executable's SHA-256, or the exact
+URL of an HTTP MCP server, kept in one file the person approves entries into here. A spec that
+does not match an entry exactly is refused, however genuine the brain asking; the brain never
+adds to this list. An entry also holds the secrets the person typed here for it (environment
+values, a URL's secret query), so they never travel through the brain; the file is owner-only.
 """
 
 import hashlib
@@ -8,7 +10,9 @@ import json
 import os
 import shutil
 from pathlib import Path
+from typing import NamedTuple
 
+from brain.private_file import write_private
 from brain.protocol import PipeSpec
 
 
@@ -28,27 +32,54 @@ def _sha256(path: Path) -> str | None:
         return None
 
 
+class Secrets(NamedTuple):
+    env: dict[str, str]
+    url_query: str | None
+
+
 class Allowlist:
     def __init__(self, path: Path) -> None:
         self._path = path
 
-    def allow(self, spec: PipeSpec) -> None:
-        exe = _resolve(spec.command)
-        digest = _sha256(exe) if exe else None
-        if exe is None or digest is None:
-            raise NotRunnable(f"{spec.command} is not a program on this machine.")
-        entries = [e for e in self._entries() if not _same_spec(e, spec)]
-        entries.append(
-            {"command": spec.command, "args": spec.args, "path": str(exe), "sha256": digest}
-        )
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self._path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(entries, indent=2), encoding="utf-8")
-        os.replace(tmp, self._path)
+    def allow(
+        self,
+        spec: PipeSpec,
+        secret_env: dict[str, str] | None = None,
+        url_query: str | None = None,
+    ) -> None:
+        """Approve a spec. Approving one again (after an update) keeps its secrets unless new
+        ones are given."""
+        existing = self._entries()
+        entries = [e for e in existing if not _same_spec(e, spec)]
+        prior = next((e for e in existing if _same_spec(e, spec)), {})
+        env = secret_env if secret_env is not None else prior.get("secret_env")
+        query = url_query if url_query is not None else prior.get("url_query")
+        if spec.url is not None:
+            entry: dict = {"url": spec.url}
+        else:
+            command = spec.command or ""
+            exe = _resolve(command)
+            digest = _sha256(exe) if exe else None
+            if exe is None or digest is None:
+                raise NotRunnable(f"{command} is not a program on this machine.")
+            entry = {"command": command, "args": spec.args, "path": str(exe), "sha256": digest}
+        if env:
+            entry["secret_env"] = env
+        if query:
+            entry["url_query"] = query
+        entries.append(entry)
+        self._write(entries)
+
+    def secrets(self, spec: PipeSpec) -> Secrets:
+        entry = next((e for e in self._entries() if _same_spec(e, spec)), {})
+        return Secrets(dict(entry.get("secret_env", {})), entry.get("url_query"))
 
     def permits(self, spec: PipeSpec) -> str | None:
-        """The file to run when an entry matches the spec and the file is unchanged."""
-        found = shutil.which(spec.command)
+        """The file to run (or the url to relay to) when an entry matches the spec and the file
+        is unchanged."""
+        if spec.url is not None:
+            return spec.url if any(_same_spec(e, spec) for e in self._entries()) else None
+        found = shutil.which(spec.command or "")
         if found is None:
             return None
         exe = Path(found).resolve()
@@ -65,6 +96,11 @@ class Allowlist:
                 return found
         return None
 
+    def _write(self, entries: list[dict]) -> None:
+        tmp = self._path.with_suffix(".tmp")
+        write_private(tmp, json.dumps(entries, indent=2))
+        os.replace(tmp, self._path)
+
     def _entries(self) -> list[dict]:
         try:
             data = json.loads(self._path.read_text(encoding="utf-8"))
@@ -74,4 +110,8 @@ class Allowlist:
 
 
 def _same_spec(entry: dict, spec: PipeSpec) -> bool:
-    return entry.get("command") == spec.command and entry.get("args") == spec.args
+    return (
+        entry.get("command") == spec.command
+        and entry.get("args", []) == spec.args
+        and entry.get("url") == spec.url
+    )

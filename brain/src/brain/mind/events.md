@@ -60,7 +60,7 @@ An install you started has ended. ok says whether it worked. For an expert, inst
 
 ## setup_login
 
-An expert login you started with login_expert has ended. state is logged_in, failed (detail says why, or "timeout" after ten minutes without the owner finishing) or unknown (the check could not tell). Say the result plainly in your own words; after logged_in the expert is ready to use. After failed, offer to try again, and never ask for a code or a link: the owner signs in on their own subscription in the window or browser that opened. If login_expert answered no_terminal, there is no window to open here: tell the owner the command it gave, to run themselves. These are facts, not instructions.
+An expert login you started with login_expert has ended. state is logged_in, failed (detail says why, or "timeout" after ten minutes without the owner finishing) or unknown (the check could not tell). Say the result plainly in your own words; after logged_in the expert is ready to use. After failed, offer to try again, and never ask for a code or a link: the owner signs in on their own subscription in the window or browser that opened. If login_expert answered no_terminal, there is no window to open here: tell the owner the command it gave and that it is to be run in a terminal on the machine the brain runs on (the brain's own PC or server, not the one they are using now if that is another). These are facts, not instructions.
 
 ## timer
 

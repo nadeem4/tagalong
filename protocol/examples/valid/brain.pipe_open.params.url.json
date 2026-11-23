@@ -1,0 +1,6 @@
+{
+  "jsonrpc": "2.0",
+  "id": "p2",
+  "method": "pipe_open",
+  "params": { "pipe": "k2", "spec": { "url": "https://mcp.example.com/mcp" } }
+}

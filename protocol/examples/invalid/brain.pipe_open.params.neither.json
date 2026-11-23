@@ -1,0 +1,6 @@
+{
+  "jsonrpc": "2.0",
+  "id": "p4",
+  "method": "pipe_open",
+  "params": { "pipe": "k4", "spec": { "args": ["--stdio"] } }
+}
