@@ -1,0 +1,5 @@
+*
+!brain/pyproject.toml
+!brain/uv.lock
+!brain/src
+**/__pycache__

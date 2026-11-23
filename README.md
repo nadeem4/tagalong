@@ -128,6 +128,12 @@ desktop paired to it dials it over `wss`, pinned to the certificate in the link,
 brain of its own. If the machine has a Tailscale address, the brain lists it in `hello` and a paired
 desktop saves it, so the brain stays reachable away from home.
 
+To run the brain on a server with no screen, install it with `install/install.sh` (or `install.ps1`)
+and run `tagalong serve --install-service`, or run `tagalong serve` in the foreground: both turn the
+network listener on and print a pairing QR. A Docker line does the same: `docker run -v tagalong:/data
+-p 47323:47323 -e TAGALONG_PUBLIC_HOST=<name> tagalong`, publishing only the network port. `tagalong
+update` upgrades an installed brain. See [docs/brain/server.md](docs/brain/server.md).
+
 To keep the brain running without the desktop window, run `uv run tagalong service install`: it
 registers a per-user task that starts the brain at logon (a Windows scheduled task, a macOS launchd
 agent or a Linux systemd user unit) and saves `TAGALONG_NETWORK=1` in `.env` before it starts the

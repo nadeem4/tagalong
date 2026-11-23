@@ -89,6 +89,7 @@ variable. "Positive" means at least 1.
 | `TAGALONG_BRAIN_ADDR`                                            | `127.0.0.1:47321`         | brain, desktop, WhatsApp bridge | Where the brain listens and where bodies dial                                       |
 | `TAGALONG_NETWORK`                                               | off                       | brain                           | `1` adds an encrypted (wss) listener for bodies on other devices                    |
 | `TAGALONG_NETWORK_PORT`                                          | `47323`                   | brain                           | Port of that listener                                                               |
+| `TAGALONG_PUBLIC_HOST`                                           | unset                     | brain, `tagalong`               | Address in the pairing link instead of the LAN address (behind Docker)              |
 | `TAGALONG_LOCAL_TOKEN`                                           | none                      | WhatsApp bridge                 | The brain's local token, passed to the bridge it starts; never set by hand          |
 | `TAGALONG_MODEL`                                                 | `claude-opus-5-5`         | brain                           | Scout's model until Home saves a choice                                             |
 | `TAGALONG_STT_LIVE`                                              | auto                      | brain                           | Live speech model id, or auto, until Home saves a choice                            |

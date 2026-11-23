@@ -99,6 +99,43 @@ jobs:
       - name: Test
         run: uv run pytest
 
+  # The server image: built, never pushed. Layers are cached between runs, so only a change to
+  # the brain's dependencies or code rebuilds them. Gated like `build`.
+  image:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.code == 'true') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          push: false
+          tags: tagalong:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Only the network port is exposed
+        run: |
+          test "$(docker image inspect tagalong:ci --format '{{json .Config.ExposedPorts}}')" = '{"47323/tcp":{}}'
+
+      - name: The first start prints a pairing link and the brain stays up
+        run: |
+          docker run -d --name brain -e TAGALONG_PUBLIC_HOST=example.test tagalong:ci
+          sleep 30
+          docker logs brain > serve.log 2>&1
+          cat serve.log
+          test "$(docker inspect -f '{{.State.Running}}' brain)" = true
+          grep -q 'tagalong://pair?addr=example.test:47323' serve.log
+          grep -q 'brain listening on wss://0.0.0.0:47323' serve.log
+          timeout 20 docker stop -t 10 brain
+          test "$(docker inspect -f '{{.State.ExitCode}}' brain)" != 137
+
   # Only what needs Windows, and only once the Linux job is green.
   e2e:
     needs: build

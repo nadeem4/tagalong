@@ -22,6 +22,7 @@ from typing import NoReturn, TextIO
 
 from brain.apps import AppError, TokenFile
 from brain.config import load_config, load_env_file, upsert_env_value
+from brain.devices import Devices
 from brain.discovery import lan_address
 from brain.events import Event
 from brain.identity import load_or_create_identity
@@ -43,7 +44,7 @@ from brain.setup.net import GetJson, http_fetch, real_get_json
 from brain.setup.registry import Registry, RegistryEntry, RegistryUnavailable
 from brain.setup.store import ExpertStore, all_experts
 from brain.setup.terminal import OpenTerminal, real_open_terminal
-from brain.store.db import open_db
+from brain.store.db import open_db, utc_now_text
 from brain.tools import KEY_NAME, clean_key
 from brain.voice.models import Fetch
 
@@ -88,6 +89,11 @@ def _parser() -> argparse.ArgumentParser:
     pair.add_argument("--kind", choices=sorted(PAIR_KINDS), default="desktop")
     service = sub.add_parser("service", help="run the brain at logon, without the desktop")
     service.add_argument("sub", choices=["install", "remove", "status"])
+    serve = sub.add_parser("serve", help="run the brain here for other devices, with a pairing QR")
+    serve.add_argument(
+        "--install-service", action="store_true", help="start it at logon instead of running it"
+    )
+    sub.add_parser("update", help="upgrade the brain installed by the install script")
     login = sub.add_parser("login", help="log an installed expert in")
     login.add_argument("expert_id")
     return p
@@ -110,6 +116,7 @@ def main(
     now: Callable[[], float] = time.time,
     host_addr: Callable[[], str] = lan_address,
     service_for: Callable[[Path], Service] = real_service,
+    run_brain: Callable[[], None] | None = None,
 ) -> int:
     """Every outside thing is a parameter, so tests run on fakes. Exits 0 ok, 1 failed, 2 usage."""
     args = _parser().parse_args(argv)  # a usage error exits 2 here
@@ -117,6 +124,7 @@ def main(
     config = load_config(env)
     home = config.data_dir
     load_env_file(home, env)  # the brain reads the same .env
+    config = load_config(env)
     run = run or partial(real_run_cmd, timeout=NPM_TIMEOUT_S)
     machine = inspect_fn or partial(inspect, home, run)
     reg = Registry(home, get_json)
@@ -133,6 +141,12 @@ def main(
             _pair(config, args.kind, host_addr, out)
         elif args.cmd == "service":
             _service(args.sub, service_for(home), home, env, out)
+            if args.sub == "install":
+                out("Pair a device with `tagalong pair`.")
+        elif args.cmd == "serve":
+            _serve(args.install_service, config, service_for(home), env, host_addr, out)
+        elif args.cmd == "update":
+            await _update(run, env, out)
         elif args.cmd == "key":
             _key(home, env, args.stdin, stdin, secret, out)
         elif args.cmd == "install":
@@ -144,6 +158,10 @@ def main(
 
     try:
         asyncio.run(go())
+        if args.cmd == "serve" and not args.install_service:
+            if run_brain is None:
+                from brain.main import main as run_brain
+            run_brain()
     except _Fail as err:
         out(str(err))
         return 1
@@ -205,7 +223,11 @@ def _pair(config, kind: str, host_addr: Callable[[], str], out) -> None:
     db = open_db(config.data_dir / "tagalong.db")
 
     _, pairing = build_pairing(
-        db, load_or_create_identity(config.data_dir), config.network_port, host_addr
+        db,
+        load_or_create_identity(config.data_dir),
+        config.public_host,
+        config.network_port,
+        host_addr,
     )
     offer = pairing.make_code(kind)
     if kind == "browser":  # redeemed on this machine only, so a code and no address
@@ -217,6 +239,25 @@ def _pair(config, kind: str, host_addr: Callable[[], str], out) -> None:
     out(render_qr(offer.link))
     out(offer.link)
     out("Valid for 10 minutes, one use. Open it on the other machine's Tagalong.")
+
+
+def _serve(install, config, service: Service, env, host_addr, out) -> None:
+    if install:
+        _service("install", service, config.data_dir, env, out)
+    else:
+        upsert_env_value(config.data_dir, "TAGALONG_NETWORK", "1", env)
+    config = load_config(env)
+    if Devices(open_db(config.data_dir / "tagalong.db"), utc_now_text).list():
+        out("Pair another device with `tagalong pair`.")
+    else:
+        _pair(config, "desktop", host_addr, out)
+
+
+async def _update(run: RunCmd, env, out) -> None:
+    done = await run(["uv", "tool", "upgrade", "brain"], env, None)
+    if done.code != 0:
+        raise _Fail(f"The update failed: {(done.err or done.out).strip()}")
+    out("Updated. A running brain uses the new version after `tagalong stop` and a restart.")
 
 
 def _service(action: str, service: Service, home: Path, env, out) -> None:
@@ -241,7 +282,6 @@ def _service(action: str, service: Service, home: Path, env, out) -> None:
         out("Installed: the brain starts at logon, with network access on for other devices.")
         out("Turned the network listener on (TAGALONG_NETWORK=1 in .env).")
         out("A brain already running gets the network listener when it restarts.")
-        out("Pair a device with `tagalong pair`.")
 
 
 def _stop(home: Path, stop: Callable[[Path], str], out) -> None:
