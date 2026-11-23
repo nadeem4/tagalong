@@ -22,6 +22,7 @@ interface BuilderConfig {
   asarUnpack: string[];
   npmRebuild: boolean;
   extraResources: { from: string; to: string; filter?: string[] }[];
+  extraFiles: { from: string; to: string }[];
   win: { target: { target: string; arch: string[] }[] };
   nsis: { oneClick: boolean; perMachine: boolean; runAfterFinish: boolean; include?: string };
   mac: { target: string[] };
@@ -57,6 +58,16 @@ describe('electron-builder config', () => {
     );
     expect(script).toContain('brain.pid');
     expect(script).toContain('taskkill');
+  });
+
+  it('puts a tagalong command in the install folder and on the user PATH, and takes it off again', () => {
+    expect(config.extraFiles).toContainEqual({ from: 'build/tagalong.cmd', to: 'tagalong.cmd' });
+    const script = readFileSync(
+      fileURLToPath(new URL('../../build/installer.nsh', import.meta.url)),
+      'utf8',
+    );
+    expect(script).toMatch(/customInstall[\s\S]*SetEnvironmentVariable\('Path'[\s\S]*'User'/);
+    expect(script).toMatch(/customUnInstall[\s\S]*SetEnvironmentVariable\('Path'[\s\S]*'User'/);
   });
 
   it('keeps the product name, so the installed app finds the same user data folder', () => {

@@ -23,6 +23,7 @@ const tools = {
   onCapture: noop,
   openExternal: async () => undefined,
   files: { folders: () => [], trash: async () => undefined },
+  connectAiTool: async () => [],
   reading: {
     detect: async () => ({ rows: [] }),
     install: async () => ({ outcome: 'installed' as const, message: '' }),

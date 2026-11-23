@@ -14,7 +14,7 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { NodeChild } from '../node/runner';
 
-const DEFAULT_ADDR = '127.0.0.1:47321';
+export const DEFAULT_ADDR = '127.0.0.1:47321';
 
 export type SetupState = 'idle' | 'installing' | 'failed';
 

@@ -10,6 +10,7 @@
   "asarUnpack": ["**/*.node"],
   "npmRebuild": false,
   "publish": null,
+  "extraFiles": [{ "from": "build/tagalong.cmd", "to": "tagalong.cmd" }],
   "extraResources": [
     {
       "from": "../browser/dist",

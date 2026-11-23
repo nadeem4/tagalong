@@ -14,6 +14,7 @@ import type { LinkStore, PairedLink } from './link-store';
 import { readLocalToken } from './launch';
 import { pinnedSocket } from './pinned-socket';
 import type { ReadingDeps } from './body-tools';
+import type { ConnectAiTool } from './body-tools';
 import type { FileDeps } from '../tools/files';
 
 const DEFAULT_ADDR = '127.0.0.1:47321';
@@ -32,6 +33,8 @@ type StartBrainOptions = Pick<
   files: FileDeps;
   /** How Scout reads the screen: detection, the language install and telling the brain. */
   reading: ReadingDeps;
+  /** Sets an AI tool up for Scout's memory; the brain calls it with a token, so it is never declared. */
+  connectAiTool: ConnectAiTool;
   /** This install's body id (`readOrMakeBodyId`); the brain keeps one body per id. */
   bodyId: string;
   env?: NodeJS.ProcessEnv;
@@ -71,6 +74,7 @@ export function startBrain(options: StartBrainOptions): BrainClient {
     openExternal,
     files,
     reading,
+    connectAiTool,
     ...handlers
   } = options;
   // A paired brain is dialed over wss by address in turn: a dial that fails (or shows another
@@ -110,7 +114,15 @@ export function startBrain(options: StartBrainOptions): BrainClient {
   };
   let reached = false;
   let stopping = false;
-  const { tools, run } = bodyTools(platform, exclusions, onCapture, openExternal, files, reading);
+  const { tools, run } = bodyTools(
+    platform,
+    exclusions,
+    onCapture,
+    openExternal,
+    files,
+    reading,
+    connectAiTool,
+  );
   const brain = new BrainClient({
     ...handlers,
     onHello: (hello) => {

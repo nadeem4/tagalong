@@ -32,8 +32,12 @@ const RUN_TIMEOUT_MS = 15_000;
 /** Install limit, plus the re-check that follows it, plus slack. The brain's wait must exceed it. */
 export const INSTALL_TOOL_TIMEOUT_MS = INSTALL_TIMEOUT_MS + DETECT_TIMEOUT_MS + 10_000;
 
+/** Two CLI calls and the bridge check; the brain waits longer than this. */
+export const CONNECT_TOOL_TIMEOUT_MS = 60_000;
+
 const TOOL_TIMEOUTS: Record<string, number> = {
   install_ocr_language: INSTALL_TOOL_TIMEOUT_MS,
+  connect_ai_tool: CONNECT_TOOL_TIMEOUT_MS,
 };
 
 /** What the reading tools need: detection, the install, and telling the brain the result. */
@@ -239,6 +243,8 @@ function text(value: string): Part[] {
   return [{ type: 'text', text: value }];
 }
 
+export type ConnectAiTool = (input: Record<string, unknown>) => Promise<Part[]>;
+
 export function bodyTools(
   platform: Platform,
   exclusions: () => CaptureExclusions,
@@ -246,6 +252,7 @@ export function bodyTools(
   openExternal: (url: string) => Promise<void>,
   files: FileDeps,
   reading: ReadingDeps,
+  connectAiTool: ConnectAiTool,
 ): { tools: Tool[]; run: (tool: string, input: Record<string, unknown>) => Promise<Part[]> } {
   const announce = (blocked: CaptureBlock | null) =>
     onCapture(captureNotice({ at: new Date(), screenshot: true, blocked, paused: false }));
@@ -341,6 +348,8 @@ ${JSON.stringify(status)}`);
     open_url: openUrl,
     ...fileTools(files),
     install_ocr_language: installOcrLanguage,
+    // Not in `tools`: only the brain's own connect_ai_tool calls it, never the model.
+    connect_ai_tool: connectAiTool,
   };
 
   async function run(tool: string, input: Record<string, unknown>): Promise<Part[]> {

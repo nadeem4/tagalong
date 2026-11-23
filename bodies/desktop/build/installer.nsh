@@ -54,7 +54,17 @@
   !insertmacro tagalongStopBrain uninstall
 !macroend
 
+; `tagalong` on the user's own PATH (HKCU, no admin), so an AI tool can start the memory bridge.
+; Terminals opened before the install need reopening. PowerShell edits the value because
+; SetEnvironmentVariable also tells running programs the environment changed.
+!macro customInstall
+  nsExec::Exec `powershell -NoProfile -NonInteractive -Command "$$p=[string][Environment]::GetEnvironmentVariable('Path','User'); if(-not (($$p -split ';') -contains '$INSTDIR')){[Environment]::SetEnvironmentVariable('Path',(($$p.TrimEnd(';')+';$INSTDIR').TrimStart(';')),'User')}"`
+  Pop $0
+!macroend
+
 !macro customUnInstall
   nsExec::Exec 'schtasks /Delete /TN "TagalongBrain" /F'
+  Pop $0
+  nsExec::Exec `powershell -NoProfile -NonInteractive -Command "$$p=[string][Environment]::GetEnvironmentVariable('Path','User'); [Environment]::SetEnvironmentVariable('Path',((($$p -split ';') | Where-Object { $$_ -and $$_ -ne '$INSTDIR' }) -join ';'),'User')"`
   Pop $0
 !macroend
