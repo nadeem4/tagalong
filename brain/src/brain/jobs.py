@@ -357,7 +357,7 @@ class Jobs:
             earlier, earlier_part = found if found else (None, None)
         pinned = earlier_part.host if earlier_part and earlier_part.session_id else None
         if pinned is None and existing is not None:
-            pinned = existing.parts[0].host
+            pinned = existing.parts[0].host if existing.parts else None
         try:
             where = self._where(chosen, pinned)
         except Unavailable as gone:
@@ -1119,7 +1119,10 @@ class Jobs:
 
     def note(self, job: Job) -> str:
         """The wake text for a finished job: its row and the summary of its steps."""
-        return job_note(job, self.wake_facts(job.id), self._outputs)
+        return self.note_with(job, {})
+
+    def note_with(self, job: Job, facts: dict[str, str]) -> str:
+        return job_note(job, {**facts, **self.wake_facts(job.id)}, self._outputs)
 
     def activity_line(self, job_id: str) -> str:
         """One line about a job's steps for list_jobs; empty when it recorded none."""
@@ -1363,7 +1366,13 @@ class Jobs:
         activity = self._activity.get(job_id, {}).get(part)
         if activity:
             activity.end("stopped", reason)
-        self._forget(job_id, part)
+        if self._forget(job_id, part):
+            self._drop_stale_news(job_id)
+        job = self._records.get_job(job_id)
+        assert job is not None
+        host = job.parts[-1].host
+        paused = f"{host} dropped; its saved session carries on there when it is back"
+        self._news("job_ended", job_id, {"report": self.note_with(job, {"paused": paused})})
         self._changed()
         self.fill_slots()
         return True
@@ -1375,6 +1384,13 @@ class Jobs:
         for item in self._items.list_open("host_offline"):
             if (item.saved_call or {}).get("host") == body_id:
                 self._items.finish(item.id, "host_back")
+
+    def _drop_stale_news(self, job_id: str) -> None:
+        """job_ended carries the same facts, so held failure and quiet news is stale now."""
+        self._finish_news("job_step_failed", f"job:{job_id}")
+        self._finish_news("job_quiet", f"job:{job_id}")
+        if self._scout is not None:
+            self._scout.cancel_job(job_id)
 
     async def _end(
         self, job_id: str, state: str, reason: str, result: str | None, part: str = "p1"
@@ -1388,11 +1404,7 @@ class Jobs:
         activity = self._activity.get(job_id, {}).get(part)
         done = self._forget(job_id, part)
         if done:
-            # job_ended carries the same facts, so held failure and quiet news is stale now
-            self._finish_news("job_step_failed", f"job:{job_id}")
-            self._finish_news("job_quiet", f"job:{job_id}")
-            if self._scout is not None:
-                self._scout.cancel_job(job_id)
+            self._drop_stale_news(job_id)
         if activity:
             activity.end(state, reason)  # its change notice is the one, sent after the end row
             if done:

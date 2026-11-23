@@ -36,7 +36,7 @@ def _row(item: OpenItem, now: datetime) -> dict:
     elif item.kind == "offer":
         line = saved.get("sentence") or "An offer from Scout"
     elif item.kind == "host_offline":
-        line = f"{saved.get('expert')} is waiting for {saved.get('host')} to connect"
+        line = f"{saved.get('expert')} could not start: {saved.get('host')} was offline"
     return {
         "id": item.id,
         "kind": word,

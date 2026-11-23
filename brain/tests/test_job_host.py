@@ -86,13 +86,19 @@ async def test_an_offline_host_leaves_an_open_item_and_the_job_does_not_move(set
 async def test_a_host_that_drops_holds_the_part_blocked_with_its_session(setup):
     bodies, node, build = setup
     rig = build(HANG)
-    job = await rig.jobs.start("go", NODE_FOLDER)
+    task = rig.tasks.open("later", "scout")
+    rig.tasks.wait(task)
+    job = await rig.jobs.start("go", NODE_FOLDER, task_id=task)
     await until(lambda: rig.records.get_job(job).parts[0].progress)
     bodies.disconnect("pc", node)
     await until(lambda: rig.records.get_job(job).parts[0].state == "blocked")
     part = rig.records.get_job(job).parts[0]
     assert (part.host, bool(part.session_id)) == ("pc", True)
     assert rig.finished == []
+    (news,) = [e for e in rig.emitted if e.kind == "job_ended"]
+    assert news.source == f"job:{job}" and news.task == task
+    assert "Paused:\npc dropped" in news.payload["report"]
+    assert rig.tasks.get(task).state == "waiting"
 
 
 async def test_apps_are_refused_for_an_expert_on_a_node_and_no_token_is_made(setup):
@@ -138,14 +144,21 @@ async def test_a_queued_hand_off_checks_the_folder_on_its_host_and_leaves_an_ite
     assert [i.kind for i in rig.items.list_open()] == ["host_offline"]
 
 
-async def test_coming_back_closes_the_host_offline_item(setup):
-    bodies, node, build = setup
-    rig = build()
-    first = await rig.jobs.start("one", NODE_FOLDER)
-    await finish(rig, first)
-    bodies.disconnect("pc", node)
-    with pytest.raises(JobError):
-        await rig.jobs.start("two", NODE_FOLDER, continue_job=first)
-    node.connect()
-    rig.jobs.body_connected("pc")
+async def test_a_queued_hand_off_fails_when_the_folder_is_missing_on_its_online_host(setup):
+    _, node, build = setup
+    rig = build(HANG, max_running=1)
+    await rig.jobs.start("one", NODE_FOLDER)
+    queued = await rig.jobs.start("two", NODE_FOLDER)
+    node.folders.discard(NODE_FOLDER)
+    await rig.jobs.stop(next(iter(rig.jobs._runs)))
+    await until(lambda: rig.records.get_job(queued).state == "failed")
     assert rig.items.list_open() == []
+
+
+async def test_a_part_for_a_queued_job_is_refused_as_busy_not_a_crash(setup):
+    _, _, build = setup
+    rig = build(HANG, max_running=1)
+    await rig.jobs.start("one", NODE_FOLDER)
+    queued = await rig.jobs.start("two", NODE_FOLDER)
+    with pytest.raises(JobError, match="slots are busy"):
+        await rig.jobs.start("more", NODE_FOLDER, job=str(queued))

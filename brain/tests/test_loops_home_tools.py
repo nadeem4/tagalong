@@ -284,5 +284,5 @@ async def test_a_job_waiting_for_its_machine_shows_on_home(rig):
     rig.items.open("host_offline", saved_call={"expert": "claude-acp", "host": "pc"})
     rows = (await rig.call("loops_state"))["open_items"]
     assert [(r["kind"], r["title"]) for r in rows] == [
-        ("Waiting for a machine", "claude-acp is waiting for pc to connect")
+        ("Waiting for a machine", "claude-acp could not start: pc was offline")
     ]

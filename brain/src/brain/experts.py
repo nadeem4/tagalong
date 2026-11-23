@@ -138,8 +138,11 @@ async def kill_tree(process: asyncio.subprocess.Process) -> None:
 
 
 def _quoted(part: str) -> str:
-    """The node's own shell is often Windows', where a path with a space needs double quotes."""
-    return f'"{part}"' if " " in part else part
+    """The node's own shell is often Windows', where a space or one of `&()^|<>"` needs double
+    quotes."""
+    if not any(c in part for c in ' &()^|<>"'):
+        return part
+    return '"' + part.replace('"', '\\"') + '"'
 
 
 class ExpertHosts:
