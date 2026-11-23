@@ -373,6 +373,9 @@ class PictureApps:
     def ids(self):
         return ["gmail"]
 
+    async def restart(self, app_id):
+        pass
+
     def name(self, app_id):
         return "Gmail"
 

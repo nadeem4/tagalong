@@ -89,6 +89,8 @@ from brain.permission import (
     StandingRule,
     stored_auto_rules,
 )
+from brain.placement_tools import placement_tools
+from brain.placements import Placements
 from brain.presence import Presence
 from brain.protocol import (
     BODY_DESKTOP,
@@ -232,6 +234,7 @@ class Session:
         # open asks and questions with it, which only holds when they share the store's hooks.
         work = WorkStore(memory.db, now, lambda text: mask_json(self.guards, "work", text))
         self._asks = Asks(bodies)
+        self._apps = apps
         # One set of spend guards for the loop, the runner, the side-check and offers.
         self.guards = spend_guards(budget, step_cap)
         self.guards.add(wake_caps(wakes_per_hour))
@@ -387,9 +390,10 @@ class Session:
         sources: list = []
         if apps is not None and tokens is not None:  # the two always come as a pair
             tools += app_home_tools(apps, memory, tokens, notify, bodies)
+            tools += placement_tools(Placements(memory.db), apps.ids, apps.restart, notify)
             # Before bodies: BodySource.unavailable claims any `x__y` name whose prefix is not an
             # online body, which would hide an app's own "not connected" line behind its slug.
-            sources.append(AppSource(apps))
+            sources.append(AppSource(apps, self._ask_where))
         sources.append(WebSource())  # before bodies, whose tools come last in the model's list
         sources.append(BodySource(bodies))
 
@@ -972,13 +976,26 @@ class Session:
         else:
             self.presence.record(event.kind, event.source, event.payload)
 
+    async def _ask_where(self, app: str, body: str) -> bool:
+        reply = await self.holds.ask(
+            kind="question",
+            text=f"Where should {app} run: on the brain, or on {body}?",
+            options=["Brain", body],
+            part=None,
+        )
+        return reply.option == body
+
     def body_gone(self, body_id: str) -> None:
         """A body disconnected for good: its reading status must not outlive it."""
+        if self._apps is not None:
+            self._apps.body_changed(body_id)
         self.know_me.drop_watcher(body_id)
         if self.reading.forget(body_id):
             self._bodies.notify("changed", {"what": "reading"})
 
     def _on_connect(self, body_id: str, away: float | None) -> None:
+        if self._apps is not None:
+            self._apps.body_changed(body_id)
         kind = next((b.kind for b in self._bodies.online() if b.id == body_id), None)
         event = from_connect(body_id, away, kind)
         if event is not None:

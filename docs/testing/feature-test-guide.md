@@ -935,6 +935,16 @@ on fakes. To see it by hand, add a loop with an anchor to a test store and open 
    `TAGALONG_LOOP_STALE_DAYS` becomes stale and arrives in one wake listing the stale loops.
 5. Focus and tab events still never wake Scout by themselves.
 
+## Where an app runs (automated only)
+
+`cd brain && uv run pytest tests/test_placements.py tests/test_pipe_client.py tests/test_toolbox_routing.py tests/test_placement_tools.py -q` on a fake node that really runs a fake MCP server:
+
+1. The five placement modes resolve as the table in [connected apps](../bodies/connected-apps.md#where-an-app-runs) says, including Body only with the node offline (unavailable) and a preference falling back to the brain.
+2. An MCP session (initialize, list tools, call a tool) works over a node pipe; a command the node's allow-list lacks is denied; a node that drops ends the pipe; another body cannot close someone else's pipe.
+3. A call on a node asks, or runs on Auto, exactly as on the brain, by app and tool.
+4. Ask me asks one card per turn for an app, not one per call.
+5. Home's `placement_set` saves a placement and restarts the app; a bad one is refused and nothing is saved.
+
 ## Open items (automated only)
 
 Permission cards, choices, installs and sign-ins are open items, and Home's Tasks page shows them

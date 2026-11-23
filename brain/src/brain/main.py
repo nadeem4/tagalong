@@ -50,6 +50,7 @@ from brain.models import model_name
 from brain.offers import OfferSettings
 from brain.open_items import OpenItems
 from brain.pairing import LOOPBACK_KINDS, NETWORK_KINDS, build_pairing
+from brain.placements import Placements
 from brain.server import start_server
 from brain.sessions import Session
 from brain.setup.apps import app_setup_tools
@@ -150,7 +151,15 @@ async def _run() -> None:
     why_pick = WhyPick(reader_model, reader_budget, config.data_dir)
     experts = ExpertStore(config.data_dir)
     tokens = TokenFile(config.data_dir)
-    apps = Apps(memory, bodies.notify, os.environ, tokens=tokens, data_dir=config.data_dir)
+    apps = Apps(
+        memory,
+        bodies.notify,
+        os.environ,
+        tokens=tokens,
+        data_dir=config.data_dir,
+        placements=Placements(memory.db),
+        bodies=bodies,
+    )
     local_token = load_or_create_local_token(config.data_dir)
     identity = load_or_create_identity(config.data_dir)
 

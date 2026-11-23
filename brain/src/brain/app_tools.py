@@ -5,6 +5,7 @@ from the tool's hints, but a risky word in the name always locks it, since hints
 app's own claim and cannot be trusted to lower the bar. Results come back fenced as data.
 """
 
+import asyncio
 import json
 import logging
 import re
@@ -35,6 +36,7 @@ from brain.apps import (
 from brain.bodies import Bodies
 from brain.mind.turn import Call
 from brain.permission import Tier, tier
+from brain.placements import Choose, Unavailable
 from brain.protocol import LIMITS, ErrorCode, RpcError
 from brain.toolbox import NAME_MAX, SEP, Handler, ToolSpec
 from brain.tools import Notify, _fence_safe
@@ -397,8 +399,13 @@ class AppSource:
 
     approval_source = "app"
 
-    def __init__(self, apps: Apps) -> None:
+    def __init__(
+        self, apps: Apps, ask_where: Callable[[str, str], Awaitable[bool]] | None = None
+    ) -> None:
         self._apps = apps
+        # (app name, body name) -> True for the body, False for the brain: one card for the person.
+        self._ask_where = ask_where
+        self._picks: dict[tuple[str, str], asyncio.Task[str]] = {}
 
     def label(self, app_id: str) -> str:
         """The app's name, for Home's group heading."""
@@ -428,6 +435,7 @@ class AppSource:
         if real is None:
             raise RpcError(ErrorCode.unknown_tool, f"No tool named {tool}.")
         try:
+            await self._apps.ensure_at(app_id, await self._where(app_id, call))
             result = await self._apps.call(app_id, real, call.input)
         except AppError as exc:
             raise RpcError(ErrorCode.tool_failed, str(exc)) from None
@@ -436,8 +444,37 @@ class AppSource:
             raise RpcError(ErrorCode.tool_failed, f"{name} could not do that: {reason}")
         return format_result(app_id, result)
 
+    async def _where(self, app_id: str, call: Call) -> str:
+        """Where this call runs. A both-and-ask app asks the person once per turn."""
+        try:
+            return self._apps.resolve(app_id)
+        except Unavailable as gone:
+            body = self._apps.body_name(gone.body_id)
+            name = self._apps.name(app_id)
+            raise RpcError(
+                ErrorCode.body_offline, f"{name} runs on {body}, which is not connected right now."
+            ) from None
+        except Choose as choice:
+            if not call.turn:
+                return await self._pick(app_id, choice.body_id)
+            key = (call.turn, app_id)
+            prior = self._picks.get(key)
+            if prior is None or (prior.done() and (prior.cancelled() or prior.exception())):
+                self._picks = {k: v for k, v in self._picks.items() if k[0] == call.turn}
+                prior = self._picks[key] = asyncio.ensure_future(self._pick(app_id, choice.body_id))
+            return await prior
+
+    async def _pick(self, app_id: str, body_id: str) -> str:
+        if self._ask_where is None:
+            return "brain"
+        wants_body = await self._ask_where(self._apps.name(app_id), self._apps.body_name(body_id))
+        return body_id if wants_body else "brain"
+
     def unavailable(self, name: str) -> RpcError | None:
         app_id, sep, _ = name.partition(SEP)
+        line = self._apps.unavailable_line(app_id) if sep else None
+        if line is not None:
+            return RpcError(ErrorCode.body_offline, line)
         if sep and app_id in self._apps.ids() and self._apps.status(app_id).state != "connected":
             return RpcError(
                 ErrorCode.body_offline, f"{self._apps.name(app_id)} is not connected right now."

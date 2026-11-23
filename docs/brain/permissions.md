@@ -71,6 +71,8 @@ Read it top to bottom: the floor (`Tier`) is fixed in code, so it decides who ma
 
 ## Tool modes and cards
 
+Where an app runs (the brain or a node's pipe) does not change any of this: the gate runs before the call is routed, so an app's tools ask, auto or stay off by app and tool wherever they run ([where an app runs](../bodies/connected-apps.md#where-an-app-runs)).
+
 Every tool has a mode: `off`, `ask` or `auto`. `Toolbox.mode(spec)` picks it in this order: a stored
 `off` first (see [Off](#off)); a tool that
 asks for itself (below) is `auto`; then the user's saved choice (a locked tool included); then a
