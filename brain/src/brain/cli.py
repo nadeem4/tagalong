@@ -88,6 +88,11 @@ def _parser() -> argparse.ArgumentParser:
     pair.add_argument("--kind", choices=sorted(PAIR_KINDS), default="desktop")
     service = sub.add_parser("service", help="run the brain at logon, without the desktop")
     service.add_argument("sub", choices=["install", "remove", "status"])
+    serve = sub.add_parser("serve", help="run the brain here for other devices, with a pairing QR")
+    serve.add_argument(
+        "--install-service", action="store_true", help="start it at logon instead of running it"
+    )
+    sub.add_parser("update", help="upgrade the brain installed by the install script")
     login = sub.add_parser("login", help="log an installed expert in")
     login.add_argument("expert_id")
     return p
@@ -108,8 +113,9 @@ def main(
     stdin: TextIO | None = None,
     stop: Callable[[Path], str] = stop_real_brain,
     now: Callable[[], float] = time.time,
-    host_addr: Callable[[], str] = lan_address,
+    host_addr: Callable[[], str] | None = None,
     service_for: Callable[[Path], Service] = real_service,
+    run_brain: Callable[[], None] | None = None,
 ) -> int:
     """Every outside thing is a parameter, so tests run on fakes. Exits 0 ok, 1 failed, 2 usage."""
     args = _parser().parse_args(argv)  # a usage error exits 2 here
@@ -121,6 +127,8 @@ def main(
     machine = inspect_fn or partial(inspect, home, run)
     reg = Registry(home, get_json)
     stdin = stdin or sys.stdin
+    # Behind Docker the machine's own address is the container's, which no other device can reach.
+    host_addr = host_addr or (lambda: env.get("TAGALONG_PUBLIC_HOST") or lan_address())
 
     async def go() -> None:
         if args.cmd == "doctor":
@@ -133,6 +141,10 @@ def main(
             _pair(config, args.kind, host_addr, out)
         elif args.cmd == "service":
             _service(args.sub, service_for(home), home, env, out)
+        elif args.cmd == "serve":
+            _serve(args.install_service, config, service_for(home), env, host_addr, run_brain, out)
+        elif args.cmd == "update":
+            await _update(run, out)
         elif args.cmd == "key":
             _key(home, env, args.stdin, stdin, secret, out)
         elif args.cmd == "install":
@@ -203,7 +215,6 @@ def _pair(config, kind: str, host_addr: Callable[[], str], out) -> None:
             "brain, then run this again."
         )
     db = open_db(config.data_dir / "tagalong.db")
-
     _, pairing = build_pairing(
         db, load_or_create_identity(config.data_dir), config.network_port, host_addr
     )
@@ -217,6 +228,30 @@ def _pair(config, kind: str, host_addr: Callable[[], str], out) -> None:
     out(render_qr(offer.link))
     out(offer.link)
     out("Valid for 10 minutes, one use. Open it on the other machine's Tagalong.")
+
+
+def _serve(install, config, service: Service, env, host_addr, run_brain, out) -> None:
+    if install:
+        _service("install", service, config.data_dir, env, out)
+    else:
+        upsert_env_value(config.data_dir, "TAGALONG_NETWORK", "1", env)
+    config = load_config(env)
+    paired = open_db(config.data_dir / "tagalong.db").execute("SELECT 1 FROM devices").fetchone()
+    if paired:
+        out("Pair another device with `tagalong pair`.")
+    else:
+        _pair(config, "desktop", host_addr, out)
+    if not install:
+        if run_brain is None:
+            from brain.main import main as run_brain
+        run_brain()
+
+
+async def _update(run: RunCmd, out) -> None:
+    done = await run(["uv", "tool", "upgrade", "brain"], os.environ, None)
+    if done.code != 0:
+        raise _Fail(f"The update failed: {(done.err or done.out).strip()}")
+    out("Updated. A running brain uses the new version after `tagalong stop` and a restart.")
 
 
 def _service(action: str, service: Service, home: Path, env, out) -> None:
