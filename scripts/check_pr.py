@@ -180,6 +180,9 @@ def run_checks(
     span = f"{resolved}...HEAD"
     changed = _git(repo, "diff", "--name-only", "--no-renames", "-z", span)[1].split("\0") if resolved else []
     changed = [p for p in changed if p]
+    for p in changed:
+        if re.search(r"[{}]", p) and (repo / p).exists():
+            report.errors.append(f"{p}: a brace in a file name is a shell accident; remove it")
     mapping = read_check_map(claude_md) if claude_md.exists() and not full else []
     commands, why = select_checks(mapping, changed, command)
     if why == "docs only":

@@ -16,6 +16,7 @@ import uuid
 from brain.bodies import Bodies
 from brain.devices import Devices
 from brain.pairing import Pairing
+from brain.permission import Tier
 from brain.protocol import ErrorCode, RpcError
 from brain.toolbox import BODY_TOOL_TIMEOUTS, Handler, ToolSpec
 
@@ -171,6 +172,7 @@ def connect_ai_tool_tools(devices: Devices, bodies: Bodies) -> list[tuple[ToolSp
                     "properties": {"tool": _TOOL_SCHEMA, "personal": {"type": "boolean"}},
                     "required": ["tool"],
                 },
+                tier=Tier.person_only,  # writes a token file and runs commands: asks every time
             ),
             connect,
         ),

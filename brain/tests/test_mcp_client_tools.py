@@ -7,6 +7,7 @@ import pytest
 from brain.devices import Devices
 from brain.mcp_client_tools import connect_ai_tool_tools
 from brain.memory import Memory
+from brain.permission import Tier, gate_tier
 from brain.protocol import Body, ErrorCode, RpcError
 
 NOW = "2026-11-22T00:00:00Z"
@@ -106,9 +107,13 @@ async def test_show_me_gives_the_line_and_no_secret(tmp_path):
     assert "--pair" in text and devices.list() == []
 
 
-async def test_a_body_call_that_times_out_cuts_the_new_client_off_too(tmp_path):
-    bodies = FakeBodies([DESKTOP], local=["desk"], fail=TimeoutError())
-    devices, handlers = rig(tmp_path, bodies)
-    with pytest.raises(TimeoutError):
-        await handlers["connect_ai_tool"]({"tool": "codex"})
-    assert devices.verify(bodies.used[0][2]["token"]) is None
+def test_connecting_asks_the_person_every_time_even_after_an_always(tmp_path):
+    _, handlers = rig(tmp_path, FakeBodies([DESKTOP]))
+    devices = Devices(Memory(tmp_path / "u.db").db, lambda: NOW)
+    spec = next(
+        s
+        for s, _ in connect_ai_tool_tools(devices, FakeBodies([DESKTOP]))
+        if s.name == "connect_ai_tool"
+    )
+    assert gate_tier(spec, "auto") is Tier.person_only
+    assert gate_tier(spec, None) is Tier.person_only

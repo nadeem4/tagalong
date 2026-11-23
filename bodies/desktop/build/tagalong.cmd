@@ -8,5 +8,9 @@ set "UV_PROJECT_ENVIRONMENT=%TG_HOME%\runtime\venv"
 set "UV_PYTHON_INSTALL_DIR=%TG_HOME%\runtime\python"
 set "UV_CACHE_DIR=%TG_HOME%\cache\uv"
 set "UV_PYTHON_PREFERENCE=only-managed"
+if not exist "%UV_PROJECT_ENVIRONMENT%\pyvenv.cfg" (
+  echo Tagalong has not finished setting up yet. Open Tagalong once, then try again.
+  exit /b 1
+)
 "%~dp0resources\uv\uv.exe" run --no-sync --project "%~dp0resources\brain" tagalong %*
 exit /b %ERRORLEVEL%

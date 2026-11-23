@@ -65,6 +65,7 @@ The brain is Python; the TypeScript apps are bodies.
 - Tests run on fakes, never real providers: the fake brain in bodies/desktop/e2e/fixtures and fake clients in the Python tests. A real API call costs the user money; only make one when the user asks in that session.
 - Secrets never enter git: keys live in the environment or `<TAGALONG_HOME>/.env`. Every variable the code reads appears in .env.example.
 - Any file holding a token or key is written with brain.private_file.write_private.
+- A new Scout tool gets a `tool_words` entry, and its builder joins `_scout_tool_names` in brain/tests/test_tool_words.py.
 - Every file opens with a 2-6 line header; comments explain why, not history.
 - Conventional Commits, e.g. feat(desktop): ...
 - Docs are part of done: README.md, the matching docs/ subsystem doc, and docs/testing/feature-test-guide.md. A contract change also updates protocol/README.md, protocol/examples, protocol/ts and brain/src/brain/protocol.py together.

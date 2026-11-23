@@ -375,7 +375,7 @@ async function start(): Promise<void> {
         ? { command: `"${join(dirname(process.execPath), 'tagalong.cmd')}"`, args: [] }
         : {
             command: 'uv',
-            args: ['run', '--no-sync', '--project', brainRun().brainDir, 'tagalong'],
+            args: ['run', '--no-sync', '--project', `"${brainRun().brainDir}"`, 'tagalong'],
           },
       cursorConfig: join(homedir(), '.cursor', 'mcp.json'),
       windows: process.platform === 'win32',

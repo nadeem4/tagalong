@@ -66,8 +66,12 @@ describe('electron-builder config', () => {
       fileURLToPath(new URL('../../build/installer.nsh', import.meta.url)),
       'utf8',
     );
-    expect(script).toMatch(/customInstall[\s\S]*SetEnvironmentVariable\('Path'[\s\S]*'User'/);
-    expect(script).toMatch(/customUnInstall[\s\S]*SetEnvironmentVariable\('Path'[\s\S]*'User'/);
+    // Text only: the real edit runs in the installer and is checked by hand (feature test guide).
+    expect(script).toMatch(/customInstall[\s\S]*tagalongUserPath add/);
+    expect(script).toMatch(/customUnInstall[\s\S]*tagalongUserPath remove/);
+    expect(script).toContain('DoNotExpandEnvironmentNames');
+    expect(script).toContain('ExpandString');
+    expect(script).not.toContain("'$INSTDIR'");
   });
 
   it('keeps the product name, so the installed app finds the same user data folder', () => {

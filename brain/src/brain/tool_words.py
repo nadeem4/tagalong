@@ -367,6 +367,18 @@ WORDS: dict[str, Words] = {
         "Installs Windows' own text recognition for a language, such as French. Windows will also ask for administrator permission.",
         "computer",
     ),
+    "connect_ai_tool": Words(
+        "Connect an AI tool",
+        "Sets up Claude Code, Codex or Cursor to use Scout's memory.",
+        "Gives the tool its own access to what Scout remembers and adds it to the tool on this PC. Scout asks you every time, and the tool can be cut off again in Home.",
+        "setup",
+    ),
+    "ai_tool_howto": Words(
+        "Show how to connect an AI tool",
+        "Shows the steps to connect an AI tool to Scout's memory yourself.",
+        "Gives the exact line to run for Claude Code, Codex or Cursor. It holds no secret.",
+        "setup",
+    ),
     "tabs": Words(
         "See and read tabs",
         "Lists your tabs and reads the one you need.",

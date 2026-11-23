@@ -29,8 +29,10 @@ function setup(windows = true) {
   });
 }
 
+const readReply = (isError: boolean) =>
+  `{"jsonrpc":"2.0","id":1,"result":{"serverInfo":{}}}\n{"jsonrpc":"2.0","id":2,"result":{"content":[],"isError":${isError}}}\n`;
 const bridgeAnswers = (command: string) =>
-  command === 'tagalong' ? { stdout: '{"result":{"serverInfo":{"name":"tagalong-memory"}}}' } : {};
+  command === 'tagalong' ? { stdout: readReply(false) } : {};
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'connect-'));
@@ -82,7 +84,7 @@ describe('connect_ai_tool', () => {
         'claude-code',
       ],
     });
-    expect(JSON.stringify(out)).toContain('bridge answered');
+    expect(JSON.stringify(out)).toContain('read the memory list');
   });
 
   it('adds Codex with its own command', async () => {
@@ -143,6 +145,23 @@ describe('connect_ai_tool', () => {
     const out = JSON.stringify(await setup()({ tool: 'codex', token: TOKEN }));
     expect(out).toContain('did not answer');
     expect(out).not.toContain(TOKEN);
+  });
+
+  it('says so when the bridge starts but cannot reach the brain', async () => {
+    answers = (command) => (command === 'tagalong' ? { stdout: readReply(true) } : {});
+    const out = JSON.stringify(await setup()({ tool: 'codex', token: TOKEN }));
+    expect(out).toContain("could not reach Scout's brain");
+  });
+
+  it('sends the bridge a real read, not only the greeting', async () => {
+    await setup()({ tool: 'codex', token: TOKEN });
+    const probe = calls.find((c) => c.command === 'tagalong');
+    expect(probe?.input).toContain('"method":"tools/call"');
+    expect(probe?.input).toContain('list_memories');
+  });
+
+  it('refuses a tool name that only exists on Object.prototype', async () => {
+    await expect(setup()({ tool: 'constructor', token: TOKEN })).rejects.toThrow(/known tool/);
   });
 
   it('restricts the pairing file to the owner on Windows', async () => {

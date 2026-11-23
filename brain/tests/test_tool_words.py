@@ -46,6 +46,7 @@ def _scout_tool_names() -> set[str]:
     """Scout's built-in tools as main.py builds them, with fakes for what the builders only close
     over (nothing here is called)."""
     from brain.loops.tools import loop_tools
+    from brain.mcp_client_tools import connect_ai_tool_tools
     from brain.setup.apps import app_setup_tools
     from brain.setup.expert_tools import expert_setup_tools, login_tools
 
@@ -56,6 +57,7 @@ def _scout_tool_names() -> set[str]:
         + app_setup_tools(MagicMock(), *[fake] * 10, {}, fake, fake)[0]
         + login_tools(MagicMock(), fake)
         + loop_tools(fake)
+        + connect_ai_tool_tools(fake, fake)
     )
     session = make_session(_Model(), _Budget(), Bodies(), 10, Memory(":memory:"), extra_tools=extra)
     return {
@@ -90,8 +92,8 @@ def test_groups_order_and_titles():
     assert {w.group for w in WORDS.values()} == {g.id for g in GROUPS}
 
 
-def test_there_are_57_tools():
-    assert len(WORDS) == 57
+def test_there_are_59_tools():
+    assert len(WORDS) == 59
 
 
 def test_words_match_the_wording_page_spot_checks():

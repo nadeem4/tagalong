@@ -55,16 +55,41 @@ const bridge = (name: string): string[] => [
   name,
 ];
 
-const INITIALIZE = JSON.stringify({
-  jsonrpc: '2.0',
-  id: 1,
-  method: 'initialize',
-  params: {
-    protocolVersion: '2024-11-05',
-    capabilities: {},
-    clientInfo: { name: 'tagalong', version: '1' },
+// What an AI tool sends first, then one real read: it makes the bridge dial the brain with the token.
+const PROBE = [
+  {
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'initialize',
+    params: {
+      protocolVersion: '2024-11-05',
+      capabilities: {},
+      clientInfo: { name: 'tagalong', version: '1' },
+    },
   },
-});
+  { jsonrpc: '2.0', method: 'notifications/initialized' },
+  {
+    jsonrpc: '2.0',
+    id: 2,
+    method: 'tools/call',
+    params: { name: 'list_memories', arguments: {} },
+  },
+]
+  .map((message) => `${JSON.stringify(message)}\n`)
+  .join('');
+
+/** The bridge's answer to the read: null when it never came, else whether the brain was reached. */
+function readReached(stdout: string): boolean | null {
+  for (const line of stdout.split('\n')) {
+    try {
+      const reply = JSON.parse(line) as { id?: number; result?: { isError?: boolean } };
+      if (reply.id === 2) return reply.result?.isError !== true;
+    } catch {
+      // Not a whole JSON line (yet).
+    }
+  }
+  return null;
+}
 
 const TOO_LONG = 'Setting up took too long, so it was stopped.';
 
@@ -77,7 +102,12 @@ export function connectAiTool(
 ): (input: Record<string, unknown>) => Promise<Part[]> {
   return async (input) => {
     const { tool, token } = input;
-    if (typeof tool !== 'string' || !(tool in LABELS) || typeof token !== 'string' || !token) {
+    if (
+      typeof tool !== 'string' ||
+      !Object.hasOwn(LABELS, tool) ||
+      typeof token !== 'string' ||
+      !token
+    ) {
       throw new RpcError(
         ErrorCode.invalid_params,
         'connect_ai_tool needs a known tool and a token',
@@ -170,21 +200,23 @@ export function connectAiTool(
     else await addWithCli(CLI[known]);
     await writeLink();
 
-    let answered = false;
+    let reached: boolean | null = null;
     try {
       const probe = await run(
         deps.tagalong.command,
         [...deps.tagalong.args, 'memory-mcp', '--client', known],
-        { input: `${INITIALIZE}\n`, until: '"serverInfo"', timeoutMs: PROBE_LIMIT_MS },
+        { input: PROBE, until: '"id":2', timeoutMs: PROBE_LIMIT_MS },
       );
-      answered = probe.stdout.includes('"serverInfo"');
+      reached = readReached(probe.stdout);
     } catch {
       // Out of time: the set-up itself is done, only the check is unanswered.
     }
     const label = LABELS[known];
-    const text = answered
-      ? `${label} is connected to Scout's memory: the bridge answered.`
-      : `${label} is set up, but the bridge did not answer. If Tagalong was only just installed, open a new terminal window and try ${label} again.`;
+    const text = reached
+      ? `${label} is connected to Scout's memory: the bridge started and read the memory list.`
+      : reached === false
+        ? `${label} is set up, but the bridge could not reach Scout's brain. Check that the brain is running, then try again.`
+        : `${label} is set up, but the bridge did not answer. If Tagalong was only just installed, open a new terminal window and try ${label} again.`;
     return [{ type: 'text', text }];
   };
 }
