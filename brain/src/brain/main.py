@@ -5,6 +5,7 @@ so the library's own connection chatter stays quiet and only the brain's lines p
 """
 
 import asyncio
+import ctypes
 import errno
 import logging
 import os
@@ -478,14 +479,6 @@ def main() -> None:
         pass
 
 
-def hide_console(kernel32, user32) -> None:
-    """A GUI-subsystem process has no console, so every console child it starts would open its
-    own window; a hidden console of its own is inherited by them instead."""
-    kernel32.AllocConsole()
-    hwnd = kernel32.GetConsoleWindow()
-    user32.ShowWindow(hwnd, 0)  # SW_HIDE
-
-
 def service_main(argv: list[str] | None = None) -> None:
     """The logon service's windowless launcher (`brain-service`). It has no console and gets no
     environment from the task, so it takes KEY=VALUE arguments and writes to brain.log."""
@@ -494,5 +487,10 @@ def service_main(argv: list[str] | None = None) -> None:
         os.environ[name] = value
     home = load_config(os.environ).data_dir
     home.mkdir(parents=True, exist_ok=True)
+    if sys.platform == "win32":
+        # A windowless process has no console, so each console child (experts, the WhatsApp
+        # bridge) would open a window of its own; a hidden console here is inherited instead.
+        ctypes.windll.kernel32.AllocConsole()
+        ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 0)
     sys.stdout = sys.stderr = open(home / "brain.log", "a", encoding="utf-8", buffering=1)  # noqa: SIM115
     main()

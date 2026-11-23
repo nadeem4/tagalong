@@ -1,6 +1,7 @@
 """Checks main refuses to start without an API key, and opens the memory db under the data dir."""
 
 import asyncio
+import ctypes
 import errno
 import io
 import json
@@ -824,7 +825,9 @@ def test_the_service_entry_takes_its_environment_from_arguments_and_logs_to_brai
     assert "hello" in (tmp_path / "brain.log").read_text(encoding="utf-8")
 
 
-def test_hide_console_gives_the_process_a_console_then_hides_it():
+def test_the_service_entry_on_windows_hides_a_console_of_its_own_for_its_children(
+    monkeypatch, tmp_path
+):
     calls = []
 
     class Kernel32:
@@ -839,5 +842,16 @@ def test_hide_console_gives_the_process_a_console_then_hides_it():
         def ShowWindow(self, hwnd, how):
             calls.append(("show", hwnd, how))
 
-    main.hide_console(Kernel32(), User32())
-    assert calls == ["alloc", "get", ("show", 77, 0)]
+    class Windll:
+        kernel32 = Kernel32()
+        user32 = User32()
+
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(ctypes, "windll", Windll(), raising=False)
+    monkeypatch.setattr(main, "main", lambda: calls.append("main"))
+    out, err = sys.stdout, sys.stderr
+    try:
+        main.service_main([f"TAGALONG_HOME={tmp_path}"])
+    finally:
+        sys.stdout, sys.stderr = out, err
+    assert calls == ["alloc", "get", ("show", 77, 0), "main"]

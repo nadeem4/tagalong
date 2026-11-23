@@ -297,7 +297,7 @@ The outbox is described under [Outbox and replay](#outbox-and-replay): live-only
   older brain that sends neither is still understood; `protocol` stays 1). The desktop compares
   them with its own to decide on a restart (see [desktop.md](../bodies/desktop.md#brain-version-check-and-restart)).
   `TAGALONG_STARTED_BY=desktop` (set by the desktop when it spawns the brain) is reported by
-  `brain_status` as `started_by: "desktop"`; `service` (set by the logon service) is `"service"`; unset, it is `"person"`. `main.service_main` is the windowless `brain-service` entry the Windows task runs: it takes `KEY=VALUE` arguments into the environment, gives the process a hidden console (`hide_console`, so console children such as the WhatsApp bridge open no window) and writes to `brain.log`.
+  `brain_status` as `started_by: "desktop"`; `service` (set by the logon service) is `"service"`; unset, it is `"person"`. `main.service_main` is the windowless `brain-service` entry the Windows task runs: it takes `KEY=VALUE` arguments into the environment, gives the process a hidden console (so console children such as the WhatsApp bridge open no window) and writes to `brain.log`.
 - After `hello`, `tools` replaces the body's tool list and answers `{}`. A second `hello` gets
   `invalid_request`. The connection stays open.
 - `say` starts or joins a turn (see [What a turn does](turns.md#a-turn)); bad params get
