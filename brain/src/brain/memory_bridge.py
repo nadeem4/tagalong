@@ -20,14 +20,13 @@ from urllib.parse import parse_qs, urlsplit
 from mcp import types
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed
 
-from brain.memory_mcp import MEMORY_SPECS, MEMORY_TOOLS
-from brain.node.main import MAX_FRAME, connect_pinned
-from brain.protocol import PROTOCOL, ErrorCode
+from brain.link import dial, hello_params, request
+from brain.memory_mcp import MEMORY_SPECS, MEMORY_TOOLS, as_mcp_tool
+from brain.protocol import ErrorCode
 
-NAME_PATTERN = r"^[a-z0-9-]{1,32}$"
+REPLY_TIMEOUT = 10
 Dial = Callable[[str, str | None], Awaitable[Any]]
 
 
@@ -40,12 +39,6 @@ class BridgeLink:
 
 class BridgeError(Exception):
     """A failure worded for the AI tool that called, or for the person at the terminal."""
-
-
-async def dial(addr: str, fingerprint: str | None) -> Any:
-    if fingerprint is None:
-        return await connect(f"ws://{addr}", max_size=MAX_FRAME)
-    return await connect_pinned(addr, fingerprint)
 
 
 def link_path(home: Path, name: str) -> Path:
@@ -68,10 +61,6 @@ def save_link(home: Path, name: str, link: BridgeLink) -> None:
     path.write_text(json.dumps(asdict(link)), encoding="utf-8")
 
 
-def _frame(req_id: int, method: str, params: dict) -> str:
-    return json.dumps({"jsonrpc": "2.0", "id": req_id, "method": method, "params": params})
-
-
 async def _reply(ws: Any, req_id: int) -> dict:
     async for raw in ws:
         message = json.loads(raw)
@@ -85,20 +74,14 @@ async def call_brain(link: BridgeLink, name: str, tool: str, args: dict, connect
     try:
         ws = await connect_to(link.addr, link.fingerprint)
         async with ws:
-            hello = {
-                "protocol": PROTOCOL,
-                "token": link.token,
-                "body": {"id": name, "kind": "mcp_client", "name": name, "display": False},
-                "tools": [],
-            }
-            await ws.send(_frame(1, "hello", hello))
-            if "error" in await _reply(ws, 1):
+            await ws.send(request(1, "hello", hello_params(link.token, name, "mcp_client", name)))
+            if "error" in await asyncio.wait_for(_reply(ws, 1), REPLY_TIMEOUT):
                 raise BridgeError(
                     "The brain refused this AI tool; its access may have been revoked. Make a "
                     "new link in Home and pair again."
                 )
-            await ws.send(_frame(2, "call", {"tool": tool, "input": args}))
-            answer = await _reply(ws, 2)
+            await ws.send(request(2, "call", {"tool": tool, "input": args}))
+            answer = await asyncio.wait_for(_reply(ws, 2), REPLY_TIMEOUT)
     except ssl.SSLError:
         raise BridgeError(
             "Scout's brain showed a certificate other than the one this tool was paired with."
@@ -112,12 +95,7 @@ async def call_brain(link: BridgeLink, name: str, tool: str, args: dict, connect
 
 def build_server(link: BridgeLink, name: str = "mcp", connect_to: Dial = dial) -> Server:
     tools = [
-        types.Tool(
-            name=external,
-            description=MEMORY_SPECS[internal].description,
-            input_schema=MEMORY_SPECS[internal].input_schema,
-        )
-        for external, internal in MEMORY_TOOLS.items()
+        as_mcp_tool(external, MEMORY_SPECS[internal]) for external, internal in MEMORY_TOOLS.items()
     ]
 
     async def list_tools(ctx, params) -> types.ListToolsResult:
@@ -153,8 +131,8 @@ async def pair_with_link(home: Path, name: str, link: str, connect_to: Dial = di
         ws = await connect_to(addr, fingerprint)
         async with ws:
             params = {"code": code, "device": {"name": name, "kind": "mcp_client"}}
-            await ws.send(_frame(1, "pair", params))
-            answer = await asyncio.wait_for(_reply(ws, 1), 10)
+            await ws.send(request(1, "pair", params))
+            answer = await asyncio.wait_for(_reply(ws, 1), REPLY_TIMEOUT)
     except ssl.SSLError:
         raise BridgeError(
             "Scout's brain showed a certificate other than the one in the link."

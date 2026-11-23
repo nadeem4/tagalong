@@ -23,6 +23,8 @@ class DeviceCheck(Protocol):
     def verify(self, token: str) -> Principal | None: ...
 
 
+BODY_KINDS = frozenset({"local", "desktop", "browser", "node"})
+CLIENT_KINDS = frozenset({"mcp_client"})
 LOCAL = Principal(key="local", name="this computer", kind="local", local=True)
 
 
@@ -37,13 +39,17 @@ class Authenticator:
         self._devices = devices
         self._loopback = loopback  # a device on the loopback listener is on this machine
 
-    def identify(self, token: str) -> Principal | None:
+    def identify(self, token: str, kinds: frozenset[str] = BODY_KINDS) -> Principal | None:
+        """The principal for a token, only if it is of one of `kinds`: a body's token is no
+        memory client's and the reverse."""
         if not token:
             return None
         if self._local and hmac.compare_digest(token.encode(), self._local):
-            return LOCAL
+            return LOCAL if LOCAL.kind in kinds else None
         principal = self._devices.verify(token) if self._devices else None
-        return replace(principal, local=True) if principal and self._loopback else principal
+        if principal is None or principal.kind not in kinds:
+            return None
+        return replace(principal, local=True) if self._loopback else principal
 
 
 def listener_auth(local_token: str, devices: DeviceCheck) -> tuple[Authenticator, Authenticator]:

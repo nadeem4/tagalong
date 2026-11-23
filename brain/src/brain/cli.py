@@ -32,7 +32,7 @@ from brain.events import Event
 from brain.identity import load_or_create_identity
 from brain.lifecycle import pid_path, stop_real_brain
 from brain.memory import Memory
-from brain.memory_bridge import NAME_PATTERN, BridgeError
+from brain.memory_bridge import BridgeError
 from brain.memory_bridge import pair_with_link as real_pair_memory
 from brain.memory_bridge import serve as real_serve_memory
 from brain.node.allowlist import Allowlist, NotRunnable
@@ -40,8 +40,8 @@ from brain.node.main import HelloRefused
 from brain.node.main import run_node as real_run_node
 from brain.node.signin import browser_sign_in
 from brain.open_items import OpenItems
-from brain.pairing import PAIR_KINDS, build_pairing, render_qr
-from brain.protocol import PipeSpec
+from brain.pairing import OFFERED_KINDS, build_pairing, render_qr
+from brain.protocol import BODY_ID_PATTERN, PipeSpec
 from brain.service import Service, ServiceError, real_service
 from brain.setup.apps import add_registry_app, app_card
 from brain.setup.facts import Machine, RunCmd, inspect, real_run_cmd
@@ -98,7 +98,7 @@ def _parser() -> argparse.ArgumentParser:
     add.add_argument("app_id")
     add.add_argument("--yes", action="store_true", help="skip the question")
     pair = sub.add_parser("pair", help="make a one-time code to pair another machine")
-    pair.add_argument("--kind", choices=sorted(PAIR_KINDS), default="desktop")
+    pair.add_argument("--kind", choices=sorted(OFFERED_KINDS), default="desktop")
     service = sub.add_parser("service", help="run the brain at logon, without the desktop")
     service.add_argument("sub", choices=["install", "remove", "status"])
     serve = sub.add_parser("serve", help="run the brain here for other devices, with a pairing QR")
@@ -217,10 +217,7 @@ def main(
             if run_brain is None:
                 from brain.main import main as run_brain
             run_brain()
-    except _Fail as err:
-        out(str(err))
-        return 1
-    except BridgeError as err:
+    except (_Fail, BridgeError) as err:
         out(str(err))
         return 1
     except (InstallError, RegistryUnavailable, AppError) as err:
@@ -418,7 +415,7 @@ def _service(action: str, service: Service, home: Path, env, out) -> None:
 
 
 async def _memory_mcp(args, home: Path, serve_memory, pair_memory, out) -> None:
-    if not re.fullmatch(NAME_PATTERN, args.client):
+    if not re.fullmatch(BODY_ID_PATTERN, args.client):
         raise _Fail("--client is lowercase letters, digits and - only, at most 32 characters.")
     if args.pair:
         await pair_memory(home, args.client, args.pair)

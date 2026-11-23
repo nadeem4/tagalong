@@ -5,7 +5,6 @@ import hashlib
 import secrets
 import sqlite3
 from collections.abc import Callable
-from dataclasses import dataclass
 
 from brain.auth import Principal
 from brain.store import devices as store
@@ -13,13 +12,6 @@ from brain.store import devices as store
 
 def hash_secret(secret: str) -> str:
     return hashlib.sha256(secret.encode()).hexdigest()
-
-
-@dataclass(frozen=True)
-class McpClient:
-    id: str
-    name: str
-    personal: bool  # may read the facts the owner keeps back
 
 
 class Devices:

@@ -12,7 +12,9 @@ from event_log import make_session
 from mcp import ClientSession
 from mcp.shared.memory import create_client_server_memory_streams
 from test_server import Open, ScriptedModel
+from websockets.asyncio.server import serve
 
+from brain import memory_bridge
 from brain.auth import Authenticator
 from brain.bodies import Bodies
 from brain.devices import Devices
@@ -145,3 +147,17 @@ async def test_a_pinned_link_refuses_a_brain_with_another_certificate(brain, tmp
     async with mcp(server) as s:
         out = await s.call_tool("recall", {"query": "x"})
     assert out.is_error and "certificate" in out.content[0].text
+
+
+async def test_a_brain_that_accepts_the_socket_and_never_answers_is_a_tool_error(monkeypatch):
+    monkeypatch.setattr(memory_bridge, "REPLY_TIMEOUT", 0.2)
+
+    async def silent(ws):
+        await asyncio.sleep(5)
+
+    async with serve(silent, "127.0.0.1", 0) as listener:
+        port = listener.sockets[0].getsockname()[1]
+        server = build_server(BridgeLink(f"127.0.0.1:{port}", None, "t"))
+        async with mcp(server) as s:
+            out = await s.call_tool("recall", {"query": "x"})
+    assert out.is_error and "not reachable" in out.content[0].text

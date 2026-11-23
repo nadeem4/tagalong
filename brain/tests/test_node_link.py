@@ -8,7 +8,7 @@ import pytest
 from websockets.asyncio.server import serve
 
 from brain.identity import load_or_create_identity, server_ssl_context
-from brain.node.main import connect_pinned
+from brain.link import connect_pinned
 
 
 async def hello(ws) -> None:

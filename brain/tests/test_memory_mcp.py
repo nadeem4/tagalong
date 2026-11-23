@@ -19,7 +19,8 @@ from ask_log import approvals_on, list_approvals
 from mcp import ClientSession, types
 from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
 
-from brain.devices import Devices, McpClient
+from brain.auth import Principal
+from brain.devices import Devices
 from brain.expert_apps import ExpertApps
 from brain.guards import Guards
 from brain.identity import load_or_create_identity
@@ -81,7 +82,9 @@ class Rig:
         self.devices = Devices(self.memory.db, lambda: NOW)
 
     def client(self, name="Claude Code", personal=False):
-        return name, McpClient(name, name, personal)
+        return name, Principal(
+            key=f"device:{name}", name=name, kind="mcp_client", local=False, personal=personal
+        )
 
 
 @pytest.fixture

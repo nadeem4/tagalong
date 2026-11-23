@@ -15,13 +15,13 @@ from contextvars import ContextVar
 
 from mcp import types
 
-from brain.devices import McpClient
+from brain.auth import Principal
 from brain.guards import Guards
 from brain.masking import mask_json
 from brain.memory import Memory
 from brain.mind.turn import Call
 from brain.permission import Tier
-from brain.protocol import RpcError
+from brain.protocol import ErrorCode, RpcError
 from brain.store.memory import OUTSIDE, MemoryFull, MemoryRefused
 from brain.toolbox import Handler, Toolbox, ToolSpec
 from brain.tools import Notify, format_hits
@@ -77,11 +77,11 @@ MEMORY_SPECS = {
 }
 
 # Who is calling, for the handler: the toolbox passes a tool's arguments and nothing else.
-CLIENT: ContextVar[McpClient | None] = ContextVar("memory_client", default=None)
+CLIENT: ContextVar[Principal | None] = ContextVar("memory_client", default=None)
 
 
 def memory_client_tools(memory: Memory, notify: Notify) -> list[tuple[ToolSpec, Handler]]:
-    def client() -> McpClient:
+    def client() -> Principal:
         who = CLIENT.get()
         assert who is not None
         return who
@@ -132,15 +132,15 @@ def memory_client_tools(memory: Memory, notify: Notify) -> list[tuple[ToolSpec, 
     ]
 
 
+def as_mcp_tool(name: str, spec: ToolSpec) -> types.Tool:
+    return types.Tool(name=name, description=spec.description, input_schema=spec.input_schema)
+
+
 def list_memory_tools(toolbox: Toolbox) -> list[types.Tool]:
     """The memory tools a client may call now: those not turned Off."""
     live = {s.name: s for s in toolbox.active_specs() if s.name in MEMORY_TOOLS.values()}
     return [
-        types.Tool(
-            name=external,
-            description=live[internal].description,
-            input_schema=live[internal].input_schema,
-        )
+        as_mcp_tool(external, live[internal])
         for external, internal in MEMORY_TOOLS.items()
         if internal in live
     ]
@@ -149,14 +149,15 @@ def list_memory_tools(toolbox: Toolbox) -> list[types.Tool]:
 async def call_memory_tool(
     toolbox: Toolbox,
     guards: Guards,
-    client: McpClient,
+    client: Principal,
     name: str,
     args: dict,
     by: str,
     job_id: str | None = None,
 ) -> types.CallToolResult:
     """One client call through the toolbox gate as `mcp:<client>`; `by` says who asks, for the
-    Allow card. A tool turned Off is refused by the gate itself."""
+    Allow card. A tool turned Off is refused by the gate itself; a name that is no memory tool
+    raises unknown_tool."""
 
     def reply(text: str, is_error: bool = False) -> types.CallToolResult:
         text = mask_json(guards, "job_result", text)  # a memory may quote a secret the brain knows
@@ -166,7 +167,7 @@ async def call_memory_tool(
 
     internal = MEMORY_TOOLS.get(name)
     if internal is None:
-        return reply(f"No tool named {name}.", True)
+        raise RpcError(ErrorCode.unknown_tool, f"No tool named {name}.")
     text = f"{name} {json.dumps(args, sort_keys=True, separators=(',', ':'))} ({by})"
     call = Call(uuid.uuid4().hex, internal, args, "", text)
     token = CLIENT.set(client)

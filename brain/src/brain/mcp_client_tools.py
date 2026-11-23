@@ -30,13 +30,14 @@ def mcp_client_tools(
                 "Network access is off, so no pairing link can reach this brain. Set "
                 "TAGALONG_NETWORK=1 and restart the brain.",
             )
-        offer = pairing.make_code(KIND, personal=args.get("personal") is True)
+        personal = args.get("personal") is True
+        offer = pairing.make_code(KIND, personal=personal)
         return json.dumps(
             {
                 "name": name.strip(),
                 "link": offer.link,
                 "expires_at": offer.expires_at,
-                "personal": args.get("personal") is True,
+                "personal": personal,
             }
         )
 

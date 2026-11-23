@@ -18,6 +18,7 @@ from pydantic import (
 )
 
 PROTOCOL = 3
+BODY_ID_PATTERN = r"[a-z0-9-]{1,32}"
 
 # The kinds of body a turn can be shown on (`Body.kind`), as saved with each message.
 BODY_DESKTOP = "desktop"
@@ -139,7 +140,7 @@ Part = Annotated[TextPart | ImagePart | FilePart, Field(discriminator="type")]
 
 
 class Body(Model):
-    id: Annotated[str, Field(pattern=r"^[a-z0-9-]{1,32}$")]
+    id: Annotated[str, Field(pattern=f"^{BODY_ID_PATTERN}$")]
     kind: str
     name: str
     display: bool | None = None  # false: shows nothing; omitted or true: shows turns and asks

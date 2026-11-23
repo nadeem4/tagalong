@@ -5,7 +5,6 @@ voice models, so a machine without them can run it.
 """
 
 import asyncio
-import hashlib
 import json
 import logging
 import socket
@@ -15,13 +14,12 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from pydantic import ValidationError
-from websockets.asyncio.client import ClientConnection, connect
 from websockets.exceptions import ConnectionClosed
 
+from brain.link import connect_pinned, hello_params, request
 from brain.node.allowlist import Allowlist
 from brain.node.pipes import Pipes, Spawn, spawn_process
 from brain.protocol import (
-    PROTOCOL,
     ErrorCode,
     FolderCheckParams,
     PipeCloseParams,
@@ -33,7 +31,6 @@ from brain.protocol import (
 log = logging.getLogger("node")
 HELLO_ID = "h1"
 RETRY_S = 2.0
-MAX_FRAME = 28_000_000
 
 
 class HelloRefused(Exception):
@@ -63,15 +60,7 @@ class NodeSession:
 
         pipes = Pipes(self._allowlist, notify, self._spawn)
         writer = asyncio.create_task(drain())
-        hello = {
-            "protocol": PROTOCOL,
-            "token": token,
-            "body": {"id": body_id, "kind": "node", "name": name, "display": False},
-            "tools": [],
-        }
-        out.put_nowait(
-            json.dumps({"jsonrpc": "2.0", "id": HELLO_ID, "method": "hello", "params": hello})
-        )
+        out.put_nowait(request(HELLO_ID, "hello", hello_params(token, body_id, "node", name)))
         try:
             async for raw in ws:
                 message = _parse(raw)
@@ -129,22 +118,6 @@ def _parse(raw: str | bytes) -> dict[str, Any] | None:
     except ValueError:
         return None
     return message if isinstance(message, dict) else None
-
-
-async def connect_pinned(addr: str, fingerprint: str) -> ClientConnection:
-    """wss to the brain, trusting only the certificate with this SHA-256 fingerprint. The brain's
-    certificate is self-signed, so names and chains mean nothing; the pin is its identity. A
-    mismatch closes the socket before anything, the token included, is sent."""
-    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    ws = await connect(f"wss://{addr}", ssl=ctx, max_size=MAX_FRAME)
-    ssl_object = ws.transport.get_extra_info("ssl_object")
-    der = ssl_object.getpeercert(binary_form=True) if ssl_object else None
-    if der is None or hashlib.sha256(der).hexdigest() != fingerprint.lower():
-        await ws.close()
-        raise ssl.SSLError("The brain showed a certificate other than the one paired with.")
-    return ws
 
 
 async def run_node(

@@ -72,16 +72,15 @@ def insert_pair_code(
     )
 
 
-def redeem_pair_code(
-    db: sqlite3.Connection, secret_hash: str, kind: str, now: str
-) -> tuple[bool] | None:
+def redeem_pair_code(db: sqlite3.Connection, secret_hash: str, kind: str, now: str) -> bool | None:
     """Spend the code in the same statement that finds it, so two redeems cannot both win.
-    Returns (personal,) of the code, or None when it is unknown, used, expired or another kind."""
-    return db.execute(
+    Returns the code's `personal`, or None when it is unknown, used, expired or another kind."""
+    row = db.execute(
         "UPDATE pair_codes SET used_at=? WHERE secret_hash=? AND kind=? AND used_at IS NULL"
         " AND expires_at>? RETURNING personal",
         (now, secret_hash, kind, now),
     ).fetchone()
+    return None if row is None else bool(row[0])
 
 
 def delete_expired_codes(db: sqlite3.Connection, now: str) -> None:
