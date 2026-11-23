@@ -18,7 +18,7 @@ from brain.protocol import PipeSpec
 from tests.fake_node import FAKE, FakeNode
 from tests.test_apps import free_port, wait_for_port
 
-SECRET = "sk-live-not-a-real-key-123"
+SECRET = "planted-value-for-the-leak-check"
 
 
 @pytest.fixture
