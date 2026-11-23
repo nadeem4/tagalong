@@ -363,8 +363,10 @@ class Bodies:
             await self._request(
                 body_id, "pipe_open", {"pipe": pipe_id, "spec": spec.model_dump()}, timeout
             )
-        except BaseException:
+        except BaseException as exc:
             self._pipes.pop(pipe_id, None)
+            if isinstance(exc, RpcError) and exc.code == ErrorCode.timeout:
+                self.send_live(body_id, "pipe_close", {"pipe": pipe_id})  # it may have started
             raise
         return pipe
 

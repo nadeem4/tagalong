@@ -8,6 +8,8 @@ import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from brain.store import placements as store
+
 Location = str  # "brain" or a body id
 
 
@@ -67,21 +69,13 @@ class Placements:
         self._db = db
 
     def get(self, kind: str, target_id: str) -> Placement | None:
-        row = self._db.execute(
-            "SELECT mode, body_id, prefer FROM placements WHERE target_kind=? AND target_id=?",
-            (kind, target_id),
-        ).fetchone()
+        row = store.get_placement(self._db, kind, target_id)
         return None if row is None else Placement(*row)
 
     def set(self, kind: str, target_id: str, placement: Placement) -> None:
-        self._db.execute(
-            "INSERT OR REPLACE INTO placements(target_kind, target_id, mode, body_id, prefer)"
-            " VALUES (?, ?, ?, ?, ?)",
-            (kind, target_id, placement.mode, placement.body_id, placement.prefer),
+        store.set_placement(
+            self._db, kind, target_id, placement.mode, placement.body_id, placement.prefer
         )
 
     def all(self, kind: str) -> dict[str, Placement]:
-        rows = self._db.execute(
-            "SELECT target_id, mode, body_id, prefer FROM placements WHERE target_kind=?", (kind,)
-        )
-        return {r[0]: Placement(*r[1:]) for r in rows}
+        return {r[0]: Placement(*r[1:]) for r in store.all_placements(self._db, kind)}

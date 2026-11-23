@@ -83,6 +83,7 @@ class Rig:
 
     async def close(self) -> None:
         await self.apps.shutdown()
+        await self.node.aclose()
         self.memory.close()
 
 

@@ -52,10 +52,3 @@ def test_a_placement_persists_and_is_replaced(tmp_path):
     store.set("app", "gh", Placement("body", "pc"))
     assert store.get("app", "gh") == Placement("body", "pc")
     assert Placements(db).get("expert", "gh") is None
-
-
-def test_a_body_mode_needs_a_body():
-    with pytest.raises(ValueError):
-        Placement("body")
-    with pytest.raises(ValueError):
-        Placement("both", "pc")

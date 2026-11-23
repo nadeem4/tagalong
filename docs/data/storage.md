@@ -856,7 +856,7 @@ gone.
 
 ### placements
 
-Where an app or expert runs (migration 0042). Code reaches it through `placements.py` `Placements`.
+Where an app or expert runs (migration 0042). Code reaches it through `placements.py` `Placements`, which uses `store/placements.py` for the SQL.
 
 | Column        | Type | Meaning                                                     |
 | ------------- | ---- | ----------------------------------------------------------- |
