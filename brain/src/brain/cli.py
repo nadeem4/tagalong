@@ -124,6 +124,7 @@ def main(
     config = load_config(env)
     home = config.data_dir
     load_env_file(home, env)  # the brain reads the same .env
+    config = load_config(env)
     run = run or partial(real_run_cmd, timeout=NPM_TIMEOUT_S)
     machine = inspect_fn or partial(inspect, home, run)
     reg = Registry(home, get_json)

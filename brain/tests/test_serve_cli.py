@@ -95,3 +95,10 @@ def test_update_shows_what_uv_said_when_it_fails(tmp_path):
 
     assert rig.go("update", run=run) == 1
     assert "`brain` is not installed" in rig.text
+
+
+def test_pair_after_serve_reads_the_network_switch_and_public_host_saved_in_env(tmp_path):
+    (tmp_path / ".env").write_text("TAGALONG_NETWORK=1\nTAGALONG_PUBLIC_HOST=h\n")
+    rig = Rig(tmp_path)
+    assert rig.go("pair") == 0
+    assert "addr=h:47323" in rig.text
