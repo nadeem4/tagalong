@@ -125,6 +125,14 @@ async def test_ask_me_asks_once_per_turn_not_per_call(make):
     assert len(rig.where_asked) == 2
 
 
+async def test_ask_me_is_the_brain_for_a_call_with_no_turn(make):
+    rig = await make(Placement("both", "pc", "ask"))
+    rules.set_permission_mode(rig.memory.db, "fake__echo", "auto")
+    assert "hi" in await rig.call(turn="")
+    assert rig.where_asked == []
+    assert not rig.node.opened
+
+
 async def test_an_app_placed_on_a_node_that_is_offline_says_so_plainly(make):
     rig = await make(Placement("body", "pc"), node_online=False)
     with pytest.raises(RpcError) as err:

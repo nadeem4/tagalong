@@ -381,10 +381,10 @@ Each app has a placement (`placements.py`, table `placements`; see [storage](../
 | brain              | brain                                | brain              |
 | body               | the node                             | unavailable        |
 | both, prefer body  | the node                             | brain              |
-| both, prefer brain | brain                                | node               |
+| both, prefer brain | brain                                | brain              |
 | both, ask me       | one card per turn: Brain or the node | whichever is ready |
 
-Only a stdio app can run on a node: the brain opens a pipe to the node (`pipes.py`, `Bodies.open_pipe`), the node starts the command only if its own allow-list has it, and the MCP session runs over the pipe. The brain makes and reads every MCP message; the node moves bytes. An app that is unavailable (Body only, node offline) answers with a plain line, "{app} runs on {node}, which is not connected right now." Ask me asks once per turn for an app, not once per call. When a node connects or goes, `Apps.body_changed` relaunches the apps that were placed on it or running there.
+Only a stdio app can run on a node: the brain opens a pipe to the node (`pipes.py`, `Bodies.open_pipe`), the node starts the command only if its own allow-list has it, and the MCP session runs over the pipe. The brain makes and reads every MCP message; the node moves bytes. An app that is unavailable (Body only, node offline) answers with a plain line, "{app} runs on {node}, which is not connected right now." Ask me asks once per turn for an app, not once per call; a call with no turn (an expert's or Home's) has no card to ask on, so it runs on the brain. When a node connects or goes, `Apps.body_changed` relaunches the apps that were placed on it or running there.
 
 A placement is not a permission: a call on a node still goes through the Toolbox gate first, so the rule is keyed by app and tool and is the same wherever the app runs. Home reads and sets placements with `placement_list` and `placement_set`; setting an app's placement restarts it. Scout cannot move an app.
 

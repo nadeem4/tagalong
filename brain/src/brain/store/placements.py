@@ -28,7 +28,9 @@ def set_placement(
     )
 
 
-def all_placements(db: sqlite3.Connection, kind: str) -> list[tuple[str, str, str | None, str | None]]:
+def all_placements(
+    db: sqlite3.Connection, kind: str
+) -> list[tuple[str, str, str | None, str | None]]:
     """(target_id, mode, body_id, prefer) for every target of this kind."""
     return db.execute(
         "SELECT target_id, mode, body_id, prefer FROM placements WHERE target_kind=?", (kind,)

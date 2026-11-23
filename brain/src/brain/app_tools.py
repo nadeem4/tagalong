@@ -445,7 +445,8 @@ class AppSource:
         return format_result(app_id, result)
 
     async def _where(self, app_id: str, call: Call) -> str:
-        """Where this call runs. A both-and-ask app asks the person once per turn."""
+        """Where this call runs. A both-and-ask app asks the person once per turn; a call with no
+        turn (an expert's, Home's) has no card to ask on, so it runs on the brain."""
         try:
             return self._apps.resolve(app_id)
         except Unavailable as gone:
@@ -453,7 +454,7 @@ class AppSource:
             raise RpcError(ErrorCode.body_offline, line) from None
         except Choose as choice:
             if not call.turn:
-                return await self._pick(app_id, choice.body_id)
+                return "brain"
             key = (call.turn, app_id)
             prior = self._picks.get(key)
             if prior is None or (prior.done() and (prior.cancelled() or prior.exception())):
