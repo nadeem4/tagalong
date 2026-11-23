@@ -64,6 +64,7 @@ The brain is Python; the TypeScript apps are bodies.
 - No computer control: no mouse or keyboard automation anywhere. The one exception is the desktop's Ctrl+C selection copy (bodies/desktop/src/main/platform/selection.ts), scoped to reading the selection and restoring the clipboard. The desktop file tools (bodies/desktop/src/main/tools/files.ts) are file access inside folders the person chose, not computer control.
 - Tests run on fakes, never real providers: the fake brain in bodies/desktop/e2e/fixtures and fake clients in the Python tests. A real API call costs the user money; only make one when the user asks in that session.
 - Secrets never enter git: keys live in the environment or `<TAGALONG_HOME>/.env`. Every variable the code reads appears in .env.example.
+- Any file holding a token or key is written with brain.private_file.write_private.
 - Every file opens with a 2-6 line header; comments explain why, not history.
 - Conventional Commits, e.g. feat(desktop): ...
 - Docs are part of done: README.md, the matching docs/ subsystem doc, and docs/testing/feature-test-guide.md. A contract change also updates protocol/README.md, protocol/examples, protocol/ts and brain/src/brain/protocol.py together.
