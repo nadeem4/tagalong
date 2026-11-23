@@ -22,13 +22,13 @@ from typing import NoReturn, TextIO
 
 from brain.apps import AppError, TokenFile
 from brain.config import load_config, load_env_file, upsert_env_value
+from brain.devices import Devices
 from brain.discovery import lan_address
 from brain.events import Event
 from brain.identity import load_or_create_identity
 from brain.lifecycle import pid_path, stop_real_brain
 from brain.memory import Memory
 from brain.open_items import OpenItems
-from brain.pairing import PAIR_KINDS, build_pairing, render_qr
 from brain.service import Service, ServiceError, real_service
 from brain.setup.apps import add_registry_app, app_card
 from brain.setup.facts import Machine, RunCmd, inspect, real_run_cmd
