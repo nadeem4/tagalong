@@ -2,7 +2,8 @@
 URL of an HTTP MCP server, kept in one file the person approves entries into here. A spec that
 does not match an entry exactly is refused, however genuine the brain asking; the brain never
 adds to this list. An entry also holds the secrets the person typed here for it (environment
-values, a URL's secret query), so they never travel through the brain; the file is owner-only.
+values, a URL's secret query, a bearer token), so they never travel through the brain; the file
+is owner-only. OAuth tokens from `tagalong node signin` sit beside it under `app-oauth/`.
 """
 
 import hashlib
@@ -12,6 +13,7 @@ import shutil
 from pathlib import Path
 from typing import NamedTuple
 
+from brain.app_oauth import FileTokenStorage
 from brain.private_file import write_private
 from brain.protocol import PipeSpec
 
@@ -35,6 +37,11 @@ def _sha256(path: Path) -> str | None:
 class Secrets(NamedTuple):
     env: dict[str, str]
     url_query: str | None
+    bearer: str | None
+
+
+def oauth_storage(node_dir: Path, url: str) -> FileTokenStorage:
+    return FileTokenStorage(node_dir, hashlib.sha256(url.encode()).hexdigest()[:24])
 
 
 class Allowlist:
@@ -46,6 +53,7 @@ class Allowlist:
         spec: PipeSpec,
         secret_env: dict[str, str] | None = None,
         url_query: str | None = None,
+        bearer: str | None = None,
     ) -> None:
         """Approve a spec. Approving one again (after an update) keeps its secrets unless new
         ones are given."""
@@ -54,6 +62,7 @@ class Allowlist:
         prior = next((e for e in existing if _same_spec(e, spec)), {})
         env = secret_env if secret_env is not None else prior.get("secret_env")
         query = url_query if url_query is not None else prior.get("url_query")
+        token = bearer if bearer is not None else prior.get("bearer")
         if spec.url is not None:
             entry: dict = {"url": spec.url}
         else:
@@ -67,12 +76,20 @@ class Allowlist:
             entry["secret_env"] = env
         if query:
             entry["url_query"] = query
+        if token:
+            entry["bearer"] = token
         entries.append(entry)
         self._write(entries)
 
     def secrets(self, spec: PipeSpec) -> Secrets:
         entry = next((e for e in self._entries() if _same_spec(e, spec)), {})
-        return Secrets(dict(entry.get("secret_env", {})), entry.get("url_query"))
+        return Secrets(
+            dict(entry.get("secret_env", {})), entry.get("url_query"), entry.get("bearer")
+        )
+
+    @property
+    def node_dir(self) -> Path:
+        return self._path.parent
 
     def permits(self, spec: PipeSpec) -> str | None:
         """The file to run (or the url to relay to) when an entry matches the spec and the file

@@ -627,3 +627,33 @@ def test_node_allow_refuses_a_confused_request(tmp_path, argv):
     rig = Rig(tmp_path)
     assert rig.go(*argv, secret=lambda p: "v") == 1
     assert not (rig.home / "node" / "allowlist.json").exists()
+
+
+def test_node_signin_runs_here_then_approves_the_address(tmp_path):
+    rig = Rig(tmp_path)
+    url = "https://mcp.example.com/mcp"
+    signed: list[tuple[str, Path]] = []
+
+    async def fake_signin(address, node_dir):
+        signed.append((address, node_dir))
+
+    assert rig.go("node", "signin", url, node_signin=fake_signin) == 0
+    assert signed == [(url, rig.home / "node")]
+    allowlist = Allowlist(rig.home / "node" / "allowlist.json")
+    assert allowlist.permits(PipeSpec(url=url)) is not None
+    assert "never sees" in rig.text
+
+
+def test_node_signin_refuses_an_address_that_is_not_http(tmp_path):
+    rig = Rig(tmp_path)
+    assert rig.go("node", "signin", "ftp://x.example/mcp") == 1
+    assert not (rig.home / "node" / "allowlist.json").exists()
+
+
+def test_node_allow_bearer_is_asked_for_here_and_never_printed(tmp_path):
+    rig = Rig(tmp_path)
+    url = "https://mcp.example.com/mcp"
+    assert rig.go("node", "allow", "--url", url, "--bearer", secret=lambda p: "tok-123") == 0
+    stored = Allowlist(rig.home / "node" / "allowlist.json").secrets(PipeSpec(url=url))
+    assert stored.bearer == "tok-123"
+    assert "tok-123" not in rig.text

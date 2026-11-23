@@ -9,7 +9,8 @@ import logging
 from urllib.parse import quote, quote_plus
 
 import anyio
-from mcp.client.streamable_http import streamable_http_client
+import httpx2
+from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
 from mcp.shared.message import SessionMessage
 from mcp.types import jsonrpc_message_adapter
 
@@ -20,9 +21,17 @@ INVALID_REQUEST = -32600
 
 
 class HttpRelay:
-    def __init__(self, url: str, secrets: list[str]) -> None:
+    def __init__(
+        self,
+        url: str,
+        secrets: list[str],
+        auth: httpx2.Auth | None = None,
+        bearer: str | None = None,
+    ) -> None:
         self.stdout = asyncio.StreamReader()
         self._url = url
+        self._auth = auth
+        self._headers = {"Authorization": f"Bearer {bearer}"} if bearer else None
         forms = {
             form for value in secrets for form in (value, quote(value, safe=""), quote_plus(value))
         }
@@ -69,7 +78,8 @@ class HttpRelay:
     async def _run(self) -> None:
         try:
             async with (
-                streamable_http_client(self._url) as (read, write),
+                create_mcp_http_client(headers=self._headers, auth=self._auth) as client,
+                streamable_http_client(self._url, http_client=client) as (read, write),
                 anyio.create_task_group() as tasks,
             ):
 

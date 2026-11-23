@@ -705,9 +705,10 @@ class Apps:
 
     async def _node_streams(self, slot: _Slot):
         row = slot.row
-        if self._bodies is None or (row.transport == "http" and row.auth != "none"):
+        if self._bodies is None:
             raise AppError(f"{row.name} cannot run on another machine yet.")
-        # The node adds this app's secrets from what its person entered there; none is sent.
+        # The node adds this app's secrets and sign-in from what its person entered there; none
+        # is sent.
         if row.transport == "stdio":
             spec = PipeSpec(command=row.config["command"], args=row.config.get("args", []))
         else:

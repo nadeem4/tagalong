@@ -137,7 +137,8 @@ flowchart TD
 - **Later 401**: a 401 in a live session flips the app to `needs-sign-in` ("Sign in to X again.").
 - **Guard**: the brain only follows https addresses, or http to loopback.
 - **Same machine**: the browser opens, and the callback lands, on the machine the brain runs on. A
-  brain on another machine cannot finish a sign-in from this desktop.
+  brain on another machine cannot finish a sign-in from this desktop. An app placed on a node signs
+  in on that node instead: `tagalong node signin <url>` there.
 
 ### Read, change and locked
 
@@ -384,7 +385,7 @@ Each app has a placement (`placements.py`, table `placements`; see [storage](../
 | both, prefer brain | brain                                | brain              |
 | both, ask me       | one card per turn: Brain or the node | whichever is ready |
 
-A stdio app or an http app with no sign-in (or a `url_secret` key) can run on a node: the brain opens a pipe to the node (`pipes.py`, `Bodies.open_pipe`), the node starts the command only if its own allow-list has it, and the MCP session runs over the pipe. For an http app the spec is the app's address and the node relays to it. The brain makes and reads every MCP message; the node moves bytes. The keys such an app needs (`secret_env`, `url_secret`) are typed on the node with `tagalong node allow` and never reach the brain ([node](../brain/node.md#secrets-stay-on-the-node)). An app that is unavailable (Body only, node offline) answers with a plain line, "{app} runs on {node}, which is not connected right now." Ask me asks once per turn for an app, not once per call; a call with no turn (an expert's or Home's) has no card to ask on, so it runs on the brain. When a node connects or goes, `Apps.body_changed` relaunches the apps that were placed on it or running there.
+A stdio app, or an http app with no sign-in, a `url_secret` key, a bearer token or an OAuth sign-in, can run on a node (the last two are made on the node, see [Signing in on the node](../brain/node.md#signing-in-on-the-node)): the brain opens a pipe to the node (`pipes.py`, `Bodies.open_pipe`), the node starts the command only if its own allow-list has it, and the MCP session runs over the pipe. For an http app the spec is the app's address and the node relays to it. The brain makes and reads every MCP message; the node moves bytes. The keys such an app needs (`secret_env`, `url_secret`) are typed on the node with `tagalong node allow` and never reach the brain ([node](../brain/node.md#secrets-stay-on-the-node)). An app that is unavailable (Body only, node offline) answers with a plain line, "{app} runs on {node}, which is not connected right now." Ask me asks once per turn for an app, not once per call; a call with no turn (an expert's or Home's) has no card to ask on, so it runs on the brain. When a node connects or goes, `Apps.body_changed` relaunches the apps that were placed on it or running there.
 
 A placement is not a permission: a call on a node still goes through the Toolbox gate first, so the rule is keyed by app and tool and is the same wherever the app runs. Home reads and sets placements with `placement_list` and `placement_set`; setting an app's placement restarts it. Scout cannot move an app.
 

@@ -15,8 +15,9 @@ from collections.abc import Awaitable, Callable
 from typing import Protocol
 
 from brain.apps import merge_url_secret, url_secret_values
-from brain.node.allowlist import Allowlist
+from brain.node.allowlist import Allowlist, oauth_storage
 from brain.node.relay import HttpRelay
+from brain.node.signin import stored_auth
 from brain.protocol import ErrorCode, PipeSpec, RpcError
 
 CHUNK = 65_536
@@ -33,7 +34,7 @@ class Child(Protocol):
 
 
 Spawn = Callable[[str, list[str], dict[str, str]], Awaitable[Child]]
-ConnectUrl = Callable[[str, list[str]], Child]
+ConnectUrl = Callable[..., Child]
 Send = Callable[[str, dict], None]
 
 
@@ -99,9 +100,17 @@ class Pipes:
         try:
             if spec.url is not None:
                 query = secrets.url_query
+                auth = stored_auth(path, self._allowlist.node_dir)
+                tokens = oauth_storage(self._allowlist.node_dir, path).token_strings()
                 child = self._connect_url(
                     merge_url_secret(path, query) if query else path,
-                    url_secret_values(query) if query else [],
+                    [
+                        *(url_secret_values(query) if query else []),
+                        *tokens,
+                        *filter(None, [secrets.bearer]),
+                    ],
+                    auth=auth,
+                    bearer=secrets.bearer,
                 )
             else:
                 child = await self._spawn(path, spec.args, secrets.env)
