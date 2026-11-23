@@ -449,11 +449,8 @@ class AppSource:
         try:
             return self._apps.resolve(app_id)
         except Unavailable as gone:
-            body = self._apps.body_name(gone.body_id)
-            name = self._apps.name(app_id)
-            raise RpcError(
-                ErrorCode.body_offline, f"{name} runs on {body}, which is not connected right now."
-            ) from None
+            line = self._apps.gone_line(self._apps.name(app_id), gone.body_id)
+            raise RpcError(ErrorCode.body_offline, line) from None
         except Choose as choice:
             if not call.turn:
                 return await self._pick(app_id, choice.body_id)

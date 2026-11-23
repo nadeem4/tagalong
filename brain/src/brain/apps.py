@@ -374,6 +374,9 @@ class Apps:
     def body_name(self, body_id: str) -> str:
         return self._bodies.name(body_id) if self._bodies else body_id
 
+    def gone_line(self, app_name: str, body_id: str) -> str:
+        return f"{app_name} runs on {self.body_name(body_id)}, which is not connected right now."
+
     def unavailable_line(self, app_id: str) -> str | None:
         """The plain line for an app whose node is not connected; None for any other state."""
         slot = self._slots.get(app_id)
@@ -561,10 +564,7 @@ class Apps:
             slot.location = where or self._place(row)
         except Unavailable as gone:
             slot.location = gone.body_id
-            name = self._bodies.name(gone.body_id) if self._bodies else gone.body_id
-            self._set(
-                slot, "error", f"{row.name} runs on {name}, which is not connected right now."
-            )
+            self._set(slot, "error", self.gone_line(row.name, gone.body_id))
             return
         self._set(slot, "connecting")
         slot.task = asyncio.create_task(self._run(slot))

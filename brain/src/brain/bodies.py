@@ -375,17 +375,19 @@ class Bodies:
         try:
             if method == "pipe_data":
                 data = PipeDataParams.model_validate(params)
-                owned = self._pipes.get(data.pipe)
-                if owned is not None and owned[0] == body_id:
-                    owned[1].feed(data.data)
+                if (pipe := self._owned_pipe(body_id, data.pipe)) is not None:
+                    pipe.feed(data.data)
             elif method == "pipe_close":
                 closed = PipeCloseParams.model_validate(params)
-                owned = self._pipes.get(closed.pipe)
-                if owned is not None and owned[0] == body_id:
+                if (pipe := self._owned_pipe(body_id, closed.pipe)) is not None:
                     del self._pipes[closed.pipe]
-                    owned[1].end()
+                    pipe.end()
         except ValueError:
             return
+
+    def _owned_pipe(self, body_id: str, pipe_id: str) -> Pipe | None:
+        owned = self._pipes.get(pipe_id)
+        return owned[1] if owned is not None and owned[0] == body_id else None
 
     def _end_pipes(self, body_id: str) -> None:
         for pipe_id, (owner, pipe) in list(self._pipes.items()):

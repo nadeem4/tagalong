@@ -11,20 +11,18 @@ from dataclasses import dataclass
 Location = str  # "brain" or a body id
 
 
-class Unavailable(Exception):
+class _AtBody(Exception):
+    def __init__(self, body_id: str) -> None:
+        super().__init__(body_id)
+        self.body_id = body_id
+
+
+class Unavailable(_AtBody):
     """The only place it may run is a node that is not connected."""
 
-    def __init__(self, body_id: str) -> None:
-        super().__init__(body_id)
-        self.body_id = body_id
 
-
-class Choose(Exception):
+class Choose(_AtBody):
     """Both places can run it and the person is to say which."""
-
-    def __init__(self, body_id: str) -> None:
-        super().__init__(body_id)
-        self.body_id = body_id
 
 
 @dataclass(frozen=True)
