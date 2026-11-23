@@ -342,6 +342,7 @@ class Jobs:
             raise JobError("pass continue_job or fresh, not both")
         earlier = self._earlier(continue_job, folder, expert) if continue_job else None
         earlier_part = earlier.parts[-1] if earlier else None
+        existing = None
         if job is not None:
             existing = self._records.get_job(job)
             if existing is None:
@@ -354,8 +355,11 @@ class Jobs:
         if earlier is None and not fresh:
             found = self._records.last_part_for(chosen.id, str(path))
             earlier, earlier_part = found if found else (None, None)
+        pinned = earlier_part.host if earlier_part and earlier_part.session_id else None
+        if pinned is None and existing is not None:
+            pinned = existing.parts[0].host
         try:
-            where = self._where(chosen, earlier_part)
+            where = self._where(chosen, pinned)
         except Unavailable as gone:
             raise await self._host_offline(
                 chosen, gone.body_id, folder, task, task_id, caused_by
@@ -381,6 +385,7 @@ class Jobs:
                     "resume": earlier_part
                     and {"job": earlier_part.job_id, "part": earlier_part.id},
                     "explicit": bool(continue_job),
+                    "host": where,
                 },
                 clean.strip(),
             )
@@ -391,6 +396,7 @@ class Jobs:
             path,
             earlier=earlier,
             earlier_part=earlier_part,
+            pinned=where,
             new_job=job is None,
             apps=offered,
             mode=mode,
@@ -406,12 +412,11 @@ class Jobs:
             started.title = job_title(saved) if saved else None
         return started
 
-    def _where(self, chosen: InstalledExpert, earlier_part: JobPart | None) -> str:
-        """The machine this part runs on. A part that continues a saved session runs where that
-        session lives; a job never moves."""
+    def _where(self, chosen: InstalledExpert, pinned: str | None) -> str:
+        """The machine this part runs on: the one its job is pinned to (a job never moves), else
+        the expert's placement."""
         if self._hosts is None:
             return "brain"
-        pinned = earlier_part.host if earlier_part and earlier_part.session_id else None
         return self._hosts.locate(chosen, pinned)
 
     async def _folder_exists(self, where: str, folder: str) -> bool:
@@ -517,6 +522,7 @@ class Jobs:
         *,
         earlier: Job | None = None,
         earlier_part: JobPart | None = None,
+        pinned: str | None = None,
         new_job: bool = True,
         apps: tuple[str, ...] = (),
         mode: str | None = None,
@@ -537,7 +543,7 @@ class Jobs:
         else:
             part = "p1" if new_job else self._reserve_part(job_id)
         try:
-            where = self._where(chosen, earlier_part)
+            where = self._where(chosen, pinned)
         except Unavailable as gone:
             raise JobError(f"{chosen.id} runs on {gone.body_id}, which is not connected") from None
         run = self._make_run(
@@ -655,6 +661,7 @@ class Jobs:
             part.task,
             Path(part.folder),
             earlier_part=part,
+            pinned=part.host,
             new_job=False,
             redo=row,
         )
@@ -794,6 +801,21 @@ class Jobs:
             parts = earlier.parts if earlier else []
             earlier_part = next((p for p in parts if p.id == resume.get("part")), None)
             self._check_apps(wants.get("apps") or (), settling=settling)  # one may be gone now
+            folder = detail.get("folder") or ""
+            pinned = wants.get("host")
+            try:
+                where = self._where(chosen, pinned)
+            except Unavailable as gone:
+                raise await self._host_offline(
+                    chosen,
+                    gone.body_id,
+                    folder,
+                    detail.get("task") or "",
+                    goal.task_id,
+                    wants.get("caused_by"),
+                ) from None
+            if not await self._folder_exists(where, folder):
+                raise JobError(f"no folder at {folder}")
             await self._start_part(
                 goal.id,
                 chosen,
@@ -801,6 +823,7 @@ class Jobs:
                 Path(detail.get("folder") or ""),
                 earlier=earlier if earlier_part else None,
                 earlier_part=earlier_part,
+                pinned=pinned,
                 apps=tuple(wants.get("apps") or ()),
                 mode=detail.get("mode"),
                 task_id=goal.task_id,
@@ -1323,9 +1346,43 @@ class Jobs:
         self._progress_sent.pop(job_id, None)
         return True
 
+    def _hold_lost(self, job_id: str, part: str, reason: str) -> bool:
+        """The machine a part ran on dropped: one with a saved session is held for Scout to carry
+        on, as the resume scan holds it, and False for one with none, which ends as failed."""
+        work = self._records.work
+        work_id = f"{job_id}.{part}"
+        row = work.get(work_id)
+        session = (row.checkpoint or {}).get("session_id") if row else None
+        if not session:
+            return False
+        try:
+            work.transition(work_id, "blocked", reason=reason)
+        except TransitionRefused:
+            return True  # the part had already ended: another writer got there first
+        work.add_event(work_id, "resumed", {"session_id": session})
+        activity = self._activity.get(job_id, {}).get(part)
+        if activity:
+            activity.end("stopped", reason)
+        self._forget(job_id, part)
+        self._changed()
+        self.fill_slots()
+        return True
+
+    def body_connected(self, body_id: str) -> None:
+        """A machine is back: what waited for it is no longer waiting."""
+        if self._items is None:
+            return
+        for item in self._items.list_open("host_offline"):
+            if (item.saved_call or {}).get("host") == body_id:
+                self._items.finish(item.id, "host_back")
+
     async def _end(
         self, job_id: str, state: str, reason: str, result: str | None, part: str = "p1"
     ) -> None:
+        if state == "host_lost":
+            if self._hold_lost(job_id, part, reason):
+                return
+            state = "error"
         result = mask_json(self._guards, "job_result", result)
         job = self._settle(job_id, part, state, reason, result)
         activity = self._activity.get(job_id, {}).get(part)

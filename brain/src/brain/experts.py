@@ -137,6 +137,11 @@ async def kill_tree(process: asyncio.subprocess.Process) -> None:
     await process.wait()
 
 
+def _quoted(part: str) -> str:
+    """The node's own shell is often Windows', where a path with a space needs double quotes."""
+    return f'"{part}"' if " " in part else part
+
+
 class ExpertHosts:
     """The Jobs factory: one ExpertHost per installed expert, a session handle per job."""
 
@@ -179,7 +184,6 @@ class ExpertHosts:
             return "brain"
 
     async def folder_exists(self, where: str, folder: str) -> bool:
-        """Whether the folder is there on a node."""
         return await self._bodies.folder_exists(where, folder)
 
     def _open_pipe(self, where: str, expert) -> Callable[[PipeSpec], Awaitable[Pipe]]:
@@ -189,9 +193,9 @@ class ExpertHosts:
             except RpcError as err:
                 name = self._bodies.name(where)
                 if err.code == ErrorCode.denied:
-                    approve = f"tagalong node allow {spec.command}"
+                    approve = f"tagalong node allow {_quoted(spec.command)}"
                     if spec.args:
-                        approve += " -- " + " ".join(spec.args)
+                        approve += " -- " + " ".join(_quoted(a) for a in spec.args)
                     raise ExpertError(
                         f"{expert.name} is not approved on {name}. On that machine run: {approve}"
                     ) from None
@@ -282,6 +286,14 @@ class ExpertHost:
         self._pipe: Pipe | None = None
         self.can_resume: bool | None = None  # known after the first initialize
         self.http_mcp = False  # whether the agent takes an http MCP server; same moment
+
+    @property
+    def on_node(self) -> bool:
+        return self._open_pipe is not None
+
+    @property
+    def lost_node(self) -> bool:
+        return self._pipe is not None and self._pipe.ended
 
     def alive(self) -> bool:
         if self._pipe is not None:
@@ -545,6 +557,8 @@ class ExpertRun:
         """The `mcp_servers` for this session: the bridge when apps were granted, else none."""
         if not self.apps or self._bridge is None:
             return []
+        if self._host.on_node:  # the grant's address and token are the brain's own, not for a node
+            return []
         if not self._host.http_mcp:
             log.warning("expert does not accept http MCP servers; apps not offered to it")
             return []
@@ -666,6 +680,8 @@ class ExpertRun:
         except Exception as exc:
             if self._stopping:
                 state, reason = "stopped", "stopped"
+            elif self._host.lost_node:
+                state, reason = "host_lost", "the machine it ran on dropped"
             else:
                 state, reason = (
                     "error",
