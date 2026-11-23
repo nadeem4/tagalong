@@ -28,8 +28,12 @@ from brain.events import Event
 from brain.identity import load_or_create_identity
 from brain.lifecycle import pid_path, stop_real_brain
 from brain.memory import Memory
+from brain.node.allowlist import Allowlist, NotRunnable
+from brain.node.main import HelloRefused
+from brain.node.main import run_node as real_run_node
 from brain.open_items import OpenItems
 from brain.pairing import PAIR_KINDS, build_pairing, render_qr
+from brain.protocol import PipeSpec
 from brain.service import Service, ServiceError, real_service
 from brain.setup.apps import add_registry_app, app_card
 from brain.setup.facts import Machine, RunCmd, inspect, real_run_cmd
@@ -94,6 +98,13 @@ def _parser() -> argparse.ArgumentParser:
         "--install-service", action="store_true", help="start it at logon instead of running it"
     )
     sub.add_parser("update", help="upgrade the brain installed by the install script")
+    node = sub.add_parser("node", help="run tools for a brain on another machine").add_subparsers(
+        dest="sub", required=True
+    )
+    node.add_parser("run", help="connect to the paired brain and serve its pipes")
+    allow = node.add_parser("allow", help="let the brain run this command here")
+    allow.add_argument("command")
+    allow.add_argument("args", nargs=argparse.REMAINDER, help="its arguments, after --")
     login = sub.add_parser("login", help="log an installed expert in")
     login.add_argument("expert_id")
     return p
@@ -117,13 +128,15 @@ def main(
     host_addr: Callable[[], str] = lan_address,
     service_for: Callable[[Path], Service] = real_service,
     run_brain: Callable[[], None] | None = None,
+    run_node: Callable[[MutableMapping[str, str], Allowlist], Awaitable[None]] = real_run_node,
 ) -> int:
     """Every outside thing is a parameter, so tests run on fakes. Exits 0 ok, 1 failed, 2 usage."""
     args = _parser().parse_args(argv)  # a usage error exits 2 here
     env = os.environ if env is None else env
     config = load_config(env)
     home = config.data_dir
-    load_env_file(home, env)  # the brain reads the same .env
+    if args.cmd != "node":  # a node's children must not inherit the brain's keys
+        load_env_file(home, env)  # the brain reads the same .env
     config = load_config(env)
     run = run or partial(real_run_cmd, timeout=NPM_TIMEOUT_S)
     machine = inspect_fn or partial(inspect, home, run)
@@ -145,6 +158,8 @@ def main(
                 out("Pair a device with `tagalong pair`.")
         elif args.cmd == "serve":
             _serve(args.install_service, config, service_for(home), env, host_addr, out)
+        elif args.cmd == "node":
+            await _node(args, home, env, run_node, out)
         elif args.cmd == "update":
             await _update(run, env, out)
         elif args.cmd == "key":
@@ -251,6 +266,30 @@ def _serve(install, config, service: Service, env, host_addr, out) -> None:
         out("Pair another device with `tagalong pair`.")
     else:
         _pair(config, "desktop", host_addr, out)
+
+
+NODE_ENV = ("TAGALONG_NODE_ADDR", "TAGALONG_NODE_FP", "TAGALONG_NODE_TOKEN", "TAGALONG_NODE_ID")
+
+
+async def _node(args, home: Path, env, run_node, out) -> None:
+    allowlist = Allowlist(home / "node" / "allowlist.json")
+    if args.sub == "allow":
+        spec = PipeSpec(
+            command=args.command, args=args.args[1:] if args.args[:1] == ["--"] else args.args
+        )
+        try:
+            allowlist.allow(spec)
+        except NotRunnable as err:
+            raise _Fail(str(err)) from None
+        out(f"The brain may now run: {' '.join([spec.command, *spec.args])}")
+        return
+    missing = [name for name in NODE_ENV if not env.get(name)]
+    if missing:
+        raise _Fail(f"A node needs {', '.join(missing)}; the desktop sets them when it starts one.")
+    try:
+        await run_node(env, allowlist)
+    except HelloRefused as err:
+        raise _Fail(f"The brain refused this node ({err}). Pair this device again.") from None
 
 
 async def _update(run: RunCmd, env, out) -> None:

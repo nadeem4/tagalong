@@ -40,17 +40,17 @@ The brain is Python; the TypeScript apps are bodies.
 - Brain (Python 3.12 or 3.13): cd brain && uv sync; uv run pytest; uv run ruff check; uv run ruff format --check; uv run brain (starts the websocket server); uv run tagalong stop (ends the brain the desktop left running); uv run tagalong perf [--since 1h] (step timings and cancelled asks, read from brain.log)
 - Run: pnpm dev:desktop (builds contract, ui and the browser add-on first; the desktop starts the brain detached if none is running (output in <TAGALONG_HOME>/brain.log) and leaves it running on quit; or run `cd brain && uv run brain` yourself); the desktop dials the brain at TAGALONG_BRAIN_ADDR (default 127.0.0.1:47321) and retries every 2 s
 - Experts: Scout installs them on demand from the registry (nothing to install by hand); each runs on the user's own login, not the API key; TAGALONG_EXPERT_CMD adds one custom expert
-- Setup from a terminal (no screen): cd brain && uv run tagalong doctor (also stop, key set, install <expert>, login <expert>, apps add <app>, pair [--kind], service install|remove|status, serve [--install-service], update; never needs a running brain)
+- Setup from a terminal (no screen): cd brain && uv run tagalong doctor (also stop, key set, install <expert>, login <expert>, apps add <app>, pair [--kind], service install|remove|status, serve [--install-service], update, node run|allow; never needs a running brain)
 - Package: pnpm package:win
 - WhatsApp bridge: pnpm --filter @tagalong/whatsapp build (one file, dist/index.js) and test; `pnpm dev:desktop` builds it
 
 ## Layout
 
 - protocol/: the contract between the brain and the bodies (README.md is the source of truth, examples/ shared by both test suites, ts/ the zod package `@tagalong/contract`, incl. `pair-link.ts`)
-- brain/: the Python brain (uv project); start at `src/brain/main.py` and `server.py`; module map in docs/brain/README.md
+- brain/: the Python brain (uv project); start at `src/brain/main.py` and `server.py`; module map in docs/brain/README.md; `node/` is the node a remote brain pipes tools through (docs/brain/node.md)
 - bodies/ui: shared React UI (Home, tour, settings, voice, bubble); `src/shapes` holds React-free shapes
 - bodies/mascot: `@tagalong/mascot`, the WebGL mascot engine (docs/bodies/mascot.md)
-- bodies/desktop: Electron body; main process in `src/main/` (brain link incl. the pinned remote link in `brain/pinned-socket.ts`, `link-store.ts`, `discover.ts`, IPC incl. `ipc/pair.ts` and `ipc/brain-service.ts`, windows, tools)
+- bodies/desktop: Electron body; main process in `src/main/` (brain link incl. the pinned remote link in `brain/pinned-socket.ts`, `link-store.ts`, `discover.ts`, IPC incl. `ipc/pair.ts` and `ipc/brain-service.ts`, `node/` the node it runs beside a remote brain, windows, tools)
 - bodies/browser: Chromium MV3 browser body (popup voice and pairing in `src/pair.ts`, offscreen mic)
 - bodies/whatsapp: WhatsApp body, bundled to one `dist/index.js` the brain runs
 - install/ and Dockerfile: the server brain's install scripts (`install.sh`, `install.ps1`) and image (docs/brain/server.md)

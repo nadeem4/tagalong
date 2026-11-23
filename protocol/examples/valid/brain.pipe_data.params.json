@@ -1,0 +1,5 @@
+{
+  "jsonrpc": "2.0",
+  "method": "pipe_data",
+  "params": { "pipe": "k1", "data": "eyJqc29ucnBjIjoiMi4wIn0K" }
+}

@@ -1,0 +1,6 @@
+{
+  "jsonrpc": "2.0",
+  "id": "p1",
+  "method": "pipe_open",
+  "params": { "pipe": "k1", "spec": { "command": "claude-code-acp", "args": ["--stdio"] } }
+}

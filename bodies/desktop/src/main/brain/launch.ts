@@ -12,6 +12,7 @@ import { closeSync, existsSync, mkdirSync, openSync, readFileSync } from 'node:f
 import { connect } from 'node:net';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
+import type { NodeChild } from '../node/runner';
 
 const DEFAULT_ADDR = '127.0.0.1:47321';
 
@@ -137,6 +138,28 @@ export function realRunTagalong(
   args: string[],
 ): Promise<{ code: number; out: string }> {
   return runTagalong(uvOptions(real), args);
+}
+
+/** `tagalong node run` as a child the desktop owns; ending it ends uv's python child too. */
+export function realSpawnNode(real: RealLaunch, nodeEnv: NodeJS.ProcessEnv): NodeChild {
+  const { env, brainDir, uv } = uvOptions(real);
+  const child = nodeSpawn(uv, ['run', '--no-sync', 'tagalong', 'node', 'run'], {
+    cwd: brainDir,
+    env: { ...env, ...nodeEnv },
+    stdio: 'ignore',
+    windowsHide: true,
+  });
+  return {
+    kill: () => {
+      if (process.platform === 'win32' && child.pid !== undefined) {
+        nodeSpawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+      } else child.kill();
+    },
+    onExit: (listener) => {
+      child.once('exit', listener);
+      child.once('error', listener);
+    },
+  };
 }
 
 export function realStop(real: RealLaunch): Promise<boolean> {

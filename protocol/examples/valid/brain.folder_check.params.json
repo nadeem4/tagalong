@@ -1,0 +1,6 @@
+{
+  "jsonrpc": "2.0",
+  "id": "f1",
+  "method": "folder_check",
+  "params": { "path": "/home/me/project" }
+}

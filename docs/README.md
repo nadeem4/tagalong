@@ -34,6 +34,7 @@ Before changing a feature, read its doc and run its section of [testing/feature-
 | [brain/setup.md](brain/setup.md)             | Installing experts and apps, the `tagalong` command                  |
 | [brain/safety.md](brain/safety.md)           | Budget, guards, masking and retries                                  |
 | [brain/server.md](brain/server.md)           | The brain on a server: `tagalong serve`, the install script, Docker  |
+| [brain/node.md](brain/node.md)               | The node: pipes a remote brain's tools through the person's PC       |
 | [brain/loops.md](brain/loops.md)             | Loops, mail and timers                                               |
 
 ## senses/

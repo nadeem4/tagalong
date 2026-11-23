@@ -1,0 +1,5 @@
+{
+  "jsonrpc": "2.0",
+  "id": "p1",
+  "error": { "code": -32003, "message": "That command is not on this node's list." }
+}
