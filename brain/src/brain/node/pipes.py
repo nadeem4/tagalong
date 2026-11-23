@@ -14,6 +14,8 @@ import sys
 from collections.abc import Awaitable, Callable
 from typing import Protocol
 
+import httpx2
+
 from brain.apps import merge_url_secret, url_secret_values
 from brain.node.allowlist import Allowlist, oauth_storage
 from brain.node.relay import HttpRelay
@@ -34,7 +36,18 @@ class Child(Protocol):
 
 
 Spawn = Callable[[str, list[str], dict[str, str]], Awaitable[Child]]
-ConnectUrl = Callable[..., Child]
+
+
+class ConnectUrl(Protocol):
+    def __call__(
+        self,
+        url: str,
+        secrets: Callable[[], list[str]],
+        auth: httpx2.Auth | None,
+        bearer: str | None,
+    ) -> Child: ...
+
+
 Send = Callable[[str, dict], None]
 
 
@@ -100,16 +113,16 @@ class Pipes:
         try:
             if spec.url is not None:
                 query = secrets.url_query
-                auth = stored_auth(path, self._allowlist.node_dir)
-                tokens = oauth_storage(self._allowlist.node_dir, path).token_strings()
+                storage = oauth_storage(self._allowlist.node_dir, path)
+                signed_in = bool(storage.token_strings())
+                fixed = [
+                    *(url_secret_values(query) if query else []),
+                    *filter(None, [secrets.bearer]),
+                ]
                 child = self._connect_url(
                     merge_url_secret(path, query) if query else path,
-                    [
-                        *(url_secret_values(query) if query else []),
-                        *tokens,
-                        *filter(None, [secrets.bearer]),
-                    ],
-                    auth=auth,
+                    lambda: [*fixed, *storage.token_strings()],
+                    auth=stored_auth(path, storage) if signed_in else None,
                     bearer=secrets.bearer,
                 )
             else:

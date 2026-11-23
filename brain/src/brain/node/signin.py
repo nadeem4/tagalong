@@ -4,6 +4,8 @@ the redirect here, and the token is saved under the node's folder, never sent to
 """
 
 import asyncio
+import os
+import tempfile
 import webbrowser
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -12,7 +14,7 @@ import httpx2
 from mcp import ClientSession
 from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
 
-from brain.app_oauth import LoopbackCallback, NeedsSignIn, make_provider
+from brain.app_oauth import FileTokenStorage, LoopbackCallback, NeedsSignIn, make_provider
 from brain.apps import AppRow
 from brain.node.allowlist import oauth_storage
 
@@ -27,8 +29,23 @@ async def sign_in(
     open_url: Callable[[str], Awaitable[None]],
     timeout: float = 300,
 ) -> None:
-    storage = oauth_storage(node_dir, url)
-    storage.clear()  # a fresh sign-in registers a client for this run's port
+    node_dir.mkdir(parents=True, exist_ok=True)
+    # A fresh sign-in registers a client for this run's port, and only a finished one replaces
+    # what is saved, so it runs in a scratch folder on the same disk.
+    with tempfile.TemporaryDirectory(dir=node_dir) as scratch:
+        storage = oauth_storage(Path(scratch), url)
+        await _sign_in(url, storage, open_url, timeout)
+        target = oauth_storage(node_dir, url).path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(storage.path, target)
+
+
+async def _sign_in(
+    url: str,
+    storage: FileTokenStorage,
+    open_url: Callable[[str], Awaitable[None]],
+    timeout: float,
+) -> None:
     listener = LoopbackCallback()
     redirect_uri = await listener.start()
     try:
@@ -53,10 +70,7 @@ async def _no_code() -> tuple[str, str, str | None]:
     raise NeedsSignIn("Sign in again with `tagalong node signin`.")
 
 
-def stored_auth(url: str, node_dir: Path) -> httpx2.Auth | None:
-    storage = oauth_storage(node_dir, url)
-    if not storage.token_strings():
-        return None
+def stored_auth(url: str, storage: FileTokenStorage) -> httpx2.Auth:
     return make_provider(_row(url), storage, "http://127.0.0.1/callback", _no_browser, _no_code)
 
 

@@ -11,9 +11,11 @@ import sys
 from dataclasses import replace
 from pathlib import Path
 
+import httpx2
 import pytest
 
 from brain import cli
+from brain.app_oauth import OAuthError
 from brain.memory import Memory
 from brain.node.allowlist import Allowlist
 from brain.node.main import HelloRefused
@@ -657,3 +659,25 @@ def test_node_allow_bearer_is_asked_for_here_and_never_printed(tmp_path):
     stored = Allowlist(rig.home / "node" / "allowlist.json").secrets(PipeSpec(url=url))
     assert stored.bearer == "tok-123"
     assert "tok-123" not in rig.text
+
+
+@pytest.mark.parametrize(
+    ("error", "shown"),
+    [
+        (ExceptionGroup("tg", [OAuthError("The sign-in timed out.")]), "The sign-in timed out."),
+        (ExceptionGroup("tg", [httpx2.ConnectError("refused")]), "Could not reach"),
+        (httpx2.ConnectError("refused"), "Could not reach"),
+    ],
+)
+def test_node_signin_that_fails_says_so_in_a_plain_line_and_approves_nothing(
+    tmp_path, error, shown
+):
+    rig = Rig(tmp_path)
+
+    async def failing(address, node_dir):
+        raise error
+
+    assert rig.go("node", "signin", "https://mcp.example.com/mcp", node_signin=failing) == 1
+    assert shown in rig.text
+    assert "Traceback" not in rig.text
+    assert not (rig.home / "node" / "allowlist.json").exists()

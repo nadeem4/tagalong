@@ -67,7 +67,7 @@ class Setup:
             self.children.append(child)
             return child
 
-        def relay(url: str, secrets: list[str], **_: object) -> FakeChild:
+        def relay(url, secrets, auth, bearer) -> FakeChild:
             self.relayed.append(url)
             child = child_type()
             self.children.append(child)

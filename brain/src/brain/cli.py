@@ -21,8 +21,10 @@ from pathlib import Path
 from typing import NoReturn, TextIO
 from urllib.parse import urlsplit
 
+import httpx2
+
 from brain.app_oauth import OAuthError
-from brain.apps import AppError, TokenFile, split_secrets
+from brain.apps import AppError, TokenFile, root_cause, split_secrets
 from brain.config import load_config, load_env_file, upsert_env_value
 from brain.devices import Devices
 from brain.discovery import lan_address
@@ -297,17 +299,21 @@ def _serve(install, config, service: Service, env, host_addr, out) -> None:
 NODE_ENV = ("TAGALONG_NODE_ADDR", "TAGALONG_NODE_FP", "TAGALONG_NODE_TOKEN", "TAGALONG_NODE_ID")
 
 
+def _check_address(url: str) -> None:
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise _Fail("The address must be an http or https URL.")
+    if split_secrets("", {"url": url}, "http")[1]:
+        raise _Fail("Leave the secret out of the address; add it with `node allow --url-secret`.")
+
+
 def _node_allow(args, allowlist: Allowlist, secret: Callable[[str], str], out) -> None:
     if (args.url is None) == (args.command is None):
         raise _Fail("Give a command, or --url with an address, not both.")
     if args.url is not None:
-        parts = urlsplit(args.url)
-        if parts.scheme not in ("http", "https") or not parts.hostname:
-            raise _Fail("The address must be an http or https URL.")
+        _check_address(args.url)
         if args.secret_env:
             raise _Fail("--secret-env is for a command; a URL takes --url-secret or --bearer.")
-        if split_secrets("", {"url": args.url}, "http")[1]:
-            raise _Fail("Leave the secret out of the address and give it with --url-secret.")
         spec = PipeSpec(url=args.url)
         shown = args.url
     else:
@@ -334,15 +340,16 @@ def _node_allow(args, allowlist: Allowlist, secret: Callable[[str], str], out) -
 
 
 async def _node_signin(url: str, node_dir: Path, allowlist: Allowlist, node_signin, out) -> None:
-    parts = urlsplit(url)
-    if parts.scheme not in ("http", "https") or not parts.hostname:
-        raise _Fail("The address must be an http or https URL.")
-    if split_secrets("", {"url": url}, "http")[1]:
-        raise _Fail("Leave the secret out of the address; add it with `node allow --url-secret`.")
+    _check_address(url)
     try:
         await node_signin(url, node_dir)
-    except OAuthError as err:
-        raise _Fail(str(err)) from None
+    except Exception as err:
+        cause = root_cause(err)
+        if isinstance(cause, OAuthError):
+            raise _Fail(str(cause)) from None
+        if isinstance(cause, httpx2.ConnectError):
+            raise _Fail(f"Could not reach {url}.") from None
+        raise
     allowlist.allow(PipeSpec(url=url))
     out(f"Signed in. The brain may now open {url}; it never sees the sign-in.")
 

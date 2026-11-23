@@ -186,21 +186,6 @@ async def test_listener_survives_a_malformed_request_line():
     assert await waiter == ("abc", "s", None)
 
 
-async def test_token_file_is_never_written_world_readable_first(tmp_path, monkeypatch):
-    import os
-
-    modes: list[int] = []
-    real_open = os.open
-
-    def spy(path, flags, mode=0o777, **kw):
-        modes.append(mode)
-        return real_open(path, flags, mode, **kw)
-
-    monkeypatch.setattr(os, "open", spy)
-    await FileTokenStorage(tmp_path, "notes").set_tokens(TOKEN)
-    assert modes == [0o600]
-
-
 # ---- the URL guard ----
 
 

@@ -6,6 +6,7 @@ looks like a child process to the pipes, so the brain's end is the same for a co
 import asyncio
 import json
 import logging
+from collections.abc import Callable
 from urllib.parse import quote, quote_plus
 
 import anyio
@@ -24,7 +25,7 @@ class HttpRelay:
     def __init__(
         self,
         url: str,
-        secrets: list[str],
+        secrets: Callable[[], list[str]],
         auth: httpx2.Auth | None = None,
         bearer: str | None = None,
     ) -> None:
@@ -32,10 +33,9 @@ class HttpRelay:
         self._url = url
         self._auth = auth
         self._headers = {"Authorization": f"Bearer {bearer}"} if bearer else None
-        forms = {
-            form for value in secrets for form in (value, quote(value, safe=""), quote_plus(value))
-        }
-        self._forms = sorted(forms, key=len, reverse=True)
+        self._secrets = secrets
+        self._seen: tuple[str, ...] = ()
+        self._forms: list[str] = []
         self._lines: asyncio.Queue[SessionMessage] = asyncio.Queue()
         self._partial = b""
         self._task = asyncio.create_task(self._run())
@@ -64,6 +64,16 @@ class HttpRelay:
             self._emit(json.dumps({"jsonrpc": "2.0", "id": request["id"], "error": error}))
 
     def _emit(self, text: str) -> None:
+        # Read on every line: the SDK refreshes the sign-in's tokens while the pipe is open.
+        secrets = tuple(self._secrets())
+        if secrets != self._seen:
+            self._seen = secrets
+            forms = {
+                form
+                for value in secrets
+                for form in (value, quote(value, safe=""), quote_plus(value))
+            }
+            self._forms = sorted(forms, key=len, reverse=True)
         for form in self._forms:
             text = text.replace(form, "[secret]")
         self.stdout.feed_data(text.encode() + b"\n")
