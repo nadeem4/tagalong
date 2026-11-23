@@ -29,6 +29,7 @@ from brain.identity import load_or_create_identity
 from brain.lifecycle import pid_path, stop_real_brain
 from brain.memory import Memory
 from brain.open_items import OpenItems
+from brain.pairing import PAIR_KINDS, build_pairing, render_qr
 from brain.service import Service, ServiceError, real_service
 from brain.setup.apps import add_registry_app, app_card
 from brain.setup.facts import Machine, RunCmd, inspect, real_run_cmd
@@ -43,7 +44,7 @@ from brain.setup.net import GetJson, http_fetch, real_get_json
 from brain.setup.registry import Registry, RegistryEntry, RegistryUnavailable
 from brain.setup.store import ExpertStore, all_experts
 from brain.setup.terminal import OpenTerminal, real_open_terminal
-from brain.store.db import open_db
+from brain.store.db import open_db, utc_now_text
 from brain.tools import KEY_NAME, clean_key
 from brain.voice.models import Fetch
 
@@ -245,8 +246,7 @@ def _serve(install, config, service: Service, env, host_addr, out) -> None:
     else:
         upsert_env_value(config.data_dir, "TAGALONG_NETWORK", "1", env)
     config = load_config(env)
-    paired = open_db(config.data_dir / "tagalong.db").execute("SELECT 1 FROM devices").fetchone()
-    if paired:
+    if Devices(open_db(config.data_dir / "tagalong.db"), utc_now_text).list():
         out("Pair another device with `tagalong pair`.")
     else:
         _pair(config, "desktop", host_addr, out)
