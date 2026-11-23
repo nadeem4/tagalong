@@ -52,6 +52,7 @@ class Setup:
     def __init__(self, tmp_path: Path, child_type: type[FakeChild] = FakeChild) -> None:
         self.exe = tmp_path / "expert.exe"
         self.exe.write_bytes(b"binary")
+        self.exe.chmod(0o755)
         self.allowlist = Allowlist(tmp_path / "allowlist.json")
         self.sent: list[tuple[str, dict]] = []
         self.children: list[FakeChild] = []

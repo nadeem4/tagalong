@@ -14,6 +14,7 @@ from brain.protocol import PipeSpec
 def exe(tmp_path: Path) -> Path:
     path = tmp_path / "expert.exe"
     path.write_bytes(b"binary one")
+    path.chmod(0o755)
     return path
 
 

@@ -508,6 +508,7 @@ def test_node_allow_approves_a_command_for_this_machine_only(tmp_path):
     rig = Rig(tmp_path)
     exe = rig.home / "expert.exe"
     exe.write_bytes(b"binary")
+    exe.chmod(0o755)
     assert rig.go("node", "allow", str(exe), "--stdio") == 0
     allowlist = Allowlist(rig.home / "node" / "allowlist.json")
     assert allowlist.permits(PipeSpec(command=str(exe), args=["--stdio"])) == str(exe)
@@ -556,6 +557,7 @@ def test_node_allow_keeps_a_double_dash_inside_the_args(tmp_path):
     rig = Rig(tmp_path)
     exe = rig.home / "expert.exe"
     exe.write_bytes(b"binary")
+    exe.chmod(0o755)
     assert rig.go("node", "allow", str(exe), "--", "--a", "--", "b") == 0
     spec = PipeSpec(command=str(exe), args=["--a", "--", "b"])
     assert Allowlist(rig.home / "node" / "allowlist.json").permits(spec) == str(exe)
