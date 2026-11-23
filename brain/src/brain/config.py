@@ -76,9 +76,8 @@ class Config:
     started_by: Literal["desktop", "person", "service"] = "person"  # who owns the process
     network: bool = False  # also listen for bodies on other machines, over wss
     network_port: int = DEFAULT_NETWORK_PORT
-    public_host: str | None = (
-        None  # what a paired device dials, when this machine's LAN address is not it
-    )
+    # what a paired device dials, when this machine's LAN address is not it
+    public_host: str | None = None
 
 
 def split_command(cmd: str, posix: bool | None = None) -> list[str]:

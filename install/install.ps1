@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 $Source = 'git+https://github.com/nadeem4/tagalong#subdirectory=brain'
 
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
-    Invoke-RestMethod https://astral.sh/uv/install.ps1 | Invoke-Expression
+    Invoke-RestMethod https://astral.sh/uv/0.12.17/install.ps1 | Invoke-Expression
     $env:Path = "$env:USERPROFILE\.local\bin;$env:Path"
 }
 

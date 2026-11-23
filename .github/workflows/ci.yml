@@ -126,8 +126,12 @@ jobs:
 
       - name: The first start prints a pairing link
         run: |
-          timeout 30 docker run --rm -e TAGALONG_PUBLIC_HOST=example.test tagalong:ci > serve.log 2>&1 || true
+          status=0
+          timeout 30 docker run --rm -e TAGALONG_PUBLIC_HOST=example.test tagalong:ci > serve.log 2>&1 || status=$?
+          cat serve.log
+          test "$status" = 124
           grep -q 'tagalong://pair?addr=example.test:47323' serve.log
+          grep -q 'brain listening on wss://0.0.0.0:47323' serve.log
 
   # Only what needs Windows, and only once the Linux job is green.
   e2e:

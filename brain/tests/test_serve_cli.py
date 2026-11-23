@@ -1,21 +1,25 @@
 """`tagalong serve` and `tagalong update` on fakes: no brain starts, no service is installed."""
 
+import asyncio
+
 from test_cli import Rig
 from test_service import Calls
 
+from brain.devices import Devices
 from brain.service import Service
-from brain.store.db import open_db
+from brain.setup.facts import CmdResult
+from brain.store.db import open_db, utc_now_text
 
 HOST = {"host_addr": lambda: "192.168.1.5"}
 
 
 def serving(tmp_path, runner=None, env=None):
-    """Returns the rig, the keyword arguments for go() and the list of brain starts."""
     started: list[str] = []
     service = Service("linux", "/v/bin/brain", tmp_path / "unit", runner or Calls())
     rig = Rig(tmp_path)
 
     def run_brain() -> None:
+        asyncio.run(asyncio.sleep(0))
         started.append((tmp_path / ".env").read_text())
 
     kw = {"run_brain": run_brain, "service_for": lambda home: service, **HOST}
@@ -38,9 +42,6 @@ def test_serve_prints_the_pairing_link_before_the_brain_starts(tmp_path):
 
 
 def test_serve_prints_no_link_once_a_device_is_paired(tmp_path):
-    from brain.devices import Devices
-    from brain.store.db import utc_now_text
-
     Devices(open_db(tmp_path / "tagalong.db"), utc_now_text).create("laptop", "desktop")
     rig, kw, started, env = serving(tmp_path)
     assert rig.go("serve", env=env, **kw) == 0
@@ -79,8 +80,6 @@ def test_update_upgrades_the_installed_brain_and_says_to_restart(tmp_path):
 
     async def run(argv, env, cwd):
         calls.append(argv)
-        from brain.setup.facts import CmdResult
-
         return CmdResult(0, "", "")
 
     assert rig.go("update", run=run) == 0
@@ -92,8 +91,6 @@ def test_update_shows_what_uv_said_when_it_fails(tmp_path):
     rig = Rig(tmp_path)
 
     async def run(argv, env, cwd):
-        from brain.setup.facts import CmdResult
-
         return CmdResult(2, "", "`brain` is not installed")
 
     assert rig.go("update", run=run) == 1

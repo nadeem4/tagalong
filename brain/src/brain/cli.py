@@ -123,7 +123,6 @@ def main(
     config = load_config(env)
     home = config.data_dir
     load_env_file(home, env)  # the brain reads the same .env
-    config = load_config(env)
     run = run or partial(real_run_cmd, timeout=NPM_TIMEOUT_S)
     machine = inspect_fn or partial(inspect, home, run)
     reg = Registry(home, get_json)
@@ -140,8 +139,10 @@ def main(
             _pair(config, args.kind, host_addr, out)
         elif args.cmd == "service":
             _service(args.sub, service_for(home), home, env, out)
+            if args.sub == "install":
+                out("Pair a device with `tagalong pair`.")
         elif args.cmd == "serve":
-            _serve(args.install_service, config, service_for(home), env, host_addr, run_brain, out)
+            _serve(args.install_service, config, service_for(home), env, host_addr, out)
         elif args.cmd == "update":
             await _update(run, env, out)
         elif args.cmd == "key":
@@ -155,6 +156,10 @@ def main(
 
     try:
         asyncio.run(go())
+        if args.cmd == "serve" and not args.install_service:
+            if run_brain is None:
+                from brain.main import main as run_brain
+            run_brain()
     except _Fail as err:
         out(str(err))
         return 1
@@ -234,7 +239,7 @@ def _pair(config, kind: str, host_addr: Callable[[], str], out) -> None:
     out("Valid for 10 minutes, one use. Open it on the other machine's Tagalong.")
 
 
-def _serve(install, config, service: Service, env, host_addr, run_brain, out) -> None:
+def _serve(install, config, service: Service, env, host_addr, out) -> None:
     if install:
         _service("install", service, config.data_dir, env, out)
     else:
@@ -245,10 +250,6 @@ def _serve(install, config, service: Service, env, host_addr, run_brain, out) ->
         out("Pair another device with `tagalong pair`.")
     else:
         _pair(config, "desktop", host_addr, out)
-    if not install:
-        if run_brain is None:
-            from brain.main import main as run_brain
-        run_brain()
 
 
 async def _update(run: RunCmd, env, out) -> None:
@@ -280,7 +281,6 @@ def _service(action: str, service: Service, home: Path, env, out) -> None:
         out("Installed: the brain starts at logon, with network access on for other devices.")
         out("Turned the network listener on (TAGALONG_NETWORK=1 in .env).")
         out("A brain already running gets the network listener when it restarts.")
-        out("Pair a device with `tagalong pair`.")
 
 
 def _stop(home: Path, stop: Callable[[Path], str], out) -> None:

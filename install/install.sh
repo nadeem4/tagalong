@@ -6,7 +6,7 @@ set -eu
 SOURCE="git+https://github.com/nadeem4/tagalong#subdirectory=brain"
 
 if ! command -v uv >/dev/null 2>&1; then
-  curl -LsSf https://astral.sh/uv/install.sh | sh
+  curl -LsSf https://astral.sh/uv/0.12.17/install.sh | sh
   PATH="$HOME/.local/bin:$PATH"
 fi
 

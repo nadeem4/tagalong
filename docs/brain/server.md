@@ -18,7 +18,7 @@ The brain's loopback listener (`127.0.0.1:47321`) stays loopback-only. The netwo
 
 ## The install script
 
-`install/install.sh` (Linux and macOS) and `install/install.ps1` (Windows) install [uv](https://docs.astral.sh/uv/) when it is missing, then install the brain as a uv tool from this repository (`uv tool install --python 3.13 --force git+https://github.com/nadeem4/tagalong#subdirectory=brain`), which puts `tagalong` and `brain` on the path. They print what to run next: `tagalong key set`, then `tagalong serve --install-service`. They change nothing else and start nothing. Read a script before piping it to a shell.
+`install/install.sh` (Linux and macOS) and `install/install.ps1` (Windows) install [uv](https://docs.astral.sh/uv/) (pinned to 0.12.17) when it is missing, then install the brain as a uv tool from this repository's `main` branch (`uv tool install --python 3.13 --force git+https://github.com/nadeem4/tagalong#subdirectory=brain`), which puts `tagalong` and `brain` on the path. They print what to run next: `tagalong key set`, then `tagalong serve --install-service`. They change nothing else and start nothing. Read a script before piping it to a shell.
 
 ```sh
 curl -LsSf https://raw.githubusercontent.com/nadeem4/tagalong/main/install/install.sh | sh
@@ -32,7 +32,7 @@ irm https://raw.githubusercontent.com/nadeem4/tagalong/main/install/install.ps1 
 
 ## Docker
 
-The `Dockerfile` at the repository root builds the brain on `ghcr.io/astral-sh/uv:python3.13-bookworm-slim` from `brain/pyproject.toml`, `brain/uv.lock` and `brain/src` only (`.dockerignore` excludes everything else). It runs as a non-root user, keeps all data in the `/data` volume (`TAGALONG_HOME`) and starts `tagalong serve`. It bakes in no key, token or `.env`: the Anthropic key arrives as `-e ANTHROPIC_API_KEY=...` or in `/data/.env`.
+The `Dockerfile` at the repository root builds the brain on `ghcr.io/astral-sh/uv:python3.13-bookworm-slim` from `brain/pyproject.toml`, `brain/uv.lock` and `brain/src` only (`.dockerignore` excludes everything else). It runs as a non-root user, keeps all data in the `/data` volume (`TAGALONG_HOME`; use a named volume, because a bind-mounted host folder is root-owned and the non-root `tagalong` user cannot write it) and starts `tagalong serve`. It bakes in no key, token or `.env`: the Anthropic key arrives as `-e ANTHROPIC_API_KEY=...` or in `/data/.env`.
 
 ```sh
 docker build -t tagalong .
