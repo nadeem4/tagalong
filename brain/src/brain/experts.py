@@ -208,9 +208,9 @@ class ExpertHosts:
         )
         # A reinstall with a new command is a new host; so is the same expert on another machine.
         key = (expert.id, tuple(expert.command), host)
-        found = self._hosts.get(key)
-        if found is None:
-            found = self._hosts[key] = ExpertHost(
+        adapter = self._hosts.get(key)
+        if adapter is None:
+            adapter = self._hosts[key] = ExpertHost(
                 expert.command,
                 expert.id,
                 path_first,
@@ -218,9 +218,8 @@ class ExpertHosts:
                 sleep=self._sleep,
                 open_pipe=None if host == "brain" else self._open_pipe(host, expert),
             )
-        host = found
         return ExpertRun(
-            host=host,
+            host=adapter,
             quiet_s=self._quiet_s,
             sleep=self._sleep,
             clock=self._clock,

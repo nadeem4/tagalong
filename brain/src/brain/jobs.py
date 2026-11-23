@@ -540,10 +540,9 @@ class Jobs:
             where = self._where(chosen, earlier_part)
         except Unavailable as gone:
             raise JobError(f"{chosen.id} runs on {gone.body_id}, which is not connected") from None
-        place = {"host": where} if self._hosts is not None else {}
         run = self._make_run(
             chosen,
-            **place,
+            host=where,
             job_id=job_id,
             on_permission=lambda request: self._permission(job_id, request, part),
             on_question=lambda question: self._question(job_id, question, part),
