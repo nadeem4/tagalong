@@ -153,6 +153,15 @@ describe('connect_ai_tool', () => {
     expect(out).toContain("could not reach Scout's brain");
   });
 
+  it('does not call a JSON-RPC error reply a success', async () => {
+    answers = (command) =>
+      command === 'tagalong'
+        ? { stdout: '{"jsonrpc":"2.0","id":2,"error":{"code":-32603,"message":"x"}}\n' }
+        : {};
+    const out = JSON.stringify(await setup()({ tool: 'codex', token: TOKEN }));
+    expect(out).toContain("could not reach Scout's brain");
+  });
+
   it('sends the bridge a real read, not only the greeting', async () => {
     await setup()({ tool: 'codex', token: TOKEN });
     const probe = calls.find((c) => c.command === 'tagalong');

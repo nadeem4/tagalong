@@ -24,7 +24,9 @@ export function runCommand(
     let stderr = '';
     child.stdout.on('data', (chunk: Buffer) => {
       stdout += chunk.toString();
-      if (opts.until !== undefined && stdout.includes(opts.until)) {
+      // The line holding the match must be complete, or a reply sent in pieces is cut short.
+      const at = opts.until === undefined ? -1 : stdout.indexOf(opts.until);
+      if (at >= 0 && stdout.indexOf('\n', at) >= 0) {
         resolve({ code: 0, stdout, stderr });
         child.kill();
       }
@@ -33,6 +35,8 @@ export function runCommand(
     child.once('error', (error) => resolve({ code: 1, stdout, stderr: error.message }));
     child.once('close', (code) => resolve({ code: code ?? 1, stdout, stderr }));
     child.stdin.on('error', () => undefined);
-    child.stdin.end(opts.input ?? '');
+    // With `until` the input stays open, so the server is not cut off by EOF mid-request.
+    if (opts.until === undefined) child.stdin.end(opts.input ?? '');
+    else child.stdin.write(opts.input ?? '');
   });
 }

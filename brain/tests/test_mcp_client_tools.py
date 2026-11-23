@@ -108,7 +108,6 @@ async def test_show_me_gives_the_line_and_no_secret(tmp_path):
 
 
 def test_connecting_asks_the_person_every_time_even_after_an_always(tmp_path):
-    _, handlers = rig(tmp_path, FakeBodies([DESKTOP]))
     devices = Devices(Memory(tmp_path / "u.db").db, lambda: NOW)
     spec = next(
         s

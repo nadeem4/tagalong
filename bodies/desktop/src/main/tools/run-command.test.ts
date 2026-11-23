@@ -27,6 +27,21 @@ describe('runCommand', () => {
     }
   });
 
+  it('waits for the whole line when the reply arrives in pieces', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'run-'));
+    const script = join(dir, 'split.js');
+    writeFileSync(
+      script,
+      'process.stdout.write(\'{"id":2,\'); setTimeout(() => process.stdout.write(\'"result":{}}\\n\'), 300); setTimeout(() => {}, 20000);',
+    );
+    try {
+      const result = await runCommand('node', [script], { until: '"id":2' });
+      expect(result.stdout).toBe('{"id":2,"result":{}}\n');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('reports a command that does not exist as a failure, not a throw', async () => {
     const result = await runCommand('tagalong-no-such-command', []);
     expect(result.code).not.toBe(0);

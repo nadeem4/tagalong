@@ -54,8 +54,6 @@
   !insertmacro tagalongStopBrain uninstall
 !macroend
 
-
-
 ; `tagalong` on the user's own PATH (HKCU, no admin), so an AI tool can start the memory bridge.
 ; The folder reaches PowerShell through the environment, never inside its script text, so an
 ; apostrophe in the path is harmless. The value is read unexpanded and written back as

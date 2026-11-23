@@ -83,7 +83,7 @@ function readReached(stdout: string): boolean | null {
   for (const line of stdout.split('\n')) {
     try {
       const reply = JSON.parse(line) as { id?: number; result?: { isError?: boolean } };
-      if (reply.id === 2) return reply.result?.isError !== true;
+      if (reply.id === 2) return reply.result !== undefined && reply.result.isError !== true;
     } catch {
       // Not a whole JSON line (yet).
     }
