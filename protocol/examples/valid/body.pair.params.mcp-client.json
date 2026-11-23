@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "pair",
+  "params": {
+    "code": "Zk3p9Qm2vXc8Lw1RtY6bNa4s",
+    "device": { "name": "claude-code", "kind": "mcp_client" }
+  }
+}
