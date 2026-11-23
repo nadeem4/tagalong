@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import NoReturn, TextIO
 from urllib.parse import urlsplit
 
-from brain.apps import AppError, TokenFile
+from brain.apps import AppError, TokenFile, split_secrets
 from brain.config import load_config, load_env_file, upsert_env_value
 from brain.devices import Devices
 from brain.discovery import lan_address
@@ -294,6 +294,8 @@ def _node_allow(args, allowlist: Allowlist, secret: Callable[[str], str], out) -
             raise _Fail("The address must be an http or https URL.")
         if args.secret_env:
             raise _Fail("--secret-env is for a command; a URL takes --url-secret.")
+        if split_secrets("", {"url": args.url}, "http")[1]:
+            raise _Fail("Leave the secret out of the address and give it with --url-secret.")
         spec = PipeSpec(url=args.url)
         shown = args.url
     else:

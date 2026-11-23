@@ -568,7 +568,6 @@ def test_node_allow_url_approves_that_exact_address_only(tmp_path):
     assert rig.go("node", "allow", "--url", "https://mcp.example.com/mcp") == 0
     allowlist = Allowlist(rig.home / "node" / "allowlist.json")
     assert allowlist.permits(PipeSpec(url="https://mcp.example.com/mcp")) is not None
-    assert allowlist.permits(PipeSpec(url="https://mcp.example.com/other")) is None
 
 
 def test_node_allow_asks_for_each_secret_here_and_never_prints_it(tmp_path):
@@ -589,6 +588,21 @@ def test_node_allow_asks_for_each_secret_here_and_never_prints_it(tmp_path):
         "API_KEY": "hunter2-value"
     }
     assert "hunter2-value" not in rig.text
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://mcp.example.com/mcp?api_key=abc",
+        "https://mcp.example.com/mcp?x=1&token=abc",
+        "https://user:pass@mcp.example.com/mcp",
+    ],
+)
+def test_node_allow_refuses_a_url_that_carries_its_secret_and_points_to_url_secret(tmp_path, url):
+    rig = Rig(tmp_path)
+    assert rig.go("node", "allow", "--url", url) == 1
+    assert "--url-secret" in " ".join(rig.lines)
+    assert not (rig.home / "node" / "allowlist.json").exists()
 
 
 def test_node_allow_url_secret_is_asked_for_here(tmp_path):

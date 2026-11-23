@@ -568,6 +568,8 @@ class PipeSpec(Model):
     def _one_target(self) -> "PipeSpec":
         if (self.command is None) == (self.url is None):
             raise ValueError("a spec names a command or a url, one of them.")
+        if self.url is not None and self.args:
+            raise ValueError("a url spec takes no args.")
         return self
 
 

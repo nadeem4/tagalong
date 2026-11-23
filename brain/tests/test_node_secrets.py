@@ -3,6 +3,8 @@ secret is in no frame the brain sends or receives, no spec, and nothing the brai
 node over real node pipes; the MCP servers are the real fake one, over stdio and over http.
 """
 
+import asyncio
+import json
 import subprocess
 import sys
 
@@ -81,3 +83,37 @@ async def test_a_url_apps_secret_query_is_added_on_the_node_and_crosses_no_frame
     finally:
         server.kill()
         server.wait()
+
+
+async def test_a_server_that_echoes_the_secret_query_back_leaks_it_in_no_frame(rig):
+    run, node, memory = rig
+
+    async def echo(reader, writer):
+        request = (await reader.readuntil(b"\r\n\r\n")).decode()
+        target = request.split(" ", 2)[1]
+        body = json.dumps(
+            {"jsonrpc": "2.0", "id": 1, "error": {"code": -32600, "message": f"bad {target}"}}
+        ).encode()
+        writer.write(
+            b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n"
+            b"Content-Length: " + str(len(body)).encode() + b"\r\n\r\n" + body
+        )
+        await writer.drain()
+        writer.close()
+
+    server = await asyncio.start_server(echo, "127.0.0.1", 0)
+    try:
+        port = server.sockets[0].getsockname()[1]
+        url = f"http://127.0.0.1:{port}/mcp"
+        node.allowlist.allow(PipeSpec(url=url), url_query=f"api_key={SECRET}&n=a%20b+c")
+        row = AppRow("fake", "Fake", "http", {"url": url, "url_secret": True}, "none", True)
+        try:
+            await run(row)
+        except Exception:
+            pass
+        await asyncio.sleep(0.5)
+        assert any("bad /mcp" in frame for frame in node.frames)
+        assert nothing_secret_left_the_node(node, memory)
+        assert "a b c" not in "".join(node.frames) and "a%20b" not in "".join(node.frames)
+    finally:
+        server.close()

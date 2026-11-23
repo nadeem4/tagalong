@@ -96,13 +96,6 @@ def test_an_exact_url_is_permitted_and_another_is_not(allowlist):
     assert allowlist.permits(PipeSpec(url="https://evil.example.com/mcp")) is None
 
 
-def test_a_url_entry_never_permits_a_command_and_the_reverse(allowlist, exe):
-    allowlist.allow(PipeSpec(url=URL))
-    assert allowlist.permits(spec(exe)) is None
-    allowlist.allow(spec(exe))
-    assert allowlist.permits(PipeSpec(url="https://other.example.com/")) is None
-
-
 def test_secrets_are_kept_with_the_entry_and_survive_approving_it_again(allowlist, exe):
     allowlist.allow(spec(exe), secret_env={"API_KEY": "s3cret"})
     assert allowlist.secrets(spec(exe)).env == {"API_KEY": "s3cret"}

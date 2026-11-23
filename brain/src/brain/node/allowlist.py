@@ -12,6 +12,7 @@ import shutil
 from pathlib import Path
 from typing import NamedTuple
 
+from brain.private_file import write_private
 from brain.protocol import PipeSpec
 
 
@@ -96,11 +97,8 @@ class Allowlist:
         return None
 
     def _write(self, entries: list[dict]) -> None:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self._path.with_suffix(".tmp")
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(json.dumps(entries, indent=2))
+        write_private(tmp, json.dumps(entries, indent=2))
         os.replace(tmp, self._path)
 
     def _entries(self) -> list[dict]:

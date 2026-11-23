@@ -14,7 +14,7 @@ import sys
 from collections.abc import Awaitable, Callable
 from typing import Protocol
 
-from brain.apps import merge_url_secret
+from brain.apps import merge_url_secret, url_secret_values
 from brain.node.allowlist import Allowlist
 from brain.node.relay import HttpRelay
 from brain.protocol import ErrorCode, PipeSpec, RpcError
@@ -33,7 +33,7 @@ class Child(Protocol):
 
 
 Spawn = Callable[[str, list[str], dict[str, str]], Awaitable[Child]]
-ConnectUrl = Callable[[str], Child]
+ConnectUrl = Callable[[str, list[str]], Child]
 Send = Callable[[str, dict], None]
 
 
@@ -99,7 +99,10 @@ class Pipes:
         try:
             if spec.url is not None:
                 query = secrets.url_query
-                child = self._connect_url(merge_url_secret(path, query) if query else path)
+                child = self._connect_url(
+                    merge_url_secret(path, query) if query else path,
+                    url_secret_values(query) if query else [],
+                )
             else:
                 child = await self._spawn(path, spec.args, secrets.env)
         except OSError as err:

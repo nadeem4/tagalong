@@ -2,6 +2,7 @@
 allow-list approving what the test names and a real child behind them (a fake MCP server)."""
 
 import asyncio
+import base64
 import json
 import sys
 from pathlib import Path
@@ -22,7 +23,8 @@ class FakeNode:
         self.allowlist = Allowlist(tmp_path / "allowlist.json")
         self.allowlist.allow(PipeSpec(command=sys.executable, args=[FAKE]))
         self._children: list[Child] = []
-        self.frames: list[str] = []  # every frame that crossed to or from the brain
+        # every frame to or from the brain, pipe_data bodies also decoded, and the pipe_open replies
+        self.frames: list[str] = []
         self.pipes = Pipes(self.allowlist, self._to_brain, self._spawn)
         self.opened: list[PipeSpec] = []
         self.folders: set[str] = set()
@@ -47,15 +49,20 @@ class FakeNode:
         self.bodies.connect(body, [], self, None, Principal("device:pc", "Laptop", "node", False))
 
     def _to_brain(self, method: str, params: dict) -> None:
-        self.frames.append(json.dumps({"method": method, "params": params}))
+        self._record(json.dumps({"method": method, "params": params}), params)
         self.bodies.pipe_event(self.body_id, self, method, params)
 
     def send(self, frame: str) -> None:
-        self.frames.append(frame)
         message = json.loads(frame)
+        self._record(frame, message.get("params", {}))
         task = asyncio.create_task(self._handle(message))
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
+
+    def _record(self, frame: str, params: dict) -> None:
+        self.frames.append(frame)
+        if "data" in params:
+            self.frames.append(base64.b64decode(params["data"]).decode("utf-8", "replace"))
 
     def close(self) -> None:
         self.closed = True
@@ -77,6 +84,7 @@ class FakeNode:
                     "id": message["id"],
                     "error": {"code": int(err.code), "message": err.message},
                 }
+            self.frames.append(json.dumps(reply))
             self.bodies.resolve(self.body_id, self, reply)
         elif method == "folder_check":
             exists = params["path"] in self.folders

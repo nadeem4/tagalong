@@ -42,12 +42,12 @@ An app that needs a key must not hand it to the brain. The person types it on th
 - `tagalong node allow --secret-env API_KEY <command> [-- args...]` asks, with the input hidden, for the value of each named variable and keeps it in that entry. The node adds it to that child's environment only.
 - `tagalong node allow --url <address> --url-secret` asks for the secret query string (like `key=value`) and keeps it in the entry. The node adds it to the address when it connects.
 
-The values live in `allowlist.json` beside the entry, created owner-only (where the platform honours it). Approving the same entry again after an update keeps them unless new ones are typed. A spec never carries a secret: the brain sends only the command and args, or the URL, so no frame, log or brain database row holds one (`brain/tests/test_node_secrets.py` captures every frame). An app placed on a node ignores the brain's own copies of its keys.
+The values live in `allowlist.json` beside the entry, written owner-only through the brain's one private-file writer (mode 0600; on Windows icacls removes inherited access and grants only the current user). Approving the same entry again after an update keeps them unless new ones are typed. A spec never carries a secret: the brain sends only the command and args, or the URL, so no frame, log or brain database row holds one (`brain/tests/test_node_secrets.py` captures every frame, decoded). A server that echoes the query back in a message cannot leak it either: the relay replaces each secret value, raw and percent-encoded, with `[secret]` in every line it sends the brain. A line to the relay that is not a JSON-RPC message is answered with an error for its id, and a line over 8 MiB ends the pipe. An app placed on a node ignores the brain's own copies of its keys.
 
 ## Running one
 
 - `tagalong node allow <command> [-- args...]`: approve a command on this machine; `--secret-env NAME` (repeatable) types a secret for it here.
-- `tagalong node allow --url <address> [--url-secret]`: approve an HTTP MCP server's exact address, with an optional secret query typed here.
+- `tagalong node allow --url <address> [--url-secret]`: approve an HTTP MCP server's exact address, with an optional secret query typed here. An address that already carries a secret (a `key=` style query or `user:pass@`) is refused: give the secret with `--url-secret`.
 - `tagalong node run`: connect and serve; needs the four `TAGALONG_NODE_*` variables (the desktop sets them).
 
 `brain.node` imports nothing of the voice models (`brain/tests/test_node_imports.py`).

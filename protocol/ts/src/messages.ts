@@ -396,6 +396,9 @@ export const PipeSpec = z
   })
   .refine((spec) => (spec.command === undefined) !== (spec.url === undefined), {
     message: 'a spec names a command or a url, one of them',
+  })
+  .refine((spec) => spec.url === undefined || spec.args.length === 0, {
+    message: 'a url spec takes no args',
   });
 export type PipeSpec = z.infer<typeof PipeSpec>;
 
