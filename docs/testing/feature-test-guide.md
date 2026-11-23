@@ -3260,4 +3260,15 @@ By hand, with Claude Code or Cursor on the brain's machine:
 5. Stop the brain and ask the tool to recall. **Expected:** a plain "brain not reachable" error.
 6. Revoke the client in Home. **Expected:** the tool's next call is refused.
 
+### Scout connects an AI tool (BA12)
+
+Automated: `brain/tests/test_mcp_client_tools.py` (the token goes to the desktop body and is in no result the model reads; connecting again cuts the old token off; a failed set-up cuts the new client off; no desktop makes nothing; the show-me text holds no secret), `bodies/desktop/src/main/tools/connect-ai-tool.test.ts` (on a fake runner: the pairing file, `claude`, `codex` and Cursor's `mcp.json`, a failed command, a missing tool, an unreadable Cursor file left alone, an owner-only file), `run-command.test.ts`, `body-tools.test.ts` (handled but never declared) and `packaging.test.ts` (the PATH hooks and `tagalong.cmd`).
+
+By hand, on a packaged install (not run in automation):
+
+1. Install, open a new terminal, run `tagalong --help`. **Expected:** it runs. Uninstall and open a new terminal. **Expected:** the command is gone from PATH.
+2. In Home chat say "connect Claude Code to your memory". **Expected:** Scout offers "set it up" or "show you how"; after "set it up" and one Allow, Claude Code lists the `tagalong` server and `recall` works.
+3. Say it again. **Expected:** it works and the old token stops working.
+4. Take `claude` off PATH and ask again. **Expected:** Scout says it is not installed and offers the steps.
+
 Needs a real second machine (not run in automation): pair from a PC other than the brain's, with the brain's network listener on, and repeat steps 3 to 6.
