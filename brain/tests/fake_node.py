@@ -26,6 +26,7 @@ class FakeNode:
             self.allowlist, lambda m, p: bodies.pipe_event(body_id, self, m, p), self._spawn
         )
         self.opened: list[PipeSpec] = []
+        self.folders: set[str] = set()
         self._tasks: set[asyncio.Task] = set()
         self.closed = False
         self.hold_open = False
@@ -73,6 +74,13 @@ class FakeNode:
                     "error": {"code": int(err.code), "message": err.message},
                 }
             self.bodies.resolve(self.body_id, self, reply)
+        elif method == "folder_check":
+            exists = params["path"] in self.folders
+            self.bodies.resolve(
+                self.body_id,
+                self,
+                {"jsonrpc": "2.0", "id": message["id"], "result": {"exists": exists}},
+            )
         elif method == "pipe_data":
             self.pipes.write(params["pipe"], params["data"])
         elif method == "pipe_close":

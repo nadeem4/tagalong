@@ -655,6 +655,9 @@ class StubHost:
     def __init__(self) -> None:
         self.process = SimpleNamespace(returncode=None)
 
+    def alive(self) -> bool:
+        return self.process.returncode is None
+
 
 async def quiet_run(clock: FakeClock, facts: list, quiet_s: float = 1200.0) -> ExpertRun:
     async def on_quiet(f):

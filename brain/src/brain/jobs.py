@@ -35,6 +35,7 @@ from brain.permission import (
     expert_asker,
     summarise,
 )
+from brain.placements import Unavailable
 from brain.protocol import RpcError
 from brain.questions import ScoutQuestions
 from brain.setup.install import NODE_FLOOR
@@ -350,11 +351,17 @@ class Jobs:
         chosen = await self._pick(earlier_part.agent if earlier_part else expert)
         offered = self._check_apps(apps)
         path = Path(folder)
-        if not (path.is_absolute() and path.is_dir()):
-            raise JobError(f"no folder at {folder}")
         if earlier is None and not fresh:
             found = self._records.last_part_for(chosen.id, str(path))
             earlier, earlier_part = found if found else (None, None)
+        try:
+            where = self._where(chosen, earlier_part)
+        except Unavailable as gone:
+            raise await self._host_offline(
+                chosen, gone.body_id, folder, task, task_id, caused_by
+            ) from None
+        if not await self._folder_exists(where, folder):
+            raise JobError(f"no folder at {folder}")
         job_id = job or uuid.uuid4().hex[:8]
         clean = mask_json(self._guards, "job_title", title.strip()) if title else ""
         key = job_id if job is None else uuid.uuid4().hex  # one slot claim per start
@@ -398,6 +405,41 @@ class Jobs:
             saved = self._records.get_job(str(started))
             started.title = job_title(saved) if saved else None
         return started
+
+    def _where(self, chosen: InstalledExpert, earlier_part: JobPart | None) -> str:
+        """The machine this part runs on. A part that continues a saved session runs where that
+        session lives; a job never moves."""
+        if self._hosts is None:
+            return "brain"
+        pinned = earlier_part.host if earlier_part and earlier_part.session_id else None
+        return self._hosts.locate(chosen, pinned)
+
+    async def _folder_exists(self, where: str, folder: str) -> bool:
+        if where == "brain":
+            path = Path(folder)
+            return path.is_absolute() and path.is_dir()
+        return await self._hosts.folder_exists(where, folder)
+
+    async def _host_offline(
+        self,
+        chosen: InstalledExpert,
+        body_id: str,
+        folder: str,
+        task: str,
+        task_id: str | None,
+        caused_by: str | None,
+    ) -> JobError:
+        """The machine this job belongs to is away: leave an open item for it and refuse, as a
+        fact. Nothing starts anywhere else."""
+        call = {"expert": chosen.id, "host": body_id, "folder": folder, "task": task}
+        if self._items is not None and self._items.find_open("host_offline", call) is None:
+            self._items.open("host_offline", saved_call=call, task_id=task_id, caused_by=caused_by)
+        return await self._refusal(
+            f"{chosen.id} runs on {body_id}, which is not connected right now",
+            "host_offline",
+            chosen.id,
+            host=body_id,
+        )
 
     def _after_start(
         self,
@@ -494,8 +536,14 @@ class Jobs:
             part = redo.id.split(".", 1)[1]
         else:
             part = "p1" if new_job else self._reserve_part(job_id)
+        try:
+            where = self._where(chosen, earlier_part)
+        except Unavailable as gone:
+            raise JobError(f"{chosen.id} runs on {gone.body_id}, which is not connected") from None
+        place = {"host": where} if self._hosts is not None else {}
         run = self._make_run(
             chosen,
+            **place,
             job_id=job_id,
             on_permission=lambda request: self._permission(job_id, request, part),
             on_question=lambda question: self._question(job_id, question, part),
@@ -538,13 +586,14 @@ class Jobs:
                     parent,
                     task_id=task_id,
                     caused_by=caused_by,
+                    host=where,
                 )
             else:
                 # Scout may have closed the job while the start awaited the expert or the card.
                 current = self._records.get_job(job_id)
                 if current is None or current.closed_at:
                     raise JobError(f"job {job_id} is closed; open a new job instead")
-                added = self._records.add_part(job_id, chosen.id, task, str(path), part)
+                added = self._records.add_part(job_id, chosen.id, task, str(path), part, where)
                 assert added == part
             self._runs.setdefault(job_id, {})[part] = run
             self._activity.setdefault(job_id, {})[part] = JobActivity(

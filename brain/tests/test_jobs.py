@@ -29,6 +29,7 @@ from brain.masking import Masker, mask_secrets
 from brain.memory import Memory
 from brain.open_items import OpenItemRefused, OpenItems
 from brain.permission import Decision, Engine, Grant, Person, SideCheckDecider
+from brain.placements import Placements
 from brain.protocol import ErrorCode, RpcError
 from brain.setup.store import InstalledExpert
 from brain.store import rules
@@ -181,6 +182,7 @@ class Rig:
         load: bool | str = False,
         apps=None,
         before_start=None,
+        bodies=None,
     ) -> None:
         self.bridge = FakeBridge()
         script = tmp_path / "script.json"
@@ -216,7 +218,10 @@ class Rig:
         self.engine = engine or Engine(deciders, self.approvals, self.offers, lambda name: None)
         # shared: the real factory, one warm adapter per expert; its idle wait never ends here.
         self.gate = asyncio.Event()
-        self.hosts = ExpertHosts(300, sleep=lambda s: self.gate.wait())
+        self.placements = Placements(self.memory.db)
+        self.hosts = ExpertHosts(
+            300, sleep=lambda s: self.gate.wait(), bodies=bodies, placements=self.placements
+        )
         self.records = JobRecords(
             WorkStore(self.memory.db, lambda: self.wall), self.memory.db, lambda: self.wall
         )

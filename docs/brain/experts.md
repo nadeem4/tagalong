@@ -27,7 +27,11 @@ title, the question's own text (`description`), the option labels and `multi` (a
 answers with a list of labels). The child gets the brain's environment through `setup/env.py` `expert_env(expert_id, ...)`,
 without that expert's own key variables (the last column of the table below; an unknown id loses
 all of them) and without `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN`, so each expert runs on the user's own login, never a key Scout uses. For an expert on the private
-Node, that Node's folder goes first on the child's PATH (the brain's own PATH is unchanged). The process is closed by closing its stdin; if it stays alive it is killed with
+Node, that Node's folder goes first on the child's PATH (the brain's own PATH is unchanged).
+
+### Where an expert runs
+
+An expert can run on a body's machine through that body's node ([node](node.md)). `ExpertHosts.locate` picks the machine: the expert's stored placement (`expert` rows of `placements`, resolved by `resolve_placement`), or, when a job continues a saved session, the machine that session lives on. A job never moves: if its host is not connected, the hand-off is refused with the fact `host_offline` and an open item of kind `host_offline` is left, and nothing starts on the brain or elsewhere. `ExpertHost` talks ACP the same way on both: a local child's stdio, or a node pipe (`pipe_open` of the expert's `command` and `args`, bytes both ways). The node runs the command only if its own allow-list has it; a refusal comes back as the line to run on that machine, `tagalong node allow <command> -- <args>`, and the brain never adds to the list. The command is the same one the brain has installed, so the expert has to be installed at that path on the node's machine; the brain does not install on a node. A node that drops mid-job ends the run as an error through the same path as a crashed adapter, and its saved session stays on that host for a follow-up. Placement "both, ask me" runs an expert on the brain. The process is closed by closing its stdin; if it stays alive it is killed with
 its children (`taskkill /T /F` on Windows; on Linux and macOS only the adapter process is
 killed, and its children exit when their stdin closes). Start and the mode change are bounded by a 60 s
 startup limit (an adapter that never answers is killed and reported). `stop()` and `close()` are

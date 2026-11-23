@@ -191,6 +191,10 @@ sequenceDiagram
 
 The order matters for one reason: the task is marked stopped first, so nothing the later steps wake can start new work on it. Each step is isolated, so a failure in one does not leave the others undone.
 
+## Where a part runs
+
+Each job part records its host (`JobPart.host`: `brain` or a node's body id). A follow-up that carries on a saved session (explicit `continue_job`, or the same expert in the same folder) runs on that host even if the expert's placement has changed since. When that host is offline the hand-off is refused with `{problem: "host_offline", host}` and an open item of kind `host_offline` (saved call: expert, host, folder, task) stays; the job does not start elsewhere. A new hand-off with no session to carry on is placed by the expert's placement. The folder must exist on the machine the part runs on: the brain checks its own disk, or asks the node (`folder_check`). A host that drops during a run ends the part as failed like a crashed adapter, with its session kept. See [experts](experts.md#where-an-expert-runs).
+
 ## Restart recovery
 
 A Scout ask is an open item, so it outlives the turn, your absence and a brain restart. Other work is settled at start too: `EventLog.recover` returns `taken` events to `new` (counted as a failed attempt, reason `restart`), the work resume scan blocks or fails running job parts, and `Tasks.sweep` removes old ended tasks after `Tasks.settle` runs. A job's
