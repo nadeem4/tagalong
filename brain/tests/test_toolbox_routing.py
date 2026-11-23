@@ -2,6 +2,7 @@
 the permission engine, with the rule keyed by app and tool. Fake MCP server, fake node.
 """
 
+import asyncio
 import sys
 from datetime import UTC, datetime
 from functools import partial
@@ -136,3 +137,23 @@ async def test_prefer_body_falls_back_to_the_brain_when_the_node_is_offline(make
     rig = await make(Placement("both", "pc", "body"), node_online=False)
     assert "hi" in await rig.call()
     assert not rig.node.opened
+
+
+async def test_a_body_only_app_works_once_its_node_connects(make):
+    rig = await make(Placement("body", "pc"), node_online=False)
+    rig.node.connect()
+    rig.apps.body_changed("pc")
+    async with asyncio.timeout(30):
+        while rig.apps.status("fake").state != "connected":
+            await asyncio.sleep(0.05)
+    assert "hi" in await rig.call()
+    assert rig.node.opened
+
+
+async def test_calls_in_one_turn_start_the_app_once(make):
+    rig = await make(Placement("both", "pc", "ask"))
+    rules.set_permission_mode(rig.memory.db, "fake__echo", "auto")
+    calls = [Call(f"c{n}", "fake__echo", {"text": "hi"}, "t1", "") for n in range(3)]
+    results = await asyncio.gather(*(rig.toolbox.run(call) for call in calls))
+    assert all("hi" in result for result in results)
+    assert len(rig.node.opened) == 1

@@ -410,7 +410,7 @@ class Apps:
 
     def _is_misplaced(self, app_id: str, slot: _Slot) -> bool:
         try:
-            return slot.location != self.resolve(app_id)
+            return slot.location != self.resolve(app_id) or slot.state == "error"
         except Choose:
             return False
         except Unavailable:
@@ -450,6 +450,12 @@ class Apps:
             return
         async with old.lock:  # shared by every slot of this app, so re-read the current one
             current = self._slots[app_id]
+            if (
+                where is not None
+                and current.location == where
+                and current.state in ("connecting", "connected")
+            ):
+                return  # a call before this one already moved it
             await self._stop(current)
             if open_url:  # a fresh sign-in starts clean: the old client id has the old port
                 self._forget_oauth(app_id)
