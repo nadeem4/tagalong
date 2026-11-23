@@ -15,6 +15,7 @@ class Hit:
     text: str
     category: str = ""
     span: str = ""
+    source: str = ""
 
 
 def span_text(start: str | None, end: str | None) -> str:
@@ -67,13 +68,15 @@ def search(
     from_year: int | None = None,
     to_year: int | None = None,
     category: str | None = None,
+    facts_only: bool = False,
 ) -> list[Hit]:
     """Memory items, saved chat and work (jobs, steps) matching `query`; `kind` narrows to one
     memory kind, "chat" or "work". Personal (asked) facts only come back with
     `include_personal`; the portrait never does, it is already in the prompt.
 
     A year, range or category narrows to dated or categorised memory facts (never chat, work or
-    summaries, whose timestamps are days); with no words the filter alone lists them by date."""
+    summaries, whose timestamps are days); with no words the filter alone lists them by date.
+    `facts_only` leaves out chat, work and summaries, which are conversation, not facts."""
     match = fts_query(query)
     conds, fargs = _year_filters(year, from_year, to_year)
     if category and category.strip():
@@ -85,7 +88,7 @@ def search(
         return []
     hits: list[Hit] = []
     if kind not in ("chat", "work"):
-        cols = "m.id, m.kind, m.updated_at, m.text, m.category, m.span_start, m.span_end"
+        cols = "m.id, m.kind, m.updated_at, m.text, m.category, m.span_start, m.span_end, m.source"
         if match:
             sql = (
                 f"SELECT {cols} FROM memories_fts"
@@ -96,7 +99,7 @@ def search(
             sql = f"SELECT {cols} FROM memories m WHERE 1=1"
             args = []
         sql += " AND m.kind != 'portrait'"
-        if filtered:
+        if filtered or facts_only:
             sql += " AND m.kind != 'summary'"
         if not include_personal:
             sql += " AND m.visibility = 'free'"
@@ -110,10 +113,10 @@ def search(
         sql += " LIMIT ?"
         args.append(limit)
         hits = [
-            Hit(str(i), k, at, t, c or "", "" if k == "summary" else span_text(s, e))
-            for i, k, at, t, c, s, e in db.execute(sql, args)
+            Hit(str(i), k, at, t, c or "", "" if k == "summary" else span_text(s, e), src)
+            for i, k, at, t, c, s, e, src in db.execute(sql, args)
         ]
-    if filtered:
+    if filtered or facts_only:
         return hits
     if kind is None or kind == "work":
         rows = db.execute(

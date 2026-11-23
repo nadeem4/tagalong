@@ -86,6 +86,10 @@ With `TAGALONG_NETWORK=1` a second listener takes bodies from other devices on `
 
 The network listener accepts device tokens only, never the local token: a leaked local-token file on one machine cannot be used from another.
 
+### Memory clients
+
+`/mcp/memory` (`memory_mcp.py`, loopback only, port `TAGALONG_MCP_PORT`, default 47324) takes bearer tokens of `devices` rows of kind `mcp_client`, looked up on every request, so a revoked token fails at once. Such a token is refused as a body's `hello`, and a body's token is refused here. Each call goes through `Toolbox.run` as caller `mcp:<client>` (audience `mcp`), so modes, the Allow card and masking apply; a client gets recall, remember and list only, never forget. Its `memory_remember` is a locked tool: only the owner (or an Auto set on Home) decides it, never Scout's side-check, because the note is an outside tool's text. Requests whose `Host` is not `127.0.0.1` or `localhost` are refused (DNS rebinding). See [Memory for other AI tools](../data/memory.md#memory-for-other-ai-tools).
+
 ### A node's allow-list
 
 A node (a body of kind `node` on the person's own PC) starts a process for the brain, so its own allow-list, not the brain's token, is the boundary. A `pipe_open` runs only when the node's `<TAGALONG_HOME>/node/allowlist.json` holds that exact command and arguments and the program's SHA-256 still matches; anything else is `denied`, even from a genuine brain. The brain cannot add or change an entry: the person runs `tagalong node allow` on that machine. The hash covers only the file the command resolves to (a `.cmd` shim, `npx`), not what that file goes on to load. See [node.md](node.md).

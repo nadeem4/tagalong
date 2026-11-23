@@ -510,6 +510,10 @@ Nothing runs until you ask. When you do, Scout reads only what you point it at:
 
 With `TAGALONG_NETWORK=1` the brain listens for your other devices and announces itself on your home network (mDNS: the service type, version and a host name only; nothing about you). A device joins only with a one-time code you make (`tagalong pair` or Home), valid 10 minutes and once. The brain keeps each device's name, kind, when it paired and when it was last seen, and only a hash of its token. You can rename or revoke a device in Home; revoking cuts it off at once.
 
+## Other AI tools reading your memory
+
+A tool you make a client in Home (`mcp_client_make`) can read Scout's saved facts and add notes over a loopback address, with a bearer token shown once. It never sees chat, summaries or work. Facts you keep back (personal) stay back unless you switched that on for that client. Adding a note asks you every time (Scout never answers for you), the endpoint refuses a request whose `Host` is not `127.0.0.1` or `localhost`, a full memory is reported to the tool as full (make room in Home), answers are masked for secrets, and a note is labelled with the tool that wrote it and shown to Scout as that tool's word, not yours. A tool cannot delete anything. Revoke a client in Home and its next call fails. The endpoint is reachable only on the brain's own machine.
+
 ## What Scout remembers: see it, delete it
 
 Scout keeps what it learns about you (facts, preferences, and short summaries of long
