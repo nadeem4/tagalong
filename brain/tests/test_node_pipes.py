@@ -57,14 +57,23 @@ class Setup:
         self.sent: list[tuple[str, dict]] = []
         self.children: list[FakeChild] = []
         self.started: list[tuple[str, list[str]]] = []
+        self.envs: list[dict[str, str]] = []
+        self.relayed: list[str] = []
 
-        async def spawn(path: str, args: list[str]) -> FakeChild:
+        async def spawn(path: str, args: list[str], env: dict[str, str]) -> FakeChild:
             self.started.append((path, args))
+            self.envs.append(env)
             child = child_type()
             self.children.append(child)
             return child
 
-        self.pipes = Pipes(self.allowlist, lambda m, p: self.sent.append((m, p)), spawn)
+        def relay(url: str, secrets: list[str]) -> FakeChild:
+            self.relayed.append(url)
+            child = child_type()
+            self.children.append(child)
+            return child
+
+        self.pipes = Pipes(self.allowlist, lambda m, p: self.sent.append((m, p)), spawn, relay)
 
     def spec(self, *args: str) -> PipeSpec:
         return PipeSpec(command=str(self.exe), args=list(args))
@@ -136,7 +145,29 @@ async def test_a_spawned_child_does_not_inherit_the_nodes_link_token(monkeypatch
     with pytest.raises(HelloRefused):
         await run_node(os.environ, Allowlist(Path("unused.json")), dial=refused)
     child = await spawn_process(
-        sys.executable, ["-c", "import os; print(sorted(k for k in os.environ if 'NODE' in k))"]
+        sys.executable, ["-c", "import os; print(sorted(k for k in os.environ if 'NODE' in k))"], {}
     )
     out = await child.stdout.read()
     assert b"TAGALONG_NODE" not in out
+
+
+async def test_the_secrets_entered_on_the_node_reach_the_child_and_no_one_else(node):
+    node.allowlist.allow(node.spec(), secret_env={"API_KEY": "s3cret"})
+    await node.pipes.open("k1", node.spec())
+    assert node.envs == [{"API_KEY": "s3cret"}]
+    assert node.sent == []
+
+
+async def test_an_approved_url_is_relayed_with_its_secret_query_added_on_the_node(node):
+    url = "https://mcp.example.com/mcp"
+    node.allowlist.allow(PipeSpec(url=url), url_query="key=abc")
+    await node.pipes.open("k1", PipeSpec(url=url))
+    assert node.relayed == [url + "?key=abc"]
+
+
+async def test_a_url_the_person_did_not_approve_is_denied_and_never_contacted(node):
+    node.allowlist.allow(PipeSpec(url="https://mcp.example.com/mcp"))
+    with pytest.raises(RpcError) as caught:
+        await node.pipes.open("k1", PipeSpec(url="https://evil.example.com/mcp"))
+    assert caught.value.code == ErrorCode.denied
+    assert node.relayed == []

@@ -19,8 +19,9 @@ from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 from typing import NoReturn, TextIO
+from urllib.parse import urlsplit
 
-from brain.apps import AppError, TokenFile
+from brain.apps import AppError, TokenFile, split_secrets
 from brain.config import load_config, load_env_file, upsert_env_value
 from brain.devices import Devices
 from brain.discovery import lan_address
@@ -102,9 +103,22 @@ def _parser() -> argparse.ArgumentParser:
         dest="sub", required=True
     )
     node.add_parser("run", help="connect to the paired brain and serve its pipes")
-    allow = node.add_parser("allow", help="let the brain run this command here")
-    allow.add_argument("command")
+    allow = node.add_parser("allow", help="let the brain run this command or open this URL here")
+    allow.add_argument("command", nargs="?")
     allow.add_argument("args", nargs=argparse.REMAINDER, help="its arguments, after --")
+    allow.add_argument("--url", help="an HTTP MCP server's exact address, instead of a command")
+    allow.add_argument(
+        "--secret-env",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="an environment variable whose value is typed here and kept on this machine",
+    )
+    allow.add_argument(
+        "--url-secret",
+        action="store_true",
+        help="a secret query string for the URL, typed here and kept on this machine",
+    )
     login = sub.add_parser("login", help="log an installed expert in")
     login.add_argument("expert_id")
     return p
@@ -159,7 +173,7 @@ def main(
         elif args.cmd == "serve":
             _serve(args.install_service, config, service_for(home), env, host_addr, out)
         elif args.cmd == "node":
-            await _node(args, home, env, run_node, out)
+            await _node(args, home, env, run_node, secret, out)
         elif args.cmd == "update":
             await _update(run, env, out)
         elif args.cmd == "key":
@@ -271,17 +285,43 @@ def _serve(install, config, service: Service, env, host_addr, out) -> None:
 NODE_ENV = ("TAGALONG_NODE_ADDR", "TAGALONG_NODE_FP", "TAGALONG_NODE_TOKEN", "TAGALONG_NODE_ID")
 
 
-async def _node(args, home: Path, env, run_node, out) -> None:
-    allowlist = Allowlist(home / "node" / "allowlist.json")
-    if args.sub == "allow":
+def _node_allow(args, allowlist: Allowlist, secret: Callable[[str], str], out) -> None:
+    if (args.url is None) == (args.command is None):
+        raise _Fail("Give a command, or --url with an address, not both.")
+    if args.url is not None:
+        parts = urlsplit(args.url)
+        if parts.scheme not in ("http", "https") or not parts.hostname:
+            raise _Fail("The address must be an http or https URL.")
+        if args.secret_env:
+            raise _Fail("--secret-env is for a command; a URL takes --url-secret.")
+        if split_secrets("", {"url": args.url}, "http")[1]:
+            raise _Fail("Leave the secret out of the address and give it with --url-secret.")
+        spec = PipeSpec(url=args.url)
+        shown = args.url
+    else:
+        if args.url_secret:
+            raise _Fail("--url-secret is for a URL.")
         spec = PipeSpec(
             command=args.command, args=args.args[1:] if args.args[:1] == ["--"] else args.args
         )
-        try:
-            allowlist.allow(spec)
-        except NotRunnable as err:
-            raise _Fail(str(err)) from None
-        out(f"The brain may now run: {' '.join([spec.command, *spec.args])}")
+        shown = " ".join([args.command, *spec.args])
+    env = {name: secret(f"Value for {name} (hidden): ") for name in args.secret_env}
+    query = (
+        secret("Secret query for the URL, like key=value (hidden): ") if args.url_secret else None
+    )
+    try:
+        allowlist.allow(spec, secret_env=env or None, url_query=query or None)
+    except NotRunnable as err:
+        raise _Fail(str(err)) from None
+    out(f"The brain may now {'open' if args.url else 'run'}: {shown}")
+    if env or query:
+        out("The secrets stay on this machine; the brain never sees them.")
+
+
+async def _node(args, home: Path, env, run_node, secret, out) -> None:
+    allowlist = Allowlist(home / "node" / "allowlist.json")
+    if args.sub == "allow":
+        _node_allow(args, allowlist, secret, out)
         return
     missing = [name for name in NODE_ENV if not env.get(name)]
     if missing:
@@ -503,7 +543,8 @@ async def _login(expert_id: str, home: Path, open_terminal: OpenTerminal, out) -
     facts = result[0].payload
     if facts.get("detail") == "no_terminal":
         raise _Fail(
-            f"no window can open here; run this yourself, then `tagalong doctor`:\n  "
+            f"no window can open here; run this on the machine the brain runs on, then "
+            f"`tagalong doctor`:\n  "
             f"{facts['command']}"
         )
     if facts["state"] != "logged_in":

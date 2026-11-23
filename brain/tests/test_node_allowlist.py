@@ -2,6 +2,7 @@
 machine runs, whoever asks. Real files in a temp folder stand in for executables; nothing runs.
 """
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -83,3 +84,34 @@ def test_a_link_runs_as_the_link_so_a_venv_python_keeps_its_venv(allowlist, exe,
     assert allowlist.permits(spec(link)) == str(link)
     exe.write_bytes(b"binary two")
     assert allowlist.permits(spec(link)) is None
+
+
+URL = "https://mcp.example.com/mcp"
+
+
+def test_an_exact_url_is_permitted_and_another_is_not(allowlist):
+    allowlist.allow(PipeSpec(url=URL))
+    assert allowlist.permits(PipeSpec(url=URL)) == URL
+    assert allowlist.permits(PipeSpec(url=URL + "/x")) is None
+    assert allowlist.permits(PipeSpec(url="https://evil.example.com/mcp")) is None
+
+
+def test_secrets_are_kept_with_the_entry_and_survive_approving_it_again(allowlist, exe):
+    allowlist.allow(spec(exe), secret_env={"API_KEY": "s3cret"})
+    assert allowlist.secrets(spec(exe)).env == {"API_KEY": "s3cret"}
+    exe.write_bytes(b"binary two")
+    allowlist.allow(spec(exe))
+    assert allowlist.secrets(spec(exe)).env == {"API_KEY": "s3cret"}
+    assert allowlist.secrets(spec(exe, "other")).env == {}
+
+
+def test_a_url_secret_is_the_entrys_and_a_spec_cannot_ask_for_another_entrys(allowlist):
+    allowlist.allow(PipeSpec(url=URL), url_query="key=abc")
+    assert allowlist.secrets(PipeSpec(url=URL)).url_query == "key=abc"
+    assert allowlist.secrets(PipeSpec(url=URL + "?x=1")).url_query is None
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="chmod is not honoured on Windows")
+def test_the_list_file_is_owner_only_once_it_holds_secrets(allowlist, exe, tmp_path):
+    allowlist.allow(spec(exe), secret_env={"API_KEY": "s3cret"})
+    assert (tmp_path / "node" / "allowlist.json").stat().st_mode & 0o077 == 0

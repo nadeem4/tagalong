@@ -945,6 +945,16 @@ on fakes. To see it by hand, add a loop with an anchor to a test store and open 
 4. Ask me asks one card per turn for an app, not one per call.
 5. Home's `placement_set` saves a placement and restarts the app; a bad one is refused and nothing is saved.
 
+## Keys for an app on a node (automated only)
+
+`cd brain && uv run pytest tests/test_node_secrets.py tests/test_node_allowlist.py tests/test_node_pipes.py -q`, and the `node allow` tests in `tests/test_cli.py`:
+
+1. A stdio app placed on a node runs with a key typed on the node, and a capture of every frame to and from the brain, plus the brain's database, holds no trace of it.
+2. An http app placed on a node is relayed to its approved address with its secret query added on the node, and the capture holds no trace of it.
+3. A URL the person did not approve with `tagalong node allow --url` is denied and never contacted; an exact address is the only match.
+4. `tagalong node allow --secret-env` and `--url-secret` ask for the value with hidden input and never print it; a confused request is refused and writes nothing.
+5. A headless brain's `tagalong login <expert>` prints the command to run on the machine the brain runs on.
+
 ## Where an expert runs (automated only)
 
 `cd brain && uv run pytest tests/test_experts_transport.py tests/test_job_host.py -q` on a fake node that runs the fake ACP agent:

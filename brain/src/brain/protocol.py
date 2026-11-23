@@ -557,9 +557,20 @@ class KnowMeStatusParams(Model):
 
 # Node pipes: the brain asks a node (a body on another machine) to run an allowed command and
 # relays its stdin and stdout as raw bytes. The node refuses any spec its own allow-list lacks.
+# A spec names a command, or the exact URL of an HTTP MCP server the node relays to. Secrets are
+# never part of it: the node adds the ones its person entered there.
 class PipeSpec(Model):
-    command: Annotated[str, Field(min_length=1)]
+    command: Annotated[str, Field(min_length=1)] | None = None
     args: list[str] = []
+    url: Annotated[str, Field(min_length=1)] | None = None
+
+    @model_validator(mode="after")
+    def _one_target(self) -> "PipeSpec":
+        if (self.command is None) == (self.url is None):
+            raise ValueError("a spec names a command or a url, one of them.")
+        if self.url is not None and self.args:
+            raise ValueError("a url spec takes no args.")
+        return self
 
 
 class PipeOpenParams(Model):

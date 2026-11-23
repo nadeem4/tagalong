@@ -25,26 +25,36 @@ flowchart LR
 
 ## The allow-list
 
-The allow-list is the security boundary. It lives in `<TAGALONG_HOME>/node/allowlist.json` on the node's machine and holds entries of `command`, `args`, the resolved file `path` and the file's `sha256`. A `pipe_open` runs only when an entry matches the spec exactly (same command, same args in the same order), the command resolves to the same file, and that file still hashes to the recorded value. Anything else gets `denied` and nothing starts, even from a genuine brain with a valid token. A file that was updated or swapped no longer matches until the person approves it again. A damaged list file permits nothing. The node starts the command as found on the path, not the file a link points to, so a venv's `python` link still finds its venv; the hash is checked on the target.
+The allow-list is the security boundary. It lives in `<TAGALONG_HOME>/node/allowlist.json` on the node's machine and holds entries of `command`, `args`, the resolved file `path` and the file's `sha256`, or of an exact `url` (an HTTP MCP server). A `pipe_open` for a URL runs only when an entry has that same address character for character; no command runs for it. A `pipe_open` runs only when an entry matches the spec exactly (same command, same args in the same order), the command resolves to the same file, and that file still hashes to the recorded value. Anything else gets `denied` and nothing starts, even from a genuine brain with a valid token. A file that was updated or swapped no longer matches until the person approves it again. A damaged list file permits nothing. The node starts the command as found on the path, not the file a link points to, so a venv's `python` link still finds its venv; the hash is checked on the target.
 
-Only the person on the node's machine adds an entry: `tagalong node allow <command> [-- args...]` there records the current hash. The brain has no message that adds or changes an entry. The list is per machine and not synced.
+Only the person on the node's machine adds an entry: `tagalong node allow <command> [-- args...]` there records the current hash, and `tagalong node allow --url <address>` approves one exact address. The brain has no message that adds or changes an entry. The list is per machine and not synced.
 
 A hash covers the file the command resolves to, not what that file goes on to load: approving `npx` approves `npx` running anything. Approve the program that is the tool.
 
 ## Pipes
 
-`pipe_open { pipe, spec: { command, args? } }` asks the node to start the child; its answer is `{}` or an error (`denied`, `invalid_params` for a pipe id already open, `tool_failed` when the OS cannot start it). The brain's bytes go to the child's stdin as `pipe_data { pipe, data }` (base64) and the child's stdout comes back the same way; stderr is dropped. `pipe_close` from the brain kills the child and its whole process tree (so a `.cmd` shim cannot keep the pipe open) and is not echoed; a child that exits on its own makes the node send `pipe_close { pipe, code }`. When the brain connection ends, every child is killed. `folder_check { path }` answers `{ exists }` for a folder on this machine. The wire shapes are in [protocol/README.md](../../protocol/README.md).
+`pipe_open { pipe, spec: { command, args? } | { url } }` asks the node to start the child (for a `url`, `relay.py` posts the brain's JSON-RPC lines to that HTTP MCP server and returns its messages as lines, so the brain's end is the same); its answer is `{}` or an error (`denied`, `invalid_params` for a pipe id already open, `tool_failed` when the OS cannot start it). The brain's bytes go to the child's stdin as `pipe_data { pipe, data }` (base64) and the child's stdout comes back the same way; stderr is dropped. `pipe_close` from the brain kills the child and its whole process tree (so a `.cmd` shim cannot keep the pipe open) and is not echoed; a child that exits on its own makes the node send `pipe_close { pipe, code }`. When the brain connection ends, every child is killed. `folder_check { path }` answers `{ exists }` for a folder on this machine. The wire shapes are in [protocol/README.md](../../protocol/README.md).
+
+## Secrets stay on the node
+
+An app that needs a key must not hand it to the brain. The person types it on the node's machine, in the same `tagalong node allow` that approves the entry (options go before the command):
+
+- `tagalong node allow --secret-env API_KEY <command> [-- args...]` asks, with the input hidden, for the value of each named variable and keeps it in that entry. The node adds it to that child's environment only.
+- `tagalong node allow --url <address> --url-secret` asks for the secret query string (like `key=value`) and keeps it in the entry. The node adds it to the address when it connects.
+
+The values live in `allowlist.json` beside the entry, written owner-only through the brain's one private-file writer (mode 0600; on Windows icacls removes inherited access and grants only the current user). Approving the same entry again after an update keeps them unless new ones are typed. A spec never carries a secret: the brain sends only the command and args, or the URL, so no frame, log or brain database row holds one (`brain/tests/test_node_secrets.py` captures every frame, decoded). A server that echoes the query back in a message cannot leak it either: the relay replaces each secret value, raw and percent-encoded, with `[secret]` in every line it sends the brain. A line to the relay that is not a JSON-RPC message is answered with an error for its id, and a line over 8 MiB ends the pipe. An app placed on a node ignores the brain's own copies of its keys.
 
 ## Running one
 
-- `tagalong node allow <command> [-- args...]`: approve a command on this machine.
+- `tagalong node allow <command> [-- args...]`: approve a command on this machine; `--secret-env NAME` (repeatable) types a secret for it here.
+- `tagalong node allow --url <address> [--url-secret]`: approve an HTTP MCP server's exact address, with an optional secret query typed here. An address that already carries a secret (a `key=` style query or `user:pass@`) is refused: give the secret with `--url-secret`.
 - `tagalong node run`: connect and serve; needs the four `TAGALONG_NODE_*` variables (the desktop sets them).
 
 `brain.node` imports nothing of the voice models (`brain/tests/test_node_imports.py`).
 
 ## Not supported yet
 
-- A spec that is an HTTP MCP URL (an app with an http transport cannot be placed on a node yet), and the browser add-on's loopback proxy: BA10.
+- An http app that signs in with OAuth or a bearer token cannot be placed on a node yet (a keyed URL, `url_secret`, can), and the browser add-on's loopback proxy: BA10.
 - The brain does not install an expert on a node: it runs the expert's installed command there once the person has approved it. Both the toolbox's use (an app's stdio MCP server, [Where an app runs](../bodies/connected-apps.md#where-an-app-runs)) and the expert host's use ([Where an expert runs](experts.md#where-an-expert-runs)) go over a pipe.
 
 The node reuses the desktop's device token under body id `node-xxxxxx`, so it cannot be revoked apart from the desktop and its device kind is `desktop`.

@@ -369,7 +369,10 @@ class Bodies:
         self._pipes[pipe_id] = (body_id, pipe)
         try:
             await self._request(
-                body_id, "pipe_open", {"pipe": pipe_id, "spec": spec.model_dump()}, timeout
+                body_id,
+                "pipe_open",
+                {"pipe": pipe_id, "spec": spec.model_dump(exclude_none=True)},
+                timeout,
             )
         except BaseException as exc:
             self._pipes.pop(pipe_id, None)
