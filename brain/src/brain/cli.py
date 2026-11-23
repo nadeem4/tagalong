@@ -32,6 +32,9 @@ from brain.events import Event
 from brain.identity import load_or_create_identity
 from brain.lifecycle import pid_path, stop_real_brain
 from brain.memory import Memory
+from brain.memory_bridge import NAME_PATTERN, BridgeError
+from brain.memory_bridge import pair_with_link as real_pair_memory
+from brain.memory_bridge import serve as real_serve_memory
 from brain.node.allowlist import Allowlist, NotRunnable
 from brain.node.main import HelloRefused
 from brain.node.main import run_node as real_run_node
@@ -132,6 +135,11 @@ def _parser() -> argparse.ArgumentParser:
         "signin", help="sign in to an OAuth app here, on the machine running it"
     )
     signin.add_argument("url", help="the app's HTTP MCP address")
+    memory = sub.add_parser(
+        "memory-mcp", help="share Scout's memory with this AI tool (the tool starts this itself)"
+    )
+    memory.add_argument("--client", required=True, help="this tool's name, e.g. claude-code")
+    memory.add_argument("--pair", metavar="LINK", help="pair first, with a link made in Home")
     login = sub.add_parser("login", help="log an installed expert in")
     login.add_argument("expert_id")
     return p
@@ -157,6 +165,8 @@ def main(
     run_brain: Callable[[], None] | None = None,
     run_node: Callable[[MutableMapping[str, str], Allowlist], Awaitable[None]] = real_run_node,
     node_signin: Callable[[str, Path], Awaitable[None]] = browser_sign_in,
+    serve_memory: Callable[[Path, str], Awaitable[None]] = real_serve_memory,
+    pair_memory: Callable[[Path, str, str], Awaitable[None]] = real_pair_memory,
 ) -> int:
     """Every outside thing is a parameter, so tests run on fakes. Exits 0 ok, 1 failed, 2 usage."""
     args = _parser().parse_args(argv)  # a usage error exits 2 here
@@ -188,6 +198,8 @@ def main(
             _serve(args.install_service, config, service_for(home), env, host_addr, out)
         elif args.cmd == "node":
             await _node(args, home, env, run_node, node_signin, secret, out)
+        elif args.cmd == "memory-mcp":
+            await _memory_mcp(args, home, serve_memory, pair_memory, out)
         elif args.cmd == "update":
             await _update(run, env, out)
         elif args.cmd == "key":
@@ -206,6 +218,9 @@ def main(
                 from brain.main import main as run_brain
             run_brain()
     except _Fail as err:
+        out(str(err))
+        return 1
+    except BridgeError as err:
         out(str(err))
         return 1
     except (InstallError, RegistryUnavailable, AppError) as err:
@@ -400,6 +415,17 @@ def _service(action: str, service: Service, home: Path, env, out) -> None:
         out("Installed: the brain starts at logon, with network access on for other devices.")
         out("Turned the network listener on (TAGALONG_NETWORK=1 in .env).")
         out("A brain already running gets the network listener when it restarts.")
+
+
+async def _memory_mcp(args, home: Path, serve_memory, pair_memory, out) -> None:
+    if not re.fullmatch(NAME_PATTERN, args.client):
+        raise _Fail("--client is lowercase letters, digits and - only, at most 32 characters.")
+    if args.pair:
+        await pair_memory(home, args.client, args.pair)
+        out("Paired. Add it to your AI tool, for example:")
+        out(f"  claude mcp add tagalong -- tagalong memory-mcp --client {args.client}")
+    else:
+        await serve_memory(home, args.client)
 
 
 def _stop(home: Path, stop: Callable[[Path], str], out) -> None:

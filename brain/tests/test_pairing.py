@@ -92,3 +92,13 @@ def test_failures_older_than_the_window_are_forgotten(pairing, clock):
     clock.advance(seconds=61)
     pairing.redeem("wrong", "A", "desktop", kinds=NETWORK_KINDS)
     assert pairing._db.execute("SELECT COUNT(*) FROM pair_failures").fetchone()[0] == 1
+
+
+def test_a_memory_client_code_keeps_the_personal_switch_it_was_made_with(pairing):
+    offer = pairing.make_code("mcp_client", personal=True)
+    _, token = pairing.redeem(offer.secret, "cursor", "mcp_client", kinds=NETWORK_KINDS)
+    principal = pairing._devices.verify(token)
+    assert (principal.kind, principal.personal) == ("mcp_client", True)
+    plain = pairing.make_code("mcp_client")
+    _, token = pairing.redeem(plain.secret, "codex", "mcp_client", kinds=NETWORK_KINDS)
+    assert pairing._devices.verify(token).personal is False

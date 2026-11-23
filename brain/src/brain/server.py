@@ -9,6 +9,8 @@ go to the voice seam (Session.voice); any other request answers method_not_found
 `call` runs in its own task and replies through the peer queue.
 A body that joins without a usable backlog is sent the asks still open.
 Response frames (a body's answer to `use`) go to Bodies.resolve.
+A memory client (`mcp_client`, an outside AI tool's bridge) joins with its own token, is no body,
+and may only `call` the three memory tools; its token is checked again on every call.
 """
 
 import asyncio
@@ -23,8 +25,10 @@ from pydantic import BaseModel, ValidationError
 from websockets.asyncio.server import Server, ServerConnection, serve
 from websockets.exceptions import ConnectionClosed
 
-from brain.auth import Authenticator
+from brain.auth import Authenticator, Principal
 from brain.bodies import CALLER, Bodies, WriteQueue
+from brain.devices import McpClient
+from brain.memory_mcp import MEMORY_TOOLS, call_memory_tool
 from brain.protocol import (
     LIMITS,
     PROTOCOL,
@@ -123,6 +127,7 @@ async def _handler(
     peer = _Peer()
     writer = asyncio.create_task(_writer(ws, peer))
     body_id: str | None = None
+    client_token: str | None = None  # set once a memory client has joined; it is no body
     calls: set[asyncio.Task] = set()
     listening: set[str] = set()  # holds the body id once this connection has listened
     try:
@@ -130,25 +135,42 @@ async def _handler(
             message = _parse(raw)
             if isinstance(message, str):
                 peer.send(message)
-                if body_id is None:
+                if body_id is None and client_token is None:
                     break
                 continue
             method = message.get("method")
             req_id = _usable_id(message)
-            if body_id is None:
+            if body_id is None and client_token is None:
                 if method == "pair":  # one attempt per connection, whatever the answer
                     peer.send(_pair(message, req_id, redeem))
                     break
                 if method != "hello":  # method may be None for a response
                     peer.send(_error(req_id, ErrorCode.invalid_request, "hello must come first"))
                     break
-                body_id = _hello(
+                joined = _hello(
                     message, req_id, peer, bodies, session_id, session, build, auth, addrs()
                 )
-                if body_id is None:
+                if joined is None:
                     break
+                if isinstance(joined, Principal):
+                    client_token = message["params"]["token"]
+                    continue
+                body_id = joined
                 # A new connection of this body: what an older one reported no longer holds.
                 session.presence.speech_gone(body_id)
+                continue
+            if client_token is not None:
+                if "id" in message:
+                    if method == "call":
+                        task = asyncio.create_task(
+                            _client_call(message, req_id, client_token, peer, session, auth)
+                        )
+                        calls.add(task)
+                        task.add_done_callback(calls.discard)
+                    else:
+                        peer.send(
+                            _error(req_id, ErrorCode.method_not_found, f"Unknown method: {method}")
+                        )
                 continue
             if not isinstance(method, str):
                 try:
@@ -256,10 +278,11 @@ def _hello(
     build: tuple[str, str] | None,
     auth: Authenticator,
     addrs: list[str],
-) -> str | None:
+) -> str | Principal | None:
     """Join the body and queue the result, the backlog, then any open asks it cannot have;
-    None means hello failed. The token is checked before the shape, so an unauthenticated
-    caller gets no validation text; it is never logged."""
+    None means hello failed. A memory client gets only the result and its principal back. The
+    token is checked before the shape, so an unauthenticated caller gets no validation text; it
+    is never logged."""
     raw = message.get("params")
     # Check the version first: a future protocol may change the shape, and its body
     # should learn "mismatch", not "invalid params".
@@ -278,6 +301,14 @@ def _hello(
     except ValidationError as exc:
         peer.send(_error(req_id, ErrorCode.invalid_params, str(exc)))
         return None
+    if (principal.kind == "mcp_client") != (params.body.kind == "mcp_client"):
+        # A body's token is no memory client and a client's token is no body.
+        peer.send(_error(req_id, ErrorCode.unauthorized, "That token is not for this connection"))
+        return None
+    if principal.kind == "mcp_client":
+        result = HelloResult(protocol=PROTOCOL, session=session_id, tools=[], seq=0, resync=False)
+        peer.send(_result(req_id, result))
+        return principal
     joined = bodies.connect(params.body, params.tools, peer, params.last_seq, principal)
     if joined is None:
         peer.send(_error(req_id, ErrorCode.unauthorized, "That body id belongs to another device"))
@@ -323,6 +354,46 @@ async def _call(message: dict, req_id: Any, body_id: str, peer: _Peer, session: 
         raise
     except Exception as exc:
         reply = _error(req_id, ErrorCode.tool_failed, str(exc) or type(exc).__name__)
+    peer.send(reply)
+
+
+async def _client_call(
+    message: dict, req_id: Any, token: str, peer: _Peer, session: Session, auth: Authenticator
+) -> None:
+    """A memory client's call, through the toolbox gate as `mcp:<client>`. The token is checked
+    again so a client revoked while connected is refused on its next call."""
+    try:
+        principal = auth.identify(token)
+        if principal is None:
+            raise RpcError(ErrorCode.unauthorized, "Unknown or revoked token")
+        try:
+            params = CallParams.model_validate(message.get("params"))
+        except ValidationError:
+            raise RpcError(
+                ErrorCode.invalid_params, "call needs a tool and an input object."
+            ) from None
+        if params.tool not in MEMORY_TOOLS:
+            raise RpcError(ErrorCode.unknown_tool, f"No tool named {params.tool}.")
+        who = McpClient(principal.device_id or "", principal.name, principal.personal)
+        out = await call_memory_tool(
+            session.toolbox,
+            session.guards,
+            who,
+            params.tool,
+            params.input,
+            f"memory client {who.name}",
+        )
+        text = out.content[0].text
+        if out.is_error:
+            raise RpcError(ErrorCode.tool_failed, text)
+        reply = _result(req_id, CallResult(output=[{"type": "text", "text": text}]))
+    except RpcError as exc:
+        reply = _error(req_id, exc.code, str(exc))
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        log.exception("handler failed for a memory call")
+        reply = _error(req_id, ErrorCode.internal_error, "Internal error")
     peer.send(reply)
 
 

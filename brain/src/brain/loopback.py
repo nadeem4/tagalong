@@ -1,6 +1,4 @@
-"""An ASGI app served on 127.0.0.1 only, for the brain's two MCP servers (the experts' bridge and
-the memory endpoint). Port 0 lets the system pick one.
-"""
+"""An ASGI app served on 127.0.0.1 only, for the experts' MCP bridge. The system picks the port."""
 
 import asyncio
 import contextlib
@@ -16,15 +14,10 @@ class _Server(uvicorn.Server):
 
 
 @contextlib.asynccontextmanager
-async def serve_loopback(app, port: int = 0):
-    """Serve `app` until the block ends; yields the port it listens on. Raises OSError when the
-    port is taken."""
+async def serve_loopback(app):
+    """Serve `app` until the block ends; yields the port it listens on."""
     sock = socket.socket()
-    try:
-        sock.bind(("127.0.0.1", port))
-    except OSError:
-        sock.close()
-        raise
+    sock.bind(("127.0.0.1", 0))
     config = uvicorn.Config(
         app, interface="asgi3", log_level="warning", lifespan="off", access_log=False
     )

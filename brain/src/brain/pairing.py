@@ -27,7 +27,8 @@ FAILURE_WINDOW = timedelta(minutes=1)
 MAX_FAILURES = 5
 PAIR_KINDS = ("desktop", "node", "browser")
 LOOPBACK_KINDS = frozenset({"browser"})
-NETWORK_KINDS = frozenset(PAIR_KINDS) - LOOPBACK_KINDS
+# A memory client pairs from a link made in Home, not from `tagalong pair`, so it is no PAIR_KIND.
+NETWORK_KINDS = frozenset(PAIR_KINDS) - LOOPBACK_KINDS | {"mcp_client"}
 
 
 @dataclass(frozen=True)
@@ -58,7 +59,7 @@ class Pairing:
         self._now = now
         self._addr = addr
 
-    def make_code(self, kind: str = "desktop") -> PairOffer:
+    def make_code(self, kind: str = "desktop", personal: bool = False) -> PairOffer:
         now = self._now()
         store.delete_expired_codes(self._db, now)
         secret = (
@@ -71,6 +72,7 @@ class Pairing:
             secret_hash=hash_secret(secret),
             kind=kind,
             expires_at=expires_at,
+            personal=personal,
         )
         query = urlencode(
             {"addr": self._addr(), "fp": self._identity.fingerprint, "code": secret},
@@ -88,8 +90,13 @@ class Pairing:
         store.delete_old_failures(self._db, since)
         if store.count_recent_failures(self._db, since) >= MAX_FAILURES:
             return None
-        if kind in kinds and store.redeem_pair_code(self._db, hash_secret(code), kind, now):
-            return self._devices.create(name, kind)
+        spent = (
+            store.redeem_pair_code(self._db, hash_secret(code), kind, now)
+            if kind in kinds
+            else None
+        )
+        if spent is not None:
+            return self._devices.create(name, kind, personal=bool(spent[0]))
         store.record_failure(self._db, now)
         return None
 

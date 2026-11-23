@@ -22,24 +22,15 @@ def insert_device(
     )
 
 
-def device_by_token_hash(db: sqlite3.Connection, token_hash: str) -> tuple[str, str, str] | None:
-    """(id, name, kind) of the live body device holding this token; a client of the memory
-    endpoint is not one."""
-    return db.execute(
-        "SELECT id, name, kind FROM devices WHERE token_hash=? AND revoked_at IS NULL"
-        " AND kind != 'mcp_client'",
-        (token_hash,),
-    ).fetchone()
-
-
-def client_by_token_hash(db: sqlite3.Connection, token_hash: str) -> tuple[str, str, bool] | None:
-    """(id, name, personal) of the live memory client holding this token."""
+def device_by_token_hash(
+    db: sqlite3.Connection, token_hash: str
+) -> tuple[str, str, str, bool] | None:
+    """(id, name, kind, personal) of the live device holding this token."""
     row = db.execute(
-        "SELECT id, name, personal FROM devices WHERE token_hash=? AND revoked_at IS NULL"
-        " AND kind='mcp_client'",
+        "SELECT id, name, kind, personal FROM devices WHERE token_hash=? AND revoked_at IS NULL",
         (token_hash,),
     ).fetchone()
-    return None if row is None else (row[0], row[1], bool(row[2]))
+    return None if row is None else (row[0], row[1], row[2], bool(row[3]))
 
 
 def list_devices(db: sqlite3.Connection) -> list[dict]:
@@ -66,24 +57,31 @@ def touch_device(db: sqlite3.Connection, id: str, now: str) -> None:
 
 
 def insert_pair_code(
-    db: sqlite3.Connection, *, id: str, secret_hash: str, kind: str, expires_at: str
+    db: sqlite3.Connection,
+    *,
+    id: str,
+    secret_hash: str,
+    kind: str,
+    expires_at: str,
+    personal: bool = False,
 ) -> None:
     db.execute(
-        "INSERT INTO pair_codes(id, secret_hash, kind, expires_at) VALUES (?, ?, ?, ?)",
-        (id, secret_hash, kind, expires_at),
+        "INSERT INTO pair_codes(id, secret_hash, kind, expires_at, personal)"
+        " VALUES (?, ?, ?, ?, ?)",
+        (id, secret_hash, kind, expires_at, personal),
     )
 
 
-def redeem_pair_code(db: sqlite3.Connection, secret_hash: str, kind: str, now: str) -> bool:
-    """Spend the code in the same statement that finds it, so two redeems cannot both win."""
-    return (
-        db.execute(
-            "UPDATE pair_codes SET used_at=? WHERE secret_hash=? AND kind=? AND used_at IS NULL"
-            " AND expires_at>?",
-            (now, secret_hash, kind, now),
-        ).rowcount
-        > 0
-    )
+def redeem_pair_code(
+    db: sqlite3.Connection, secret_hash: str, kind: str, now: str
+) -> tuple[bool] | None:
+    """Spend the code in the same statement that finds it, so two redeems cannot both win.
+    Returns (personal,) of the code, or None when it is unknown, used, expired or another kind."""
+    return db.execute(
+        "UPDATE pair_codes SET used_at=? WHERE secret_hash=? AND kind=? AND used_at IS NULL"
+        " AND expires_at>? RETURNING personal",
+        (now, secret_hash, kind, now),
+    ).fetchone()
 
 
 def delete_expired_codes(db: sqlite3.Connection, now: str) -> None:

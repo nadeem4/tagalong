@@ -1,29 +1,22 @@
-"""Scout's memory for other AI tools: an MCP server on loopback at /mcp/memory.
+"""Scout's memory for other AI tools: the three tools a memory client (a `devices` row of kind
+`mcp_client`) or an expert may call, reached over the brain's websocket through the bridge in
+memory_bridge.py.
 
-A client the owner made in Home holds a bearer token (a `devices` row of kind `mcp_client`, only
-its hash kept; revoking it ends the next call). Its three tools are toolbox tools of audience
-mcp and expert, so every call passes the gate as caller `mcp:<client>` and its answer is masked.
-There is no forget: another tool never deletes what Scout remembers. What a client writes is
-labelled with its name, and chat, summaries and (without the switch) personal facts never leave.
+They are toolbox tools of audience mcp and expert, so every call passes the gate as caller
+`mcp:<client>` and its answer is masked. There is no forget: another tool never deletes what
+Scout remembers. What a client writes is labelled with its name, and chat, summaries and
+(without the switch) personal facts never leave.
 """
 
-import asyncio
 import json
 import logging
 import uuid
-from collections.abc import Callable
-from contextlib import AsyncExitStack
 from contextvars import ContextVar
 
 from mcp import types
-from mcp.server import Server
-from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
-from mcp.server.transport_security import TransportSecuritySettings
-from starlette.responses import PlainTextResponse
 
-from brain.devices import Devices, McpClient
+from brain.devices import McpClient
 from brain.guards import Guards
-from brain.loopback import serve_loopback
 from brain.masking import mask_json
 from brain.memory import Memory
 from brain.mind.turn import Call
@@ -35,7 +28,6 @@ from brain.tools import Notify, format_hits
 
 log = logging.getLogger("brain")
 
-PATH = "/mcp/memory"
 LIST_MAX = 200
 # What the client calls each tool, and the toolbox name behind it (Scout has its own `recall`).
 MEMORY_TOOLS = {
@@ -44,6 +36,45 @@ MEMORY_TOOLS = {
     "list_memories": "memory_list",
 }
 _AUDIENCE = frozenset({"mcp", "expert"})
+
+MEMORY_SPECS = {
+    "memory_recall": ToolSpec(
+        "memory_recall",
+        "Search what Scout remembers about the owner. Returns matching memories.",
+        {
+            "type": "object",
+            "properties": {"query": {"type": "string"}},
+            "required": ["query"],
+        },
+        _AUDIENCE,
+        effect="read",
+    ),
+    "memory_remember": ToolSpec(
+        "memory_remember",
+        "Save a short note about the owner for Scout to keep. It is shown to Scout as "
+        "told by you, not as the owner's own words.",
+        {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string"},
+                "tag": {
+                    "type": "string",
+                    "description": "Topic of the note, e.g. work or skills.",
+                },
+            },
+            "required": ["text"],
+        },
+        _AUDIENCE,
+        tier=Tier.locked,  # the text is an outside tool's, so only the owner may allow it
+    ),
+    "memory_list": ToolSpec(
+        "memory_list",
+        "List Scout's memories, newest first.",
+        {"type": "object", "properties": {}},
+        _AUDIENCE,
+        effect="read",
+    ),
+}
 
 # Who is calling, for the handler: the toolbox passes a tool's arguments and nothing else.
 CLIENT: ContextVar[McpClient | None] = ContextVar("memory_client", default=None)
@@ -95,51 +126,9 @@ def memory_client_tools(memory: Memory, notify: Notify) -> list[tuple[ToolSpec, 
         )
 
     return [
-        (
-            ToolSpec(
-                "memory_recall",
-                "Search what Scout remembers about the owner. Returns matching memories.",
-                {
-                    "type": "object",
-                    "properties": {"query": {"type": "string"}},
-                    "required": ["query"],
-                },
-                _AUDIENCE,
-                effect="read",
-            ),
-            recall,
-        ),
-        (
-            ToolSpec(
-                "memory_remember",
-                "Save a short note about the owner for Scout to keep. It is shown to Scout as "
-                "told by you, not as the owner's own words.",
-                {
-                    "type": "object",
-                    "properties": {
-                        "text": {"type": "string"},
-                        "tag": {
-                            "type": "string",
-                            "description": "Topic of the note, e.g. work or skills.",
-                        },
-                    },
-                    "required": ["text"],
-                },
-                _AUDIENCE,
-                tier=Tier.locked,  # the text is an outside tool's, so only the owner may allow it
-            ),
-            remember,
-        ),
-        (
-            ToolSpec(
-                "memory_list",
-                "List Scout's memories, newest first.",
-                {"type": "object", "properties": {}},
-                _AUDIENCE,
-                effect="read",
-            ),
-            list_memories,
-        ),
+        (MEMORY_SPECS["memory_recall"], recall),
+        (MEMORY_SPECS["memory_remember"], remember),
+        (MEMORY_SPECS["memory_list"], list_memories),
     ]
 
 
@@ -191,87 +180,3 @@ async def call_memory_tool(
     finally:
         CLIENT.reset(token)
     return reply(out if isinstance(out, str) else "")
-
-
-class MemoryMcp:
-    def __init__(
-        self, devices: Devices, toolbox: Callable[[], Toolbox], guards: Guards, port: int
-    ) -> None:
-        self._devices = devices
-        self._toolbox = toolbox
-        self._guards = guards
-        self._port = port
-        self._stack = AsyncExitStack()
-        self._stop = asyncio.Event()
-        self._holding: asyncio.Task | None = None
-        self.url = ""
-        self._manager = StreamableHTTPSessionManager(
-            Server(
-                "tagalong-memory",
-                on_list_tools=lambda ctx, params: self._list(),
-                on_call_tool=lambda ctx, params: self._call(
-                    ctx.request.scope["memory_client"], params
-                ),
-            ),
-            json_response=True,
-            stateless=True,
-            # Keeps a web page from reaching this port through the owner's browser (DNS rebinding).
-            security_settings=TransportSecuritySettings(
-                allowed_hosts=["127.0.0.1:*", "localhost:*"],
-                allowed_origins=["http://127.0.0.1:*", "http://localhost:*"],
-            ),
-        )
-
-    async def start(self) -> None:
-        """Raises OSError when the port is taken; the brain then runs without this endpoint."""
-        ready = asyncio.Event()
-        # The manager's task group must start and end in one task, so a task owns it.
-        self._holding = asyncio.create_task(self._hold(ready))
-        await ready.wait()
-        try:
-            port = await self._stack.enter_async_context(serve_loopback(self._asgi, self._port))
-        except OSError:
-            await self.stop()
-            raise
-        self.url = f"http://127.0.0.1:{port}{PATH}"
-
-    async def stop(self) -> None:
-        await self._stack.aclose()
-        self._stop.set()
-        if self._holding is not None:
-            await self._holding
-
-    async def _hold(self, ready: asyncio.Event) -> None:
-        async with self._manager.run():
-            ready.set()
-            await self._stop.wait()
-
-    async def _asgi(self, scope, receive, send) -> None:
-        if scope["type"] != "http":
-            return
-        sent = dict(scope["headers"]).get(b"authorization", b"")
-        token = sent[7:].decode("utf-8", "replace") if sent.startswith(b"Bearer ") else ""
-        if scope["path"] != PATH:
-            await PlainTextResponse("not found", 404)(scope, receive, send)
-            return
-        client = self._devices.client(token) if token else None
-        if client is None:
-            await PlainTextResponse("unauthorized", 401)(scope, receive, send)
-            return
-        scope["memory_client"] = client
-        await self._manager.handle_request(scope, receive, send)
-
-    async def _list(self) -> types.ListToolsResult:
-        return types.ListToolsResult(tools=list_memory_tools(self._toolbox()))
-
-    async def _call(
-        self, client: McpClient, params: types.CallToolRequestParams
-    ) -> types.CallToolResult:
-        return await call_memory_tool(
-            self._toolbox(),
-            self._guards,
-            client,
-            params.name,
-            params.arguments or {},
-            f"memory client {client.name}",
-        )

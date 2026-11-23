@@ -13,9 +13,10 @@ from typing import Protocol
 class Principal:
     key: str  # "local" or "device:<id>"; a body id is bound to this
     name: str
-    kind: str  # "local" | desktop | browser | node
+    kind: str  # "local" | desktop | browser | node | mcp_client
     local: bool
     device_id: str | None = None
+    personal: bool = False  # an mcp_client that may read the facts the owner keeps back
 
 
 class DeviceCheck(Protocol):
