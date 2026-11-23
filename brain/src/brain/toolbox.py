@@ -150,7 +150,12 @@ class BrainSource:
 # "still installing". Raise this together with the desktop constant.
 INSTALL_OCR_TIMEOUT_S = 660.0
 # Tools whose body-side work legitimately runs long. Every other tool keeps Bodies.use's 30 s.
-BODY_TOOL_TIMEOUTS = {"install_ocr_language": INSTALL_OCR_TIMEOUT_S}
+# The desktop stops connect_ai_tool's work at 50 s and answers by 60 s; the brain waits longer.
+CONNECT_AI_TOOL_TIMEOUT_S = 90.0
+BODY_TOOL_TIMEOUTS = {
+    "install_ocr_language": INSTALL_OCR_TIMEOUT_S,
+    "connect_ai_tool": CONNECT_AI_TOOL_TIMEOUT_S,
+}
 
 SEP = "__"  # joins body id and tool name; bodies may not use it in tool names
 

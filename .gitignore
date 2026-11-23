@@ -13,6 +13,7 @@ bodies/desktop/dist/
 bodies/desktop/out/
 bodies/desktop/build/*
 !bodies/desktop/build/installer.nsh
+!bodies/desktop/build/tagalong.cmd
 
 # env & secrets
 .env

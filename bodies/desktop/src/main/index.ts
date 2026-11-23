@@ -7,7 +7,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import type { IpcMainInvokeEvent } from 'electron';
 import {
   BrowserWindow,
@@ -55,10 +55,13 @@ import { createNodeRunner } from './node/runner';
 import { registerPairIpc } from './ipc/pair';
 import { registerBrainServiceIpc } from './ipc/brain-service';
 import { startingGate } from './brain/starting-gate';
-import { homedir, hostname } from 'node:os';
+import { homedir, hostname, userInfo } from 'node:os';
+import { connectAiTool } from './tools/connect-ai-tool';
+import { runCommand } from './tools/run-command';
 import { ownBuild } from './brain/build-id';
 import {
   brainLogPath,
+  localBrainAddr,
   dataDir as brainDataDir,
   realLaunch,
   realRestartService,
@@ -357,6 +360,27 @@ async function start(): Promise<void> {
       folders: () => desktop?.settings.fileFolders ?? settings.fileFolders,
       trash: (path) => shell.trashItem(path),
     },
+    connectAiTool: connectAiTool({
+      home: () => brainDataDir(process.env, homedir()),
+      brain: () => {
+        const paired = link.paired();
+        return paired === null
+          ? { addr: localBrainAddr(process.env), fingerprint: null }
+          : { addr: paired.lastGood ?? paired.addrs[0] ?? '', fingerprint: paired.fp };
+      },
+      run: runCommand,
+      // The installer's PATH entry reaches this process only after a restart, so the check
+      // starts the shim by its path.
+      tagalong: app.isPackaged
+        ? { command: `"${join(dirname(process.execPath), 'tagalong.cmd')}"`, args: [] }
+        : {
+            command: 'uv',
+            args: ['run', '--no-sync', '--project', `"${brainRun().brainDir}"`, 'tagalong'],
+          },
+      cursorConfig: join(homedir(), '.cursor', 'mcp.json'),
+      windows: process.platform === 'win32',
+      user: userInfo().username,
+    }),
     reading: {
       detect: detectReadingStatus,
       install: (language) => installOcrLanguage(runPowerShellScript, language),

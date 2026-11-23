@@ -16,6 +16,10 @@ import type { NodeChild } from '../node/runner';
 
 const DEFAULT_ADDR = '127.0.0.1:47321';
 
+/** The address the brain is dialed at when no remote brain is paired. */
+export const localBrainAddr = (env: NodeJS.ProcessEnv): string =>
+  env.TAGALONG_BRAIN_ADDR ?? DEFAULT_ADDR;
+
 export type SetupState = 'idle' | 'installing' | 'failed';
 
 export interface LaunchOptions {
@@ -229,7 +233,7 @@ export async function launchBrain(options: LaunchOptions): Promise<void> {
   const { openLog, closeLog, probe } = options;
   const { exists, spawn } = options;
   const { log, remote } = options;
-  const addr = env.TAGALONG_BRAIN_ADDR ?? DEFAULT_ADDR;
+  const addr = localBrainAddr(env);
   if (env.TAGALONG_START_BRAIN === '0' || remote() || !isLocal(addr)) return;
   if (!exists(join(brainDir, 'pyproject.toml'))) return;
   if (await probe(addr)) return;

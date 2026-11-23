@@ -43,7 +43,7 @@ from brain.loops.service import LoopService
 from brain.loops.store import LoopStore
 from brain.loops.tools import loop_tools
 from brain.masking import Masker, SecretLogFilter, mask_json
-from brain.mcp_client_tools import mcp_client_tools
+from brain.mcp_client_tools import connect_ai_tool_tools, mcp_client_tools
 from brain.memory import Memory
 from brain.memory_mcp import memory_client_tools
 from brain.mind.turn import AnthropicModel
@@ -338,6 +338,7 @@ async def _run() -> None:
         + device_tools(devices, pairing, config.network)
         + memory_client_tools(memory, bodies.notify)
         + mcp_client_tools(devices, pairing, config.network)
+        + connect_ai_tool_tools(devices, bodies)
         + bodies_tools(
             bodies, lambda: bridges, config.data_dir, os.environ, bodies.notify, secrets.clear
         )

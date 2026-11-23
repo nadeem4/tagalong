@@ -54,7 +54,26 @@
   !insertmacro tagalongStopBrain uninstall
 !macroend
 
+; `tagalong` on the user's own PATH (HKCU, no admin), so an AI tool can start the memory bridge.
+; The folder reaches PowerShell through the environment, never inside its script text, so an
+; apostrophe in the path is harmless. The value is read unexpanded and written back as
+; REG_EXPAND_SZ so entries such as %USERPROFILE%\bin survive. Terminals opened before the
+; install need reopening.
+!macro tagalongUserPath op
+  System::Call 'Kernel32::SetEnvironmentVariable(t "TAGALONG_DIR", t "$INSTDIR")'
+  System::Call 'Kernel32::SetEnvironmentVariable(t "TAGALONG_PATH_OP", t "${op}")'
+  nsExec::Exec `powershell -NoProfile -NonInteractive -Command "$$k=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment',$$true); $$p=[string]$$k.GetValue('Path','',[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames); $$d=$$env:TAGALONG_DIR; $$r=@($$p -split ';' | Where-Object { $$_ -and $$_ -ne $$d }); if($$env:TAGALONG_PATH_OP -eq 'add'){ $$r+=$$d }; $$k.SetValue('Path',($$r -join ';'),[Microsoft.Win32.RegistryValueKind]::ExpandString)"`
+  Pop $0
+  ; A registry write does not tell running programs; this broadcast does, so new windows see it.
+  System::Call 'user32::SendMessageTimeoutW(i 0xffff, i 0x1A, i 0, t "Environment", i 2, i 5000, *i .r0)'
+!macroend
+
+!macro customInstall
+  !insertmacro tagalongUserPath add
+!macroend
+
 !macro customUnInstall
   nsExec::Exec 'schtasks /Delete /TN "TagalongBrain" /F'
   Pop $0
+  !insertmacro tagalongUserPath remove
 !macroend

@@ -67,6 +67,9 @@ function setup(
     }),
     ...readingOverrides,
   };
+  const connectAiTool = vi.fn(async (_input: Record<string, unknown>) => [
+    { type: 'text' as const, text: 'connected' },
+  ]);
   const tools = bodyTools(
     platform as unknown as Platform,
     () => exclusions,
@@ -74,8 +77,9 @@ function setup(
     openExternal,
     { folders: () => [], trash },
     reading,
+    connectAiTool,
   );
-  return { platform, onCapture, openExternal, trash, reading, order, ...tools };
+  return { connectAiTool, platform, onCapture, openExternal, trash, reading, order, ...tools };
 }
 
 describe('bodyTools declarations', () => {
@@ -112,6 +116,15 @@ describe('bodyTools declarations', () => {
       ['write_file', 'change'],
       ['install_ocr_language', 'change'],
     ]);
+  });
+});
+
+describe('connect_ai_tool', () => {
+  it('runs for the brain but is never declared, so the model cannot call it', async () => {
+    const { tools, run, connectAiTool } = setup();
+    expect(tools.map((t) => t.name)).not.toContain('connect_ai_tool');
+    await run('connect_ai_tool', { tool: 'codex', token: 't' });
+    expect(connectAiTool).toHaveBeenCalledWith({ tool: 'codex', token: 't' });
   });
 });
 

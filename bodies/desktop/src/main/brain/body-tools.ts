@@ -15,6 +15,7 @@ import type { Platform } from '../platform/index';
 import { RpcError } from '@tagalong/contract';
 import { fileTools, type FileDeps } from '../tools/files';
 import { INSTALL_TIMEOUT_MS, type InstallResult } from '../platform/ocr-install';
+import { CONNECT_BUDGET_MS } from '../tools/connect-ai-tool';
 import { DETECT_TIMEOUT_MS } from '../platform/reading-status';
 import type { ReadingStatus } from '../platform/reading-status';
 
@@ -24,13 +25,11 @@ import type { ReadingStatus } from '../platform/reading-status';
  */
 const DEFAULT_WINDOW_TEXT_CHARS = 8_000;
 const RUN_TIMEOUT_MS = 15_000;
-/**
- * Tools that may outlast the usual limit. The install gives up at INSTALL_TIMEOUT_MS with
- * "still installing"; this limit sits above it (room for the re-check) so that answer always
- * comes first, and the brain's own wait sits above this one.
- */
 /** Install limit, plus the re-check that follows it, plus slack. The brain's wait must exceed it. */
 export const INSTALL_TOOL_TIMEOUT_MS = INSTALL_TIMEOUT_MS + DETECT_TIMEOUT_MS + 10_000;
+
+/** The connect tool stops its own work at CONNECT_BUDGET_MS; this limit sits above it. */
+export const CONNECT_TOOL_TIMEOUT_MS = CONNECT_BUDGET_MS + 10_000;
 
 const TOOL_TIMEOUTS: Record<string, number> = {
   install_ocr_language: INSTALL_TOOL_TIMEOUT_MS,
@@ -239,6 +238,8 @@ function text(value: string): Part[] {
   return [{ type: 'text', text: value }];
 }
 
+export type ConnectAiTool = (input: Record<string, unknown>) => Promise<Part[]>;
+
 export function bodyTools(
   platform: Platform,
   exclusions: () => CaptureExclusions,
@@ -246,6 +247,7 @@ export function bodyTools(
   openExternal: (url: string) => Promise<void>,
   files: FileDeps,
   reading: ReadingDeps,
+  connectAiTool: ConnectAiTool,
 ): { tools: Tool[]; run: (tool: string, input: Record<string, unknown>) => Promise<Part[]> } {
   const announce = (blocked: CaptureBlock | null) =>
     onCapture(captureNotice({ at: new Date(), screenshot: true, blocked, paused: false }));
@@ -342,9 +344,14 @@ ${JSON.stringify(status)}`);
     ...fileTools(files),
     install_ocr_language: installOcrLanguage,
   };
+  // Answered but never declared in `hello`: only the brain's own tools call these, never the model.
+  const brainOnly: Record<string, { handler: ConnectAiTool; timeoutMs: number }> = {
+    connect_ai_tool: { handler: connectAiTool, timeoutMs: CONNECT_TOOL_TIMEOUT_MS },
+  };
 
   async function run(tool: string, input: Record<string, unknown>): Promise<Part[]> {
-    const handler = handlers[tool];
+    const hidden = brainOnly[tool];
+    const handler = hidden?.handler ?? handlers[tool];
     if (handler === undefined) throw new RpcError(ErrorCode.unknown_tool, 'unknown tool');
     // The platform has no abort, so a call may finish after the timeout reply; a late OCR
     // read still raises the capture notice, which is the honest record of it.
@@ -352,7 +359,7 @@ ${JSON.stringify(status)}`);
     const timeout = new Promise<never>((_, reject) => {
       timer = setTimeout(
         () => reject(new RpcError(ErrorCode.timeout, `${tool} took too long`)),
-        TOOL_TIMEOUTS[tool] ?? RUN_TIMEOUT_MS,
+        hidden?.timeoutMs ?? TOOL_TIMEOUTS[tool] ?? RUN_TIMEOUT_MS,
       );
     });
     try {
