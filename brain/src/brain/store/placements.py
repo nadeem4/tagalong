@@ -1,4 +1,7 @@
-"""SQL for where an expert or app runs."""
+"""SQL for where an expert or app runs.
+
+One row per placed name; placements.py resolves a row against the connected bodies.
+"""
 
 import sqlite3
 
