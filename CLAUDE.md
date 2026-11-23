@@ -20,7 +20,7 @@ Before a push only the lines matching the changed files run (`scripts/check_pr.p
 
 Check [brain/*, protocol/*]: cd brain && uv run ruff check && uv run ruff format --check && uv run pytest --testmon -q
 Check [protocol/*, bodies/*]: pnpm typecheck && pnpm lint && pnpm format:check && pnpm exec vitest run --changed origin/main
-Check [Dockerfile, .dockerignore, install/*, docs/*, *.md, .github/*, .githooks/*, scripts/*, .gitignore, .prettierignore]: none
+Check [Dockerfile, .dockerignore, .env.example, install/*, docs/*, *.md, .github/*, .githooks/*, scripts/*, .gitignore, .prettierignore]: none
 
 Release targets: none (the Windows installer ships by pushing a v* tag; release.yml builds it)
 
