@@ -132,6 +132,7 @@ async def test_a_second_client_is_labelled_with_its_own_name(rig):
     async with Client(rig, b) as s:
         await s.call_tool("remember", {"text": "two"})
     assert sources(rig) == ["mcp:Claude Code", "mcp:Cursor"]
+    assert rig.changed == [{"what": "memory"}, {"what": "memory"}]
 
 
 async def test_a_personal_memory_stays_home_unless_the_client_is_allowed(rig):
