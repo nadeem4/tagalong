@@ -65,7 +65,7 @@ The relay (`node/relay.py`) sends the bearer, or uses the stored OAuth tokens (r
 
 ## Not supported yet
 
-- A node or browser add-on proxy to the brain's memory endpoint (BA10, not built): tools on the person's PC would reach a remote brain's `/mcp/memory` only through a node-side listener and new node-to-brain HTTP frames, which have no design yet. Use the endpoint on the brain's own machine.
+- Other AI tools on the person's PC reach a remote brain's memory without a node: `tagalong memory-mcp` (BA11) dials the brain itself over the same pinned `wss` link a body uses, as an `mcp_client` (see [Memory for other AI tools](../data/memory.md#memory-for-other-ai-tools)).
 - An app that stays on a remote brain cannot sign in from the person's PC: the node would have to forward the OAuth code to the brain, which needs a new contract frame and has no design yet. Sign in on the machine the brain runs on, or place the app on the node.
 - The brain does not install an expert on a node: it runs the expert's installed command there once the person has approved it. Both the toolbox's use (an app's stdio MCP server, [Where an app runs](../bodies/connected-apps.md#where-an-app-runs)) and the expert host's use ([Where an expert runs](experts.md#where-an-expert-runs)) go over a pipe.
 

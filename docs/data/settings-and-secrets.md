@@ -88,7 +88,6 @@ variable. "Positive" means at least 1.
 | `TAGALONG_HOME`                                                  | `~/.tagalong`             | brain, desktop (`launch.ts`)    | The data folder; only the real environment can set it, since `.env` lives inside it |
 | `TAGALONG_BRAIN_ADDR`                                            | `127.0.0.1:47321`         | brain, desktop, WhatsApp bridge | Where the brain listens and where bodies dial                                       |
 | `TAGALONG_NETWORK`                                               | off                       | brain                           | `1` adds an encrypted (wss) listener for bodies on other devices                    |
-| `TAGALONG_MCP_PORT`                                              | `47324`                   | brain                           | Loopback port of the memory endpoint for other AI tools                             |
 | `TAGALONG_NETWORK_PORT`                                          | `47323`                   | brain                           | Port of that listener                                                               |
 | `TAGALONG_PUBLIC_HOST`                                           | unset                     | brain, `tagalong`               | Address in the pairing link instead of the LAN address (behind Docker)              |
 | `TAGALONG_LOCAL_TOKEN`                                           | none                      | WhatsApp bridge                 | The brain's local token, passed to the bridge it starts; never set by hand          |
