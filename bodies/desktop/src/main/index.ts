@@ -51,6 +51,7 @@ import { startBrain } from './brain/start';
 import { bonjourBrowse, discoverBrains } from './brain/discover';
 import { LinkStore } from './brain/link-store';
 import { pinnedSocket } from './brain/pinned-socket';
+import { createNodeRunner } from './node/runner';
 import { registerPairIpc } from './ipc/pair';
 import { registerBrainServiceIpc } from './ipc/brain-service';
 import { startingGate } from './brain/starting-gate';
@@ -62,6 +63,7 @@ import {
   realLaunch,
   realRestartService,
   realRunTagalong,
+  realSpawnNode,
   realStop,
 } from './brain/launch';
 import type { RealLaunch } from './brain/launch';
@@ -183,6 +185,8 @@ interface Desktop {
 let desktop: Desktop | null = null;
 /** The brain link as last reported, for the ask handler's choice of words. */
 let brainStatus: BrainStatus = 'connecting';
+/** Runs the node while this desktop is paired to a remote brain. */
+let nodeRunner: ReturnType<typeof createNodeRunner> | null = null;
 /** Starts the brain (installing it first when packaged) and holds the setup state Home shows. */
 const brainRun = (): RealLaunch => ({
   brainDir: app.isPackaged
@@ -279,6 +283,7 @@ app.on('before-quit', () => {
   stopPresence();
   stopFocusWatch();
   desktop?.brain.stop();
+  nodeRunner?.stop();
 });
 
 async function start(): Promise<void> {
@@ -400,6 +405,7 @@ async function start(): Promise<void> {
     onHello: (hello) => void brainControl?.check(hello),
     onStatus: (status) => {
       brainStatus = status;
+      nodeRunner?.sync();
       markBrainLink(statusMarks, status);
       if (status === 'online') void chatSync.online();
       // A listening session open when the link dropped asks the new connection to listen.
@@ -421,6 +427,14 @@ async function start(): Promise<void> {
       }
     },
   });
+
+  const bodyId = readOrMakeBodyId(settingsStore);
+  nodeRunner = createNodeRunner({
+    link,
+    nodeId: bodyId.replace(/^desktop-/, 'node-'),
+    spawn: (env) => realSpawnNode(brainRun(), env),
+  });
+  nodeRunner.sync();
 
   const run = brainRun();
   brainControl = createBrainStatus({
