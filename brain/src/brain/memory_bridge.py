@@ -2,10 +2,6 @@
 and stops itself. It holds no memory: each tool call dials the brain, says hello as a client of
 kind `mcp_client` with its own token, forwards the call and returns the brain's answer, so the
 brain's permission engine, masking and source labels apply as they do to every other caller.
-
-The link file `<TAGALONG_HOME>/memory-clients/<name>.json` holds the brain's address, the pinned
-certificate fingerprint (null for the brain's own machine, which is reached over loopback ws)
-and the client's token.
 """
 
 import asyncio
@@ -24,6 +20,7 @@ from websockets.exceptions import ConnectionClosed
 
 from brain.link import dial, hello_params, request
 from brain.memory_mcp import MEMORY_SPECS, MEMORY_TOOLS, as_mcp_tool
+from brain.private_file import write_private
 from brain.protocol import ErrorCode
 
 REPLY_TIMEOUT = 10
@@ -42,6 +39,8 @@ class BridgeError(Exception):
 
 
 def link_path(home: Path, name: str) -> Path:
+    """The link file holds the brain's address, the pinned certificate fingerprint (null for the
+    brain's own machine, reached over loopback ws) and the client's token."""
     return home / "memory-clients" / f"{name}.json"
 
 
@@ -56,9 +55,7 @@ def load_link(home: Path, name: str) -> BridgeLink:
 
 
 def save_link(home: Path, name: str, link: BridgeLink) -> None:
-    path = link_path(home, name)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(asdict(link)), encoding="utf-8")
+    write_private(link_path(home, name), json.dumps(asdict(link)))
 
 
 async def _reply(ws: Any, req_id: int) -> dict:
@@ -75,11 +72,15 @@ async def call_brain(link: BridgeLink, name: str, tool: str, args: dict, connect
         ws = await connect_to(link.addr, link.fingerprint)
         async with ws:
             await ws.send(request(1, "hello", hello_params(link.token, name, "mcp_client", name)))
-            if "error" in await asyncio.wait_for(_reply(ws, 1), REPLY_TIMEOUT):
-                raise BridgeError(
-                    "The brain refused this AI tool; its access may have been revoked. Make a "
-                    "new link in Home and pair again."
-                )
+            refused = await asyncio.wait_for(_reply(ws, 1), REPLY_TIMEOUT)
+            if "error" in refused:
+                error = refused["error"]
+                if error.get("code") == ErrorCode.unauthorized:
+                    raise BridgeError(
+                        "The brain refused this AI tool; its access may have been revoked. Make "
+                        "a new link in Home and pair again."
+                    )
+                raise BridgeError(str(error.get("message", "The brain refused this AI tool.")))
             await ws.send(request(2, "call", {"tool": tool, "input": args}))
             answer = await asyncio.wait_for(_reply(ws, 2), REPLY_TIMEOUT)
     except ssl.SSLError:

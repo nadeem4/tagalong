@@ -362,7 +362,7 @@ async def _client_session(
             if method != "call":
                 peer.send(_error(req_id, ErrorCode.method_not_found, f"Unknown method: {method}"))
                 continue
-            task = asyncio.create_task(_run_call(message, req_id, peer, run))
+            task = asyncio.create_task(_run_call(message, req_id, peer, run, hide_errors=True))
             calls.add(task)
             task.add_done_callback(calls.discard)
     finally:
@@ -371,7 +371,11 @@ async def _client_session(
 
 
 async def _run_call(
-    message: dict, req_id: Any, peer: _Peer, run: Callable[[CallParams], Awaitable[str]]
+    message: dict,
+    req_id: Any,
+    peer: _Peer,
+    run: Callable[[CallParams], Awaitable[str]],
+    hide_errors: bool = False,
 ) -> None:
     """Run a tool call in its own task so a slow one never blocks the read loop, which must
     keep delivering `use` responses and answers."""
@@ -392,7 +396,11 @@ async def _run_call(
     except asyncio.CancelledError:
         raise
     except Exception as exc:
-        reply = _error(req_id, ErrorCode.tool_failed, str(exc) or type(exc).__name__)
+        if hide_errors:  # an outside tool gets no exception text
+            log.exception("handler failed for a memory call")
+            reply = _error(req_id, ErrorCode.internal_error, "Internal error")
+        else:
+            reply = _error(req_id, ErrorCode.tool_failed, str(exc) or type(exc).__name__)
     peer.send(reply)
 
 

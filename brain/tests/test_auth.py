@@ -1,6 +1,6 @@
 """Authenticator: a token becomes a principal, or nothing."""
 
-from brain.auth import CLIENT_KINDS, Authenticator, Principal, listener_auth
+from brain.auth import Authenticator, Principal, listener_auth
 
 
 def test_local_token_gives_the_local_principal():
@@ -51,15 +51,3 @@ def test_the_network_listener_takes_device_tokens_and_not_the_local_token():
     assert loopback.identify("dtok").device_id == "d1" and loopback.identify("dtok").local
     assert network.identify("abc") is None
     assert network.identify("dtok") == dev
-
-
-def test_a_memory_client_token_is_refused_unless_the_caller_asks_for_clients():
-    client = Principal(key="device:c1", name="cc", kind="mcp_client", local=False, device_id="c1")
-
-    class Fake:
-        def verify(self, token):
-            return client
-
-    a = Authenticator(None, Fake())
-    assert a.identify("t") is None
-    assert a.identify("t", CLIENT_KINDS) == client

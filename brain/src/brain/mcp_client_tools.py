@@ -31,7 +31,7 @@ def mcp_client_tools(
                 "TAGALONG_NETWORK=1 and restart the brain.",
             )
         personal = args.get("personal") is True
-        offer = pairing.make_code(KIND, personal=personal)
+        offer = pairing.make_code(KIND, personal=personal, name=name.strip())
         return json.dumps(
             {
                 "name": name.strip(),

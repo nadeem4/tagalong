@@ -58,7 +58,7 @@ class Pairing:
         self._now = now
         self._addr = addr
 
-    def make_code(self, kind: str = "desktop", personal: bool = False) -> PairOffer:
+    def make_code(self, kind: str = "desktop", personal: bool = False, name: str = "") -> PairOffer:
         now = self._now()
         store.delete_expired_codes(self._db, now)
         secret = (
@@ -72,6 +72,7 @@ class Pairing:
             kind=kind,
             expires_at=expires_at,
             personal=personal,
+            name=name,
         )
         query = urlencode(
             {"addr": self._addr(), "fp": self._identity.fingerprint, "code": secret},
@@ -83,19 +84,21 @@ class Pairing:
     def redeem(
         self, code: str, name: str, kind: str, *, kinds: frozenset[str]
     ) -> tuple[str, str] | None:
-        """`kinds` is what the listener the device came in on may pair."""
+        """`kinds` is what the listener the device came in on may pair. A name given when the code
+        was made wins over the one the device offers."""
         now = self._now()
         since = utc_text(datetime.fromisoformat(now) - FAILURE_WINDOW)
         store.delete_old_failures(self._db, since)
         if store.count_recent_failures(self._db, since) >= MAX_FAILURES:
             return None
-        personal = (
+        spent = (
             store.redeem_pair_code(self._db, hash_secret(code), kind, now)
             if kind in kinds
             else None
         )
-        if personal is not None:
-            return self._devices.create(name, kind, personal=personal)
+        if spent is not None:
+            personal, given = spent
+            return self._devices.create(given or name, kind, personal=personal)
         store.record_failure(self._db, now)
         return None
 

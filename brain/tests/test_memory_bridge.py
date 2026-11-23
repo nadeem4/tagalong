@@ -6,6 +6,7 @@ on loopback, wss pinned to a fingerprint), with fake model and fake asks; no rea
 import asyncio
 import contextlib
 import json
+import sys
 
 import pytest
 from event_log import make_session
@@ -19,8 +20,16 @@ from brain.auth import Authenticator
 from brain.bodies import Bodies
 from brain.devices import Devices
 from brain.identity import load_or_create_identity, server_ssl_context
+from brain.link import dial
 from brain.memory import Memory
-from brain.memory_bridge import BridgeLink, build_server, load_link, pair_with_link
+from brain.memory_bridge import (
+    BridgeLink,
+    build_server,
+    link_path,
+    load_link,
+    pair_with_link,
+    save_link,
+)
 from brain.memory_mcp import memory_client_tools
 from brain.pairing import NETWORK_KINDS, Pairing
 from brain.server import start_server
@@ -161,3 +170,32 @@ async def test_a_brain_that_accepts_the_socket_and_never_answers_is_a_tool_error
         async with mcp(server) as s:
             out = await s.call_tool("recall", {"query": "x"})
     assert out.is_error and "not reachable" in out.content[0].text
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX modes")
+def test_the_link_file_holding_the_token_is_owner_only(tmp_path):
+    save_link(tmp_path, "cursor", BridgeLink("127.0.0.1:1", None, "secret"))
+    assert link_path(tmp_path, "cursor").stat().st_mode & 0o777 == 0o600
+
+
+@pytest.mark.parametrize("addr", ["10.0.0.2:47322", "example.com:47322"])
+async def test_a_brain_on_another_machine_is_never_dialled_without_a_pin(addr):
+    with pytest.raises(OSError, match="another machine"):
+        await dial(addr, None)
+
+
+async def test_a_refusal_that_is_not_about_the_token_reports_the_brains_own_words():
+    async def refuse(ws):
+        await ws.recv()
+        await ws.send(
+            json.dumps(
+                {"jsonrpc": "2.0", "id": 1, "error": {"code": -32002, "message": "Version off"}}
+            )
+        )
+
+    async with serve(refuse, "127.0.0.1", 0) as listener:
+        port = listener.sockets[0].getsockname()[1]
+        server = build_server(BridgeLink(f"127.0.0.1:{port}", None, "t"))
+        async with mcp(server) as s:
+            out = await s.call_tool("recall", {"query": "x"})
+    assert out.is_error and "Version off" in out.content[0].text

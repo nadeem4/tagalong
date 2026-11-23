@@ -64,23 +64,27 @@ def insert_pair_code(
     kind: str,
     expires_at: str,
     personal: bool = False,
+    name: str = "",
 ) -> None:
     db.execute(
-        "INSERT INTO pair_codes(id, secret_hash, kind, expires_at, personal)"
-        " VALUES (?, ?, ?, ?, ?)",
-        (id, secret_hash, kind, expires_at, personal),
+        "INSERT INTO pair_codes(id, secret_hash, kind, expires_at, personal, name)"
+        " VALUES (?, ?, ?, ?, ?, ?)",
+        (id, secret_hash, kind, expires_at, personal, name),
     )
 
 
-def redeem_pair_code(db: sqlite3.Connection, secret_hash: str, kind: str, now: str) -> bool | None:
+def redeem_pair_code(
+    db: sqlite3.Connection, secret_hash: str, kind: str, now: str
+) -> tuple[bool, str] | None:
     """Spend the code in the same statement that finds it, so two redeems cannot both win.
-    Returns the code's `personal`, or None when it is unknown, used, expired or another kind."""
+    Returns the code's (`personal`, `name`), or None when it is unknown, used, expired or of
+    another kind."""
     row = db.execute(
         "UPDATE pair_codes SET used_at=? WHERE secret_hash=? AND kind=? AND used_at IS NULL"
-        " AND expires_at>? RETURNING personal",
+        " AND expires_at>? RETURNING personal, name",
         (now, secret_hash, kind, now),
     ).fetchone()
-    return None if row is None else bool(row[0])
+    return None if row is None else (bool(row[0]), row[1])
 
 
 def delete_expired_codes(db: sqlite3.Connection, now: str) -> None:

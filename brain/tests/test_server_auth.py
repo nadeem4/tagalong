@@ -235,3 +235,23 @@ async def test_a_body_token_is_no_memory_client_and_the_reverse(
         await ws.send(client_frame(token, kind=hello_kind))
         assert json.loads(await ws.recv())["error"]["code"] == -32009
     assert bodies.online() == []
+
+
+async def test_an_unexpected_failure_gives_a_memory_client_no_exception_text(
+    make_memory_env, memory_env, monkeypatch
+):
+    async def boom(*args, **kwargs):
+        raise RuntimeError("secret detail")
+
+    monkeypatch.setattr("brain.server.call_memory_tool", boom)
+    _, devices = memory_env
+    _, token = devices.create("claude-code", "mcp_client")
+    _, port = await make_memory_env(listeners(devices)["network"])
+    async with connect(f"ws://127.0.0.1:{port}") as ws:
+        await ws.send(client_frame(token))
+        await ws.recv()
+        await ws.send(
+            client_frame(token, method="call", params={"tool": "recall", "input": {"query": "x"}})
+        )
+        reply = json.loads(await ws.recv())
+    assert reply["error"]["message"] == "Internal error"

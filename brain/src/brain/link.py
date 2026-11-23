@@ -13,6 +13,7 @@ from websockets.asyncio.client import ClientConnection, connect
 from brain.protocol import PROTOCOL
 
 MAX_FRAME = 28_000_000
+LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
 
 async def connect_pinned(addr: str, fingerprint: str) -> ClientConnection:
@@ -32,8 +33,11 @@ async def connect_pinned(addr: str, fingerprint: str) -> ClientConnection:
 
 
 async def dial(addr: str, fingerprint: str | None) -> ClientConnection:
-    """No fingerprint means the brain's own machine, reached over loopback ws."""
+    """No fingerprint means the brain's own machine, reached over loopback ws; anything else
+    without a pin would send the token unprotected, so it is refused."""
     if fingerprint is None:
+        if addr.rpartition(":")[0].strip("[]") not in LOOPBACK_HOSTS:
+            raise OSError("Refusing a plain connection to a brain on another machine.")
         return await connect(f"ws://{addr}", max_size=MAX_FRAME)
     return await connect_pinned(addr, fingerprint)
 

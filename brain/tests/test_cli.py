@@ -701,17 +701,6 @@ def test_memory_mcp_pair_redeems_the_link_and_says_how_to_add_the_tool(tmp_path)
     assert "tagalong memory-mcp --client cursor" in rig.text
 
 
-def test_memory_mcp_without_pair_serves_this_client(tmp_path):
-    rig = Rig(tmp_path)
-    served = []
-
-    async def serve(home, name):
-        served.append(name)
-
-    assert rig.go("memory-mcp", "--client", "claude-code", serve_memory=serve) == 0
-    assert served == ["claude-code"]
-
-
 def test_memory_mcp_that_was_never_paired_fails_with_how_to_pair(tmp_path):
     rig = Rig(tmp_path)
     assert rig.go("memory-mcp", "--client", "nobody") == 1
