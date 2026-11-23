@@ -61,7 +61,3 @@ class HttpRelay:
             log.warning("the relay to the app ended with an error", exc_info=False)
         finally:
             self.stdout.feed_eof()
-
-
-def http_relay(url: str) -> HttpRelay:
-    return HttpRelay(url)

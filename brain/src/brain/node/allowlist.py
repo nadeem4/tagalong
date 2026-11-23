@@ -48,8 +48,9 @@ class Allowlist:
     ) -> None:
         """Approve a spec. Approving one again (after an update) keeps its secrets unless new
         ones are given."""
-        entries = [e for e in self._entries() if not _same_spec(e, spec)]
-        prior = next((e for e in self._entries() if _same_spec(e, spec)), {})
+        existing = self._entries()
+        entries = [e for e in existing if not _same_spec(e, spec)]
+        prior = next((e for e in existing if _same_spec(e, spec)), {})
         env = secret_env if secret_env is not None else prior.get("secret_env")
         query = url_query if url_query is not None else prior.get("url_query")
         if spec.url is not None:

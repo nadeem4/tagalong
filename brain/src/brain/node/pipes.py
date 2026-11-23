@@ -16,7 +16,7 @@ from typing import Protocol
 
 from brain.apps import merge_url_secret
 from brain.node.allowlist import Allowlist
-from brain.node.relay import http_relay
+from brain.node.relay import HttpRelay
 from brain.protocol import ErrorCode, PipeSpec, RpcError
 
 CHUNK = 65_536
@@ -81,7 +81,7 @@ class Pipes:
         allowlist: Allowlist,
         send: Send,
         spawn: Spawn = spawn_process,
-        connect_url: ConnectUrl = http_relay,
+        connect_url: ConnectUrl = HttpRelay,
     ) -> None:
         self._allowlist = allowlist
         self._send = send
