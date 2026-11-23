@@ -1,0 +1,1 @@
+{ "jsonrpc": "2.0", "method": "pipe_close", "params": { "pipe": "k1" } }

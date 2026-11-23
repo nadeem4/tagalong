@@ -15,6 +15,9 @@ import pytest
 
 from brain import cli
 from brain.memory import Memory
+from brain.node.allowlist import Allowlist
+from brain.node.main import HelloRefused
+from brain.protocol import PipeSpec
 from brain.setup import install as install_mod
 from brain.setup.facts import CmdResult, Machine, NodePaths, ToolVersion
 from brain.setup.paths import cache_file, node_dir
@@ -496,3 +499,40 @@ def test_perf_skips_junk_lines(tmp_path):
     rig = Rig(tmp_path)
     assert rig.go("perf", now=lambda: 1000.0) == 0
     assert "tool" in rig.text and "0.300" in rig.text
+
+
+# ---- node ----
+
+
+def test_node_allow_approves_a_command_for_this_machine_only(tmp_path):
+    rig = Rig(tmp_path)
+    exe = rig.home / "expert.exe"
+    exe.write_bytes(b"binary")
+    assert rig.go("node", "allow", str(exe), "--stdio") == 0
+    allowlist = Allowlist(rig.home / "node" / "allowlist.json")
+    assert allowlist.permits(PipeSpec(command=str(exe), args=["--stdio"])) == str(exe)
+    assert allowlist.permits(PipeSpec(command=str(exe))) is None
+
+
+def test_node_allow_of_a_missing_program_fails_with_a_fact(tmp_path):
+    rig = Rig(tmp_path)
+    assert rig.go("node", "allow", str(rig.home / "missing.exe")) == 1
+    assert "is not a program on this machine" in rig.text
+
+
+def test_node_run_without_its_link_says_what_is_missing(tmp_path):
+    rig = Rig(tmp_path)
+    assert rig.go("node", "run") == 1
+    assert "TAGALONG_NODE_ADDR" in rig.text
+
+
+def test_node_run_stops_when_the_brain_refuses_its_token(tmp_path):
+    rig = Rig(tmp_path)
+
+    async def refused(env, allowlist):
+        raise HelloRefused("Unknown or revoked token")
+
+    env = {k: "x" for k in ("TAGALONG_NODE_ADDR", "TAGALONG_NODE_FP", "TAGALONG_NODE_TOKEN")}
+    env["TAGALONG_NODE_ID"] = "node-1"
+    assert rig.go("node", "run", env=env, run_node=refused) == 1
+    assert "refused" in rig.text

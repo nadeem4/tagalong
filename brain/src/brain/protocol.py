@@ -555,6 +555,36 @@ class KnowMeStatusParams(Model):
     portrait: Annotated[str, Field(max_length=1500)] | None = None
 
 
+# Node pipes: the brain asks a node (a body on another machine) to run an allowed command and
+# relays its stdin and stdout as raw bytes. The node refuses any spec its own allow-list lacks.
+class PipeSpec(Model):
+    command: Annotated[str, Field(min_length=1)]
+    args: list[str] = []
+
+
+class PipeOpenParams(Model):
+    pipe: Id
+    spec: PipeSpec
+
+
+class PipeDataParams(Model):
+    pipe: Id
+    data: str  # base64 of the bytes
+
+
+class PipeCloseParams(Model):
+    pipe: Id
+    code: int | None = None  # the child's exit code, when the node reports the close
+
+
+class FolderCheckParams(Model):
+    path: Annotated[str, Field(min_length=1)]
+
+
+class FolderCheckResult(Model):
+    exists: bool
+
+
 # Method name -> (params model, result model or None for notifications).
 type MethodMap = dict[str, tuple[type[BaseModel], type[BaseModel] | None]]
 
@@ -573,6 +603,8 @@ BODY_TO_BRAIN: MethodMap = {
     "hush": (EmptyParams, None),
     "speech_state": (SpeechStateParams, None),
     "know_me_start": (KnowMeStartParams, KnowMeStartResult),
+    "pipe_data": (PipeDataParams, None),
+    "pipe_close": (PipeCloseParams, None),
 }
 
 BRAIN_TO_BODY: MethodMap = {
@@ -589,4 +621,8 @@ BRAIN_TO_BODY: MethodMap = {
     "speech": (SpeechParams, None),
     "speech_control": (SpeechControlParams, None),
     "know_me_status": (KnowMeStatusParams, None),
+    "pipe_open": (PipeOpenParams, EmptyResult),
+    "pipe_data": (PipeDataParams, None),
+    "pipe_close": (PipeCloseParams, None),
+    "folder_check": (FolderCheckParams, FolderCheckResult),
 }

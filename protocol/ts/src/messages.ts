@@ -386,6 +386,28 @@ export interface MethodSchemas {
   live?: boolean;
 }
 
+// Node pipes: the brain asks a node to run an allowed command and relays its stdin and stdout.
+export const PipeSpec = z.object({
+  command: z.string().min(1),
+  args: z.array(z.string()).default([]),
+});
+export type PipeSpec = z.infer<typeof PipeSpec>;
+
+export const PipeOpenParams = z.object({ pipe: Id, spec: PipeSpec });
+export type PipeOpenParams = z.infer<typeof PipeOpenParams>;
+
+export const PipeDataParams = z.object({ pipe: Id, data: z.string() });
+export type PipeDataParams = z.infer<typeof PipeDataParams>;
+
+export const PipeCloseParams = z.object({ pipe: Id, code: z.number().int().optional() });
+export type PipeCloseParams = z.infer<typeof PipeCloseParams>;
+
+export const FolderCheckParams = z.object({ path: z.string().min(1) });
+export type FolderCheckParams = z.infer<typeof FolderCheckParams>;
+
+export const FolderCheckResult = z.object({ exists: z.boolean() });
+export type FolderCheckResult = z.infer<typeof FolderCheckResult>;
+
 export const bodyToBrain = {
   hello: { params: HelloParams, result: HelloResult },
   pair: { params: PairParams, result: PairResult },
@@ -401,6 +423,8 @@ export const bodyToBrain = {
   hush: { params: EmptyParams },
   speech_state: { params: SpeechStateParams, live: true },
   know_me_start: { params: KnowMeStartParams, result: KnowMeStartResult },
+  pipe_data: { params: PipeDataParams },
+  pipe_close: { params: PipeCloseParams },
 } satisfies Record<string, MethodSchemas>;
 
 export const brainToBody = {
@@ -417,6 +441,10 @@ export const brainToBody = {
   speech: { params: SpeechParams, live: true },
   speech_control: { params: SpeechControlParams, live: true },
   know_me_status: { params: KnowMeStatusParams, live: true },
+  pipe_open: { params: PipeOpenParams, result: EmptyResult },
+  pipe_data: { params: PipeDataParams },
+  pipe_close: { params: PipeCloseParams },
+  folder_check: { params: FolderCheckParams, result: FolderCheckResult },
 } satisfies Record<string, MethodSchemas>;
 
 export type BodyToBrainMethod = keyof typeof bodyToBrain;

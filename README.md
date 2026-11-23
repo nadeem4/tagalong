@@ -132,7 +132,7 @@ To run the brain on a server with no screen, install it with `install/install.sh
 and run `tagalong serve --install-service`, or run `tagalong serve` in the foreground: both turn the
 network listener on and print a pairing QR. A Docker line does the same: `docker run -v tagalong:/data
 -p 47323:47323 -e TAGALONG_PUBLIC_HOST=<name> tagalong`, publishing only the network port. `tagalong
-update` upgrades an installed brain. See [docs/brain/server.md](docs/brain/server.md).
+update` upgrades an installed brain. See [docs/brain/server.md](docs/brain/server.md). A desktop paired to a remote brain also runs a node (`tagalong node`) so the brain can use tools on this PC; the node runs only commands you approve there with `tagalong node allow` ([docs/brain/node.md](docs/brain/node.md)).
 
 To keep the brain running without the desktop window, run `uv run tagalong service install`: it
 registers a per-user task that starts the brain at logon (a Windows scheduled task, a macOS launchd

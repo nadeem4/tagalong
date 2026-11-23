@@ -57,6 +57,8 @@ describe('method maps', () => {
       | 'hush'
       | 'speech_state'
       | 'know_me_start'
+      | 'pipe_data'
+      | 'pipe_close'
     >();
   });
   it('has literal brain to body method names', () => {
@@ -74,6 +76,10 @@ describe('method maps', () => {
       | 'speech'
       | 'speech_control'
       | 'know_me_status'
+      | 'pipe_open'
+      | 'pipe_data'
+      | 'pipe_close'
+      | 'folder_check'
     >();
   });
 });
