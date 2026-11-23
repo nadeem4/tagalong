@@ -11,9 +11,11 @@ import sys
 from dataclasses import replace
 from pathlib import Path
 
+import httpx2
 import pytest
 
 from brain import cli
+from brain.app_oauth import OAuthError
 from brain.memory import Memory
 from brain.node.allowlist import Allowlist
 from brain.node.main import HelloRefused
@@ -626,4 +628,56 @@ def test_node_allow_url_secret_is_asked_for_here(tmp_path):
 def test_node_allow_refuses_a_confused_request(tmp_path, argv):
     rig = Rig(tmp_path)
     assert rig.go(*argv, secret=lambda p: "v") == 1
+    assert not (rig.home / "node" / "allowlist.json").exists()
+
+
+def test_node_signin_runs_here_then_approves_the_address(tmp_path):
+    rig = Rig(tmp_path)
+    url = "https://mcp.example.com/mcp"
+    signed: list[tuple[str, Path]] = []
+
+    async def fake_signin(address, node_dir):
+        signed.append((address, node_dir))
+
+    assert rig.go("node", "signin", url, node_signin=fake_signin) == 0
+    assert signed == [(url, rig.home / "node")]
+    allowlist = Allowlist(rig.home / "node" / "allowlist.json")
+    assert allowlist.permits(PipeSpec(url=url)) is not None
+    assert "never sees" in rig.text
+
+
+def test_node_signin_refuses_an_address_that_is_not_http(tmp_path):
+    rig = Rig(tmp_path)
+    assert rig.go("node", "signin", "ftp://x.example/mcp") == 1
+    assert not (rig.home / "node" / "allowlist.json").exists()
+
+
+def test_node_allow_bearer_is_asked_for_here_and_never_printed(tmp_path):
+    rig = Rig(tmp_path)
+    url = "https://mcp.example.com/mcp"
+    assert rig.go("node", "allow", "--url", url, "--bearer", secret=lambda p: "tok-123") == 0
+    stored = Allowlist(rig.home / "node" / "allowlist.json").secrets(PipeSpec(url=url))
+    assert stored.bearer == "tok-123"
+    assert "tok-123" not in rig.text
+
+
+@pytest.mark.parametrize(
+    ("error", "shown"),
+    [
+        (ExceptionGroup("tg", [OAuthError("The sign-in timed out.")]), "The sign-in timed out."),
+        (ExceptionGroup("tg", [httpx2.ConnectError("refused")]), "Could not reach"),
+        (httpx2.ConnectError("refused"), "Could not reach"),
+    ],
+)
+def test_node_signin_that_fails_says_so_in_a_plain_line_and_approves_nothing(
+    tmp_path, error, shown
+):
+    rig = Rig(tmp_path)
+
+    async def failing(address, node_dir):
+        raise error
+
+    assert rig.go("node", "signin", "https://mcp.example.com/mcp", node_signin=failing) == 1
+    assert shown in rig.text
+    assert "Traceback" not in rig.text
     assert not (rig.home / "node" / "allowlist.json").exists()

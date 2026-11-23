@@ -44,17 +44,29 @@ An app that needs a key must not hand it to the brain. The person types it on th
 
 The values live in `allowlist.json` beside the entry, written owner-only through the brain's one private-file writer (mode 0600; on Windows icacls removes inherited access and grants only the current user). Approving the same entry again after an update keeps them unless new ones are typed. A spec never carries a secret: the brain sends only the command and args, or the URL, so no frame, log or brain database row holds one (`brain/tests/test_node_secrets.py` captures every frame, decoded). A server that echoes the query back in a message cannot leak it either: the relay replaces each secret value, raw and percent-encoded, with `[secret]` in every line it sends the brain. A line to the relay that is not a JSON-RPC message is answered with an error for its id, and a line over 8 MiB ends the pipe. An app placed on a node ignores the brain's own copies of its keys.
 
+## Signing in on the node
+
+An http app with a sign-in runs on a node once the person has signed in there:
+
+- `tagalong node signin <address>` runs the app's OAuth on this machine: the browser opens here, the loopback listener catches the redirect here (`app_oauth.make_provider`, `LoopbackCallback`) and the tokens are saved in `<TAGALONG_HOME>/node/app-oauth/<hash of the address>.json`, owner-only through the same private-file writer as the allow-list, by `FileTokenStorage`. The sign-in runs in a scratch folder beside it and the file is moved into place only once it has finished, so a declined, timed-out or unreachable sign-in saves nothing and leaves a token already saved as it was. A failure prints one plain line and exits 1. It then approves the address as `allow --url` does.
+- `tagalong node allow --url <address> --bearer` asks for a bearer token with hidden input and keeps it in the entry like the other secrets.
+
+The relay (`node/relay.py`) sends the bearer, or uses the stored OAuth tokens (refreshing them), when it connects; it never opens a browser, so an expired sign-in ends the pipe and the person signs in again here. The brain then shows the app's error as the command to run on the node (for an OAuth app ``Sign in to {app} on {node}: `tagalong node signin <address>` ``, for a token app `tagalong node allow --url <address> --bearer`), and the `sign_in_app` call refuses the app with the same line rather than opening a browser on the brain's machine. Tokens are masked in every line the relay sends the brain, read from the saved file for each line so a token the SDK refreshes while the pipe is open is masked too, and `brain/tests/test_node_signin.py` shows neither an OAuth token nor a bearer in any decoded frame or brain database row.
+
 ## Running one
 
 - `tagalong node allow <command> [-- args...]`: approve a command on this machine; `--secret-env NAME` (repeatable) types a secret for it here.
 - `tagalong node allow --url <address> [--url-secret]`: approve an HTTP MCP server's exact address, with an optional secret query typed here. An address that already carries a secret (a `key=` style query or `user:pass@`) is refused: give the secret with `--url-secret`.
+- `tagalong node allow --url <address> --bearer`: as above, with a bearer token typed here.
+- `tagalong node signin <address>`: sign in to an OAuth app on this machine ([Signing in on the node](#signing-in-on-the-node)).
 - `tagalong node run`: connect and serve; needs the four `TAGALONG_NODE_*` variables (the desktop sets them).
 
 `brain.node` imports nothing of the voice models (`brain/tests/test_node_imports.py`).
 
 ## Not supported yet
 
-- An http app that signs in with OAuth or a bearer token cannot be placed on a node yet (a keyed URL, `url_secret`, can), and the browser add-on's loopback proxy: BA10.
+- The browser add-on's loopback proxy: BA10.
+- An app that stays on a remote brain cannot sign in from the person's PC: the node would have to forward the OAuth code to the brain, which needs a new contract frame and has no design yet. Sign in on the machine the brain runs on, or place the app on the node.
 - The brain does not install an expert on a node: it runs the expert's installed command there once the person has approved it. Both the toolbox's use (an app's stdio MCP server, [Where an app runs](../bodies/connected-apps.md#where-an-app-runs)) and the expert host's use ([Where an expert runs](experts.md#where-an-expert-runs)) go over a pipe.
 
 The node reuses the desktop's device token under body id `node-xxxxxx`, so it cannot be revoked apart from the desktop and its device kind is `desktop`.

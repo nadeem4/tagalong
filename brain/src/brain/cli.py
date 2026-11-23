@@ -21,7 +21,10 @@ from pathlib import Path
 from typing import NoReturn, TextIO
 from urllib.parse import urlsplit
 
-from brain.apps import AppError, TokenFile, split_secrets
+import httpx2
+
+from brain.app_oauth import OAuthError
+from brain.apps import AppError, TokenFile, root_cause, split_secrets
 from brain.config import load_config, load_env_file, upsert_env_value
 from brain.devices import Devices
 from brain.discovery import lan_address
@@ -32,6 +35,7 @@ from brain.memory import Memory
 from brain.node.allowlist import Allowlist, NotRunnable
 from brain.node.main import HelloRefused
 from brain.node.main import run_node as real_run_node
+from brain.node.signin import browser_sign_in
 from brain.open_items import OpenItems
 from brain.pairing import PAIR_KINDS, build_pairing, render_qr
 from brain.protocol import PipeSpec
@@ -119,6 +123,15 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="a secret query string for the URL, typed here and kept on this machine",
     )
+    allow.add_argument(
+        "--bearer",
+        action="store_true",
+        help="a bearer token for the URL, typed here and kept on this machine",
+    )
+    signin = node.add_parser(
+        "signin", help="sign in to an OAuth app here, on the machine running it"
+    )
+    signin.add_argument("url", help="the app's HTTP MCP address")
     login = sub.add_parser("login", help="log an installed expert in")
     login.add_argument("expert_id")
     return p
@@ -143,6 +156,7 @@ def main(
     service_for: Callable[[Path], Service] = real_service,
     run_brain: Callable[[], None] | None = None,
     run_node: Callable[[MutableMapping[str, str], Allowlist], Awaitable[None]] = real_run_node,
+    node_signin: Callable[[str, Path], Awaitable[None]] = browser_sign_in,
 ) -> int:
     """Every outside thing is a parameter, so tests run on fakes. Exits 0 ok, 1 failed, 2 usage."""
     args = _parser().parse_args(argv)  # a usage error exits 2 here
@@ -173,7 +187,7 @@ def main(
         elif args.cmd == "serve":
             _serve(args.install_service, config, service_for(home), env, host_addr, out)
         elif args.cmd == "node":
-            await _node(args, home, env, run_node, secret, out)
+            await _node(args, home, env, run_node, node_signin, secret, out)
         elif args.cmd == "update":
             await _update(run, env, out)
         elif args.cmd == "key":
@@ -285,22 +299,26 @@ def _serve(install, config, service: Service, env, host_addr, out) -> None:
 NODE_ENV = ("TAGALONG_NODE_ADDR", "TAGALONG_NODE_FP", "TAGALONG_NODE_TOKEN", "TAGALONG_NODE_ID")
 
 
+def _check_address(url: str) -> None:
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise _Fail("The address must be an http or https URL.")
+    if split_secrets("", {"url": url}, "http")[1]:
+        raise _Fail("Leave the secret out of the address; add it with `node allow --url-secret`.")
+
+
 def _node_allow(args, allowlist: Allowlist, secret: Callable[[str], str], out) -> None:
     if (args.url is None) == (args.command is None):
         raise _Fail("Give a command, or --url with an address, not both.")
     if args.url is not None:
-        parts = urlsplit(args.url)
-        if parts.scheme not in ("http", "https") or not parts.hostname:
-            raise _Fail("The address must be an http or https URL.")
+        _check_address(args.url)
         if args.secret_env:
-            raise _Fail("--secret-env is for a command; a URL takes --url-secret.")
-        if split_secrets("", {"url": args.url}, "http")[1]:
-            raise _Fail("Leave the secret out of the address and give it with --url-secret.")
+            raise _Fail("--secret-env is for a command; a URL takes --url-secret or --bearer.")
         spec = PipeSpec(url=args.url)
         shown = args.url
     else:
-        if args.url_secret:
-            raise _Fail("--url-secret is for a URL.")
+        if args.url_secret or args.bearer:
+            raise _Fail("--url-secret and --bearer are for a URL.")
         spec = PipeSpec(
             command=args.command, args=args.args[1:] if args.args[:1] == ["--"] else args.args
         )
@@ -309,19 +327,40 @@ def _node_allow(args, allowlist: Allowlist, secret: Callable[[str], str], out) -
     query = (
         secret("Secret query for the URL, like key=value (hidden): ") if args.url_secret else None
     )
+    bearer = secret("Bearer token for the URL (hidden): ") if args.bearer else None
     try:
-        allowlist.allow(spec, secret_env=env or None, url_query=query or None)
+        allowlist.allow(
+            spec, secret_env=env or None, url_query=query or None, bearer=bearer or None
+        )
     except NotRunnable as err:
         raise _Fail(str(err)) from None
     out(f"The brain may now {'open' if args.url else 'run'}: {shown}")
-    if env or query:
+    if env or query or bearer:
         out("The secrets stay on this machine; the brain never sees them.")
 
 
-async def _node(args, home: Path, env, run_node, secret, out) -> None:
+async def _node_signin(url: str, node_dir: Path, allowlist: Allowlist, node_signin, out) -> None:
+    _check_address(url)
+    try:
+        await node_signin(url, node_dir)
+    except Exception as err:
+        cause = root_cause(err)
+        if isinstance(cause, OAuthError):
+            raise _Fail(str(cause)) from None
+        if isinstance(cause, httpx2.ConnectError):
+            raise _Fail(f"Could not reach {url}.") from None
+        raise
+    allowlist.allow(PipeSpec(url=url))
+    out(f"Signed in. The brain may now open {url}; it never sees the sign-in.")
+
+
+async def _node(args, home: Path, env, run_node, node_signin, secret, out) -> None:
     allowlist = Allowlist(home / "node" / "allowlist.json")
     if args.sub == "allow":
         _node_allow(args, allowlist, secret, out)
+        return
+    if args.sub == "signin":
+        await _node_signin(args.url, home / "node", allowlist, node_signin, out)
         return
     missing = [name for name in NODE_ENV if not env.get(name)]
     if missing:

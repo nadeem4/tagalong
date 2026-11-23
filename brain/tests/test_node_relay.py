@@ -9,7 +9,7 @@ from brain.node.relay import MAX_LINE, HttpRelay
 
 
 async def test_a_line_that_is_not_a_message_is_answered_with_an_error_for_its_id():
-    relay = HttpRelay("http://127.0.0.1:1/mcp", [])
+    relay = HttpRelay("http://127.0.0.1:1/mcp", list)
     try:
         relay.write(b'{"jsonrpc": "2.0", "id": 7, "method": 5}\n')
         reply = json.loads(await asyncio.wait_for(relay.stdout.readline(), 5))
@@ -20,7 +20,7 @@ async def test_a_line_that_is_not_a_message_is_answered_with_an_error_for_its_id
 
 
 async def test_a_line_past_the_cap_ends_the_pipe():
-    relay = HttpRelay("http://127.0.0.1:1/mcp", [])
+    relay = HttpRelay("http://127.0.0.1:1/mcp", list)
     relay.write(b"x" * (MAX_LINE + 1))
     assert await asyncio.wait_for(relay.stdout.read(), 5) == b""
     await relay.wait()

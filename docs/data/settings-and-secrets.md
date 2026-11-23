@@ -176,7 +176,7 @@ by `[secret]`; see [privacy](privacy.md#what-is-masked-on-disk-what-is-not).
 
 ### Secrets on a node
 
-An app placed on a node keeps its keys on that machine: `tagalong node allow --secret-env NAME ...` or `--url-secret` stores them in the node's `<TAGALONG_HOME>/node/allowlist.json` entry, and the brain's `app-tokens.json` is not read for it. See [the node](../brain/node.md#secrets-stay-on-the-node).
+An app placed on a node keeps its keys on that machine: `tagalong node allow --secret-env NAME ...` or `--url-secret` stores them in the node's `<TAGALONG_HOME>/node/allowlist.json` entry, and the brain's `app-tokens.json` is not read for it. A bearer token (`--bearer`) is kept the same way, and an OAuth sign-in made with `tagalong node signin <url>` lives in the node's `<TAGALONG_HOME>/node/app-oauth/`, so neither is in the brain's `app-oauth/` folder or any frame it receives. See [the node](../brain/node.md#secrets-stay-on-the-node).
 
 ### WhatsApp values in the Python brain
 

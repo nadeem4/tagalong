@@ -314,6 +314,8 @@ def app_home_tools(
             raise refuse(f"{row.name} does not use sign-in.")
         if not row.enabled:
             raise refuse(f"Turn {row.name} on before signing in.")
+        if line := apps.node_signin_line(app_id):
+            raise refuse(line)
         open_url = browser_opener(bodies, app_id)
         if open_url is None:
             raise refuse("Open Tagalong on the machine the brain runs on to sign in.")

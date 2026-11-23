@@ -22,6 +22,8 @@ from mcp.shared.auth import (
     OAuthToken,
 )
 
+from brain.private_file import write_private
+
 if TYPE_CHECKING:
     from brain.apps import AppRow
 
@@ -46,6 +48,10 @@ class FileTokenStorage:
     def __init__(self, data_dir: Path | str, app_id: str) -> None:
         self._path = Path(data_dir) / "app-oauth" / f"{app_id}.json"
 
+    @property
+    def path(self) -> Path:
+        return self._path
+
     def _read(self) -> dict[str, Any]:
         try:
             data = json.loads(self._path.read_text(encoding="utf-8"))
@@ -54,12 +60,8 @@ class FileTokenStorage:
         return data if isinstance(data, dict) else {}
 
     def _write(self, data: dict[str, Any]) -> None:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self._path.with_suffix(".tmp")
-        # Created 0600 up front so the secret is never on disk readable by others, even briefly.
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(json.dumps(data))
+        write_private(tmp, json.dumps(data))
         os.replace(tmp, self._path)
 
     def token_strings(self) -> list[str]:

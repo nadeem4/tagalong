@@ -290,7 +290,7 @@ class _Slot:
     location: str = "brain"  # where its session runs: the brain or a node's body id
 
 
-def _root(exc: BaseException) -> BaseException:
+def root_cause(exc: BaseException) -> BaseException:
     while isinstance(exc, BaseExceptionGroup) and exc.exceptions:
         exc = exc.exceptions[0]
     return exc
@@ -298,7 +298,7 @@ def _root(exc: BaseException) -> BaseException:
 
 def _plain(exc: BaseException) -> str:
     """The first line of the real error; never anything from env values."""
-    exc = _root(exc)
+    exc = root_cause(exc)
     if isinstance(exc, TimeoutError):
         return "did not answer in time"
     lines = str(exc).strip().splitlines()
@@ -307,7 +307,7 @@ def _plain(exc: BaseException) -> str:
 
 def _connect_error(name: str, exc: BaseException) -> str:
     """The app's error line: one plain sentence naming the app, never raw OS text."""
-    root = _root(exc)
+    root = root_cause(exc)
     if isinstance(root, TimeoutError):
         return f"{name} did not answer in time."
     chain: list[BaseException] = []
@@ -395,6 +395,21 @@ class Apps:
         if slot is None or slot.location == "brain" or slot.state == "connected":
             return None
         return slot.error or None
+
+    def node_signin_line(self, app_id: str) -> str | None:
+        """What to run on the node for an app that runs there and needs a sign-in or token."""
+        slot = self._slots.get(app_id)
+        if slot is None or slot.location == "brain" or slot.row.transport != "http":
+            return None
+        row, url, node = slot.row, slot.row.config["url"], self.body_name(slot.location)
+        if row.auth == "oauth":
+            return f"Sign in to {row.name} on {node}: `tagalong node signin {url}`"
+        if row.auth == "token":
+            return (
+                f"Add the token for {row.name} on {node}: "
+                f"`tagalong node allow --url {url} --bearer`"
+            )
+        return None
 
     def _brain_can_run(self, row: AppRow) -> bool:
         return row.transport == "http" or shutil.which(row.config["command"]) is not None
@@ -627,6 +642,8 @@ class Apps:
                     if slot.stopping:
                         return
                     if slot.dropped:
+                        if signin := self.node_signin_line(slot.row.id):
+                            raise AppError(signin)
                         if slot.signed_out:
                             raise NeedsSignIn(f"Sign in to {slot.row.name} again.")
                         raise AppError(f"The connection {slot.row.name} closed.")
@@ -641,12 +658,14 @@ class Apps:
                                 "could not refresh tools for %s", slot.row.id, exc_info=True
                             )
         except Exception as exc:
-            root = _root(exc)
+            root = root_cause(exc)
             if isinstance(root, NeedsSignIn):
                 self._set(slot, "needs-sign-in", str(root))
             elif slot.open_url:  # a sign-in that failed, was refused or was abandoned
                 known = isinstance(root, OAuthError | TimeoutError)
                 self._set(slot, "needs-sign-in", _plain(exc) if known else "The sign-in failed.")
+            elif not isinstance(root, AppError) and (signin := self.node_signin_line(slot.row.id)):
+                self._set(slot, "error", signin)
             else:
                 self._set(slot, "error", _connect_error(slot.row.name, exc))
         finally:
@@ -705,9 +724,10 @@ class Apps:
 
     async def _node_streams(self, slot: _Slot):
         row = slot.row
-        if self._bodies is None or (row.transport == "http" and row.auth != "none"):
+        if self._bodies is None:
             raise AppError(f"{row.name} cannot run on another machine yet.")
-        # The node adds this app's secrets from what its person entered there; none is sent.
+        # The node adds this app's secrets and sign-in from what its person entered there; none
+        # is sent.
         if row.transport == "stdio":
             spec = PipeSpec(command=row.config["command"], args=row.config.get("args", []))
         else:
@@ -715,6 +735,8 @@ class Apps:
         try:
             pipe = await self._bodies.open_pipe(slot.location, spec)
         except RpcError as err:
+            if signin := self.node_signin_line(row.id):
+                raise AppError(signin) from None
             raise AppError(
                 f"{row.name} could not start on {self._bodies.name(slot.location)}: {err.message}"
             ) from None
