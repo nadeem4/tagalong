@@ -693,9 +693,13 @@ class Apps:
 
     async def _node_streams(self, slot: _Slot):
         row = slot.row
-        if self._bodies is None or row.transport != "stdio":
+        if self._bodies is None or (row.transport == "http" and row.auth != "none"):
             raise AppError(f"{row.name} cannot run on another machine yet.")
-        spec = PipeSpec(command=row.config["command"], args=row.config.get("args", []))
+        # The node adds this app's secrets from what its person entered there; none is sent.
+        if row.transport == "stdio":
+            spec = PipeSpec(command=row.config["command"], args=row.config.get("args", []))
+        else:
+            spec = PipeSpec(url=row.config["url"])
         try:
             pipe = await self._bodies.open_pipe(slot.location, spec)
         except RpcError as err:

@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": "p3",
+  "method": "pipe_open",
+  "params": {
+    "pipe": "k3",
+    "spec": { "command": "claude-code-acp", "url": "https://mcp.example.com/mcp" }
+  }
+}

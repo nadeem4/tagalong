@@ -50,7 +50,7 @@ class Rig:
         self.ws = FakeSocket()
         self.children: list[FakeChild] = []
 
-        async def spawn(path: str, args: list[str]) -> FakeChild:
+        async def spawn(path: str, args: list[str], env: dict[str, str]) -> FakeChild:
             child = child_type()
             self.children.append(child)
             return child
@@ -101,7 +101,11 @@ async def test_an_allowed_pipe_open_is_answered_and_its_output_relayed(rig):
     spec = PipeSpec(command=str(rig.exe), args=["--stdio"])
     rig.allowlist.allow(spec)
     rig.ws.feed(
-        {"id": "p1", "method": "pipe_open", "params": {"pipe": "k1", "spec": spec.model_dump()}}
+        {
+            "id": "p1",
+            "method": "pipe_open",
+            "params": {"pipe": "k1", "spec": spec.model_dump(exclude_none=True)},
+        }
     )
     await rig.settle()
     assert rig.replies("p1")["result"] == {}
@@ -132,7 +136,11 @@ async def test_the_brains_data_and_close_reach_the_child(rig):
     spec = PipeSpec(command=str(rig.exe))
     rig.allowlist.allow(spec)
     rig.ws.feed(
-        {"id": "p1", "method": "pipe_open", "params": {"pipe": "k1", "spec": spec.model_dump()}}
+        {
+            "id": "p1",
+            "method": "pipe_open",
+            "params": {"pipe": "k1", "spec": spec.model_dump(exclude_none=True)},
+        }
     )
     rig.ws.feed(
         {"method": "pipe_data", "params": {"pipe": "k1", "data": base64.b64encode(b"in").decode()}}
@@ -158,7 +166,11 @@ async def test_a_close_of_a_stuck_child_does_not_stall_the_session(tmp_path):
     spec = PipeSpec(command=str(rig.exe))
     rig.allowlist.allow(spec)
     rig.ws.feed(
-        {"id": "p1", "method": "pipe_open", "params": {"pipe": "k1", "spec": spec.model_dump()}}
+        {
+            "id": "p1",
+            "method": "pipe_open",
+            "params": {"pipe": "k1", "spec": spec.model_dump(exclude_none=True)},
+        }
     )
     rig.ws.feed({"method": "pipe_close", "params": {"pipe": "k1"}})
     rig.ws.feed({"id": "f1", "method": "folder_check", "params": {"path": str(tmp_path)}})
@@ -170,7 +182,12 @@ async def test_a_close_of_a_stuck_child_does_not_stall_the_session(tmp_path):
 async def test_a_notification_without_an_id_gets_no_reply_and_does_not_end_the_node(rig):
     spec = PipeSpec(command=str(rig.exe))
     rig.allowlist.allow(spec)
-    rig.ws.feed({"method": "pipe_open", "params": {"pipe": "k1", "spec": spec.model_dump()}})
+    rig.ws.feed(
+        {
+            "method": "pipe_open",
+            "params": {"pipe": "k1", "spec": spec.model_dump(exclude_none=True)},
+        }
+    )
     rig.ws.feed({"id": "f1", "method": "folder_check", "params": {"path": str(rig.exe.parent)}})
     await rig.settle()
     assert not rig.task.done()
@@ -181,7 +198,11 @@ async def test_losing_the_brain_kills_every_child(rig):
     spec = PipeSpec(command=str(rig.exe))
     rig.allowlist.allow(spec)
     rig.ws.feed(
-        {"id": "p1", "method": "pipe_open", "params": {"pipe": "k1", "spec": spec.model_dump()}}
+        {
+            "id": "p1",
+            "method": "pipe_open",
+            "params": {"pipe": "k1", "spec": spec.model_dump(exclude_none=True)},
+        }
     )
     await rig.settle()
     await rig.finish()

@@ -22,9 +22,8 @@ class FakeNode:
         self.allowlist = Allowlist(tmp_path / "allowlist.json")
         self.allowlist.allow(PipeSpec(command=sys.executable, args=[FAKE]))
         self._children: list[Child] = []
-        self.pipes = Pipes(
-            self.allowlist, lambda m, p: bodies.pipe_event(body_id, self, m, p), self._spawn
-        )
+        self.frames: list[str] = []  # every frame that crossed to or from the brain
+        self.pipes = Pipes(self.allowlist, self._to_brain, self._spawn)
         self.opened: list[PipeSpec] = []
         self.folders: set[str] = set()
         self._tasks: set[asyncio.Task] = set()
@@ -33,8 +32,8 @@ class FakeNode:
         self.opened_ids: list[str] = []
         self.closed_pipes: list[str] = []
 
-    async def _spawn(self, path: str, args: list[str]) -> Child:
-        child = await spawn_process(path, args)
+    async def _spawn(self, path: str, args: list[str], env: dict[str, str]) -> Child:
+        child = await spawn_process(path, args, env)
         self._children.append(child)
         return child
 
@@ -47,7 +46,12 @@ class FakeNode:
         body = Body(id=self.body_id, kind="node", name="Laptop", display=False)
         self.bodies.connect(body, [], self, None, Principal("device:pc", "Laptop", "node", False))
 
+    def _to_brain(self, method: str, params: dict) -> None:
+        self.frames.append(json.dumps({"method": method, "params": params}))
+        self.bodies.pipe_event(self.body_id, self, method, params)
+
     def send(self, frame: str) -> None:
+        self.frames.append(frame)
         message = json.loads(frame)
         task = asyncio.create_task(self._handle(message))
         self._tasks.add(task)

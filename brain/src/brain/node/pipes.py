@@ -1,6 +1,7 @@
-"""The node's pipes: one allowed command per pipe, its stdin and stdout relayed to the brain as
-base64 `pipe_data`. The spec is checked against the allow-list before anything starts; the
-brain keeps all the protocol logic (ACP, MCP) and the node only moves bytes.
+"""The node's pipes: one allowed command (or HTTP MCP relay) per pipe, its stdin and stdout
+relayed to the brain as base64 `pipe_data`. The spec is checked against the allow-list before
+anything starts; the secrets the person entered here are added to the child or the URL on this
+machine only. The brain keeps all the protocol logic (ACP, MCP) and the node only moves bytes.
 """
 
 import asyncio
@@ -13,7 +14,9 @@ import sys
 from collections.abc import Awaitable, Callable
 from typing import Protocol
 
+from brain.apps import merge_url_secret
 from brain.node.allowlist import Allowlist
+from brain.node.relay import http_relay
 from brain.protocol import ErrorCode, PipeSpec, RpcError
 
 CHUNK = 65_536
@@ -29,7 +32,8 @@ class Child(Protocol):
     async def wait(self) -> int: ...
 
 
-Spawn = Callable[[str, list[str]], Awaitable[Child]]
+Spawn = Callable[[str, list[str], dict[str, str]], Awaitable[Child]]
+ConnectUrl = Callable[[str], Child]
 Send = Callable[[str, dict], None]
 
 
@@ -58,10 +62,11 @@ class _Process:
         return await self._proc.wait()
 
 
-async def spawn_process(path: str, args: list[str]) -> Child:
+async def spawn_process(path: str, args: list[str], env: dict[str, str]) -> Child:
     proc = await asyncio.create_subprocess_exec(
         path,
         *args,
+        env={**os.environ, **env},
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.DEVNULL,
@@ -71,10 +76,17 @@ async def spawn_process(path: str, args: list[str]) -> Child:
 
 
 class Pipes:
-    def __init__(self, allowlist: Allowlist, send: Send, spawn: Spawn = spawn_process) -> None:
+    def __init__(
+        self,
+        allowlist: Allowlist,
+        send: Send,
+        spawn: Spawn = spawn_process,
+        connect_url: ConnectUrl = http_relay,
+    ) -> None:
         self._allowlist = allowlist
         self._send = send
         self._spawn = spawn
+        self._connect_url = connect_url
         self._open: dict[str, tuple[Child, asyncio.Task]] = {}
 
     async def open(self, pipe: str, spec: PipeSpec) -> None:
@@ -82,9 +94,14 @@ class Pipes:
             raise RpcError(ErrorCode.invalid_params, "That pipe is already open.")
         path = self._allowlist.permits(spec)
         if path is None:
-            raise RpcError(ErrorCode.denied, "That command is not on this node's list.")
+            raise RpcError(ErrorCode.denied, "That is not on this node's list.")
+        secrets = self._allowlist.secrets(spec)
         try:
-            child = await self._spawn(path, spec.args)
+            if spec.url is not None:
+                query = secrets.url_query
+                child = self._connect_url(merge_url_secret(path, query) if query else path)
+            else:
+                child = await self._spawn(path, spec.args, secrets.env)
         except OSError as err:
             raise RpcError(ErrorCode.tool_failed, f"Could not start it: {err}") from None
         self._open[pipe] = (child, asyncio.create_task(self._relay(pipe, child)))

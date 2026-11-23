@@ -259,6 +259,9 @@ when Scout calls one of their tools in a turn you started.
   the apps table, the repository or logs; see [connected apps](../bodies/connected-apps.md) and the next
   section. **Disconnect** deletes them.
 
+- **Keys for an app on another PC.** When an app runs on a node, its keys are typed on that PC and
+  kept there. They are not in any message to or from the brain, nor in its database or logs.
+
 ### What an expert can reach
 
 An expert reaches an app only through a small server inside the brain, open on this computer
