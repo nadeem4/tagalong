@@ -13,8 +13,10 @@ from websockets.exceptions import ConnectionClosed, WebSocketException
 
 from brain.auth import Authenticator
 from brain.bodies import Bodies
+from brain.devices import Devices
 from brain.identity import load_or_create_identity, server_ssl_context
 from brain.memory import Memory
+from brain.memory_mcp import memory_client_tools
 from brain.server import start_server
 
 
@@ -115,3 +117,141 @@ async def test_a_hello_without_a_usable_token_is_unauthorized_and_echoes_nothing
         reply = await ws.recv()
     assert json.loads(reply)["error"]["code"] == -32009
     assert "UPPER-secret-input" not in reply
+
+
+def client_frame(token, kind="mcp_client", method="hello", params=None, req_id=1):
+    if method == "hello":
+        params = {
+            "protocol": 3,
+            "token": token,
+            "body": {"id": "claude-code", "kind": kind, "name": "claude-code", "display": False},
+            "tools": [],
+        }
+    return json.dumps({"jsonrpc": "2.0", "id": req_id, "method": method, "params": params})
+
+
+@pytest.fixture
+def memory_env(tmp_path):
+    memory = Memory(tmp_path / "t.db")
+    devices = Devices(memory.db, lambda: "2026-11-22T00:00:00Z")
+    yield memory, devices
+    memory.close()
+
+
+@pytest.fixture
+async def make_memory_env(memory_env):
+    servers = []
+    memory, devices = memory_env
+
+    async def make(auth):
+        bodies = Bodies()
+        session = make_session(
+            ScriptedModel(asyncio.Event()),
+            Open(),
+            bodies,
+            10,
+            memory,
+            extra_tools=memory_client_tools(memory, bodies.notify),
+        )
+        server = await start_server("127.0.0.1", 0, bodies, "s1", session, auth=auth)
+        servers.append(server)
+        return bodies, server.sockets[0].getsockname()[1]
+
+    yield make
+    for server in servers:
+        server.close()
+        await server.wait_closed()
+
+
+def listeners(devices):
+    return {
+        "loopback": Authenticator("good", devices, loopback=True),
+        "network": Authenticator(None, devices),
+    }
+
+
+@pytest.mark.parametrize("listener", ["loopback", "network"])
+async def test_a_memory_client_token_opens_a_connection_that_can_recall(
+    make_memory_env, memory_env, listener
+):
+    memory, devices = memory_env
+    memory.remember("about_you", "Likes oat milk")
+    _, token = devices.create("claude-code", "mcp_client")
+    bodies, port = await make_memory_env(listeners(devices)[listener])
+    async with connect(f"ws://127.0.0.1:{port}") as ws:
+        await ws.send(client_frame(token))
+        assert "result" in json.loads(await ws.recv())
+        await ws.send(
+            client_frame(token, method="call", params={"tool": "recall", "input": {"query": "oat"}})
+        )
+        reply = json.loads(await ws.recv())
+    assert "oat milk" in reply["result"]["output"][0]["text"]
+    assert bodies.online() == []
+
+
+async def test_a_memory_client_gets_unknown_tool_for_anything_but_memory(
+    make_memory_env, memory_env
+):
+    _, devices = memory_env
+    _, token = devices.create("claude-code", "mcp_client")
+    _, port = await make_memory_env(listeners(devices)["network"])
+    async with connect(f"ws://127.0.0.1:{port}") as ws:
+        await ws.send(client_frame(token))
+        await ws.recv()
+        await ws.send(
+            client_frame(token, method="call", params={"tool": "get_settings", "input": {}})
+        )
+        assert json.loads(await ws.recv())["error"]["code"] == -32001
+        await ws.send(
+            client_frame(token, method="say", params={"id": "e1", "text": "hi"}, req_id=2)
+        )
+        assert json.loads(await ws.recv())["error"]["code"] == -32601
+
+
+async def test_a_revoked_memory_client_is_refused_on_its_next_call(make_memory_env, memory_env):
+    _, devices = memory_env
+    device_id, token = devices.create("claude-code", "mcp_client")
+    _, port = await make_memory_env(listeners(devices)["network"])
+    async with connect(f"ws://127.0.0.1:{port}") as ws:
+        await ws.send(client_frame(token))
+        await ws.recv()
+        devices.revoke(device_id)
+        await ws.send(
+            client_frame(token, method="call", params={"tool": "list_memories", "input": {}})
+        )
+        assert json.loads(await ws.recv())["error"]["code"] == -32009
+
+
+@pytest.mark.parametrize(
+    ("device_kind", "hello_kind"), [("desktop", "mcp_client"), ("mcp_client", "desktop")]
+)
+async def test_a_body_token_is_no_memory_client_and_the_reverse(
+    make_memory_env, memory_env, device_kind, hello_kind
+):
+    _, devices = memory_env
+    _, token = devices.create("x", device_kind)
+    bodies, port = await make_memory_env(listeners(devices)["network"])
+    async with connect(f"ws://127.0.0.1:{port}") as ws:
+        await ws.send(client_frame(token, kind=hello_kind))
+        assert json.loads(await ws.recv())["error"]["code"] == -32009
+    assert bodies.online() == []
+
+
+async def test_an_unexpected_failure_gives_a_memory_client_no_exception_text(
+    make_memory_env, memory_env, monkeypatch
+):
+    async def boom(*args, **kwargs):
+        raise RuntimeError("secret detail")
+
+    monkeypatch.setattr("brain.server.call_memory_tool", boom)
+    _, devices = memory_env
+    _, token = devices.create("claude-code", "mcp_client")
+    _, port = await make_memory_env(listeners(devices)["network"])
+    async with connect(f"ws://127.0.0.1:{port}") as ws:
+        await ws.send(client_frame(token))
+        await ws.recv()
+        await ws.send(
+            client_frame(token, method="call", params={"tool": "recall", "input": {"query": "x"}})
+        )
+        reply = json.loads(await ws.recv())
+    assert reply["error"]["message"] == "Internal error"

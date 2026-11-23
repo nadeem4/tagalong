@@ -681,3 +681,33 @@ def test_node_signin_that_fails_says_so_in_a_plain_line_and_approves_nothing(
     assert shown in rig.text
     assert "Traceback" not in rig.text
     assert not (rig.home / "node" / "allowlist.json").exists()
+
+
+# ---- memory-mcp ----
+
+
+def test_memory_mcp_pair_redeems_the_link_and_says_how_to_add_the_tool(tmp_path):
+    rig = Rig(tmp_path)
+    seen = []
+
+    async def pair(home, name, link):
+        seen.append((home, name, link))
+
+    assert (
+        rig.go("memory-mcp", "--client", "cursor", "--pair", "tagalong://pair?x", pair_memory=pair)
+        == 0
+    )
+    assert seen == [(rig.home, "cursor", "tagalong://pair?x")]
+    assert "tagalong memory-mcp --client cursor" in rig.text
+
+
+def test_memory_mcp_that_was_never_paired_fails_with_how_to_pair(tmp_path):
+    rig = Rig(tmp_path)
+    assert rig.go("memory-mcp", "--client", "nobody") == 1
+    assert "--pair" in rig.text
+
+
+def test_memory_mcp_refuses_a_client_name_that_is_not_a_file_name(tmp_path):
+    rig = Rig(tmp_path)
+    assert rig.go("memory-mcp", "--client", "../evil") == 1
+    assert "--client" in rig.text

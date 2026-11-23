@@ -9,6 +9,8 @@ go to the voice seam (Session.voice); any other request answers method_not_found
 `call` runs in its own task and replies through the peer queue.
 A body that joins without a usable backlog is sent the asks still open.
 Response frames (a body's answer to `use`) go to Bodies.resolve.
+A memory client (`mcp_client`, an outside AI tool's bridge) joins with its own token, is no body,
+and may only `call` the three memory tools; its token is checked again on every call.
 """
 
 import asyncio
@@ -16,15 +18,17 @@ import base64
 import json
 import logging
 import ssl
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
 from websockets.asyncio.server import Server, ServerConnection, serve
 from websockets.exceptions import ConnectionClosed
 
-from brain.auth import Authenticator
+from brain.auth import BODY_KINDS, CLIENT_KINDS, Authenticator, Principal
 from brain.bodies import CALLER, Bodies, WriteQueue
+from brain.link import MAX_FRAME
+from brain.memory_mcp import call_memory_tool
 from brain.protocol import (
     LIMITS,
     PROTOCOL,
@@ -49,8 +53,6 @@ from brain.protocol import (
     ToolsParams,
 )
 from brain.sessions import Session
-
-MAX_FRAME = 28_000_000
 
 Redeem = Callable[[str, str, str], tuple[str, str] | None]
 KNOW_ME_PDF_MAX = 10 * 1024 * 1024  # decoded bytes
@@ -142,8 +144,20 @@ async def _handler(
                 if method != "hello":  # method may be None for a response
                     peer.send(_error(req_id, ErrorCode.invalid_request, "hello must come first"))
                     break
-                body_id = _hello(
-                    message, req_id, peer, bodies, session_id, session, build, auth, addrs()
+                joined = _identify(message, req_id, peer, auth)
+                if joined is None:
+                    break
+                principal, params = joined
+                if params.body.kind == "mcp_client":
+                    # A memory client is no body: it gets the result and may only call.
+                    result = HelloResult(
+                        protocol=PROTOCOL, session=session_id, tools=[], seq=0, resync=False
+                    )
+                    peer.send(_result(req_id, result))
+                    await _client_session(ws, peer, session, auth, params.token)
+                    break
+                body_id = _join_body(
+                    req_id, peer, bodies, session_id, session, build, principal, params, addrs()
                 )
                 if body_id is None:
                     break
@@ -246,20 +260,13 @@ def _pair(message: dict, req_id: Any, redeem: Redeem | None) -> str:
     return _result(req_id, PairResult(device_id=paired[0], token=paired[1]))
 
 
-def _hello(
-    message: dict,
-    req_id: Any,
-    peer: _Peer,
-    bodies: Bodies,
-    session_id: str,
-    session: Session,
-    build: tuple[str, str] | None,
-    auth: Authenticator,
-    addrs: list[str],
-) -> str | None:
-    """Join the body and queue the result, the backlog, then any open asks it cannot have;
-    None means hello failed. The token is checked before the shape, so an unauthenticated
-    caller gets no validation text; it is never logged."""
+def _identify(
+    message: dict, req_id: Any, peer: _Peer, auth: Authenticator
+) -> tuple[Principal, HelloParams] | None:
+    """Check a hello's version, token and shape; None means an error was sent. The token is
+    checked before the shape, so an unauthenticated caller gets no validation text; it is never
+    logged. A hello that says it is a memory client is checked as one, so a body's token is no
+    client's and the reverse."""
     raw = message.get("params")
     # Check the version first: a future protocol may change the shape, and its body
     # should learn "mismatch", not "invalid params".
@@ -269,15 +276,33 @@ def _hello(
         peer.send(_error(req_id, ErrorCode.version_mismatch, "Unsupported protocol", data))
         return None
     token = raw.get("token") if isinstance(raw, dict) else None
-    principal = auth.identify(token) if isinstance(token, str) else None
+    body = raw.get("body") if isinstance(raw, dict) else None
+    is_client = isinstance(body, dict) and body.get("kind") == "mcp_client"
+    kinds = CLIENT_KINDS if is_client else BODY_KINDS
+    principal = auth.identify(token, kinds) if isinstance(token, str) else None
     if principal is None:
         peer.send(_error(req_id, ErrorCode.unauthorized, "Unknown or revoked token"))
         return None
     try:
-        params = HelloParams.model_validate(raw)
+        return principal, HelloParams.model_validate(raw)
     except ValidationError as exc:
         peer.send(_error(req_id, ErrorCode.invalid_params, str(exc)))
         return None
+
+
+def _join_body(
+    req_id: Any,
+    peer: _Peer,
+    bodies: Bodies,
+    session_id: str,
+    session: Session,
+    build: tuple[str, str] | None,
+    principal: Principal,
+    params: HelloParams,
+    addrs: list[str],
+) -> str | None:
+    """Join the body and queue the result, the backlog, then any open asks it cannot have;
+    None means the body id belongs to another device."""
     joined = bodies.connect(params.body, params.tools, peer, params.last_seq, principal)
     if joined is None:
         peer.send(_error(req_id, ErrorCode.unauthorized, "That body id belongs to another device"))
@@ -301,8 +326,58 @@ def _hello(
     return params.body.id
 
 
-async def _call(message: dict, req_id: Any, body_id: str, peer: _Peer, session: Session) -> None:
-    """Run a Home tool in its own task so a slow one never blocks the read loop, which must
+async def _client_session(
+    ws: ServerConnection, peer: _Peer, session: Session, auth: Authenticator, token: str
+) -> None:
+    """The rest of a memory client's connection: it may only `call`. Its token is checked on
+    every call, so a client revoked while connected is refused on its next one."""
+
+    async def run(params: CallParams) -> str:
+        principal = auth.identify(token, CLIENT_KINDS)
+        if principal is None:
+            raise RpcError(ErrorCode.unauthorized, "Unknown or revoked token")
+        out = await call_memory_tool(
+            session.toolbox,
+            session.guards,
+            principal,
+            params.tool,
+            params.input,
+            f"memory client {principal.name}",
+        )
+        if out.is_error:
+            raise RpcError(ErrorCode.tool_failed, out.content[0].text)
+        return out.content[0].text
+
+    calls: set[asyncio.Task] = set()
+    try:
+        async for raw in ws:
+            message = _parse(raw)
+            if isinstance(message, str):
+                peer.send(message)
+                continue
+            if "id" not in message:
+                continue
+            req_id = _usable_id(message)
+            method = message.get("method")
+            if method != "call":
+                peer.send(_error(req_id, ErrorCode.method_not_found, f"Unknown method: {method}"))
+                continue
+            task = asyncio.create_task(_run_call(message, req_id, peer, run, hide_errors=True))
+            calls.add(task)
+            task.add_done_callback(calls.discard)
+    finally:
+        for task in calls:
+            task.cancel()
+
+
+async def _run_call(
+    message: dict,
+    req_id: Any,
+    peer: _Peer,
+    run: Callable[[CallParams], Awaitable[str]],
+    hide_errors: bool = False,
+) -> None:
+    """Run a tool call in its own task so a slow one never blocks the read loop, which must
     keep delivering `use` responses and answers."""
     try:
         try:
@@ -312,8 +387,7 @@ async def _call(message: dict, req_id: Any, body_id: str, peer: _Peer, session: 
             raise RpcError(
                 ErrorCode.invalid_params, "call needs a tool and an input object."
             ) from None
-        CALLER.set(body_id)
-        text = await session.call_home(params.tool, params.input)
+        text = await run(params)
         reply = _result(req_id, CallResult(output=[{"type": "text", "text": text}]))
     except ValidationError as exc:
         reply = _error(req_id, ErrorCode.invalid_params, str(exc))
@@ -322,8 +396,20 @@ async def _call(message: dict, req_id: Any, body_id: str, peer: _Peer, session: 
     except asyncio.CancelledError:
         raise
     except Exception as exc:
-        reply = _error(req_id, ErrorCode.tool_failed, str(exc) or type(exc).__name__)
+        if hide_errors:  # an outside tool gets no exception text
+            log.exception("handler failed for a memory call")
+            reply = _error(req_id, ErrorCode.internal_error, "Internal error")
+        else:
+            reply = _error(req_id, ErrorCode.tool_failed, str(exc) or type(exc).__name__)
     peer.send(reply)
+
+
+async def _call(message: dict, req_id: Any, body_id: str, peer: _Peer, session: Session) -> None:
+    async def run(params: CallParams) -> str:
+        CALLER.set(body_id)
+        return await session.call_home(params.tool, params.input)
+
+    await _run_call(message, req_id, peer, run)
 
 
 def _bad_start(exc: ValidationError) -> str:

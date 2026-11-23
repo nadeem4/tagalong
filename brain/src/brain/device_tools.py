@@ -7,7 +7,7 @@ or hash, and `pair_make`'s code is the one place a secret leaves the brain.
 import json
 
 from brain.devices import Devices
-from brain.pairing import PAIR_KINDS, Pairing, render_qr
+from brain.pairing import OFFERED_KINDS, Pairing, render_qr
 from brain.protocol import ErrorCode, RpcError
 from brain.toolbox import Handler, ToolSpec
 
@@ -40,10 +40,10 @@ def device_tools(
 
     async def pair_make(args: dict) -> str:
         kind = args.get("kind", "desktop")
-        if kind not in PAIR_KINDS:
+        if kind not in OFFERED_KINDS:
             raise RpcError(
                 ErrorCode.invalid_params,
-                "kind must be " + ", ".join(PAIR_KINDS[:-1]) + " or " + PAIR_KINDS[-1] + ".",
+                "kind must be " + ", ".join(OFFERED_KINDS[:-1]) + " or " + OFFERED_KINDS[-1] + ".",
             )
         if kind != "browser" and not network:
             raise RpcError(
@@ -103,7 +103,7 @@ def device_tools(
                 "6-digit code; other devices get a link and its QR.",
                 {
                     "type": "object",
-                    "properties": {"kind": {"enum": list(PAIR_KINDS)}},
+                    "properties": {"kind": {"enum": list(OFFERED_KINDS)}},
                 },
                 _HOME,
             ),

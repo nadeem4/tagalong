@@ -5,7 +5,6 @@ import hashlib
 import secrets
 import sqlite3
 from collections.abc import Callable
-from dataclasses import dataclass
 
 from brain.auth import Principal
 from brain.store import devices as store
@@ -13,13 +12,6 @@ from brain.store import devices as store
 
 def hash_secret(secret: str) -> str:
     return hashlib.sha256(secret.encode()).hexdigest()
-
-
-@dataclass(frozen=True)
-class McpClient:
-    id: str
-    name: str
-    personal: bool  # may read the facts the owner keeps back
 
 
 class Devices:
@@ -47,21 +39,19 @@ class Devices:
         )
         return device_id, token
 
-    def client(self, token: str) -> McpClient | None:
-        row = store.client_by_token_hash(self._db, hash_secret(token))
-        if row is None:
-            return None
-        store.touch_device(self._db, row[0], self._now())
-        return McpClient(*row)
-
     def verify(self, token: str) -> Principal | None:
         row = store.device_by_token_hash(self._db, hash_secret(token))
         if row is None:
             return None
-        device_id, name, kind = row
+        device_id, name, kind, personal = row
         store.touch_device(self._db, device_id, self._now())
         return Principal(
-            key=f"device:{device_id}", name=name, kind=kind, local=False, device_id=device_id
+            key=f"device:{device_id}",
+            name=name,
+            kind=kind,
+            local=False,
+            device_id=device_id,
+            personal=personal,
         )
 
     def list(self) -> list[dict]:

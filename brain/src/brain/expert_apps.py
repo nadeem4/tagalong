@@ -23,7 +23,7 @@ from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from starlette.responses import PlainTextResponse
 
 from brain.app_tools import specs_for
-from brain.devices import McpClient
+from brain.auth import Principal
 from brain.guards import Guards
 from brain.loopback import serve_loopback
 from brain.masking import mask_json
@@ -35,7 +35,7 @@ from brain.toolbox import Toolbox
 log = logging.getLogger("brain")
 
 # What an expert's own memory writes are labelled with; it never reads the personal facts.
-EXPERT_CLIENT = McpClient("expert", "expert", False)
+EXPERT_CLIENT = Principal(key="expert", name="expert", kind="expert", local=False)
 
 
 @dataclass

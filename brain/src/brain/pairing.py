@@ -25,9 +25,9 @@ from brain.store.db import utc_now_text, utc_text
 CODE_LIFE = timedelta(minutes=10)
 FAILURE_WINDOW = timedelta(minutes=1)
 MAX_FAILURES = 5
-PAIR_KINDS = ("desktop", "node", "browser")
-LOOPBACK_KINDS = frozenset({"browser"})
-NETWORK_KINDS = frozenset(PAIR_KINDS) - LOOPBACK_KINDS
+OFFERED_KINDS = ("desktop", "node", "browser")  # what `tagalong pair` and Home's Pair offer
+LOOPBACK_KINDS = frozenset({"browser"})  # the kinds a code may carry on the loopback listener
+NETWORK_KINDS = frozenset({"desktop", "node", "mcp_client"})  # and on the network listener
 
 
 @dataclass(frozen=True)
@@ -58,7 +58,7 @@ class Pairing:
         self._now = now
         self._addr = addr
 
-    def make_code(self, kind: str = "desktop") -> PairOffer:
+    def make_code(self, kind: str = "desktop", personal: bool = False, name: str = "") -> PairOffer:
         now = self._now()
         store.delete_expired_codes(self._db, now)
         secret = (
@@ -71,6 +71,8 @@ class Pairing:
             secret_hash=hash_secret(secret),
             kind=kind,
             expires_at=expires_at,
+            personal=personal,
+            name=name,
         )
         query = urlencode(
             {"addr": self._addr(), "fp": self._identity.fingerprint, "code": secret},
@@ -82,14 +84,21 @@ class Pairing:
     def redeem(
         self, code: str, name: str, kind: str, *, kinds: frozenset[str]
     ) -> tuple[str, str] | None:
-        """`kinds` is what the listener the device came in on may pair."""
+        """`kinds` is what the listener the device came in on may pair. A name given when the code
+        was made wins over the one the device offers."""
         now = self._now()
         since = utc_text(datetime.fromisoformat(now) - FAILURE_WINDOW)
         store.delete_old_failures(self._db, since)
         if store.count_recent_failures(self._db, since) >= MAX_FAILURES:
             return None
-        if kind in kinds and store.redeem_pair_code(self._db, hash_secret(code), kind, now):
-            return self._devices.create(name, kind)
+        spent = (
+            store.redeem_pair_code(self._db, hash_secret(code), kind, now)
+            if kind in kinds
+            else None
+        )
+        if spent is not None:
+            personal, given = spent
+            return self._devices.create(given or name, kind, personal=personal)
         store.record_failure(self._db, now)
         return None
 

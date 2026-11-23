@@ -1,14 +1,15 @@
 """Home's tools for the AI tools that may use Scout's memory: mcp_client_make, mcp_clients_list,
 mcp_client_revoke.
 
-Home only: Scout must never mint a token or cut a client off. `mcp_client_make` shows the URL and
-the bearer once; a listing carries neither the token nor its hash.
+Home only: Scout must never mint a pairing link or cut a client off. `mcp_client_make` shows a
+one-time link, which `tagalong memory-mcp --pair` redeems on the AI tool's machine; the client's
+token is made then and never passes through here. A listing carries neither a token nor its hash.
 """
 
 import json
-from collections.abc import Callable
 
 from brain.devices import Devices
+from brain.pairing import Pairing
 from brain.protocol import ErrorCode, RpcError
 from brain.toolbox import Handler, ToolSpec
 
@@ -16,25 +17,27 @@ _HOME = frozenset({"home"})
 KIND = "mcp_client"
 
 
-def mcp_client_tools(devices: Devices, url: Callable[[], str]) -> list[tuple[ToolSpec, Handler]]:
+def mcp_client_tools(
+    devices: Devices, pairing: Pairing, network: bool
+) -> list[tuple[ToolSpec, Handler]]:
     async def make(args: dict) -> str:
         name = args.get("name")
         if not isinstance(name, str) or not name.strip():
             raise RpcError(ErrorCode.invalid_params, "name must say which tool this is for.")
-        if not url():
+        if not network:
             raise RpcError(
-                ErrorCode.tool_failed,
-                "The memory endpoint is not running: its port is taken. Set TAGALONG_MCP_PORT "
-                "and restart the brain.",
+                ErrorCode.invalid_params,
+                "Network access is off, so no pairing link can reach this brain. Set "
+                "TAGALONG_NETWORK=1 and restart the brain.",
             )
-        device_id, token = devices.create(name.strip(), KIND, personal=args.get("personal") is True)
+        personal = args.get("personal") is True
+        offer = pairing.make_code(KIND, personal=personal, name=name.strip())
         return json.dumps(
             {
-                "id": device_id,
                 "name": name.strip(),
-                "url": url(),
-                "bearer": token,
-                "personal": args.get("personal") is True,
+                "link": offer.link,
+                "expires_at": offer.expires_at,
+                "personal": personal,
             }
         )
 
@@ -52,8 +55,9 @@ def mcp_client_tools(devices: Devices, url: Callable[[], str]) -> list[tuple[Too
         (
             ToolSpec(
                 "mcp_client_make",
-                "Let another AI tool use Scout's memory: returns its URL and bearer token, shown "
-                "this once. personal=true also lets it read the facts the owner keeps back.",
+                "Let another AI tool use Scout's memory: returns a one-time link to redeem on the "
+                "machine that runs the tool (`tagalong memory-mcp --pair <link> --client <name>`). "
+                "personal=true also lets it read the facts the owner keeps back.",
                 {
                     "type": "object",
                     "properties": {"name": {"type": "string"}, "personal": {"type": "boolean"}},

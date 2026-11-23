@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "hello",
+  "params": {
+    "protocol": 3,
+    "token": "t0k",
+    "body": { "id": "claude-code", "kind": "mcp_client", "name": "claude-code", "display": false },
+    "tools": []
+  }
+}

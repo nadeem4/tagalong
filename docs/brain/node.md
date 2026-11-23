@@ -10,7 +10,7 @@ A node is a small process on a body's machine that runs commands for the brain w
 
 ## How it connects
 
-The node dials the brain's network listener over `wss`, trusting only the certificate whose SHA-256 fingerprint it was given (`connect_pinned` in `brain/src/brain/node/main.py`; a different certificate closes the socket before any frame, the token included, is sent). It then sends `hello` as a body of kind `node` with `display: false` and no tools, using the device token of the desktop it runs beside. A refused token ends the node (`tagalong node run` exits 1); any other loss of the brain is retried every 2 seconds.
+The node dials the brain's network listener over `wss`, trusting only the certificate whose SHA-256 fingerprint it was given (`connect_pinned` in `brain/src/brain/link.py`; a different certificate closes the socket before any frame, the token included, is sent). It then sends `hello` as a body of kind `node` with `display: false` and no tools, using the device token of the desktop it runs beside. A refused token ends the node (`tagalong node run` exits 1); any other loss of the brain is retried every 2 seconds.
 
 The desktop starts the node itself while it is paired to a remote brain and stops it when it goes back to the brain on this PC (`bodies/desktop/src/main/node/runner.ts`). The pairing reaches the node through its environment, not its arguments, so the token never shows in a process list; the node removes these variables from its own environment on start and does not load `<TAGALONG_HOME>/.env`, so no allowed child inherits the token or the brain's keys: `TAGALONG_NODE_ADDR`, `TAGALONG_NODE_FP`, `TAGALONG_NODE_TOKEN`, `TAGALONG_NODE_ID`.
 
@@ -65,7 +65,7 @@ The relay (`node/relay.py`) sends the bearer, or uses the stored OAuth tokens (r
 
 ## Not supported yet
 
-- A node or browser add-on proxy to the brain's memory endpoint (BA10, not built): tools on the person's PC would reach a remote brain's `/mcp/memory` only through a node-side listener and new node-to-brain HTTP frames, which have no design yet. Use the endpoint on the brain's own machine.
+- Other AI tools on the person's PC reach a remote brain's memory without a node: `tagalong memory-mcp` (BA11) dials the brain itself over the same pinned `wss` link a body uses, as an `mcp_client` (see [Memory for other AI tools](../data/memory.md#memory-for-other-ai-tools)).
 - An app that stays on a remote brain cannot sign in from the person's PC: the node would have to forward the OAuth code to the brain, which needs a new contract frame and has no design yet. Sign in on the machine the brain runs on, or place the app on the node.
 - The brain does not install an expert on a node: it runs the expert's installed command there once the person has approved it. Both the toolbox's use (an app's stdio MCP server, [Where an app runs](../bodies/connected-apps.md#where-an-app-runs)) and the expert host's use ([Where an expert runs](experts.md#where-an-expert-runs)) go over a pipe.
 

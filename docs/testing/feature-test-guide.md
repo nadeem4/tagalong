@@ -3247,13 +3247,17 @@ By hand, with a desktop paired to a brain on another machine:
 2. Start the desktop. **Expected:** in Home's Bodies card a body of kind `node` appears for that machine.
 3. Quit the desktop. **Expected:** the node disappears and no `tagalong node run` process is left.
 
-## Memory for other AI tools (BA10; automated, the real client by hand)
+## Memory for other AI tools (BA10, BA11; automated, the real client by hand)
 
-Automated: `brain/tests/test_memory_mcp.py` (a real MCP client over loopback: only recall, remember and list_memories; revoke fails the next call; a body token is no key and a client token is no body login; personal facts, chat and summaries stay home; remember asks and a denial saves nothing; reads are masked; an Off tool is neither listed nor callable; every write is labelled `mcp:<client>` and a blank source is refused; the socket is bound to 127.0.0.1 and a foreign `Host` is refused; Scout's side-check cannot approve a remember; list_memories still returns facts under 200+ summaries; a full memory gives the client a plain refusal; Scout replacing or repeating a told note takes the label back; an expert's reads never return a personal fact; Home make, list, revoke; the experts' bridge offers the same tools) and `test_memory_prompt.py` (outside notes are shown as told by that tool, never as Scout's own).
+Automated: `brain/tests/test_memory_mcp.py` (the gate behind the three tools: personal facts, chat and summaries stay home; remember asks and a denial saves nothing; reads are masked; an Off tool is not listed to experts and is refused when called; every write is labelled `mcp:<client>` and a blank source is refused; Scout's side-check cannot approve a remember; list_memories still returns facts under 200+ summaries; a full memory gives the client a plain refusal; Scout replacing or repeating a told note takes the label back; an expert's reads never return a personal fact; Home makes a link, lists and revokes; the experts' bridge offers the same tools), `test_server_auth.py` (an `mcp_client` token opens a connection on both listeners; only the three memory tools; not a body; a revoked client is refused on its next call; a body token is no client and the reverse), `test_memory_bridge.py` (the bridge lists the three tools, labels a remember with the client's name, says "not reachable" when the brain is down or silent, writes the token file owner-only, never dials another machine without a pin, reports a non-token refusal in the brain's words, pairs from a link and uses the pinned `wss`, refuses a wrong fingerprint), `test_cli.py` (`memory-mcp`) and `test_memory_prompt.py` (outside notes are shown as told by that tool, never as Scout's own).
 
 By hand, with Claude Code or Cursor on the brain's machine:
 
-1. In Home, make a client named for the tool. **Expected:** a URL ending `/mcp/memory` and a bearer, shown once.
-2. Add it to the tool as an HTTP MCP server with `Authorization: Bearer <token>`. **Expected:** it lists recall, remember and list_memories, no forget.
-3. Ask the tool to remember a note. **Expected:** Scout asks first; after Allow, the memory shows it labelled with the tool, and Scout speaks of it as told by that tool.
-4. Revoke the client in Home. **Expected:** the tool's next call is refused.
+1. In Home, make a client named for the tool (network access on). **Expected:** a pairing link, shown once.
+2. In a terminal on the tool's machine run `tagalong memory-mcp --pair <link> --client <name>`. **Expected:** it says it is paired and prints a `claude mcp add` line.
+3. Add it to the tool with that line. **Expected:** it lists recall, remember and list_memories, no forget.
+4. Ask the tool to remember a note. **Expected:** Scout asks first; after Allow, the memory shows it labelled with the tool, and Scout speaks of it as told by that tool.
+5. Stop the brain and ask the tool to recall. **Expected:** a plain "brain not reachable" error.
+6. Revoke the client in Home. **Expected:** the tool's next call is refused.
+
+Needs a real second machine (not run in automation): pair from a PC other than the brain's, with the brain's network listener on, and repeat steps 3 to 6.
