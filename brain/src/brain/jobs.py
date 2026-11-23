@@ -1370,8 +1370,11 @@ class Jobs:
             self._drop_stale_news(job_id)
         job = self._records.get_job(job_id)
         assert job is not None
-        host = job.parts[-1].host
-        paused = f"{host} dropped; its saved session carries on there when it is back"
+        host = next(p.host for p in job.parts if p.id == part)
+        paused = (
+            f"{host} dropped; the session is kept on that machine and carries on there "
+            "with the owner's yes once it is back"
+        )
         self._news("job_ended", job_id, {"report": self.note_with(job, {"paused": paused})})
         self._changed()
         self.fill_slots()
