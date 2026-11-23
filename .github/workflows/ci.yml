@@ -124,14 +124,17 @@ jobs:
         run: |
           test "$(docker image inspect tagalong:ci --format '{{json .Config.ExposedPorts}}')" = '{"47323/tcp":{}}'
 
-      - name: The first start prints a pairing link
+      - name: The first start prints a pairing link and the brain stays up
         run: |
-          status=0
-          timeout 30 docker run --rm -e TAGALONG_PUBLIC_HOST=example.test tagalong:ci > serve.log 2>&1 || status=$?
+          docker run -d --name brain -e TAGALONG_PUBLIC_HOST=example.test tagalong:ci
+          sleep 30
+          docker logs brain > serve.log 2>&1
           cat serve.log
-          test "$status" = 124
+          test "$(docker inspect -f '{{.State.Running}}' brain)" = true
           grep -q 'tagalong://pair?addr=example.test:47323' serve.log
           grep -q 'brain listening on wss://0.0.0.0:47323' serve.log
+          timeout 20 docker stop -t 10 brain
+          test "$(docker inspect -f '{{.State.ExitCode}}' brain)" != 137
 
   # Only what needs Windows, and only once the Linux job is green.
   e2e:

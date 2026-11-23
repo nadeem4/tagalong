@@ -21,5 +21,7 @@ USER tagalong
 VOLUME /data
 EXPOSE 47323
 
+# The brain runs as PID 1, which gets no default SIGTERM handler; Ctrl+C is the stop it handles.
+STOPSIGNAL SIGINT
 ENTRYPOINT []
 CMD ["tagalong", "serve"]
