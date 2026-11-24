@@ -7,7 +7,11 @@
 
 import { useState } from 'react';
 import { useHostBridge } from './host-bridge';
+import { useBrainCard } from './home/use-brain-card';
 import { placeOf, type ConnectorConfirmParams } from './shapes';
+
+/** The brain's own option in a where-to-run ask; the other option is the body's name. */
+const BRAIN_OPTION = 'Brain';
 
 type Decision = 'once' | 'always' | 'deny';
 export type JobAnswer = { option: string; text?: string; checkBackAt?: string };
@@ -89,50 +93,48 @@ function TaskNote({
 }
 
 /**
- * The brain asks where an app runs, once, because the row says Ask me each time. Each place is a
- * button; "Remember my choice" also sets the row to it, so the brain stops asking.
+ * The brain asks where an app runs, once, because the row says Ask me each time. The brain's
+ * options are `Brain` and the body's name; the buttons read This PC and the brain machine's name,
+ * and answer with the brain's own words. "Remember my choice" also sets the row, so it stops asking.
  */
 function WhereCard({
   place,
   confirm,
   onReply,
 }: {
-  place: { app: string; body: string };
+  place: { app: string; body: string; name: string };
   confirm: ConnectorConfirmParams;
   onReply: (answer: JobAnswer) => void;
 }) {
   const bridge = useHostBridge();
+  const { card } = useBrainCard();
   const [keep, setKeep] = useState(false);
-  const options = confirm.options ?? [];
+  const bodyOption = (confirm.options ?? []).find((o) => o !== BRAIN_OPTION) ?? '';
   const choose = (option: string): void => {
     if (!keep) return onReply({ option });
-    // The brain lists itself first, then the body.
-    const choice = option === options[0] ? 'brain' : 'body';
+    const choice = option === bodyOption ? 'body' : 'brain';
     bridge.setPlacement('app', place.app, placeOf(choice, 'body', place.body)).then(
       () => onReply({ option }),
       () => onReply({ option }),
     );
   };
+  const heading = `Where should ${place.name} run?`;
   return (
-    <section className="card" aria-label={confirm.summary}>
+    <section className="card" aria-label={heading}>
       <div className="card-head">
-        <p className="bubble-text">{confirm.summary}</p>
+        <p className="bubble-text">{heading}</p>
       </div>
       <label className="bubble-check">
         <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} />
-        Remember my choice
+        Remember my choice for {place.name}
       </label>
       <div className="card-actions" role="group" aria-label="Options">
-        {options.map((option, i) => (
-          <button
-            key={option}
-            type="button"
-            className={i === options.length - 1 ? 'bubble-primary' : 'bubble-quiet'}
-            onClick={() => choose(option)}
-          >
-            {option}
-          </button>
-        ))}
+        <button type="button" className="bubble-quiet" onClick={() => choose(bodyOption)}>
+          This PC
+        </button>
+        <button type="button" className="bubble-primary" onClick={() => choose(BRAIN_OPTION)}>
+          {card?.host ?? 'The brain'}
+        </button>
       </div>
     </section>
   );

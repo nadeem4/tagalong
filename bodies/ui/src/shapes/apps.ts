@@ -103,8 +103,8 @@ export const ConnectorConfirmParams = z.object({
   checkBackBy: z.enum(['scout', 'person']).optional(),
   /** The brain marked the ask urgent. */
   urgent: z.boolean().optional(),
-  /** A where-to-run question: the app and the node body it asks about, as the brain's ids. */
-  place: z.object({ app: z.string(), body: z.string() }).optional(),
+  /** A where-to-run question: the app's id and name and the node body it asks about. */
+  place: z.object({ app: z.string(), body: z.string(), name: z.string() }).optional(),
 });
 export type ConnectorConfirmParams = z.infer<typeof ConnectorConfirmParams>;
 

@@ -406,6 +406,7 @@ class AskTask(Model):
 class AskPlace(Model):
     app: Id
     body: Id
+    name: str
 
 
 class AskOpen(Model):

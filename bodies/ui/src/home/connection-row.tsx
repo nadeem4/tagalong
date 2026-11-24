@@ -56,7 +56,7 @@ export function ConnectionRow({
   update,
   onUpdate,
   runsOn,
-  waitingForPc = false,
+  waitingFor,
 }: {
   app: AppInfo;
   /** Who made it, when the brain says; null shows no chip. */
@@ -66,8 +66,8 @@ export function ConnectionRow({
   onUpdate?: () => void;
   /** The Runs on control, when Scout has more than one machine to run it on. */
   runsOn?: ReactNode;
-  /** The app is placed on a PC that is not connected right now. */
-  waitingForPc?: boolean;
+  /** The name of the PC the app is placed on when it is not connected right now. */
+  waitingFor?: string | undefined;
   onSwitch: () => void;
   onRestart: () => void;
   onSignIn: () => void;
@@ -78,17 +78,18 @@ export function ConnectionRow({
   const toolCount = `${tools.length} tool${tools.length === 1 ? '' : 's'}`;
   // An oauth app that is connecting is waiting on the person's browser, not on the network.
   const waiting = app.auth === 'oauth' && app.status === 'connecting';
-  const status = waitingForPc
-    ? {
-        className: 'cx-status cx-status--warn',
-        dot: 'home-dot home-dot--warn',
-        words: 'Waiting for This PC',
-      }
-    : {
-        className: 'cx-status',
-        dot: STATUS_DOT[app.status],
-        words: waiting ? 'Waiting for the browser' : STATUS_WORDS[app.status],
-      };
+  const status =
+    waitingFor !== undefined
+      ? {
+          className: 'cx-status cx-status--warn',
+          dot: 'home-dot home-dot--warn',
+          words: `Waiting for ${waitingFor}`,
+        }
+      : {
+          className: 'cx-status',
+          dot: STATUS_DOT[app.status],
+          words: waiting ? 'Waiting for the browser' : STATUS_WORDS[app.status],
+        };
   const needsSignIn = app.auth === 'oauth' && app.status === 'needs-sign-in';
   const versionWords = update === undefined ? null : updateMeta(update);
   const updateShown = update !== undefined && updateVisible(update);
@@ -107,8 +108,10 @@ export function ConnectionRow({
             )}
           </span>
           <span className="cx-meta">
-            {TRANSPORT_WORDS[app.transport]} · {toolCount}
-            {versionWords !== null && ` · ${versionWords}`}
+            {waitingFor !== undefined
+              ? `${waitingFor} is off. ${name} jobs wait and start when it is back.`
+              : `${TRANSPORT_WORDS[app.transport]} · ${toolCount}`}
+            {waitingFor === undefined && versionWords !== null && ` · ${versionWords}`}
           </span>
         </div>
         <div className="cx-row__side">

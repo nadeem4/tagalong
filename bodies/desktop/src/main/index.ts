@@ -459,7 +459,7 @@ async function start(): Promise<void> {
   const bodyId = readOrMakeBodyId(settingsStore);
   nodeRunner = createNodeRunner({
     link,
-    nodeId: bodyId.replace(/^desktop-/, 'node-'),
+    nodeId: nodeIdOf(bodyId),
     disabled: startsNoProcesses(process.env),
     spawn: (env) => realSpawnNode(brainRun(), env),
   });
@@ -687,6 +687,11 @@ let pauseListening: (change: Partial<typeof listeningWhy>) => void = () => undef
  * panel is open on something else (a quiet line, a drop card) the bubble is not showing, so
  * the words are dropped.
  */
+/** The node this PC runs beside a remote brain: its desktop body id with the `node-` prefix. */
+function nodeIdOf(desktopBodyId: string): string {
+  return desktopBodyId.replace(/^desktop-/, 'node-');
+}
+
 function showRemark(params: unknown): void {
   const panel = desktop?.panel;
   const avatar = desktop?.avatar;
@@ -1145,7 +1150,10 @@ function registerIpc(): void {
     brain: required().brain,
     runTailscale,
   });
-  registerPlacementsIpc(handle, required().brain);
+  registerPlacementsIpc(handle, {
+    brain: required().brain,
+    thisPcNode: nodeIdOf(readOrMakeBodyId(required().settingsStore)),
+  });
   registerBrainServiceIpc(handle, {
     run: (args) => realRunTagalong(brainRun(), args),
     isService: async () => (await brainControl?.card())?.startedBy === 'service',

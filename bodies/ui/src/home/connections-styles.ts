@@ -203,7 +203,7 @@ export const CONNECTIONS_CSS = `
   height: 28px; padding: 0 ${t.space.md}px; border-radius: ${t.radius.sm}px; border: 1px solid ${themedColor.panelLine};
   background: none; font: inherit; ${typeCss('small')}; font-weight: 600; color: ${themedColor.panelMuted}; cursor: pointer;
 }
-:is(.home, .wt) .cx-runs__seg[aria-pressed='true'] { background: ${themedColor.panelTile}; color: ${themedColor.panelText}; }
+:is(.home, .wt) .cx-runs__seg[aria-pressed='true'] { background: ${t.color.gold}; border-color: transparent; color: ${t.color.goldInk}; }
 :is(.home, .wt) .cx-runs__btn:focus-visible, :is(.home, .wt) .cx-runs__item:focus-visible, :is(.home, .wt) .cx-runs__seg:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 2px; }
 :is(.home, .wt) .dv-confirm {
   display: flex; flex-wrap: wrap; align-items: center; gap: ${t.space.md}px ${t.space.lg}px; padding: ${t.space.lg}px; margin: 0 0 ${t.space.md}px;

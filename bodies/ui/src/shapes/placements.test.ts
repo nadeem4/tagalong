@@ -5,14 +5,16 @@ import { choiceOf, parsePlacements, placeOf } from './placements';
 const THIS_PC = 'node-ab12';
 
 describe('parsePlacements', () => {
-  it('keys each placement by kind and id, with the node id of this PC the brain names', () => {
-    const state = parsePlacements({
-      this_pc: THIS_PC,
-      placements: [
-        { kind: 'app', id: 'gmail', mode: 'brain', body_id: null, prefer: null },
-        { kind: 'expert', id: 'claude_code', mode: 'both', body_id: THIS_PC, prefer: 'ask' },
-      ],
-    });
+  it('keys each placement by kind and id, with the node id of this PC', () => {
+    const state = parsePlacements(
+      {
+        placements: [
+          { kind: 'app', id: 'gmail', mode: 'brain', body_id: null, prefer: null },
+          { kind: 'expert', id: 'claude_code', mode: 'both', body_id: THIS_PC, prefer: 'ask' },
+        ],
+      },
+      THIS_PC,
+    );
     expect(state.thisPc).toBe(THIS_PC);
     expect(state.places['app:gmail']).toEqual({ mode: 'brain', bodyId: null, prefer: null });
     expect(state.places['expert:claude_code']).toEqual({

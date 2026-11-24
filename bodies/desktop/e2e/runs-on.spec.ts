@@ -90,11 +90,11 @@ test('the Ask me card shows both places and Remember my choice keeps the answer'
   await field.waitFor({ state: 'visible', timeout: 30_000 });
   await field.fill('please where ask');
   await field.press('Enter');
-  const card = panel.getByRole('region', { name: /^Where should Files run/ });
-  await expect(card.getByRole('button', { name: 'Brain' })).toBeVisible({ timeout: 30_000 });
-  await expect(card.getByRole('button', { name: 'this-pc' })).toBeVisible();
-  await card.getByRole('checkbox', { name: 'Remember my choice' }).check();
-  await card.getByRole('button', { name: 'Brain' }).click();
+  const card = panel.getByRole('region', { name: 'Where should Files run?' });
+  await expect(card.getByRole('button', { name: 'Studio-PC' })).toBeVisible({ timeout: 30_000 });
+  await expect(card.getByRole('button', { name: 'This PC' })).toBeVisible();
+  await card.getByRole('checkbox', { name: 'Remember my choice for Files' }).check();
+  await card.getByRole('button', { name: 'Studio-PC' }).click();
   await expect.poll(() => brain.placementCalls.at(-1), { timeout: 15_000 }).toBe('app files brain');
   await expect
     .poll(() => brain.answers.at(-1), { timeout: 15_000 })

@@ -13,6 +13,7 @@ export function RunsOn({
   machine,
   choice,
   tryFirst,
+  canAsk,
   onChange,
 }: {
   name: string;
@@ -20,6 +21,8 @@ export function RunsOn({
   machine: string;
   choice: RunsChoice;
   tryFirst: TryFirst;
+  /** Apps may ask each time; an expert never does (the brain falls back to itself). */
+  canAsk: boolean;
   onChange: (choice: RunsChoice, tryFirst: TryFirst) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -94,7 +97,7 @@ export function RunsOn({
               ))}
             </div>
           )}
-          {item('ask', 'Ask me each time', 'Scout asks in its bubble before it runs.')}
+          {canAsk && item('ask', 'Ask me each time', 'Scout asks in its bubble before it runs.')}
         </div>
       )}
     </div>
@@ -121,6 +124,7 @@ export function PlaceControl({
       machine={model.machine}
       choice={choice}
       tryFirst={tryFirst}
+      canAsk={kind === 'app'}
       onChange={(next, first) => model.set(kind, id, next, first)}
     />
   );

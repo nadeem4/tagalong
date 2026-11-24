@@ -952,7 +952,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             state: 'open',
             text: 'Where should Files run: on the brain, or on this-pc?',
             options: ['Brain', 'this-pc'],
-            place: { app: 'files', body: 'node-e2e' },
+            place: { app: 'files', body: 'node-e2e', name: 'Files' },
           });
         } else if (msg.params?.text?.includes('choose')) {
           // Scout's own choice: no tool, no confirm, one recommended option.
@@ -1442,7 +1442,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         } else if (params.tool === 'brain_status' && options.brainStatus !== undefined) {
           value = options.brainStatus;
         } else if (params.tool === 'placement_list') {
-          value = { placements, this_pc: 'node-e2e' };
+          value = { placements };
         } else if (params.tool === 'placement_set') {
           const i = params.input ?? {};
           placementCalls.push(

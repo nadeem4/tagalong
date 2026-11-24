@@ -606,10 +606,13 @@ describe('createTurnEvents: asks', () => {
           options: ['Brain', 'This PC'],
           tool: undefined,
           input: undefined,
-          place: { app: 'files', body: 'node-1a2b3c' },
+          place: { app: 'files', body: 'node-1a2b3c', name: 'Files' },
         }),
       );
-      expect(e).toMatchObject({ question: true, place: { app: 'files', body: 'node-1a2b3c' } });
+      expect(e).toMatchObject({
+        question: true,
+        place: { app: 'files', body: 'node-1a2b3c', name: 'Files' },
+      });
     });
 
     it('an ask without free_text or recommended adds neither field', () => {

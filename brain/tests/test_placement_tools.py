@@ -24,7 +24,6 @@ class Rig:
             lambda: ["gh"],
             relocate,
             lambda m, p: self.told.append((m, p)),
-            lambda: "node-abc123",
         )
         self.handlers = {spec.name: handler for spec, handler in tools}
 
@@ -46,10 +45,6 @@ async def test_set_then_list_shows_the_placement_and_moves_the_app(rig):
     ]
     assert rig.moved == ["gh"]
     assert rig.told == [("changed", {"what": "placements"})]
-
-
-async def test_list_names_the_this_pc_node(rig):
-    assert (await rig.run("placement_list"))["this_pc"] == "node-abc123"
 
 
 @pytest.mark.parametrize(

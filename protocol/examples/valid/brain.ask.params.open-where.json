@@ -7,6 +7,6 @@
     "state": "open",
     "text": "Where should Files run: on the brain, or on This PC?",
     "options": ["Brain", "This PC"],
-    "place": { "app": "files", "body": "node-1a2b3c" }
+    "place": { "app": "files", "body": "node-1a2b3c", "name": "Files" }
   }
 }

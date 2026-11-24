@@ -9,8 +9,17 @@ import { callJson } from '../brain/call-json';
 import type { BrainCall } from '../brain/call-json';
 import type { IpcHandle } from './handle';
 
-export function registerPlacementsIpc(handle: IpcHandle, brain: BrainCall): void {
-  handle(IPC.placementsList, async () => parsePlacements(await callJson(brain, 'placement_list')));
+export interface PlacementsDeps {
+  brain: BrainCall;
+  /** The body id of the node this PC runs beside a remote brain. */
+  thisPcNode: string;
+}
+
+export function registerPlacementsIpc(handle: IpcHandle, deps: PlacementsDeps): void {
+  const { brain, thisPcNode } = deps;
+  handle(IPC.placementsList, async () =>
+    parsePlacements(await callJson(brain, 'placement_list'), thisPcNode),
+  );
   handle(IPC.placementsSet, async (_event, kind: 'app' | 'expert', id: string, place: Place) => {
     await callJson(brain, 'placement_set', {
       kind,

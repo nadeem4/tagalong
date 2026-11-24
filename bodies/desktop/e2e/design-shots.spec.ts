@@ -1274,6 +1274,7 @@ test('BAU3 Runs on control and the Ask me card, light and dark', async () => {
     await expect(two.home.getByRole('button', { name: /^Try this PC first/ })).toBeVisible();
     await both(two.home, 'control-open');
     await two.home.keyboard.press('Escape');
+    const thisPc = (await two.home.evaluate(() => window.tagalong.placementsState())).thisPc;
     two.brain.setScene({
       apps: [
         {
@@ -1284,7 +1285,7 @@ test('BAU3 Runs on control and the Ask me card, light and dark', async () => {
           enabled: true,
           status: 'error',
           error: 'Files runs on this PC, which is not connected right now.',
-          waiting_on: 'node-e2e',
+          waiting_on: thisPc,
           tools: [],
         },
       ],
@@ -1327,7 +1328,7 @@ test('BAU3 Runs on control and the Ask me card, light and dark', async () => {
     await field.waitFor({ state: 'visible', timeout: 30_000 });
     await field.fill('please where ask');
     await field.press('Enter');
-    const card = panel.getByRole('region', { name: /^Where should Files run/ });
+    const card = panel.getByRole('region', { name: 'Where should Files run?' });
     await expect(card).toBeVisible({ timeout: 30_000 });
     await card.getByRole('checkbox').check();
     await both(panel, 'ask-me');

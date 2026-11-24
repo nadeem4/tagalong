@@ -14,6 +14,7 @@ function setup(props: Partial<Parameters<typeof RunsOn>[0]> = {}) {
       machine="mini-pc"
       choice="brain"
       tryFirst="body"
+      canAsk
       onChange={onChange}
       {...props}
     />,
@@ -30,6 +31,13 @@ describe('RunsOn', () => {
     }
     fireEvent.click(screen.getByRole('button', { name: /^This PC/ }));
     expect(onChange).toHaveBeenCalledWith('body', 'body');
+  });
+
+  it('leaves out Ask me each time where Scout never asks', () => {
+    setup({ canAsk: false });
+    open();
+    expect(screen.queryByRole('button', { name: /^Ask me each time/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Both/ })).toBeInTheDocument();
   });
 
   it('asks which to try first once Both is chosen', () => {

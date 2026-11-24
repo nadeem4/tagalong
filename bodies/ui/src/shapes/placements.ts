@@ -7,7 +7,6 @@
 import { z } from 'zod';
 
 const Wire = z.object({
-  this_pc: z.string(),
   placements: z.array(
     z.object({
       kind: z.enum(['app', 'expert']),
@@ -27,7 +26,7 @@ export interface Place {
 }
 
 export interface PlacementsState {
-  /** The body id of the node this PC runs beside a remote brain, as the brain names it. */
+  /** The body id of the node this PC runs beside a remote brain. */
   thisPc: string;
   /** Keyed `app:<id>` or `expert:<id>`; a tool with no entry runs on the brain. */
   places: Record<string, Place>;
@@ -38,17 +37,16 @@ export type TryFirst = 'body' | 'brain';
 
 export const placeKey = (kind: 'app' | 'expert', id: string): string => `${kind}:${id}`;
 
-export function parsePlacements(json: unknown): PlacementsState {
+export function parsePlacements(json: unknown, thisPc: string): PlacementsState {
   const places: Record<string, Place> = {};
-  const wire = Wire.parse(json);
-  for (const row of wire.placements) {
+  for (const row of Wire.parse(json).placements) {
     places[placeKey(row.kind, row.id)] = {
       mode: row.mode,
       bodyId: row.body_id,
       prefer: row.prefer,
     };
   }
-  return { thisPc: wire.this_pc, places };
+  return { thisPc, places };
 }
 
 export function choiceOf(place: Place | undefined): { choice: RunsChoice; tryFirst: TryFirst } {

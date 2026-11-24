@@ -105,6 +105,29 @@ describe('Runs on on Connections rows', () => {
       },
     });
     const row = await screen.findByRole('region', { name: 'Gmail' });
-    expect(row).toHaveTextContent('Waiting for This PC');
+    await waitFor(() => expect(row).toHaveTextContent('Waiting for This PC'));
+  });
+
+  it('names another body a row waits on, by the name the brain gives it', async () => {
+    open({
+      brainCard: REMOTE,
+      apps: [app('gmail', 'Gmail', { status: 'error', waiting_on: 'desktop-laptop' })],
+      bodies: {
+        bodies: [{ id: 'desktop-laptop', kind: 'desktop', name: 'Laptop', connected: false }],
+        whatsapp: { enabled: false, set: {} as never, complete: false, state: 'off', port: 0 },
+      },
+    });
+    const row = await screen.findByRole('region', { name: 'Gmail' });
+    await waitFor(() => expect(row).toHaveTextContent('Waiting for Laptop'));
+    expect(row).toHaveTextContent('Laptop is off. Gmail jobs wait and start when it is back.');
+  });
+
+  it('offers Ask me each time on an app but not on an expert', async () => {
+    open({ brainCard: REMOTE });
+    fireEvent.click(await screen.findByRole('button', { name: 'Runs on, Files: mini-pc' }));
+    expect(screen.getByRole('button', { name: /^Ask me each time/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Experts' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Runs on, Claude Code/ }));
+    expect(screen.queryByRole('button', { name: /^Ask me each time/ })).not.toBeInTheDocument();
   });
 });

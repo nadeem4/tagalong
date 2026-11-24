@@ -60,7 +60,7 @@ export function AppsTab({
       update={rowUpdate(updates, 'app', app.id)}
       onUpdate={() => updates?.onUpdate('app', app.id)}
       runsOn={<PlaceControl model={runsOn} kind="app" id={app.id} name={app.name} />}
-      waitingForPc={app.waiting_on != null}
+      waitingFor={app.waiting_on != null ? runsOn?.nameOf(app.waiting_on) : undefined}
     />
   );
   const official = officialIds === null ? [] : apps.filter((app) => officialIds.has(app.id));
