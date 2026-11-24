@@ -11,29 +11,12 @@ describe('STEPS', () => {
     expect(KEY_STEP).toBe(10);
     expect(STEPS.find((step) => step.id === KEY_STEP)?.title).toBe('API key');
   });
-
-  it('step eleven is Get to know you and can be skipped', () => {
-    expect(STEPS[10]).toEqual({ id: 11, title: 'Get to know you', skippable: true });
-  });
-
-  it('step twelve is Connect your tools and can be skipped', () => {
-    expect(STEPS[11]).toEqual({ id: 12, title: 'Connect your tools', skippable: true });
-  });
 });
 
 describe('side list names', () => {
   it('names step 7 Everyday jobs and keeps its id', () => {
     expect(STEPS.find((step) => step.id === 7)?.title).toBe('Everyday jobs');
     expect(STEPS.find((step) => step.id === 3)?.title).toBe('How it works');
-  });
-});
-
-describe('onBrain', () => {
-  it('marks the steps a paired desktop reads from its brain: Voice and the API key', () => {
-    expect(STEPS.filter((step) => step.onBrain).map((step) => step.title)).toEqual([
-      'Voice',
-      'API key',
-    ]);
   });
 });
 

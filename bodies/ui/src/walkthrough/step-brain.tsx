@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react';
 import { Toggle, ThreeWay } from '../controls';
 import type { FoundBrain } from '../shapes/pairing';
+import { BrainDiagram } from '../pair/brain-diagram';
 import { FoundBrains } from '../pair/found-brains';
 import { PairLinkForm } from '../pair/pair-link-form';
 import { ServerSetup } from '../pair/server-setup';
@@ -16,16 +17,20 @@ import type { WalkthroughHost } from './walkthrough-host';
 type Place = 'this' | 'other' | 'server';
 
 const PLACES: readonly { id: Place; title: string; detail: string }[] = [
-  { id: 'this', title: 'On this computer', detail: 'Simplest. Scout runs here, beside you.' },
+  {
+    id: 'this',
+    title: 'On this computer',
+    detail: 'Everything stays on this PC. The simplest way to start.',
+  },
   {
     id: 'other',
     title: 'On another computer',
-    detail: 'A PC that is already running Scout’s brain, at home or elsewhere.',
+    detail: 'Scout already lives on a PC you own. Pair this one to it.',
   },
   {
     id: 'server',
     title: 'On a server I’ll set up',
-    detail: 'An always-on machine. Scout shows you the commands.',
+    detail: 'An always-on machine or a cloud server. One command installs it, then you pair.',
   },
 ];
 
@@ -41,7 +46,7 @@ export function StepBrain({
   onPaired,
 }: {
   host: Host;
-  /** Called with whether Next must wait: another place is chosen and nothing is paired yet. */
+  /** Called with whether Next must wait: another computer is chosen and nothing is paired yet. */
   onBlock: (blocked: boolean) => void;
   /** Called with whether this PC's brain is set to be kept on for other devices. */
   onShare: (shared: boolean) => void;
@@ -60,7 +65,7 @@ export function StepBrain({
     discoverBrains().then(setFound, () => setFound([]));
   }, [place, discoverBrains]);
 
-  const blocked = place !== 'this' && pairedWith === null;
+  const blocked = place === 'other' && pairedWith === null;
   useEffect(() => onBlock(blocked), [blocked, onBlock]);
 
   const shared = place === 'this' && keepOn;
@@ -75,17 +80,22 @@ export function StepBrain({
   return (
     <section>
       <span className="wt-label">Your brain</span>
-      <h1>Where should Scout’s brain live?</h1>
+      <h1>Where does Scout’s brain live?</h1>
       <p className="wt-lead">
-        The brain is the part of Scout that thinks and remembers. Most people keep it on this
-        computer. You can move it later.
+        The brain is the part of Scout that thinks, remembers and runs your jobs. This computer can
+        always talk to it, wherever it lives.
       </p>
       <div className="pair-paths">
         <ThreeWay
           cards
           label="Where Scout’s brain lives"
           value={place}
-          options={PLACES.map(({ id, title, detail }) => ({ value: id, label: title, detail }))}
+          options={PLACES.map(({ id, title, detail }) => ({
+            value: id,
+            label: title,
+            detail,
+            icon: <BrainDiagram place={id} />,
+          }))}
           onChange={(next) => {
             setPlace(next as Place);
             setPairedWith(null);

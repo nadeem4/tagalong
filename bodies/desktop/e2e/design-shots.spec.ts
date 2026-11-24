@@ -1000,7 +1000,7 @@ test('BAU0 Home and the tour, light and dark', async () => {
   try {
     const tour = await first.find('walkthrough');
     await expect(
-      tour.getByRole('heading', { name: 'Where should Scout’s brain live?' }),
+      tour.getByRole('heading', { name: 'Where does Scout’s brain live?' }),
     ).toBeVisible();
     for (const scheme of ['light', 'dark'] as const) {
       await tour.emulateMedia({ colorScheme: scheme });
@@ -1049,7 +1049,7 @@ test('BAU1 where the brain lives and pairing, light and dark', async () => {
       }
     };
     await expect(
-      tour.getByRole('heading', { name: 'Where should Scout’s brain live?' }),
+      tour.getByRole('heading', { name: 'Where does Scout’s brain live?' }),
     ).toBeVisible();
     await shoot('brain-step');
     await tour.getByRole('radio', { name: /On a server I’ll set up/ }).check();

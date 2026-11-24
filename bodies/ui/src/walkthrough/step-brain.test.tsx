@@ -71,7 +71,7 @@ describe('StepBrain', () => {
   });
 
   it.each<[Extract<PairOutcome, { ok: false }>['reason'], RegExp]>([
-    ['refused', /expired or was already used/],
+    ['refused', /expired, was already used, or there were too many wrong tries/],
     ['wrong_brain', /not the computer that made this link. Nothing was sent/],
     ['unreachable', /Can’t reach 192\.168\.1\.20/],
     ['bad_link', /isn’t a Scout pairing link/],
@@ -84,9 +84,10 @@ describe('StepBrain', () => {
     expect(onBlock).toHaveBeenLastCalledWith(true);
   });
 
-  it('shows the server install commands per system, then takes the link', async () => {
-    open();
+  it('shows the server install commands per system and lets Next through, since the server is set up later', async () => {
+    const { onBlock } = open();
     fireEvent.click(screen.getByRole('radio', { name: /On a server I’ll set up/ }));
+    expect(onBlock).toHaveBeenLastCalledWith(false);
     expect(screen.getByText(/install\.sh \| sh/)).toBeInTheDocument();
     expect(screen.getByText('tagalong serve --install-service')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('radio', { name: 'Windows' }));

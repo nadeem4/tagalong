@@ -53,7 +53,7 @@ describe('Walkthrough', () => {
   it('Next advances, and Skip without a key goes to the key step without saving', async () => {
     const host = open();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      'Where should Scout’s brain live?',
+      'Where does Scout’s brain live?',
     );
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     await screen.findByRole('heading', { name: 'One companion for everything you do' });

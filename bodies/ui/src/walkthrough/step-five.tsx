@@ -19,7 +19,15 @@ export const TALK_KEYS: readonly { value: string; label: string }[] = [
   { value: 'ScrollLock', label: 'Scroll Lock' },
 ];
 
-function VoiceForm({ host, settings }: { host: WalkthroughHost; settings: WalkthroughSettings }) {
+function VoiceForm({
+  host,
+  settings,
+  brainName,
+}: {
+  host: WalkthroughHost;
+  settings: WalkthroughSettings;
+  brainName: string | null;
+}) {
   const start = settings.voice;
   const startTalk = settings.hotkeys.talk ?? 'RightControl';
   const startMouth = start.mouth === 'system' ? 'system' : 'kokoro';
@@ -88,8 +96,8 @@ function VoiceForm({ host, settings }: { host: WalkthroughHost; settings: Walkth
           ]}
         />
         <p className="wt-help">
-          Made on your computer. The voice you pick below starts downloading as soon as you pick it;
-          until it is ready, Scout uses the Windows voice.
+          Made on {brainName ?? 'your computer'}. The voice you pick below starts downloading as
+          soon as you pick it; until it is ready, Scout uses the Windows voice.
         </p>
       </div>
       <div className="wt-voice">
@@ -116,7 +124,14 @@ function VoiceForm({ host, settings }: { host: WalkthroughHost; settings: Walkth
   );
 }
 
-export function StepFive({ host }: { host: WalkthroughHost }) {
+export function StepFive({
+  host,
+  brainName = null,
+}: {
+  host: WalkthroughHost;
+  /** The other computer the brain runs on, when this PC is paired to one. */
+  brainName?: string | null;
+}) {
   const { settings, failed } = useWalkthroughSettings(host);
   return (
     <section>
@@ -126,7 +141,7 @@ export function StepFive({ host }: { host: WalkthroughHost }) {
         Hold the talk key, ask out loud, let go. Scout answers in short spoken sentences, and the
         words show in the bubble too.
       </p>
-      {settings !== null && <VoiceForm host={host} settings={settings} />}
+      {settings !== null && <VoiceForm host={host} settings={settings} brainName={brainName} />}
       {failed && (
         <p className="wt-error" role="alert">
           Scout could not read your settings.

@@ -8,8 +8,6 @@ import { Button, CopyButton } from '../controls';
 import type { PairOffer } from '../shapes/pairing';
 import { QrImage } from './qr-image';
 
-const CODE_LIFE_MS = 10 * 60 * 1000;
-
 interface PairDialogProps {
   make: () => Promise<PairOffer>;
   copyText: (text: string) => Promise<void>;
@@ -24,6 +22,7 @@ function clock(ms: number): string {
 /** Counts down to expiry, on its own tick so the QR beside it is not redrawn each second. */
 function Countdown({ expiresAt }: { expiresAt: string }) {
   const [now, setNow] = useState(() => Date.now());
+  const [life] = useState(() => Date.parse(expiresAt) - Date.now());
   const left = Date.parse(expiresAt) - now;
   const expired = left <= 0;
   useEffect(() => {
@@ -41,7 +40,7 @@ function Countdown({ expiresAt }: { expiresAt: string }) {
         {!expired && <span>Expires in {clock(left)}</span>}
       </div>
       <div className="pair-bar" aria-hidden="true">
-        <i style={{ width: `${Math.min(100, Math.max(0, (left / CODE_LIFE_MS) * 100))}%` }} />
+        <i style={{ width: `${Math.min(100, Math.max(0, (left / life) * 100))}%` }} />
       </div>
     </div>
   );

@@ -423,8 +423,8 @@ Rules each module enforces:
   (`src/walkthrough.tsx`) mounts `Walkthrough` from `@tagalong/ui` (`bodies/ui/src/walkthrough/`):
   a navy side panel with the twelve-step list, the step on the page, and a footer (Back on the left, not on step 1;
   a quiet Skip link (not on steps 10 and 12) and the primary Next on the right, "Get started" on step 2; on step 10 Next stays off until the key is good; step 12 shows a quiet "I'll do this later" and the primary "Finish", which both finish and are never off).
-  Step 1, "Where should Scout's brain live?" (`step-brain.tsx`, with `bodies/ui/src/pair/`), offers
-  three paths, shown as the shared `ThreeWay` control in its `cards` form (one radio group, arrow keys). **On this computer** is the default, with a "Keep it on for my other
+  Step 1, "Where does Scout's brain live?" (`step-brain.tsx`, with `bodies/ui/src/pair/`), offers
+  three paths, shown as the shared `ThreeWay` control in its `cards` form (one radio group, arrow keys), each with a small drawing (`pair/brain-diagram.tsx`) of the machines, the gold dot marking the brain. **On this computer** is the default, with a "Keep it on for my other
   devices" `Toggle`, off: on, Next runs `installBrainService` (`tagalong service install`, which turns the
   network listener on) and the finish card gains **Pair a device**, which opens `PairDialog`: a QR
   (`QrImage`, drawn from the terminal text `pair_make` returns), the link with Copy, a 10-minute
@@ -433,11 +433,11 @@ Rules each module enforces:
   **On another computer** lists brains found nearby (`discoverBrains`, asked only once this path is chosen) and takes a pairing link
   (`pairWithLink`); each failure has its own line (expired or used, not the computer that made the
   link, cannot reach it, not a link, cannot seal) in `pair/pair-text.ts` (the link is read with `parsePairLink` from `@tagalong/contract`), and Next stays off until
-  the pairing succeeds. **On a server I'll set up** shows the install commands per system (the
-  ones in docs/brain/server.md) with Copy, then the same link field. Once paired with a brain that
+  the pairing succeeds on this path. **On a server I'll set up** shows the install commands per system (the
+  ones in docs/brain/server.md) with Copy, then the same link field; Next stays on, since the server is set up later. Once paired with a brain that
   is not on this PC, the side list tags the Voice and API key steps "On <host>" and the key step
   says "Already set on <host>" when that brain has a key. The renderer reads where the brain is
-  from `brainLink` on each step change.
+  from `brainLink` once when the tour opens, and a pairing in step 1 sets it at once.
   Steps 2 to 5 are static copy under the pitch "One companion for everything you do": welcome (a day
   with Scout), how it works (the route a request takes), what to ask (five everyday moments, from
   `moments.ts`) and asking (the ask and pause keys as keycaps, a static bubble preview, what Scout
@@ -461,7 +461,7 @@ Rules each module enforces:
   file, only sent to Anthropic, never written to history or logs, change or remove it in Settings)
   and never the key; "Where do I get one?" calls
   `openKeyPage`, which main answers by opening exactly the Console key page.
-  Step 11, "Let Scout get to know you" (`step-know-me.tsx`), is skippable: it mounts `KnowMeFlow` (the get-to-know-me form and result view, read through the host bridge context) and never blocks Next, because a run goes on in the brain while the person moves on. Step 11, "Connect your tools" (`step-ten.tsx`), is the one place the tour connects things, and
+  Step 11, "Let Scout get to know you" (`step-know-me.tsx`), is skippable: it mounts `KnowMeFlow` (the get-to-know-me form and result view, read through the host bridge context) and never blocks Next, because a run goes on in the brain while the person moves on. Step 12, "Connect your tools" (`step-ten.tsx`), is the one place the tour connects things, and
   nothing on it blocks Finish. It reads the brain's `setup_overview` through the host's
   `setupOverview` (and again on `changed setup`) and draws the Connections page's rows: an **Apps**
   group (Gmail, Google Calendar and Notion, each with the Official chip, "<job> · Browser sign-in"

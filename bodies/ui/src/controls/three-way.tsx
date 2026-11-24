@@ -4,13 +4,15 @@
  * Native buttons in a radio group with a roving tab stop; arrow keys move the choice, as
  * native radios do. The look lives in CONTROLS_CSS.
  */
-import { useRef } from 'react';
+import { useRef, type ReactNode } from 'react';
 
 export interface ThreeWayOption {
   value: string;
   label: string;
   /** A line under the label, shown by `cards`. */
   detail?: string;
+  /** A picture at the start of the card, shown by `cards`. */
+  icon?: ReactNode;
   disabled?: boolean;
 }
 
@@ -86,10 +88,13 @@ export function ThreeWay({
         >
           {cards ? (
             <>
-              <strong>{option.label}</strong>
-              {option.detail !== undefined && (
-                <span className="tg-three__detail">{option.detail}</span>
-              )}
+              {option.icon}
+              <span className="tg-three__text">
+                <strong>{option.label}</strong>
+                {option.detail !== undefined && (
+                  <span className="tg-three__detail">{option.detail}</span>
+                )}
+              </span>
             </>
           ) : (
             option.label

@@ -66,7 +66,7 @@ function body(
     case 5:
       return <StepFour host={host} />;
     case 6:
-      return <StepFive host={host} />;
+      return <StepFive host={host} brainName={brainName} />;
     case 7:
       return <StepSix />;
     case 8:

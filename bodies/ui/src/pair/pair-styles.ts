@@ -7,6 +7,8 @@ import { themeTokens as t, themedColor, typeCss } from '../theme/tokens';
 
 export const PAIR_CSS = `
 .pair-paths { margin-top: ${t.space.xxl}px; max-width: 640px; }
+.pair-diag { flex: none; width: 132px; height: 56px; color: ${themedColor.panelMuted}; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.pair-diag .pair-diag__brain { fill: ${t.color.gold}; stroke: none; }
 .pair-meta { ${typeCss('small')}; color: ${themedColor.panelMuted}; }
 .pair-label { display: block; margin: 0 0 4px; ${typeCss('small')}; font-weight: ${t.fontWeight.semibold}; }
 .pair-keep { display: flex; align-items: center; justify-content: space-between; gap: ${t.space.lg}px; margin-top: ${t.space.xl}px; max-width: 640px; }

@@ -120,9 +120,7 @@ async function expectClosedAndDone(): Promise<void> {
 test('fresh start shows the walkthrough and hides the pet, bubble and dock', async () => {
   await launchWith({ hasKey: true });
   const tour = await windowFor('walkthrough');
-  await expect(
-    tour.getByRole('heading', { name: 'Where should Scout’s brain live?' }),
-  ).toBeVisible();
+  await expect(tour.getByRole('heading', { name: 'Where does Scout’s brain live?' })).toBeVisible();
   expect(await visible('avatar')).toBe(false);
   expect(await visible('panel')).toBe(false);
   expect(tourSeen()).toBe(false);
@@ -181,7 +179,7 @@ test('closing mid-way brings the pet back and the tour returns next launch', asy
   await launch(brain!.addr, [], dataDir);
   const again = await windowFor('walkthrough');
   await expect(
-    again.getByRole('heading', { name: 'Where should Scout’s brain live?' }),
+    again.getByRole('heading', { name: 'Where does Scout’s brain live?' }),
   ).toBeVisible();
 });
 
@@ -298,9 +296,7 @@ test('Show the tour again from Home reopens it at step 1', async () => {
   const home = await windowFor('home');
   await home.getByRole('button', { name: 'Show the tour again' }).click();
   const tour = await windowFor('walkthrough');
-  await expect(
-    tour.getByRole('heading', { name: 'Where should Scout’s brain live?' }),
-  ).toBeVisible();
+  await expect(tour.getByRole('heading', { name: 'Where does Scout’s brain live?' })).toBeVisible();
 });
 
 test('the everyday jobs step only explains: no Connect or Set up buttons', async () => {

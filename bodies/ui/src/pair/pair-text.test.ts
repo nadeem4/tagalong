@@ -1,9 +1,7 @@
-/** Tests for the pairing words: a brain's name from its address, which addresses are this PC, the host of a pairing link. */
+/** Tests for the pairing words: a brain's name from its address, which addresses are this PC. */
 
 import { describe, expect, it } from 'vitest';
-import { brainNameOf, isLocalAddr, linkHost } from './pair-text';
-
-const FP = 'ab'.repeat(32);
+import { brainNameOf, isLocalAddr } from './pair-text';
 
 describe('brainNameOf', () => {
   it('is the host, without scheme or port', () => {
@@ -22,17 +20,4 @@ describe('isLocalAddr', () => {
     'treats %s as another computer',
     (addr) => expect(isLocalAddr(addr)).toBe(false),
   );
-});
-
-describe('linkHost', () => {
-  it('is the host of a pairing link', () => {
-    expect(linkHost(`tagalong://pair?addr=192.168.1.20:47323&fp=${FP}&code=xyz`)).toBe(
-      '192.168.1.20',
-    );
-  });
-
-  it('is null for text that is not a pairing link', () => {
-    expect(linkHost('hello')).toBeNull();
-    expect(linkHost('tagalong://pair?addr=192.168.1.20:47323')).toBeNull();
-  });
 });

@@ -2653,7 +2653,7 @@ brain; this checks it on the real one.
 1. **Action:** delete `settings.json` and start Tagalong, with or without a brain. **Expected:**
    the walkthrough opens by itself; no pet, bubble or dock shows. Escape does not close it.
 2. **Action:** press **Get started**, then **Next** through the steps. **Expected:** step 1 reads
-   "Where should Scout's brain live?" and has no Back; the footer shows Back, a quiet **Skip**
+   "Where does Scout's brain live?" and has no Back; the footer shows Back, a quiet **Skip**
    link (not on steps 10 and 12) and the primary button (**Get started** on step 2); the side list (step 7 is "Everyday jobs", step 11 "Let Scout get to know you", step 12 "Connect your tools") jumps only to steps you
    have reached; Skip with no key goes to step 10 and saves nothing. Steps 2 to 4 are text only; step
    5 shows the ask and pause keys as keycaps (never "CommandOrControl").
@@ -2677,8 +2677,8 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`, `bodies
 
 1. **Action:** on step 1 look at the page. **Expected:** three choices (On this computer, preselected; On another computer; On a server I'll set up). On this computer shows a "Keep it on for my other devices" switch, off.
 2. **Action:** switch it on and press **Next**. **Expected:** Tagalong registers the brain as a logon service with the network on (Home's Where things run shows it); at the end the finish card has **Pair a device**, which opens a QR with the link, a countdown and **Make a new code**. On another PC, pasting that link into **Pairing link** pairs it.
-3. **Action:** choose **On another computer** with a brain running on your network (`tagalong serve`). **Expected:** it appears under "Found nearby"; **Next** stays off. Paste a link made with `tagalong pair`. **Expected:** "Paired with <host>", **Next** turns on, the side list tags **Voice** and **API key** "On <host>", and the key step says "Already set on <host>" when that brain has a key. A used or old link says "That code has expired or was already used"; a link whose brain shows another certificate says "This is not the computer that made this link. Nothing was sent."; an off or unreachable brain says "Can't reach <host>".
-4. **Action:** choose **On a server I'll set up**. **Expected:** install commands per system with Copy, and the same link field.
+3. **Action:** choose **On another computer** with a brain running on your network (`tagalong serve`). **Expected:** it appears under "Found nearby"; **Next** stays off. Paste a link made with `tagalong pair`. **Expected:** "Paired with <host>", **Next** turns on, the side list tags **Voice** and **API key** "On <host>", and the key step says "Already set on <host>" when that brain has a key. A used or old link (or five wrong tries in a minute) says "That code has expired, was already used, or there were too many wrong tries"; a link whose brain shows another certificate says "This is not the computer that made this link. Nothing was sent."; an off or unreachable brain says "Can't reach <host>".
+4. **Action:** choose **On a server I'll set up**. **Expected:** install commands per system with Copy, and the same link field; **Next** stays on.
 5. **Action:** open the browser add-on's popup. **Expected:** a status dot (green connected, red otherwise); **Show the short code** reveals the pairing code field (it opens by itself when the add-on needs a code).
 
 ### K.5. Steps 7 to 12 and the end

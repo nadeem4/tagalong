@@ -28,7 +28,7 @@ export function pairErrorLine(
 ): string {
   switch (reason) {
     case 'refused':
-      return `That code has expired or was already used. Codes last 10 minutes. Make a new one on ${name}.`;
+      return `That code has expired, was already used, or there were too many wrong tries. Wait a minute, then make a new one on ${name}.`;
     case 'wrong_brain':
       return 'This is not the computer that made this link. Nothing was sent.';
     case 'unreachable':

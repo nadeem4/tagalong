@@ -7,8 +7,8 @@ import { StepSaveContext } from './use-step-save';
 import { createFakeHostBridge } from '../test-support/fake-host-bridge';
 import { makeWalkthroughHost, mountStep } from './test-host';
 
-function mount(host = makeWalkthroughHost()) {
-  const saver = mountStep(<StepFive host={host} />);
+function mount(host = makeWalkthroughHost(), brainName: string | null = null) {
+  const saver = mountStep(<StepFive host={host} brainName={brainName} />);
   return { host, saver };
 }
 
@@ -126,6 +126,12 @@ describe('StepFive', () => {
     await screen.findByLabelText('Talk key');
     await saver.save();
     expect(host.saveSettings).not.toHaveBeenCalled();
+  });
+
+  it('says the voice is made on the other computer when the brain lives there', async () => {
+    mount(makeWalkthroughHost(), 'mini-pc');
+    await screen.findByLabelText('Talk key');
+    expect(screen.getByText(/^Made on mini-pc\./)).toBeInTheDocument();
   });
 
   it('shows the spec copy word for word', async () => {
