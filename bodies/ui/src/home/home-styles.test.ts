@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { themeTokens as t } from '../theme/tokens';
+import { WALKTHROUGH_CSS } from '../walkthrough/walkthrough-styles';
 import { HOME_CSS } from './home-styles';
 
 describe('HOME_CSS', () => {
@@ -46,5 +47,14 @@ describe('HOME_CSS', () => {
     expect(HOME_CSS).toMatch(
       /prefers-reduced-motion: reduce\)\s*\{[^}]*\.job-log__glyph--running[^}]*animation: none/,
     );
+  });
+
+  it('Home and the tour both swap the panel colour when the system is dark', () => {
+    for (const css of [HOME_CSS, WALKTHROUGH_CSS]) {
+      const dark = /prefers-color-scheme: dark\)\s*\{[^{]*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+      const darkPanel = /--tg-panel:\s*(#\w+)/.exec(dark)?.[1];
+      expect(darkPanel).toBeDefined();
+      expect(darkPanel?.toUpperCase()).not.toBe(t.color.panel.toUpperCase());
+    }
   });
 });

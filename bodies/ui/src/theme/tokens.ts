@@ -1,6 +1,6 @@
 /**
  * Design tokens shared by Home, Settings, the bubble and the dock: colours, fonts, the seven
- * type roles, spacing and radii. Contains themeTokens and typeCss.
+ * type roles, spacing and radii. Contains themeTokens, themedColor, THEME_CSS and typeCss.
  */
 
 /**
@@ -8,7 +8,7 @@
  * `themeTokens.color` takes the light values; `themedColor` and THEME_CSS carry both. Gold, the
  * navy chrome and the spend bar stay the same in both themes.
  */
-const themed = {
+export const themed = {
   panel: { light: '#F6F7FB', dark: '#0F1325' },
   panelText: { light: '#12162B', dark: '#E9ECF5' },
   panelMuted: { light: '#5A6178', dark: '#A3AAC4' },
