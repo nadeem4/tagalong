@@ -22,6 +22,7 @@ const FAKE_KEY = 'sk-ant-example-not-a-real-key';
 
 let app: ElectronApplication | undefined;
 let brain: FakeBrain | undefined;
+let remote: FakeBrain | undefined;
 let dataDir: string | undefined;
 
 test.afterEach(async () => {
@@ -31,6 +32,8 @@ test.afterEach(async () => {
     app = undefined;
     await brain?.close();
     brain = undefined;
+    await remote?.close();
+    remote = undefined;
     if (dataDir !== undefined) {
       rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
     }
@@ -117,9 +120,7 @@ async function expectClosedAndDone(): Promise<void> {
 test('fresh start shows the walkthrough and hides the pet, bubble and dock', async () => {
   await launchWith({ hasKey: true });
   const tour = await windowFor('walkthrough');
-  await expect(
-    tour.getByRole('heading', { name: 'One companion for everything you do' }),
-  ).toBeVisible();
+  await expect(tour.getByRole('heading', { name: 'Where does Scout’s brain live?' })).toBeVisible();
   expect(await visible('avatar')).toBe(false);
   expect(await visible('panel')).toBe(false);
   expect(tourSeen()).toBe(false);
@@ -128,7 +129,7 @@ test('fresh start shows the walkthrough and hides the pet, bubble and dock', asy
 test('existing user with a key sees it once, can skip the key step, then never again', async () => {
   await launchWith({ hasKey: true });
   const tour = await windowFor('walkthrough');
-  await nextTo(tour, 9);
+  await nextTo(tour, 10);
   await expect(tour.getByText('A key is already set.')).toBeVisible({ timeout: 30_000 });
   await tour.getByRole('button', { name: 'Next' }).click();
   await tour.getByRole('button', { name: 'Next' }).click();
@@ -146,7 +147,7 @@ test('existing user with a key sees it once, can skip the key step, then never a
   expect(app!.windows().some((w) => w.url().includes('walkthrough.html'))).toBe(false);
 });
 
-test('Skip without a key lands on step 9 and cannot finish', async () => {
+test('Skip without a key lands on the key step and cannot finish', async () => {
   await launchWith({ hasKey: false });
   const tour = await windowFor('walkthrough');
   await tour.getByRole('button', { name: 'Skip' }).click();
@@ -178,7 +179,7 @@ test('closing mid-way brings the pet back and the tour returns next launch', asy
   await launch(brain!.addr, [], dataDir);
   const again = await windowFor('walkthrough');
   await expect(
-    again.getByRole('heading', { name: 'One companion for everything you do' }),
+    again.getByRole('heading', { name: 'Where does Scout’s brain live?' }),
   ).toBeVisible();
 });
 
@@ -220,7 +221,7 @@ test('invalid key then valid key finishes; the key never reaches settings.json',
 test('Finish marks the tour seen at once, so closing the card with X never brings it back', async () => {
   await launchWith({ hasKey: true });
   const tour = await windowFor('walkthrough');
-  await nextTo(tour, 9);
+  await nextTo(tour, 10);
   await expect(tour.getByText('A key is already set.')).toBeVisible({ timeout: 30_000 });
   await tour.getByRole('button', { name: 'Next' }).click();
   await tour.getByRole('button', { name: 'Next' }).click();
@@ -241,7 +242,7 @@ test('Finish marks the tour seen at once, so closing the card with X never bring
   expect(app!.windows().some((w) => w.url().includes('walkthrough.html'))).toBe(false);
 });
 
-test('brain offline at step 9 says so, then recovers when the brain starts', async () => {
+test('brain offline at the key step says so, then recovers when the brain starts', async () => {
   const port = await freePort();
   await launch(`127.0.0.1:${port}`);
   const tour = await windowFor('walkthrough');
@@ -260,9 +261,28 @@ test('brain offline at step 9 says so, then recovers when the brain starts', asy
 test('a key from the environment shows the environment line and Finish is on', async () => {
   await launchWith({ hasKey: true, environment: true });
   const tour = await windowFor('walkthrough');
-  await nextTo(tour, 9);
+  await nextTo(tour, 10);
   await expect(tour.getByText('Set by your environment')).toBeVisible({ timeout: 30_000 });
   await expect(tour.getByRole('button', { name: 'Next' })).toBeEnabled();
+});
+
+test('On another computer pairs by link, and the brain steps then say where they are set', async () => {
+  remote = await startFakeBrain({ hasKey: true, tls: true });
+  await launchWith({ hasKey: true });
+  const tour = await windowFor('walkthrough');
+  await tour.getByRole('radio', { name: /On another computer/ }).check();
+  await expect(tour.getByRole('button', { name: 'Next' })).toBeDisabled();
+  await tour.getByLabel('Pairing link').fill(remote.pairLink);
+  await tour.getByRole('button', { name: 'Pair', exact: true }).click();
+  await expect(tour.getByText('Paired with 127.0.0.2')).toBeVisible({ timeout: 30_000 });
+  await expect.poll(() => remote!.hellos, { timeout: 30_000 }).toBeGreaterThan(0);
+  await tour.getByRole('button', { name: 'Next' }).click();
+  await expect(tour.getByRole('listitem').filter({ hasText: 'Voice' })).toContainText(
+    'On 127.0.0.2',
+  );
+  await expect(tour.getByRole('listitem').filter({ hasText: 'API key' })).toContainText(
+    'On 127.0.0.2',
+  );
 });
 
 test('Show the tour again from Home reopens it at step 1', async () => {
@@ -276,25 +296,23 @@ test('Show the tour again from Home reopens it at step 1', async () => {
   const home = await windowFor('home');
   await home.getByRole('button', { name: 'Show the tour again' }).click();
   const tour = await windowFor('walkthrough');
-  await expect(
-    tour.getByRole('heading', { name: 'One companion for everything you do' }),
-  ).toBeVisible();
+  await expect(tour.getByRole('heading', { name: 'Where does Scout’s brain live?' })).toBeVisible();
 });
 
-test('step 6 only explains: no Connect or Set up buttons', async () => {
+test('the everyday jobs step only explains: no Connect or Set up buttons', async () => {
   await launchWith({ hasKey: true });
   const tour = await windowFor('walkthrough');
-  await nextTo(tour, 6);
+  await nextTo(tour, 7);
   await expect(tour.getByRole('heading', { name: 'Scout does the everyday jobs' })).toBeVisible();
   const page = tour.locator('main');
   await expect(page.getByRole('button', { name: /Connect|Set up/ })).toHaveCount(0);
   await expect(page.getByText('Claude Code')).toHaveCount(0);
 });
 
-test('step 11 installs Claude Code on the fake brain and shows it ready', async () => {
+test('the connect step installs Claude Code on the fake brain and shows it ready', async () => {
   await launchWith({ hasKey: true });
   const tour = await windowFor('walkthrough');
-  await nextTo(tour, 11);
+  await nextTo(tour, 12);
   const row = tour.getByRole('listitem').filter({ hasText: 'Claude Code' });
   await row.getByRole('button', { name: 'Add' }).click();
   await expect(row.getByText('Ready')).toBeVisible({ timeout: 15_000 });
@@ -302,10 +320,10 @@ test('step 11 installs Claude Code on the fake brain and shows it ready', async 
   expect(brain!.expertApprovals).toEqual([true]); // the press is the OK, so no Allow card
 });
 
-test('step 11 connects Gmail on the fake brain', async () => {
+test('the connect step connects Gmail on the fake brain', async () => {
   await launchWith({ hasKey: true });
   const tour = await windowFor('walkthrough');
-  await nextTo(tour, 11);
+  await nextTo(tour, 12);
   await tour.getByRole('button', { name: 'Add Gmail' }).click();
   await expect(
     tour.getByRole('listitem').filter({ hasText: 'Gmail' }).getByText('Connected'),
@@ -313,10 +331,10 @@ test('step 11 connects Gmail on the fake brain', async () => {
   expect(brain!.appSetups).toEqual(['io.example/gmail']);
 });
 
-test('step 11 can be finished without connecting anything, and the card has no ready list', async () => {
+test('the connect step can be finished without connecting anything, and the card has no ready list', async () => {
   await launchWith({ hasKey: true });
   const tour = await windowFor('walkthrough');
-  await nextTo(tour, 11);
+  await nextTo(tour, 12);
   await tour.getByRole('button', { name: 'I’ll do this later' }).click();
   await expect(tour.getByRole('heading', { name: 'Scout is on your screen' })).toBeVisible();
   await expect(tour.getByText('Ready to use')).toHaveCount(0);
@@ -326,7 +344,7 @@ test('step 11 can be finished without connecting anything, and the card has no r
 test('every step fits the window: footer in view, nothing wider than the page (150% scaling)', async () => {
   await launchWith({ hasKey: true }, ['--force-device-scale-factor=1.5']);
   const tour = await windowFor('walkthrough');
-  for (let step = 1; step <= 11; step += 1) {
+  for (let step = 1; step <= 12; step += 1) {
     const fit = await tour.evaluate(() => {
       const footer = document.querySelector('.wt-footer')!.getBoundingClientRect();
       const body = document.querySelector('.wt-body')!;
@@ -337,16 +355,16 @@ test('every step fits the window: footer in view, nothing wider than the page (1
       };
     });
     expect(fit, `step ${step}`).toEqual({ footerInView: true, noSideScroll: true });
-    if (step < 11) await tour.getByRole('button', { name: /^(Get started|Next)$/ }).click();
+    if (step < 12) await tour.getByRole('button', { name: /^(Get started|Next)$/ }).click();
   }
 });
 
-test('steps 2 and 3 and the footer fit at 1040x680 without a horizontal scrollbar', async () => {
+test('steps 3 and 4 and the footer fit at 1040x680 without a horizontal scrollbar', async () => {
   await launchWith({ hasKey: true });
   const tour = await windowFor('walkthrough');
-  await nextTo(tour, 2);
-  for (const step of [2, 3]) {
-    if (step === 3) await tour.getByRole('button', { name: 'Next' }).click();
+  await nextTo(tour, 3);
+  for (const step of [3, 4]) {
+    if (step === 4) await tour.getByRole('button', { name: 'Next' }).click();
     const fit = await tour.evaluate(() => {
       const footer = document.querySelector('.wt-footer')!.getBoundingClientRect();
       const body = document.querySelector('.wt-body')!;
@@ -369,18 +387,18 @@ test('a small work area still keeps the footer in view and nothing wider than th
       .find((w) => w.webContents.getURL().includes('walkthrough.html'))
       ?.setContentSize(682, 512),
   );
-  for (let step = 1; step <= 11; step += 1) {
+  for (let step = 1; step <= 12; step += 1) {
     await expect
       .poll(() => fitOf(tour), { message: `step ${step}` })
       .toEqual({ footerInView: true, noSideScroll: true });
-    if (step < 11) await tour.getByRole('button', { name: /^(Get started|Next)$/ }).click();
+    if (step < 12) await tour.getByRole('button', { name: /^(Get started|Next)$/ }).click();
   }
 });
 
-test('step 8 and the finish screen fit at 1040x680 with no horizontal scroll', async () => {
+test('the limit step and the finish screen fit at 1040x680 with no horizontal scroll', async () => {
   await launchWith({ hasKey: true });
   const tour = await windowFor('walkthrough');
-  await nextTo(tour, 8);
+  await nextTo(tour, 9);
   await expect(tour.getByText('Spent today: $0.42')).toBeVisible();
   await expect.poll(() => fitOf(tour)).toEqual({ footerInView: true, noSideScroll: true });
   await tour.getByRole('button', { name: 'Next' }).click();
@@ -395,7 +413,7 @@ test('step 8 and the finish screen fit at 1040x680 with no horizontal scroll', a
   await expect.poll(() => fitOf(tour)).toEqual({ footerInView: true, noSideScroll: true });
 });
 
-test('a 910x512 window (150 percent on 1366x768) keeps Skip on step 8 and Finish on step 11 in view', async () => {
+test('a 910x512 window (150 percent on 1366x768) keeps Skip on the limit step and Finish on the last in view', async () => {
   await launchWith({ hasKey: true }, ['--force-device-scale-factor=1.5']);
   const tour = await windowFor('walkthrough');
   // 1366x768 at 150% leaves about 910x512 DIPs.
@@ -404,8 +422,8 @@ test('a 910x512 window (150 percent on 1366x768) keeps Skip on step 8 and Finish
       .find((w) => w.webContents.getURL().includes('walkthrough.html'))
       ?.setContentSize(910, 512),
   );
-  // Skip is on every step but the key and the last, so check it on step 8 and Finish on step 11.
-  await nextTo(tour, 8);
+  // Skip is on every step but the key and the last, so check it on the limit step and Finish on the last.
+  await nextTo(tour, 9);
   await expect(tour.getByRole('button', { name: 'Skip' })).toBeInViewport();
   await tour.getByRole('button', { name: 'Next' }).click();
   await expect(tour.getByText('A key is already set.')).toBeVisible({ timeout: 30_000 });
@@ -417,7 +435,7 @@ test('a 910x512 window (150 percent on 1366x768) keeps Skip on step 8 and Finish
 test('the voice step works from the keyboard: switch, slider and select', async () => {
   await launchWith({ hasKey: true });
   const tour = await windowFor('walkthrough');
-  await nextTo(tour, 5);
+  await nextTo(tour, 6);
   const talks = tour.getByRole('switch', { name: 'Scout talks' });
   await expect(talks).toHaveAttribute('aria-checked', 'true');
   await talks.focus();
@@ -442,7 +460,7 @@ test('the voice step works from the keyboard: switch, slider and select', async 
 test('the voice card plays a sample at the chosen speed, saves a pick at once, and Next never waits on its download', async () => {
   await launchWith({ hasKey: true });
   const tour = await windowFor('walkthrough');
-  await nextTo(tour, 5);
+  await nextTo(tour, 6);
   await tour.getByRole('button', { name: 'Play George' }).click();
   await expect.poll(() => brain!.samples.length).toBe(1);
   expect(brain!.samples[0]).toMatchObject({ voice: 'kokoro-bm-george', speed: 0.95 });
@@ -451,7 +469,7 @@ test('the voice card plays a sample at the chosen speed, saves a pick at once, a
   await expect.poll(() => brain!.ttsSets).toEqual(['kokoro-bm-george']);
   await expect(tour.getByRole('radio', { name: /^George/ })).toContainText('Downloading 40%');
   await tour.getByRole('button', { name: 'Next' }).click();
-  await expect(tour.getByRole('listitem').nth(5).getByRole('button')).toHaveAttribute(
+  await expect(tour.getByRole('listitem').nth(6).getByRole('button')).toHaveAttribute(
     'aria-current',
     'step',
   );

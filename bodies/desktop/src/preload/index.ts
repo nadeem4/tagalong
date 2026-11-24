@@ -43,27 +43,24 @@ import type {
 } from '@tagalong/ui';
 import type {
   BodiesState,
+  FoundBrain,
   LoopsState,
-  TaskRow,
-  WaitingEvent,
   ModelState,
+  PairOffer,
+  PairOutcome,
   SttState,
-  TtsState,
-  VoiceDownload,
+  TaskRow,
   TimerRow,
+  TtsState,
   UpdateKind,
   UpdateResult,
   UpdatesState,
+  VoiceDownload,
+  WaitingEvent,
   WhatsAppChange,
 } from '@tagalong/ui/shapes';
 import { IPC } from '../shared/ipc';
-import type {
-  BrainServiceOutcome,
-  BrainServiceState,
-  FoundBrain,
-  PairOutcome,
-  PreloadBridge,
-} from '../shared/ipc';
+import type { BrainServiceOutcome, BrainServiceState, PreloadBridge } from '../shared/ipc';
 import { heldUntilHeard } from './held';
 import type {
   BrowserFolder,
@@ -227,6 +224,7 @@ const bridge: PreloadBridge = {
 const host: TagalongHostApi = {
   discoverBrains: () => ipcRenderer.invoke(IPC.pairDiscover) as Promise<FoundBrain[]>,
   pairWithLink: (text) => ipcRenderer.invoke(IPC.pairWithLink, text) as Promise<PairOutcome>,
+  pairMake: () => ipcRenderer.invoke(IPC.pairMake) as Promise<PairOffer>,
   forgetBrain: () => ipcRenderer.invoke(IPC.pairForget) as Promise<void>,
   installBrainService: () =>
     ipcRenderer.invoke(IPC.brainServiceInstall) as Promise<BrainServiceOutcome>,

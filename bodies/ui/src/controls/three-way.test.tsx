@@ -89,4 +89,17 @@ describe('ThreeWay', () => {
     );
     expect(screen.getByRole('radiogroup')).toHaveAttribute('aria-describedby', 'note');
   });
+
+  it('shows each option as a card with its detail, still one radio group with arrow keys', () => {
+    const onChange = vi.fn();
+    const cards = [
+      { value: 'a', label: 'Here', detail: 'Runs beside you.', icon: <svg data-testid="pic" /> },
+      { value: 'b', label: 'There', detail: 'Another PC.' },
+    ];
+    render(<ThreeWay label="place" value="a" options={cards} onChange={onChange} cards />);
+    expect(screen.getByRole('radio', { name: /Here/ })).toHaveTextContent('Runs beside you.');
+    expect(screen.getByTestId('pic')).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('radio', { name: /Here/ }), { key: 'ArrowDown' });
+    expect(onChange).toHaveBeenCalledWith('b');
+  });
 });

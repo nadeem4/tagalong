@@ -6,7 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { themeTokens } from '../../../ui/src/theme/tokens';
+import { themed, themeTokens } from '../../../ui/src/theme/tokens';
 
 const read = (...parts: string[]): string =>
   readFileSync(join(import.meta.dirname, ...parts), 'utf8');
@@ -53,6 +53,9 @@ describe('popup and mic page style', () => {
       line: color.panelLine.toUpperCase(),
       link: color.link.toUpperCase(),
       err: color.errInk.toUpperCase(),
+      ok: themed.okDot.light.toUpperCase(),
+      gold: color.gold.toUpperCase(),
+      ink: color.goldInk.toUpperCase(),
     });
     expect(vars(/prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([^}]*)\}/.exec(css)?.[1])).toEqual({
       bg: color.page.toUpperCase(),
@@ -62,6 +65,7 @@ describe('popup and mic page style', () => {
       line: color.fieldLine.toUpperCase(),
       link: color.sky.toUpperCase(),
       err: color.errNavyInk.toUpperCase(),
+      ok: themed.okDot.dark.toUpperCase(),
     });
     for (const page of ['mic.html', 'permission.html']) {
       const html = read('..', 'permission', page);

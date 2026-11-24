@@ -3,7 +3,7 @@
  * tag, and nothing at all when nothing was connected.
  */
 
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { FinishCard } from './finish-card';
 
@@ -51,5 +51,23 @@ describe('FinishCard', () => {
     card();
     expect(screen.queryByText('Ready to use')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Scout is on your screen' })).toBeInTheDocument();
+  });
+
+  it('offers Pair a device only when asked to, and the button calls it', () => {
+    card();
+    expect(screen.queryByRole('button', { name: 'Pair a device' })).not.toBeInTheDocument();
+    cleanup();
+    const onPairDevice = vi.fn();
+    render(
+      <FinishCard
+        askKey="Ctrl+Shift+Space"
+        talkKey="Right Ctrl"
+        onOpenHome={vi.fn()}
+        onClose={vi.fn()}
+        onPairDevice={onPairDevice}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Pair a device' }));
+    expect(onPairDevice).toHaveBeenCalledTimes(1);
   });
 });

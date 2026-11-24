@@ -133,6 +133,7 @@ describe('registerPairIpc', () => {
     registerPairIpc(ipc.handle, {
       ...deps,
       deviceName: 'My PC',
+      brain: { call: async () => [] },
       discover: async () => [],
       reconnect: () => void restarts.push(1),
     });
@@ -140,5 +141,39 @@ describe('registerPairIpc', () => {
     expect(restarts).toEqual([]);
     await ipc.invoke(IPC.pairWithLink, link);
     expect(restarts).toEqual([1]);
+  });
+
+  it('makes a pairing code on this PC’s brain and hands the page the link, expiry and QR but not the secret', async () => {
+    const { deps } = setup(() => undefined);
+    const asked: { tool: string; input: unknown }[] = [];
+    const ipc = fakeIpc();
+    registerPairIpc(ipc.handle, {
+      ...deps,
+      deviceName: 'My PC',
+      brain: {
+        call: async (tool, input) => {
+          asked.push({ tool, input });
+          return [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                link,
+                secret: 'the-code',
+                expires_at: '2026-11-23T12:10:00Z',
+                qr: 'QR',
+              }),
+            },
+          ];
+        },
+      },
+      discover: async () => [],
+      reconnect: () => undefined,
+    });
+    expect(await ipc.invoke(IPC.pairMake)).toEqual({
+      link,
+      expiresAt: '2026-11-23T12:10:00Z',
+      qr: 'QR',
+    });
+    expect(asked).toEqual([{ tool: 'pair_make', input: { kind: 'desktop' } }]);
   });
 });

@@ -74,10 +74,10 @@ async function meterMoves(page: Page): Promise<void> {
   await expect(page.getByRole('meter')).toHaveCount(0);
 }
 
-test('walkthrough step 5: the meter moves with the fake microphone', async () => {
+test('walkthrough voice step: the meter moves with the fake microphone', async () => {
   await launch(false);
   const tour = await windowFor('walkthrough');
-  for (let at = 1; at < 5; at += 1) {
+  for (let at = 1; at < 6; at += 1) {
     await tour.getByRole('button', { name: /^(Get started|Next)$/ }).click();
   }
   await tour.getByLabel('Microphone').waitFor();

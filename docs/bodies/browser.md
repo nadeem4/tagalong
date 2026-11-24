@@ -510,7 +510,9 @@ installed app the folder is `resources/extension`; in development it is `bodies/
 open `chrome://extensions` (or `edge://extensions`), switch on Developer mode and choose **Load
 unpacked**.
 
-Home's Places page (Home > Places) shows whether the add-on is connected to the brain (Connected or Not set up). While it is not, its row has **Get the add-on**, which opens the tour at its Browser step (step 7) with the same folder and steps.
+Home's Places page (Home > Places) shows whether the add-on is connected to the brain (Connected or Not set up). While it is not, its row has **Get the add-on**, which opens the tour at its Browser step (step 8) with the same folder and steps.
+
+The toolbar popup shows the brain status with a coloured dot (`data-state` on the status line: green online, red offline, unauthorized or outdated) and keeps the pairing code behind **Show the short code**, which opens by itself when the brain says the add-on needs a pairing code. The pairing logic is unchanged (`src/pair.ts`).
 
 ## Failure handling
 

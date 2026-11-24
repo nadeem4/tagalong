@@ -68,6 +68,7 @@ import {
   realRunTagalong,
   realSpawnNode,
   realStop,
+  startsNoProcesses,
 } from './brain/launch';
 import type { RealLaunch } from './brain/launch';
 import { saveAvatarSpot } from './avatar-spot';
@@ -456,6 +457,7 @@ async function start(): Promise<void> {
   nodeRunner = createNodeRunner({
     link,
     nodeId: bodyId.replace(/^desktop-/, 'node-'),
+    disabled: startsNoProcesses(process.env),
     spawn: (env) => realSpawnNode(brainRun(), env),
   });
   nodeRunner.sync();
@@ -1123,6 +1125,7 @@ function registerIpc(): void {
   registerPairIpc(handle, {
     link: required().link,
     openSocket: pinnedSocket,
+    brain: required().brain,
     log: (line) => console.warn(line),
     deviceName: hostname(),
     discover: () => discoverBrains({ browse: bonjourBrowse }),

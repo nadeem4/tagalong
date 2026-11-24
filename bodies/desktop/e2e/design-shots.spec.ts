@@ -908,7 +908,7 @@ test('E2 tour connect step and finish card', async () => {
   const { find, done } = await launchShot({ hasKey: true, expertInstallingPercent: 40 }, false);
   try {
     const tour = await find('walkthrough');
-    for (let at = 1; at < 11; at += 1) {
+    for (let at = 1; at < 12; at += 1) {
       await tour.getByRole('button', { name: /^(Get started|Next)$/ }).click();
     }
     await expect(tour.getByRole('heading', { name: 'Connect your tools' })).toBeVisible();
@@ -937,7 +937,7 @@ test('K6 get to know me: tour step and Home portrait, light and dark', async () 
   const { find, done } = await launchShot({ hasKey: true }, false);
   try {
     const tour = await find('walkthrough');
-    for (let at = 1; at < 9; at += 1) {
+    for (let at = 1; at < 10; at += 1) {
       await tour.getByRole('button', { name: /^(Get started|Next)$/ }).click();
     }
     await expect(tour.getByText('A key is already set.')).toBeVisible({ timeout: 30_000 });
@@ -1000,7 +1000,7 @@ test('BAU0 Home and the tour, light and dark', async () => {
   try {
     const tour = await first.find('walkthrough');
     await expect(
-      tour.getByRole('heading', { name: 'One companion for everything you do' }),
+      tour.getByRole('heading', { name: 'Where does Scout’s brain live?' }),
     ).toBeVisible();
     for (const scheme of ['light', 'dark'] as const) {
       await tour.emulateMedia({ colorScheme: scheme });
@@ -1030,5 +1030,48 @@ test('BAU0 Home and the tour, light and dark', async () => {
     }
   } finally {
     await second.done();
+  }
+});
+
+test('BAU1 where the brain lives and pairing, light and dark', async () => {
+  test.setTimeout(180_000);
+  const dir = shotDir('bau1');
+  mkdirSync(dir, { recursive: true });
+  const remote = await startFakeBrain({ hasKey: true, tls: true });
+  const { find, done } = await launchShot({ hasKey: true }, false);
+  try {
+    const tour = await find('walkthrough');
+    const shoot = async (name: string): Promise<void> => {
+      for (const scheme of ['light', 'dark'] as const) {
+        await tour.emulateMedia({ colorScheme: scheme });
+        await settled(tour);
+        await tour.screenshot({ path: join(dir, `${name}-${scheme}.png`) });
+      }
+    };
+    await expect(
+      tour.getByRole('heading', { name: 'Where does Scout’s brain live?' }),
+    ).toBeVisible();
+    await shoot('brain-step');
+    await tour.getByRole('radio', { name: /On a server I’ll set up/ }).check();
+    await shoot('server');
+    await tour.getByRole('radio', { name: /On another computer/ }).check();
+    await tour.getByLabel('Pairing link').fill(remote.pairLink.replace('e2e-pair-code', 'stale'));
+    await tour.getByRole('button', { name: 'Pair', exact: true }).click();
+    await expect(tour.getByRole('alert')).toBeVisible({ timeout: 30_000 });
+    await shoot('code-error');
+    await tour.getByLabel('Pairing link').fill(remote.pairLink);
+    await tour.getByRole('button', { name: 'Pair', exact: true }).click();
+    await expect(tour.getByText('Paired with 127.0.0.2')).toBeVisible({ timeout: 30_000 });
+    await shoot('success');
+    for (let at = 0; at < 5; at += 1) {
+      await tour.getByRole('button', { name: /^(Get started|Next)$/ }).click();
+    }
+    await expect(tour.getByRole('listitem').filter({ hasText: 'Voice' })).toContainText(
+      'On 127.0.0.2',
+    );
+    await shoot('voice-on-remote');
+  } finally {
+    await done();
+    await remote.close();
   }
 });

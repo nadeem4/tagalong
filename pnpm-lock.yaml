@@ -145,6 +145,9 @@ importers:
 
   bodies/ui:
     dependencies:
+      '@tagalong/contract':
+        specifier: workspace:*
+        version: link:../../protocol/ts
       '@tagalong/mascot':
         specifier: workspace:*
         version: link:../mascot

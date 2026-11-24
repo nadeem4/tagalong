@@ -69,6 +69,9 @@ export const themeTokens = {
     /** Sky blue: the job log's edit lines (the bubble hard-codes the same blue). */
     sky: '#7CB8F2',
     goldInk: '#12162B',
+    /** The pairing QR is dark on white in both themes, so a scanner can read it. */
+    qrInk: '#12162B',
+    qrPaper: '#FFFFFF',
     focusOnNavy: '#F2C14E',
     /** A filled bar that has reached its limit (the spend meter). */
     warnBar: '#B7791F',

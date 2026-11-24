@@ -10,6 +10,9 @@
   --line: #e0e3ec;
   --link: #3d4a8a;
   --err: #8a1c12;
+  --ok: #2f9e44;
+  --gold: #f2c14e;
+  --ink: #12162b;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -20,6 +23,7 @@
     --line: #2e3558;
     --link: #7cb8f2;
     --err: #ffb4c0;
+    --ok: #7dd87f;
   }
 }
 body {
@@ -114,4 +118,51 @@ button {
 }
 #voice-line:empty {
   display: none;
+}
+
+.status::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.status[data-state='online']::before {
+  background: var(--ok);
+}
+.status[data-state='offline']::before,
+.status[data-state='unauthorized']::before,
+.status[data-state='outdated']::before {
+  background: var(--err);
+}
+.card {
+  margin: 0 0 12px;
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.card input {
+  background: var(--bg);
+}
+.primary {
+  padding: 6px 16px;
+  color: var(--ink);
+  background: var(--gold);
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.primary[disabled] {
+  opacity: 0.5;
+}
+.link {
+  margin: 0 0 12px;
+  padding: 0;
+  color: var(--link);
+  background: none;
+  border: 0;
+  cursor: pointer;
 }

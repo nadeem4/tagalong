@@ -4,13 +4,14 @@ import { createNodeRunner, type NodeChild } from './runner';
 
 type Link = { addrs: string[]; fp: string; lastGood?: string } | null;
 
-function setup(initial: Link = null, token: string | null = 'tok') {
+function setup(initial: Link = null, token: string | null = 'tok', disabled = false) {
   const state = { link: initial, token };
   const started: NodeJS.ProcessEnv[] = [];
   const children: (NodeChild & { killed: boolean; exit: () => void })[] = [];
   const runner = createNodeRunner({
     link: { paired: () => state.link, token: () => state.token },
     nodeId: 'node-a1b2c3',
+    disabled,
     spawn: (env) => {
       started.push(env);
       let onExit: () => void = () => undefined;
@@ -35,6 +36,16 @@ function setup(initial: Link = null, token: string | null = 'tok') {
 describe('node runner', () => {
   it('starts nothing while the desktop uses the brain on this PC', () => {
     const { runner, started } = setup(null);
+    runner.sync();
+    expect(started).toEqual([]);
+  });
+
+  it('starts nothing when processes are switched off, even while paired', () => {
+    const { runner, started } = setup(
+      { addrs: ['10.0.0.5:47323'], fp: 'ab'.repeat(32) },
+      'tok',
+      true,
+    );
     runner.sync();
     expect(started).toEqual([]);
   });

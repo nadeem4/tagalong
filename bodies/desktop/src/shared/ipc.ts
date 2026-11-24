@@ -18,7 +18,7 @@ import type { DropOffer, HostBridge } from '@tagalong/ui';
 import type { KeyResult, KeyStatus } from '@tagalong/ui';
 
 export type { KeyResult, KeyStatus };
-import type { FixTarget } from '@tagalong/ui/shapes';
+import type { FixTarget, FoundBrain, PairOffer, PairOutcome } from '@tagalong/ui/shapes';
 
 /** Channel names, in one place so main and preload cannot drift apart. */
 export const IPC = {
@@ -148,6 +148,7 @@ export const IPC = {
   pairDiscover: 'tagalong:pair:discover',
   pairWithLink: 'tagalong:pair:with-link',
   pairForget: 'tagalong:pair:forget',
+  pairMake: 'tagalong:pair:make',
   // Making this PC the brain: the logon service that keeps it running without the window.
   brainServiceInstall: 'tagalong:brain-service:install',
   brainServiceRemove: 'tagalong:brain-service:remove',
@@ -313,16 +314,6 @@ export type PreloadBridge = Omit<
  * anything specific to this host lives here instead, so a component can never grow a
  * dependency on something the Chrome host will not have.
  */
-/** A brain announcing itself on the home network; never trusted until paired. */
-export interface FoundBrain {
-  name: string;
-  addr: string;
-}
-
-export type PairOutcome =
-  | { ok: true }
-  | { ok: false; reason: 'bad_link' | 'cannot_seal' | 'wrong_brain' | 'refused' | 'unreachable' };
-
 export type BrainServiceOutcome = { ok: true } | { ok: false; detail: string };
 export type BrainServiceState = 'installed' | 'not_installed' | 'unknown';
 
@@ -331,6 +322,8 @@ export interface TagalongHostApi {
   discoverBrains(): Promise<FoundBrain[]>;
   /** Pairs with the brain a pasted `tagalong://pair` link names; on success the desktop dials it. */
   pairWithLink(text: string): Promise<PairOutcome>;
+  /** Makes a pairing code on this PC's brain for another device to scan or type. */
+  pairMake(): Promise<PairOffer>;
   /** Forgets the paired brain and goes back to the one on this PC. */
   forgetBrain(): Promise<void>;
   /** Registers the brain to start at logon, with network access on for other devices. */

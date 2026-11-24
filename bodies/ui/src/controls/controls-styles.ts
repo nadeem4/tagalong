@@ -68,6 +68,20 @@ export const CONTROLS_CSS = `
 .tg-three__option:hover:not(:disabled):not([aria-checked='true']) { background: var(--tg-ctl-line); }
 .tg-three__option[aria-checked='true'] { background: ${t.color.gold}; color: ${t.color.goldInk}; }
 .tg-three__option:disabled { opacity: 0.4; cursor: not-allowed; }
+.tg-three--cards { display: flex; flex-direction: column; gap: ${t.space.md}px; padding: 0; border: 0; background: none; border-radius: 0; }
+.tg-three--cards .tg-three__option {
+  display: flex; align-items: center; gap: ${t.space.lg}px; height: auto; min-width: 0;
+  padding: ${t.space.lg}px ${t.space.xl}px; border: 2px solid var(--tg-ctl-line); border-radius: ${t.radius.card}px; background: var(--tg-ctl-bg);
+  color: var(--tg-ctl-ink); text-align: left; ${typeCss('small')};
+}
+.tg-three--cards .tg-three__option strong { ${typeCss('bodyLead')}; font-weight: ${t.fontWeight.semibold}; }
+.tg-three--cards .tg-three__option[aria-checked='true'] { background: var(--tg-ctl-bg); color: var(--tg-ctl-ink); border-color: ${t.color.gold}; }
+.tg-three--cards .tg-three__option:hover:not(:disabled):not([aria-checked='true']) { background: var(--tg-ctl-bg); border-color: var(--tg-ctl-muted); }
+.tg-three__ring { flex: none; margin-left: auto; width: 20px; height: 20px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--tg-ctl-line); display: grid; place-items: center; }
+.tg-three__option[aria-checked='true'] .tg-three__ring { border-color: ${t.color.gold}; }
+.tg-three__option[aria-checked='true'] .tg-three__ring::after { content: ''; width: 10px; height: 10px; border-radius: 50%; background: ${t.color.gold}; }
+.tg-three__text { display: flex; flex-direction: column; gap: 2px; }
+.tg-three__detail { color: var(--tg-ctl-muted); }
 
 .tg-select { display: flex; flex-direction: column; gap: ${t.space.xs}px; min-width: 0; }
 .tg-select__label { color: var(--tg-ctl-muted); ${typeCss('small')}; }

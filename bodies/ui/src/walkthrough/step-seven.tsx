@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Button } from '../controls';
+import { Button, CopyButton } from '../controls';
 import type { WalkthroughHost } from './walkthrough-host';
 
 type Host = Pick<WalkthroughHost, 'browserFolder' | 'showBrowserFolder' | 'copyText'>;
@@ -21,9 +21,6 @@ export function StepSeven({ host }: { host: Host }) {
     );
   }, [browserFolder]);
 
-  // A copy that fails costs nothing: the address is on screen to type.
-  const copy = (text: string) => void host.copyText(text).catch(() => undefined);
-
   return (
     <section>
       <span className="wt-label">Browser</span>
@@ -37,12 +34,12 @@ export function StepSeven({ host }: { host: Host }) {
           <h3>Open your browser’s extensions page</h3>
           <p>Paste the address into the address bar.</p>
           <div className="wt-row">
-            <Button variant="quiet" onClick={() => copy('chrome://extensions')}>
+            <CopyButton variant="quiet" text="chrome://extensions" copy={host.copyText}>
               Copy chrome://extensions
-            </Button>
-            <Button variant="quiet" onClick={() => copy('edge://extensions')}>
+            </CopyButton>
+            <CopyButton variant="quiet" text="edge://extensions" copy={host.copyText}>
               Copy edge://extensions
-            </Button>
+            </CopyButton>
           </div>
         </li>
         <li>
@@ -59,13 +56,14 @@ export function StepSeven({ host }: { host: Host }) {
             >
               Show folder
             </Button>
-            <Button
+            <CopyButton
               variant="quiet"
+              text={folder ?? ''}
+              copy={host.copyText}
               disabled={folder === null}
-              onClick={() => folder !== null && copy(folder)}
             >
               Copy folder path
-            </Button>
+            </CopyButton>
           </div>
         </li>
       </ol>

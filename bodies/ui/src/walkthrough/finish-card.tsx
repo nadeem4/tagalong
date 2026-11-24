@@ -16,6 +16,8 @@ interface FinishCardProps {
   error?: string;
   /** What the connect step set up; the block is left out when this is empty or absent. */
   ready?: readonly ReadyItem[];
+  /** Present when this PC's brain is kept on for other devices: opens the pairing code dialog. */
+  onPairDevice?: (() => void) | undefined;
 }
 
 const READY_WORDS: Record<ReadyItem['state'], string> = {
@@ -37,6 +39,7 @@ export function FinishCard({
   onClose,
   error,
   ready = [],
+  onPairDevice,
 }: FinishCardProps) {
   return (
     <>
@@ -109,6 +112,11 @@ export function FinishCard({
           </p>
         ) : null}
         <span className="wt-spacer" />
+        {onPairDevice !== undefined && (
+          <Button variant="secondary" onClick={onPairDevice}>
+            Pair a device
+          </Button>
+        )}
         <Button variant="secondary" onClick={onOpenHome}>
           Open Home
         </Button>
