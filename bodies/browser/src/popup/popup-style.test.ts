@@ -54,6 +54,8 @@ describe('popup and mic page style', () => {
       link: color.link.toUpperCase(),
       err: color.errInk.toUpperCase(),
       ok: themed.okDot.light.toUpperCase(),
+      gold: color.gold.toUpperCase(),
+      ink: color.goldInk.toUpperCase(),
     });
     expect(vars(/prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([^}]*)\}/.exec(css)?.[1])).toEqual({
       bg: color.page.toUpperCase(),

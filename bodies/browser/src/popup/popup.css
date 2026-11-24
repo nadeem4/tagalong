@@ -11,6 +11,8 @@
   --link: #3d4a8a;
   --err: #8a1c12;
   --ok: #2f9e44;
+  --gold: #f2c14e;
+  --ink: #12162b;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -146,9 +148,9 @@ button {
   background: var(--bg);
 }
 .primary {
-  padding: 6px 14px;
-  color: #12162b;
-  background: #f2c14e;
+  padding: 6px 16px;
+  color: var(--ink);
+  background: var(--gold);
   border: 0;
   border-radius: 8px;
   cursor: pointer;

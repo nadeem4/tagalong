@@ -25,7 +25,7 @@ export const PAIR_CSS = `
 .pair-form { margin-top: ${t.space.xl}px; }
 .pair-commands { list-style: none; margin: ${t.space.lg}px 0 0; padding: 0; display: flex; flex-direction: column; gap: ${t.space.md}px; }
 .pair-commands li, .pair-copy { display: flex; align-items: stretch; gap: 8px; }
-.pair-code { flex: 1; min-width: 0; padding: 10px 12px; border-radius: ${t.radius.sm}px; background: ${t.color.page}; color: ${t.color.textSoft}; border: 1px solid ${t.color.fieldLine}; font-family: ${t.font.mono}; ${typeCss('small')}; overflow-wrap: anywhere; user-select: all; }
+.pair-code { flex: 1; min-width: 0; padding: ${t.space.md}px ${t.space.lg}px; border-radius: ${t.radius.sm}px; background: ${t.color.page}; color: ${t.color.textSoft}; border: 1px solid ${t.color.fieldLine}; font-family: ${t.font.mono}; ${typeCss('small')}; overflow-wrap: anywhere; user-select: all; }
 .pair-input { flex: 1; min-width: 0; height: 40px; padding: 0 12px; border-radius: ${t.radius.sm}px; border: 1px solid ${themedColor.keycapLine}; background: ${themedColor.controlFill}; color: ${themedColor.panelText}; font-family: ${t.font.mono}; ${typeCss('small')}; }
 
 .pair-alert { display: flex; flex-direction: column; gap: 2px; margin: ${t.space.lg}px 0 0; padding: 12px; border-radius: ${t.radius.card}px; background: ${themedColor.warnFill}; color: ${themedColor.warnInk}; ${typeCss('small')}; max-width: 640px; }
@@ -39,15 +39,15 @@ export const PAIR_CSS = `
 .pair-dialog .pair-alert { margin: 0; max-width: none; }
 .pair-grid { display: grid; grid-template-columns: auto 1fr; gap: 24px; align-items: start; }
 .pair-scan { display: flex; flex-direction: column; gap: 8px; align-items: center; }
-.pair-qrbox { padding: 12px; border-radius: ${t.radius.card}px; background: #FFFFFF; line-height: 0; border: 1px solid ${themedColor.panelLine}; }
-.pair-qr { width: 168px; height: 168px; display: block; fill: #12162B; }
-.pair-qr .pair-qr__light { fill: #FFFFFF; }
+.pair-qrbox { padding: 12px; border-radius: ${t.radius.card}px; background: ${t.color.qrPaper}; line-height: 0; border: 1px solid ${themedColor.panelLine}; }
+.pair-qr { width: 168px; height: 168px; display: block; fill: ${t.color.qrInk}; }
+.pair-qr .pair-qr__light { fill: ${t.color.qrPaper}; }
 .pair-link { display: flex; flex-direction: column; }
 .pair-expiry { display: flex; flex-direction: column; gap: 8px; }
 .pair-expiry__row { display: flex; justify-content: space-between; }
 .pair-waiting { display: inline-flex; align-items: center; gap: 8px; }
 .pair-dot { width: 8px; height: 8px; border-radius: 50%; background: ${themedColor.okDot}; }
-.pair-bar { height: 4px; border-radius: 2px; background: ${themedColor.panelTile}; overflow: hidden; }
+.pair-bar { height: 4px; border-radius: ${t.radius.sm}px; background: ${themedColor.panelTile}; overflow: hidden; }
 .pair-bar > i { display: block; height: 100%; background: ${t.color.gold}; }
 .pair-actions { display: flex; justify-content: flex-end; gap: 8px; }
 `;

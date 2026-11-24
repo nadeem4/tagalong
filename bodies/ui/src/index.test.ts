@@ -20,6 +20,7 @@ describe('ui package surface', () => {
         'HomeView',
         'SETTINGS_CSS',
         'Walkthrough',
+        'KEY_STEP',
         'createFakeHostBridge',
         'Toggle',
         'Select',

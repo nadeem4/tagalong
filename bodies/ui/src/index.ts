@@ -90,5 +90,5 @@ export type { HealthFacts } from './health';
 
 /** The first-run walkthrough window's content. */
 export { Walkthrough } from './walkthrough/walkthrough';
-export { KEY_STEP, STEPS } from './walkthrough/steps';
+export { KEY_STEP } from './walkthrough/steps';
 export type { WalkthroughHost, WalkthroughSettings } from './walkthrough/walkthrough-host';

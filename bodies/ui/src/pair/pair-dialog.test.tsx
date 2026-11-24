@@ -28,6 +28,7 @@ describe('PairDialog', () => {
     expect(await screen.findByRole('img', { name: 'Pairing QR code' })).toBeInTheDocument();
     expect(screen.getByText(OFFER.link)).toBeInTheDocument();
     expect(screen.getByText('Expires in 9:41')).toBeInTheDocument();
+    await act(async () => {});
     act(() => void vi.advanceTimersByTime(1000));
     expect(screen.getByText('Expires in 9:40')).toBeInTheDocument();
   });
