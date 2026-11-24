@@ -1,6 +1,6 @@
 /**
  * Home: the one window for the companion and the app. Scout in the corner and seven pages
- * (overview, tasks, connections, places, approvals, what Scout remembers, settings), each fed by the
+ * (overview, tasks, connections, devices, approvals, what Scout remembers, settings), each fed by the
  * Python brain. Contains HomeView, HomeHost and HomePage. Rendered by the
  * desktop `home` page.
  */
@@ -19,7 +19,7 @@ import { CONNECTIONS_CSS } from './connections-styles';
 import { HOME_CSS } from './home-styles';
 import { MemoryView } from './memory-view';
 import { TasksView } from './tasks-view';
-import { PlacesView } from './places-view';
+import { DevicesView } from './devices-view';
 import { PermissionsPanel } from './permissions-panel';
 import { SpendCard } from './spend-card';
 import { BrainCard } from './brain-card';
@@ -27,13 +27,13 @@ import { UpdateBanner } from './update-banner';
 import { LINK, WhereThingsRun } from './where-things-run';
 
 export type HomePage =
-  'overview' | 'tasks' | 'connections' | 'places' | 'approvals' | 'memory' | 'settings';
+  'overview' | 'tasks' | 'connections' | 'devices' | 'approvals' | 'memory' | 'settings';
 
 const PAGES: readonly { id: HomePage; label: (name: string) => string }[] = [
   { id: 'overview', label: () => 'Overview' },
   { id: 'tasks', label: () => 'Tasks' },
   { id: 'connections', label: () => 'Connections' },
-  { id: 'places', label: () => 'Places' },
+  { id: 'devices', label: () => 'Devices' },
   { id: 'approvals', label: () => 'Approvals' },
   { id: 'memory', label: (name) => `What ${name} remembers` },
   { id: 'settings', label: () => 'Settings' },
@@ -59,13 +59,14 @@ export interface HomeViewProps {
 
 /**
  * Home: the one window for everything. The companion in the corner, and seven pages: an
- * overview, its tasks (jobs, waiting news and mail, timers), the apps it can use, the places you can talk to it, what it may do alone and
+ * overview, its tasks (jobs, waiting news and mail, timers), the apps it can use, the devices that can talk to it, what it may do alone and
  * what you approved, what it remembers, and the app's settings.
  */
 export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps) {
   const bridge = useHostBridge();
   const [page, setPage] = useState<HomePage>(asked ?? 'overview');
   const [pets, setPets] = useState<Pet[]>([]);
+  const [reach, setReach] = useState(false);
 
   const [lastAsked, setLastAsked] = useState(asked);
   if (asked !== lastAsked) {
@@ -109,7 +110,7 @@ export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps)
             onClick={() => go(item.id)}
           >
             {item.label(name)}
-            {(item.id === 'tasks' || item.id === 'places') && (
+            {(item.id === 'tasks' || item.id === 'devices') && (
               <span className="home-nav__badge" aria-hidden="true">
                 New
               </span>
@@ -121,10 +122,19 @@ export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps)
         <div className="home-page">
           {/* Overview shows the same prompt inside the brain card, so it skips the banner. */}
           {page !== 'overview' && <UpdateBanner />}
-          {page === 'overview' && <Overview companion={companion} host={host} />}
+          {page === 'overview' && (
+            <Overview
+              companion={companion}
+              host={host}
+              onAway={() => {
+                setReach(true);
+                go('devices');
+              }}
+            />
+          )}
           {page === 'tasks' && <TasksView />}
           {page === 'connections' && <ConnectionsPanel />}
-          {page === 'places' && <PlacesView />}
+          {page === 'devices' && <DevicesView reach={reach} />}
           {page === 'approvals' && <ApprovalsView />}
           {page === 'memory' && <MemoryView name={name} />}
           {page === 'settings' && (
@@ -139,7 +149,15 @@ export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps)
   );
 }
 
-function Overview({ companion, host }: { companion: Pet | undefined; host: HomeHost }) {
+function Overview({
+  companion,
+  host,
+  onAway,
+}: {
+  companion: Pet | undefined;
+  host: HomeHost;
+  onAway: () => void;
+}) {
   const [status, setStatus] = useState<{ text: string; ok: boolean }>({ text: 'Ready', ok: true });
 
   const bridge = useHostBridge();
@@ -202,7 +220,7 @@ function Overview({ companion, host }: { companion: Pet | undefined; host: HomeH
           </Button>
         </section>
       </div>
-      <BrainCard />
+      <BrainCard onAway={onAway} />
       <WhereThingsRun />
       <SpendCard />
     </>

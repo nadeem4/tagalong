@@ -131,6 +131,8 @@ export const HOME_CSS = `${THEME_CSS}
 }
 .brain-foot { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: ${t.space.md}px; }
 .brain-foot__note { margin-right: auto; ${typeCss('small')}; }
+.brain-service { display: flex; align-items: center; justify-content: space-between; gap: ${t.space.lg}px; margin: ${t.space.lg}px 0; padding: ${t.space.lg}px; border-radius: ${t.radius.card}px; background: ${themedColor.panelTile}; }
+.brain-service > span { display: flex; flex-direction: column; }
 .brain-error {
   display: flex; align-items: center; gap: ${t.space.lg}px; padding: ${t.space.lg}px;
   border-radius: ${t.radius.card}px; background: ${themedColor.errFill}; color: ${themedColor.errInk};

@@ -48,9 +48,9 @@ The brain is Python; the TypeScript apps are bodies.
 
 - protocol/: the contract between the brain and the bodies (README.md is the source of truth, examples/ shared by both test suites, ts/ the zod package `@tagalong/contract`, incl. `pair-link.ts`)
 - brain/: the Python brain (uv project); start at `src/brain/main.py` and `server.py`; module map in docs/brain/README.md; `node/` is the node a remote brain pipes tools through (docs/brain/node.md)
-- bodies/ui: shared React UI (Home, tour incl. `src/pair/` the brain-placement and pairing screens, settings, voice, bubble); `src/shapes` holds React-free shapes
+- bodies/ui: shared React UI (Home incl. `src/home/devices-view.tsx`, tour incl. `src/pair/` the brain-placement and pairing screens, settings, voice, bubble); `src/shapes` holds React-free shapes
 - bodies/mascot: `@tagalong/mascot`, the WebGL mascot engine (docs/bodies/mascot.md)
-- bodies/desktop: Electron body; main process in `src/main/` (brain link incl. the pinned remote link in `brain/pinned-socket.ts`, `link-store.ts`, `discover.ts`, IPC incl. `ipc/pair.ts` and `ipc/brain-service.ts`, `node/` the node it runs beside a remote brain, windows, tools)
+- bodies/desktop: Electron body; main process in `src/main/` (brain link incl. the pinned remote link in `brain/pinned-socket.ts`, `link-store.ts`, `discover.ts`, IPC incl. `ipc/pair.ts`, `ipc/devices.ts` and `ipc/brain-service.ts`, `node/` the node it runs beside a remote brain, windows, tools)
 - bodies/browser: Chromium MV3 browser body (popup voice and pairing in `src/pair.ts`, offscreen mic)
 - bodies/whatsapp: WhatsApp body, bundled to one `dist/index.js` the brain runs
 - install/ and Dockerfile: the server brain's install scripts (`install.sh`, `install.ps1`) and image (docs/brain/server.md)

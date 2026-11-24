@@ -5,7 +5,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useHostBridge, type BrainCard, type BrainLink } from '../host-bridge';
 
-export function useBrainCard(): { card: BrainCard | null; setup: BrainLink['setup'] } {
+export function useBrainCard(): {
+  card: BrainCard | null;
+  setup: BrainLink['setup'];
+  refresh: () => void;
+} {
   const bridge = useHostBridge();
   const [card, setCard] = useState<BrainCard | null>(null);
   const [setup, setSetup] = useState<BrainLink['setup']>('idle');
@@ -27,5 +31,5 @@ export function useBrainCard(): { card: BrainCard | null; setup: BrainLink['setu
     });
   }, [bridge, refresh]);
 
-  return { card, setup };
+  return { card, setup, refresh };
 }

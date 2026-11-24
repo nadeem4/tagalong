@@ -61,4 +61,25 @@ describe('PairDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(onClose).toHaveBeenCalled();
   });
+
+  it('explains that network access is off and turns it on, then makes the code', async () => {
+    const make = vi.fn().mockRejectedValueOnce(new Error('network_off')).mockResolvedValue(OFFER);
+    const enableNetwork = vi.fn(() => Promise.resolve(true));
+    open({ make, enableNetwork });
+    expect(await screen.findByText(/Other devices cannot reach this computer yet/)).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Let other devices connect' }));
+    expect(await screen.findByRole('img', { name: 'Pairing QR code' })).toBeInTheDocument();
+    expect(enableNetwork).toHaveBeenCalledTimes(1);
+  });
+
+  it('Not now on the network prompt closes the dialog without changing anything', async () => {
+    const enableNetwork = vi.fn(() => Promise.resolve(true));
+    const { onClose } = open({
+      make: vi.fn(() => Promise.reject(new Error('network_off'))),
+      enableNetwork,
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Not now' }));
+    expect(onClose).toHaveBeenCalled();
+    expect(enableNetwork).not.toHaveBeenCalled();
+  });
 });

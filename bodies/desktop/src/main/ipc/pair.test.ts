@@ -176,4 +176,20 @@ describe('registerPairIpc', () => {
     });
     expect(asked).toEqual([{ tool: 'pair_make', input: { kind: 'desktop' } }]);
   });
+
+  it('says network_off when the brain will not make a code for other devices', async () => {
+    const { deps } = setup(() => undefined);
+    const ipc = fakeIpc();
+    registerPairIpc(ipc.handle, {
+      ...deps,
+      deviceName: 'My PC',
+      brain: {
+        call: () =>
+          Promise.reject(new Error('Network access is off, so only the browser add-on can pair.')),
+      },
+      discover: async () => [],
+      reconnect: () => undefined,
+    });
+    await expect(ipc.invoke(IPC.pairMake)).rejects.toThrow('network_off');
+  });
 });

@@ -65,12 +65,18 @@ export function registerPairIpc(
     return outcome;
   });
   handle(IPC.pairMake, async (): Promise<PairOffer> => {
-    const made = (await callJson(deps.brain, 'pair_make', { kind: 'desktop' })) as {
-      link: string;
-      expires_at: string;
-      qr: string;
-    };
-    return { link: made.link, expiresAt: made.expires_at, qr: made.qr };
+    try {
+      const made = (await callJson(deps.brain, 'pair_make', { kind: 'desktop' })) as {
+        link: string;
+        expires_at: string;
+        qr: string;
+      };
+      return { link: made.link, expiresAt: made.expires_at, qr: made.qr };
+    } catch (error) {
+      throw new Error(String(error).includes('Network access is off') ? 'network_off' : 'failed', {
+        cause: error,
+      });
+    }
   });
   handle(IPC.pairForget, () => {
     deps.link.forget();

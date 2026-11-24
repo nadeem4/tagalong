@@ -275,6 +275,19 @@ describe('a brain on another machine', () => {
     expect(await status.card()).toMatchObject({ host: 'HOME-PC', local: false });
   });
 
+  it('still names its host, and is not offered a restart, once it cannot be reached', async () => {
+    const { status, brain, stops } = setup({ wire: REMOTE });
+    await status.card();
+    (brain as { link: string }).link = 'offline';
+    expect(await status.card()).toMatchObject({
+      status: 'offline',
+      host: 'HOME-PC',
+      local: false,
+    });
+    await status.restart();
+    expect(stops).toEqual([]);
+  });
+
   it('is not restarted, not even by an older build', async () => {
     const { status, stops, relaunches } = setup({ wire: { ...REMOTE, version: '0.1.0' } });
     await status.restart();

@@ -116,7 +116,7 @@ flowchart LR
   nav --> ov["Overview<br/>(Scout card, BrainCard, WhereThingsRun, SpendCard)"]
   nav --> tk["Tasks<br/>(TasksView, Now card)"]
   nav --> cn["Connections<br/>(ConnectionsPanel: apps, experts)"]
-  nav --> pl["Places<br/>(PlacesView: This PC, Chrome add-on, WhatsApp)"]
+  nav --> pl["Devices<br/>(DevicesView: paired devices, AI tools, Chrome add-on, WhatsApp)"]
   nav --> ap["Approvals<br/>(ApprovalsView: preferences, ask history)"]
   nav --> mem["What Scout remembers<br/>(MemoryView)"]
   nav --> st["Settings<br/>(the host's form, PermissionsPanel)"]
@@ -127,7 +127,7 @@ flowchart LR
 ```
 
 The Memory entry reads "What Scout remembers" (the companion's name fills in), and Tasks and
-Places carry a "New" badge. The Settings page is the host's own form (passed in as `settings`)
+Devices carry a "New" badge. The Settings page is the host's own form (passed in as `settings`)
 with the Permissions card under it. The Tasks page
 (`tasks-view.tsx`) shows the Now card above four tabs. Every page reads and writes through the brain's Home tools
 (see [Talking to the brain](#talking-to-the-brain)), so Home shows what the brain holds, never a copy.
@@ -861,8 +861,23 @@ pictures")`: `IPC.askScout` (`ipc/ask-scout.ts`) brings the companion up and sen
   `approveTool` IPC (`ipc/connections.ts`) calls it and swallows only `not_found` (the ask already closed), because that card goes with its closed frame.
   Any other refusal (the brain offline) rejects back to the bubble, which keeps the card up to click again; only the person's click answers an ask. The bubble is brought up when an ask opens.
 
-Home's Places page (`bodies/ui/src/home/places-view.tsx`, nav label Places with a "New" badge, after
-Connections; `ipc/bodies.ts`) lists the places you can talk to Scout: **This PC** (Desktop), the **Chrome
+Home's Devices page (`bodies/ui/src/home/devices-view.tsx`, nav label Devices with a "New" badge, after
+Connections; `ipc/devices.ts` and `ipc/bodies.ts`) lists the paired devices from the brain's `devices_list`
+(`parseDevices` in `ui/src/shapes/devices.ts` drops revoked ones and sets AI tools, kind `mcp_client`, apart).
+Each row (`device-row.tsx`) renames in place (Enter saves, Escape cancels) and revokes after a confirm line
+(`device_rename`, `device_revoke`; the confirm for an AI tool says what it added stays). It shows Online now
+when a connected body has the same name and kind. A device that appears on a later read gets a New chip and a
+"paired" line. **Pair a device** opens the pair dialog on `pairMake`; with network access off the brain refuses
+and the desktop answers `network_off`, so the dialog offers **Let other devices connect**, which runs
+`tagalong service install` (per-user, no admin prompt). With nothing paired an empty card offers Pair a device
+and **Reach Scout away from home**, the Tailscale guide (`tailscale-guide.tsx`): a step is done when `tailscale
+ip -4` returns an address (`ipc/devices.ts` runs it through an injected runner; no `tailscale` on the PATH
+means Install Tailscale first, whose button opens only https://tailscale.com/download) or the brain answers
+at its tailnet name. The brain card on Overview has four states: a local service, a local brain that is not a
+service yet ("Make this Scout's brain"), a remote brain (machine name, no restart, "Use a different brain")
+and an unreachable remote brain (Try now, Away from home?); the desktop remembers where the brain last said it
+runs so an unreachable remote brain still reads as remote. Besides the paired devices the page lists the
+places you can talk to Scout: **This PC** (Desktop), **This PC** (Desktop), the **Chrome
 add-on** (Connected or Not set up, with a "Get the add-on" button that opens the tour at its Browser step,
 step 8) and **WhatsApp**, each with a purpose line and Connected, Not set up or Offline (WhatsApp is
 Offline when its five values are saved but it is not connected). WhatsApp's setup sits under its row:

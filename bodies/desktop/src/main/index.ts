@@ -5,6 +5,7 @@
  * Electron itself: they move windows, read the screen or open things through the shell.
  */
 
+import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -54,6 +55,7 @@ import { pinnedSocket } from './brain/pinned-socket';
 import { createNodeRunner } from './node/runner';
 import { registerPairIpc } from './ipc/pair';
 import { registerBrainServiceIpc } from './ipc/brain-service';
+import { registerDevicesIpc } from './ipc/devices';
 import { startingGate } from './brain/starting-gate';
 import { homedir, hostname, userInfo } from 'node:os';
 import { connectAiTool } from './tools/connect-ai-tool';
@@ -1122,6 +1124,11 @@ function registerIpc(): void {
   registerBodiesIpc(handle, { brain: required().brain });
   registerJobsIpc(handle, { brain: required().brain });
   registerApprovalsIpc(handle, { brain: required().brain });
+  const redial = (): void => {
+    void brainSetup.retry();
+    required().brain.stop();
+    required().brain.start();
+  };
   registerPairIpc(handle, {
     link: required().link,
     openSocket: pinnedSocket,
@@ -1129,11 +1136,21 @@ function registerIpc(): void {
     log: (line) => console.warn(line),
     deviceName: hostname(),
     discover: () => discoverBrains({ browse: bonjourBrowse }),
-    reconnect: () => {
-      void brainSetup.retry();
-      required().brain.stop();
-      required().brain.start();
-    },
+    reconnect: redial,
+  });
+  registerDevicesIpc(handle, {
+    brain: required().brain,
+    runTailscale: () =>
+      new Promise((resolve, reject) => {
+        // An e2e run starts no process, so Tailscale reads as not installed.
+        if (startsNoProcesses(process.env)) return reject(new Error('ENOENT'));
+        execFile('tailscale', ['ip', '-4'], { timeout: 5000 }, (error, stdout) => {
+          if (error !== null && (error as NodeJS.ErrnoException).code === 'ENOENT') reject(error);
+          else resolve({ code: error === null ? 0 : 1, out: stdout });
+        });
+      }),
+    openExternal: (url) => shell.openExternal(url),
+    reconnect: redial,
   });
   registerBrainServiceIpc(handle, { run: (args) => realRunTagalong(brainRun(), args) });
   registerBrainLinkIpc(handle, { brain: required().brain, setup: brainSetup });

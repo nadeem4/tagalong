@@ -74,6 +74,8 @@ export interface FakeBrainOptions {
    * kind named twice in `connected` is two bodies.
    */
   bodies?: { connected?: string[]; whatsappSet?: string[]; whatsappState?: string };
+  /** The paired devices `devices_list` answers; rename and revoke change this list as the real brain does. */
+  devices?: { id: string; name: string; kind: string; lastSeen?: string | null }[];
 }
 
 export const PAIR_CODE = 'e2e-pair-code';
@@ -563,6 +565,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   const keyResults = [...(options.keyResults ?? ['ok'])];
   const keyCalls = { attempts: 0 };
   const removedPreferences: number[] = [];
+  const pairedDevices = (options.devices ?? []).map((d) => ({ ...d }));
   const preferences: Record<string, unknown>[] = [
     { ...DEFAULT_PREFERENCE },
     { ...TEST_PREFERENCE },
@@ -1412,6 +1415,34 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           notify('changed', { what: 'approvals' });
         } else if (params.tool === 'brain_status' && options.brainStatus !== undefined) {
           value = options.brainStatus;
+        } else if (params.tool === 'devices_list') {
+          value = {
+            devices: pairedDevices.map((d) => ({
+              id: d.id,
+              name: d.name,
+              kind: d.kind,
+              personal: true,
+              paired_at: '2026-11-14T09:00:00Z',
+              last_seen: d.lastSeen ?? null,
+              revoked_at: null,
+            })),
+          };
+        } else if (params.tool === 'pair_make') {
+          value = {
+            link: 'tagalong://pair?addr=100.64.0.7:47323&fp=ab&code=e2e-code',
+            secret: 'e2e-code',
+            expires_at: new Date(Date.now() + 600_000).toISOString(),
+            qr: ['█▀█ ▄█▀', '▀▄▀ █▀▄', '█▀█ ▄▀█'].join(String.fromCharCode(10)),
+          };
+        } else if (params.tool === 'device_rename') {
+          const device = pairedDevices.find((d) => d.id === String(params.input?.id));
+          if (device !== undefined)
+            device.name = String((params.input as { name?: string } | undefined)?.name);
+          value = { ok: true };
+        } else if (params.tool === 'device_revoke') {
+          const at = pairedDevices.findIndex((d) => d.id === String(params.input?.id));
+          if (at >= 0) pairedDevices.splice(at, 1);
+          value = { ok: true };
         } else if (params.tool === 'bodies_status') {
           const on = options.bodies?.connected ?? ['desktop'];
           // One row per online body (a kind listed twice is two bodies); none online: one row.

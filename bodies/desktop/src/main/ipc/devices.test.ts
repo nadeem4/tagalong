@@ -1,0 +1,90 @@
+/**
+ * Tests for the devices IPC: the list, rename and revoke go through the brain's tools, and the Tailscale
+ * state comes from `tailscale ip -4` on a fake runner.
+ */
+import { describe, expect, it } from 'vitest';
+import { IPC } from '../../shared/ipc';
+import { registerDevicesIpc } from './devices';
+import { fakeIpc } from './fake-ipc';
+
+const text = (value: unknown) => [{ type: 'text' as const, text: JSON.stringify(value) }];
+
+function setup(
+  answer: (tool: string) => unknown,
+  tailscale: { code: number; out: string } | 'missing' = 'missing',
+) {
+  const ipc = fakeIpc();
+  const calls: [string, object | undefined][] = [];
+  const opened: string[] = [];
+  registerDevicesIpc(ipc.handle, {
+    brain: {
+      call: (tool: string, input?: object) => {
+        calls.push([tool, input]);
+        try {
+          return Promise.resolve(answer(tool)) as Promise<never>;
+        } catch (error) {
+          return Promise.reject(error as Error);
+        }
+      },
+    },
+    runTailscale: () =>
+      tailscale === 'missing' ? Promise.reject(new Error('ENOENT')) : Promise.resolve(tailscale),
+    openExternal: (url) => {
+      opened.push(url);
+      return Promise.resolve();
+    },
+    reconnect: () => {
+      calls.push(['reconnect', undefined]);
+    },
+  });
+  return { ...ipc, calls, opened };
+}
+
+const device = (id: string, name: string, kind: string) => ({
+  id,
+  name,
+  kind,
+  personal: true,
+  paired_at: '2026-11-14T09:00:00Z',
+  last_seen: null,
+  revoked_at: null,
+});
+
+describe('registerDevicesIpc', () => {
+  it('lists paired devices with AI tools apart, and sends rename and revoke to the brain', async () => {
+    const { invoke, calls } = setup((tool) =>
+      tool === 'devices_list'
+        ? text({ devices: [device('a', 'Laptop', 'desktop'), device('b', 'Cursor', 'mcp_client')] })
+        : text({ ok: true }),
+    );
+    const state = (await invoke(IPC.devicesList)) as {
+      devices: { name: string }[];
+      aiTools: { name: string }[];
+    };
+    expect(state.devices.map((d) => d.name)).toEqual(['Laptop']);
+    expect(state.aiTools.map((d) => d.name)).toEqual(['Cursor']);
+    await invoke(IPC.devicesRename, 'a', 'Work laptop');
+    await invoke(IPC.devicesRevoke, 'a');
+    expect(calls.slice(1)).toEqual([
+      ['device_rename', { id: 'a', name: 'Work laptop' }],
+      ['device_revoke', { id: 'a' }],
+    ]);
+  });
+
+  it('reads the tailnet address from tailscale, and says not installed when it is missing', async () => {
+    const found = setup(() => text({}), { code: 0, out: '100.64.0.7\n' });
+    expect(await found.invoke(IPC.tailscaleState)).toEqual({ installed: true, ip: '100.64.0.7' });
+    const signedOut = setup(() => text({}), { code: 1, out: 'not logged in' });
+    expect(await signedOut.invoke(IPC.tailscaleState)).toEqual({ installed: true, ip: null });
+    const missing = setup(() => text({}), 'missing');
+    expect(await missing.invoke(IPC.tailscaleState)).toEqual({ installed: false, ip: null });
+  });
+
+  it('opens only the Tailscale download page, and reconnect dials the brain again', async () => {
+    const { invoke, opened, calls } = setup(() => text({}));
+    await invoke(IPC.tailscaleDownload);
+    await invoke(IPC.brainReconnect);
+    expect(opened).toEqual(['https://tailscale.com/download']);
+    expect(calls).toEqual([['reconnect', undefined]]);
+  });
+});

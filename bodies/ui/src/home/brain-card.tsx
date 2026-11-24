@@ -4,9 +4,13 @@
  * restart offered), offline (Start brain, the app's own version, the unknown as a dash). The
  * first-run install lines live here too.
  */
+import { useState } from 'react';
 import { useHostBridge, type BrainCard as BrainCardData } from '../host-bridge';
 import { Button } from '../controls/button';
+import { PairDialog } from '../pair/pair-dialog';
+import { PAIR_CSS } from '../pair/pair-styles';
 import { ErrIcon } from './brain-icons';
+import { RemoteBrainCard } from './remote-brain-card';
 import { LEAVES_IT_ALONE, UpdatePrompt } from './update-banner';
 import { useBrainCard } from './use-brain-card';
 
@@ -115,12 +119,21 @@ function Facts({ card }: { card: BrainCardData }) {
   );
 }
 
-export function BrainCard() {
+export function BrainCard({ onAway }: { onAway?: () => void }) {
   const bridge = useHostBridge();
-  const { card, setup } = useBrainCard();
+  const { card, setup, refresh } = useBrainCard();
+  const [pairing, setPairing] = useState(false);
+  const [serviceFailed, setServiceFailed] = useState(false);
   if (card === null) return null;
+  if (card.local === false) return <RemoteBrainCard card={card} {...(onAway ? { onAway } : {})} />;
   const offline = card.status === 'offline';
   const person = card.startedBy === 'person';
+  const service = card.startedBy === 'service';
+  const makeService = async (): Promise<void> => {
+    const outcome = await bridge.installBrainService();
+    setServiceFailed(!outcome.ok);
+    refresh();
+  };
 
   return (
     <section className="tg-card brain-card" aria-label="Scout's brain">
@@ -154,7 +167,39 @@ export function BrainCard() {
       )}
       {!offline && card.update !== 'none' && <UpdatePrompt card={card} />}
       <Facts card={card} />
+      {!offline && !service && (
+        <div className="brain-service">
+          <span>
+            <strong>Make this computer Scout's brain</strong>
+            <span className="brain-meta">
+              Starts it when you sign in and keeps it running, so your other devices can reach it.
+            </span>
+          </span>
+          <Button variant="secondary" onClick={() => void makeService()}>
+            Make this Scout's brain
+          </Button>
+        </div>
+      )}
+      {serviceFailed && (
+        <p role="alert" className="brain-foot__note">
+          Scout could not set that up. Try again, or run "tagalong service install" in a terminal.
+        </p>
+      )}
+      {pairing && (
+        <PairDialog
+          make={bridge.pairMake}
+          copyText={bridge.copyText}
+          enableNetwork={async () => (await bridge.installBrainService()).ok}
+          onClose={() => setPairing(false)}
+        />
+      )}
       <div className="brain-foot">
+        <style>{PAIR_CSS}</style>
+        {service && !offline && (
+          <Button variant="secondary" onClick={() => setPairing(true)}>
+            Pair a device
+          </Button>
+        )}
         {person && !offline && <p className="brain-foot__note">{LEAVES_IT_ALONE}</p>}
         {!offline && !person && card.update === 'none' && (
           <Button

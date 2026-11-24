@@ -12,6 +12,8 @@ interface PairDialogProps {
   make: () => Promise<PairOffer>;
   copyText: (text: string) => Promise<void>;
   onClose: () => void;
+  /** Turns on the brain's network access for other devices; true when it worked. Absent: no prompt is offered. */
+  enableNetwork?: () => Promise<boolean>;
 }
 
 function clock(ms: number): string {
@@ -47,21 +49,67 @@ function Countdown({ expiresAt }: { expiresAt: string }) {
 }
 
 /** One code: asks the brain for it once, then shows it. A new code is a new instance (a new key). */
-function PairCode({ make, copyText }: Pick<PairDialogProps, 'make' | 'copyText'>) {
-  const [result, setResult] = useState<PairOffer | 'failed' | null>(null);
+function PairCode({
+  make,
+  copyText,
+  enableNetwork,
+  onRetry,
+  onClose,
+}: Pick<PairDialogProps, 'make' | 'copyText' | 'enableNetwork' | 'onClose'> & {
+  onRetry: () => void;
+}) {
+  const [result, setResult] = useState<PairOffer | 'failed' | 'network_off' | null>(null);
+  const [enabling, setEnabling] = useState(false);
 
   useEffect(() => {
     let live = true;
     make().then(
       (made) => live && setResult(made),
-      () => live && setResult('failed'),
+      (error: unknown) =>
+        live &&
+        setResult(
+          enableNetwork !== undefined && String(error).includes('network_off')
+            ? 'network_off'
+            : 'failed',
+        ),
     );
     return () => {
       live = false;
     };
-  }, [make]);
+  }, [make, enableNetwork]);
 
-  if (result === 'failed') {
+  if (result === 'network_off' && enableNetwork !== undefined) {
+    return (
+      <>
+        <p className="pair-alert" role="status">
+          <span>
+            <strong>Other devices cannot reach this computer yet.</strong> Turn on "Let other
+            devices connect" first. Scout keeps the link encrypted and checks every device against a
+            code.
+          </span>
+        </p>
+        <div className="pair-actions">
+          <Button variant="secondary" onClick={onClose}>
+            Not now
+          </Button>
+          <Button
+            variant="primary"
+            disabled={enabling}
+            onClick={() => {
+              setEnabling(true);
+              void enableNetwork().then((ok) => {
+                setEnabling(false);
+                if (ok) onRetry();
+              });
+            }}
+          >
+            Let other devices connect
+          </Button>
+        </div>
+      </>
+    );
+  }
+  if (result === 'failed' || result === 'network_off') {
     return (
       <p className="pair-alert pair-alert--err" role="alert">
         Scout could not make a code. Check that the brain is running, then make a new one.
@@ -91,7 +139,7 @@ function PairCode({ make, copyText }: Pick<PairDialogProps, 'make' | 'copyText'>
   );
 }
 
-export function PairDialog({ make, copyText, onClose }: PairDialogProps) {
+export function PairDialog({ make, copyText, onClose, enableNetwork }: PairDialogProps) {
   const [round, setRound] = useState(0);
 
   useEffect(() => {
@@ -106,7 +154,14 @@ export function PairDialog({ make, copyText, onClose }: PairDialogProps) {
     <div className="pair-scrim">
       <div className="pair-dialog" role="dialog" aria-modal="true" aria-label="Pair a device">
         <h2>Pair a device</h2>
-        <PairCode key={round} make={make} copyText={copyText} />
+        <PairCode
+          key={round}
+          make={make}
+          copyText={copyText}
+          onClose={onClose}
+          {...(enableNetwork === undefined ? {} : { enableNetwork })}
+          onRetry={() => setRound((n) => n + 1)}
+        />
         <p className="pair-alert">
           Pair only devices you own. A paired device can use everything Scout knows. Revoke it any
           time in Devices.

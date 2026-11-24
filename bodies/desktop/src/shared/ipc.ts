@@ -148,6 +148,12 @@ export const IPC = {
   pairDiscover: 'tagalong:pair:discover',
   pairWithLink: 'tagalong:pair:with-link',
   pairForget: 'tagalong:pair:forget',
+  devicesList: 'tagalong:devices:list',
+  devicesRename: 'tagalong:devices:rename',
+  devicesRevoke: 'tagalong:devices:revoke',
+  brainReconnect: 'tagalong:brain:reconnect',
+  tailscaleState: 'tagalong:tailscale:state',
+  tailscaleDownload: 'tagalong:tailscale:download',
   pairMake: 'tagalong:pair:make',
   // Making this PC the brain: the logon service that keeps it running without the window.
   brainServiceInstall: 'tagalong:brain-service:install',
@@ -305,6 +311,7 @@ export type PreloadBridge = Omit<
   | 'readingRecheck'
   | 'openLanguageSettings'
   | 'playVoiceSample'
+  | 'copyText'
 >;
 
 /**

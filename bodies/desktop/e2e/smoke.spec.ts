@@ -341,7 +341,7 @@ test('Home is one window: Scout, jobs, connections and settings', async () => {
       'Overview',
       'TasksNew',
       'Connections',
-      'PlacesNew',
+      'DevicesNew',
       'Approvals',
       'What Scout remembers',
       'Settings',

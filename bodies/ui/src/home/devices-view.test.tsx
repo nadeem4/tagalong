@@ -1,15 +1,16 @@
 /**
- * Tests for PlacesView: the three places you can talk to Scout (this PC, the browser add-on,
- * WhatsApp) with their state, and the WhatsApp setup kept under its row (five fields, the switch,
- * Save). A saved secret shows only the word Saved; a typed one is cleared after a save.
+ * Tests for DevicesView: this PC, the paired computers, browsers and AI tools with rename and
+ * revoke, pairing another device, the browser add-on and WhatsApp with its setup kept under its
+ * row (five fields, the switch, Save). A saved secret shows only the word Saved; a typed one is
+ * cleared after a save.
  */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { HostBridgeProvider } from '../host-bridge';
-import type { BodiesState } from '../shapes';
+import type { BodiesState, DevicesState } from '../shapes';
 import { createFakeHostBridge } from '../test-support/fake-host-bridge';
 import type { FakeHostBridge } from '../test-support/fake-host-bridge';
-import { PlacesView } from './places-view';
+import { DevicesView } from './devices-view';
 
 const SET_ALL = {
   accessToken: true,
@@ -47,11 +48,14 @@ function stateWith(
   };
 }
 
-function open(bodies: BodiesState = stateWith()): FakeHostBridge {
-  const bridge = createFakeHostBridge({ bodies });
+function open(
+  bodies: BodiesState = stateWith(),
+  devices: DevicesState = { devices: [], aiTools: [] },
+): FakeHostBridge {
+  const bridge = createFakeHostBridge({ bodies, devices });
   render(
     <HostBridgeProvider bridge={bridge}>
-      <PlacesView />
+      <DevicesView />
     </HostBridgeProvider>,
   );
   return bridge;
@@ -68,14 +72,14 @@ async function openSetup(): Promise<void> {
 const type = (label: RegExp, value: string) =>
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
 
-describe('PlacesView', () => {
+describe('DevicesView', () => {
   it('says what the page is for', async () => {
     open();
+    await screen.findByText('This PC');
     expect(
-      await screen.findByText(
-        'The places you can talk to Scout. Each one is the same Scout and the same conversation.',
-      ),
+      await screen.findByText('Everything that can talk to Scout, and where its brain lives.'),
     ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Devices' })).toBeInTheDocument();
   });
 
   it('lists This PC, the browser add-on and WhatsApp, each with a purpose line', async () => {
@@ -175,6 +179,129 @@ describe('PlacesView', () => {
     expect(screen.getByLabelText(/Access token/)).toBeInTheDocument();
   });
 
+  describe('paired devices and AI tools', () => {
+    const LAPTOP = {
+      id: 'd1',
+      name: "Nadeem's laptop",
+      kind: 'desktop',
+      pairedAt: '2026-11-14T09:00:00Z',
+      lastSeen: null,
+    };
+    const CHROME = {
+      id: 'd2',
+      name: 'Chrome on laptop',
+      kind: 'browser',
+      pairedAt: '2026-11-14T09:00:00Z',
+      lastSeen: '2026-11-22T18:02:00Z',
+    };
+    const CURSOR = {
+      id: 'd3',
+      name: 'Cursor',
+      kind: 'mcp_client',
+      pairedAt: '2026-11-15T09:00:00Z',
+      lastSeen: null,
+    };
+    const online = (name: string): BodiesState => {
+      const state = stateWith();
+      state.bodies = [
+        { id: 'desktop-x', kind: 'desktop', name, connected: true },
+        ...state.bodies.filter((b) => b.kind !== 'desktop'),
+      ];
+      return state;
+    };
+
+    it('lists a paired device with Online now when it is connected, and an AI tool in its own group', async () => {
+      open(online("Nadeem's laptop"), { devices: [LAPTOP, CHROME], aiTools: [CURSOR] });
+      await screen.findByText('Chrome on laptop');
+      expect(row("Nadeem's laptop")).toHaveTextContent('Online now');
+      expect(row("Nadeem's laptop")).toHaveTextContent('Desktop · paired 14 Nov');
+      expect(row('Chrome on laptop')).toHaveTextContent('Last seen');
+      expect(screen.getByRole('region', { name: 'AI tools' })).toContainElement(row('Cursor'));
+      expect(row('Cursor')).toHaveTextContent("Reads and adds to Scout's memory");
+    });
+
+    it('with nothing paired says so and offers the next step', async () => {
+      open();
+      expect(await screen.findByText('Only this computer so far')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Reach Scout away from home' })).toBeEnabled();
+    });
+
+    it('renames a device in place and Escape cancels', async () => {
+      const bridge = open(stateWith(), { devices: [CHROME], aiTools: [] });
+      await screen.findByText('Chrome on laptop');
+      fireEvent.click(within(row('Chrome on laptop')).getByRole('button', { name: 'Rename' }));
+      fireEvent.keyDown(screen.getByRole('textbox', { name: 'Name' }), { key: 'Escape' });
+      expect(screen.queryByRole('textbox', { name: 'Name' })).not.toBeInTheDocument();
+      fireEvent.click(within(row('Chrome on laptop')).getByRole('button', { name: 'Rename' }));
+      fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), {
+        target: { value: 'Work Chrome' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await screen.findByText('Work Chrome');
+      expect(bridge.deviceCalls).toEqual(['rename d2 Work Chrome']);
+    });
+
+    it('asks before revoking, Keep it changes nothing, Revoke removes the row', async () => {
+      const bridge = open(stateWith(), { devices: [CHROME], aiTools: [] });
+      await screen.findByText('Chrome on laptop');
+      fireEvent.click(within(row('Chrome on laptop')).getByRole('button', { name: 'Revoke' }));
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Revoke Chrome on laptop? It stops working right away and loses access to Scout. You can pair it again with a new code.',
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Keep it' }));
+      expect(bridge.deviceCalls).toEqual([]);
+      fireEvent.click(within(row('Chrome on laptop')).getByRole('button', { name: 'Revoke' }));
+      fireEvent.click(within(screen.getByRole('alert')).getByRole('button', { name: 'Revoke' }));
+      await waitFor(() => expect(screen.queryByText('Chrome on laptop')).not.toBeInTheDocument());
+      expect(bridge.deviceCalls).toEqual(['revoke d2']);
+    });
+
+    it('revoking an AI tool says what it already added stays', async () => {
+      open(stateWith(), { devices: [], aiTools: [CURSOR] });
+      await screen.findByText('Cursor');
+      fireEvent.click(within(row('Cursor')).getByRole('button', { name: 'Revoke' }));
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        "Revoke Cursor? It can no longer read or add to Scout's memory. What it already added stays; remove it under What Scout remembers.",
+      );
+    });
+
+    it('says who joined, with a New chip, when a device pairs while the page is open', async () => {
+      const bridge = open(stateWith(), { devices: [CHROME], aiTools: [] });
+      await screen.findByText('Chrome on laptop');
+      bridge.devices = {
+        devices: [CHROME, { ...LAPTOP, name: "Nadeem's phone", lastSeen: '2026-11-23T12:00:00Z' }],
+        aiTools: [],
+      };
+      act(() => bridge.emitChanged('bodies'));
+      expect(await screen.findByRole('status')).toHaveTextContent(
+        "Nadeem's phone is paired. It can now talk to Scout.",
+      );
+      expect(row("Nadeem's phone")).toHaveTextContent('New');
+    });
+
+    it('Pair a device opens the pairing dialog with a fresh code', async () => {
+      open();
+      fireEvent.click((await screen.findAllByRole('button', { name: 'Pair a device' }))[0]!);
+      expect(await screen.findByRole('img', { name: 'Pairing QR code' })).toBeInTheDocument();
+    });
+
+    it('with network access off the dialog offers to turn it on', async () => {
+      const bridge = createFakeHostBridge({ bodies: stateWith() });
+      bridge.pairError = 'network_off';
+      render(
+        <HostBridgeProvider bridge={bridge}>
+          <DevicesView />
+        </HostBridgeProvider>,
+      );
+      fireEvent.click((await screen.findAllByRole('button', { name: 'Pair a device' }))[0]!);
+      const turnOn = await screen.findByRole('button', { name: 'Let other devices connect' });
+      bridge.pairError = undefined;
+      fireEvent.click(turnOn);
+      expect(await screen.findByRole('img', { name: 'Pairing QR code' })).toBeInTheDocument();
+      expect(bridge.brainActions).toContain('install-service');
+    });
+  });
+
   describe('WhatsApp keeps its setup flow', () => {
     it('shows a saved value as Saved and never its value', async () => {
       open(stateWith({ set: { ...SET_ALL, verifyToken: false } }));
@@ -254,7 +381,7 @@ describe('PlacesView', () => {
       bridge.whatsappFails = 'Scout could not save: EAAG-fake-token';
       render(
         <HostBridgeProvider bridge={bridge}>
-          <PlacesView />
+          <DevicesView />
         </HostBridgeProvider>,
       );
       await openSetup();
@@ -290,7 +417,7 @@ describe('PlacesView', () => {
     bridge.bodiesState = () => Promise.reject(new Error('offline'));
     render(
       <HostBridgeProvider bridge={bridge}>
-        <PlacesView />
+        <DevicesView />
       </HostBridgeProvider>,
     );
     expect(await screen.findByRole('alert')).toHaveTextContent(

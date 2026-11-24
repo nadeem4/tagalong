@@ -75,6 +75,8 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
   let lastHello: HelloBuild = {};
   /** The model the brain last named, so the card still shows it while the brain is offline. */
   let lastModel: string | null = null;
+  /** Where the brain last said it runs, so an unreachable remote brain still reads as remote. */
+  let lastWhere: { host?: string; local?: boolean } = {};
 
   /** The brain's own facts; null offline or from an old brain with no `brain_status`. */
   async function facts(): Promise<Facts | null> {
@@ -88,7 +90,13 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
 
   async function card(): Promise<BrainCard> {
     const f = await facts();
-    if (f !== null) lastModel = f.model ?? null;
+    if (f !== null) {
+      lastModel = f.model ?? null;
+      lastWhere = {
+        ...(f.host !== undefined && { host: f.host }),
+        ...(f.local !== undefined && { local: f.local }),
+      };
+    }
     return {
       status: brain.link === 'online' ? 'running' : 'offline',
       update,
@@ -105,8 +113,7 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
       logPath: f?.log_path ?? fallback.logPath,
       places: f?.places ?? [],
       workRunning: f?.work_running ?? false,
-      ...(f?.host !== undefined && { host: f.host }),
-      ...(f?.local !== undefined && { local: f.local }),
+      ...lastWhere,
     };
   }
 
@@ -119,7 +126,7 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
 
   async function restart(): Promise<void> {
     const f = await facts();
-    if (f?.local === false) return;
+    if (f?.local === false || (f === null && lastWhere.local === false)) return;
     if (f?.started_by === 'person') {
       throw new Error('You started the brain yourself, so restart it in your terminal.');
     }
