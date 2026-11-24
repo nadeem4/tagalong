@@ -88,6 +88,7 @@ describe('brain card', () => {
       places: [{ id: 'desktop', kind: 'desktop', name: 'Desktop' }],
       workRunning: false,
       model: 'Claude Opus 5.5',
+      local: true,
       lastConnected: '2026-11-24T08:41:00.000Z',
     });
   });

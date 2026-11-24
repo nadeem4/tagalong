@@ -125,7 +125,7 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
       places: f?.places ?? [],
       workRunning: f?.work_running ?? false,
       ...(host !== undefined && { host }),
-      ...(remote(f) && { local: false }),
+      local: !remote(f),
       ...(f?.network !== undefined && { network: f.network }),
       ...(identity !== undefined && { identity: shortId(identity) }),
       ...(lastOnline !== null && { lastConnected: lastOnline }),

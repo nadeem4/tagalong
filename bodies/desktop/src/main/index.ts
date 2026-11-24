@@ -53,7 +53,7 @@ import { LinkStore } from './brain/link-store';
 import { pinnedSocket } from './brain/pinned-socket';
 import { createNodeRunner } from './node/runner';
 import { registerPairIpc } from './ipc/pair';
-import { registerBrainServiceIpc } from './ipc/brain-service';
+import { registerBrainServiceIpc, waitForRestart } from './ipc/brain-service';
 import { registerDevicesIpc } from './ipc/devices';
 import { startingGate } from './brain/starting-gate';
 import { homedir, hostname, userInfo } from 'node:os';
@@ -194,15 +194,6 @@ let brainStatus: BrainStatus = 'connecting';
 /** Runs the node while this desktop is paired to a remote brain. */
 let nodeRunner: ReturnType<typeof createNodeRunner> | null = null;
 /** Starts the brain (installing it first when packaged) and holds the setup state Home shows. */
-/** Resolves true once the brain link is up, polling for up to twenty seconds. */
-async function brainOnline(brain: { link: string }): Promise<boolean> {
-  for (let tries = 0; tries < 80; tries += 1) {
-    if (brain.link === 'online') return true;
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  return false;
-}
-
 const brainRun = (): RealLaunch => ({
   brainDir: app.isPackaged
     ? join(process.resourcesPath, 'brain')
@@ -1155,8 +1146,14 @@ function registerIpc(): void {
   });
   registerBrainServiceIpc(handle, {
     run: (args) => realRunTagalong(brainRun(), args),
+    isService: async () => (await brainControl?.card())?.startedBy === 'service',
+    stop: () => realStop(brainRun()),
     restart: () => realRestartService(brainRun()),
-    online: () => brainOnline(required().brain),
+    restarted: () =>
+      waitForRestart(
+        () => required().brain.link,
+        (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+      ),
   });
   registerBrainLinkIpc(handle, {
     brain: required().brain,

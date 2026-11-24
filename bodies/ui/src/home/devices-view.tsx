@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { BodiesState, DeviceRow, DevicesState } from '../shapes';
 import { Button } from '../controls/button';
 import { useHostBridge } from '../host-bridge';
+import { Icon } from '../icons';
 import { HostPairDialog } from '../pair/host-pair-dialog';
 import { DeviceRowItem } from './device-row';
 import { Place, StandingLabel } from './place-row';
@@ -122,6 +123,7 @@ export function DevicesView({ reach = false }: { reach?: boolean }) {
       {head}
       {joined !== undefined && (
         <p className="dv-joined" role="status">
+          <Icon name="check" />
           {joined.name} is paired. It can now talk to Scout.
         </p>
       )}

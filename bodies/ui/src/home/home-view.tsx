@@ -82,6 +82,7 @@ export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps)
   const name = companion?.name ?? 'Scout';
   const go = (next: HomePage): void => {
     setPage(next);
+    setReach(false);
     onPage?.(next);
   };
 
@@ -127,8 +128,8 @@ export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps)
               companion={companion}
               host={host}
               onAway={() => {
-                setReach(true);
                 go('devices');
+                setReach(true);
               }}
             />
           )}

@@ -74,6 +74,23 @@ function PairCode({
     };
   }, [make]);
 
+  const footer = (
+    <>
+      <p className="pair-alert">
+        Pair only devices you own. A paired device can use everything Scout knows. Revoke it any
+        time in Devices.
+      </p>
+      <div className="pair-actions">
+        <Button variant="quiet" onClick={onRetry}>
+          Make a new code
+        </Button>
+        <Button variant="secondary" onClick={onClose} autoFocus>
+          Done
+        </Button>
+      </div>
+    </>
+  );
+
   if (result === 'network_off') {
     return (
       <>
@@ -114,12 +131,22 @@ function PairCode({
   }
   if (result === 'failed') {
     return (
-      <p className="pair-alert pair-alert--err" role="alert">
-        Scout could not make a code. Check that the brain is running, then make a new one.
-      </p>
+      <>
+        <p className="pair-alert pair-alert--err" role="alert">
+          Scout could not make a code. Check that the brain is running, then make a new one.
+        </p>
+        {footer}
+      </>
     );
   }
-  if (result === null) return <p className="pair-meta">Making a code…</p>;
+  if (result === null) {
+    return (
+      <>
+        <p className="pair-meta">Making a code…</p>
+        {footer}
+      </>
+    );
+  }
   return (
     <>
       <div className="pair-grid">
@@ -138,6 +165,7 @@ function PairCode({
         </div>
       </div>
       <Countdown expiresAt={result.expiresAt} />
+      {footer}
     </>
   );
 }
@@ -165,18 +193,6 @@ export function PairDialog({ make, copyText, onClose, enableNetwork }: PairDialo
           enableNetwork={enableNetwork}
           onRetry={() => setRound((n) => n + 1)}
         />
-        <p className="pair-alert">
-          Pair only devices you own. A paired device can use everything Scout knows. Revoke it any
-          time in Devices.
-        </p>
-        <div className="pair-actions">
-          <Button variant="quiet" onClick={() => setRound((n) => n + 1)}>
-            Make a new code
-          </Button>
-          <Button variant="secondary" onClick={onClose} autoFocus>
-            Done
-          </Button>
-        </div>
       </div>
     </div>
   );

@@ -88,6 +88,14 @@ describe('PairDialog', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('could not turn network access on');
   });
 
+  it('the network prompt has its own buttons, with no new-code footer or safety note', async () => {
+    open({ make: vi.fn(() => Promise.reject(new Error('network_off'))) });
+    await screen.findByText(/Other devices cannot reach this computer yet/);
+    expect(screen.queryByRole('button', { name: 'Make a new code' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Done' })).toBeNull();
+    expect(screen.queryByText(/Pair only devices you own/)).toBeNull();
+  });
+
   it('Not now on the network prompt closes the dialog without changing anything', async () => {
     const enableNetwork = vi.fn(() => Promise.resolve(true));
     const { onClose } = open({

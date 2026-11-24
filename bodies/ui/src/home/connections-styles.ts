@@ -184,7 +184,8 @@ export const CONNECTIONS_CSS = `
 }
 :is(.home, .wt) .dv-confirm > span { flex: 1; min-width: 200px; }
 :is(.home, .wt) .dv-confirm .tg-button--quiet { border: 1px solid currentColor; color: inherit; }
-:is(.home, .wt) .dv-joined { margin: 0 0 ${t.space.lg}px; padding: ${t.space.md}px ${t.space.lg}px; border-radius: ${t.radius.card}px; background: ${themedColor.okFill}; color: ${themedColor.okInk}; }
+:is(.home, .wt) .dv-confirm .tg-button--danger { background: ${themedColor.errInk}; color: ${themedColor.errFill}; }
+:is(.home, .wt) .dv-joined { display: flex; align-items: center; gap: ${t.space.md}px; margin: 0 0 ${t.space.lg}px; padding: ${t.space.md}px ${t.space.lg}px; border-radius: ${t.radius.card}px; background: ${themedColor.okFill}; color: ${themedColor.okInk}; }
 :is(.home, .wt) .dv-empty__actions { display: flex; flex-wrap: wrap; gap: ${t.space.md}px; }
 :is(.home, .wt) .ts-head { display: flex; align-items: center; gap: ${t.space.md}px; }
 :is(.home, .wt) .ts-head .tg-card__label { margin: 0; margin-right: auto; }

@@ -228,7 +228,7 @@ link changes. The socket is `pinnedSocket`: it trusts only the certificate whose
 a different certificate is refused and the desktop never falls back to plain `ws` or sends its token.
 The device token the brain issued at pairing is sealed with Electron `safeStorage` (`link-store.ts`)
 and is never in `settings.json`. `launchBrain` spawns nothing while the link is remote. A brain's
-`brain_status` says `local: false` when this desktop is not on its machine, and then the brain card's
+`brain_status` says `local: true` when this desktop is on the brain's machine and `local: false` when this desktop is not on its machine, and then the brain card's
 restart and open-folder do nothing. `pairWithLink` (`ipc/pair.ts`) turns a pasted or scanned link into
 a saved remote link and reconnects; `forgetBrain` returns to the local brain. Both are on the
 preload's `tagalong` object (`discoverBrains`, `pairWithLink`, `forgetBrain`); no screen uses them yet.
@@ -870,7 +870,7 @@ locale-aware day and clock words of the approval history. It shows Online now
 when a connected body carries the device's id (`device_id` on the brain's `bodies_status` rows). A device that appears on a later read gets a New chip and a
 "paired" line, both cleared once it is seen online. **Pair a device** opens the pair dialog on `pairMake`; with network access off the brain refuses
 with the `network_off` error code (the desktop maps the code, not the words), so the dialog offers **Let other devices connect**, which runs
-`tagalong service install` (per-user, no admin prompt), restarts the brain (a running brain only listens for other devices after a restart) and waits for it to come back before the dialog retries `pair_make`; the brain card now says Started by the service, so the invitation goes away. If the install or restart fails the dialog says it could not turn network access on. With nothing paired an empty card offers Pair a device
+`tagalong service install` (per-user, no admin prompt), ends the brain Tagalong started (the service cannot bind its port while it runs; a brain that already is the service is restarted instead), then waits for the link to go offline and come back (the old link is still up right after install) before the dialog retries `pair_make`; the brain card now says Started by the service, so the invitation goes away. If the install or restart fails the dialog says it could not turn network access on. With nothing paired an empty card offers Pair a device
 and **Reach Scout away from home**, the Tailscale guide (`tailscale-guide.tsx`): the guide opens at once, takes the brain card as a prop and fills in as answers arrive. A step is done when
 `tailscale ip -4` returns an address (`runTailscale` in `brain/launch.ts`, injected into `ipc/devices.ts`;
 no `tailscale` on the PATH means Install Tailscale first, with an ordinary link to https://tailscale.com/download
