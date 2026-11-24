@@ -40,7 +40,7 @@ from brain.node.main import HelloRefused
 from brain.node.main import run_node as real_run_node
 from brain.node.signin import browser_sign_in
 from brain.open_items import OpenItems
-from brain.pairing import OFFERED_KINDS, build_pairing, render_qr
+from brain.pairing import NETWORK_OFF, OFFERED_KINDS, build_pairing, render_qr
 from brain.protocol import BODY_ID_PATTERN, PipeSpec
 from brain.service import Service, ServiceError, real_service
 from brain.setup.apps import add_registry_app, app_card
@@ -271,7 +271,7 @@ def _perf(home: Path, since: str, now: float, out) -> None:
 def _pair(config, kind: str, host_addr: Callable[[], str], out) -> None:
     if kind != "browser" and not config.network:
         raise _Fail(
-            "Network access is off, so no other machine can reach this brain. Set "
+            f"{NETWORK_OFF} Set "
             f"TAGALONG_NETWORK=1 (in {config.data_dir / '.env'} or the environment), start the "
             "brain, then run this again."
         )

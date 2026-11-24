@@ -1,5 +1,5 @@
 /** Tests for launchBrain: when it spawns `uv run brain`, what it passes, and that it never stops it. */
-import type { SpawnOptions } from 'node:child_process';
+import type { execFile, SpawnOptions } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -14,6 +14,7 @@ import {
   readLocalToken,
   restartService,
   runTagalong,
+  runTailscale,
   stopBrain,
 } from './launch';
 import type { LaunchOptions } from './launch';
@@ -416,6 +417,24 @@ describe('probeAddr', () => {
 describe('readLocalToken', () => {
   it('is null when the brain has not written it yet', () => {
     expect(readLocalToken({ TAGALONG_HOME: join(tmpdir(), 'tg-missing') }, '/nope')).toBeNull();
+  });
+});
+
+describe('runTailscale', () => {
+  const answering = (error: NodeJS.ErrnoException | null, stdout = ''): typeof execFile =>
+    ((_file: string, _args: unknown, _options: unknown, done: (...a: unknown[]) => void) =>
+      done(error, stdout)) as never;
+
+  it('gives the exit code and output, and rejects only when there is no tailscale command', async () => {
+    await expect(runTailscale(answering(null, '100.64.0.7'))).resolves.toEqual({
+      code: 0,
+      out: '100.64.0.7',
+    });
+    await expect(runTailscale(answering(new Error('signed out')))).resolves.toMatchObject({
+      code: 1,
+    });
+    const missing = Object.assign(new Error('spawn tailscale ENOENT'), { code: 'ENOENT' });
+    await expect(runTailscale(answering(missing))).rejects.toThrow('ENOENT');
   });
 });
 

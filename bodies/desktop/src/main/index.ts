@@ -53,7 +53,8 @@ import { LinkStore } from './brain/link-store';
 import { pinnedSocket } from './brain/pinned-socket';
 import { createNodeRunner } from './node/runner';
 import { registerPairIpc } from './ipc/pair';
-import { registerBrainServiceIpc } from './ipc/brain-service';
+import { registerBrainServiceIpc, waitForRestart } from './ipc/brain-service';
+import { registerDevicesIpc } from './ipc/devices';
 import { startingGate } from './brain/starting-gate';
 import { homedir, hostname, userInfo } from 'node:os';
 import { connectAiTool } from './tools/connect-ai-tool';
@@ -66,6 +67,7 @@ import {
   realLaunch,
   realRestartService,
   realRunTagalong,
+  runTailscale,
   realSpawnNode,
   realStop,
   startsNoProcesses,
@@ -465,6 +467,8 @@ async function start(): Promise<void> {
   const run = brainRun();
   brainControl = createBrainStatus({
     brain,
+    paired: () => link.paired(),
+    now: () => new Date(),
     ours: ownBuild({
       packaged: run.packaged !== undefined,
       appVersion: run.appVersion,
@@ -1122,6 +1126,11 @@ function registerIpc(): void {
   registerBodiesIpc(handle, { brain: required().brain });
   registerJobsIpc(handle, { brain: required().brain });
   registerApprovalsIpc(handle, { brain: required().brain });
+  const redial = (): void => {
+    void brainSetup.retry();
+    required().brain.stop();
+    required().brain.start();
+  };
   registerPairIpc(handle, {
     link: required().link,
     openSocket: pinnedSocket,
@@ -1129,14 +1138,28 @@ function registerIpc(): void {
     log: (line) => console.warn(line),
     deviceName: hostname(),
     discover: () => discoverBrains({ browse: bonjourBrowse }),
-    reconnect: () => {
-      void brainSetup.retry();
-      required().brain.stop();
-      required().brain.start();
-    },
+    reconnect: redial,
   });
-  registerBrainServiceIpc(handle, { run: (args) => realRunTagalong(brainRun(), args) });
-  registerBrainLinkIpc(handle, { brain: required().brain, setup: brainSetup });
+  registerDevicesIpc(handle, {
+    brain: required().brain,
+    runTailscale,
+  });
+  registerBrainServiceIpc(handle, {
+    run: (args) => realRunTagalong(brainRun(), args),
+    isService: async () => (await brainControl?.card())?.startedBy === 'service',
+    stop: () => realStop(brainRun()),
+    restart: () => realRestartService(brainRun()),
+    restarted: () =>
+      waitForRestart(
+        () => required().brain.link,
+        (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+      ),
+  });
+  registerBrainLinkIpc(handle, {
+    brain: required().brain,
+    setup: brainSetup,
+    reconnect: redial,
+  });
   if (brainControl !== null) registerBrainStatusIpc(handle, brainControl);
   registerSettingsIpc(handle, {
     settingsStore: () => required().settingsStore,

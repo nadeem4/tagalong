@@ -7,6 +7,9 @@ import type {
   AppAddParams,
   AppInfo,
   BodiesState,
+  DevicesState,
+  PairOffer,
+  TailscaleState,
   LoopsState,
   TimerRow,
   TaskRow,
@@ -129,6 +132,17 @@ export interface FakeHostBridge extends HostBridge {
   readonly setupRetries: () => number;
   /** The brain card's calls in order: `restart`, `restart-after-work`, `open-folder`, `open-log`, `copy-details`. */
   readonly brainActions: readonly string[];
+  /** The paired devices and AI tools; rename and revoke edit them. A test may swap them. */
+  devices: DevicesState;
+  /** Every rename and revoke, in order: `rename id name`, `revoke id`. */
+  readonly deviceCalls: readonly string[];
+  /** Every text copied. */
+  readonly copied: readonly string[];
+  /** pairMake rejects with this message when set (`network_off`). */
+  pairError: string | undefined;
+  /** installBrainService answers this; `{ ok: false, detail }` is a refusal. */
+  serviceOutcome: { ok: true } | { ok: false; detail: string };
+  tailscale: TailscaleState;
   /** A job's steps by job id, and the bubble's running steps; a test may swap them. */
   activity: Record<string, JobActivityEntry[]>;
   /** Scout's watch list by job id; a test may swap them. */
@@ -286,6 +300,8 @@ export function createFakeHostBridge(
     brainLink?: BrainLink;
     /** Scout's brain card; defaults to a running brain the desktop started, up to date. */
     brainCard?: BrainCard;
+    devices?: DevicesState;
+    tailscale?: TailscaleState;
   } = {},
 ): FakeHostBridge {
   const handlers = new Set<(event: TurnEvent) => void>();
@@ -320,6 +336,8 @@ export function createFakeHostBridge(
   const taskStops: string[] = [];
   let setupRetries = 0;
   const brainActions: string[] = [];
+  const deviceCalls: string[] = [];
+  const copied: string[] = [];
   const activityCalls: [string, number][] = [];
   const reportCalls: [string, string][] = [];
   const keysSet: string[] = [];
@@ -648,6 +666,61 @@ export function createFakeHostBridge(
     taskStops,
     setupRetries: () => setupRetries,
     brainActions,
+    deviceCalls,
+    copied,
+    devices: options.devices ?? { devices: [], aiTools: [] },
+    pairError: undefined,
+    serviceOutcome: { ok: true },
+    tailscale: options.tailscale ?? { installed: false, ip: null },
+    devicesState() {
+      return Promise.resolve(structuredClone(fake.devices));
+    },
+    renameDevice(id, name) {
+      deviceCalls.push(`rename ${id} ${name}`);
+      const edit = (rows: DevicesState['devices']) =>
+        rows.map((row) => (row.id === id ? { ...row, name } : row));
+      fake.devices = { devices: edit(fake.devices.devices), aiTools: edit(fake.devices.aiTools) };
+      return Promise.resolve();
+    },
+    revokeDevice(id) {
+      deviceCalls.push(`revoke ${id}`);
+      fake.devices = {
+        devices: fake.devices.devices.filter((row) => row.id !== id),
+        aiTools: fake.devices.aiTools.filter((row) => row.id !== id),
+      };
+      return Promise.resolve();
+    },
+    pairMake() {
+      if (fake.pairError !== undefined) return Promise.reject(new Error(fake.pairError));
+      const offer: PairOffer = {
+        link: 'tagalong://pair?addr=192.168.1.20:47323&fp=ab&code=xyz',
+        expiresAt: new Date(Date.now() + 600_000).toISOString(),
+        qr: '███\n█ █\n███\n',
+      };
+      return Promise.resolve(offer);
+    },
+    copyText(text) {
+      copied.push(text);
+      return Promise.resolve();
+    },
+    installBrainService() {
+      brainActions.push('install-service');
+      if (fake.serviceOutcome.ok && options.brainCard !== undefined) {
+        options.brainCard = { ...options.brainCard, startedBy: 'service', network: true };
+      }
+      return Promise.resolve(fake.serviceOutcome);
+    },
+    forgetBrain() {
+      brainActions.push('forget-brain');
+      return Promise.resolve();
+    },
+    reconnectBrain() {
+      brainActions.push('reconnect');
+      return Promise.resolve();
+    },
+    tailscaleState() {
+      return Promise.resolve({ ...fake.tailscale });
+    },
     usageSummary() {
       return Promise.resolve({ spentUsd: 0, limitUsd: null });
     },
@@ -800,6 +873,10 @@ export function createFakeHostBridge(
     },
     restartBrainAfterWork() {
       brainActions.push('restart-after-work');
+      return Promise.resolve();
+    },
+    stopBrain() {
+      brainActions.push('stop');
       return Promise.resolve();
     },
     openBrainFolder() {

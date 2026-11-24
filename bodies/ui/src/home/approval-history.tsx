@@ -51,13 +51,13 @@ const FILTERS: readonly { id: ApprovalFilter; label: string; count: keyof Approv
   { id: 'refused', label: 'Refused', count: 'refused' },
 ];
 
-const time = (iso: string): string =>
+export const time = (iso: string): string =>
   new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 /** Local-calendar key, so a day boundary is the person's midnight, not UTC's. */
 const dayKey = (d: Date): string => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 
-function dayLabel(iso: string): string {
+export function dayLabel(iso: string): string {
   const date = new Date(iso);
   const now = new Date();
   const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);

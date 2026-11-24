@@ -1,11 +1,17 @@
 /**
  * Scout's brain, on Overview: what it is, whether it runs, how old it is, who started it and
  * where it keeps things. Four states as drawn: running, update ready, started by you (no
- * restart offered), offline (Start brain, the app's own version, the unknown as a dash). The
- * first-run install lines live here too.
+ * restart offered), offline (Start brain, the app's own version, the unknown as a dash). A brain
+ * on another computer (`local` false) is the same card with only what this PC can do about it:
+ * its machine and link, Try now and the Tailscale guide when unreachable, no restart or folders.
+ * The first-run install lines live here too.
  */
+import { useState } from 'react';
 import { useHostBridge, type BrainCard as BrainCardData } from '../host-bridge';
 import { Button } from '../controls/button';
+import { Toggle } from '../controls/toggle';
+import { dayLabel, time } from './approval-history';
+import { HostPairDialog } from '../pair/host-pair-dialog';
 import { ErrIcon } from './brain-icons';
 import { LEAVES_IT_ALONE, UpdatePrompt } from './update-banner';
 import { useBrainCard } from './use-brain-card';
@@ -35,6 +41,40 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 function Facts({ card }: { card: BrainCardData }) {
   const bridge = useHostBridge();
   const offline = card.status === 'offline';
+  if (card.local === false) {
+    return (
+      <dl className={offline ? 'brain-facts brain-facts--dim' : 'brain-facts'}>
+        <Row label="Status">
+          <span className="brain-status">
+            <span className={offline ? 'home-dot home-dot--warn' : 'home-dot'} aria-hidden="true" />
+            {offline ? 'Not reachable' : 'Connected'}
+          </span>
+        </Row>
+        <Row label="Runs on">{card.host ?? 'another computer'}</Row>
+        <Row label="Link">
+          Encrypted · <span className="brain-mono">{card.addr.replace(/:\d+$/, '')}</span>
+        </Row>
+        {card.identity !== undefined && (
+          <Row label="Identity">
+            <span className="brain-mono">{card.identity}</span>
+          </Row>
+        )}
+        {offline && card.lastConnected !== undefined && (
+          <Row label="Last connected">
+            {dayLabel(card.lastConnected)}, {time(card.lastConnected)}
+          </Row>
+        )}
+        {!offline && (
+          <Row label="Version">
+            {card.version === null ? DASH : `Tagalong ${card.version}`}
+            {card.version === card.appVersion && (
+              <span className="cx-chip cx-chip--official">Up to date</span>
+            )}
+          </Row>
+        )}
+      </dl>
+    );
+  }
   const stale = card.update !== 'none';
   const dot = offline ? 'home-dot home-dot--off' : stale ? 'home-dot home-dot--warn' : 'home-dot';
   const status = offline
@@ -77,6 +117,19 @@ function Facts({ card }: { card: BrainCardData }) {
         {isLocal(card.addr) ? 'This PC · ' : ''}
         <span className="brain-mono">{card.addr}</span>
       </Row>
+      {!offline && (
+        <Row label="Starts">
+          {card.startedBy === 'service' ? (
+            <>
+              At sign-in <span className="cx-chip cx-chip--official">On</span>
+            </>
+          ) : card.startedBy === 'person' ? (
+            'When you start it yourself'
+          ) : (
+            'When you open Tagalong'
+          )}
+        </Row>
+      )}
       <Row label="Version">{version}</Row>
       <Row label="Model">{card.model ?? DASH}</Row>
       <Row label="Started by">{startedBy}</Row>
@@ -115,24 +168,49 @@ function Facts({ card }: { card: BrainCardData }) {
   );
 }
 
-export function BrainCard() {
+export function BrainCard({ onAway }: { onAway: () => void }) {
   const bridge = useHostBridge();
-  const { card, setup } = useBrainCard();
+  const { card, setup, refresh } = useBrainCard();
+  const [pairing, setPairing] = useState(false);
+  const [serviceFailed, setServiceFailed] = useState(false);
+  const [enabling, setEnabling] = useState(false);
   if (card === null) return null;
+  const remote = card.local === false;
+  const machine = card.host ?? 'another computer';
   const offline = card.status === 'offline';
   const person = card.startedBy === 'person';
+  const service = card.startedBy === 'service';
+  const makeService = async (): Promise<void> => {
+    const outcome = await bridge.installBrainService();
+    setServiceFailed(!outcome.ok);
+    refresh();
+  };
+  const enableNetwork = async (): Promise<void> => {
+    setEnabling(true);
+    await makeService();
+    setEnabling(false);
+  };
 
   return (
     <section className="tg-card brain-card" aria-label="Scout's brain">
       <h2 className="brain-card__title">Scout's brain</h2>
       <p>
-        The part of Scout that thinks, remembers and runs your jobs. It keeps running when you close
-        Tagalong.
+        The part of Scout that thinks, remembers and runs your jobs.{' '}
+        {remote ? `Here it lives on ${machine}.` : 'It keeps running when you close Tagalong.'}
       </p>
-      {offline && setup === 'installing' && (
+      {offline && remote && (
+        <div className="brain-error" role="alert">
+          <ErrIcon />
+          <span>
+            Can't reach {machine}. It may be asleep, switched off or on another network. Scout keeps
+            trying every few seconds.
+          </span>
+        </div>
+      )}
+      {offline && !remote && setup === 'installing' && (
         <p>Setting up Scout's brain — one-time download. This can take a few minutes.</p>
       )}
-      {offline && setup === 'failed' && (
+      {offline && !remote && setup === 'failed' && (
         <div className="brain-error" role="alert">
           <ErrIcon />
           <span>
@@ -143,7 +221,7 @@ export function BrainCard() {
           </Button>
         </div>
       )}
-      {offline && setup === 'idle' && (
+      {offline && !remote && setup === 'idle' && (
         <div className="brain-error" role="alert">
           <ErrIcon />
           <span>Can't reach Scout's brain. Trying again every 2 s.</span>
@@ -152,11 +230,73 @@ export function BrainCard() {
           </Button>
         </div>
       )}
-      {!offline && card.update !== 'none' && <UpdatePrompt card={card} />}
+      {!offline && !remote && card.update !== 'none' && <UpdatePrompt card={card} />}
       <Facts card={card} />
+      {!offline && !remote && !service && (
+        <div className="brain-service">
+          <span>
+            <strong>Make this computer Scout's brain</strong>
+            <span className="brain-meta">
+              Scout starts when you sign in to Windows, even if Tagalong is closed, and other
+              devices can pair to it.
+            </span>
+          </span>
+          <Button variant="primary" onClick={() => void makeService()}>
+            Make this Scout's brain
+          </Button>
+        </div>
+      )}
+      {!offline && !remote && service && (
+        <div className="brain-service">
+          <span>
+            <strong>Let other devices connect</strong>
+            <span className="brain-meta">
+              Your phone, a second PC or the browser can pair. Off, only this computer can reach
+              Scout.
+            </span>
+          </span>
+          <Toggle
+            checked={card.network === true}
+            disabled={card.network === true || enabling}
+            label="Let other devices connect"
+            onChange={() => void enableNetwork()}
+          />
+        </div>
+      )}
+      {serviceFailed && (
+        <p role="alert" className="brain-foot__note">
+          Scout could not set that up. Try again, or run "tagalong service install" in a terminal.
+        </p>
+      )}
+      {pairing && <HostPairDialog host={bridge} onClose={() => setPairing(false)} />}
       <div className="brain-foot">
-        {person && !offline && <p className="brain-foot__note">{LEAVES_IT_ALONE}</p>}
-        {!offline && !person && card.update === 'none' && (
+        {remote && offline && (
+          <>
+            <Button variant="secondary" onClick={() => void bridge.reconnectBrain()}>
+              Try now
+            </Button>
+            <Button variant="quiet" onClick={onAway}>
+              Away from home?
+            </Button>
+          </>
+        )}
+        {remote && !offline && (
+          <p className="brain-foot__note">
+            To restart, stop or update the brain, open Home on {machine}.
+          </p>
+        )}
+        {remote && !offline && (
+          <Button variant="quiet" onClick={() => void bridge.forgetBrain()}>
+            Use a different brain
+          </Button>
+        )}
+        {!remote && service && !offline && (
+          <Button variant="secondary" onClick={() => setPairing(true)}>
+            Pair a device
+          </Button>
+        )}
+        {!remote && person && !offline && <p className="brain-foot__note">{LEAVES_IT_ALONE}</p>}
+        {!remote && !offline && !person && card.update === 'none' && (
           <Button
             variant="secondary"
             onClick={() => void bridge.restartBrain().catch(() => undefined)}
@@ -164,14 +304,21 @@ export function BrainCard() {
             Restart brain
           </Button>
         )}
-        {offline && (
+        {!remote && service && !offline && (
+          <Button variant="quiet" onClick={() => void bridge.stopBrain().catch(() => undefined)}>
+            Stop brain
+          </Button>
+        )}
+        {!remote && offline && (
           <button type="button" className="brain-link" onClick={() => void bridge.openBrainLog()}>
             Open log
           </button>
         )}
-        <Button variant="quiet" onClick={() => void bridge.copyBrainDetails()}>
-          Copy details
-        </Button>
+        {!remote && (
+          <Button variant="quiet" onClick={() => void bridge.copyBrainDetails()}>
+            Copy details
+          </Button>
+        )}
       </div>
     </section>
   );

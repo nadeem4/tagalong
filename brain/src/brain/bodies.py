@@ -149,6 +149,7 @@ class _Online:
     tools: list[Tool]
     peer: Peer
     local: bool  # connected on the brain's own machine (the loopback listener)
+    device_id: str | None = None  # the paired device behind it; None for the local token
 
 
 class Bodies:
@@ -187,7 +188,7 @@ class Bodies:
         if old is not None:
             old.peer.close()
             self._fail_pending(old.peer)
-        self._online[body.id] = _Online(body, tools, peer, principal.local)
+        self._online[body.id] = _Online(body, tools, peer, principal.local, principal.device_id)
         self._known[body.id] = tools
         self._names[body.id] = body.name
         gone_at = self._offline_at.pop(body.id, None)
@@ -240,6 +241,10 @@ class Bodies:
     def known_tools(self) -> dict[str, list[Tool]]:
         # Home lists permissions for tools whose body is offline right now.
         return dict(self._known)
+
+    def device_id(self, body_id: str) -> str | None:
+        online = self._online.get(body_id)
+        return online.device_id if online else None
 
     def online(self) -> list[Body]:
         return [o.body for o in self._online.values()]

@@ -47,20 +47,21 @@ describe('HomeView', () => {
       'Overview',
       'TasksNew',
       'Connections',
-      'PlacesNew',
+      'DevicesNew',
       'Approvals',
       'What Scout remembers',
       'Settings',
     ]);
   });
 
-  it('Places sits after Connections with a New badge and opens the Places page', async () => {
+  it('Devices sits after Connections with a New badge and opens the Devices page', async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     const nav = await screen.findByRole('navigation', { name: 'Tagalong' });
-    const places = within(nav).getByRole('button', { name: 'Places' });
+    const places = within(nav).getByRole('button', { name: 'Devices' });
     expect(places.querySelector('.home-nav__badge')).toHaveTextContent('New');
     fireEvent.click(places);
-    expect(await screen.findByRole('heading', { level: 1, name: 'Places' })).toBeInTheDocument();
+    await screen.findByRole('region', { name: 'Computers and browsers' });
+    expect(screen.getByRole('heading', { level: 1, name: 'Devices' })).toBeInTheDocument();
   });
 
   it('Connections has no bodies card', async () => {
@@ -85,7 +86,7 @@ describe('HomeView', () => {
       'Overview',
       'Tasks',
       'Connections',
-      'Places',
+      'Devices',
       'Approvals',
       'What Scout remembers',
     ]) {

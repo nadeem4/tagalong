@@ -12,6 +12,8 @@ How to run the brain on a machine with no screen: a home server, a spare PC or a
 
 `tagalong serve` saves `TAGALONG_NETWORK=1` in `<TAGALONG_HOME>/.env`, prints a pairing QR and link, then runs the brain in the foreground (`brain.main.main`, the same as `uv run brain`). The link is a `desktop` pairing code, valid 10 minutes and once, made by the same code as `tagalong pair`. It is printed only while no device is paired; after that a start prints `Pair another device with tagalong pair`, and a paired brain never shows a fresh code on its own.
 
+The desktop's **Let other devices connect** (pair dialog or the brain card switch) ends the brain Tagalong started, runs `tagalong service install` and waits for the brain to drop and return, because a running brain only listens for other devices after a restart. There is no command to turn network access off again.
+
 `tagalong serve --install-service` does not run the brain. It installs the logon service exactly as `tagalong service install` does (the unit, the `.env` switch, the rollback if the OS refuses) and then prints the pairing QR. The service starts the brain, so the code can be redeemed as soon as it is up; run `tagalong pair` for a fresh code if the 10 minutes pass.
 
 The brain's loopback listener (`127.0.0.1:47321`) stays loopback-only. The network listener is on `47323` (not `47322`, which the WhatsApp bridge uses).

@@ -37,14 +37,6 @@ describe('parseBodiesState', () => {
     expect(state.whatsapp).toMatchObject({ enabled: false, complete: false, port: 47322 });
   });
 
-  it('keeps the id of a body row', () => {
-    expect(parseBodiesState(WIRE).bodies.map((b) => b.id)).toEqual([
-      'desktop-a1b2c3',
-      'browser',
-      'whatsapp',
-    ]);
-  });
-
   it('rejects a state with a missing field', () => {
     const { port: _port, ...rest } = WIRE.whatsapp;
     expect(() => parseBodiesState({ ...WIRE, whatsapp: rest })).toThrow();

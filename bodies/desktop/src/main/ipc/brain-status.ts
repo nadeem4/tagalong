@@ -29,6 +29,9 @@ const Wire = z.object({
   // Optional for the same reason: the machine the brain runs on, and whether this body is on it.
   host: z.string().optional(),
   local: z.boolean().optional(),
+  // Optional for the same reason: whether it listens for other devices, and its certificate.
+  network: z.boolean().optional(),
+  fingerprint: z.string().nullish(),
 });
 type Facts = z.infer<typeof Wire>;
 
@@ -39,6 +42,9 @@ export interface BrainStatusDeps {
   brain: BrainCall & { addr: string; link: string };
   /** The app's own version and build, to compare with the brain's. */
   ours: BuildId;
+  /** The brain this desktop is paired with on another machine (its pinned certificate), or null. */
+  paired: () => { fp: string } | null;
+  now: () => Date;
   /** Where the brain keeps things when it cannot be asked (the same rule as launch.ts). */
   fallback: { dataDir: string; logPath: string };
   /** Ends the brain (`tagalong stop`); true when it exited cleanly. */
@@ -58,6 +64,8 @@ export interface BrainStatusControl {
   card(): Promise<BrainCard>;
   restart(): Promise<void>;
   restartAfterWork(): Promise<void>;
+  /** Ends a brain this desktop or the service started; the person's own is left to them. */
+  stop(): Promise<void>;
   /** The brain said hello: compare builds, then restart quietly or leave the banner on. */
   check(theirs: HelloBuild): Promise<void>;
   /** A job changed: a restart waiting for work to finish may go now. */
@@ -73,8 +81,16 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
   let restartedThisRun = false;
   let waitingForWork = false;
   let lastHello: HelloBuild = {};
-  /** The model the brain last named, so the card still shows it while the brain is offline. */
-  let lastModel: string | null = null;
+  /** The brain's last answer, so the card still shows its model and host while it is offline. */
+  let lastFacts: Facts | null = null;
+  let lastOnline: string | null = null;
+  const remote = (f: Facts | null): boolean =>
+    deps.paired() !== null || (f ?? lastFacts)?.local === false;
+  /** A certificate as the short code the card shows: the first eight hex digits, as 4F2A-91C0. */
+  const shortId = (fp: string): string => {
+    const hex = fp.replace(/[^0-9a-f]/gi, '').toUpperCase();
+    return `${hex.slice(0, 4)}-${hex.slice(4, 8)}`;
+  };
 
   /** The brain's own facts; null offline or from an old brain with no `brain_status`. */
   async function facts(): Promise<Facts | null> {
@@ -88,13 +104,16 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
 
   async function card(): Promise<BrainCard> {
     const f = await facts();
-    if (f !== null) lastModel = f.model ?? null;
+    if (f !== null) lastFacts = f;
+    if (brain.link === 'online') lastOnline = deps.now().toISOString();
+    const identity = deps.paired()?.fp ?? f?.fingerprint ?? undefined;
+    const host = f?.host ?? lastFacts?.host;
     return {
       status: brain.link === 'online' ? 'running' : 'offline',
       update,
       version: f?.version ?? (brain.link === 'online' ? (lastHello.version ?? null) : null),
       build: f?.build ?? (brain.link === 'online' ? (lastHello.build ?? null) : null),
-      model: lastModel,
+      model: lastFacts?.model ?? null,
       appVersion: ours.version,
       appBuild: ours.build,
       startedAt: f?.started_at ?? null,
@@ -105,8 +124,11 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
       logPath: f?.log_path ?? fallback.logPath,
       places: f?.places ?? [],
       workRunning: f?.work_running ?? false,
-      ...(f?.host !== undefined && { host: f.host }),
-      ...(f?.local !== undefined && { local: f.local }),
+      ...(host !== undefined && { host }),
+      local: !remote(f),
+      ...(f?.network !== undefined && { network: f.network }),
+      ...(identity !== undefined && { identity: shortId(identity) }),
+      ...(lastOnline !== null && { lastConnected: lastOnline }),
     };
   }
 
@@ -119,11 +141,20 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
 
   async function restart(): Promise<void> {
     const f = await facts();
-    if (f?.local === false) return;
+    if (remote(f)) return;
     if (f?.started_by === 'person') {
       throw new Error('You started the brain yourself, so restart it in your terminal.');
     }
     if (!(await stopAndStart(f?.started_by))) throw new Error('Scout could not restart the brain.');
+  }
+
+  async function stop(): Promise<void> {
+    const f = await facts();
+    if (remote(f)) return;
+    if (f?.started_by === 'person') {
+      throw new Error('You started the brain yourself, so stop it in your terminal.');
+    }
+    if (!(await deps.stop())) throw new Error('Scout could not stop the brain.');
   }
 
   async function restartAfterWork(): Promise<void> {
@@ -144,7 +175,7 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
   async function check(theirs: HelloBuild): Promise<void> {
     lastHello = theirs;
     const f = await facts();
-    if (f?.local === false) {
+    if (remote(f)) {
       update = 'none';
       deps.onChange();
       return;
@@ -186,6 +217,7 @@ export function createBrainStatus(deps: BrainStatusDeps): BrainStatusControl {
     card,
     restart,
     restartAfterWork,
+    stop,
     check,
     jobsChanged,
     // A brain on another machine is neither restarted nor opened from here.
@@ -202,6 +234,7 @@ export function registerBrainStatusIpc(handle: IpcHandle, control: BrainStatusCo
   handle(IPC.brainStatus, () => control.card());
   handle(IPC.brainRestart, () => control.restart());
   handle(IPC.brainRestartAfterWork, () => control.restartAfterWork());
+  handle(IPC.brainStop, () => control.stop());
   handle(IPC.brainOpenFolder, () => control.openFolder());
   handle(IPC.brainOpenLog, () => control.openLog());
   handle(IPC.brainCopyDetails, () => control.copyDetails());

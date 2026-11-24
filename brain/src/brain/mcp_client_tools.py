@@ -15,7 +15,7 @@ import uuid
 
 from brain.bodies import Bodies
 from brain.devices import Devices
-from brain.pairing import Pairing
+from brain.pairing import NETWORK_OFF, Pairing
 from brain.permission import Tier
 from brain.protocol import ErrorCode, RpcError
 from brain.toolbox import BODY_TOOL_TIMEOUTS, Handler, ToolSpec
@@ -33,9 +33,8 @@ def mcp_client_tools(
             raise RpcError(ErrorCode.invalid_params, "name must say which tool this is for.")
         if not network:
             raise RpcError(
-                ErrorCode.invalid_params,
-                "Network access is off, so no pairing link can reach this brain. Set "
-                "TAGALONG_NETWORK=1 and restart the brain.",
+                ErrorCode.network_off,
+                f"{NETWORK_OFF} Set TAGALONG_NETWORK=1 and restart the brain.",
             )
         personal = args.get("personal") is True
         offer = pairing.make_code(KIND, personal=personal, name=name.strip())

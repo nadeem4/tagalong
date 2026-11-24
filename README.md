@@ -95,7 +95,7 @@ The desktop never stops the brain, whoever started it. Its output goes to `~/.ta
 (or `<TAGALONG_HOME>/brain.log`). To stop it, run `cd brain && uv run tagalong stop`.
 
 The brain can also run the WhatsApp bridge (it starts only when `TAGALONG_WHATSAPP_*` are set; see
-`.env.example` and [docs/brain/README.md](docs/brain/setup.md#whatsapp-bridge)). Home > Places shows which places you can talk to Scout from (this PC, the browser add-on, WhatsApp) and sets WhatsApp up ([docs/bodies/whatsapp.md](docs/bodies/whatsapp.md)).
+`.env.example` and [docs/brain/README.md](docs/brain/setup.md#whatsapp-bridge)). Home > Devices lists every computer, browser and AI tool paired with Scout (rename, revoke, pair another) next to this computer, the Chrome add-on and WhatsApp, and sets WhatsApp up ([docs/bodies/whatsapp.md](docs/bodies/whatsapp.md)).
 
 To let Scout hand work to an expert (Claude Code or Codex, each tested), have Scout install
 it from the registry; nothing is installed ahead of time. With several installed, Scout names the
@@ -368,7 +368,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   - Scout reads with an app on its own. Anything that changes something (a tool the app does not
     mark read-only) shows a card in Scout's bubble: which app, what will change, **Allow** or
     **Cancel**.
-- **Places**: where you can talk to Scout. **This PC**, the **Chrome add-on** (Connected or Not set up, with **Get the add-on**, which opens the tour at its Browser step) and **WhatsApp** (Connected, Not set up or Offline), and WhatsApp's setup under its row ([docs/bodies/whatsapp.md](docs/bodies/whatsapp.md)).
+- **Devices**: everything that can talk to Scout. Paired computers, browsers and AI tools each with Rename and Revoke (Revoke asks in a red line), in two groups with counts, **Pair a device** (a code and QR; when network access is off it offers **Let other devices connect**, which installs the brain as a sign-in service and restarts it), a line when a device just joined, and **Reach Scout away from home**, a four-step Tailscale guide. Then this computer (marked **Scout's brain** when the brain runs here) and the **Chrome add-on** (Online or Not set up, with **Get the add-on**, which opens the tour at its Browser step), then **WhatsApp** (Online, Not set up or Offline) with its setup under its row ([docs/bodies/whatsapp.md](docs/bodies/whatsapp.md)). The brain card on Overview has a **Let other devices connect** switch and **Stop brain** for a service brain.
 - **Approvals**: the preferences Scout follows (the sentence, when you agreed to it, how often it was used, with **Edit** and **Remove**; "Always ask me before risky actions" is listed like any other), a summary of how many asks there were, how many Scout answered and how many you refused, and the history of every permission ask by day, filtered by **All**, **Decided by Scout** or **Refused**. A row Scout approved says so and quotes the preference it relied on. When Scout approves an ask, a small quiet card in the bubble says "Approved for you" and which preference it used.
 - **What Scout remembers**: a summary of you (with the years it covers), your facts as a timeline (newest year first, grouped by category, quiet years folded, undated facts last; open one for its quote and where it was read), then your preferences and conversation summaries. Delete any one.
 - **Settings**, in six sections. Press ⓘ beside a setting for the longer story. Below the form,

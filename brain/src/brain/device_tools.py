@@ -7,7 +7,7 @@ or hash, and `pair_make`'s code is the one place a secret leaves the brain.
 import json
 
 from brain.devices import Devices
-from brain.pairing import OFFERED_KINDS, Pairing, render_qr
+from brain.pairing import NETWORK_OFF, OFFERED_KINDS, Pairing, render_qr
 from brain.protocol import ErrorCode, RpcError
 from brain.toolbox import Handler, ToolSpec
 
@@ -47,9 +47,8 @@ def device_tools(
             )
         if kind != "browser" and not network:
             raise RpcError(
-                ErrorCode.invalid_params,
-                "Network access is off, so only the browser add-on can pair. Set "
-                "TAGALONG_NETWORK=1 and restart the brain.",
+                ErrorCode.network_off,
+                f"{NETWORK_OFF} Set TAGALONG_NETWORK=1 and restart the brain.",
             )
         offer = pairing.make_code(kind)
         return json.dumps(

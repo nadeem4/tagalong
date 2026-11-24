@@ -28,9 +28,8 @@ import { StepSaveContext } from './use-step-save';
 import type { Save } from './use-step-save';
 import type { WalkthroughHost } from './walkthrough-host';
 import { useKeyStatus } from '../key/use-key-status';
-import { PairDialog } from '../pair/pair-dialog';
+import { HostPairDialog } from '../pair/host-pair-dialog';
 import { brainNameOf, isLocalAddr } from '../pair/pair-text';
-import { PAIR_CSS } from '../pair/pair-styles';
 import { CONTROLS_CSS } from '../controls/controls-styles';
 import { CONNECTIONS_CSS } from '../home/connections-styles';
 import { WALKTHROUGH_CSS } from './walkthrough-styles';
@@ -209,7 +208,6 @@ export function Walkthrough({ host, initialStep = 1 }: WalkthroughProps) {
       <style>{CONTROLS_CSS}</style>
       <style>{WALKTHROUGH_CSS}</style>
       <style>{CONNECTIONS_CSS}</style>
-      <style>{PAIR_CSS}</style>
       <SidePanel
         current={finishKeysShown !== null ? STEPS.length + 1 : current}
         reached={reached}
@@ -256,13 +254,7 @@ export function Walkthrough({ host, initialStep = 1 }: WalkthroughProps) {
           </>
         )}
       </main>
-      {pairing && (
-        <PairDialog
-          make={host.pairMake}
-          copyText={host.copyText}
-          onClose={() => setPairing(false)}
-        />
-      )}
+      {pairing && <HostPairDialog host={host} onClose={() => setPairing(false)} />}
     </div>
   );
 }

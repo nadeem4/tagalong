@@ -43,12 +43,14 @@ import type {
 } from '@tagalong/ui';
 import type {
   BodiesState,
+  DevicesState,
   FoundBrain,
   LoopsState,
   ModelState,
   PairOffer,
   PairOutcome,
   SttState,
+  TailscaleState,
   TaskRow,
   TimerRow,
   TtsState,
@@ -152,6 +154,15 @@ const bridge: PreloadBridge = {
   eventsWaiting: () => ipcRenderer.invoke(IPC.eventsWaiting) as Promise<WaitingEvent[]>,
   tasksList: () => ipcRenderer.invoke(IPC.tasksList) as Promise<TaskRow[]>,
   bodiesState: () => ipcRenderer.invoke(IPC.bodiesState) as Promise<BodiesState>,
+  devicesState: () => ipcRenderer.invoke(IPC.devicesList) as Promise<DevicesState>,
+  renameDevice: (id, name) => ipcRenderer.invoke(IPC.devicesRename, id, name) as Promise<void>,
+  revokeDevice: (id) => ipcRenderer.invoke(IPC.devicesRevoke, id) as Promise<void>,
+  pairMake: () => ipcRenderer.invoke(IPC.pairMake) as Promise<PairOffer>,
+  installBrainService: () =>
+    ipcRenderer.invoke(IPC.brainServiceInstall) as Promise<BrainServiceOutcome>,
+  forgetBrain: () => ipcRenderer.invoke(IPC.pairForget) as Promise<void>,
+  reconnectBrain: () => ipcRenderer.invoke(IPC.brainReconnect) as Promise<void>,
+  tailscaleState: () => ipcRenderer.invoke(IPC.tailscaleState) as Promise<TailscaleState>,
   setWhatsApp: (change: WhatsAppChange) =>
     ipcRenderer.invoke(IPC.whatsappSet, change) as Promise<void>,
   readingStatus: () => ipcRenderer.invoke(IPC.readingStatus) as Promise<string>,
@@ -163,6 +174,7 @@ const bridge: PreloadBridge = {
   brainCard: () => ipcRenderer.invoke(IPC.brainStatus) as Promise<BrainCard>,
   restartBrain: () => ipcRenderer.invoke(IPC.brainRestart) as Promise<void>,
   restartBrainAfterWork: () => ipcRenderer.invoke(IPC.brainRestartAfterWork) as Promise<void>,
+  stopBrain: () => ipcRenderer.invoke(IPC.brainStop) as Promise<void>,
   openBrainFolder: () => ipcRenderer.invoke(IPC.brainOpenFolder) as Promise<void>,
   openBrainLog: () => ipcRenderer.invoke(IPC.brainOpenLog) as Promise<void>,
   copyBrainDetails: () => ipcRenderer.invoke(IPC.brainCopyDetails) as Promise<void>,

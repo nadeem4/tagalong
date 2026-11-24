@@ -1,6 +1,6 @@
 /**
  * The HostBridge a window hands to @tagalong/ui: the preload's calls plus the ones the preload
- * cannot make itself (the health check, Fix it, Open logs folder, playing a voice sample), which
+ * cannot make itself (the health check, Fix it, Open logs folder, playing a voice sample, copying text), which
  * need renderer code.
  * Contains fullBridge.
  */
@@ -51,5 +51,6 @@ export function fullBridge(): HostBridge {
     readingRecheck: () => host.readingRecheck(),
     openLanguageSettings: () => host.openLanguageSettings(),
     playVoiceSample: makeSamplePlayer(),
+    copyText: (text) => navigator.clipboard.writeText(text),
   };
 }

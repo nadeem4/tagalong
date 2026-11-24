@@ -11,6 +11,7 @@ import type {
   AppsList,
   BodiesState,
   ContextSnapshot,
+  DevicesState,
   FixTarget,
   LoopsState,
   KnowMeInput,
@@ -18,7 +19,9 @@ import type {
   KnowSourceInfo,
   MemoryEntry,
   ModelState,
+  PairOffer,
   Pet,
+  TailscaleState,
   SttState,
   TtsState,
   VoiceDownload,
@@ -251,6 +254,12 @@ export interface BrainCard {
   /** The machine the brain runs on, and whether this body is on it; absent from an older brain. */
   host?: string;
   local?: boolean;
+  /** Whether it listens for other devices, from the brain; absent from an older one. */
+  network?: boolean;
+  /** The brain's certificate as a short code (4F2A-91C0), to check against the other machine. */
+  identity?: string;
+  /** ISO, UTC: the last time the desktop saw the brain answer. */
+  lastConnected?: string;
 }
 
 export interface AskInput {
@@ -430,6 +439,23 @@ export interface HostBridge {
    * to the brain once and is never read back. Rejects with one fixed sentence on failure.
    */
   setWhatsApp(change: WhatsAppChange): Promise<void>;
+  /** Home's Devices page: the paired machines, browsers and AI tools. Rejects while the brain is away. */
+  devicesState(): Promise<DevicesState>;
+  /** Gives a paired device or AI tool a new name; rejects when the brain refuses. */
+  renameDevice(id: string, name: string): Promise<void>;
+  /** Cuts a paired device or AI tool off at once; rejects when the brain refuses. */
+  revokeDevice(id: string): Promise<void>;
+  /** A fresh pairing code on this PC's brain. Rejects with `network_off` while the brain does not listen beyond this PC. */
+  pairMake(): Promise<PairOffer>;
+  copyText(text: string): Promise<void>;
+  /** Registers the brain to start at sign-in with network access on; no administrator prompt. */
+  installBrainService(): Promise<{ ok: true } | { ok: false; detail: string }>;
+  /** Forgets the paired brain and goes back to the one on this PC. */
+  forgetBrain(): Promise<void>;
+  /** Dials the brain again now instead of at the next retry. */
+  reconnectBrain(): Promise<void>;
+  /** What the desktop finds of Tailscale on this PC; no call leaves the machine. */
+  tailscaleState(): Promise<TailscaleState>;
   /**
    * How Scout reads the screen on this PC, as the brain's reading_status answer (JSON text; read
    * it with readingRowsOf). Changes arrive as `changed reading`. Rejects while the brain is away.
@@ -485,6 +511,8 @@ export interface HostBridge {
   restartBrain(): Promise<void>;
   /** Restarts the brain once no job is running. */
   restartBrainAfterWork(): Promise<void>;
+  /** Ends the brain on this PC (a service brain, or one the desktop started). */
+  stopBrain(): Promise<void>;
   openBrainFolder(): Promise<void>;
   openBrainLog(): Promise<void>;
   /** Copies version, build, process id, address, data folder, model and who started it. */

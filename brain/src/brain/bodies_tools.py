@@ -113,7 +113,9 @@ def bodies_tools(
         for kind, label in _KINDS:
             mine = [b for b in online if b.kind == kind]
             rows += [
-                {"id": b.id, "kind": kind, "name": b.name, "connected": True} for b in mine
+                {"id": b.id, "kind": kind, "name": b.name, "connected": True}
+                | ({"device_id": d} if (d := bodies.device_id(b.id)) else {})
+                for b in mine
             ] or [{"id": kind, "kind": kind, "name": label, "connected": False}]
         return json.dumps({"bodies": rows})
 

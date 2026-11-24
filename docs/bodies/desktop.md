@@ -116,7 +116,7 @@ flowchart LR
   nav --> ov["Overview<br/>(Scout card, BrainCard, WhereThingsRun, SpendCard)"]
   nav --> tk["Tasks<br/>(TasksView, Now card)"]
   nav --> cn["Connections<br/>(ConnectionsPanel: apps, experts)"]
-  nav --> pl["Places<br/>(PlacesView: This PC, Chrome add-on, WhatsApp)"]
+  nav --> pl["Devices<br/>(DevicesView: paired devices, AI tools, this computer, Chrome add-on, WhatsApp)"]
   nav --> ap["Approvals<br/>(ApprovalsView: preferences, ask history)"]
   nav --> mem["What Scout remembers<br/>(MemoryView)"]
   nav --> st["Settings<br/>(the host's form, PermissionsPanel)"]
@@ -127,7 +127,7 @@ flowchart LR
 ```
 
 The Memory entry reads "What Scout remembers" (the companion's name fills in), and Tasks and
-Places carry a "New" badge. The Settings page is the host's own form (passed in as `settings`)
+Devices carry a "New" badge. The Settings page is the host's own form (passed in as `settings`)
 with the Permissions card under it. The Tasks page
 (`tasks-view.tsx`) shows the Now card above four tabs. Every page reads and writes through the brain's Home tools
 (see [Talking to the brain](#talking-to-the-brain)), so Home shows what the brain holds, never a copy.
@@ -228,7 +228,7 @@ link changes. The socket is `pinnedSocket`: it trusts only the certificate whose
 a different certificate is refused and the desktop never falls back to plain `ws` or sends its token.
 The device token the brain issued at pairing is sealed with Electron `safeStorage` (`link-store.ts`)
 and is never in `settings.json`. `launchBrain` spawns nothing while the link is remote. A brain's
-`brain_status` says `local: false` when this desktop is not on its machine, and then the brain card's
+`brain_status` says `local: true` when this desktop is on the brain's machine and `local: false` when this desktop is not on its machine, and then the brain card's
 restart and open-folder do nothing. `pairWithLink` (`ipc/pair.ts`) turns a pasted or scanned link into
 a saved remote link and reconnects; `forgetBrain` returns to the local brain. Both are on the
 preload's `tagalong` object (`discoverBrains`, `pairWithLink`, `forgetBrain`); no screen uses them yet.
@@ -861,19 +861,35 @@ pictures")`: `IPC.askScout` (`ipc/ask-scout.ts`) brings the companion up and sen
   `approveTool` IPC (`ipc/connections.ts`) calls it and swallows only `not_found` (the ask already closed), because that card goes with its closed frame.
   Any other refusal (the brain offline) rejects back to the bubble, which keeps the card up to click again; only the person's click answers an ask. The bubble is brought up when an ask opens.
 
-Home's Places page (`bodies/ui/src/home/places-view.tsx`, nav label Places with a "New" badge, after
-Connections; `ipc/bodies.ts`) lists the places you can talk to Scout: **This PC** (Desktop), the **Chrome
-add-on** (Connected or Not set up, with a "Get the add-on" button that opens the tour at its Browser step,
-step 8) and **WhatsApp**, each with a purpose line and Connected, Not set up or Offline (WhatsApp is
-Offline when its five values are saved but it is not connected). WhatsApp's setup sits under its row:
+Home's Devices page (`bodies/ui/src/home/devices-view.tsx`, nav label Devices with a "New" badge, after
+Connections; `ipc/devices.ts` and `ipc/bodies.ts`) lists the paired devices from the brain's `devices_list`
+(`parseDevices` in `ui/src/shapes/devices.ts` drops revoked ones and sets AI tools, kind `mcp_client`, apart).
+Each row (`device-row.tsx`) renames in place (Enter saves, Escape cancels) and revokes after a red callout under the row (Keep it or Revoke;
+`device_rename`, `device_revoke`; the callout for an AI tool says what it added stays). A refused rename or revoke puts the row back and says so. Rows sit in two groups, **Computers and browsers** and **AI tools**, each headed with an "N paired" count and drawn with line icons (`device-icons.tsx`), not letters; the header Pair button is hidden while nothing is paired. "Last seen" reuses the
+locale-aware day and clock words of the approval history. It shows Online now
+when a connected body carries the device's id (`device_id` on the brain's `bodies_status` rows). A device that appears on a later read gets a New chip and a
+"paired" line, both cleared once it is seen online. **Pair a device** opens the pair dialog on `pairMake`; with network access off the brain refuses
+with the `network_off` error code (the desktop maps the code, not the words), so the dialog offers **Let other devices connect**, which runs
+`tagalong service install` (per-user, no admin prompt), ends the brain Tagalong started (the service cannot bind its port while it runs; a brain that already is the service is restarted instead), then waits for the link to go offline and come back (the old link is still up right after install) before the dialog retries `pair_make`; the brain card now says Started by the service, so the invitation goes away. If the install or restart fails the dialog says it could not turn network access on. With nothing paired an empty card offers Pair a device
+and **Reach Scout away from home**, the Tailscale guide (`tailscale-guide.tsx`): the guide opens at once, takes the brain card as a prop and fills in as answers arrive. A step is done when
+`tailscale ip -4` returns an address (`runTailscale` in `brain/launch.ts`, injected into `ipc/devices.ts`;
+no `tailscale` on the PATH means Install Tailscale first, with an ordinary link to https://tailscale.com/download
+that the window-open handler sends to the browser) or the brain answers at its tailnet name. It looks again
+when the window regains focus and on **Check again**, with no polling. The brain card on Overview has four states: a local service (Starts: At sign-in, a **Let other devices connect** switch that runs the same network-on flow and cannot turn it off again, Stop brain, `IPC.brainStop`), a local brain that is not a
+service yet (Starts: When you open Tagalong, a gold "Make this Scout's brain"), a remote brain (machine name, Identity, no restart, "Use a different brain")
+and an unreachable remote brain (outlined Try now, Away from home?, Last connected, which the desktop keeps in memory only and forgets on restart); one `BrainCard` renders both (a remote brain only drops what this PC cannot do). The desktop calls the brain
+remote when the pinned link is paired or the brain said so, so an unreachable remote brain still reads as
+remote. `IPC.brainReconnect` is registered once, in `ipc/brain-link.ts`. Besides the paired devices the page lists the
+places you can talk to Scout: this computer's Desktop row (chips "Scout's brain", with a gold dot on its icon, when the brain runs here, and "This computer") and the **Chrome
+add-on** (Online or Not set up, with a "Get the add-on" button that opens the tour at its Browser step,
+step 8), each with a purpose line. Below the lists a **Messaging** card (`whatsapp-card.tsx`) holds **WhatsApp**, Online, Offline (its five values are saved but it is not connected) or Not set up. WhatsApp's setup sits under its row:
 five fields
 (access token, app secret, verify token as password inputs; phone number ID and your number as text), one
 `Toggle` named WhatsApp (disabled, with the reason, until all five are saved) and one Save. A saved value shows
 only the word Saved; Save sends only the fields typed and then clears them. A failure shows one fixed line;
 `ipc/bodies.ts` checks the argument with a strict zod shape and rebuilds every error from fixed text with no
 `cause`, so a pasted secret never comes back. The page reads again on `changed { what: "bodies" }`;
-if the brain cannot be read it says so in an alert. `e2e/design-shots.spec.ts` renders it in all three
-states against the fake brain's `bodies` option.
+if the brain cannot be read it says so in an alert. `e2e/design-shots.spec.ts` renders the page, the brain card states, WhatsApp's setup, the network-off dialog, a device just joined, inline rename and the guide against the fake brain's `bodies`, `pairNetworkOff` and `pairDevice` options. The Tailscale guide marks each step done, now or still to do, says "Found." on a step it detected and opens the download page with a boxed button.
 See [whatsapp.md](whatsapp.md).
 
 `turn-events.ts` turns the validated notifications into the TurnEvents the renderer already

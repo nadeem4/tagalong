@@ -4,8 +4,8 @@
  * no Restart, and "When your job finishes" waits for the work.
  */
 
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import {
   HostBridgeProvider,
   type BrainCard as BrainCardData,
@@ -53,7 +53,7 @@ function renderCard(brainCard: BrainCardData, brainLink?: BrainLink) {
   const bridge = createFakeHostBridge({ brainCard, ...(brainLink ? { brainLink } : {}) });
   render(
     <HostBridgeProvider bridge={bridge}>
-      <BrainCard />
+      <BrainCard onAway={() => undefined} />
     </HostBridgeProvider>,
   );
   return bridge;
@@ -226,5 +226,76 @@ describe('BrainCard', () => {
     expect(await region()).toHaveTextContent("Scout's brain did not finish setting up.");
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(bridge.setupRetries()).toBe(1);
+  });
+
+  describe('where the brain lives', () => {
+    const REMOTE: BrainCardData = {
+      ...RUNNING,
+      startedBy: null,
+      addr: '192.168.1.20:47321',
+      host: 'mini-pc',
+      local: false,
+    };
+
+    it('a brain on this PC that is not a service yet offers to become one', async () => {
+      const bridge = renderCard(RUNNING);
+      fireEvent.click(await screen.findByRole('button', { name: "Make this Scout's brain" }));
+      await waitFor(() => expect(bridge.brainActions).toContain('install-service'));
+    });
+
+    it('becoming the service replaces the invitation with the switch, Pair and Stop brain', async () => {
+      const bridge = renderCard({ ...RUNNING, local: true });
+      fireEvent.click(await screen.findByRole('button', { name: "Make this Scout's brain" }));
+      expect(
+        await screen.findByRole('switch', { name: 'Let other devices connect' }),
+      ).toBeDisabled();
+      expect(screen.queryByRole('button', { name: "Make this Scout's brain" })).toBeNull();
+      expect(screen.getByText('At sign-in')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Stop brain' }));
+      expect(bridge.brainActions).toContain('stop');
+    });
+
+    it('a service brain that is not listening yet has a switch that turns it on', async () => {
+      const bridge = renderCard({ ...RUNNING, local: true, startedBy: 'service', network: false });
+      const toggle = await screen.findByRole('switch', { name: 'Let other devices connect' });
+      expect(toggle).toHaveAttribute('aria-checked', 'false');
+      fireEvent.click(toggle);
+      await waitFor(() => expect(bridge.brainActions).toContain('install-service'));
+      await waitFor(() =>
+        expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'true'),
+      );
+    });
+
+    it('a connected remote brain names its machine and has no restart', async () => {
+      const bridge = renderCard({ ...REMOTE, identity: '4F2A-91C0' });
+      const card = await region();
+      expect(card).toHaveTextContent('Runs onmini-pc');
+      expect(card).toHaveTextContent('Identity4F2A-91C0');
+      expect(card).toHaveTextContent('To restart, stop or update the brain, open Home on mini-pc.');
+      expect(screen.queryByRole('button', { name: 'Restart brain' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Open folder' })).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Use a different brain' }));
+      expect(bridge.brainActions).toContain('forget-brain');
+    });
+
+    it('an unreachable remote brain can be tried now or reached from away', async () => {
+      const away = vi.fn();
+      const bridge = createFakeHostBridge({
+        brainCard: { ...REMOTE, status: 'offline', lastConnected: '2026-11-24T08:41:00Z' },
+      });
+      render(
+        <HostBridgeProvider bridge={bridge}>
+          <BrainCard onAway={away} />
+        </HostBridgeProvider>,
+      );
+      expect(await screen.findByRole('alert')).toHaveTextContent("Can't reach mini-pc.");
+      fireEvent.click(screen.getByRole('button', { name: 'Try now' }));
+      expect(bridge.brainActions).toContain('reconnect');
+      fireEvent.click(screen.getByRole('button', { name: 'Away from home?' }));
+      expect(away).toHaveBeenCalled();
+      expect(screen.queryByRole('button', { name: 'Start brain' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Use a different brain' })).toBeNull();
+      expect(screen.getByText('Last connected')).toBeInTheDocument();
+    });
   });
 });

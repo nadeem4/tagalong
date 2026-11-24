@@ -203,6 +203,7 @@ JSON-RPC error objects: `{ code, message, data? }`. `message` is a plain sentenc
 | `tool_failed`      | -32007 | The tool ran and failed; `data` may carry details                     |
 | `over_limit`       | -32008 | A part or message is over the size limits                             |
 | `unauthorized`     | -32009 | `hello` with a missing, wrong or revoked token, or a refused `pair`   |
+| `network_off`      | -32010 | A pairing code was asked for while the brain listens only on this PC  |
 
 ## The TypeScript client
 

@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { _electron as electron, expect, test } from '@playwright/test';
-import type { ElectronApplication, Page } from '@playwright/test';
+import type { ElectronApplication, Locator, Page } from '@playwright/test';
 import { sourceHash } from '../src/main/brain/build-id';
 import { closeApp } from './fixtures/close-app';
 import { freePort } from './fixtures/free-port';
@@ -809,7 +809,7 @@ test('E5 model states', async () => {
   }
 });
 
-// E2: Home > Places in three states, tour step 11 before and after adding one, and the finish card.
+// E2: Home > Devices in three states, tour step 11 before and after adding one, and the finish card.
 async function launchShot(options: Parameters<typeof startFakeBrain>[0], settings = true) {
   const brain = await startFakeBrain(options);
   const dataDir = mkdtempSync(join(tmpdir(), 'tagalong-shot-'));
@@ -832,7 +832,7 @@ async function launchShot(options: Parameters<typeof startFakeBrain>[0], setting
     await brain.close();
     rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   };
-  return { find, done };
+  return { find, done, brain };
 }
 
 async function placesPage(
@@ -845,9 +845,9 @@ async function placesPage(
     const home = await find('home');
     await home
       .getByRole('navigation')
-      .getByRole('button', { name: /^Places/ })
+      .getByRole('button', { name: /^Devices/ })
       .click();
-    await expect(home.getByRole('heading', { level: 1, name: 'Places' })).toBeVisible();
+    await expect(home.getByRole('heading', { level: 1, name: 'Devices' })).toBeVisible();
     await take(home);
   } finally {
     await done();
@@ -896,7 +896,7 @@ test('E2 places states', async () => {
       },
     },
     async (home) => {
-      await expect(home.getByText('Connected').first()).toBeVisible({ timeout: 30_000 });
+      await expect(home.getByText('Online').first()).toBeVisible({ timeout: 30_000 });
       await home.screenshot({ path: join(dir, 'all-connected.png') });
     },
   );
@@ -1073,5 +1073,169 @@ test('BAU1 where the brain lives and pairing, light and dark', async () => {
   } finally {
     await done();
     await remote.close();
+  }
+});
+
+const REMOTE_BRAIN = {
+  version: '0.0.1',
+  build: 'x',
+  pid: 4242,
+  started_at: new Date(Date.now() - 3 * 3_600_000).toISOString(),
+  addr: '100.64.0.7:47321',
+  data_dir: 'C:/Users/you/.tagalong',
+  log_path: 'C:/Users/you/.tagalong/brain.log',
+  places: [{ id: 'desktop', kind: 'desktop', name: 'Desktop' }],
+  work_running: false,
+  host: 'Studio-PC',
+};
+
+test('BAU2 devices, the brain card and the Tailscale guide, light and dark', async () => {
+  test.setTimeout(300_000);
+  const dir = shotDir('bau2');
+  mkdirSync(dir, { recursive: true });
+  const both = async (home: Page, name: string, target?: Locator): Promise<void> => {
+    for (const scheme of ['light', 'dark'] as const) {
+      await home.emulateMedia({ colorScheme: scheme });
+      await settled(home);
+      await (target ?? home).screenshot({ path: join(dir, `${name}-${scheme}.png`) });
+    }
+  };
+  const open = async (
+    options: Parameters<typeof startFakeBrain>[0],
+    page: 'Overview' | 'Devices',
+  ) => {
+    const launched = await launchShot(options);
+    await (await launched.find('avatar')).evaluate(() => window.tagalongHost.openSettings());
+    const home = await launched.find('home');
+    await home
+      .getByRole('navigation')
+      .getByRole('button', { name: new RegExp(`^${page}`) })
+      .click();
+    return { ...launched, home };
+  };
+
+  const rows = await open(
+    {
+      hasKey: true,
+      bodies: {
+        connected: ['desktop', 'browser'],
+        deviceIds: { browser: 'd2' },
+        whatsappSet: ALL_FIVE.slice(0, 3),
+      },
+      brainStatus: { ...status('service', false), local: true, host: 'mini-pc', network: true },
+      devices: [
+        { id: 'd1', name: 'Desktop', kind: 'desktop' },
+        { id: 'd2', name: 'Chrome on laptop', kind: 'browser', lastSeen: '2026-11-22T18:02:00Z' },
+        { id: 'd3', name: 'Cursor', kind: 'mcp_client' },
+      ],
+    },
+    'Devices',
+  );
+  try {
+    await expect(rows.home.getByText('Chrome on laptop')).toBeVisible({ timeout: 30_000 });
+    await both(rows.home, 'devices');
+    await rows.home.getByRole('button', { name: 'Set up' }).click();
+    await expect(rows.home.getByLabel(/Access token/)).toBeVisible();
+    await both(rows.home, 'whatsapp');
+    await rows.home.getByRole('button', { name: 'Revoke' }).first().click();
+    await both(rows.home, 'revoke-confirm');
+    await rows.home.getByRole('button', { name: 'Keep it' }).click();
+    await rows.home.getByRole('button', { name: 'Rename' }).first().click();
+    await both(rows.home, 'rename');
+    await rows.home.keyboard.press('Escape');
+    rows.brain.pairDevice({ id: 'd4', name: "Nadeem's phone", kind: 'desktop' });
+    await expect(rows.home.locator('.dv-joined')).toContainText("Nadeem's phone is paired");
+    await both(rows.home, 'joined');
+  } finally {
+    await rows.done();
+  }
+
+  const empty = await open({ hasKey: true }, 'Devices');
+  try {
+    await expect(empty.home.getByText('Only this computer so far')).toBeVisible({
+      timeout: 30_000,
+    });
+    await both(empty.home, 'devices-empty');
+    await empty.home.getByRole('button', { name: 'Pair a device' }).first().click();
+    await expect(empty.home.getByRole('dialog')).toBeVisible();
+    await both(empty.home, 'pair');
+    await empty.home.keyboard.press('Escape');
+    await empty.home.getByRole('button', { name: 'Reach Scout away from home' }).click();
+    await expect(empty.home.getByRole('region', { name: /away from home/i })).toBeVisible();
+    await both(empty.home, 'tailscale');
+  } finally {
+    await empty.done();
+  }
+
+  const offDialog = await open({ hasKey: true, pairNetworkOff: true }, 'Devices');
+  try {
+    await offDialog.home.getByRole('button', { name: 'Pair a device' }).first().click();
+    await expect(offDialog.home.getByText(/Other devices cannot reach/)).toBeVisible({
+      timeout: 30_000,
+    });
+    await both(offDialog.home, 'pair-network-off');
+  } finally {
+    await offDialog.done();
+  }
+
+  const guideRemote = await open(
+    { hasKey: true, brainStatus: { ...REMOTE_BRAIN, started_by: 'service', local: false } },
+    'Devices',
+  );
+  try {
+    await guideRemote.home.getByRole('button', { name: 'Reach Scout away from home' }).click();
+    const guide = guideRemote.home.getByRole('region', { name: /away from home/i });
+    await expect(guide).toContainText('Install Tailscale on Studio-PC', { timeout: 30_000 });
+    await both(guideRemote.home, 'tailscale-remote');
+  } finally {
+    await guideRemote.done();
+  }
+
+  const brainCard = (home: Page) => home.getByRole('region', { name: "Scout's brain" });
+  for (const [name, facts] of [
+    ['local-service', { ...status('service', false), local: true, host: 'This PC', network: true }],
+    ['local-not-service', { ...status('desktop', false), local: true, host: 'This PC' }],
+    ['remote', { ...REMOTE_BRAIN, started_by: 'service', local: false }],
+  ] as const) {
+    const launched = await open({ hasKey: true, brainStatus: facts }, 'Overview');
+    try {
+      await expect(brainCard(launched.home)).toBeVisible({ timeout: 30_000 });
+      await settled(launched.home);
+      await both(launched.home, `brain-${name}`, brainCard(launched.home));
+    } finally {
+      await launched.done();
+    }
+  }
+
+  const gone = await startFakeBrain({
+    hasKey: true,
+    brainStatus: { ...REMOTE_BRAIN, started_by: 'service', local: false },
+  });
+  const dataDir = mkdtempSync(join(tmpdir(), 'tagalong-shot-'));
+  seedSettings(dataDir);
+  const app = await electron.launch({
+    args: ['.', `--user-data-dir=${dataDir}`],
+    cwd: appDir,
+    env: { ...launchEnv(dataDir), TAGALONG_BRAIN_ADDR: gone.addr, TAGALONG_START_BRAIN: '0' },
+  });
+  try {
+    const find = async (n: string): Promise<Page> => {
+      for (let at = 0; at < 120; at += 1) {
+        const page = app.windows().find((p) => p.url().includes(`${n}.html`));
+        if (page !== undefined) return page;
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      throw new Error(`no ${n} window appeared`);
+    };
+    await (await find('avatar')).evaluate(() => window.tagalongHost.openSettings());
+    const home = await find('home');
+    await home.getByRole('button', { name: 'Overview', exact: true }).click();
+    await expect(brainCard(home)).toContainText('Studio-PC', { timeout: 30_000 });
+    await gone.close();
+    await expect(brainCard(home)).toContainText('Not reachable', { timeout: 60_000 });
+    await both(home, 'brain-remote-unreachable', brainCard(home));
+  } finally {
+    await closeApp(app);
+    rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
 });
