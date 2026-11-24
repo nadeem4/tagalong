@@ -2,12 +2,14 @@
  * Tests for TailscaleGuide: which of its four steps are done follows what the desktop finds
  * (the tailscale command, the brain's address), and a PC without Tailscale starts at Install.
  */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { HostBridgeProvider } from '../host-bridge';
 import type { BrainCard } from '../host-bridge';
 import { createFakeHostBridge } from '../test-support/fake-host-bridge';
 import { TailscaleGuide } from './tailscale-guide';
+
+const step = (title: string): HTMLElement => screen.getByText(title).closest('li')!;
 
 const REMOTE: BrainCard = {
   status: 'running',
@@ -48,11 +50,14 @@ describe('TailscaleGuide', () => {
   });
 
   it('marks this device done once it has a tailnet address, and looks again on Check again', async () => {
-    const bridge = open({ installed: true, ip: null });
+    const bridge = open({ installed: true, ip: null }, REMOTE);
     expect(await screen.findByText('Open Tailscale and sign in.')).toBeInTheDocument();
+    expect(step('Install Tailscale on this device')).toHaveClass('ts-step--now');
     bridge.tailscale = { installed: true, ip: '100.64.0.7' };
     fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
-    expect(await screen.findByText('Tailscale is running on this device')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(step('Install Tailscale on this device')).toHaveClass('ts-step--done'),
+    );
   });
 
   it('is Working, with the address to copy, when the brain is reached over its tailnet address', async () => {

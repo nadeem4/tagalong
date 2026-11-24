@@ -1,21 +1,21 @@
 /**
  * One paired computer, browser or AI tool on Devices: its name and standing, with Rename in
- * place and a Revoke that asks first, in the row, as Remove does on Connections. Contains
- * DeviceRowItem.
+ * place and a Revoke that asks first in a red line under the row. A refused rename or revoke
+ * puts the row back and says so. Contains DeviceRowItem.
  */
 import { useState } from 'react';
 import { Button } from '../controls/button';
 import type { DeviceRow } from '../shapes';
 import { dayLabel, time } from './approval-history';
+import type { DeviceIconName } from './device-icons';
 import { Place, StandingLabel } from './place-row';
 
-const KINDS: Record<string, { tile: string; label: string }> = {
-  desktop: { tile: 'PC', label: 'Desktop' },
-  browser: { tile: 'C', label: 'Browser' },
-  node: { tile: 'PC', label: 'Computer' },
-  mcp_client: { tile: 'AI', label: "Reads and adds to Scout's memory" },
+const KINDS: Record<string, { icon: DeviceIconName; label: string }> = {
+  desktop: { icon: 'laptop', label: 'Desktop' },
+  browser: { icon: 'globe', label: 'Browser' },
+  node: { icon: 'pc', label: 'Computer' },
+  mcp_client: { icon: 'term', label: "Reads and adds to Scout's memory" },
 };
-const OTHER = { tile: 'PC', label: 'Device' };
 
 const when = (iso: string): string => `${dayLabel(iso)}, ${time(iso)}`;
 
@@ -40,22 +40,37 @@ export function DeviceRowItem({
 }) {
   const [mode, setMode] = useState<'view' | 'rename' | 'revoke'>('view');
   const [draft, setDraft] = useState(device.name);
+  const [failed, setFailed] = useState<string | null>(null);
   const aiTool = device.kind === 'mcp_client';
-  const kind = KINDS[device.kind] ?? OTHER;
+  const kind = KINDS[device.kind] ?? KINDS['node']!;
   const meta = aiTool
     ? `${kind.label} · ${device.lastSeen === null ? 'not used yet' : `last used ${when(device.lastSeen)}`}`
     : `${kind.label} · paired ${dayLabel(device.pairedAt)}`;
 
+  const attempt = async (act: () => Promise<void>, words: string): Promise<void> => {
+    setFailed(null);
+    try {
+      await act();
+    } catch {
+      setFailed(words);
+    }
+    setMode('view');
+  };
   const save = async (): Promise<void> => {
     const name = draft.trim();
-    if (name !== '' && name !== device.name) await onRename(name);
-    setMode('view');
+    if (name === '' || name === device.name) return setMode('view');
+    await attempt(() => onRename(name), `Scout could not rename ${device.name}.`);
+  };
+  const start = (next: 'rename' | 'revoke'): void => {
+    setFailed(null);
+    setDraft(device.name);
+    setMode(next);
   };
 
   return (
     <li className="cx-item">
       <Place
-        tile={kind.tile}
+        icon={kind.icon}
         name={
           mode === 'rename' ? (
             <input
@@ -73,63 +88,55 @@ export function DeviceRowItem({
             device.name
           )
         }
-        chips={[...(fresh ? ['New'] : []), ...(aiTool ? ['Memory'] : [])]}
+        chips={[
+          ...(fresh ? [{ label: 'New', tone: 'ok' as const }] : []),
+          ...(aiTool ? [{ label: 'Memory' }] : []),
+        ]}
         purpose={meta}
       >
-        <StandingLabel
-          standing={online ? 'connected' : 'not-set-up'}
-          words={seenWords(device, online)}
-        />
-        {mode === 'rename' && (
+        {mode === 'rename' ? (
           <>
             <Button variant="primary" onClick={() => void save()}>
               Save
             </Button>
-            <Button variant="quiet" onClick={() => setMode('view')}>
+            <Button variant="secondary" onClick={() => setMode('view')}>
               Cancel
             </Button>
           </>
-        )}
-        {mode === 'revoke' && (
+        ) : (
           <>
-            <Button
-              variant="danger"
-              aria-label={`Yes, revoke ${device.name}`}
-              onClick={() => void onRevoke()}
-            >
-              Yes, revoke
-            </Button>
-            <Button
-              variant="secondary"
-              aria-label={`Keep ${device.name}`}
-              onClick={() => setMode('view')}
-            >
-              Keep
-            </Button>
-          </>
-        )}
-        {mode === 'view' && (
-          <>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setDraft(device.name);
-                setMode('rename');
-              }}
-            >
+            <StandingLabel standing={online ? 'online' : 'off'} words={seenWords(device, online)} />
+            <Button variant="secondary" onClick={() => start('rename')}>
               Rename
             </Button>
-            <Button variant="quiet" onClick={() => setMode('revoke')}>
+            <Button variant="secondary" onClick={() => start('revoke')}>
               Revoke
             </Button>
           </>
         )}
       </Place>
       {mode === 'revoke' && (
+        <div role="alert" className="dv-confirm">
+          <span>
+            <strong>Revoke {device.name}?</strong>{' '}
+            {aiTool
+              ? "It can no longer read or add to Scout's memory. What it already added stays; remove it under What Scout remembers."
+              : 'It stops working right away and loses access to Scout. You can pair it again with a new code.'}
+          </span>
+          <Button variant="quiet" onClick={() => setMode('view')}>
+            Keep it
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => void attempt(onRevoke, `Scout could not revoke ${device.name}.`)}
+          >
+            Revoke
+          </Button>
+        </div>
+      )}
+      {failed !== null && (
         <p role="alert" className="tg-note cx-row__note">
-          {aiTool
-            ? `Revoke ${device.name}? It can no longer read or add to Scout's memory. What it already added stays; remove it under What Scout remembers.`
-            : `Revoke ${device.name}? It stops working right away and loses access to Scout. You can pair it again with a new code.`}
+          {failed}
         </p>
       )}
     </li>

@@ -254,6 +254,12 @@ export interface BrainCard {
   /** The machine the brain runs on, and whether this body is on it; absent from an older brain. */
   host?: string;
   local?: boolean;
+  /** Whether it listens for other devices, from the brain; absent from an older one. */
+  network?: boolean;
+  /** The brain's certificate as a short code (4F2A-91C0), to check against the other machine. */
+  identity?: string;
+  /** ISO, UTC: the last time the desktop saw the brain answer. */
+  lastConnected?: string;
 }
 
 export interface AskInput {
@@ -505,6 +511,8 @@ export interface HostBridge {
   restartBrain(): Promise<void>;
   /** Restarts the brain once no job is running. */
   restartBrainAfterWork(): Promise<void>;
+  /** Ends the brain on this PC (a service brain, or one the desktop started). */
+  stopBrain(): Promise<void>;
   openBrainFolder(): Promise<void>;
   openBrainLog(): Promise<void>;
   /** Copies version, build, process id, address, data folder, model and who started it. */

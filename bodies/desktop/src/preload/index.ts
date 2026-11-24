@@ -174,6 +174,7 @@ const bridge: PreloadBridge = {
   brainCard: () => ipcRenderer.invoke(IPC.brainStatus) as Promise<BrainCard>,
   restartBrain: () => ipcRenderer.invoke(IPC.brainRestart) as Promise<void>,
   restartBrainAfterWork: () => ipcRenderer.invoke(IPC.brainRestartAfterWork) as Promise<void>,
+  stopBrain: () => ipcRenderer.invoke(IPC.brainStop) as Promise<void>,
   openBrainFolder: () => ipcRenderer.invoke(IPC.brainOpenFolder) as Promise<void>,
   openBrainLog: () => ipcRenderer.invoke(IPC.brainOpenLog) as Promise<void>,
   copyBrainDetails: () => ipcRenderer.invoke(IPC.brainCopyDetails) as Promise<void>,

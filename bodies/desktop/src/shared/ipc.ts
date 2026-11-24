@@ -140,6 +140,7 @@ export const IPC = {
   brainStatus: 'tagalong:brain:status',
   brainRestart: 'tagalong:brain:restart',
   brainRestartAfterWork: 'tagalong:brain:restart-after-work',
+  brainStop: 'tagalong:brain:stop',
   brainOpenFolder: 'tagalong:brain:open-folder',
   brainOpenLog: 'tagalong:brain:open-log',
   brainCopyDetails: 'tagalong:brain:copy-details',

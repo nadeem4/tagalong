@@ -1,87 +1,28 @@
 /**
- * Home's Devices page: this PC and every paired computer, browser and AI tool (rename, revoke,
- * pair another), plus the browser add-on and WhatsApp with its setup under its row: five fields,
- * one switch, one Save. A saved value shows only the word Saved, never itself; what is typed goes
- * to the brain once and the field is cleared. The brain owns it all; this asks, then reads again
- * when it says `bodies` changed. Contains DevicesView.
+ * Home's Devices page: this computer (marked when it holds Scout's brain), every paired computer
+ * and browser, and the AI tools, each in its own group with a count (rename, revoke, pair
+ * another), plus the browser add-on. The brain owns it all; this asks, then reads again when it
+ * says `bodies` changed. Contains DevicesView.
  */
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import type {
-  BodiesState,
-  DeviceRow,
-  DevicesState,
-  WhatsAppChange,
-  WhatsAppField,
-} from '../shapes';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { BodiesState, DeviceRow, DevicesState } from '../shapes';
 import { Button } from '../controls/button';
-import { Toggle } from '../controls/toggle';
 import { useHostBridge } from '../host-bridge';
 import { HostPairDialog } from '../pair/host-pair-dialog';
 import { DeviceRowItem } from './device-row';
 import { Place, StandingLabel } from './place-row';
 import { TailscaleGuide } from './tailscale-guide';
 import { useBrainCard } from './use-brain-card';
-import type { Standing } from './place-row';
 
 // The tour's Browser step is where the add-on's folder and its load-unpacked steps are shown.
 const BROWSER_STEP = 8;
 
-const FIELDS: { id: WhatsAppField; label: string; secret: boolean; hint: string }[] = [
-  {
-    id: 'accessToken',
-    label: 'Access token',
-    secret: true,
-    hint: 'The long-lived token from Meta',
-  },
-  {
-    id: 'appSecret',
-    label: 'App secret',
-    secret: true,
-    hint: 'Checks that messages come from Meta',
-  },
-  {
-    id: 'verifyToken',
-    label: 'Verify token',
-    secret: true,
-    hint: 'Any phrase you pick; Meta asks for it once',
-  },
-  {
-    id: 'phoneNumberId',
-    label: 'Phone number ID',
-    secret: false,
-    hint: 'The ID of the number Scout sends from',
-  },
-  {
-    id: 'allowedNumber',
-    label: 'Your number',
-    secret: false,
-    hint: 'Only messages from this number reach Scout',
-  },
-];
-
-const STATE_LINE: Record<string, string> = {
-  off: 'WhatsApp is off.',
-  starting: 'WhatsApp is starting.',
-  running: 'WhatsApp is running.',
-  not_built: 'The WhatsApp bridge is not built yet. Build it, then switch WhatsApp off and on.',
-  node_failed:
-    'Scout could not get Node to run the WhatsApp bridge. It tries again when you switch WhatsApp off and on.',
-};
-const WAITING = 'WhatsApp is waiting for all five values. Save all five to switch it on.';
-const SAVE_FAILED = 'Scout could not save the WhatsApp settings.';
-
-const EMPTY: Record<WhatsAppField, string> = {
-  accessToken: '',
-  appSecret: '',
-  verifyToken: '',
-  phoneNumberId: '',
-  allowedNumber: '',
-};
+const nothingPaired = (paired: DevicesState): boolean =>
+  paired.devices.length === 0 && paired.aiTools.length === 0;
 
 export function DevicesView({ reach = false }: { reach?: boolean }) {
   const bridge = useHostBridge();
   const { card } = useBrainCard();
-  const formId = useId();
   const [state, setState] = useState<BodiesState | null>(null);
   const [paired, setPaired] = useState<DevicesState | null>(null);
   const known = useRef<Set<string> | null>(null);
@@ -89,10 +30,6 @@ export function DevicesView({ reach = false }: { reach?: boolean }) {
   const [pairing, setPairing] = useState(false);
   const [guide, setGuide] = useState(reach);
   const [failed, setFailed] = useState(false);
-  const [setup, setSetup] = useState(false);
-  const [typed, setTyped] = useState(EMPTY);
-  const [busy, setBusy] = useState(false);
-  const [saveFailed, setSaveFailed] = useState(false);
 
   const refresh = useCallback(() => {
     Promise.all([bridge.bodiesState(), bridge.devicesState()])
@@ -127,30 +64,13 @@ export function DevicesView({ reach = false }: { reach?: boolean }) {
     });
   }, [bridge, refresh]);
 
-  // One path for Save and the switch. On a refusal only the fixed line shows: the thrown text
-  // is dropped, because it could repeat something that was typed.
-  const send = async (change: WhatsAppChange): Promise<boolean> => {
-    setBusy(true);
-    setSaveFailed(false);
-    try {
-      await bridge.setWhatsApp(change);
-      return true;
-    } catch {
-      setSaveFailed(true);
-      return false;
-    } finally {
-      setBusy(false);
-      refresh();
-    }
-  };
-
   const head = (
     <div className="home-head home-head--row">
       <div>
         <h1 className="home-title">Devices</h1>
         <p>Everything that can talk to Scout, and where its brain lives.</p>
       </div>
-      {state !== null && (
+      {state !== null && paired !== null && !nothingPaired(paired) && (
         <Button variant="primary" onClick={() => setPairing(true)}>
           Pair a device
         </Button>
@@ -169,28 +89,20 @@ export function DevicesView({ reach = false }: { reach?: boolean }) {
     );
   }
 
-  const connected = (kind: 'desktop' | 'browser' | 'whatsapp'): boolean =>
-    state.bodies.find((body) => body.kind === kind)?.connected === true;
-  const wa = state.whatsapp;
-  // A body that is a paired device shows as that device's row; the rest (this PC, the add-on, and
-  // the offline row the brain keeps for a kind with none online) keep their own.
+  // A body that is a paired device shows as that device's row; the rest (this computer, the
+  // add-on, and the offline row the brain keeps for a kind with none online) keep their own.
   const isOnline = (device: DeviceRow): boolean =>
     state.bodies.some((body) => body.connected && body.device_id === device.id);
   const unpaired = (kind: 'desktop' | 'browser') =>
     state.bodies.filter((body) => body.kind === kind && body.device_id === undefined);
-  const whatsapp: Standing = connected('whatsapp')
-    ? 'connected'
-    : wa.complete
-      ? 'offline'
-      : 'not-set-up';
-  const nothingPaired = paired.devices.length === 0 && paired.aiTools.length === 0;
-  const joined = [...paired.devices, ...paired.aiTools].find((device) => fresh.has(device.id));
+  const isFresh = (device: DeviceRow): boolean => fresh.has(device.id) && !isOnline(device);
+  const joined = [...paired.devices, ...paired.aiTools].find(isFresh);
   const itemFor = (device: DeviceRow) => (
     <DeviceRowItem
       key={device.id}
       device={device}
       online={isOnline(device)}
-      fresh={fresh.has(device.id)}
+      fresh={isFresh(device)}
       onRename={async (name) => {
         await bridge.renameDevice(device.id, name);
         refreshDevices();
@@ -201,16 +113,7 @@ export function DevicesView({ reach = false }: { reach?: boolean }) {
       }}
     />
   );
-
-  const changes: WhatsAppChange = {};
-  for (const { id } of FIELDS) {
-    const value = typed[id].trim();
-    if (value !== '') changes[id] = value;
-  }
-  const dirty = Object.keys(changes).length > 0;
-  const save = async (): Promise<void> => {
-    if (await send(changes)) setTyped(EMPTY);
-  };
+  const holdsBrain = card?.local === true;
 
   return (
     <>
@@ -221,7 +124,7 @@ export function DevicesView({ reach = false }: { reach?: boolean }) {
         </p>
       )}
       {pairing && <HostPairDialog host={bridge} onClose={() => setPairing(false)} />}
-      {nothingPaired && (
+      {nothingPaired(paired) && (
         <section className="tg-card dv-empty" aria-label="Only this computer so far">
           <h2 className="tg-card__label">Only this computer so far</h2>
           <p>
@@ -239,29 +142,45 @@ export function DevicesView({ reach = false }: { reach?: boolean }) {
         </section>
       )}
       {guide && <TailscaleGuide card={card} onClose={() => setGuide(false)} />}
-      <section className="tg-card" aria-label="Computers and browsers">
+      <section className="tg-card" aria-labelledby="dv-machines">
+        <div className="dv-group">
+          <h2 id="dv-machines" className="tg-card__label">
+            Computers and browsers
+          </h2>
+          <span className="cx-meta">{paired.devices.length} paired</span>
+        </div>
         <ul className="cx-list">
-          {paired.devices.map(itemFor)}
           {unpaired('desktop').map((desktop) => (
             <li className="cx-item" key={desktop.id}>
               <Place
-                tile="PC"
+                icon="pc"
+                brain={holdsBrain}
                 name={desktop.connected ? desktop.name : 'This PC'}
-                chips={['Desktop']}
-                purpose="Scout sits on your screen, reads what you point it at and talks out loud."
+                chips={[
+                  ...(holdsBrain ? [{ label: "Scout's brain", tone: 'rec' as const }] : []),
+                  { label: 'This computer' },
+                ]}
+                purpose={`Desktop · ${holdsBrain ? 'always on' : 'Scout sits on your screen'}`}
               >
-                <StandingLabel standing={desktop.connected ? 'connected' : 'offline'} />
+                <StandingLabel
+                  standing={desktop.connected ? 'online' : 'off'}
+                  words={desktop.connected ? 'Online' : 'Offline'}
+                />
               </Place>
             </li>
           ))}
+          {paired.devices.map(itemFor)}
           {unpaired('browser').map((browser) => (
             <li className="cx-item" key={browser.id}>
               <Place
-                tile="C"
+                icon="globe"
                 name={browser.connected ? browser.name : 'Chrome add-on'}
                 purpose="Scout reads the page you are on, and you can talk to it from the toolbar."
               >
-                <StandingLabel standing={browser.connected ? 'connected' : 'not-set-up'} />
+                <StandingLabel
+                  standing={browser.connected ? 'online' : 'off'}
+                  words={browser.connected ? 'Online' : 'Not set up'}
+                />
                 {!browser.connected && (
                   <Button
                     variant="secondary"
@@ -276,93 +195,16 @@ export function DevicesView({ reach = false }: { reach?: boolean }) {
         </ul>
       </section>
       {paired.aiTools.length > 0 && (
-        <section className="tg-card" aria-label="AI tools">
+        <section className="tg-card" aria-labelledby="dv-ai">
+          <div className="dv-group">
+            <h2 id="dv-ai" className="tg-card__label">
+              AI tools
+            </h2>
+            <span className="cx-meta">{paired.aiTools.length} paired</span>
+          </div>
           <ul className="cx-list">{paired.aiTools.map(itemFor)}</ul>
         </section>
       )}
-      <section className="tg-card" aria-label="Messaging">
-        <ul className="cx-list">
-          <li className="cx-item">
-            <Place
-              tile="W"
-              name="WhatsApp"
-              purpose="Message Scout from your phone. It answers in the same chat."
-            >
-              <StandingLabel standing={whatsapp} />
-              {setup ? (
-                <Toggle
-                  checked={wa.enabled}
-                  label="WhatsApp"
-                  disabled={busy || (!wa.complete && !wa.enabled)}
-                  onChange={(enabled) => void send({ enabled })}
-                />
-              ) : (
-                <Button
-                  variant="secondary"
-                  aria-expanded={false}
-                  aria-controls={formId}
-                  onClick={() => setSetup(true)}
-                >
-                  {whatsapp === 'connected' ? 'Settings' : 'Set up'}
-                </Button>
-              )}
-            </Place>
-            {setup && (
-              <form
-                id={formId}
-                className="cx-form"
-                aria-busy={busy}
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  if (dirty && !busy) void save();
-                }}
-              >
-                <p role="status" aria-live="polite" className="cx-form__lead">
-                  {wa.complete || wa.enabled
-                    ? (STATE_LINE[wa.state] ?? STATE_LINE['off'])
-                    : WAITING}
-                </p>
-                <div className="cx-two">
-                  {FIELDS.map(({ id, label, secret, hint }) => {
-                    const inputId = `${formId}-${id}`;
-                    return (
-                      <div key={id} className="cx-field">
-                        <label htmlFor={inputId} className="cx-field__lbl">
-                          {label}
-                        </label>
-                        <input
-                          id={inputId}
-                          className="cx-input"
-                          type={secret ? 'password' : 'text'}
-                          autoComplete="off"
-                          spellCheck={false}
-                          placeholder={wa.set[id] ? 'Saved' : ''}
-                          aria-describedby={`${inputId}-hint`}
-                          value={typed[id]}
-                          onChange={(event) => setTyped({ ...typed, [id]: event.target.value })}
-                        />
-                        <span id={`${inputId}-hint`} className="cx-field__hint">
-                          {hint}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-                {saveFailed && (
-                  <p role="alert" className="cx-form__error">
-                    {SAVE_FAILED}
-                  </p>
-                )}
-                <div className="cx-form__actions">
-                  <Button variant="primary" type="submit" disabled={!dirty || busy}>
-                    Save
-                  </Button>
-                </div>
-              </form>
-            )}
-          </li>
-        </ul>
-      </section>
     </>
   );
 }

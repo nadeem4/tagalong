@@ -6,6 +6,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '../controls/button';
+import { Icon } from '../setup/icons';
 import { CopyButton } from '../controls/copy-button';
 import { useHostBridge } from '../host-bridge';
 import type { BrainCard } from '../host-bridge';
@@ -14,24 +15,26 @@ import type { TailscaleState } from '../shapes';
 
 const DOWNLOAD = 'https://tailscale.com/download';
 
+type StepMark = 'done' | 'now' | 'todo';
+
 function Step({
-  done,
+  mark,
   doneTitle,
   todoTitle,
   children,
 }: {
-  done: boolean;
+  mark: StepMark;
   doneTitle: string;
   todoTitle: string;
   children?: React.ReactNode;
 }) {
   return (
-    <li className={done ? 'ts-step ts-step--done' : 'ts-step'}>
+    <li className={`ts-step ts-step--${mark}`} aria-current={mark === 'now' ? 'step' : undefined}>
       <span className="ts-mark" aria-hidden="true">
-        {done ? '✓' : ''}
+        {mark === 'done' && <Icon name="tick" />}
       </span>
       <div>
-        <strong>{done ? doneTitle : todoTitle}</strong>
+        <strong>{mark === 'done' ? doneTitle : todoTitle}</strong>
         {children}
       </div>
     </li>
@@ -58,6 +61,10 @@ export function TailscaleGuide({ card, onClose }: { card: BrainCard | null; onCl
   const deviceDone = tailscale?.ip != null;
   const brainDone = overTailnet || (card !== null && card.local !== false && deviceDone);
   const working = overTailnet && card?.status === 'running';
+  const done = [brainDone, deviceDone, overTailnet, working];
+  const current = done.indexOf(false);
+  const mark = (index: number): StepMark =>
+    done[index] ? 'done' : index === current ? 'now' : 'todo';
 
   return (
     <section className="tg-card ts-guide" aria-label="Reach Scout away from home">
@@ -77,17 +84,17 @@ export function TailscaleGuide({ card, onClose }: { card: BrainCard | null; onCl
       </p>
       <ol className="ts-steps">
         <Step
-          done={brainDone}
-          doneTitle={`Tailscale is running on ${machine}`}
+          mark={mark(0)}
+          doneTitle={`Install Tailscale on ${machine}`}
           todoTitle={`Install Tailscale on ${machine}`}
         >
-          {!brainDone && (
-            <p className="cx-meta">Sign in with the account you will use everywhere.</p>
-          )}
+          <p className="cx-meta">
+            {brainDone ? 'Found.' : 'Sign in with the account you will use everywhere.'}
+          </p>
         </Step>
         <Step
-          done={deviceDone}
-          doneTitle="Tailscale is running on this device"
+          mark={mark(1)}
+          doneTitle="Install Tailscale on this device"
           todoTitle="Install Tailscale on this device"
         >
           {!deviceDone && (
@@ -98,14 +105,20 @@ export function TailscaleGuide({ card, onClose }: { card: BrainCard | null; onCl
             </p>
           )}
           {tailscale?.installed === false && (
-            <a className="cx-link" href={DOWNLOAD} target="_blank" rel="noreferrer noopener">
+            <a
+              className="tg-button tg-button--secondary"
+              href={DOWNLOAD}
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              <Icon name="external" />
               Open the Tailscale download page
             </a>
           )}
         </Step>
         <Step
-          done={overTailnet}
-          doneTitle={`Paired using ${machine}'s Tailscale address`}
+          mark={mark(2)}
+          doneTitle={`Pair using ${machine}'s Tailscale address`}
           todoTitle={`Pair using ${machine}'s Tailscale address`}
         >
           {!overTailnet && (
@@ -114,7 +127,9 @@ export function TailscaleGuide({ card, onClose }: { card: BrainCard | null; onCl
             </p>
           )}
         </Step>
-        <Step done={working} doneTitle="Check it works" todoTitle="Check it works" />
+        <Step mark={mark(3)} doneTitle="Check it works" todoTitle="Check it works">
+          {!working && <p className="cx-meta">Switch Wi-Fi off on your phone and open Scout.</p>}
+        </Step>
       </ol>
       {working && tailnet !== null && (
         <p className="ts-address">

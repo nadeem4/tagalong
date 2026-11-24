@@ -73,7 +73,15 @@ export interface FakeBrainOptions {
    * which WhatsApp values are saved (default: only the desktop, nothing saved, WhatsApp off). A
    * kind named twice in `connected` is two bodies.
    */
-  bodies?: { connected?: string[]; whatsappSet?: string[]; whatsappState?: string };
+  bodies?: {
+    connected?: string[];
+    whatsappSet?: string[];
+    whatsappState?: string;
+    /** Body kind to the paired device it is, so that device's row says Online now. */
+    deviceIds?: Record<string, string>;
+  };
+  /** `pair_make` answers network_off, the way a brain that does not listen yet does. */
+  pairNetworkOff?: boolean;
   /** The paired devices `devices_list` answers; rename and revoke change this list as the real brain does. */
   devices?: { id: string; name: string; kind: string; lastSeen?: string | null }[];
 }
@@ -171,6 +179,8 @@ export interface FakeBrain {
     steps: { job: string; expert: string; text: string; at: string }[],
     what: string,
   ): void;
+  /** A device pairs now: it joins `devices_list` and the bodies are told `changed: bodies`. */
+  pairDevice(device: { id: string; name: string; kind: string; lastSeen?: string | null }): void;
   /** Tell every connected body that Scout approved an ask under a preference. */
   sendApproved(note: { tool: string; text: string; preference: string }): void;
   /** Scout starts a turn on its own and says one line: the desktop shows it as a quiet line. */
@@ -1428,6 +1438,16 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             })),
           };
         } else if (params.tool === 'pair_make') {
+          if (options.pairNetworkOff === true) {
+            socket.send(
+              JSON.stringify({
+                jsonrpc: '2.0',
+                id: msg.id,
+                error: { code: ErrorCode.network_off, message: 'network_off' },
+              }),
+            );
+            return;
+          }
           value = {
             link: 'tagalong://pair?addr=100.64.0.7:47323&fp=ab&code=e2e-code',
             secret: 'e2e-code',
@@ -1456,6 +1476,9 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
                   kind,
                   name: i === 0 ? name : `${name} ${i + 1}`,
                   connected: true,
+                  ...(i === 0 && options.bodies?.deviceIds?.[kind] !== undefined
+                    ? { device_id: options.bodies.deviceIds[kind] }
+                    : {}),
                 }));
           });
           value = { bodies: rows };
@@ -1782,6 +1805,18 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             jsonrpc: '2.0',
             method: 'heard',
             params: { event, ...(text === undefined ? {} : { text }) },
+          }),
+        );
+      }
+    },
+    pairDevice: (device) => {
+      pairedDevices.push({ ...device });
+      for (const socket of sockets) {
+        socket.send(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            method: 'changed',
+            params: { seq: ++seq, what: 'bodies' },
           }),
         );
       }

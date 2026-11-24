@@ -174,6 +174,16 @@ export const CONNECTIONS_CSS = `
 :is(.home, .wt) .cx-input--area { height: auto; min-height: 72px; padding: 8px 12px; resize: vertical; white-space: pre; }
 :is(.home, .wt) .cx-code { ${typeCss('small')}; background: ${themedColor.panelTile}; padding: ${t.space.xxs}px ${t.space.sm}px; border-radius: ${t.radius.sm}px; color: ${themedColor.panelText}; }
 :is(.home, .wt) .cx-form__actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+:is(.home, .wt) .dv-group { display: flex; align-items: baseline; gap: ${t.space.md}px; margin-bottom: ${t.space.sm}px; }
+:is(.home, .wt) .dv-group .tg-card__label { margin: 0; }
+:is(.home, .wt) .dv-tile { position: relative; }
+:is(.home, .wt) .dv-tile__brain { position: absolute; right: -3px; top: -3px; width: 12px; height: 12px; border-radius: 50%; background: ${t.color.gold}; border: 2px solid ${themedColor.panel}; }
+:is(.home, .wt) .dv-confirm {
+  display: flex; flex-wrap: wrap; align-items: center; gap: ${t.space.md}px ${t.space.lg}px; padding: ${t.space.lg}px; margin: 0 0 ${t.space.md}px;
+  border-radius: ${t.radius.card}px; background: ${themedColor.errFill}; color: ${themedColor.errInk}; ${typeCss('small')};
+}
+:is(.home, .wt) .dv-confirm > span { flex: 1; min-width: 200px; }
+:is(.home, .wt) .dv-confirm .tg-button--quiet { border: 1px solid currentColor; color: inherit; }
 :is(.home, .wt) .dv-joined { margin: 0 0 ${t.space.lg}px; padding: ${t.space.md}px ${t.space.lg}px; border-radius: ${t.radius.card}px; background: ${themedColor.okFill}; color: ${themedColor.okInk}; }
 :is(.home, .wt) .dv-empty__actions { display: flex; flex-wrap: wrap; gap: ${t.space.md}px; }
 :is(.home, .wt) .ts-head { display: flex; align-items: center; gap: ${t.space.md}px; }
@@ -182,6 +192,8 @@ export const CONNECTIONS_CSS = `
 :is(.home, .wt) .ts-step { display: flex; gap: ${t.space.lg}px; align-items: flex-start; }
 :is(.home, .wt) .ts-step p { margin: ${t.space.xxs}px 0 ${t.space.md}px; }
 :is(.home, .wt) .ts-mark { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 1px solid ${themedColor.panelLine}; display: inline-flex; align-items: center; justify-content: center; }
+:is(.home, .wt) .ts-step a.tg-button { text-decoration: none; }
+:is(.home, .wt) .ts-step--now .ts-mark { background: ${t.color.gold}; border-color: transparent; }
 :is(.home, .wt) .ts-step--done .ts-mark { background: ${themedColor.okFill}; color: ${themedColor.okInk}; border-color: transparent; }
 :is(.home, .wt) .ts-address { display: flex; align-items: center; gap: ${t.space.md}px; margin: ${t.space.lg}px 0 0; }
 `;

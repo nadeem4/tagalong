@@ -12,8 +12,8 @@ interface PairDialogProps {
   make: () => Promise<PairOffer>;
   copyText: (text: string) => Promise<void>;
   onClose: () => void;
-  /** Turns on the brain's network access for other devices; true when it worked. Absent: no prompt is offered. */
-  enableNetwork?: () => Promise<boolean>;
+  /** Turns on the brain's network access and restarts it; true once it is back. */
+  enableNetwork: () => Promise<boolean>;
 }
 
 function clock(ms: number): string {
@@ -60,25 +60,21 @@ function PairCode({
 }) {
   const [result, setResult] = useState<PairOffer | 'failed' | 'network_off' | null>(null);
   const [enabling, setEnabling] = useState(false);
+  const [enableFailed, setEnableFailed] = useState(false);
 
   useEffect(() => {
     let live = true;
     make().then(
       (made) => live && setResult(made),
       (error: unknown) =>
-        live &&
-        setResult(
-          enableNetwork !== undefined && String(error).includes('network_off')
-            ? 'network_off'
-            : 'failed',
-        ),
+        live && setResult(String(error).includes('network_off') ? 'network_off' : 'failed'),
     );
     return () => {
       live = false;
     };
-  }, [make, enableNetwork]);
+  }, [make]);
 
-  if (result === 'network_off' && enableNetwork !== undefined) {
+  if (result === 'network_off') {
     return (
       <>
         <p className="pair-alert" role="status">
@@ -88,6 +84,11 @@ function PairCode({
             code.
           </span>
         </p>
+        {enableFailed && (
+          <p className="pair-alert pair-alert--err" role="alert">
+            Scout could not turn network access on. Try again.
+          </p>
+        )}
         <div className="pair-actions">
           <Button variant="secondary" onClick={onClose}>
             Not now
@@ -97,8 +98,10 @@ function PairCode({
             disabled={enabling}
             onClick={() => {
               setEnabling(true);
+              setEnableFailed(false);
               void enableNetwork().then((ok) => {
                 setEnabling(false);
+                setEnableFailed(!ok);
                 if (ok) onRetry();
               });
             }}
@@ -109,7 +112,7 @@ function PairCode({
       </>
     );
   }
-  if (result === 'failed' || result === 'network_off') {
+  if (result === 'failed') {
     return (
       <p className="pair-alert pair-alert--err" role="alert">
         Scout could not make a code. Check that the brain is running, then make a new one.
@@ -159,7 +162,7 @@ export function PairDialog({ make, copyText, onClose, enableNetwork }: PairDialo
           make={make}
           copyText={copyText}
           onClose={onClose}
-          {...(enableNetwork === undefined ? {} : { enableNetwork })}
+          enableNetwork={enableNetwork}
           onRetry={() => setRound((n) => n + 1)}
         />
         <p className="pair-alert">

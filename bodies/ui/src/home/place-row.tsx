@@ -1,61 +1,57 @@
 /**
- * One row of Devices: a tile, a name with chips, a line of what it is and, on the right, its
- * standing and actions. Shared by the machines, the browser add-on, WhatsApp and the paired
- * devices. Contains Place, StandingLabel and Standing.
+ * One row of Devices: an icon tile (a gold dot on the one that holds the brain), a name with
+ * chips, a line of what it is and, on the right, its standing and actions. Contains Place,
+ * StandingLabel and Standing.
  */
 import type { ReactNode } from 'react';
+import { DeviceIcon } from './device-icons';
+import type { DeviceIconName } from './device-icons';
 
-export type Standing = 'connected' | 'not-set-up' | 'offline';
+export type Standing = 'online' | 'off';
 
-const STANDING_WORDS: Record<Standing, string> = {
-  connected: 'Connected',
-  'not-set-up': 'Not set up',
-  offline: 'Offline',
-};
-const STANDING_DOT: Record<Standing, string> = {
-  connected: 'home-dot',
-  'not-set-up': 'home-dot home-dot--off',
-  offline: 'home-dot home-dot--warn',
-};
-const STANDING_CLASS: Record<Standing, string> = {
-  connected: 'cx-status',
-  'not-set-up': 'cx-status cx-status--off',
-  offline: 'cx-status cx-status--warn',
-};
+export interface Chip {
+  label: string;
+  tone?: 'ok' | 'rec';
+}
 
-export function StandingLabel({ standing, words }: { standing: Standing; words?: string }) {
+export function StandingLabel({ standing, words }: { standing: Standing; words: string }) {
+  const on = standing === 'online';
   return (
-    <span className={STANDING_CLASS[standing]}>
-      <span className={STANDING_DOT[standing]} aria-hidden="true" />
-      {words ?? STANDING_WORDS[standing]}
+    <span className={on ? 'cx-status' : 'cx-status cx-status--off'}>
+      <span className={on ? 'home-dot' : 'home-dot home-dot--off'} aria-hidden="true" />
+      {words}
     </span>
   );
 }
 
 export function Place({
-  tile,
+  icon,
+  brain = false,
   name,
   chips = [],
   purpose,
   children,
 }: {
-  tile: string;
+  icon: DeviceIconName;
+  /** This machine holds Scout's brain: a gold dot on its tile. */
+  brain?: boolean;
   name: ReactNode;
-  chips?: string[];
+  chips?: Chip[];
   purpose: string;
   children: ReactNode;
 }) {
   return (
     <div className="cx-row">
-      <span className="cx-tile" aria-hidden="true">
-        {tile}
+      <span className="cx-tile dv-tile" aria-hidden="true">
+        <DeviceIcon name={icon} />
+        {brain && <i className="dv-tile__brain" />}
       </span>
       <div className="cx-row__main">
         <span className="cx-row__name">
           <span>{name}</span>
-          {chips.map((chip) => (
-            <span key={chip} className="cx-chip cx-chip--quiet">
-              {chip}
+          {chips.map(({ label, tone }) => (
+            <span key={label} className={tone ? `cx-chip cx-chip--${tone}` : 'cx-chip'}>
+              {label}
             </span>
           ))}
         </span>

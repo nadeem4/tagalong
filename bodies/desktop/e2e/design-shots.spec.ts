@@ -832,7 +832,7 @@ async function launchShot(options: Parameters<typeof startFakeBrain>[0], setting
     await brain.close();
     rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   };
-  return { find, done };
+  return { find, done, brain };
 }
 
 async function placesPage(
@@ -1117,7 +1117,8 @@ test('BAU2 devices, the brain card and the Tailscale guide, light and dark', asy
   const rows = await open(
     {
       hasKey: true,
-      bodies: { connected: ['desktop', 'browser'] },
+      bodies: { connected: ['desktop', 'browser'], deviceIds: { browser: 'd2' } },
+      brainStatus: { ...status('service', false), local: true, host: 'mini-pc', network: true },
       devices: [
         { id: 'd1', name: 'Desktop', kind: 'desktop' },
         { id: 'd2', name: 'Chrome on laptop', kind: 'browser', lastSeen: '2026-11-22T18:02:00Z' },
@@ -1131,6 +1132,13 @@ test('BAU2 devices, the brain card and the Tailscale guide, light and dark', asy
     await both(rows.home, 'devices');
     await rows.home.getByRole('button', { name: 'Revoke' }).first().click();
     await both(rows.home, 'revoke-confirm');
+    await rows.home.getByRole('button', { name: 'Keep it' }).click();
+    await rows.home.getByRole('button', { name: 'Rename' }).first().click();
+    await both(rows.home, 'rename');
+    await rows.home.keyboard.press('Escape');
+    rows.brain.pairDevice({ id: 'd4', name: "Nadeem's phone", kind: 'desktop' });
+    await expect(rows.home.getByRole('status')).toContainText("Nadeem's phone is paired");
+    await both(rows.home, 'joined');
   } finally {
     await rows.done();
   }
@@ -1152,9 +1160,33 @@ test('BAU2 devices, the brain card and the Tailscale guide, light and dark', asy
     await empty.done();
   }
 
+  const offDialog = await open({ hasKey: true, pairNetworkOff: true }, 'Devices');
+  try {
+    await offDialog.home.getByRole('button', { name: 'Pair a device' }).first().click();
+    await expect(offDialog.home.getByText(/Other devices cannot reach/)).toBeVisible({
+      timeout: 30_000,
+    });
+    await both(offDialog.home, 'pair-network-off');
+  } finally {
+    await offDialog.done();
+  }
+
+  const guideRemote = await open(
+    { hasKey: true, brainStatus: { ...REMOTE_BRAIN, started_by: 'service', local: false } },
+    'Devices',
+  );
+  try {
+    await guideRemote.home.getByRole('button', { name: 'Reach Scout away from home' }).click();
+    const guide = guideRemote.home.getByRole('region', { name: /away from home/i });
+    await expect(guide).toContainText('Install Tailscale on Studio-PC', { timeout: 30_000 });
+    await both(guideRemote.home, 'tailscale-remote');
+  } finally {
+    await guideRemote.done();
+  }
+
   const brainCard = (home: Page) => home.getByRole('region', { name: "Scout's brain" });
   for (const [name, facts] of [
-    ['local-service', { ...status('service', false), local: true, host: 'This PC' }],
+    ['local-service', { ...status('service', false), local: true, host: 'This PC', network: true }],
     ['local-not-service', { ...status('desktop', false), local: true, host: 'This PC' }],
     ['remote', { ...REMOTE_BRAIN, started_by: 'service', local: false }],
   ] as const) {

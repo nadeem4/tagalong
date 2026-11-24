@@ -4,13 +4,24 @@ import { IPC } from '../../shared/ipc';
 import { registerBrainServiceIpc } from './brain-service';
 import { fakeIpc } from './fake-ipc';
 
-function setup(reply: { code: number; out: string }) {
+function setup(
+  reply: { code: number; out: string },
+  over: { restarts?: boolean; online?: boolean } = {},
+) {
   const ipc = fakeIpc();
   const ran: string[][] = [];
   registerBrainServiceIpc(ipc.handle, {
     run: async (args) => {
       ran.push(args);
       return reply;
+    },
+    restart: async () => {
+      ran.push(['restart']);
+      return over.restarts ?? true;
+    },
+    online: async () => {
+      ran.push(['online']);
+      return over.online ?? true;
     },
   });
   return { ipc, ran };
@@ -20,7 +31,14 @@ describe('registerBrainServiceIpc', () => {
   it('install runs `tagalong service install` and reports success', async () => {
     const { ipc, ran } = setup({ code: 0, out: 'Installed.' });
     expect(await ipc.invoke(IPC.brainServiceInstall)).toEqual({ ok: true });
-    expect(ran).toEqual([['service', 'install']]);
+    expect(ran).toEqual([['service', 'install'], ['restart'], ['online']]);
+  });
+
+  it('install is not done until the restarted brain is back, because only then does it listen', async () => {
+    const stuck = setup({ code: 0, out: '' }, { restarts: false });
+    expect(await stuck.ipc.invoke(IPC.brainServiceInstall)).toMatchObject({ ok: false });
+    const silent = setup({ code: 0, out: '' }, { online: false });
+    expect(await silent.ipc.invoke(IPC.brainServiceInstall)).toMatchObject({ ok: false });
   });
 
   it('a failed install gives the last line the command printed', async () => {

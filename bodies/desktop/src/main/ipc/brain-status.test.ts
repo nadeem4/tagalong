@@ -44,7 +44,8 @@ function setup(
           : Promise.resolve([{ type: 'text' as const, text: JSON.stringify(wire) }]),
     },
     ours: OURS,
-    paired: () => over.paired === true,
+    paired: () => (over.paired === true ? { fp: 'ab12cd34ef56' } : null),
+    now: () => new Date('2026-11-24T08:41:00Z'),
     fallback: { dataDir: 'C:/fallback', logPath: 'C:/fallback/brain.log' },
     stop: () => Promise.resolve(stops.push(1) > 0),
     relaunch: () => Promise.resolve(void relaunches.push(1)),
@@ -87,6 +88,7 @@ describe('brain card', () => {
       places: [{ id: 'desktop', kind: 'desktop', name: 'Desktop' }],
       workRunning: false,
       model: 'Claude Opus 5.5',
+      lastConnected: '2026-11-24T08:41:00.000Z',
     });
   });
 
@@ -135,6 +137,26 @@ describe('restart', () => {
     const { status, stops } = setup({ wire: { ...WIRE, started_by: 'person' } });
     await expect(status.restart()).rejects.toThrow();
     expect(stops).toHaveLength(0);
+  });
+
+  it('stop ends a brain the desktop or the service started, and refuses the person-started one', async () => {
+    const mine = setup();
+    await mine.status.stop();
+    expect(mine.stops).toHaveLength(1);
+    expect(mine.relaunches).toHaveLength(0);
+    const theirs = setup({ wire: { ...WIRE, started_by: 'person' } });
+    await expect(theirs.status.stop()).rejects.toThrow();
+    expect(theirs.stops).toHaveLength(0);
+  });
+
+  it('reports whether it listens for other devices and when the link last answered', async () => {
+    const { status, brain } = setup({ wire: { ...WIRE, network: true } });
+    expect(await status.card()).toMatchObject({
+      network: true,
+      lastConnected: '2026-11-24T08:41:00.000Z',
+    });
+    (brain as { link: string }).link = 'offline';
+    expect(await status.card()).toMatchObject({ lastConnected: '2026-11-24T08:41:00.000Z' });
   });
 
   it('stops the brain then starts it again', async () => {
@@ -261,6 +283,7 @@ describe('registerBrainStatusIpc', () => {
         IPC.brainStatus,
         IPC.brainRestart,
         IPC.brainRestartAfterWork,
+        IPC.brainStop,
         IPC.brainOpenFolder,
         IPC.brainOpenLog,
         IPC.brainCopyDetails,
@@ -294,6 +317,11 @@ describe('a brain on another machine', () => {
   it('is remote from the first card when the link is paired, even before the brain has answered', async () => {
     const { status } = setup({ wire: 'missing', paired: true });
     expect(await status.card()).toMatchObject({ local: false });
+  });
+
+  it('shows the pinned certificate as a short code to check against the other machine', async () => {
+    const { status } = setup({ wire: REMOTE, paired: true });
+    expect(await status.card()).toMatchObject({ identity: 'AB12-CD34' });
   });
 
   it('is not restarted, not even by an older build', async () => {

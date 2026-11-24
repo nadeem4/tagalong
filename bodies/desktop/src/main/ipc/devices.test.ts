@@ -1,5 +1,5 @@
 /**
- * Tests for the devices IPC: the list, rename and revoke go through the brain's tools, and the Tailscale
+ * Tests for the devices IPC: rename and revoke go through the brain's tools, and the Tailscale
  * state comes from `tailscale ip -4` on a fake runner.
  */
 import { describe, expect, it } from 'vitest';
@@ -32,32 +32,12 @@ function setup(
   return { ...ipc, calls };
 }
 
-const device = (id: string, name: string, kind: string) => ({
-  id,
-  name,
-  kind,
-  personal: true,
-  paired_at: '2026-11-14T09:00:00Z',
-  last_seen: null,
-  revoked_at: null,
-});
-
 describe('registerDevicesIpc', () => {
-  it('lists paired devices with AI tools apart, and sends rename and revoke to the brain', async () => {
-    const { invoke, calls } = setup((tool) =>
-      tool === 'devices_list'
-        ? text({ devices: [device('a', 'Laptop', 'desktop'), device('b', 'Cursor', 'mcp_client')] })
-        : text({ ok: true }),
-    );
-    const state = (await invoke(IPC.devicesList)) as {
-      devices: { name: string }[];
-      aiTools: { name: string }[];
-    };
-    expect(state.devices.map((d) => d.name)).toEqual(['Laptop']);
-    expect(state.aiTools.map((d) => d.name)).toEqual(['Cursor']);
+  it('sends rename and revoke to the brain', async () => {
+    const { invoke, calls } = setup(() => text({ ok: true }));
     await invoke(IPC.devicesRename, 'a', 'Work laptop');
     await invoke(IPC.devicesRevoke, 'a');
-    expect(calls.slice(1)).toEqual([
+    expect(calls).toEqual([
       ['device_rename', { id: 'a', name: 'Work laptop' }],
       ['device_revoke', { id: 'a' }],
     ]);

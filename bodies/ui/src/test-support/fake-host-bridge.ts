@@ -705,6 +705,9 @@ export function createFakeHostBridge(
     },
     installBrainService() {
       brainActions.push('install-service');
+      if (fake.serviceOutcome.ok && options.brainCard !== undefined) {
+        options.brainCard = { ...options.brainCard, startedBy: 'service', network: true };
+      }
       return Promise.resolve(fake.serviceOutcome);
     },
     forgetBrain() {
@@ -870,6 +873,10 @@ export function createFakeHostBridge(
     },
     restartBrainAfterWork() {
       brainActions.push('restart-after-work');
+      return Promise.resolve();
+    },
+    stopBrain() {
+      brainActions.push('stop');
       return Promise.resolve();
     },
     openBrainFolder() {
