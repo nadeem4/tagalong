@@ -6,7 +6,7 @@
  */
 import { pairOverSocket, parsePairLink } from '@tagalong/contract';
 import { IPC } from '../../shared/ipc';
-import type { FoundBrain, PairOffer, PairOutcome } from '../../shared/ipc';
+import type { FoundBrain, PairOffer, PairOutcome } from '@tagalong/ui/shapes';
 import { callJson } from '../brain/call-json';
 import type { BrainCall } from '../brain/call-json';
 import type { LinkStore } from '../brain/link-store';

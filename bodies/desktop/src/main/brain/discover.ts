@@ -4,7 +4,7 @@
  * owner made on that brain, whose fingerprint the desktop then pins.
  */
 import { Bonjour } from 'bonjour-service';
-import type { FoundBrain } from '../../shared/ipc';
+import type { FoundBrain } from '@tagalong/ui/shapes';
 
 export interface Announcement {
   name: string;

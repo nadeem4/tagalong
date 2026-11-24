@@ -8,16 +8,10 @@ import type { ReactElement } from 'react';
 import { vi } from 'vitest';
 import type { MicWatcher } from '../controls';
 import type { KeyResult, KeyStatus } from '../host-bridge';
-import type { SetupOverview } from '../shapes';
+import type { FoundBrain, PairOffer, PairOutcome, SetupOverview } from '../shapes';
 import { createFakeHostBridge } from '../test-support/fake-host-bridge';
 import { StepSaveContext } from './use-step-save';
-import type {
-  FoundBrain,
-  PairOffer,
-  PairOutcome,
-  WalkthroughHost,
-  WalkthroughSettings,
-} from './walkthrough-host';
+import type { WalkthroughHost, WalkthroughSettings } from './walkthrough-host';
 
 export const NO_KEY: KeyStatus = {
   hasKey: false,

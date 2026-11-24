@@ -450,15 +450,26 @@ const APPROVALS = [
   },
 ];
 
+// Generating a key pair costs a second, so each worker makes one and every TLS brain reuses it.
+let tlsIdentity: Promise<{ cert: string; key: string; pin: string }> | undefined;
+function tlsOnce(): Promise<{ cert: string; key: string; pin: string }> {
+  tlsIdentity ??= generate([{ name: 'commonName', value: '127.0.0.1' }]).then(
+    ({ cert, private: key }) => ({
+      cert,
+      key,
+      pin: createHash('sha256').update(new X509Certificate(cert).raw).digest('hex'),
+    }),
+  );
+  return tlsIdentity;
+}
+
 export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<FakeBrain> {
   // Port 0: a free port, so a real brain on 47321 never collides with the suite.
-  let pin = '';
+  const tls = options.tls === true ? await tlsOnce() : undefined;
   let tlsServer: ReturnType<typeof createServer> | undefined;
   let server: WebSocketServer;
-  if (options.tls === true) {
-    const { cert, private: key } = await generate([{ name: 'commonName', value: '127.0.0.1' }]);
-    pin = createHash('sha256').update(new X509Certificate(cert).raw).digest('hex');
-    tlsServer = createServer({ cert, key });
+  if (tls !== undefined) {
+    tlsServer = createServer({ cert: tls.cert, key: tls.key });
     server = new WebSocketServer({ server: tlsServer });
     await new Promise<void>((resolve) =>
       tlsServer!.listen(options.port ?? 0, '127.0.0.2', resolve),
@@ -469,7 +480,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   }
   const listening = (): AddressInfo =>
     (tlsServer === undefined ? server.address() : tlsServer.address()) as AddressInfo;
-  const expectedToken = options.token ?? (options.tls === true ? PAIRED_TOKEN : E2E_LOCAL_TOKEN);
+  const expectedToken = options.token ?? (tls === undefined ? E2E_LOCAL_TOKEN : PAIRED_TOKEN);
   // Seq is the brain's, not the connection's: it keeps rising across a reconnect.
   let seq = 0;
   let turns = 0;
@@ -1574,7 +1585,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
 
   return {
     addr: `127.0.0.1:${listening().port}`,
-    pairLink: `tagalong://pair?addr=127.0.0.2:${listening().port}&fp=${pin}&code=${PAIR_CODE}`,
+    pairLink: `tagalong://pair?addr=127.0.0.2:${listening().port}&fp=${tls?.pin ?? ''}&code=${PAIR_CODE}`,
     answers,
     permissionSets,
     loopCalls,

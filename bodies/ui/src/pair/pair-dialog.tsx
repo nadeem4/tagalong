@@ -4,8 +4,8 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Button } from '../controls';
-import type { PairOffer } from '../walkthrough/walkthrough-host';
+import { Button, CopyButton } from '../controls';
+import type { PairOffer } from '../shapes/pairing';
 import { QrImage } from './qr-image';
 
 const CODE_LIFE_MS = 10 * 60 * 1000;
@@ -21,32 +21,80 @@ function clock(ms: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
-export function PairDialog({ make, copyText, onClose }: PairDialogProps) {
-  const [offer, setOffer] = useState<PairOffer | null>(null);
-  const [failed, setFailed] = useState(false);
+/** Counts down to expiry, on its own tick so the QR beside it is not redrawn each second. */
+function Countdown({ expiresAt }: { expiresAt: string }) {
   const [now, setNow] = useState(() => Date.now());
+  const left = Date.parse(expiresAt) - now;
+  const expired = left <= 0;
+  useEffect(() => {
+    if (expired) return;
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(tick);
+  }, [expired]);
+  return (
+    <div className="pair-expiry">
+      <div className="pair-meta pair-expiry__row">
+        <span className="pair-waiting">
+          <span className="pair-dot" aria-hidden="true" />
+          {expired ? 'This code has expired.' : 'Waiting for a device'}
+        </span>
+        {!expired && <span>Expires in {clock(left)}</span>}
+      </div>
+      <div className="pair-bar" aria-hidden="true">
+        <i style={{ width: `${Math.min(100, Math.max(0, (left / CODE_LIFE_MS) * 100))}%` }} />
+      </div>
+    </div>
+  );
+}
 
-  const [attempt, setAttempt] = useState(0);
+/** One code: asks the brain for it once, then shows it. A new code is a new instance (a new key). */
+function PairCode({ make, copyText }: Pick<PairDialogProps, 'make' | 'copyText'>) {
+  const [result, setResult] = useState<PairOffer | 'failed' | null>(null);
 
   useEffect(() => {
     let live = true;
     make().then(
-      (made) => live && setOffer(made),
-      () => live && setFailed(true),
+      (made) => live && setResult(made),
+      () => live && setResult('failed'),
     );
     return () => {
       live = false;
     };
-  }, [make, attempt]);
-  const again = (): void => {
-    setOffer(null);
-    setFailed(false);
-    setAttempt((n) => n + 1);
-  };
-  useEffect(() => {
-    const tick = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(tick);
-  }, []);
+  }, [make]);
+
+  if (result === 'failed') {
+    return (
+      <p className="pair-alert pair-alert--err" role="alert">
+        Scout could not make a code. Check that the brain is running, then make a new one.
+      </p>
+    );
+  }
+  if (result === null) return <p className="pair-meta">Making a code…</p>;
+  return (
+    <>
+      <div className="pair-grid">
+        <div className="pair-scan">
+          <div className="pair-qrbox">
+            <QrImage text={result.qr} label="Pairing QR code" />
+          </div>
+          <span className="pair-meta">Scan with the other device</span>
+        </div>
+        <div className="pair-link">
+          <span className="pair-label">Or send this link</span>
+          <div className="pair-copy">
+            <code className="pair-code">{result.link}</code>
+            <CopyButton text={result.link} copy={copyText} />
+          </div>
+        </div>
+      </div>
+      <Countdown expiresAt={result.expiresAt} />
+    </>
+  );
+}
+
+export function PairDialog({ make, copyText, onClose }: PairDialogProps) {
+  const [round, setRound] = useState(0);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') onClose();
@@ -55,63 +103,17 @@ export function PairDialog({ make, copyText, onClose }: PairDialogProps) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const left = offer === null ? 0 : Date.parse(offer.expiresAt) - now;
-  const expired = offer !== null && left <= 0;
-
   return (
     <div className="pair-scrim">
       <div className="pair-dialog" role="dialog" aria-modal="true" aria-label="Pair a device">
         <h2>Pair a device</h2>
-        {failed ? (
-          <p className="pair-alert pair-alert--err" role="alert">
-            Scout could not make a code. Check that the brain is running, then make a new one.
-          </p>
-        ) : offer === null ? (
-          <p className="pair-meta">Making a code…</p>
-        ) : (
-          <>
-            <div className="pair-grid">
-              <div className="pair-scan">
-                <div className="pair-qrbox">
-                  <QrImage text={offer.qr} label="Pairing QR code" />
-                </div>
-                <span className="pair-meta">Scan with the other device</span>
-              </div>
-              <div className="pair-link">
-                <span className="pair-label">Or send this link</span>
-                <div className="pair-copy">
-                  <code className="pair-code">{offer.link}</code>
-                  <Button
-                    variant="secondary"
-                    onClick={() => void copyText(offer.link).catch(() => undefined)}
-                  >
-                    Copy
-                  </Button>
-                </div>
-              </div>
-            </div>
-            <div className="pair-expiry">
-              <div className="pair-meta pair-expiry__row">
-                <span className="pair-waiting">
-                  <span className="pair-dot" aria-hidden="true" />
-                  {expired ? 'This code has expired.' : 'Waiting for a device'}
-                </span>
-                {!expired && <span>Expires in {clock(left)}</span>}
-              </div>
-              <div className="pair-bar" aria-hidden="true">
-                <i
-                  style={{ width: `${Math.min(100, Math.max(0, (left / CODE_LIFE_MS) * 100))}%` }}
-                />
-              </div>
-            </div>
-          </>
-        )}
+        <PairCode key={round} make={make} copyText={copyText} />
         <p className="pair-alert">
           Pair only devices you own. A paired device can use everything Scout knows. Revoke it any
           time in Devices.
         </p>
         <div className="pair-actions">
-          <Button variant="quiet" onClick={again}>
+          <Button variant="quiet" onClick={() => setRound((n) => n + 1)}>
             Make a new code
           </Button>
           <Button variant="secondary" onClick={onClose} autoFocus>

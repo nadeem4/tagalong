@@ -424,15 +424,15 @@ Rules each module enforces:
   a navy side panel with the twelve-step list, the step on the page, and a footer (Back on the left, not on step 1;
   a quiet Skip link (not on steps 10 and 12) and the primary Next on the right, "Get started" on step 2; on step 10 Next stays off until the key is good; step 12 shows a quiet "I'll do this later" and the primary "Finish", which both finish and are never off).
   Step 1, "Where should Scout's brain live?" (`step-brain.tsx`, with `bodies/ui/src/pair/`), offers
-  three paths. **On this computer** is the default, with an unticked "Keep it on for my other
-  devices": ticked, Next runs `installBrainService` (`tagalong service install`, which turns the
+  three paths, shown as the shared `ThreeWay` control in its `cards` form (one radio group, arrow keys). **On this computer** is the default, with a "Keep it on for my other
+  devices" `Toggle`, off: on, Next runs `installBrainService` (`tagalong service install`, which turns the
   network listener on) and the finish card gains **Pair a device**, which opens `PairDialog`: a QR
   (`QrImage`, drawn from the terminal text `pair_make` returns), the link with Copy, a 10-minute
   countdown and **Make a new code**; the main process makes it with `IPC.pairMake`, which calls the
   brain's `pair_make` (kind desktop) and passes on the link, expiry and QR, never the secret.
-  **On another computer** lists brains found nearby (`discoverBrains`) and takes a pairing link
+  **On another computer** lists brains found nearby (`discoverBrains`, asked only once this path is chosen) and takes a pairing link
   (`pairWithLink`); each failure has its own line (expired or used, not the computer that made the
-  link, cannot reach it, not a link, cannot seal) in `pair/pair-text.ts`, and Next stays off until
+  link, cannot reach it, not a link, cannot seal) in `pair/pair-text.ts` (the link is read with `parsePairLink` from `@tagalong/contract`), and Next stays off until
   the pairing succeeds. **On a server I'll set up** shows the install commands per system (the
   ones in docs/brain/server.md) with Copy, then the same link field. Once paired with a brain that
   is not on this PC, the side list tags the Voice and API key steps "On <host>" and the key step

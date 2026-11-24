@@ -15,6 +15,7 @@ export * from './tasks';
 export * from './loops';
 export * from './model';
 export * from './memory';
+export * from './pairing';
 export * from './pet';
 export * from './reading';
 export * from './setup';

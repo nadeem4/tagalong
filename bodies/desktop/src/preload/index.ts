@@ -43,28 +43,24 @@ import type {
 } from '@tagalong/ui';
 import type {
   BodiesState,
+  FoundBrain,
   LoopsState,
-  TaskRow,
-  WaitingEvent,
   ModelState,
+  PairOffer,
+  PairOutcome,
   SttState,
-  TtsState,
-  VoiceDownload,
+  TaskRow,
   TimerRow,
+  TtsState,
   UpdateKind,
   UpdateResult,
   UpdatesState,
+  VoiceDownload,
+  WaitingEvent,
   WhatsAppChange,
 } from '@tagalong/ui/shapes';
 import { IPC } from '../shared/ipc';
-import type {
-  BrainServiceOutcome,
-  BrainServiceState,
-  FoundBrain,
-  PairOffer,
-  PairOutcome,
-  PreloadBridge,
-} from '../shared/ipc';
+import type { BrainServiceOutcome, BrainServiceState, PreloadBridge } from '../shared/ipc';
 import { heldUntilHeard } from './held';
 import type {
   BrowserFolder,

@@ -1,19 +1,25 @@
 /**
  * The words the pairing screens use for a brain and for each way pairing can fail. Contains
- * brainNameOf, linkHost and pairErrorLine.
+ * brainNameOf, isLocalAddr, linkHost and pairErrorLine.
  */
 
-import type { PairOutcome } from '../walkthrough/walkthrough-host';
+import { parsePairLink } from '@tagalong/contract';
+import type { PairOutcome } from '../shapes/pairing';
 
 /** What a person calls the brain at an address: its host, without scheme or port. */
 export function brainNameOf(addr: string): string {
   return /^(?:\w+:\/\/)?\[?([^\]/:]+)/.exec(addr)?.[1] ?? addr;
 }
 
+/** Whether an address is this computer's own brain rather than another machine's. */
+export function isLocalAddr(addr: string): boolean {
+  return /^(?:\w+:\/\/)?(127\.0\.0\.1|localhost|\[?::1\]?)(:|$)/.test(addr);
+}
+
 /** The host a pairing link points at, or null when it is not a link. */
 export function linkHost(link: string): string | null {
-  const addr = /[?&]addr=([^&]+)/.exec(link)?.[1];
-  return addr === undefined ? null : brainNameOf(decodeURIComponent(addr));
+  const parsed = parsePairLink(link);
+  return parsed === null ? null : brainNameOf(parsed.addr);
 }
 
 export function pairErrorLine(

@@ -5,7 +5,7 @@
 
 import { useState } from 'react';
 import { Button } from '../controls';
-import type { PairOutcome } from '../walkthrough/walkthrough-host';
+import type { PairOutcome } from '../shapes/pairing';
 import { linkHost, pairErrorLine } from './pair-text';
 
 interface PairLinkFormProps {

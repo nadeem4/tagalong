@@ -18,7 +18,7 @@ import type { DropOffer, HostBridge } from '@tagalong/ui';
 import type { KeyResult, KeyStatus } from '@tagalong/ui';
 
 export type { KeyResult, KeyStatus };
-import type { FixTarget } from '@tagalong/ui/shapes';
+import type { FixTarget, FoundBrain, PairOffer, PairOutcome } from '@tagalong/ui/shapes';
 
 /** Channel names, in one place so main and preload cannot drift apart. */
 export const IPC = {
@@ -314,23 +314,6 @@ export type PreloadBridge = Omit<
  * anything specific to this host lives here instead, so a component can never grow a
  * dependency on something the Chrome host will not have.
  */
-/** A brain announcing itself on the home network; never trusted until paired. */
-export interface FoundBrain {
-  name: string;
-  addr: string;
-}
-
-export type PairOutcome =
-  | { ok: true }
-  | { ok: false; reason: 'bad_link' | 'cannot_seal' | 'wrong_brain' | 'refused' | 'unreachable' };
-
-/** A one-time code this PC's brain made for another device: its link, expiry (ISO) and terminal QR. */
-export interface PairOffer {
-  link: string;
-  expiresAt: string;
-  qr: string;
-}
-
 export type BrainServiceOutcome = { ok: true } | { ok: false; detail: string };
 export type BrainServiceState = 'installed' | 'not_installed' | 'unknown';
 

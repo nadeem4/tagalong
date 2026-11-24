@@ -1,6 +1,6 @@
 /**
  * The first-run walkthrough's page (built as `walkthrough.html`): Walkthrough from @tagalong/ui
- * with the desktop's host calls. Main opens it at ?step=N (the no-key button opens step 10).
+ * with the desktop's host calls. Main opens it at ?step=N (the no-key button opens the key step).
  */
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -65,8 +65,7 @@ const walkthroughHost: WalkthroughHost = {
 };
 
 const stepParam = Number(new URLSearchParams(window.location.search).get('step'));
-const initialStep =
-  Number.isInteger(stepParam) && stepParam >= 1 && stepParam <= 12 ? stepParam : 1;
+const initialStep = Number.isInteger(stepParam) && stepParam >= 1 ? stepParam : 1;
 
 const container = document.getElementById('root');
 if (container !== null) {

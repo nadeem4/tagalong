@@ -29,13 +29,11 @@ import type { Save } from './use-step-save';
 import type { WalkthroughHost } from './walkthrough-host';
 import { useKeyStatus } from '../key/use-key-status';
 import { PairDialog } from '../pair/pair-dialog';
-import { brainNameOf } from '../pair/pair-text';
+import { brainNameOf, isLocalAddr } from '../pair/pair-text';
 import { PAIR_CSS } from '../pair/pair-styles';
 import { CONTROLS_CSS } from '../controls/controls-styles';
 import { CONNECTIONS_CSS } from '../home/connections-styles';
 import { WALKTHROUGH_CSS } from './walkthrough-styles';
-
-const LOCAL_ADDR = /^(?:\w+:\/\/)?(127\.0\.0\.1|localhost|\[?::1\]?)(:|$)/;
 
 interface WalkthroughProps {
   host: WalkthroughHost;
@@ -48,13 +46,17 @@ interface BodyProps {
   onValid: (valid: boolean) => void;
   onBlock: (blocked: boolean) => void;
   onShare: (shared: boolean) => void;
+  onPaired: (name: string) => void;
   brainName: string | null;
 }
 
-function body(step: number, { host, onValid, onBlock, onShare, brainName }: BodyProps): ReactNode {
+function body(
+  step: number,
+  { host, onValid, onBlock, onShare, onPaired, brainName }: BodyProps,
+): ReactNode {
   switch (step) {
     case 1:
-      return <StepBrain host={host} onBlock={onBlock} onShare={onShare} />;
+      return <StepBrain host={host} onBlock={onBlock} onShare={onShare} onPaired={onPaired} />;
     case 2:
       return <StepOne />;
     case 3:
@@ -128,14 +130,14 @@ export function Walkthrough({ host, initialStep = 1 }: WalkthroughProps) {
     heading.focus();
   }, [current]);
 
-  // Which computer the brain runs on, asked on every step so a pairing just made shows at once.
+  // Which computer the brain runs on; a pairing made in step 1 sets it through onPaired.
   const { brainLink } = host;
   useEffect(() => {
     brainLink().then(
-      ({ addr }) => setBrainName(LOCAL_ADDR.test(addr) ? null : brainNameOf(addr)),
+      ({ addr }) => setBrainName(isLocalAddr(addr) ? null : brainNameOf(addr)),
       () => undefined,
     );
-  }, [brainLink, current]);
+  }, [brainLink]);
 
   function go(step: number): void {
     setCurrent(step);
@@ -201,7 +203,6 @@ export function Walkthrough({ host, initialStep = 1 }: WalkthroughProps) {
   }
 
   const onValid = useCallback((valid: boolean) => setKeyValid(valid), []);
-  const onBlock = useCallback((blocked: boolean) => setBrainBlocked(blocked), []);
 
   return (
     <div className="wt">
@@ -225,13 +226,20 @@ export function Walkthrough({ host, initialStep = 1 }: WalkthroughProps) {
             onClose={() => void close(false)}
             error={error}
             ready={ready}
-            {...(shared && brainName === null ? { onPairDevice: () => setPairing(true) } : {})}
+            onPairDevice={shared && brainName === null ? () => setPairing(true) : undefined}
           />
         ) : (
           <>
             <div className="wt-body" key={current} ref={bodyRef}>
               <StepSaveContext.Provider value={(next) => (save.current = next)}>
-                {body(current, { host, onValid, onBlock, onShare: setShared, brainName })}
+                {body(current, {
+                  host,
+                  onValid,
+                  onBlock: setBrainBlocked,
+                  onShare: setShared,
+                  onPaired: setBrainName,
+                  brainName,
+                })}
               </StepSaveContext.Provider>
             </div>
             <Footer

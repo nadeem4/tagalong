@@ -4,7 +4,7 @@
  * need renderer code.
  * Contains fullBridge.
  */
-import type { HostBridge } from '@tagalong/ui';
+import { KEY_STEP, type HostBridge } from '@tagalong/ui';
 import type { FixTarget } from '@tagalong/ui/shapes';
 import { gatherHealth, HEALTH_TEST_BUDGET_MS } from './health-facts';
 import { listMicrophones } from './mic';
@@ -30,9 +30,6 @@ export function makeSamplePlayer(
  * The preload's bridge, plus the health check ("Scout, what's wrong?"), read from calls Home
  * and Settings already make, its Fix it, which opens the right place, and Open logs folder.
  */
-/** The walkthrough's last step: where the key is asked for. */
-const KEY_STEP = 10;
-
 export function fullBridge(): HostBridge {
   const bridge = window.tagalong;
   const host = window.tagalongHost;

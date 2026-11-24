@@ -1,10 +1,10 @@
 /**
- * The walkthrough's navy side: Scout's still mark, the "Scout" wordmark, the twelve steps (only
+ * The walkthrough's navy side: Scout's still mark, the "Scout" wordmark, the steps (only
  * those already reached can be jumped to) and the footnote. Contains SidePanel.
  */
 
 import { ScoutGlyph } from '../scout-mark';
-import { BRAIN_STEPS, STEPS } from './steps';
+import { STEPS, type StepInfo } from './steps';
 
 interface SidePanelProps {
   current: number;
@@ -15,6 +15,12 @@ interface SidePanelProps {
   keySet: boolean;
   /** The other computer the brain runs on, if this one is paired to one; its steps read "On <name>". */
   brainName?: string | null;
+}
+
+function badge(step: StepInfo, keySet: boolean, brainName: string | null): string | null {
+  if (brainName !== null && step.onBrain) return `On ${brainName}`;
+  if (step.skippable) return null;
+  return keySet ? 'Key set' : 'Required';
 }
 
 export function SidePanel({ current, reached, onJump, keySet, brainName = null }: SidePanelProps) {
@@ -28,27 +34,26 @@ export function SidePanel({ current, reached, onJump, keySet, brainName = null }
         <p className="wt-role">Your companion</p>
       </div>
       <ol className="wt-steps" aria-label="Steps">
-        {STEPS.map((step) => (
-          <li key={step.id}>
-            <button
-              type="button"
-              disabled={step.id > reached}
-              aria-current={step.id === current ? 'step' : undefined}
-              data-done={step.id < current ? 'true' : undefined}
-              onClick={() => onJump(step.id)}
-            >
-              <span className="wt-mark" aria-hidden="true">
-                {step.id < current ? '✓' : ''}
-              </span>
-              {step.title}
-              {brainName !== null && BRAIN_STEPS.includes(step.id) ? (
-                <span className="wt-req">On {brainName}</span>
-              ) : (
-                !step.skippable && <span className="wt-req">{keySet ? 'Key set' : 'Required'}</span>
-              )}
-            </button>
-          </li>
-        ))}
+        {STEPS.map((step) => {
+          const tag = badge(step, keySet, brainName);
+          return (
+            <li key={step.id}>
+              <button
+                type="button"
+                disabled={step.id > reached}
+                aria-current={step.id === current ? 'step' : undefined}
+                data-done={step.id < current ? 'true' : undefined}
+                onClick={() => onJump(step.id)}
+              >
+                <span className="wt-mark" aria-hidden="true">
+                  {step.id < current ? '✓' : ''}
+                </span>
+                {step.title}
+                {tag !== null && <span className="wt-req">{tag}</span>}
+              </button>
+            </li>
+          );
+        })}
       </ol>
       <p className="wt-foot">You can change all of this later in Home, under Settings.</p>
     </aside>

@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react';
-import { Button } from '../controls';
+import { CopyButton, ThreeWay } from '../controls';
 
 const KEY_AND_SERVE = ['tagalong key set', 'tagalong serve --install-service'];
 
@@ -37,30 +37,21 @@ export function ServerSetup({ copyText }: { copyText: (text: string) => Promise<
   const shown = SYSTEMS.find((entry) => entry.name === system) ?? SYSTEMS[0];
   return (
     <div className="pair-server">
-      <div role="tablist" aria-label="System" className="pair-tabs">
-        {SYSTEMS.map((entry) => (
-          <button
-            key={entry.name}
-            type="button"
-            role="tab"
-            aria-selected={entry.name === system}
-            onClick={() => setSystem(entry.name)}
-          >
-            {entry.name}
-          </button>
-        ))}
-      </div>
+      <ThreeWay
+        label="System"
+        value={system}
+        options={SYSTEMS.map((entry) => ({ value: entry.name, label: entry.name }))}
+        onChange={setSystem}
+      />
       <ol className="pair-commands">
         {shown.commands.map((command) => (
           <li key={command}>
             <code className="pair-code">{command}</code>
-            <Button
-              variant="secondary"
-              aria-label={`Copy ${command.split(' ').slice(0, 2).join(' ')}`}
-              onClick={() => void copyText(command).catch(() => undefined)}
-            >
-              Copy
-            </Button>
+            <CopyButton
+              text={command}
+              copy={copyText}
+              label={`Copy ${command.split(' ').slice(0, 2).join(' ')}`}
+            />
           </li>
         ))}
       </ol>

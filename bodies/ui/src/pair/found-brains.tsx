@@ -4,7 +4,7 @@
  */
 
 import { Button } from '../controls';
-import type { FoundBrain } from '../walkthrough/walkthrough-host';
+import type { FoundBrain } from '../shapes/pairing';
 
 export function FoundBrains({
   brains,

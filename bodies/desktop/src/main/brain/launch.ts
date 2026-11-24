@@ -90,6 +90,11 @@ function hostOf(addr: string): string {
   return addr.slice(0, addr.lastIndexOf(':')).replace(/^\[|\]$/g, '');
 }
 
+/** True when this run must start no brain and no node (the e2e suites and a remote-only setup). */
+export function startsNoProcesses(env: NodeJS.ProcessEnv): boolean {
+  return env.TAGALONG_START_BRAIN === '0';
+}
+
 export function isLocal(addr: string): boolean {
   return ['127.0.0.1', 'localhost', '::1'].includes(hostOf(addr));
 }
@@ -234,7 +239,7 @@ export async function launchBrain(options: LaunchOptions): Promise<void> {
   const { exists, spawn } = options;
   const { log, remote } = options;
   const addr = localBrainAddr(env);
-  if (env.TAGALONG_START_BRAIN === '0' || remote() || !isLocal(addr)) return;
+  if (startsNoProcesses(env) || remote() || !isLocal(addr)) return;
   if (!exists(join(brainDir, 'pyproject.toml'))) return;
   if (await probe(addr)) return;
 

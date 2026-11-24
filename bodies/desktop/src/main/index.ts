@@ -68,6 +68,7 @@ import {
   realRunTagalong,
   realSpawnNode,
   realStop,
+  startsNoProcesses,
 } from './brain/launch';
 import type { RealLaunch } from './brain/launch';
 import { saveAvatarSpot } from './avatar-spot';
@@ -456,7 +457,7 @@ async function start(): Promise<void> {
   nodeRunner = createNodeRunner({
     link,
     nodeId: bodyId.replace(/^desktop-/, 'node-'),
-    disabled: process.env.TAGALONG_START_BRAIN === '0',
+    disabled: startsNoProcesses(process.env),
     spawn: (env) => realSpawnNode(brainRun(), env),
   });
   nodeRunner.sync();

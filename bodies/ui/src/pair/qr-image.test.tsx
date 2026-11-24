@@ -1,4 +1,4 @@
-/** Tests for QrImage: the brain's terminal QR text becomes one dark square per dark module. */
+/** Tests for QrImage: the brain's terminal QR text becomes one dark path with a square per dark module. */
 
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
@@ -12,14 +12,10 @@ describe('QrImage', () => {
     );
     const svg = container.querySelector('svg');
     expect(svg).toHaveAttribute('aria-label', 'Pairing QR');
-    const dark = [...container.querySelectorAll('rect[data-dark]')].map((r) => [
-      r.getAttribute('x'),
-      r.getAttribute('y'),
-    ]);
-    expect(dark).toEqual([
-      ['1', '2'],
-      ['1', '3'],
-      ['2', '3'],
-    ]);
+    expect(container.querySelectorAll('rect')).toHaveLength(1);
+    expect(container.querySelector('path[data-dark]')).toHaveAttribute(
+      'd',
+      'M1 2h1v1h-1zM1 3h1v1h-1zM2 3h1v1h-1z',
+    );
   });
 });

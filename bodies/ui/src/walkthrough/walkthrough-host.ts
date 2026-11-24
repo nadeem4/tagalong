@@ -1,11 +1,12 @@
 /**
  * What the walkthrough needs from its host: the key calls it shares with Settings, today's spend, Claude Code
  * set-up, finishing the tour, and the settings, voice picker, browser-folder, pairing and Home calls the steps use.
- * Contains WalkthroughHost, WalkthroughSettings and the pairing shapes (FoundBrain, PairOutcome, PairOffer).
+ * Contains WalkthroughHost, WalkthroughSettings.
  */
 
 import type { MicWatcher } from '../controls';
 import type { HostBridge } from '../host-bridge';
+import type { FoundBrain, PairOffer, PairOutcome } from '../shapes/pairing';
 
 /**
  * The slice of the host's settings the steps read and write. Plain strings: the host
@@ -25,23 +26,6 @@ export interface WalkthroughSettings {
     mouth?: string | undefined;
     ears?: string | undefined;
   };
-}
-
-/** A brain announcing itself on the home network; never trusted until paired. */
-export interface FoundBrain {
-  name: string;
-  addr: string;
-}
-
-export type PairOutcome =
-  | { ok: true }
-  | { ok: false; reason: 'bad_link' | 'cannot_seal' | 'wrong_brain' | 'refused' | 'unreachable' };
-
-/** One pairing code the brain made: its link, when it stops working (ISO, UTC) and the link as a terminal QR. */
-export interface PairOffer {
-  link: string;
-  expiresAt: string;
-  qr: string;
 }
 
 export type WalkthroughHost = Pick<

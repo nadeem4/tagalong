@@ -10,6 +10,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
+import { KEY_STEP } from '../../ui/src/walkthrough/steps';
 import type {} from '../src/shared/ipc';
 import { closeApp } from './fixtures/close-app';
 import { startFakeBrain, type FakeBrain } from './fixtures/fake-brain';
@@ -65,7 +66,7 @@ test('no key shows the no-key state in the bubble and on the dock', async () => 
   // The button opens the walkthrough at its key step.
   await panel.getByRole('button', { name: 'Add key' }).dispatchEvent('click');
   const tour = await windowFor('walkthrough');
-  expect(tour.url()).toContain('step=10');
+  expect(tour.url()).toContain(`step=${KEY_STEP}`);
 });
 
 test('invalid key shows not accepted and the field stays', async () => {

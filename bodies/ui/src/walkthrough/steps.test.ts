@@ -1,10 +1,10 @@
 /** Tests for STEPS and skipTour: twelve steps, Your brain first, only the key unskippable, Skip needs a key to close. */
 
 import { describe, expect, it } from 'vitest';
-import { BRAIN_STEPS, KEY_STEP, STEPS, skipTour } from './steps';
+import { KEY_STEP, STEPS, skipTour } from './steps';
 
 describe('STEPS', () => {
-  it('twelve steps, Your brain first, key is ten', () => {
+  it('twelve steps, Your brain first, the key is step ten', () => {
     expect(STEPS.map((step) => step.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
     expect(STEPS[0]).toEqual({ id: 1, title: 'Your brain', skippable: true });
     expect(STEPS.filter((step) => !step.skippable).map((step) => step.id)).toEqual([10]);
@@ -28,9 +28,9 @@ describe('side list names', () => {
   });
 });
 
-describe('BRAIN_STEPS', () => {
-  it('are the steps a paired desktop reads from its brain: Voice and the API key', () => {
-    expect(BRAIN_STEPS.map((id) => STEPS.find((step) => step.id === id)?.title)).toEqual([
+describe('onBrain', () => {
+  it('marks the steps a paired desktop reads from its brain: Voice and the API key', () => {
+    expect(STEPS.filter((step) => step.onBrain).map((step) => step.title)).toEqual([
       'Voice',
       'API key',
     ]);

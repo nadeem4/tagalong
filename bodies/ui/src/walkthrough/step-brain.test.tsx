@@ -4,16 +4,19 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { StepBrain } from './step-brain';
 import { makeWalkthroughHost, mountStep } from './test-host';
-import type { PairOutcome } from './walkthrough-host';
+import type { PairOutcome } from '../shapes';
 
-const LINK = 'tagalong://pair?addr=192.168.1.20:47323&fp=ab&code=xyz';
+const LINK = `tagalong://pair?addr=192.168.1.20:47323&fp=${'ab'.repeat(32)}&code=xyz`;
 
 function open(options: Parameters<typeof makeWalkthroughHost>[0] = {}) {
   const host = makeWalkthroughHost(options);
   const onBlock = vi.fn();
   const onShare = vi.fn();
-  const step = mountStep(<StepBrain host={host} onBlock={onBlock} onShare={onShare} />);
-  return { host, onBlock, onShare, step };
+  const onPaired = vi.fn();
+  const step = mountStep(
+    <StepBrain host={host} onBlock={onBlock} onShare={onShare} onPaired={onPaired} />,
+  );
+  return { host, onBlock, onShare, onPaired, step };
 }
 
 async function enterLink(text: string): Promise<void> {
@@ -30,24 +33,22 @@ describe('StepBrain', () => {
     expect(onBlock).toHaveBeenLastCalledWith(false);
   });
 
-  it('leaves the brain as it is when Next saves without the tick', async () => {
-    const { host, step } = open();
+  it('saves nothing without the switch; with it on, installs the service and tells the shell', async () => {
+    const { host, onShare, step } = open();
     await step.save();
     expect(host.installBrainService).not.toHaveBeenCalled();
-  });
-
-  it('turns the brain on for other devices when ticked and Next saves', async () => {
-    const { host, step } = open();
-    fireEvent.click(screen.getByRole('checkbox', { name: /Keep it on for my other devices/ }));
+    expect(onShare).toHaveBeenLastCalledWith(false);
+    fireEvent.click(screen.getByRole('switch', { name: /Keep it on for my other devices/ }));
+    expect(onShare).toHaveBeenLastCalledWith(true);
     await step.save();
     expect(host.installBrainService).toHaveBeenCalledTimes(1);
   });
 
-  it('tells the shell when the brain is set to be shared, so the tour can offer Pair a device', () => {
-    const { onShare } = open();
-    expect(onShare).toHaveBeenLastCalledWith(false);
-    fireEvent.click(screen.getByRole('checkbox', { name: /Keep it on for my other devices/ }));
-    expect(onShare).toHaveBeenLastCalledWith(true);
+  it('looks for nearby brains only once another computer is chosen', () => {
+    const { host } = open();
+    expect(host.discoverBrains).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('radio', { name: /On another computer/ }));
+    expect(host.discoverBrains).toHaveBeenCalledTimes(1);
   });
 
   it('lists brains found nearby and fills in the one picked', async () => {
@@ -59,12 +60,13 @@ describe('StepBrain', () => {
   });
 
   it('pairs with the link, says so, and lets Next through', async () => {
-    const { host, onBlock } = open();
+    const { host, onBlock, onPaired } = open();
     fireEvent.click(screen.getByRole('radio', { name: /On another computer/ }));
     expect(onBlock).toHaveBeenLastCalledWith(true);
     await enterLink(LINK);
     expect(host.pairWithLink).toHaveBeenCalledWith(LINK);
     expect(await screen.findByText('Paired with 192.168.1.20')).toBeInTheDocument();
+    expect(onPaired).toHaveBeenCalledWith('192.168.1.20');
     await waitFor(() => expect(onBlock).toHaveBeenLastCalledWith(false));
   });
 
@@ -87,9 +89,9 @@ describe('StepBrain', () => {
     fireEvent.click(screen.getByRole('radio', { name: /On a server I’ll set up/ }));
     expect(screen.getByText(/install\.sh \| sh/)).toBeInTheDocument();
     expect(screen.getByText('tagalong serve --install-service')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('tab', { name: 'Windows' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Windows' }));
     expect(screen.getByText(/install\.ps1 \| iex/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('tab', { name: 'Docker' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Docker' }));
     expect(screen.getByText(/docker run/)).toBeInTheDocument();
     expect(screen.getByLabelText('Pairing link')).toBeInTheDocument();
   });

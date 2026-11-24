@@ -17,7 +17,7 @@ interface FinishCardProps {
   /** What the connect step set up; the block is left out when this is empty or absent. */
   ready?: readonly ReadyItem[];
   /** Present when this PC's brain is kept on for other devices: opens the pairing code dialog. */
-  onPairDevice?: () => void;
+  onPairDevice?: (() => void) | undefined;
 }
 
 const READY_WORDS: Record<ReadyItem['state'], string> = {

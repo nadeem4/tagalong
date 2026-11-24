@@ -32,6 +32,13 @@ describe('PairDialog', () => {
     expect(screen.getByText('Expires in 9:40')).toBeInTheDocument();
   });
 
+  it('asks for one code, not another each second', async () => {
+    const { make } = open();
+    await screen.findByRole('img', { name: 'Pairing QR code' });
+    act(() => void vi.advanceTimersByTime(5000));
+    expect(make).toHaveBeenCalledTimes(1);
+  });
+
   it('copies the whole link', async () => {
     const { copyText } = open();
     fireEvent.click(await screen.findByRole('button', { name: 'Copy' }));
