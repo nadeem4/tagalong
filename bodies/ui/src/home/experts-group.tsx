@@ -14,6 +14,8 @@ import { InstallCard } from '../setup/install-card';
 import { stageWords } from '../setup/install-progress';
 import { OutcomeText, Tile } from './app-group-row';
 import type { Outcome } from './outcome';
+import { PlaceControl } from './runs-on';
+import type { RunsOnModel } from './use-runs-on';
 import {
   UpdateSide,
   UpdatesBar,
@@ -77,9 +79,12 @@ export function ExpertsGroup({
   failedId,
   onAct,
   updates,
+  runsOn,
 }: {
   /** The brain's updates, null when it could not say: the row then shows no update at all. */
   updates: UpdatesControls | null;
+  /** Where each expert runs; null on a one-machine setup. */
+  runsOn: RunsOnModel | null;
   experts: SetupExpert[];
   progress: SetupOverview['progress'];
   /** Ids waiting on the person's answer to an Allow card. */
@@ -90,7 +95,8 @@ export function ExpertsGroup({
   onAct: (id: string) => void;
 }) {
   const row = (expert: SetupExpert) => {
-    const working = progress?.expert === expert.id || asking.has(expert.id);
+    const installing = progress?.expert === expert.id;
+    const working = installing || asking.has(expert.id);
     // The Update button and the version words come from the updates state.
     const update = rowUpdate(updates, 'expert', expert.id);
     const action = ACTION[expert.state];
@@ -121,7 +127,7 @@ export function ExpertsGroup({
           </div>
           <div className="cx-row__side">
             {outcome !== undefined && <OutcomeText outcome={outcome} />}
-            {progress?.expert === expert.id ? null : (
+            {!installing && (
               <>
                 {update?.status === 'updated' && side}
                 <span
@@ -134,21 +140,22 @@ export function ExpertsGroup({
                   {STATE_WORDS[expert.state]}
                 </span>
                 {update !== undefined && update.status !== 'updated' && side}
-                {action !== undefined && (
-                  <Button
-                    variant="primary"
-                    aria-label={action}
-                    disabled={working}
-                    onClick={() => onAct(expert.id)}
-                  >
-                    {action}
-                  </Button>
-                )}
               </>
+            )}
+            <PlaceControl model={runsOn} kind="expert" id={expert.id} name={expert.name} />
+            {!installing && action !== undefined && (
+              <Button
+                variant="primary"
+                aria-label={action}
+                disabled={working}
+                onClick={() => onAct(expert.id)}
+              >
+                {action}
+              </Button>
             )}
           </div>
         </section>
-        {progress?.expert === expert.id && (
+        {installing && (
           <InstallingCard progress={progress} name={expert.name} official={expert.official} />
         )}
         {failedId === expert.id && <FailLine name={expert.name} onRetry={() => onAct(expert.id)} />}

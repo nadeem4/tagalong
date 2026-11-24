@@ -37,6 +37,8 @@ export const CARD_CSS = `
 flex: none; display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px;
 background: ${t.color.tileNavy}; color: ${t.color.textSoft}; font-size: 11px; line-height: 14px; font-weight: 600;
 }
+.bubble-check input { flex: none; width: 16px; height: 16px; margin: 0; accent-color: ${t.color.gold}; }
+.bubble-check { display: flex; align-items: center; justify-content: flex-start; gap: ${t.space.md}px; color: ${t.color.textSoft}; ${typeCss('small')}; }
 .card-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .card-actions button { align-self: auto; height: 32px; min-height: 32px; padding: 0 ${t.space.xl}px; border-radius: ${t.radius.sm}px; ${typeCss('body')}; font-weight: 600; }
 .bubble-radio { flex: none; width: 16px; height: 16px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid ${t.color.textMuted}; }

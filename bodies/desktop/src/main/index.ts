@@ -55,6 +55,7 @@ import { createNodeRunner } from './node/runner';
 import { registerPairIpc } from './ipc/pair';
 import { registerBrainServiceIpc, waitForRestart } from './ipc/brain-service';
 import { registerDevicesIpc } from './ipc/devices';
+import { registerPlacementsIpc } from './ipc/placements';
 import { startingGate } from './brain/starting-gate';
 import { homedir, hostname, userInfo } from 'node:os';
 import { connectAiTool } from './tools/connect-ai-tool';
@@ -458,7 +459,7 @@ async function start(): Promise<void> {
   const bodyId = readOrMakeBodyId(settingsStore);
   nodeRunner = createNodeRunner({
     link,
-    nodeId: bodyId.replace(/^desktop-/, 'node-'),
+    nodeId: nodeIdOf(bodyId),
     disabled: startsNoProcesses(process.env),
     spawn: (env) => realSpawnNode(brainRun(), env),
   });
@@ -592,7 +593,7 @@ async function start(): Promise<void> {
     onBlocked: (blocked) => pauseListening({ blocked }),
   });
 
-  registerIpc();
+  registerIpc(nodeIdOf(bodyId));
 
   desktop.panel = createPanelWindow({
     isStreaming: () => (desktop?.activeTurns.size ?? 0) > 0,
@@ -678,6 +679,11 @@ let stopFocusWatch = (): void => undefined;
 /** Why Always listening waits: a call or full screen in front, or the pets hidden. */
 let listeningWhy = { blocked: false, petsShown: false };
 let pauseListening: (change: Partial<typeof listeningWhy>) => void = () => undefined;
+
+/** The node this PC runs beside a remote brain: its desktop body id with the `node-` prefix. */
+function nodeIdOf(desktopBodyId: string): string {
+  return desktopBodyId.replace(/^desktop-/, 'node-');
+}
 
 /**
  * Scout has one thing to say from a check-in: one quiet line beside the pet, without taking
@@ -1023,7 +1029,7 @@ async function noteActiveWindow(current: Desktop): Promise<ContextSnapshot | nul
  * Electron; the ones left here need Electron itself: they move windows, read the screen
  * or open things through the shell.
  */
-function registerIpc(): void {
+function registerIpc(thisPcNode: string): void {
   const required = (): Desktop => {
     if (desktop === null) throw new Error('the desktop host is not ready yet');
     return desktop;
@@ -1143,6 +1149,10 @@ function registerIpc(): void {
   registerDevicesIpc(handle, {
     brain: required().brain,
     runTailscale,
+  });
+  registerPlacementsIpc(handle, {
+    brain: required().brain,
+    thisPcNode,
   });
   registerBrainServiceIpc(handle, {
     run: (args) => realRunTagalong(brainRun(), args),

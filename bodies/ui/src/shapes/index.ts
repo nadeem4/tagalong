@@ -19,6 +19,7 @@ export * from './model';
 export * from './memory';
 export * from './pairing';
 export * from './pet';
+export * from './placements';
 export * from './reading';
 export * from './setup';
 export * from './status';

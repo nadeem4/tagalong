@@ -152,6 +152,8 @@ export const IPC = {
   devicesList: 'tagalong:devices:list',
   devicesRename: 'tagalong:devices:rename',
   devicesRevoke: 'tagalong:devices:revoke',
+  placementsList: 'tagalong:placements:list',
+  placementsSet: 'tagalong:placements:set',
   brainReconnect: 'tagalong:brain:reconnect',
   tailscaleState: 'tagalong:tailscale:state',
   pairMake: 'tagalong:pair:make',

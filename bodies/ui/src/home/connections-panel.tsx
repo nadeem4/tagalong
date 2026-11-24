@@ -24,6 +24,7 @@ import { ExpertsTab } from './experts-tab';
 import { JobTabs, panelId, tabId } from './job-tabs';
 import type { Outcome } from './outcome';
 import type { UpdatesControls } from './updates-bar';
+import { useRunsOn } from './use-runs-on';
 
 type Status = { text: string; error: boolean } | null;
 type Tab = 'apps' | 'experts';
@@ -73,6 +74,7 @@ export function ConnectionsPanel() {
   const [setupFailed, setSetupFailed] = useState(false);
   const [updates, setUpdates] = useState<UpdatesState | null>(null);
   const [checking, setChecking] = useState(false);
+  const runsOn = useRunsOn();
 
   const reloadSetup = useCallback(
     (announce = false) => {
@@ -255,6 +257,7 @@ export function ConnectionsPanel() {
           <AppsTab
             apps={apps}
             updates={updateControls}
+            runsOn={runsOn}
             officialIds={officialIds}
             offline={offline}
             busy={asking}
@@ -293,6 +296,7 @@ export function ConnectionsPanel() {
             setup={setup}
             answered={answered}
             updates={updateControls}
+            runsOn={runsOn}
             asking={asking}
             onAct={(id) => setUp(id, () => bridge.setupExpert(id, false))}
             onAdd={(id) => setUp(id, () => bridge.setupExpert(id, false))}

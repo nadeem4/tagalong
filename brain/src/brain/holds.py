@@ -92,6 +92,7 @@ class Holds:
         ask_id: str | None = None,
         job_id: str | None = None,
         part: str | None = "p1",
+        place: dict | None = None,
     ) -> Reply:
         """Show the card and wait for its answer, however long it takes. Raises RpcError
         (cancelled) when the part or task ends, AskExpired when the job's row ends."""
@@ -125,6 +126,7 @@ class Holds:
             input=input,
             free_text=free_text,
             confirm=confirm,
+            place=place,
             task=self._tasks.card_fields(item) if self._tasks else None,
         )
         try:

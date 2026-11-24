@@ -20,7 +20,10 @@ class Rig:
             self.moved.append(app_id)
 
         tools = placement_tools(
-            self.placements, lambda: ["gh"], relocate, lambda m, p: self.told.append((m, p))
+            self.placements,
+            lambda: ["gh"],
+            relocate,
+            lambda m, p: self.told.append((m, p)),
         )
         self.handlers = {spec.name: handler for spec, handler in tools}
 

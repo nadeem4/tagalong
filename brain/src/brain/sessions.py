@@ -976,12 +976,14 @@ class Session:
         else:
             self.presence.record(event.kind, event.source, event.payload)
 
-    async def _ask_where(self, app: str, body: str) -> bool:
+    async def _ask_where(self, app_id: str, body_id: str) -> bool:
+        app, body = self._apps.name(app_id), self._apps.body_name(body_id)
         reply = await self.holds.ask(
             kind="question",
             text=f"Where should {app} run: on the brain, or on {body}?",
             options=["Brain", body],
             part=None,
+            place={"app": app_id, "body": body_id, "name": app},
         )
         return reply.option == body
 

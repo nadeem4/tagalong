@@ -87,6 +87,7 @@ class Asks:
         free_text: bool = False,
         recommended: str | None = None,
         confirm: bool = False,
+        place: dict | None = None,
         task: dict | None = None,
     ) -> None:
         """Put a card on screen and return: its open item takes the answer, whenever it comes, by
@@ -105,6 +106,8 @@ class Asks:
             params["input"] = input
         if confirm:
             params["confirm"] = True  # the fixed allow, always, deny card of a tool call
+        if place is not None:
+            params["place"] = place  # a where-to-run question: the app and body it is about
         self._with_task(params, task)
         self._publish(_Open(params, free_text, kind))
         ask_event("opened", ask_id, "brain", tool or kind)

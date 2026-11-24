@@ -3,6 +3,7 @@ the permission engine, with the rule keyed by app and tool. Fake MCP server, fak
 """
 
 import asyncio
+import json
 import sys
 from datetime import UTC, datetime
 from functools import partial
@@ -10,8 +11,8 @@ from functools import partial
 import pytest
 from ask_log import approvals_on
 
-from brain.app_tools import AppSource
-from brain.apps import AppRow, Apps
+from brain.app_tools import AppSource, app_home_tools
+from brain.apps import AppRow, Apps, TokenFile
 from brain.bodies import Bodies
 from brain.memory import Memory
 from brain.mind.turn import Call
@@ -52,8 +53,8 @@ class Rig:
         self.where_asked: list[tuple[str, str]] = []
         self.pick_body = True
 
-        async def ask_where(app: str, body: str) -> bool:
-            self.where_asked.append((app, body))
+        async def ask_where(app_id: str, body_id: str) -> bool:
+            self.where_asked.append((app_id, body_id))
             return self.pick_body
 
         self.asks = FakeAsks()
@@ -119,7 +120,7 @@ async def test_ask_me_asks_once_per_turn_not_per_call(make):
     rules.set_permission_mode(rig.memory.db, "fake__echo", "auto")
     await rig.call("t1")
     await rig.call("t1")
-    assert rig.where_asked == [("Fake", "Laptop")]
+    assert rig.where_asked == [("fake", "pc")]
     assert rig.node.opened  # the person picked the node
     await rig.call("t2")
     assert len(rig.where_asked) == 2
@@ -139,6 +140,16 @@ async def test_an_app_placed_on_a_node_that_is_offline_says_so_plainly(make):
         await rig.toolbox.run(Call("c1", "fake__echo", {"text": "hi"}, "t1", ""))
     assert err.value.code == ErrorCode.body_offline
     assert "not connected right now" in err.value.message
+
+
+async def test_an_app_waiting_on_an_offline_node_names_it_in_its_listing(make, tmp_path):
+    rig = await make(Placement("body", "pc"), node_online=False)
+    assert rig.apps.status("fake").waiting_on == "pc"
+    rig.node.connect()
+    rig.bodies.disconnect("pc", rig.node)
+    home = app_home_tools(rig.apps, rig.memory, TokenFile(tmp_path), lambda *_: None, rig.bodies)
+    row = json.loads(await {s.name: h for s, h in home}["list_apps"]({}))["apps"][0]
+    assert (row["waiting_on"], row["waiting_on_name"]) == ("pc", "Laptop")
 
 
 async def test_prefer_body_falls_back_to_the_brain_when_the_node_is_offline(make):

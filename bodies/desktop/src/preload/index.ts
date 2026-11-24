@@ -44,6 +44,7 @@ import type {
 import type {
   BodiesState,
   DevicesState,
+  PlacementsState,
   FoundBrain,
   LoopsState,
   ModelState,
@@ -157,6 +158,9 @@ const bridge: PreloadBridge = {
   devicesState: () => ipcRenderer.invoke(IPC.devicesList) as Promise<DevicesState>,
   renameDevice: (id, name) => ipcRenderer.invoke(IPC.devicesRename, id, name) as Promise<void>,
   revokeDevice: (id) => ipcRenderer.invoke(IPC.devicesRevoke, id) as Promise<void>,
+  placementsState: () => ipcRenderer.invoke(IPC.placementsList) as Promise<PlacementsState>,
+  setPlacement: (kind, id, place) =>
+    ipcRenderer.invoke(IPC.placementsSet, kind, id, place) as Promise<void>,
   pairMake: () => ipcRenderer.invoke(IPC.pairMake) as Promise<PairOffer>,
   installBrainService: () =>
     ipcRenderer.invoke(IPC.brainServiceInstall) as Promise<BrainServiceOutcome>,

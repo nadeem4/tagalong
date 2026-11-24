@@ -2981,6 +2981,11 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
    asking you to tap the one you mean. A third such moment within the hour may be held by the cap and
    spoken later.
 
+## Runs on and the Ask me card
+
+1. Automated: `pnpm --filter @tagalong/ui exec vitest run src/shapes/placements.test.ts src/home/runs-on.test.tsx src/home/connections-runs-on.test.tsx src/ask-where.test.tsx`; `pnpm --filter @tagalong/desktop exec vitest run src/main/ipc/placements.test.ts`; `pnpm --filter @tagalong/desktop test:e2e` (`e2e/runs-on.spec.ts`: This PC on an app row calls `placement_set`; the Ask me card shows This PC and the brain machine and Remember my choice keeps the answer).
+2. By hand, with the brain on another computer: Home > Connections shows **Runs on <machine>** beside each app's and expert's switch; its menu offers the brain machine, This PC, Both (with Try first, the chosen one in gold) and, on apps only, Ask me each time (an expert row never offers it). Choosing This PC while that computer is off makes the row say "Waiting for This PC" and its line says what Scout will do. With the brain on this computer no row has the control. Set an app to Ask me each time and ask Scout to use it: the bubble asks "Where should <app> run?" with **This PC** and the brain machine's name; tick **Remember my choice for <app>** and the row then shows that place. Press Escape on an open menu: it closes and the control keeps focus.
+
 ## Home Devices page and WhatsApp setup
 
 1. Automated: `cd brain && uv run pytest tests/test_bodies_tools.py -q` (status never holds a secret, absent keys are unchanged, a bad value is refused unquoted, a failed write applies nothing); `pnpm --filter @tagalong/desktop exec vitest run src/main/ipc/bodies.test.ts`; `pnpm --filter @tagalong/ui exec vitest run src/home/devices-view.test.tsx src/home/tailscale-guide.test.tsx src/home/brain-card.test.tsx`; `pnpm --filter @tagalong/desktop exec vitest run src/main/ipc/devices.test.ts`; `pnpm --filter @tagalong/desktop test:e2e` (`e2e/devices.spec.ts`: a remote brain's card names its machine and has no Restart; Revoke removes the row); `pnpm --filter @tagalong/ui exec vitest run src/pair/pair-dialog.test.tsx` (make keeps answering network_off until the service is installed and the brain restarted).

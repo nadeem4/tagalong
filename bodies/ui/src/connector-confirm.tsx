@@ -2,11 +2,16 @@
  * The confirm card: Scout wants to change something, and nothing runs until the person
  * clicks. Contains ConnectorConfirmCard, for a connected app's change, a permission ask from
  * the brain's tool gate, and the asks a Claude Code job opens (hand-off, relayed permission,
- * question). Used by the bubble.
+ * question), and the Ask me card for where an app should run. Used by the bubble.
  */
 
 import { useState } from 'react';
-import type { ConnectorConfirmParams } from './shapes';
+import { useHostBridge } from './host-bridge';
+import { useBrainCard } from './home/use-brain-card';
+import { placeOf, type ConnectorConfirmParams } from './shapes';
+
+/** The brain's own option in a where-to-run ask; the other option is the body's name. */
+const BRAIN_OPTION = 'Brain';
 
 type Decision = 'once' | 'always' | 'deny';
 export type JobAnswer = { option: string; text?: string; checkBackAt?: string };
@@ -88,6 +93,54 @@ function TaskNote({
 }
 
 /**
+ * The brain asks where an app runs, once, because the row says Ask me each time. The brain's
+ * options are `Brain` and the body's name; the buttons read This PC and the brain machine's name,
+ * and answer with the brain's own words. "Remember my choice" also sets the row, so it stops asking.
+ */
+function WhereCard({
+  place,
+  confirm,
+  onReply,
+}: {
+  place: { app: string; body: string; name: string };
+  confirm: ConnectorConfirmParams;
+  onReply: (answer: JobAnswer) => void;
+}) {
+  const bridge = useHostBridge();
+  const { card } = useBrainCard();
+  const [keep, setKeep] = useState(false);
+  const bodyOption = (confirm.options ?? []).find((o) => o !== BRAIN_OPTION) ?? '';
+  const choose = (option: string): void => {
+    if (!keep) return onReply({ option });
+    const choice = option === bodyOption ? 'body' : 'brain';
+    bridge.setPlacement('app', place.app, placeOf(choice, 'body', place.body)).then(
+      () => onReply({ option }),
+      () => onReply({ option }),
+    );
+  };
+  const heading = `Where should ${place.name} run?`;
+  return (
+    <section className="card" aria-label={heading}>
+      <div className="card-head">
+        <p className="bubble-text">{heading}</p>
+      </div>
+      <label className="bubble-check">
+        <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} />
+        Remember my choice for {place.name}
+      </label>
+      <div className="card-actions" role="group" aria-label="Options">
+        <button type="button" className="bubble-quiet" onClick={() => choose(bodyOption)}>
+          This PC
+        </button>
+        <button type="button" className="bubble-primary" onClick={() => choose(BRAIN_OPTION)}>
+          {card?.host ?? 'The brain'}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/**
  * Built like the hand-off card: what will happen, then Not now, Always allow and Allow.
  * A tool that cannot be always allowed carries the "Always asks" chip.
  * A brain ask (it carries `options`) leads with Scout's own words and drops Always allow when
@@ -117,6 +170,9 @@ export function ConnectorConfirmCard({
   const canAlways = confirm.options?.includes('always') ?? false;
   // A task's card also lets the person put it off or end the task; the brain moves the check-back.
   const ofTask = confirm.options?.includes('not_now') ?? false;
+
+  if (confirm.place !== undefined)
+    return <WhereCard place={confirm.place} confirm={confirm} onReply={onReply} />;
 
   if (isJob) {
     const text = typed.trim();

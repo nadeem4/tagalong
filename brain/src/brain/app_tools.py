@@ -265,6 +265,8 @@ def app_home_tools(
                     **target(row),
                     "status": status.state,
                     "error": status.error,
+                    "waiting_on": status.waiting_on or None,
+                    "waiting_on_name": status.waiting_on and bodies.name(status.waiting_on) or None,
                     "tools": tools,
                 }
             )
@@ -405,7 +407,7 @@ class AppSource:
         self, apps: Apps, ask_where: Callable[[str, str], Awaitable[bool]] | None = None
     ) -> None:
         self._apps = apps
-        # (app name, body name) -> True for the body, False for the brain: one card for the person.
+        # (app id, body id) -> True for the body, False for the brain: one card for the person.
         self._ask_where = ask_where
         self._picks: dict[tuple[str, str], asyncio.Task[str]] = {}
 
@@ -467,7 +469,7 @@ class AppSource:
     async def _pick(self, app_id: str, body_id: str) -> str:
         if self._ask_where is None:
             return "brain"
-        wants_body = await self._ask_where(self._apps.name(app_id), self._apps.body_name(body_id))
+        wants_body = await self._ask_where(app_id, body_id)
         return body_id if wants_body else "brain"
 
     def unavailable(self, name: str) -> RpcError | None:

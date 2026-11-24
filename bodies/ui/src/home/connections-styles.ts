@@ -178,6 +178,33 @@ export const CONNECTIONS_CSS = `
 :is(.home, .wt) .dv-group .tg-card__label { margin: 0; }
 :is(.home, .wt) .dv-tile { position: relative; }
 :is(.home, .wt) .dv-tile__brain { position: absolute; right: -3px; top: -3px; width: 12px; height: 12px; border-radius: 50%; background: ${t.color.gold}; border: 2px solid ${themedColor.panel}; }
+:is(.home, .wt) .cx-runs { position: relative; }
+:is(.home, .wt) .cx-runs__btn {
+  display: inline-flex; align-items: center; gap: ${t.space.sm}px; height: 32px; padding: 0 ${t.space.md}px; border-radius: ${t.radius.sm}px;
+  border: 1px solid ${themedColor.keycapLine}; background: ${themedColor.card}; color: ${themedColor.panelText};
+  font: inherit; ${typeCss('body')}; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+:is(.home, .wt) .cx-runs__btn:disabled { background: transparent; color: ${themedColor.panelMuted}; cursor: default; }
+:is(.home, .wt) .cx-runs__label { color: ${themedColor.panelMuted}; font-weight: 400; }
+:is(.home, .wt) .cx-runs__menu {
+  position: absolute; z-index: 5; right: 0; top: calc(100% + ${t.space.xs}px); width: 300px; padding: ${t.space.sm}px;
+  border-radius: ${t.radius.card}px; border: 1px solid ${themedColor.panelLine}; background: ${themedColor.card};
+  box-shadow: 0 8px 24px rgba(18, 22, 43, .16); display: flex; flex-direction: column; gap: ${t.space.xxs}px;
+}
+:is(.home, .wt) .cx-runs__item {
+  display: flex; align-items: flex-start; gap: ${t.space.md}px; padding: ${t.space.md}px; border: 0; border-radius: ${t.radius.sm}px;
+  background: none; font: inherit; ${typeCss('body')}; color: ${themedColor.panelText}; text-align: left; cursor: pointer;
+}
+:is(.home, .wt) .cx-runs__item:hover { background: ${themedColor.panelTile}; }
+:is(.home, .wt) .cx-runs__item strong { display: block; font-weight: 600; }
+:is(.home, .wt) .cx-runs__check { width: 16px; flex: none; padding-top: ${t.space.xxs}px; }
+:is(.home, .wt) .cx-runs__first { display: flex; align-items: center; gap: ${t.space.md}px; padding: ${t.space.xs}px ${t.space.md}px ${t.space.md}px ${t.space.xxxl + t.space.xs}px; }
+:is(.home, .wt) .cx-runs__seg {
+  height: 28px; padding: 0 ${t.space.md}px; border-radius: ${t.radius.sm}px; border: 1px solid ${themedColor.panelLine};
+  background: none; font: inherit; ${typeCss('small')}; font-weight: 600; color: ${themedColor.panelMuted}; cursor: pointer;
+}
+:is(.home, .wt) .cx-runs__seg[aria-pressed='true'] { background: ${t.color.gold}; border-color: transparent; color: ${t.color.goldInk}; }
+:is(.home, .wt) .cx-runs__btn:focus-visible, :is(.home, .wt) .cx-runs__item:focus-visible, :is(.home, .wt) .cx-runs__seg:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 2px; }
 :is(.home, .wt) .dv-confirm {
   display: flex; flex-wrap: wrap; align-items: center; gap: ${t.space.md}px ${t.space.lg}px; padding: ${t.space.lg}px; margin: 0 0 ${t.space.md}px;
   border-radius: ${t.radius.card}px; background: ${themedColor.errFill}; color: ${themedColor.errInk}; ${typeCss('small')};

@@ -598,6 +598,23 @@ describe('createTurnEvents: asks', () => {
       expect(e).not.toHaveProperty('facts');
     });
 
+    it('a where-to-run ask carries the app and body ids onto the card', () => {
+      const [e] = make().map(
+        'ask',
+        jobAsk({
+          text: 'Where should Files run: on the brain, or on This PC?',
+          options: ['Brain', 'This PC'],
+          tool: undefined,
+          input: undefined,
+          place: { app: 'files', body: 'node-1a2b3c', name: 'Files' },
+        }),
+      );
+      expect(e).toMatchObject({
+        question: true,
+        place: { app: 'files', body: 'node-1a2b3c', name: 'Files' },
+      });
+    });
+
     it('an ask without free_text or recommended adds neither field', () => {
       const [e] = make().map('ask', jobAsk());
       expect(e).not.toHaveProperty('freeText');

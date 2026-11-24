@@ -5,7 +5,7 @@
  * Contains ConnectionRow, STATUS_WORDS, STATUS_DOT, STATUS_CHIP and SAME_MACHINE.
  */
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { AppInfo, UpdateRow } from '../shapes';
 import { Button } from '../controls/button';
 import { Toggle } from '../controls/toggle';
@@ -55,6 +55,8 @@ export function ConnectionRow({
   onRemove,
   update,
   onUpdate,
+  runsOn,
+  waitingFor,
 }: {
   app: AppInfo;
   /** Who made it, when the brain says; null shows no chip. */
@@ -62,6 +64,10 @@ export function ConnectionRow({
   /** Its version line and update state, when the brain has said; Update presses call onUpdate. */
   update?: UpdateRow | undefined;
   onUpdate?: () => void;
+  /** The Runs on control, when Scout has more than one machine to run it on. */
+  runsOn?: ReactNode;
+  /** The name of the PC the app is placed on when it is not connected right now. */
+  waitingFor?: string | undefined;
   onSwitch: () => void;
   onRestart: () => void;
   onSignIn: () => void;
@@ -72,6 +78,18 @@ export function ConnectionRow({
   const toolCount = `${tools.length} tool${tools.length === 1 ? '' : 's'}`;
   // An oauth app that is connecting is waiting on the person's browser, not on the network.
   const waiting = app.auth === 'oauth' && app.status === 'connecting';
+  const status =
+    waitingFor !== undefined
+      ? {
+          className: 'cx-status cx-status--warn',
+          dot: 'home-dot home-dot--warn',
+          words: `Waiting for ${waitingFor}`,
+        }
+      : {
+          className: 'cx-status',
+          dot: STATUS_DOT[app.status],
+          words: waiting ? 'Waiting for the browser' : STATUS_WORDS[app.status],
+        };
   const needsSignIn = app.auth === 'oauth' && app.status === 'needs-sign-in';
   const versionWords = update === undefined ? null : updateMeta(update);
   const updateShown = update !== undefined && updateVisible(update);
@@ -90,8 +108,10 @@ export function ConnectionRow({
             )}
           </span>
           <span className="cx-meta">
-            {TRANSPORT_WORDS[app.transport]} · {toolCount}
-            {versionWords !== null && ` · ${versionWords}`}
+            {waitingFor !== undefined
+              ? `${waitingFor} is off. ${name} jobs wait and start when it is back.`
+              : `${TRANSPORT_WORDS[app.transport]} · ${toolCount}`}
+            {waitingFor === undefined && versionWords !== null && ` · ${versionWords}`}
           </span>
         </div>
         <div className="cx-row__side">
@@ -129,14 +149,15 @@ export function ConnectionRow({
           </span>
           {/* A healthy app's status gives way to its update words, as in the mockup. */}
           {!(updateShown && app.status === 'connected') && (
-            <span className="cx-status">
-              <span className={STATUS_DOT[app.status]} aria-hidden="true" />
-              {waiting ? 'Waiting for the browser' : STATUS_WORDS[app.status]}
+            <span className={status.className}>
+              <span className={status.dot} aria-hidden="true" />
+              {status.words}
             </span>
           )}
           {update !== undefined && onUpdate !== undefined && (
             <UpdateSide row={update} onUpdate={onUpdate} />
           )}
+          {runsOn}
           <Toggle checked={app.enabled} onChange={onSwitch} label={`Scout can use ${name}`} />
         </div>
       </section>

@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "method": "ask",
+  "params": {
+    "seq": 9,
+    "id": "a4",
+    "state": "open",
+    "text": "Where should Files run: on the brain, or on This PC?",
+    "options": ["Brain", "This PC"],
+    "place": { "app": "files", "body": "node-1a2b3c", "name": "Files" }
+  }
+}

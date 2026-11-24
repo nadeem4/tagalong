@@ -403,6 +403,12 @@ class AskTask(Model):
     title: str | None = None
 
 
+class AskPlace(Model):
+    app: Id
+    body: Id
+    name: str
+
+
 class AskOpen(Model):
     seq: Seq
     id: Id
@@ -415,6 +421,7 @@ class AskOpen(Model):
     input: Input | None = None
     free_text: bool | None = None
     recommended: str | None = None
+    place: AskPlace | None = None
     task: AskTask | None = None
     check_back_at: str | None = None
     check_back_by: Literal["scout", "person"] | None = None
