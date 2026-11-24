@@ -50,6 +50,7 @@ describe('PairDialog', () => {
   it('makes a new code on request, and says so when the old one ran out', async () => {
     const { make } = open();
     await screen.findByRole('img', { name: 'Pairing QR code' });
+    await act(async () => {});
     act(() => void vi.advanceTimersByTime(10 * 60 * 1000));
     expect(screen.getByText('This code has expired.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Make a new code' }));
