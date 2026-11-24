@@ -95,6 +95,7 @@ export function ThreeWay({
                   <span className="tg-three__detail">{option.detail}</span>
                 )}
               </span>
+              <span className="tg-three__ring" aria-hidden="true" />
             </>
           ) : (
             option.label

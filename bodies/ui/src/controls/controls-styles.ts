@@ -77,6 +77,9 @@ export const CONTROLS_CSS = `
 .tg-three--cards .tg-three__option strong { ${typeCss('bodyLead')}; font-weight: ${t.fontWeight.semibold}; }
 .tg-three--cards .tg-three__option[aria-checked='true'] { background: var(--tg-ctl-bg); color: var(--tg-ctl-ink); border-color: ${t.color.gold}; }
 .tg-three--cards .tg-three__option:hover:not(:disabled):not([aria-checked='true']) { background: var(--tg-ctl-bg); border-color: var(--tg-ctl-muted); }
+.tg-three__ring { flex: none; margin-left: auto; width: 20px; height: 20px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--tg-ctl-line); display: grid; place-items: center; }
+.tg-three__option[aria-checked='true'] .tg-three__ring { border-color: ${t.color.gold}; }
+.tg-three__option[aria-checked='true'] .tg-three__ring::after { content: ''; width: 10px; height: 10px; border-radius: 50%; background: ${t.color.gold}; }
 .tg-three__text { display: flex; flex-direction: column; gap: 2px; }
 .tg-three__detail { color: var(--tg-ctl-muted); }
 
