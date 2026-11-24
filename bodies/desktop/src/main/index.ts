@@ -1145,10 +1145,7 @@ function registerIpc(): void {
     brain: required().brain,
     runTailscale,
   });
-  registerPlacementsIpc(handle, {
-    brain: required().brain,
-    thisPcNode: readOrMakeBodyId(required().settingsStore).replace(/^desktop-/, 'node-'),
-  });
+  registerPlacementsIpc(handle, required().brain);
   registerBrainServiceIpc(handle, {
     run: (args) => realRunTagalong(brainRun(), args),
     isService: async () => (await brainControl?.card())?.startedBy === 'service',

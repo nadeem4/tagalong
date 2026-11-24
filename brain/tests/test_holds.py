@@ -91,6 +91,12 @@ async def test_a_held_question_waits_until_the_card_is_answered():
     assert rig.saved == [(card["id"], "A", "desktop")]  # the card_answer event is saved
 
 
+async def test_a_where_question_carries_the_app_and_body_ids():
+    rig = Rig()
+    rig.ask(job_id=rig.job(), place={"app": "gh", "body": "node-1"})
+    assert (await rig.card())["place"] == {"app": "gh", "body": "node-1"}
+
+
 async def test_a_typed_answer_comes_back_with_its_text():
     rig = Rig()
     waiting = rig.ask(job_id=rig.job(), free_text=True)

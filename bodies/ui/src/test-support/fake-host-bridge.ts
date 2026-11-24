@@ -693,6 +693,7 @@ export function createFakeHostBridge(
         ...fake.placements,
         places: { ...fake.placements.places, [placeKey(kind, id)]: place },
       };
+      fake.emitChanged('placements');
       return Promise.resolve();
     },
     devicesState() {

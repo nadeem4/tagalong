@@ -1,4 +1,4 @@
-/** Tests for the placements IPC: reading adds this PC's node id, and setting sends the place the person chose. */
+/** Tests for the placements IPC: reading passes on this PC's node id, and setting sends the place the person chose. */
 import { describe, expect, it } from 'vitest';
 import { IPC } from '../../shared/ipc';
 import { fakeIpc } from './fake-ipc';
@@ -10,23 +10,21 @@ function setup() {
   const ipc = fakeIpc();
   const calls: [string, object | undefined][] = [];
   registerPlacementsIpc(ipc.handle, {
-    thisPcNode: 'node-ab12',
-    brain: {
-      call: (tool: string, input?: object) => {
-        calls.push([tool, input]);
-        return Promise.resolve(
-          text({
-            placements: [{ kind: 'app', id: 'gmail', mode: 'brain', body_id: null, prefer: null }],
-          }),
-        ) as Promise<never>;
-      },
+    call: (tool: string, input?: object) => {
+      calls.push([tool, input]);
+      return Promise.resolve(
+        text({
+          this_pc: 'node-ab12',
+          placements: [{ kind: 'app', id: 'gmail', mode: 'brain', body_id: null, prefer: null }],
+        }),
+      ) as Promise<never>;
     },
   });
   return { ...ipc, calls };
 }
 
 describe('registerPlacementsIpc', () => {
-  it('answers the brain placements with this PC node', async () => {
+  it('answers the brain placements with the this PC node the brain names', async () => {
     const { invoke } = setup();
     expect(await invoke(IPC.placementsList)).toEqual({
       thisPc: 'node-ab12',

@@ -96,6 +96,7 @@ describe('Runs on on Connections rows', () => {
         app('gmail', 'Gmail', {
           status: 'error',
           error: 'Gmail runs on this-pc, which is not connected right now.',
+          waiting_on: 'node-this',
         }),
       ],
       placements: {

@@ -7,7 +7,7 @@
 
 import { useState } from 'react';
 import { useHostBridge } from './host-bridge';
-import { placeOf, whereAskApp, type ConnectorConfirmParams } from './shapes';
+import { placeOf, type ConnectorConfirmParams } from './shapes';
 
 type Decision = 'once' | 'always' | 'deny';
 export type JobAnswer = { option: string; text?: string; checkBackAt?: string };
@@ -93,11 +93,11 @@ function TaskNote({
  * button; "Remember my choice" also sets the row to it, so the brain stops asking.
  */
 function WhereCard({
-  app,
+  place,
   confirm,
   onReply,
 }: {
-  app: string;
+  place: { app: string; body: string };
   confirm: ConnectorConfirmParams;
   onReply: (answer: JobAnswer) => void;
 }) {
@@ -106,25 +106,21 @@ function WhereCard({
   const options = confirm.options ?? [];
   const choose = (option: string): void => {
     if (!keep) return onReply({ option });
-    void (async () => {
-      const [{ apps }, { thisPc }] = await Promise.all([
-        bridge.listConnections(),
-        bridge.placementsState(),
-      ]);
-      const row = apps.find((a) => a.name.toLowerCase() === app.toLowerCase());
-      const place = placeOf(option === 'Brain' ? 'brain' : 'body', 'body', thisPc);
-      if (row !== undefined) await bridge.setPlacement('app', row.id, place);
-      onReply({ option });
-    })().catch(() => onReply({ option }));
+    // The brain lists itself first, then the body.
+    const choice = option === options[0] ? 'brain' : 'body';
+    bridge.setPlacement('app', place.app, placeOf(choice, 'body', place.body)).then(
+      () => onReply({ option }),
+      () => onReply({ option }),
+    );
   };
   return (
-    <section className="card" aria-label={`Where should ${app} run?`}>
+    <section className="card" aria-label={confirm.summary}>
       <div className="card-head">
-        <p className="bubble-text">Where should {app} run?</p>
+        <p className="bubble-text">{confirm.summary}</p>
       </div>
       <label className="bubble-check">
         <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} />
-        Remember my choice for {app}
+        Remember my choice
       </label>
       <div className="card-actions" role="group" aria-label="Options">
         {options.map((option, i) => (
@@ -160,7 +156,6 @@ export function ConnectorConfirmCard({
   onReply: (answer: JobAnswer) => void;
 }) {
   const [typed, setTyped] = useState('');
-  const where = confirm.question === true ? whereAskApp(confirm.summary) : null;
   const isAsk = confirm.options !== undefined;
   const isJob =
     confirm.question === true ||
@@ -174,7 +169,8 @@ export function ConnectorConfirmCard({
   // A task's card also lets the person put it off or end the task; the brain moves the check-back.
   const ofTask = confirm.options?.includes('not_now') ?? false;
 
-  if (where !== null) return <WhereCard app={where} confirm={confirm} onReply={onReply} />;
+  if (confirm.place !== undefined)
+    return <WhereCard place={confirm.place} confirm={confirm} onReply={onReply} />;
 
   if (isJob) {
     const text = typed.trim();

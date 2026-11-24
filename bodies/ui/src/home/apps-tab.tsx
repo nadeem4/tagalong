@@ -4,23 +4,13 @@
  * before community) and "Add it yourself" for anything not listed. "Your apps" also carries the
  * updates header and switches (updates-bar.tsx). Contains AppsTab.
  */
-import { placeKey, type AppAddParams, type AppInfo, type AppRow } from '../shapes';
+import type { AppAddParams, AppInfo, AppRow } from '../shapes';
 import { AppSearch } from './app-search';
 import { ConnectionRow } from './connection-row';
 import type { Outcome } from './outcome';
 import { PlaceControl } from './runs-on';
 import type { RunsOnModel } from './use-runs-on';
 import { UpdatesBar, rowUpdate, type UpdatesControls } from './updates-bar';
-
-const OFF_PLACE = /is not connected right now\.$/;
-
-// An app placed on this PC whose node is away: its row says what it waits on, not "Not working".
-function waitingFor(runsOn: RunsOnModel | null, app: AppInfo): string | null {
-  const place = runsOn?.state.places[placeKey('app', app.id)];
-  return place?.mode === 'body' && app.status === 'error' && OFF_PLACE.test(app.error)
-    ? 'This PC'
-    : null;
-}
 
 export function AppsTab({
   apps,
@@ -70,7 +60,7 @@ export function AppsTab({
       update={rowUpdate(updates, 'app', app.id)}
       onUpdate={() => updates?.onUpdate('app', app.id)}
       runsOn={<PlaceControl model={runsOn} kind="app" id={app.id} name={app.name} />}
-      waitingFor={waitingFor(runsOn, app)}
+      waitingForPc={app.waiting_on != null}
     />
   );
   const official = officialIds === null ? [] : apps.filter((app) => officialIds.has(app.id));

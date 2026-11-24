@@ -2984,7 +2984,7 @@ Needs a connected app (Home, Connections) and an installed, logged-in expert.
 ## Runs on and the Ask me card
 
 1. Automated: `pnpm --filter @tagalong/ui exec vitest run src/shapes/placements.test.ts src/home/runs-on.test.tsx src/home/connections-runs-on.test.tsx src/ask-where.test.tsx`; `pnpm --filter @tagalong/desktop exec vitest run src/main/ipc/placements.test.ts`; `pnpm --filter @tagalong/desktop test:e2e` (`e2e/runs-on.spec.ts`: This PC on an app row calls `placement_set`; the Ask me card shows both places and Remember my choice keeps the answer).
-2. By hand, with the brain on another computer: Home > Connections shows **Runs on <machine>** beside each app's and expert's switch; its menu offers the brain machine, This PC, Both (with Try first) and Ask me each time. Choosing This PC while that computer is off makes the row say "Waiting for This PC". With the brain on this computer no row has the control. Set an app to Ask me each time and ask Scout to use it: the bubble asks "Where should the app run?" with the two places; tick **Remember my choice** and the row then shows that place.
+2. By hand, with the brain on another computer: Home > Connections shows **Runs on <machine>** beside each app's and expert's switch; its menu offers the brain machine, This PC, Both (with Try first) and Ask me each time. Choosing This PC while that computer is off makes the row say "Waiting for This PC". With the brain on this computer no row has the control. Set an app to Ask me each time and ask Scout to use it: the bubble asks "Where should the app run?" with the two places; tick **Remember my choice** and the row then shows that place. Press Escape on an open menu: it closes and the control keeps focus.
 
 ## Home Devices page and WhatsApp setup
 

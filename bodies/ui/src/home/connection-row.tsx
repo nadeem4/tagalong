@@ -56,7 +56,7 @@ export function ConnectionRow({
   update,
   onUpdate,
   runsOn,
-  waitingFor,
+  waitingForPc = false,
 }: {
   app: AppInfo;
   /** Who made it, when the brain says; null shows no chip. */
@@ -66,8 +66,8 @@ export function ConnectionRow({
   onUpdate?: () => void;
   /** The Runs on control, when Scout has more than one machine to run it on. */
   runsOn?: ReactNode;
-  /** The place its row waits on when that place is not connected, e.g. `This PC`. */
-  waitingFor?: string | null;
+  /** The app is placed on a PC that is not connected right now. */
+  waitingForPc?: boolean;
   onSwitch: () => void;
   onRestart: () => void;
   onSignIn: () => void;
@@ -78,6 +78,17 @@ export function ConnectionRow({
   const toolCount = `${tools.length} tool${tools.length === 1 ? '' : 's'}`;
   // An oauth app that is connecting is waiting on the person's browser, not on the network.
   const waiting = app.auth === 'oauth' && app.status === 'connecting';
+  const status = waitingForPc
+    ? {
+        className: 'cx-status cx-status--warn',
+        dot: 'home-dot home-dot--warn',
+        words: 'Waiting for This PC',
+      }
+    : {
+        className: 'cx-status',
+        dot: STATUS_DOT[app.status],
+        words: waiting ? 'Waiting for the browser' : STATUS_WORDS[app.status],
+      };
   const needsSignIn = app.auth === 'oauth' && app.status === 'needs-sign-in';
   const versionWords = update === undefined ? null : updateMeta(update);
   const updateShown = update !== undefined && updateVisible(update);
@@ -135,16 +146,9 @@ export function ConnectionRow({
           </span>
           {/* A healthy app's status gives way to its update words, as in the mockup. */}
           {!(updateShown && app.status === 'connected') && (
-            <span className={waitingFor ? 'cx-status cx-status--warn' : 'cx-status'}>
-              <span
-                className={waitingFor ? 'home-dot home-dot--warn' : STATUS_DOT[app.status]}
-                aria-hidden="true"
-              />
-              {waitingFor
-                ? `Waiting for ${waitingFor}`
-                : waiting
-                  ? 'Waiting for the browser'
-                  : STATUS_WORDS[app.status]}
+            <span className={status.className}>
+              <span className={status.dot} aria-hidden="true" />
+              {status.words}
             </span>
           )}
           {update !== undefined && onUpdate !== undefined && (

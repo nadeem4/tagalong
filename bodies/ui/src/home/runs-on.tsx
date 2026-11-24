@@ -1,11 +1,11 @@
 /**
  * The Runs on control on an app or expert row: where it runs (the brain's machine, this PC, both
- * with a first try, or ask each time). A tool that cannot move shows This PC, fixed. Contains RunsOn
- * and PlaceControl.
+ * with a first try, or ask each time). Contains RunsOn and PlaceControl.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { choiceOf, placeKey, type RunsChoice, type TryFirst } from '../shapes';
 import { Icon } from '../setup/icons';
+import { useDismiss } from './use-dismiss';
 import type { RunsOnModel } from './use-runs-on';
 
 export function RunsOn({
@@ -13,7 +13,6 @@ export function RunsOn({
   machine,
   choice,
   tryFirst,
-  locked = false,
   onChange,
 }: {
   name: string;
@@ -21,26 +20,14 @@ export function RunsOn({
   machine: string;
   choice: RunsChoice;
   tryFirst: TryFirst;
-  /** A tool that only works on this PC. */
-  locked?: boolean;
   onChange: (choice: RunsChoice, tryFirst: TryFirst) => void;
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const away = (event: MouseEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const escape = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(false);
-    document.addEventListener('mousedown', away);
-    document.addEventListener('keydown', escape);
-    return () => {
-      document.removeEventListener('mousedown', away);
-      document.removeEventListener('keydown', escape);
-    };
-  }, [open]);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(open, [root], button, close);
 
   const words: Record<RunsChoice, string> = {
     brain: machine,
@@ -48,7 +35,7 @@ export function RunsOn({
     both: 'Both',
     ask: 'Ask me',
   };
-  const shown = words[locked ? 'body' : choice];
+  const shown = words[choice];
   const pick = (next: RunsChoice) => {
     onChange(next, tryFirst);
     if (next !== 'both') setOpen(false);
@@ -73,17 +60,17 @@ export function RunsOn({
   return (
     <div className="cx-runs" ref={root}>
       <button
+        ref={button}
         type="button"
         className="cx-runs__btn"
         aria-label={`Runs on, ${name}: ${shown}`}
         aria-haspopup="true"
         aria-expanded={open}
-        disabled={locked}
         onClick={() => setOpen(!open)}
       >
         <span className="cx-runs__label">Runs on</span>
         {shown}
-        <Icon name={locked ? 'lock' : 'chevDown'} />
+        <Icon name="chevDown" />
       </button>
       {open && (
         <div className="cx-runs__menu" role="group" aria-label={`Where ${name} runs`}>

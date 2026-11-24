@@ -246,6 +246,7 @@ const AskOpen = z
     input: Input.optional(),
     free_text: z.boolean().optional(),
     recommended: z.string().optional(),
+    place: z.object({ app: Id, body: Id }).optional(),
     task: z.object({ id: Id, title: z.string().optional() }).optional(),
     check_back_at: z.string().optional(),
     check_back_by: z.enum(['scout', 'person']).optional(),

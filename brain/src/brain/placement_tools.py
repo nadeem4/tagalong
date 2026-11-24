@@ -13,11 +13,19 @@ _HOME = frozenset({"home"})
 KINDS = ("expert", "app")
 
 
+def this_pc_node(caller: str | None) -> str | None:
+    """The node beside a desktop body: `desktop-1a2b3c` and `node-1a2b3c` share their digits."""
+    if caller is None or not caller.startswith("desktop-"):
+        return None
+    return "node-" + caller.removeprefix("desktop-")
+
+
 def placement_tools(
     placements: Placements,
     app_ids: Callable[[], list[str]],
     relocate_app: Callable[[str], Awaitable[None]],
     notify: Callable[[str, dict], None],
+    this_pc: Callable[[], str | None],
 ) -> list[tuple[ToolSpec, Handler]]:
     def refuse(message: str) -> RpcError:
         return RpcError(ErrorCode.invalid_params, message)
@@ -28,7 +36,7 @@ def placement_tools(
             for kind in KINDS
             for target, place in placements.all(kind).items()
         ]
-        return json.dumps({"placements": rows})
+        return json.dumps({"placements": rows, "this_pc": this_pc()})
 
     async def placement_set(args: dict) -> str:
         kind, target = args.get("kind"), args.get("id")
@@ -61,7 +69,8 @@ def placement_tools(
         (
             ToolSpec(
                 "placement_list",
-                "Where each expert and app runs, when it was set.",
+                "Where each expert and app runs, when it was set, and this_pc: the node id of the "
+                "asking desktop's PC.",
                 {"type": "object", "properties": {}},
                 _HOME,
                 effect="read",

@@ -35,6 +35,8 @@ export const AppInfo = z.object({
   status: ConnectionStatus,
   /** Empty when nothing is wrong. */
   error: z.string(),
+  /** The node body id it is placed on and waiting for; null when it waits on nothing. */
+  waiting_on: z.string().nullable().optional(),
   /** Where it runs: `url` for http, `command` and `args` for stdio. Never env, headers or tokens. */
   url: z.string().optional(),
   command: z.string().optional(),
@@ -101,6 +103,8 @@ export const ConnectorConfirmParams = z.object({
   checkBackBy: z.enum(['scout', 'person']).optional(),
   /** The brain marked the ask urgent. */
   urgent: z.boolean().optional(),
+  /** A where-to-run question: the app and the node body it asks about, as the brain's ids. */
+  place: z.object({ app: z.string(), body: z.string() }).optional(),
 });
 export type ConnectorConfirmParams = z.infer<typeof ConnectorConfirmParams>;
 

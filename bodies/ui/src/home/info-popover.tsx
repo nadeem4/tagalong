@@ -3,8 +3,9 @@
  * the whole row (it portals into the row's list item) so it can use the full width. Escape or a
  * click elsewhere closes it and focus goes back to the button. Contains InfoPopover.
  */
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useDismiss } from './use-dismiss';
 
 export function InfoPopover({ label, text }: { label: string; text: string }) {
   const [open, setOpen] = useState(false);
@@ -17,25 +18,8 @@ export function InfoPopover({ label, text }: { label: string; text: string }) {
     setHost(open ? (button.current?.closest('li') ?? null) : null);
   }, [open]);
 
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape') return;
-      setOpen(false);
-      button.current?.focus();
-    };
-    const onDown = (event: MouseEvent): void => {
-      const target = event.target as Node;
-      if (pop.current?.contains(target) || button.current?.contains(target)) return;
-      setOpen(false);
-    };
-    document.addEventListener('keydown', onKey);
-    document.addEventListener('mousedown', onDown);
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.removeEventListener('mousedown', onDown);
-    };
-  }, [open]);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(open, [pop, button], button, close);
 
   const body = (
     <div ref={pop} id={id} role="dialog" aria-label={`About ${label}`} className="perm-pop">

@@ -1,4 +1,4 @@
-/** Tests for RunsOn: the current choice in words, the four choices, Try first under Both, and the locked control. */
+/** Tests for RunsOn: the four choices, Try first under Both, and Escape giving focus back to the control. */
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { RunsOn } from './runs-on';
@@ -22,11 +22,6 @@ function setup(props: Partial<Parameters<typeof RunsOn>[0]> = {}) {
 }
 
 describe('RunsOn', () => {
-  it('says the current choice in words, using the brain machine name', () => {
-    setup();
-    expect(screen.getByRole('button', { name: /Runs on.*Gmail.*mini-pc/ })).toBeInTheDocument();
-  });
-
   it('offers the machine, This PC, Both and Ask me each time, and chooses one', () => {
     const onChange = setup();
     open();
@@ -47,12 +42,15 @@ describe('RunsOn', () => {
   it('shows no Try first for the other choices', () => {
     setup();
     open();
+    expect(screen.getByRole('group', { name: 'Where Gmail runs' })).toBeInTheDocument();
     expect(screen.queryByText('Try first')).not.toBeInTheDocument();
   });
 
-  it('is fixed to This PC, with no menu, when the tool cannot move', () => {
-    setup({ locked: true, choice: 'body' });
-    const control = screen.getByRole('button', { name: /Runs on.*Gmail.*This PC/ });
-    expect(control).toBeDisabled();
+  it('closes on Escape and gives focus back to the control', () => {
+    setup();
+    open();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('group', { name: 'Where Gmail runs' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Runs on.*Gmail/ })).toHaveFocus();
   });
 });

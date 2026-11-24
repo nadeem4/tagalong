@@ -24,7 +24,7 @@ from brain.app_tools import AppSource, app_home_tools
 from brain.approvals import Approvals, approval_home_tools
 from brain.apps import Apps, TokenFile
 from brain.asks import Asks
-from brain.bodies import Bodies
+from brain.bodies import CALLER, Bodies
 from brain.builtin_guards import (
     spend_guards,
     wake_caps,
@@ -89,7 +89,7 @@ from brain.permission import (
     StandingRule,
     stored_auto_rules,
 )
-from brain.placement_tools import placement_tools
+from brain.placement_tools import placement_tools, this_pc_node
 from brain.placements import Placements
 from brain.presence import Presence
 from brain.protocol import (
@@ -390,7 +390,13 @@ class Session:
         sources: list = []
         if apps is not None and tokens is not None:  # the two always come as a pair
             tools += app_home_tools(apps, memory, tokens, notify, bodies)
-            tools += placement_tools(Placements(memory.db), apps.ids, apps.restart, notify)
+            tools += placement_tools(
+                Placements(memory.db),
+                apps.ids,
+                apps.restart,
+                notify,
+                lambda: this_pc_node(CALLER.get()),
+            )
             # Before bodies: BodySource.unavailable claims any `x__y` name whose prefix is not an
             # online body, which would hide an app's own "not connected" line behind its slug.
             sources.append(AppSource(apps, self._ask_where))
@@ -976,12 +982,14 @@ class Session:
         else:
             self.presence.record(event.kind, event.source, event.payload)
 
-    async def _ask_where(self, app: str, body: str) -> bool:
+    async def _ask_where(self, app_id: str, body_id: str) -> bool:
+        app, body = self._apps.name(app_id), self._apps.body_name(body_id)
         reply = await self.holds.ask(
             kind="question",
             text=f"Where should {app} run: on the brain, or on {body}?",
             options=["Brain", body],
             part=None,
+            place={"app": app_id, "body": body_id},
         )
         return reply.option == body
 

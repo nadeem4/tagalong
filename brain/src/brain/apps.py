@@ -269,6 +269,7 @@ class TokenFile:
 class AppStatus:
     state: str  # off | connecting | connected | needs-sign-in | error
     error: str = ""
+    waiting_on: str = ""  # the node body id an app placed there is waiting for
 
 
 @dataclass
@@ -288,6 +289,7 @@ class _Slot:
     signed_out: bool = False  # the server refused our sign-in mid-session
     settled: asyncio.Event = field(default_factory=asyncio.Event)  # first connect try is over
     location: str = "brain"  # where its session runs: the brain or a node's body id
+    waiting_on: str = ""  # the offline node it is placed on, when that is why it is not connected
 
 
 def root_cause(exc: BaseException) -> BaseException:
@@ -369,7 +371,7 @@ class Apps:
             await asyncio.wait_for(slot.settled.wait(), timeout)
         except TimeoutError:
             pass
-        return AppStatus(slot.state, slot.error)
+        return AppStatus(slot.state, slot.error, slot.waiting_on)
 
     def resolve(self, app_id: str) -> str:
         """Where the app runs now; raises Choose when the person is to say, Unavailable when its
@@ -532,7 +534,7 @@ class Apps:
         slot = self._slots.get(app_id)
         if slot is None:
             return AppStatus("off")
-        return AppStatus(slot.state, slot.error)
+        return AppStatus(slot.state, slot.error, slot.waiting_on)
 
     def ids(self) -> list[str]:
         return list(self._slots)
@@ -596,7 +598,7 @@ class Apps:
         try:
             slot.location = where or self._place(row)
         except Unavailable as gone:
-            slot.location = gone.body_id
+            slot.location = slot.waiting_on = gone.body_id
             self._set(slot, "error", self.gone_line(row.name, gone.body_id))
             return
         self._set(slot, "connecting")
