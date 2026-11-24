@@ -12,6 +12,7 @@ import { SidePanel } from './side-panel';
 import { showAccelerator, StepFour } from './step-four';
 import { StepEight } from './step-eight';
 import { StepFive, TALK_KEYS } from './step-five';
+import { StepBrain } from './step-brain';
 import { StepNine } from './step-nine';
 import { StepOne } from './step-one';
 import { StepSeven } from './step-seven';
@@ -27,9 +28,14 @@ import { StepSaveContext } from './use-step-save';
 import type { Save } from './use-step-save';
 import type { WalkthroughHost } from './walkthrough-host';
 import { useKeyStatus } from '../key/use-key-status';
+import { PairDialog } from '../pair/pair-dialog';
+import { brainNameOf } from '../pair/pair-text';
+import { PAIR_CSS } from '../pair/pair-styles';
 import { CONTROLS_CSS } from '../controls/controls-styles';
 import { CONNECTIONS_CSS } from '../home/connections-styles';
 import { WALKTHROUGH_CSS } from './walkthrough-styles';
+
+const LOCAL_ADDR = /^(?:\w+:\/\/)?(127\.0\.0\.1|localhost|\[?::1\]?)(:|$)/;
 
 interface WalkthroughProps {
   host: WalkthroughHost;
@@ -37,27 +43,37 @@ interface WalkthroughProps {
   initialStep?: number;
 }
 
-function body(step: number, host: WalkthroughHost, onValid: (valid: boolean) => void): ReactNode {
+interface BodyProps {
+  host: WalkthroughHost;
+  onValid: (valid: boolean) => void;
+  onBlock: (blocked: boolean) => void;
+  onShare: (shared: boolean) => void;
+  brainName: string | null;
+}
+
+function body(step: number, { host, onValid, onBlock, onShare, brainName }: BodyProps): ReactNode {
   switch (step) {
     case 1:
-      return <StepOne />;
+      return <StepBrain host={host} onBlock={onBlock} onShare={onShare} />;
     case 2:
-      return <StepTwo />;
+      return <StepOne />;
     case 3:
-      return <StepThree />;
+      return <StepTwo />;
     case 4:
-      return <StepFour host={host} />;
+      return <StepThree />;
     case 5:
-      return <StepFive host={host} />;
+      return <StepFour host={host} />;
     case 6:
-      return <StepSix />;
+      return <StepFive host={host} />;
     case 7:
-      return <StepSeven host={host} />;
+      return <StepSix />;
     case 8:
-      return <StepEight host={host} />;
+      return <StepSeven host={host} />;
     case 9:
-      return <StepNine host={host} onValid={onValid} />;
+      return <StepEight host={host} />;
     case 10:
+      return <StepNine host={host} onValid={onValid} brainName={brainName} />;
+    case 11:
       return <StepKnowMe />;
     default:
       return <StepTen host={host} />;
@@ -86,6 +102,10 @@ export function Walkthrough({ host, initialStep = 1 }: WalkthroughProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [keyValid, setKeyValid] = useState(false);
+  const [brainBlocked, setBrainBlocked] = useState(false);
+  const [shared, setShared] = useState(false);
+  const [pairing, setPairing] = useState(false);
+  const [brainName, setBrainName] = useState<string | null>(null);
   const { status: keyFacts } = useKeyStatus(host);
   const [finishKeysShown, setFinishKeysShown] = useState<{ ask: string; talk: string } | null>(
     null,
@@ -107,6 +127,15 @@ export function Walkthrough({ host, initialStep = 1 }: WalkthroughProps) {
     heading.tabIndex = -1;
     heading.focus();
   }, [current]);
+
+  // Which computer the brain runs on, asked on every step so a pairing just made shows at once.
+  const { brainLink } = host;
+  useEffect(() => {
+    brainLink().then(
+      ({ addr }) => setBrainName(LOCAL_ADDR.test(addr) ? null : brainNameOf(addr)),
+      () => undefined,
+    );
+  }, [brainLink, current]);
 
   function go(step: number): void {
     setCurrent(step);
@@ -172,17 +201,20 @@ export function Walkthrough({ host, initialStep = 1 }: WalkthroughProps) {
   }
 
   const onValid = useCallback((valid: boolean) => setKeyValid(valid), []);
+  const onBlock = useCallback((blocked: boolean) => setBrainBlocked(blocked), []);
 
   return (
     <div className="wt">
       <style>{CONTROLS_CSS}</style>
       <style>{WALKTHROUGH_CSS}</style>
       <style>{CONNECTIONS_CSS}</style>
+      <style>{PAIR_CSS}</style>
       <SidePanel
         current={finishKeysShown !== null ? STEPS.length + 1 : current}
         reached={reached}
         onJump={go}
         keySet={keyFacts !== null && keyFacts !== 'offline' && keyFacts.hasKey}
+        brainName={brainName}
       />
       <main className="wt-page">
         {finishKeysShown !== null ? (
@@ -193,12 +225,13 @@ export function Walkthrough({ host, initialStep = 1 }: WalkthroughProps) {
             onClose={() => void close(false)}
             error={error}
             ready={ready}
+            {...(shared && brainName === null ? { onPairDevice: () => setPairing(true) } : {})}
           />
         ) : (
           <>
             <div className="wt-body" key={current} ref={bodyRef}>
               <StepSaveContext.Provider value={(next) => (save.current = next)}>
-                {body(current, host, onValid)}
+                {body(current, { host, onValid, onBlock, onShare: setShared, brainName })}
               </StepSaveContext.Provider>
             </div>
             <Footer
@@ -209,11 +242,19 @@ export function Walkthrough({ host, initialStep = 1 }: WalkthroughProps) {
               onNext={() => void next()}
               onSkip={() => void leave()}
               keyReady={keyValid}
+              blocked={current === 1 && brainBlocked}
               onFinish={() => void finish()}
             />
           </>
         )}
       </main>
+      {pairing && (
+        <PairDialog
+          make={host.pairMake}
+          copyText={host.copyText}
+          onClose={() => setPairing(false)}
+        />
+      )}
     </div>
   );
 }

@@ -1,10 +1,10 @@
 /**
- * The walkthrough's navy side: Scout's still mark, the "Scout" wordmark, the eleven steps (only
+ * The walkthrough's navy side: Scout's still mark, the "Scout" wordmark, the twelve steps (only
  * those already reached can be jumped to) and the footnote. Contains SidePanel.
  */
 
 import { ScoutGlyph } from '../scout-mark';
-import { STEPS } from './steps';
+import { BRAIN_STEPS, STEPS } from './steps';
 
 interface SidePanelProps {
   current: number;
@@ -13,9 +13,11 @@ interface SidePanelProps {
   onJump: (step: number) => void;
   /** Whether the brain already has the key, so the key step reads Key set, not Required. */
   keySet: boolean;
+  /** The other computer the brain runs on, if this one is paired to one; its steps read "On <name>". */
+  brainName?: string | null;
 }
 
-export function SidePanel({ current, reached, onJump, keySet }: SidePanelProps) {
+export function SidePanel({ current, reached, onJump, keySet, brainName = null }: SidePanelProps) {
   return (
     <aside className="wt-side on-navy">
       <div className="wt-scout">
@@ -39,7 +41,11 @@ export function SidePanel({ current, reached, onJump, keySet }: SidePanelProps) 
                 {step.id < current ? '✓' : ''}
               </span>
               {step.title}
-              {!step.skippable && <span className="wt-req">{keySet ? 'Key set' : 'Required'}</span>}
+              {brainName !== null && BRAIN_STEPS.includes(step.id) ? (
+                <span className="wt-req">On {brainName}</span>
+              ) : (
+                !step.skippable && <span className="wt-req">{keySet ? 'Key set' : 'Required'}</span>
+              )}
             </button>
           </li>
         ))}

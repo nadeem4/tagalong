@@ -61,6 +61,7 @@ import type {
   BrainServiceOutcome,
   BrainServiceState,
   FoundBrain,
+  PairOffer,
   PairOutcome,
   PreloadBridge,
 } from '../shared/ipc';
@@ -227,6 +228,7 @@ const bridge: PreloadBridge = {
 const host: TagalongHostApi = {
   discoverBrains: () => ipcRenderer.invoke(IPC.pairDiscover) as Promise<FoundBrain[]>,
   pairWithLink: (text) => ipcRenderer.invoke(IPC.pairWithLink, text) as Promise<PairOutcome>,
+  pairMake: () => ipcRenderer.invoke(IPC.pairMake) as Promise<PairOffer>,
   forgetBrain: () => ipcRenderer.invoke(IPC.pairForget) as Promise<void>,
   installBrainService: () =>
     ipcRenderer.invoke(IPC.brainServiceInstall) as Promise<BrainServiceOutcome>,

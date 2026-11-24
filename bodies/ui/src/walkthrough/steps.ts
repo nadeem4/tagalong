@@ -1,6 +1,6 @@
 /**
- * The walkthrough's eleven steps (the side list) and what Skip does. Contains STEPS,
- * KEY_STEP and skipTour.
+ * The walkthrough's twelve steps (the side list) and what Skip does. Contains STEPS,
+ * KEY_STEP, BRAIN_STEPS and skipTour.
  */
 
 export interface StepInfo {
@@ -12,21 +12,25 @@ export interface StepInfo {
 }
 
 export const STEPS: readonly StepInfo[] = [
-  { id: 1, title: 'Welcome', skippable: true },
-  { id: 2, title: 'How it works', skippable: true },
-  { id: 3, title: 'What to ask', skippable: true },
-  { id: 4, title: 'Asking', skippable: true },
-  { id: 5, title: 'Voice', skippable: true },
-  { id: 6, title: 'Everyday jobs', skippable: true },
-  { id: 7, title: 'Browser', skippable: true },
-  { id: 8, title: 'You’re in charge', skippable: true },
-  { id: 9, title: 'API key', skippable: false },
-  { id: 10, title: 'Get to know you', skippable: true },
-  { id: 11, title: 'Connect your tools', skippable: true },
+  { id: 1, title: 'Your brain', skippable: true },
+  { id: 2, title: 'Welcome', skippable: true },
+  { id: 3, title: 'How it works', skippable: true },
+  { id: 4, title: 'What to ask', skippable: true },
+  { id: 5, title: 'Asking', skippable: true },
+  { id: 6, title: 'Voice', skippable: true },
+  { id: 7, title: 'Everyday jobs', skippable: true },
+  { id: 8, title: 'Browser', skippable: true },
+  { id: 9, title: 'You’re in charge', skippable: true },
+  { id: 10, title: 'API key', skippable: false },
+  { id: 11, title: 'Get to know you', skippable: true },
+  { id: 12, title: 'Connect your tools', skippable: true },
 ];
 
-/** The step where the key is asked for; get to know you (10) and connecting tools (11) follow it. */
-export const KEY_STEP = 9;
+/** The step where the key is asked for; get to know you and connecting tools follow it. */
+export const KEY_STEP = 10;
+
+/** What a desktop paired to another machine's brain reads from that brain: Voice and the key. */
+export const BRAIN_STEPS: readonly number[] = [6, KEY_STEP];
 
 /** With a key Skip leaves; without one it jumps to the key, which cannot be skipped. */
 export function skipTour(hasKey: boolean): 'close' | { goTo: number } {

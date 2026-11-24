@@ -1123,6 +1123,7 @@ function registerIpc(): void {
   registerPairIpc(handle, {
     link: required().link,
     openSocket: pinnedSocket,
+    brain: required().brain,
     log: (line) => console.warn(line),
     deviceName: hostname(),
     discover: () => discoverBrains({ browse: bonjourBrowse }),

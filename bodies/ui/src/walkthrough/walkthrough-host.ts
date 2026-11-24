@@ -1,7 +1,7 @@
 /**
  * What the walkthrough needs from its host: the key calls it shares with Settings, today's spend, Claude Code
- * set-up, finishing the tour, and the settings, voice picker, browser-folder and Home calls the steps use. Contains
- * WalkthroughHost and WalkthroughSettings.
+ * set-up, finishing the tour, and the settings, voice picker, browser-folder, pairing and Home calls the steps use.
+ * Contains WalkthroughHost, WalkthroughSettings and the pairing shapes (FoundBrain, PairOutcome, PairOffer).
  */
 
 import type { MicWatcher } from '../controls';
@@ -27,6 +27,23 @@ export interface WalkthroughSettings {
   };
 }
 
+/** A brain announcing itself on the home network; never trusted until paired. */
+export interface FoundBrain {
+  name: string;
+  addr: string;
+}
+
+export type PairOutcome =
+  | { ok: true }
+  | { ok: false; reason: 'bad_link' | 'cannot_seal' | 'wrong_brain' | 'refused' | 'unreachable' };
+
+/** One pairing code the brain made: its link, when it stops working (ISO, UTC) and the link as a terminal QR. */
+export interface PairOffer {
+  link: string;
+  expiresAt: string;
+  qr: string;
+}
+
 export type WalkthroughHost = Pick<
   HostBridge,
   | 'keyStatus'
@@ -41,7 +58,16 @@ export type WalkthroughHost = Pick<
   | 'playVoiceSample'
   | 'voiceDownload'
   | 'fetchVoice'
+  | 'brainLink'
 > & {
+  /** Brains on the home network, by name and address. */
+  discoverBrains(): Promise<FoundBrain[]>;
+  /** Pairs with the brain a `tagalong://pair` link names; on success the desktop dials it. */
+  pairWithLink(text: string): Promise<PairOutcome>;
+  /** Makes a pairing code on this PC's brain, for another device to scan or type. */
+  pairMake(): Promise<PairOffer>;
+  /** Registers this PC's brain to start at logon, with network access on for other devices. */
+  installBrainService(): Promise<{ ok: true } | { ok: false; detail: string }>;
   /**
    * Sets an expert up (install, then log in) with the person's press as the OK, Tagalong's own
    * Node included. Resolves when the brain took the job; progress comes through the overview.

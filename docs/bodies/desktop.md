@@ -421,14 +421,29 @@ Rules each module enforces:
   because Escape does not close it) with the same web preferences as Home, loading
   `walkthrough.html` (`loadPage` takes an optional query, so `?step=N` names the step). The page
   (`src/walkthrough.tsx`) mounts `Walkthrough` from `@tagalong/ui` (`bodies/ui/src/walkthrough/`):
-  a navy side panel with the eleven-step list, the step on the page, and a footer (Back on the left, not on step 1;
-  a quiet Skip link (not on steps 9 and 11) and the primary Next on the right, "Get started" on step 1; on step 9 Next stays off until the key is good; step 11 shows a quiet "I'll do this later" and the primary "Finish", which both finish and are never off).
-  Steps 1 to 4 are static copy under the pitch "One companion for everything you do": welcome (a day
+  a navy side panel with the twelve-step list, the step on the page, and a footer (Back on the left, not on step 1;
+  a quiet Skip link (not on steps 10 and 12) and the primary Next on the right, "Get started" on step 2; on step 10 Next stays off until the key is good; step 12 shows a quiet "I'll do this later" and the primary "Finish", which both finish and are never off).
+  Step 1, "Where should Scout's brain live?" (`step-brain.tsx`, with `bodies/ui/src/pair/`), offers
+  three paths. **On this computer** is the default, with an unticked "Keep it on for my other
+  devices": ticked, Next runs `installBrainService` (`tagalong service install`, which turns the
+  network listener on) and the finish card gains **Pair a device**, which opens `PairDialog`: a QR
+  (`QrImage`, drawn from the terminal text `pair_make` returns), the link with Copy, a 10-minute
+  countdown and **Make a new code**; the main process makes it with `IPC.pairMake`, which calls the
+  brain's `pair_make` (kind desktop) and passes on the link, expiry and QR, never the secret.
+  **On another computer** lists brains found nearby (`discoverBrains`) and takes a pairing link
+  (`pairWithLink`); each failure has its own line (expired or used, not the computer that made the
+  link, cannot reach it, not a link, cannot seal) in `pair/pair-text.ts`, and Next stays off until
+  the pairing succeeds. **On a server I'll set up** shows the install commands per system (the
+  ones in docs/brain/server.md) with Copy, then the same link field. Once paired with a brain that
+  is not on this PC, the side list tags the Voice and API key steps "On <host>" and the key step
+  says "Already set on <host>" when that brain has a key. The renderer reads where the brain is
+  from `brainLink` on each step change.
+  Steps 2 to 5 are static copy under the pitch "One companion for everything you do": welcome (a day
   with Scout), how it works (the route a request takes), what to ask (five everyday moments, from
   `moments.ts`) and asking (the ask and pause keys as keycaps, a static bubble preview, what Scout
   never looks at). The side panel carries the `on-navy` class so shared controls draw a gold focus
-  ring there. Steps 5 to 9 sit on the shared controls: voice (a `Select` for the talk key, who
-  speaks and microphone, the shared `VoiceField` ("Pick Scout's voice") that saves its own pick at once, a `Toggle` for Scout talks, a `Slider` for speed, and a "Test your microphone" `MicTest` under the microphone that shows its level through the host's `watchMicLevel`; see [hearing.md](../senses/hearing.md)), everyday jobs (a list from `bodies/ui/src/jobs-kinds.ts` that only explains, with no buttons: connecting happens on step 11), browser (a numbered list; copy `chrome://extensions` or `edge://extensions`, Show
+  ring there. Steps 6 to 10 sit on the shared controls: voice (a `Select` for the talk key, who
+  speaks and microphone, the shared `VoiceField` ("Pick Scout's voice") that saves its own pick at once, a `Toggle` for Scout talks, a `Slider` for speed, and a "Test your microphone" `MicTest` under the microphone that shows its level through the host's `watchMicLevel`; see [hearing.md](../senses/hearing.md)), everyday jobs (a list from `bodies/ui/src/jobs-kinds.ts` that only explains, with no buttons: connecting happens on step 12), browser (a numbered list; copy `chrome://extensions` or `edge://extensions`, Show
   folder and Copy folder path for the add-on), "Scout asks first, and you set the limit" (a static
   approval card, the daily limit in the shared `MoneyField` stepper, saved with `set_daily_limit`
   only on Next, and only if it changed; an amount of 0 or less blocks Next; Settings' `LimitField`
@@ -437,8 +452,8 @@ Rules each module enforces:
   ends; an unreadable spend shows nothing) and the key. Steps 4 and 5 stage their choices (ask
   key, talk key, Scout talks, who speaks, speed, microphone; the voice pick is not staged) and write them through `saveSettings`
   only on Next, sending the whole `hotkeys` or `voice` object. The side list jumps only to steps
-  already reached. Skip finishes when a key is set, else goes to step 9 (the key step).
-  Step 9 wraps the shared `KeyField` and reports whether the key is good (checked, already set,
+  already reached. Skip finishes when a key is set, else goes to step 10 (the key step).
+  Step 10 wraps the shared `KeyField` and reports whether the key is good (checked, already set,
   or from the environment) to the shell, which turns Next on only then; with the brain offline
   it says "Scout's brain is not running", Check is off and it enables itself when the brain
   connects. It shows the `.env` path from `key_status` ("Saved on the machine running Scout's brain
@@ -446,7 +461,7 @@ Rules each module enforces:
   file, only sent to Anthropic, never written to history or logs, change or remove it in Settings)
   and never the key; "Where do I get one?" calls
   `openKeyPage`, which main answers by opening exactly the Console key page.
-  Step 10, "Let Scout get to know you" (`step-know-me.tsx`), is skippable: it mounts `KnowMeFlow` (the get-to-know-me form and result view, read through the host bridge context) and never blocks Next, because a run goes on in the brain while the person moves on. Step 11, "Connect your tools" (`step-ten.tsx`), is the one place the tour connects things, and
+  Step 11, "Let Scout get to know you" (`step-know-me.tsx`), is skippable: it mounts `KnowMeFlow` (the get-to-know-me form and result view, read through the host bridge context) and never blocks Next, because a run goes on in the brain while the person moves on. Step 11, "Connect your tools" (`step-ten.tsx`), is the one place the tour connects things, and
   nothing on it blocks Finish. It reads the brain's `setup_overview` through the host's
   `setupOverview` (and again on `changed setup`) and draws the Connections page's rows: an **Apps**
   group (Gmail, Google Calendar and Notion, each with the Official chip, "<job> · Browser sign-in"
@@ -630,7 +645,7 @@ key. The desktop does not read the brain's environment; everything comes from `k
 **No key.** Main asks `key_status` when the brain comes online and on `changed "key"`, and sets
 or clears the `no-key` status mark (`markKey` in `status-marks.ts`). The dock shows the tag
 "Add key", the bubble row says "Add your Anthropic key to start." with an **Add key** button that
-opens the walkthrough at step 9, and Scout says nothing: the app shows its own words. Settings
+opens the walkthrough at step 10, and Scout says nothing: the app shows its own words. Settings
 has an **Anthropic key** section (the shared key field and the daily limit, in `bodies/ui/src/key/`, with today's spend and a meter under the limit through `useSpentToday`),
 and Home's overview has **Show the tour again**. The health card gains an **Anthropic key** row.
 
@@ -849,7 +864,7 @@ pictures")`: `IPC.askScout` (`ipc/ask-scout.ts`) brings the companion up and sen
 Home's Places page (`bodies/ui/src/home/places-view.tsx`, nav label Places with a "New" badge, after
 Connections; `ipc/bodies.ts`) lists the places you can talk to Scout: **This PC** (Desktop), the **Chrome
 add-on** (Connected or Not set up, with a "Get the add-on" button that opens the tour at its Browser step,
-step 7) and **WhatsApp**, each with a purpose line and Connected, Not set up or Offline (WhatsApp is
+step 8) and **WhatsApp**, each with a purpose line and Connected, Not set up or Offline (WhatsApp is
 Offline when its five values are saved but it is not connected). WhatsApp's setup sits under its row:
 five fields
 (access token, app secret, verify token as password inputs; phone number ID and your number as text), one

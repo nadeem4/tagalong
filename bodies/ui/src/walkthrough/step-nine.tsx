@@ -1,6 +1,6 @@
 /**
- * Walkthrough step 9: the Anthropic key, the one thing Tagalong cannot work without. Wraps the
- * shared KeyField and tells the shell whether the key is good (checked, already set, or from the
+ * Walkthrough step 10: the Anthropic key, the one thing Tagalong cannot work without. Wraps the
+ * shared KeyField (or, on a desktop paired to another computer whose brain already has the key, a note saying so) and tells the shell whether the key is good (checked, already set, or from the
  * environment) so Finish can turn on. Contains StepNine. Words are the spec's step copy.
  */
 
@@ -13,10 +13,13 @@ import type { WalkthroughHost } from './walkthrough-host';
 export function StepNine({
   host,
   onValid,
+  brainName = null,
 }: {
   host: KeyHost & Pick<WalkthroughHost, 'openKeyPage'>;
   /** Called with whether Finish may be on; false while offline or until the key is good. */
   onValid: (valid: boolean) => void;
+  /** The other computer the brain runs on, when this PC is paired to one. */
+  brainName?: string | null;
 }) {
   const { status, refresh } = useKeyStatus(host);
   const facts = status !== null && status !== 'offline' ? status : null;
@@ -27,6 +30,27 @@ export function StepNine({
   useEffect(() => {
     onValid(valid);
   }, [valid, onValid]);
+
+  if (brainName !== null && valid) {
+    return (
+      <section>
+        <span className="wt-label">API key</span>
+        <h1>Your API key is already set</h1>
+        <p className="wt-lead">
+          Scout’s brain runs on {brainName}, and the key lives there. This PC never holds it.
+        </p>
+        <div className="tg-card wt-notes">
+          <p>
+            <strong>Already set on {brainName}</strong>
+          </p>
+          <p className="wt-help">
+            To change or remove it, use Settings after the tour, or run tagalong key set on{' '}
+            {brainName}.
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section>

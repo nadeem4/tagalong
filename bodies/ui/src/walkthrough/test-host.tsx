@@ -11,7 +11,13 @@ import type { KeyResult, KeyStatus } from '../host-bridge';
 import type { SetupOverview } from '../shapes';
 import { createFakeHostBridge } from '../test-support/fake-host-bridge';
 import { StepSaveContext } from './use-step-save';
-import type { WalkthroughHost, WalkthroughSettings } from './walkthrough-host';
+import type {
+  FoundBrain,
+  PairOffer,
+  PairOutcome,
+  WalkthroughHost,
+  WalkthroughSettings,
+} from './walkthrough-host';
 
 export const NO_KEY: KeyStatus = {
   hasKey: false,
@@ -27,8 +33,21 @@ export const SETTINGS: WalkthroughSettings = {
   voice: { enabled: true, speed: 0.95 },
 };
 
+export const OFFER: PairOffer = {
+  link: 'tagalong://pair?addr=192.168.1.20:47323&fp=4f2a91c0aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&code=abc',
+  expiresAt: '2026-11-23T12:10:00.000Z',
+  qr: '\u2588\u2588\u2588\n\u2588 \u2588\n\u2588\u2588\u2588\n',
+};
+
 export function makeWalkthroughHost(
-  options: { key?: KeyStatus | 'offline'; settings?: WalkthroughSettings } = {},
+  options: {
+    key?: KeyStatus | 'offline';
+    settings?: WalkthroughSettings;
+    found?: FoundBrain[];
+    pair?: PairOutcome;
+    /** The address the desktop dials, as brainLink reports it. */
+    brainAddr?: string;
+  } = {},
 ) {
   const key = options.key ?? NO_KEY;
   // The voice picker's calls come from the shared fake, so its roster is the one VoiceField's tests use.
@@ -76,6 +95,21 @@ export function makeWalkthroughHost(
     watchMicLevel: vi.fn<MicWatcher>(() => ({ stop: vi.fn() })),
     browserFolder: vi.fn(() => Promise.resolve({ path: 'C:/app/browser/dist', exists: true })),
     showBrowserFolder: vi.fn(() => Promise.resolve()),
+    discoverBrains: vi.fn(() => Promise.resolve(options.found ?? [])),
+    pairWithLink: vi.fn((_text: string): Promise<PairOutcome> =>
+      Promise.resolve(options.pair ?? { ok: true }),
+    ),
+    pairMake: vi.fn(() => Promise.resolve(OFFER)),
+    installBrainService: vi.fn((): Promise<{ ok: true } | { ok: false; detail: string }> =>
+      Promise.resolve({ ok: true }),
+    ),
+    brainLink: vi.fn(() =>
+      Promise.resolve({
+        addr: options.brainAddr ?? 'ws://127.0.0.1:47321',
+        status: 'online' as const,
+        setup: 'idle' as const,
+      }),
+    ),
     copyText: vi.fn((_text: string) => Promise.resolve()),
     openHome: vi.fn(() => Promise.resolve()),
   } satisfies WalkthroughHost;

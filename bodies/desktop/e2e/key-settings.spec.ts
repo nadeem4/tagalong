@@ -65,7 +65,7 @@ test('no key shows the no-key state in the bubble and on the dock', async () => 
   // The button opens the walkthrough at its key step.
   await panel.getByRole('button', { name: 'Add key' }).dispatchEvent('click');
   const tour = await windowFor('walkthrough');
-  expect(tour.url()).toContain('step=9');
+  expect(tour.url()).toContain('step=10');
 });
 
 test('invalid key shows not accepted and the field stays', async () => {

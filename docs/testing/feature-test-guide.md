@@ -2598,7 +2598,7 @@ with a fake key; the real check against Anthropic is done by hand here.
 1. **Action:** start Tagalong with no key set. **Expected:** the dock tag reads **Add key**; open
    the bubble: its status row says "Add your Anthropic key to start." with an **Add key** button.
    Ask a question: Scout gives no answer line, only the app's own words.
-2. **Action:** press **Add key**. **Expected:** the walkthrough window opens at step 9, and the
+2. **Action:** press **Add key**. **Expected:** the walkthrough window opens at step 10, and the
    pet and bubble are hidden while it is open.
 3. **Action:** open **Home → Settings** and find the **Anthropic key** section. **Expected:** the
    field is masked; **Show** (inside the field, on the right) reveals it and reads as pressed;
@@ -2618,7 +2618,7 @@ with a fake key; the real check against Anthropic is done by hand here.
    $8.00 a day." under the field, which fades after a few seconds, and Home's Spend card shows the new
    limit. The amount shows two decimals. Under the field "$x.xx of $8.00 used today" with a percentage and a
    slim meter updates after Scout answers something. When today's spend reaches the limit the meter turns amber
-   and "Today's $8 is spent; Scout pauses until midnight. Raise the limit to carry on." shows. Tour step 8 keeps its
+   and "Today's $8 is spent; Scout pauses until midnight. Raise the limit to carry on." shows. Tour step 9 keeps its
    "Spent today: $x.xx" line.
 5. **Action (developers):** start with a real `ANTHROPIC_API_KEY` in the environment.
    **Expected:** the section reads "Set by your environment" and the field is disabled.
@@ -2653,34 +2653,44 @@ brain; this checks it on the real one.
 1. **Action:** delete `settings.json` and start Tagalong, with or without a brain. **Expected:**
    the walkthrough opens by itself; no pet, bubble or dock shows. Escape does not close it.
 2. **Action:** press **Get started**, then **Next** through the steps. **Expected:** step 1 reads
-   "One companion for everything you do" and has no Back; the footer shows Back, a quiet **Skip**
-   link (not on steps 9 and 11) and the primary button; the side list (step 6 is "Everyday jobs", step 10 "Let Scout get to know you", step 11 "Connect your tools") jumps only to steps you
-   have reached; Skip with no key goes to step 9 and saves nothing. Steps 1 to 3 are text only; step
-   4 shows the ask and pause keys as keycaps (never "CommandOrControl").
-3. **Action:** on step 4 press **Change**, type `Ctrl+Shift+K`, press **Next**. **Expected:** the ask
+   "Where should Scout's brain live?" and has no Back; the footer shows Back, a quiet **Skip**
+   link (not on steps 10 and 12) and the primary button (**Get started** on step 2); the side list (step 7 is "Everyday jobs", step 11 "Let Scout get to know you", step 12 "Connect your tools") jumps only to steps you
+   have reached; Skip with no key goes to step 10 and saves nothing. Steps 2 to 4 are text only; step
+   5 shows the ask and pause keys as keycaps (never "CommandOrControl").
+3. **Action:** on step 5 press **Change**, type `Ctrl+Shift+K`, press **Next**. **Expected:** the ask
    key is now Ctrl+Shift+K (see Home → Settings). Unchanged, **Next** saves nothing.
-4. **Action:** on step 5 pick a talk key, switch **Scout talks** off, pick a voice in **Pick Scout's voice**
+4. **Action:** on step 6 pick a talk key, switch **Scout talks** off, pick a voice in **Pick Scout's voice**
    (press play to hear it) and set the speed, then **Next** (never waits on a download). **Expected:** the choices
    appear in Home → Settings. There is no Always listening control. From the keyboard, Space or
    Enter flips **Scout talks** (On/Off), the arrow keys move **Speed** and change the selects.
 5. **Action:** with a key set, press **Skip**. **Expected:** the window closes, the pet
    appears and the tour does not open at the next launch. With no key, **Skip** goes to step
-   9 instead.
+   10 instead.
 6. **Action:** while the tour is open, start Tagalong a second time, or use the tray's **Show or
    hide Scout**. **Expected:** the tour comes forward; the pet stays hidden.
 7. **Action:** an existing user (`walkthrough.done` false after this update) starts the app.
    **Expected:** the tour opens once; after Finish or Skip it never opens again.
 
-### K.5. Steps 6 to 10 and the end
+### K.4b. Where the brain lives (BAU1)
+
+The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`, `bodies/ui/src/walkthrough/step-brain.test.tsx`).
+
+1. **Action:** on step 1 look at the page. **Expected:** three choices (On this computer, preselected; On another computer; On a server I'll set up). On this computer shows an unticked "Keep it on for my other devices".
+2. **Action:** tick it and press **Next**. **Expected:** Tagalong registers the brain as a logon service with the network on (Home's Where things run shows it); at the end the finish card has **Pair a device**, which opens a QR with the link, a countdown and **Make a new code**. On another PC, pasting that link into **Pairing link** pairs it.
+3. **Action:** choose **On another computer** with a brain running on your network (`tagalong serve`). **Expected:** it appears under "Found nearby"; **Next** stays off. Paste a link made with `tagalong pair`. **Expected:** "Paired with <host>", **Next** turns on, the side list tags **Voice** and **API key** "On <host>", and the key step says "Already set on <host>" when that brain has a key. A used or old link says "That code has expired or was already used"; a link whose brain shows another certificate says "This is not the computer that made this link. Nothing was sent."; an off or unreachable brain says "Can't reach <host>".
+4. **Action:** choose **On a server I'll set up**. **Expected:** install commands per system with Copy, and the same link field.
+5. **Action:** open the browser add-on's popup. **Expected:** a status dot (green connected, red otherwise); **Show the short code** reveals the pairing code field (it opens by itself when the add-on needs a code).
+
+### K.5. Steps 7 to 12 and the end
 
 The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
 
-1. **Action:** on step 6 look at the page. **Expected:** it reads "Scout does the everyday jobs" and
+1. **Action:** on step 7 look at the page. **Expected:** it reads "Scout does the everyday jobs" and
    lists five jobs ("Draft replies to my inbox", "Plan my day around my calendar", "Research this
    and write me a summary", "Tidy this folder", "Fix this code"); it only explains: no **Connect**
    button, no Claude Code anywhere, and "Fix this code" says "which you can set up on the last
    step."
-2. **Action:** on step 11 ("Connect your tools", after the key step) look at the page, then press
+2. **Action:** on step 12 ("Connect your tools", after the key step) look at the page, then press
    **Add Gmail** (and answer the Allow card). **Expected:** one card lists Gmail, Google Calendar
    and Notion (each with its kind of job, how it signs in and an **Official** chip where it is one)
    and a second card offers Claude Code (Official, Recommended). **Add Gmail** reads "Waiting for
@@ -2689,33 +2699,33 @@ The automated version runs on the fake brain (`e2e/walkthrough.spec.ts`).
    that is not saved is not listed. Press **Add** on Claude Code: an "Installing…" block with a
    percent and bar shows, then "Needs sign-in" with a **Sign in** button (the login window opens),
    then "Ready". With the brain stopped the page says Tagalong could not read this and that you can
-   connect your tools later in Home, under Connections. Step 11 has no Skip: **I’ll do this later**
+   connect your tools later in Home, under Connections. Step 12 has no Skip: **I’ll do this later**
    and **Finish** both end the tour. On Home's **Connections** page **Your experts** lists
    Claude Code with its state; the **Experts** tab's **Add an expert** offers more (an Official one has **Add** and opens an Allow card first; a community one shows the check card first, and **Add anyway** is that approval, so it opens no further Allow card). The row says "Answer the card to add it." while the card is up; **Deny** (or letting it lapse) clears that line and says "Okay, nothing was changed." at the top of the page, and a card that Allow turns into a refusal or failure says so in plain words, never silence (Log in on a Claude Code you already logged into elsewhere opens no card: it says "Already logged in." and the chip turns ready).
-3. **Action:** on step 7 press **Copy chrome://extensions**, paste it somewhere; press **Show
+3. **Action:** on step 8 press **Copy chrome://extensions**, paste it somewhere; press **Show
    folder** and **Copy folder path**. **Expected:** the address and the add-on folder path are
    what you pasted; the folder opens.
-4. **Action:** on step 8 ("Scout asks first, and you set the limit") press **+** on the limit,
+4. **Action:** on step 9 ("Scout asks first, and you set the limit") press **+** on the limit,
    set it to 0, then 8, press **Next**. **Expected:** **+** raises it by 1; 0 shows "Enter
    an amount above $0." and stays; 8 is saved (Home's Spend card shows it). **Skip**
-   with no key goes to step 9 and leaves the limit alone.
-5. **Action:** on step 9 with no key, paste a wrong key, then a real one. **Expected:** "That key
+   with no key goes to step 10 and leaves the limit alone.
+5. **Action:** on step 10 with no key, paste a wrong key, then a real one. **Expected:** "That key
    was not accepted." with the field kept and **Next** off; then the field empties, "A key is
    already set." shows and **Next** turns on. With the network off the line reads "Scout could
    not reach Anthropic. Try again." and Next stays off.
-6. **Action:** stop the brain on step 9. **Expected:** "Scout's brain is not running.", Check and
+6. **Action:** stop the brain on step 10. **Expected:** "Scout's brain is not running.", Check and
    Next off; start the brain and Check turns on by itself. The step never says to edit a file;
    it shows where the machine running Scout's brain saved the key, under four notes ("Only sent to
    Anthropic", "Never written to Scout's history or logs", and so on).
 7. **Action:** with a real `ANTHROPIC_API_KEY` in the environment (developers). **Expected:**
-   step 9 reads "Set by your environment" and Next is on.
-8. **Action:** on step 11 press **Finish** (or **I’ll do this later**). **Expected:** the card "Scout is on your screen" shows the ask
+   step 10 reads "Set by your environment" and Next is on.
+8. **Action:** on step 12 press **Finish** (or **I’ll do this later**). **Expected:** the card "Scout is on your screen" shows the ask
    and talk keys as keycaps (never "CommandOrControl"), three things to try and, if you connected
-   anything on step 11, a "Ready to use" list (Connected / "Still installing…" / "Needs sign-in…"), and the tour is
+   anything on step 12, a "Ready to use" list (Connected / "Still installing…" / "Needs sign-in…"), and the tour is
    marked seen at once. **Done** (or **Open Home**) closes the
    window and the pet appears; closing the card with the window's X does the same. Either way the
    tour does not open at the next launch (closing part-way, before Finish, brings it back).
-9. **Action:** on step 9 press **Where do I get one?**. **Expected:** the browser opens the
+9. **Action:** on step 10 press **Where do I get one?**. **Expected:** the browser opens the
    Anthropic Console API keys page.
 
 ## Companion chat window

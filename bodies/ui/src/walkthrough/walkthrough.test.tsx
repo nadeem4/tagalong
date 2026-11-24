@@ -20,10 +20,10 @@ function open(host = makeWalkthroughHost(), initialStep?: number) {
 const sideButton = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}`) });
 
 describe('Walkthrough', () => {
-  it('renders eleven step names and the footnote', () => {
+  it('renders twelve step names and the footnote', () => {
     open();
     const list = screen.getByRole('list', { name: 'Steps' });
-    expect(list.querySelectorAll('li')).toHaveLength(11);
+    expect(list.querySelectorAll('li')).toHaveLength(12);
     expect(
       screen.getByText('You can change all of this later in Home, under Settings.'),
     ).toBeInTheDocument();
@@ -50,11 +50,13 @@ describe('Walkthrough', () => {
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
   });
 
-  it('Next advances, and Skip without a key goes to step 9 without saving', async () => {
+  it('Next advances, and Skip without a key goes to the key step without saving', async () => {
     const host = open();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      'One companion for everything you do',
+      'Where should Scout’s brain live?',
     );
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await screen.findByRole('heading', { name: 'One companion for everything you do' });
     fireEvent.click(screen.getByRole('button', { name: 'Get started' }));
     await screen.findByRole('heading', { name: 'Ask, and Scout finds the way' });
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
@@ -66,6 +68,8 @@ describe('Walkthrough', () => {
   it('the side list jumps only to reached steps', async () => {
     open();
     expect(sideButton('Voice')).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await screen.findByRole('heading', { name: 'One companion for everything you do' });
     fireEvent.click(screen.getByRole('button', { name: 'Get started' }));
     await screen.findByRole('heading', { name: 'Ask, and Scout finds the way' });
     fireEvent.click(sideButton('Welcome'));
@@ -75,7 +79,7 @@ describe('Walkthrough', () => {
   });
 
   it('opens at the step it is given and counts every step before it as reached', () => {
-    open(makeWalkthroughHost(), 9);
+    open(makeWalkthroughHost(), 10);
     expect(sideButton('Welcome')).toBeEnabled();
     expect(sideButton('API key')).toHaveAttribute('aria-current', 'step');
   });
@@ -86,7 +90,7 @@ describe('Walkthrough', () => {
     await waitFor(() => expect(host.finishWalkthrough).toHaveBeenCalledTimes(1));
   });
 
-  it('Skip without a key goes to step 9 and does not finish', async () => {
+  it('Skip without a key goes to the key step and does not finish', async () => {
     const host = open();
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
     await waitFor(() => expect(sideButton('API key')).toHaveAttribute('aria-current', 'step'));
@@ -101,7 +105,7 @@ describe('Walkthrough', () => {
   });
 
   it('saves nothing before Next, so Back loses no data', async () => {
-    const host = open(makeWalkthroughHost(), 4);
+    const host = open(makeWalkthroughHost(), 5);
     await screen.findByRole('button', { name: 'Change' });
     fireEvent.click(screen.getByRole('button', { name: 'Change' }));
     fireEvent.change(screen.getByLabelText('Ask key'), { target: { value: 'Alt+Space' } });
@@ -113,7 +117,7 @@ describe('Walkthrough', () => {
   it('does not advance when the save fails, and says why', async () => {
     const host = makeWalkthroughHost();
     host.saveSettings.mockRejectedValueOnce(new Error('That shortcut is taken.'));
-    open(host, 4);
+    open(host, 5);
     await screen.findByRole('button', { name: 'Change' });
     fireEvent.click(screen.getByRole('button', { name: 'Change' }));
     fireEvent.change(screen.getByLabelText('Ask key'), { target: { value: 'Alt+Space' } });
@@ -123,7 +127,7 @@ describe('Walkthrough', () => {
   });
 
   it('moves focus to the new step headline when the step changes', async () => {
-    open();
+    open(makeWalkthroughHost(), 2);
     fireEvent.click(screen.getByRole('button', { name: 'Get started' }));
     const heading = await screen.findByRole('heading', { name: 'Ask, and Scout finds the way' });
     await waitFor(() => expect(heading).toHaveFocus());
@@ -131,11 +135,13 @@ describe('Walkthrough', () => {
 });
 
 describe('Walkthrough, a non-coder path', () => {
-  it('never says Claude Code on steps 1 to 6', async () => {
+  it('never says Claude Code before the everyday jobs', async () => {
     const { container } = render(<Walkthrough host={makeWalkthroughHost()} />);
     expect(container.textContent).not.toMatch(/Claude Code/);
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await screen.findByRole('button', { name: 'Get started' });
     fireEvent.click(screen.getByRole('button', { name: 'Get started' }));
-    for (let step = 2; step <= 5; step += 1) {
+    for (let step = 3; step <= 6; step += 1) {
       await screen.findByRole('heading', { level: 1 });
       expect(container.textContent, `step ${step}`).not.toMatch(/Claude Code/);
       fireEvent.click(screen.getByRole('button', { name: 'Next' }));
@@ -146,8 +152,8 @@ describe('Walkthrough, a non-coder path', () => {
 });
 
 describe('Walkthrough, the end', () => {
-  it('shows the placeholder-free steps 6 to 9, then connect your tools', async () => {
-    open(makeWalkthroughHost({ key: HAS_KEY }), 6);
+  it('shows the placeholder-free steps 7 to 10, then connect your tools', async () => {
+    open(makeWalkthroughHost({ key: HAS_KEY }), 7);
     await screen.findByRole('heading', { name: 'Scout does the everyday jobs' });
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     await screen.findByRole('heading', { name: 'Let Scout read your browser tabs' });
@@ -160,23 +166,23 @@ describe('Walkthrough, the end', () => {
     expect(screen.queryByText(/coming in the next update/)).not.toBeInTheDocument();
   });
 
-  it('Next is off on step 9 until the key is set, and there is no Skip', async () => {
-    open(makeWalkthroughHost(), 9);
+  it('Next is off on the key step until the key is set, and there is no Skip', async () => {
+    open(makeWalkthroughHost(), 10);
     await screen.findByText(/Saved on the machine running/);
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
   });
 
   it('saving the key goes to Get to know you', async () => {
-    open(makeWalkthroughHost({ key: HAS_KEY }), 9);
+    open(makeWalkthroughHost({ key: HAS_KEY }), 10);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     await screen.findByRole('heading', { name: 'Let Scout get to know you' });
     expect(screen.queryByRole('button', { name: 'Finish' })).not.toBeInTheDocument();
   });
 
-  it('step ten is get to know you, and eleven keeps Connect your tools and the Finish card', async () => {
-    open(makeWalkthroughHost({ key: HAS_KEY }), 10);
+  it('step eleven is get to know you, and twelve keeps Connect your tools and the Finish card', async () => {
+    open(makeWalkthroughHost({ key: HAS_KEY }), 11);
     await screen.findByRole('heading', { name: 'Let Scout get to know you' });
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     await screen.findByRole('heading', { name: 'Connect your tools' });
@@ -184,12 +190,12 @@ describe('Walkthrough, the end', () => {
     await screen.findByRole('heading', { name: 'Scout is on your screen' });
   });
 
-  it('numbers the side list: get to know you is 10 of 11, connect your tools last', () => {
-    open(makeWalkthroughHost({ key: HAS_KEY }), 10);
+  it('numbers the side list: get to know you is 11 of 12, connect your tools last', () => {
+    open(makeWalkthroughHost({ key: HAS_KEY }), 11);
     const items = screen.getByRole('list', { name: 'Steps' }).querySelectorAll('li');
-    expect(items[9]).toHaveTextContent('Get to know you');
-    expect(items[9]?.querySelector('button')).toHaveAttribute('aria-current', 'step');
-    expect(items[10]).toHaveTextContent('Connect your tools');
+    expect(items[10]).toHaveTextContent('Get to know you');
+    expect(items[10]?.querySelector('button')).toHaveAttribute('aria-current', 'step');
+    expect(items[11]).toHaveTextContent('Connect your tools');
   });
 
   it('the finish card lists what the connect step set up', async () => {
@@ -211,7 +217,7 @@ describe('Walkthrough, the end', () => {
         failed: null,
       } as never),
     );
-    open(host, 11);
+    open(host, 12);
     fireEvent.click(await screen.findByRole('button', { name: 'Finish' }));
     await screen.findByRole('heading', { name: 'Scout is on your screen' });
     const list = await screen.findByRole('list', { name: 'Ready to use' });
@@ -220,7 +226,7 @@ describe('Walkthrough, the end', () => {
   });
 
   it('on the finish card every step in the side list is ticked and none is current', async () => {
-    open(makeWalkthroughHost({ key: HAS_KEY }), 11);
+    open(makeWalkthroughHost({ key: HAS_KEY }), 12);
     fireEvent.click(await screen.findByRole('button', { name: 'Finish' }));
     await screen.findByRole('heading', { name: 'Scout is on your screen' });
     expect(sideButton('Connect your tools')).not.toHaveAttribute('aria-current');
@@ -228,14 +234,14 @@ describe('Walkthrough, the end', () => {
   });
 
   it('"I’ll do this later" finishes the tour like Finish does', async () => {
-    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 11);
+    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 12);
     fireEvent.click(await screen.findByRole('button', { name: 'I’ll do this later' }));
     await screen.findByRole('heading', { name: 'Scout is on your screen' });
     expect(host.finishWalkthrough).toHaveBeenCalledWith({ close: false });
   });
 
   it('Finish with a key opens the finish card; Done finishes once, Open Home opens Home first', async () => {
-    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 11);
+    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 12);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Finish' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
     await screen.findByRole('heading', { name: 'Scout is on your screen' });
@@ -253,7 +259,7 @@ describe('Walkthrough, the end', () => {
   });
 
   it('a failure while closing shows an alert instead of an unhandled rejection', async () => {
-    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 11);
+    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 12);
     host.finishWalkthrough.mockImplementation((options?: { close?: boolean }) =>
       options?.close === false ? Promise.resolve() : Promise.reject(new Error('Could not close.')),
     );
@@ -265,12 +271,30 @@ describe('Walkthrough, the end', () => {
   });
 
   it('Open Home on the card opens Home and finishes the tour', async () => {
-    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 11);
+    const host = open(makeWalkthroughHost({ key: HAS_KEY }), 12);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Finish' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
     await screen.findByRole('heading', { name: 'Scout is on your screen' });
     fireEvent.click(screen.getByRole('button', { name: 'Open Home' }));
     await waitFor(() => expect(host.finishWalkthrough).toHaveBeenCalledTimes(2));
     expect(host.openHome).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Walkthrough, paired with another computer', () => {
+  const paired = () => makeWalkthroughHost({ key: HAS_KEY, brainAddr: 'wss://mini-pc:47323' });
+
+  it('tags Voice and API key in the side list as set on that computer, and no other step', async () => {
+    open(paired());
+    await waitFor(() => expect(sideButton('Voice')).toHaveTextContent('On mini-pc'));
+    expect(sideButton('API key')).toHaveTextContent('On mini-pc');
+    expect(sideButton('Welcome')).not.toHaveTextContent('On mini-pc');
+  });
+
+  it('shows the key step as already set there, and Next is on', async () => {
+    open(paired(), 10);
+    expect(await screen.findByText('Already set on mini-pc')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/API key/)).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled());
   });
 });

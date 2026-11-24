@@ -20,6 +20,9 @@
  * counts, read_aloud events and every say's params are recorded for the test, and `hear` pushes
  * a `heard` frame at will.
  */
+import { createHash, X509Certificate } from 'node:crypto';
+import { createServer } from 'node:https';
+import { generate } from 'selfsigned';
 import { WebSocketServer, type WebSocket } from 'ws';
 import type { AddressInfo } from 'node:net';
 import { readFileSync } from 'node:fs';
@@ -54,6 +57,11 @@ export interface FakeBrainOptions {
   port?: number;
   /** The token hello must carry (default: the one `launchEnv` seeds); any other gets `unauthorized`. */
   token?: string;
+  /**
+   * Serve wss on 127.0.0.2 (so the tour sees another machine) with a throwaway self-signed certificate, as a brain on another machine does, and
+   * accept `pair` with PAIR_CODE: it hands back PAIRED_TOKEN, which hello then requires.
+   */
+  tls?: boolean;
   /** What hello says of the brain's version and build (default: the app's own, a current brain). */
   hello?: { version: string; build: string };
   /** After `setup_expert` the install stays at this percent (the tour's "Installing…" row). */
@@ -68,9 +76,14 @@ export interface FakeBrainOptions {
   bodies?: { connected?: string[]; whatsappSet?: string[]; whatsappState?: string };
 }
 
+export const PAIR_CODE = 'e2e-pair-code';
+export const PAIRED_TOKEN = 'e2e-paired-token';
+
 export interface FakeBrain {
   /** "127.0.0.1:port", what TAGALONG_BRAIN_ADDR wants. */
   addr: string;
+  /** With `tls`: the pairing link a brain on another machine would show. */
+  pairLink: string;
   /** Every `answer` frame the desktop sent, in order. */
   answers: { ask: string; option: string; text?: string }[];
   /** Every `set_permission` call Home made, in order. */
@@ -439,8 +452,24 @@ const APPROVALS = [
 
 export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<FakeBrain> {
   // Port 0: a free port, so a real brain on 47321 never collides with the suite.
-  const server = new WebSocketServer({ host: '127.0.0.1', port: options.port ?? 0 });
-  await new Promise<void>((resolve) => server.once('listening', resolve));
+  let pin = '';
+  let tlsServer: ReturnType<typeof createServer> | undefined;
+  let server: WebSocketServer;
+  if (options.tls === true) {
+    const { cert, private: key } = await generate([{ name: 'commonName', value: '127.0.0.1' }]);
+    pin = createHash('sha256').update(new X509Certificate(cert).raw).digest('hex');
+    tlsServer = createServer({ cert, key });
+    server = new WebSocketServer({ server: tlsServer });
+    await new Promise<void>((resolve) =>
+      tlsServer!.listen(options.port ?? 0, '127.0.0.2', resolve),
+    );
+  } else {
+    server = new WebSocketServer({ host: '127.0.0.1', port: options.port ?? 0 });
+    await new Promise<void>((resolve) => server.once('listening', resolve));
+  }
+  const listening = (): AddressInfo =>
+    (tlsServer === undefined ? server.address() : tlsServer.address()) as AddressInfo;
+  const expectedToken = options.token ?? (options.tls === true ? PAIRED_TOKEN : E2E_LOCAL_TOKEN);
   // Seq is the brain's, not the connection's: it keeps rising across a reconnect.
   let seq = 0;
   let turns = 0;
@@ -710,7 +739,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         notify('turn', { ...base, state: 'ended', reason: 'done' });
       } else if (
         msg.method === 'hello' &&
-        (msg.params as { token?: string } | undefined)?.token !== (options.token ?? E2E_LOCAL_TOKEN)
+        (msg.params as { token?: string } | undefined)?.token !== expectedToken
       ) {
         socket.send(
           JSON.stringify({
@@ -720,6 +749,23 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           }),
         );
         socket.close();
+      } else if (msg.method === 'pair') {
+        const ok = (msg.params as { code?: string } | undefined)?.code === PAIR_CODE;
+        socket.send(
+          JSON.stringify(
+            ok
+              ? {
+                  jsonrpc: '2.0',
+                  id: msg.id,
+                  result: { device_id: 'paired-device', token: PAIRED_TOKEN },
+                }
+              : {
+                  jsonrpc: '2.0',
+                  id: msg.id,
+                  error: { code: ErrorCode.unauthorized, message: 'Unknown code' },
+                },
+          ),
+        );
       } else if (msg.method === 'hello') {
         const result = {
           protocol: 3,
@@ -1527,7 +1573,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   });
 
   return {
-    addr: `127.0.0.1:${(server.address() as AddressInfo).port}`,
+    addr: `127.0.0.1:${listening().port}`,
+    pairLink: `tagalong://pair?addr=127.0.0.2:${listening().port}&fp=${pin}&code=${PAIR_CODE}`,
     answers,
     permissionSets,
     loopCalls,
@@ -1740,6 +1787,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
       new Promise<void>((resolve) => {
         for (const client of server.clients) client.terminate();
         server.close(() => resolve());
+        tlsServer?.close();
       }),
   };
 }

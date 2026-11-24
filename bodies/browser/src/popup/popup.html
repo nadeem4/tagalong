@@ -10,19 +10,32 @@
   </head>
   <body>
     <h1>Scout</h1>
-    <p id="status" class="status" role="status">Connecting to Scout's brain...</p>
+    <p id="status" class="status" data-state="connecting" role="status">
+      Connecting to Scout's brain...
+    </p>
 
-    <button id="mic" type="button">Ask by voice</button>
+    <button id="mic" type="button" class="primary">Ask by voice</button>
     <p id="voice-line" class="muted" role="status"></p>
 
     <label for="addr">Brain address</label>
     <input id="addr" type="text" spellcheck="false" autocomplete="off" />
     <p id="addr-error" class="error" role="alert" hidden></p>
 
-    <label for="code">Pairing code</label>
-    <input id="code" type="text" inputmode="numeric" maxlength="6" autocomplete="off" />
-    <button id="pair" type="button">Pair</button>
-    <p id="pair-line" class="muted" role="status"></p>
+    <button
+      id="show-code"
+      type="button"
+      class="link"
+      aria-expanded="false"
+      aria-controls="pair-box"
+    >
+      Show the short code
+    </button>
+    <div id="pair-box" class="card" hidden>
+      <label for="code">Pairing code</label>
+      <input id="code" type="text" inputmode="numeric" maxlength="6" autocomplete="off" />
+      <button id="pair" type="button" class="primary">Pair</button>
+      <p id="pair-line" class="muted" role="status"></p>
+    </div>
 
     <label for="name">Name for this browser</label>
     <input id="name" type="text" maxlength="32" autocomplete="off" />

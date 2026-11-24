@@ -158,7 +158,7 @@ describe('PlacesView', () => {
   it('Get the add-on opens the tour at its Browser step', async () => {
     const bridge = open();
     fireEvent.click(await screen.findByRole('button', { name: 'Get the add-on' }));
-    expect(bridge.walkthroughOpens).toEqual([7]);
+    expect(bridge.walkthroughOpens).toEqual([8]);
   });
 
   it('has no add-on button once the add-on is connected', async () => {

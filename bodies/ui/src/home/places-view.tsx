@@ -13,7 +13,7 @@ import { Toggle } from '../controls/toggle';
 import { useHostBridge } from '../host-bridge';
 
 // The tour's Browser step is where the add-on's folder and its load-unpacked steps are shown.
-const BROWSER_STEP = 7;
+const BROWSER_STEP = 8;
 
 const FIELDS: { id: WhatsAppField; label: string; secret: boolean; hint: string }[] = [
   {

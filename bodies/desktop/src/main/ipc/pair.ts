@@ -1,12 +1,14 @@
 /**
  * Pairing this desktop with a brain on another machine from the link the owner made there:
  * open a socket pinned to the link's fingerprint, pair over it, and keep the address,
- * fingerprint and device token only when the brain accepts. Contains pairWithLink and
- * registerPairIpc.
+ * fingerprint and device token only when the brain accepts. Also makes the code another device
+ * pairs with. Contains pairWithLink and registerPairIpc.
  */
 import { pairOverSocket, parsePairLink } from '@tagalong/contract';
 import { IPC } from '../../shared/ipc';
-import type { FoundBrain, PairOutcome } from '../../shared/ipc';
+import type { FoundBrain, PairOffer, PairOutcome } from '../../shared/ipc';
+import { callJson } from '../brain/call-json';
+import type { BrainCall } from '../brain/call-json';
 import type { LinkStore } from '../brain/link-store';
 import type { PinnedSocket } from '../brain/pinned-socket';
 import type { IpcHandle } from './handle';
@@ -49,6 +51,7 @@ export async function pairWithLink(
 export function registerPairIpc(
   handle: IpcHandle,
   deps: PairDeps & {
+    brain: BrainCall;
     deviceName: string;
     discover: () => Promise<FoundBrain[]>;
     /** Dial again: the saved link changed. */
@@ -60,6 +63,14 @@ export function registerPairIpc(
     const outcome = await pairWithLink(deps, text, deps.deviceName);
     if (outcome.ok) deps.reconnect();
     return outcome;
+  });
+  handle(IPC.pairMake, async (): Promise<PairOffer> => {
+    const made = (await callJson(deps.brain, 'pair_make', { kind: 'desktop' })) as {
+      link: string;
+      expires_at: string;
+      qr: string;
+    };
+    return { link: made.link, expiresAt: made.expires_at, qr: made.qr };
   });
   handle(IPC.pairForget, () => {
     deps.link.forget();

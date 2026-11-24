@@ -8,7 +8,7 @@ import { BrowserWindow, screen } from 'electron';
 import { PRELOAD_PATH, loadPage } from './page';
 import { walkthroughSize } from './walkthrough-size';
 
-/** Opens the walkthrough, at `step` when one is named (the no-key button opens step 9). */
+/** Opens the walkthrough, at `step` when one is named (the no-key button opens step 10). */
 export function createWalkthroughWindow(step?: number): BrowserWindow {
   const window = new BrowserWindow({
     ...walkthroughSize(screen.getPrimaryDisplay().workArea),

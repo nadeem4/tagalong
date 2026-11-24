@@ -60,7 +60,7 @@ async function windowFor(name: string): Promise<Page> {
 test('know me: tour, start a run, move on, the finish card is still reached', async () => {
   await launch(false);
   const tour = await windowFor('walkthrough');
-  for (let at = 1; at < 9; at += 1) {
+  for (let at = 1; at < 10; at += 1) {
     await tour.getByRole('button', { name: /^(Get started|Next)$/ }).click();
   }
   await expect(tour.getByText('A key is already set.')).toBeVisible({ timeout: 30_000 });

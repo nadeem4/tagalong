@@ -1,6 +1,6 @@
 /**
  * The walkthrough's footer on every step: Back on the left (not on step 1), then a quiet
- * Skip link and the primary Next on the right. Next reads "Get started" on step 1 and stays off
+ * Skip link and the primary Next on the right. Next reads "Get started" on the welcome step (2) and waits on step 1 while a pairing is unfinished and stays off
  * on the key step until the key is good. The last step (connect your tools) has no Skip: it
  * offers Finish and a quiet "I'll do this later", which both finish. Contains Footer.
  */
@@ -18,6 +18,8 @@ interface FooterProps {
   onSkip: () => void;
   /** Next on the key step is off until the key step says the key is good. */
   keyReady?: boolean;
+  /** Next is off while the brain step has a pairing to finish. */
+  blocked?: boolean;
   onFinish?: () => void;
 }
 
@@ -29,6 +31,7 @@ export function Footer({
   onNext,
   onSkip,
   keyReady = false,
+  blocked = false,
   onFinish,
 }: FooterProps) {
   const last = step === STEPS.length;
@@ -64,10 +67,10 @@ export function Footer({
         <button
           type="button"
           className="wt-primary wt-next"
-          disabled={busy || (keyStep && !keyReady)}
+          disabled={busy || blocked || (keyStep && !keyReady)}
           onClick={onNext}
         >
-          {step === 1 ? 'Get started' : 'Next'}
+          {step === 2 ? 'Get started' : 'Next'}
         </button>
       )}
     </footer>

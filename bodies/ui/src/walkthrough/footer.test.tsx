@@ -34,37 +34,47 @@ describe('Footer', () => {
     ]);
   });
 
-  it('step 1 hides Back and labels Next "Get started"', () => {
+  it('step 1 hides Back and Next is just Next', () => {
     mount(1);
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument();
+  });
+
+  it('the welcome step labels Next "Get started"', () => {
+    mount(2);
     expect(screen.getByRole('button', { name: 'Get started' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
   });
 
-  it('step 9 (the key) keeps Next off until the key is good, and has no Finish', () => {
-    mount(9);
+  it('Next waits while the brain step says a pairing is unfinished', () => {
+    mount(1, { blocked: true });
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+  });
+
+  it('step 10 (the key) keeps Next off until the key is good, and has no Finish', () => {
+    mount(10);
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Finish' })).not.toBeInTheDocument();
   });
 
-  it('step 9 Next is on once the key is good, and calls onNext', () => {
-    const props = mount(9, { keyReady: true });
+  it('step 10 Next is on once the key is good, and calls onNext', () => {
+    const props = mount(10, { keyReady: true });
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     expect(props.onNext).toHaveBeenCalledTimes(1);
   });
 
   it('Finish carries the shared final-button class', () => {
-    mount(11);
+    mount(12);
     expect(screen.getByRole('button', { name: 'Finish' })).toHaveClass('wt-final');
   });
 
   it('Finish on the last step is never disabled', () => {
-    mount(11);
+    mount(12);
     expect(screen.getByRole('button', { name: 'Finish' })).toBeEnabled();
   });
 
   it('the last step has Back, a quiet "I’ll do this later" and Finish, and no Skip', () => {
-    mount(11);
+    mount(12);
     expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
       'Back',
       'I’ll do this later',
@@ -76,7 +86,7 @@ describe('Footer', () => {
   });
 
   it('Finish and "I’ll do this later" both call onFinish', () => {
-    const props = mount(11);
+    const props = mount(12);
     fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
     fireEvent.click(screen.getByRole('button', { name: 'I’ll do this later' }));
     expect(props.onFinish).toHaveBeenCalledTimes(2);
@@ -91,8 +101,8 @@ describe('Footer', () => {
     expect(screen.getByRole('button', { name: 'Next' })).toHaveClass('wt-primary');
   });
 
-  it('step 9 has no Skip, since the key cannot be skipped', () => {
-    mount(9);
+  it('step 10 has no Skip, since the key cannot be skipped', () => {
+    mount(10);
     expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
   });
 

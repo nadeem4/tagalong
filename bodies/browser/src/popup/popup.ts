@@ -30,6 +30,8 @@ const addrEl = document.getElementById('addr') as HTMLInputElement;
 const codeEl = document.getElementById('code') as HTMLInputElement;
 const pairEl = document.getElementById('pair') as HTMLButtonElement;
 const pairLine = document.getElementById('pair-line') as HTMLElement;
+const showCodeEl = document.getElementById('show-code') as HTMLButtonElement;
+const pairBox = document.getElementById('pair-box') as HTMLElement;
 const addrError = document.getElementById('addr-error') as HTMLElement;
 const nameEl = document.getElementById('name') as HTMLInputElement;
 const grantsEl = document.getElementById('grants') as HTMLElement;
@@ -39,6 +41,12 @@ const micEl = document.getElementById('mic') as HTMLButtonElement;
 const voiceEl = document.getElementById('voice-line') as HTMLElement;
 
 let voice: VoiceView = { state: 'idle', text: '', error: '', loading: false, progress: 0 };
+
+function openPairBox(open: boolean): void {
+  pairBox.hidden = !open;
+  showCodeEl.setAttribute('aria-expanded', String(open));
+  showCodeEl.textContent = open ? 'Hide the short code' : 'Show the short code';
+}
 
 function showVoice(view: VoiceView): void {
   voice = view;
@@ -77,10 +85,13 @@ async function showStatus(): Promise<void> {
     const worker = (await chrome.runtime.sendMessage(query)) as WorkerStatus | undefined;
     if (worker) {
       statusEl.textContent = statusLine(worker.status);
+      statusEl.dataset.state = worker.status;
+      if (worker.status === 'unauthorized') openPairBox(true);
       showVoice(worker.voice);
     }
   } catch {
     statusEl.textContent = statusLine('offline');
+    statusEl.dataset.state = 'offline';
   }
 }
 
@@ -133,6 +144,7 @@ async function init(): Promise<void> {
     });
   });
   nameEl.addEventListener('change', () => void saveName(storage, nameEl.value));
+  showCodeEl.addEventListener('click', () => openPairBox(pairBox.hidden));
   pairEl.addEventListener('click', () => {
     pairLine.textContent = 'Pairing...';
     void readSettings(storage)
@@ -170,4 +182,5 @@ async function init(): Promise<void> {
 
 init().catch(() => {
   statusEl.textContent = statusLine('offline');
+  statusEl.dataset.state = 'offline';
 });

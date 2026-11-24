@@ -31,7 +31,7 @@ export function makeSamplePlayer(
  * and Settings already make, its Fix it, which opens the right place, and Open logs folder.
  */
 /** The walkthrough's last step: where the key is asked for. */
-const KEY_STEP = 9;
+const KEY_STEP = 10;
 
 export function fullBridge(): HostBridge {
   const bridge = window.tagalong;
