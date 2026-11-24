@@ -111,6 +111,9 @@ class Memory:
     def forget(self, item_id: int) -> Item:
         return memory_store.forget(self._db, item_id)
 
+    def forget_source(self, source: str) -> int:
+        return memory_store.forget_source(self._db, source)
+
     def list_items(
         self, limit: int, include_personal: bool = True, facts_only: bool = False
     ) -> list[Item]:

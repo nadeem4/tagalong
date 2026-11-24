@@ -171,6 +171,7 @@ def connect_ai_tool_tools(devices: Devices, bodies: Bodies) -> list[tuple[ToolSp
                     "properties": {"tool": _TOOL_SCHEMA, "personal": {"type": "boolean"}},
                     "required": ["tool"],
                 },
+                frozenset({"scout", "home"}),  # Home's button is the person's yes
                 tier=Tier.person_only,  # writes a token file and runs commands: asks every time
             ),
             connect,

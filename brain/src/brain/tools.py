@@ -185,6 +185,12 @@ def brain_tools(
         notify("changed", {"what": "memory"})
         return f"forgot {item.kind} #{item.id}: {item.text}"
 
+    async def forget_memories(args: dict) -> str:
+        _need_text("forget_memories", args, "source")
+        deleted = memory.forget_source(args["source"])
+        notify("changed", {"what": "memory"})
+        return json.dumps({"deleted": deleted})
+
     async def list_memories(args: dict) -> str:
         items = memory.list_items(LIST_MEMORIES_MAX)
         portrait = memory.portrait()
@@ -311,6 +317,20 @@ def brain_tools(
                 default_mode="auto",
             ),
             forget,
+        ),
+        (
+            ToolSpec(
+                "forget_memories",
+                "Delete every memory another AI tool added, by its source (`mcp:<tool>`).",
+                {
+                    "type": "object",
+                    "properties": {"source": {"type": "string"}},
+                    "required": ["source"],
+                },
+                frozenset({"home"}),
+                effect="change",
+            ),
+            forget_memories,
         ),
         (
             ToolSpec(

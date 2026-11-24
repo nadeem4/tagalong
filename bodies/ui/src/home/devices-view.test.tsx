@@ -234,6 +234,27 @@ describe('DevicesView', () => {
       );
     });
 
+    it('revoking an AI tool removes it from the list', async () => {
+      const bridge = open(stateWith(), { devices: [], aiTools: [CURSOR] });
+      await screen.findByText('Cursor');
+      fireEvent.click(within(row('Cursor')).getByRole('button', { name: 'Revoke' }));
+      fireEvent.click(within(screen.getByRole('alert')).getByRole('button', { name: 'Revoke' }));
+      await waitFor(() => expect(screen.queryByText('Cursor')).not.toBeInTheDocument());
+      expect(bridge.deviceCalls).toEqual(['revoke d3']);
+    });
+
+    it('Connect another AI tool opens its dialog even with none connected, and Done lists the new tool', async () => {
+      const bridge = open();
+      fireEvent.click(await screen.findByRole('button', { name: 'Connect another AI tool' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Set it up' }));
+      bridge.devices = { devices: [], aiTools: [CURSOR] };
+      fireEvent.click(await screen.findByRole('button', { name: 'Done' }));
+      expect(await screen.findByRole('region', { name: 'AI tools' })).toContainElement(
+        row('Cursor'),
+      );
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
     it('says who joined, with a New chip, when a device pairs while the page is open', async () => {
       const bridge = open(stateWith(), { devices: [CHROME], aiTools: [] });
       await screen.findByText('Chrome on laptop');

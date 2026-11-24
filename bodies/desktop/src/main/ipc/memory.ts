@@ -1,6 +1,7 @@
 /**
- * IPC for Home's What Scout remembers: list it, read the portrait, delete one memory. All go
- * through the brain's tools (list_memories, forget). Contains registerMemoryIpc.
+ * IPC for Home's What Scout remembers: list it, read the portrait, delete one memory or all of
+ * one AI tool's. All go through the brain's tools (list_memories, forget, forget_memories).
+ * Contains registerMemoryIpc.
  */
 
 import type { MemoryEntry } from '@tagalong/ui/shapes';
@@ -74,5 +75,13 @@ export function registerMemoryIpc(handle: IpcHandle, deps: { brain: BrainCall })
       if (error instanceof RpcError) return false;
       throw error;
     }
+  });
+  // Only another tool's memories go by source; the rest are deleted one at a time.
+  handle(IPC.forgetMemoriesFrom, async (_event, source: string) => {
+    if (!source.startsWith('mcp:')) return 0;
+    const { deleted } = (await callJson(brain, 'forget_memories', { source })) as {
+      deleted: number;
+    };
+    return deleted;
   });
 }

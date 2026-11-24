@@ -114,4 +114,17 @@ describe('MemoryTimeline', () => {
     show([fact({ spanStart: '2020' }), fact({ category: 'Work', spanStart: '2020' })]);
     expect(screen.getByRole('heading', { level: 4, name: 'Other' })).toBeInTheDocument();
   });
+
+  it('labels a memory another AI tool added and leaves facts Scout learned in chat unlabelled', () => {
+    show([
+      fact({ text: 'Uses pnpm', source: 'mcp:cursor' }),
+      fact({ text: 'Likes tea', source: 'chat' }),
+      fact({ text: 'Plain fact' }),
+    ]);
+    expect(screen.getAllByText('From Cursor')).toHaveLength(1);
+    expect(
+      within(screen.getByText('Uses pnpm').closest('summary')!).getByText('From Cursor'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^From (Scout|Chat)/)).toBeNull();
+  });
 });

@@ -313,4 +313,45 @@ describe('MemoryView, get to know me', () => {
     expect(timeline).toHaveTextContent('From GitHub');
     expect(screen.queryByRole('region', { name: 'Scout’s portrait of you' })).toBeNull();
   });
+
+  describe('by tool', () => {
+    const CURSOR = { ...REPO, id: 'c1', text: 'Uses pnpm', source: 'mcp:cursor' };
+    const CODEX = { ...REPO, id: 'x1', text: 'Writes Rust', source: 'mcp:codex' };
+    const OWN = { ...REPO, id: 'o1', text: 'Likes tea', source: 'chat' };
+
+    it('filters the timeline to one tool or to Scout', async () => {
+      renderView(createFakeHostBridge({ memories: [CURSOR, CODEX, OWN] }));
+      await screen.findByText('Uses pnpm');
+      fireEvent.click(screen.getByRole('button', { name: /^Cursor/ }));
+      expect(screen.getByText('Uses pnpm')).toBeInTheDocument();
+      expect(screen.queryByText('Writes Rust')).toBeNull();
+      expect(screen.queryByText('Likes tea')).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: /^From Scout/ }));
+      expect(screen.getByText('Likes tea')).toBeInTheDocument();
+      expect(screen.queryByText('Uses pnpm')).toBeNull();
+    });
+
+    it('offers no filters when every memory is Scout', async () => {
+      renderView(createFakeHostBridge({ memories: [OWN, REPO] }));
+      await screen.findByText('Likes tea');
+      expect(screen.queryByRole('group', { name: 'Filter memories' })).toBeNull();
+    });
+
+    it('deletes everything from one tool after a confirm, and keeps the rest', async () => {
+      const bridge = createFakeHostBridge({ memories: [CURSOR, CODEX, OWN] });
+      renderView(bridge);
+      await screen.findByText('Uses pnpm');
+      expect(screen.queryByRole('button', { name: 'Delete everything from this tool' })).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: /^Cursor/ }));
+      fireEvent.click(screen.getByRole('button', { name: 'Delete everything from this tool' }));
+      expect(screen.getByRole('alert')).toHaveTextContent('Cursor stays connected');
+      fireEvent.click(screen.getByRole('button', { name: 'Keep them' }));
+      expect(bridge.memories).toHaveLength(3);
+      fireEvent.click(screen.getByRole('button', { name: 'Delete everything from this tool' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Delete them' }));
+      await waitFor(() => expect(screen.queryByText('Uses pnpm')).toBeNull());
+      expect(bridge.memories.map((m) => m.id)).toEqual(['x1', 'o1']);
+      expect(screen.getByText('Writes Rust')).toBeInTheDocument();
+    });
+  });
 });

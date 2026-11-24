@@ -116,3 +116,13 @@ def test_connecting_asks_the_person_every_time_even_after_an_always(tmp_path):
     )
     assert gate_tier(spec, "auto") is Tier.person_only
     assert gate_tier(spec, None) is Tier.person_only
+
+
+def test_home_can_connect_a_tool_with_a_click_and_the_model_still_can(tmp_path):
+    devices = Devices(Memory(tmp_path / "v.db").db, lambda: NOW)
+    spec = next(
+        s
+        for s, _ in connect_ai_tool_tools(devices, FakeBodies([DESKTOP]))
+        if s.name == "connect_ai_tool"
+    )
+    assert spec.audience == {"scout", "home"}

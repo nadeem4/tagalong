@@ -239,6 +239,14 @@ def forget(db: sqlite3.Connection, item_id: int) -> Item:
     return item
 
 
+def forget_source(db: sqlite3.Connection, source: str) -> int:
+    """Delete every memory another AI tool wrote under this exact source; returns the count."""
+    if not _told(source):
+        raise MemoryRefused("Only memories another AI tool added can be deleted by source.")
+    cursor = db.execute("DELETE FROM memories WHERE source=?", (source,))
+    return cursor.rowcount
+
+
 @dataclass(frozen=True)
 class NewFact:
     tag: str

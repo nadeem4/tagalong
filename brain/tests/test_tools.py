@@ -1214,6 +1214,25 @@ async def test_set_model_refuses_unknown(home):
     assert ("changed", {"what": "model"}) not in home.sent
 
 
+async def test_forget_memories_deletes_one_tools_notes_only(home, mem):
+    mem.remember("about_you", "Likes tea", source="mcp:cursor")
+    mem.remember("about_you", "Likes jam", source="mcp:cursor")
+    mem.remember("about_you", "Uses pnpm", source="mcp:codex")
+    mem.remember("about_you", "Lives in Leeds")
+    home.sent.clear()
+    out = json.loads(await home.run("forget_memories", {"source": "mcp:cursor"}))
+    assert out == {"deleted": 2}
+    assert [i.text for i in mem.list_items(10)] == ["Lives in Leeds", "Uses pnpm"]
+    assert home.sent == [("changed", {"what": "memory"})]
+
+
+async def test_forget_memories_refuses_what_is_not_another_tools(home, mem):
+    mem.remember("about_you", "Lives in Leeds")
+    with pytest.raises(MemoryRefused, match="another AI tool"):
+        await home.run("forget_memories", {"source": "chat"})
+    assert len(mem.list_items(10)) == 1
+
+
 def test_home_tools_are_not_in_model_tools(home):
     names = {t["name"] for t in home.box.model_tools()}
     assert names == {
@@ -1236,6 +1255,7 @@ def test_home_tools_contract_records_have_no_for_or_mode(home):
     records = home.box.home_tools()
     assert {r.name for r in records} == {
         "forget",
+        "forget_memories",
         "list_experts",
         "list_jobs",
         "stop_job",

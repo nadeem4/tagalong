@@ -5,6 +5,7 @@
  * `@tagalong/ui/shapes`.
  */
 export * from './addressing';
+export * from './ai-tools';
 export * from './apps';
 export * from './bodies';
 export * from './context';

@@ -42,6 +42,8 @@ import type {
   KeyResult,
 } from '@tagalong/ui';
 import type {
+  AiToolConnect,
+  AiToolLink,
   BodiesState,
   DevicesState,
   PlacementsState,
@@ -122,6 +124,8 @@ const bridge: PreloadBridge = {
     ipcRenderer.invoke(IPC.removeConnection, id) as Promise<unknown>,
   listMemories: () => ipcRenderer.invoke(IPC.listMemories) as Promise<MemoryEntry[]>,
   deleteMemory: (id: string) => ipcRenderer.invoke(IPC.deleteMemory, id) as Promise<boolean>,
+  forgetMemoriesFrom: (source) =>
+    ipcRenderer.invoke(IPC.forgetMemoriesFrom, source) as Promise<number>,
   getPortrait: () => ipcRenderer.invoke(IPC.getPortrait) as Promise<string | null>,
   knowMeSources: () => ipcRenderer.invoke(IPC.knowMeSources) as Promise<KnowSourceInfo[]>,
   // Main answers a refusal as `{ error }` (an IPC rejection would wrap the sentence); the
@@ -162,6 +166,9 @@ const bridge: PreloadBridge = {
   setPlacement: (kind, id, place) =>
     ipcRenderer.invoke(IPC.placementsSet, kind, id, place) as Promise<void>,
   pairMake: () => ipcRenderer.invoke(IPC.pairMake) as Promise<PairOffer>,
+  aiToolConnect: (tool) => ipcRenderer.invoke(IPC.aiToolConnect, tool) as Promise<AiToolConnect>,
+  aiToolLink: (tool, personal) =>
+    ipcRenderer.invoke(IPC.aiToolLink, tool, personal) as Promise<AiToolLink>,
   installBrainService: () =>
     ipcRenderer.invoke(IPC.brainServiceInstall) as Promise<BrainServiceOutcome>,
   forgetBrain: () => ipcRenderer.invoke(IPC.pairForget) as Promise<void>,

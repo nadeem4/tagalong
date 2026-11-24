@@ -255,6 +255,14 @@ describe('BrainClient', () => {
     expect(e).not.toBeInstanceOf(BrainOffline);
   });
 
+  it('call waits as long as the caller allows for a slow tool', async () => {
+    const { client, s } = await online();
+    const p = client.call('connect_ai_tool', { tool: 'cursor' }, 90_000);
+    await vi.advanceTimersByTimeAsync(60_000);
+    s.receive({ jsonrpc: '2.0', id: s.sent[1]!.id, result: { output: [] } });
+    await expect(p).resolves.toEqual([]);
+  });
+
   it('notifications are passed on in seq order and remembered as last_seq', async () => {
     const { s, notes, sockets } = await online(100);
     s.receive(turn(1));

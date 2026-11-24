@@ -4,6 +4,7 @@
  */
 
 import type {
+  AiToolConnect,
   AppAddParams,
   AppInfo,
   BodiesState,
@@ -144,6 +145,11 @@ export interface FakeHostBridge extends HostBridge {
   readonly deviceCalls: readonly string[];
   /** Every text copied. */
   readonly copied: readonly string[];
+  /** Every aiToolConnect (`cursor`) and aiToolLink (`cursor personal`), in order. */
+  readonly aiToolCalls: readonly string[];
+  /** How aiToolConnect ends, and what aiToolLink rejects with (`network_off`) when set. */
+  aiToolOutcome: AiToolConnect;
+  aiToolLinkError: string | undefined;
   /** pairMake rejects with this message when set (`network_off`). */
   pairError: string | undefined;
   /** installBrainService answers this; `{ ok: false, detail }` is a refusal. */
@@ -346,6 +352,7 @@ export function createFakeHostBridge(
   const deviceCalls: string[] = [];
   const placementCalls: string[] = [];
   const copied: string[] = [];
+  const aiToolCalls: string[] = [];
   const activityCalls: [string, number][] = [];
   const reportCalls: [string, string][] = [];
   const keysSet: string[] = [];
@@ -517,6 +524,11 @@ export function createFakeHostBridge(
     listMemories() {
       return Promise.resolve([...fake.memories]);
     },
+    forgetMemoriesFrom(source) {
+      const before = fake.memories.length;
+      fake.memories = fake.memories.filter((memory) => memory.source !== source);
+      return Promise.resolve(before - fake.memories.length);
+    },
     deleteMemory(id) {
       const before = fake.memories.length;
       fake.memories = fake.memories.filter((memory) => memory.id !== id);
@@ -676,6 +688,9 @@ export function createFakeHostBridge(
     brainActions,
     deviceCalls,
     copied,
+    aiToolCalls,
+    aiToolOutcome: { ok: true, text: 'Connected.' },
+    aiToolLinkError: undefined,
     devices: options.devices ?? { devices: [], aiTools: [] },
     pairError: undefined,
     serviceOutcome: { ok: true },
@@ -713,6 +728,19 @@ export function createFakeHostBridge(
         aiTools: fake.devices.aiTools.filter((row) => row.id !== id),
       };
       return Promise.resolve();
+    },
+    aiToolConnect(tool) {
+      aiToolCalls.push(tool);
+      return Promise.resolve(fake.aiToolOutcome);
+    },
+    aiToolLink(tool, personal) {
+      aiToolCalls.push(personal ? `${tool} personal` : tool);
+      if (fake.aiToolLinkError !== undefined)
+        return Promise.reject(new Error(fake.aiToolLinkError));
+      return Promise.resolve({
+        link: `tagalong://pair?code=${tool}${personal ? '-personal' : ''}`,
+        expiresAt: new Date(Date.now() + 600_000).toISOString(),
+      });
     },
     pairMake() {
       if (fake.pairError !== undefined) return Promise.reject(new Error(fake.pairError));

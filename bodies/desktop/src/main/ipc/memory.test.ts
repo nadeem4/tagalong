@@ -143,9 +143,21 @@ describe('registerMemoryIpc', () => {
     await expect(invoke(IPC.listMemories)).rejects.toThrow('brain sent bad memories');
   });
 
-  it('handles its three channels and nothing else', () => {
+  it('handles its four channels and nothing else', () => {
     expect(setup(() => []).channels()).toEqual(
-      [IPC.deleteMemory, IPC.getPortrait, IPC.listMemories].sort(),
+      [IPC.deleteMemory, IPC.forgetMemoriesFrom, IPC.getPortrait, IPC.listMemories].sort(),
     );
+  });
+
+  it('deletes everything one AI tool added and says how many went', async () => {
+    const { invoke, calls } = setup(() => text({ deleted: 3 }));
+    expect(await invoke(IPC.forgetMemoriesFrom, 'mcp:cursor')).toBe(3);
+    expect(calls).toEqual([['forget_memories', { source: 'mcp:cursor' }]]);
+  });
+
+  it('will not delete by a source that is not an AI tool', async () => {
+    const { invoke, calls } = setup(() => text({ deleted: 9 }));
+    expect(await invoke(IPC.forgetMemoriesFrom, 'linkedin')).toBe(0);
+    expect(calls).toEqual([]);
   });
 });
