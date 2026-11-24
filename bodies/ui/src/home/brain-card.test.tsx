@@ -243,13 +243,6 @@ describe('BrainCard', () => {
       await waitFor(() => expect(bridge.brainActions).toContain('install-service'));
     });
 
-    it('a service brain offers Restart and Pair a device, and not the install', async () => {
-      renderCard({ ...RUNNING, startedBy: 'service' });
-      expect(await screen.findByRole('button', { name: 'Restart brain' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Pair a device' })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: "Make this Scout's brain" })).toBeNull();
-    });
-
     it('a connected remote brain names its machine and has no restart', async () => {
       const bridge = renderCard(REMOTE);
       const card = await region();

@@ -578,3 +578,15 @@ def test_a_body_id_belongs_to_its_principal_until_that_principal_is_dropped():
     bodies.drop_principal("device:1")
     assert first.closed
     assert bodies.connect(body("a"), [], second, None, two) is not None
+
+
+def test_a_body_knows_the_paired_device_behind_it():
+    bodies = Bodies()
+    paired = Principal(key="device:1", name="A", kind="desktop", local=False, device_id="1")
+    bodies.connect(body("a"), [], FakePeer(), None, paired)
+    bodies.connect(body("b"), [], FakePeer(), None, LOCAL)
+    assert (bodies.device_id("a"), bodies.device_id("b"), bodies.device_id("zz")) == (
+        "1",
+        None,
+        None,
+    )

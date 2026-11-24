@@ -47,6 +47,7 @@ export const HOME_CSS = `${THEME_CSS}
 /* At least the free height, so a page that wants it (the job log) can fill what the head leaves. */
 .home-page { flex: 1 0 auto; }
 .home-head { display: flex; flex-direction: column; gap: ${t.space.xs}px; }
+.home-head--row { flex-direction: row; align-items: flex-start; justify-content: space-between; gap: ${t.space.lg}px; }
 .home-head p { margin: 0; ${typeCss('bodyLead')}; color: ${themedColor.panelMuted}; }
 .home-time { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .home-title { margin: 0; ${typeCss('heading')}; }

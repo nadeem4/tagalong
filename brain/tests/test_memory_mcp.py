@@ -30,7 +30,7 @@ from brain.memory import Memory
 from brain.memory_mcp import call_memory_tool, list_memory_tools, memory_client_tools
 from brain.pairing import NETWORK_KINDS, Pairing
 from brain.permission import Engine, Grant, Person, StandingRule, stored_auto_rules
-from brain.protocol import RpcError
+from brain.protocol import ErrorCode, RpcError
 from brain.store import rules
 from brain.store.memory import MemoryRefused
 from brain.toolbox import BrainSource, Toolbox
@@ -323,8 +323,9 @@ async def test_home_makes_a_link_that_pairs_a_client_and_lists_and_revokes_it(tm
 
 async def test_home_makes_no_link_while_the_network_is_off(tmp_path):
     devices, _, handlers = home_tools(tmp_path, network=False)
-    with pytest.raises(RpcError):
+    with pytest.raises(RpcError) as refused:
         await handlers["mcp_client_make"]({"name": "claude-code"})
+    assert refused.value.code == ErrorCode.network_off
 
 
 async def test_home_cannot_revoke_a_body_through_the_client_tool(tmp_path):

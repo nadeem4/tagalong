@@ -11,6 +11,8 @@ const Body = z.object({
   kind: z.enum(['desktop', 'browser', 'whatsapp']),
   name: z.string(),
   connected: z.boolean(),
+  /** The paired device behind this body; absent for the local token and for an offline row. */
+  device_id: z.string().optional(),
 });
 
 const Wire = z.object({

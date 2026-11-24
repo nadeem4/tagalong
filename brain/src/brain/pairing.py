@@ -26,6 +26,9 @@ CODE_LIFE = timedelta(minutes=10)
 FAILURE_WINDOW = timedelta(minutes=1)
 MAX_FAILURES = 5
 OFFERED_KINDS = ("desktop", "node", "browser")  # what `tagalong pair` and Home's Pair offer
+# Said when a pairing code is asked for while the brain listens only on this PC; the RPC and the
+# CLI add how to turn it on.
+NETWORK_OFF = "Network access is off, so no other device can reach this brain."
 LOOPBACK_KINDS = frozenset({"browser"})  # the kinds a code may carry on the loopback listener
 NETWORK_KINDS = frozenset({"desktop", "node", "mcp_client"})  # and on the network listener
 

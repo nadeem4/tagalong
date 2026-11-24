@@ -89,6 +89,6 @@ test('revoking a device removes its row', async () => {
     .click();
   await expect(home.getByText('Chrome on laptop')).toBeVisible({ timeout: 30_000 });
   await home.getByRole('button', { name: 'Revoke' }).click();
-  await home.getByRole('alert').getByRole('button', { name: 'Revoke' }).click();
+  await home.getByRole('button', { name: /^Yes, revoke/ }).click();
   await expect(home.getByText('Chrome on laptop')).toHaveCount(0);
 });

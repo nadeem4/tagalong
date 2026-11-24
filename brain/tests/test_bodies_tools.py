@@ -22,6 +22,9 @@ class FakeBodies:
     def __init__(self, *kinds):
         self._kinds = kinds
 
+    def device_id(self, body_id):
+        return "dev-1" if body_id == "desktop-0" else None
+
     def online(self):
         return [
             Body(id=f"{k}-{i}", kind=k, name=f"{k} body {i}") for i, k in enumerate(self._kinds)
@@ -92,6 +95,12 @@ async def test_bodies_status_has_one_row_per_online_body(tmp_path):
     assert [b["kind"] for b in online] == ["desktop", "desktop", "browser"]
     assert len({b["id"] for b in online}) == 3
     assert [b["name"] for b in online[:2]] == ["desktop body 0", "desktop body 1"]
+
+
+async def test_bodies_status_names_the_paired_device_behind_a_body(tmp_path):
+    r = Rig(tmp_path, kinds=("desktop", "browser"))
+    online = [b for b in json.loads(await r.run("bodies_status"))["bodies"] if b["connected"]]
+    assert [b.get("device_id") for b in online] == ["dev-1", None]
 
 
 async def test_bodies_status_still_lists_a_kind_with_none_online(tmp_path):

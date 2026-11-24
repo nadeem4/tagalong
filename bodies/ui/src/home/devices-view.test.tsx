@@ -73,18 +73,15 @@ const type = (label: RegExp, value: string) =>
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
 
 describe('DevicesView', () => {
-  it('says what the page is for', async () => {
+  it('says what the page is for, lists This PC, the browser add-on and WhatsApp with a purpose line, and offers the next step when nothing is paired', async () => {
     open();
     await screen.findByText('This PC');
-    expect(
-      await screen.findByText('Everything that can talk to Scout, and where its brain lives.'),
-    ).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Devices' })).toBeInTheDocument();
-  });
-
-  it('lists This PC, the browser add-on and WhatsApp, each with a purpose line', async () => {
-    open();
-    await screen.findByText('This PC');
+    expect(
+      screen.getByText('Everything that can talk to Scout, and where its brain lives.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Only this computer so far')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reach Scout away from home' })).toBeEnabled();
     expect(row('This PC')).toHaveTextContent('Desktop');
     expect(row('This PC')).toHaveTextContent(
       'Scout sits on your screen, reads what you point it at and talks out loud.',
@@ -201,29 +198,29 @@ describe('DevicesView', () => {
       pairedAt: '2026-11-15T09:00:00Z',
       lastSeen: null,
     };
-    const online = (name: string): BodiesState => {
+    const online = (deviceId: string): BodiesState => {
       const state = stateWith();
       state.bodies = [
-        { id: 'desktop-x', kind: 'desktop', name, connected: true },
+        {
+          id: 'desktop-x',
+          kind: 'desktop',
+          name: 'Whatever it calls itself',
+          connected: true,
+          device_id: deviceId,
+        },
         ...state.bodies.filter((b) => b.kind !== 'desktop'),
       ];
       return state;
     };
 
     it('lists a paired device with Online now when it is connected, and an AI tool in its own group', async () => {
-      open(online("Nadeem's laptop"), { devices: [LAPTOP, CHROME], aiTools: [CURSOR] });
+      open(online('d1'), { devices: [LAPTOP, CHROME], aiTools: [CURSOR] });
       await screen.findByText('Chrome on laptop');
       expect(row("Nadeem's laptop")).toHaveTextContent('Online now');
-      expect(row("Nadeem's laptop")).toHaveTextContent('Desktop · paired 14 Nov');
+      expect(row("Nadeem's laptop")).toHaveTextContent('Desktop · paired');
       expect(row('Chrome on laptop')).toHaveTextContent('Last seen');
       expect(screen.getByRole('region', { name: 'AI tools' })).toContainElement(row('Cursor'));
       expect(row('Cursor')).toHaveTextContent("Reads and adds to Scout's memory");
-    });
-
-    it('with nothing paired says so and offers the next step', async () => {
-      open();
-      expect(await screen.findByText('Only this computer so far')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Reach Scout away from home' })).toBeEnabled();
     });
 
     it('renames a device in place and Escape cancels', async () => {
@@ -241,17 +238,17 @@ describe('DevicesView', () => {
       expect(bridge.deviceCalls).toEqual(['rename d2 Work Chrome']);
     });
 
-    it('asks before revoking, Keep it changes nothing, Revoke removes the row', async () => {
+    it('asks before revoking, Keep changes nothing, Yes, revoke removes the row', async () => {
       const bridge = open(stateWith(), { devices: [CHROME], aiTools: [] });
       await screen.findByText('Chrome on laptop');
       fireEvent.click(within(row('Chrome on laptop')).getByRole('button', { name: 'Revoke' }));
       expect(screen.getByRole('alert')).toHaveTextContent(
         'Revoke Chrome on laptop? It stops working right away and loses access to Scout. You can pair it again with a new code.',
       );
-      fireEvent.click(screen.getByRole('button', { name: 'Keep it' }));
+      fireEvent.click(screen.getByRole('button', { name: /^Keep/ }));
       expect(bridge.deviceCalls).toEqual([]);
       fireEvent.click(within(row('Chrome on laptop')).getByRole('button', { name: 'Revoke' }));
-      fireEvent.click(within(screen.getByRole('alert')).getByRole('button', { name: 'Revoke' }));
+      fireEvent.click(screen.getByRole('button', { name: /^Yes, revoke/ }));
       await waitFor(() => expect(screen.queryByText('Chrome on laptop')).not.toBeInTheDocument());
       expect(bridge.deviceCalls).toEqual(['revoke d2']);
     });

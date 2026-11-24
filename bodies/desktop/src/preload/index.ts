@@ -163,7 +163,6 @@ const bridge: PreloadBridge = {
   forgetBrain: () => ipcRenderer.invoke(IPC.pairForget) as Promise<void>,
   reconnectBrain: () => ipcRenderer.invoke(IPC.brainReconnect) as Promise<void>,
   tailscaleState: () => ipcRenderer.invoke(IPC.tailscaleState) as Promise<TailscaleState>,
-  openTailscaleDownload: () => ipcRenderer.invoke(IPC.tailscaleDownload) as Promise<void>,
   setWhatsApp: (change: WhatsAppChange) =>
     ipcRenderer.invoke(IPC.whatsappSet, change) as Promise<void>,
   readingStatus: () => ipcRenderer.invoke(IPC.readingStatus) as Promise<string>,

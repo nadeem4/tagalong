@@ -29,30 +29,30 @@ const REMOTE: BrainCard = {
   local: false,
 };
 
-function open(tailscale: { installed: boolean; ip: string | null }, brainCard?: BrainCard) {
-  const bridge = createFakeHostBridge({ tailscale, ...(brainCard ? { brainCard } : {}) });
+function open(tailscale: { installed: boolean; ip: string | null }, card: BrainCard | null = null) {
+  const bridge = createFakeHostBridge({ tailscale });
   render(
     <HostBridgeProvider bridge={bridge}>
-      <TailscaleGuide onClose={() => undefined} />
+      <TailscaleGuide card={card} onClose={() => undefined} />
     </HostBridgeProvider>,
   );
   return bridge;
 }
 
 describe('TailscaleGuide', () => {
-  it('starts at Install Tailscale when there is no tailscale command, and opens the download page', async () => {
-    const bridge = open({ installed: false, ip: null });
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Open the Tailscale download page' }),
-    );
-    expect(bridge.brainActions).toContain('open-tailscale');
+  it('opens at once, then starts at Install Tailscale with a link to the download page when there is no tailscale command', async () => {
+    open({ installed: false, ip: null });
     expect(screen.getByText('Install Tailscale on this device')).toBeInTheDocument();
+    const link = await screen.findByRole('link', { name: 'Open the Tailscale download page' });
+    expect(link).toHaveAttribute('href', 'https://tailscale.com/download');
   });
 
-  it('marks this device done once it has a tailnet address', async () => {
-    open({ installed: true, ip: '100.64.0.7' });
+  it('marks this device done once it has a tailnet address, and looks again on Check again', async () => {
+    const bridge = open({ installed: true, ip: null });
+    expect(await screen.findByText('Open Tailscale and sign in.')).toBeInTheDocument();
+    bridge.tailscale = { installed: true, ip: '100.64.0.7' };
+    fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
     expect(await screen.findByText('Tailscale is running on this device')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Open the Tailscale download page' })).toBeNull();
   });
 
   it('is Working, with the address to copy, when the brain is reached over its tailnet address', async () => {

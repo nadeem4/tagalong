@@ -7,6 +7,21 @@ import { createBrainSetup, registerBrainLinkIpc } from './brain-link';
 import { fakeIpc } from './fake-ipc';
 
 describe('registerBrainLinkIpc', () => {
+  it('dials the brain again when Home asks', async () => {
+    const ipc = fakeIpc();
+    const dials: number[] = [];
+    registerBrainLinkIpc(ipc.handle, {
+      brain: { url: 'ws://x:1', link: 'offline' },
+      setup: createBrainSetup(
+        () => Promise.resolve(),
+        () => undefined,
+      ),
+      reconnect: () => void dials.push(1),
+    });
+    await ipc.invoke(IPC.brainReconnect);
+    expect(dials).toEqual([1]);
+  });
+
   it('answers with the ws address, the current status and the setup state', async () => {
     const ipc = fakeIpc();
     let link: 'online' | 'offline' = 'online';
@@ -22,6 +37,7 @@ describe('registerBrainLinkIpc', () => {
         },
       },
       setup,
+      reconnect: () => undefined,
     });
     expect(await ipc.invoke(IPC.brainLink)).toEqual({
       addr: 'ws://127.0.0.1:47321',
@@ -48,7 +64,11 @@ describe('registerBrainLinkIpc', () => {
       },
       () => undefined,
     );
-    registerBrainLinkIpc(ipc.handle, { brain: { url: 'ws://x:1', link: 'online' }, setup });
+    registerBrainLinkIpc(ipc.handle, {
+      brain: { url: 'ws://x:1', link: 'online' },
+      setup,
+      reconnect: () => undefined,
+    });
     await ipc.invoke(IPC.brainSetupRetry);
     expect(launches).toBe(0);
     outcome = 'failed';
@@ -69,7 +89,11 @@ describe('Start brain', () => {
       async () => void launches++,
       () => undefined,
     );
-    registerBrainLinkIpc(ipc.handle, { brain: { url: 'ws://x:1', link: 'offline' }, setup });
+    registerBrainLinkIpc(ipc.handle, {
+      brain: { url: 'ws://x:1', link: 'offline' },
+      setup,
+      reconnect: () => undefined,
+    });
     await ipc.invoke(IPC.brainSetupRetry);
     expect(launches).toBe(1);
   });

@@ -24,7 +24,9 @@ const WIRE = {
   model: 'Claude Opus 5.5',
 };
 
-function setup(over: { wire?: object | 'missing'; link?: string; hello?: object } = {}) {
+function setup(
+  over: { wire?: object | 'missing'; link?: string; hello?: object; paired?: boolean } = {},
+) {
   const log: string[] = [];
   const stops: number[] = [];
   const relaunches: number[] = [];
@@ -42,6 +44,7 @@ function setup(over: { wire?: object | 'missing'; link?: string; hello?: object 
           : Promise.resolve([{ type: 'text' as const, text: JSON.stringify(wire) }]),
     },
     ours: OURS,
+    paired: () => over.paired === true,
     fallback: { dataDir: 'C:/fallback', logPath: 'C:/fallback/brain.log' },
     stop: () => Promise.resolve(stops.push(1) > 0),
     relaunch: () => Promise.resolve(void relaunches.push(1)),
@@ -275,8 +278,8 @@ describe('a brain on another machine', () => {
     expect(await status.card()).toMatchObject({ host: 'HOME-PC', local: false });
   });
 
-  it('still names its host, and is not offered a restart, once it cannot be reached', async () => {
-    const { status, brain, stops } = setup({ wire: REMOTE });
+  it('is remote because the link is paired, so an unreachable brain is not offered a restart', async () => {
+    const { status, brain, stops } = setup({ wire: REMOTE, paired: true });
     await status.card();
     (brain as { link: string }).link = 'offline';
     expect(await status.card()).toMatchObject({
@@ -286,6 +289,11 @@ describe('a brain on another machine', () => {
     });
     await status.restart();
     expect(stops).toEqual([]);
+  });
+
+  it('is remote from the first card when the link is paired, even before the brain has answered', async () => {
+    const { status } = setup({ wire: 'missing', paired: true });
+    expect(await status.card()).toMatchObject({ local: false });
   });
 
   it('is not restarted, not even by an older build', async () => {

@@ -1,9 +1,10 @@
 /**
  * "Reach Scout away from home": four steps to put the brain's computer and this one on the same
- * Tailscale network. A step is done when the desktop finds what it asks for, not when it is
- * ticked. Contains TailscaleGuide.
+ * Tailscale network. It opens at once and fills in as the desktop answers; a step is done when
+ * the desktop finds what it asks for, not when it is ticked. It looks again when the window
+ * regains focus (after installing or signing in) and on Check again. Contains TailscaleGuide.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '../controls/button';
 import { CopyButton } from '../controls/copy-button';
 import { useHostBridge } from '../host-bridge';
@@ -11,13 +12,17 @@ import type { BrainCard } from '../host-bridge';
 import { tailnetHost } from '../shapes';
 import type { TailscaleState } from '../shapes';
 
+const DOWNLOAD = 'https://tailscale.com/download';
+
 function Step({
   done,
-  title,
+  doneTitle,
+  todoTitle,
   children,
 }: {
   done: boolean;
-  title: string;
+  doneTitle: string;
+  todoTitle: string;
   children?: React.ReactNode;
 }) {
   return (
@@ -26,37 +31,42 @@ function Step({
         {done ? '✓' : ''}
       </span>
       <div>
-        <strong>{title}</strong>
+        <strong>{done ? doneTitle : todoTitle}</strong>
         {children}
       </div>
     </li>
   );
 }
 
-export function TailscaleGuide({ onClose }: { onClose: () => void }) {
+export function TailscaleGuide({ card, onClose }: { card: BrainCard | null; onClose: () => void }) {
   const bridge = useHostBridge();
   const [tailscale, setTailscale] = useState<TailscaleState | null>(null);
-  const [card, setCard] = useState<BrainCard | null>(null);
 
-  useEffect(() => {
+  const check = useCallback(() => {
     void bridge.tailscaleState().then(setTailscale, () => undefined);
-    void bridge.brainCard().then(setCard, () => undefined);
   }, [bridge]);
 
-  if (tailscale === null || card === null) return null;
+  useEffect(() => {
+    check();
+    window.addEventListener('focus', check);
+    return () => window.removeEventListener('focus', check);
+  }, [check]);
 
-  const machine = card.host ?? 'the brain computer';
-  const tailnet = tailnetHost(card.addr);
-  const overTailnet = card.local === false && tailnet !== null;
-  const brainDone = overTailnet || (card.local !== false && tailscale.ip !== null);
-  const deviceDone = tailscale.ip !== null;
-  const working = overTailnet && card.status === 'running';
+  const machine = card?.host ?? 'the brain computer';
+  const tailnet = card === null ? null : tailnetHost(card.addr);
+  const overTailnet = card?.local === false && tailnet !== null;
+  const deviceDone = tailscale?.ip != null;
+  const brainDone = overTailnet || (card !== null && card.local !== false && deviceDone);
+  const working = overTailnet && card?.status === 'running';
 
   return (
     <section className="tg-card ts-guide" aria-label="Reach Scout away from home">
       <div className="ts-head">
         <h2 className="tg-card__label">Reach Scout away from home</h2>
         <span className="tg-chip">{working ? 'Working' : 'Free for personal use'}</span>
+        <Button variant="quiet" onClick={check}>
+          Check again
+        </Button>
         <Button variant="quiet" onClick={onClose}>
           Close
         </Button>
@@ -68,9 +78,8 @@ export function TailscaleGuide({ onClose }: { onClose: () => void }) {
       <ol className="ts-steps">
         <Step
           done={brainDone}
-          title={
-            brainDone ? `Tailscale is running on ${machine}` : `Install Tailscale on ${machine}`
-          }
+          doneTitle={`Tailscale is running on ${machine}`}
+          todoTitle={`Install Tailscale on ${machine}`}
         >
           {!brainDone && (
             <p className="cx-meta">Sign in with the account you will use everywhere.</p>
@@ -78,28 +87,26 @@ export function TailscaleGuide({ onClose }: { onClose: () => void }) {
         </Step>
         <Step
           done={deviceDone}
-          title={
-            deviceDone ? 'Tailscale is running on this device' : 'Install Tailscale on this device'
-          }
+          doneTitle="Tailscale is running on this device"
+          todoTitle="Install Tailscale on this device"
         >
           {!deviceDone && (
             <p className="cx-meta">
-              {tailscale.installed ? 'Open Tailscale and sign in.' : 'It is free for personal use.'}
+              {tailscale?.installed
+                ? 'Open Tailscale and sign in.'
+                : 'It is free for personal use.'}
             </p>
           )}
-          {!tailscale.installed && (
-            <Button variant="secondary" onClick={() => void bridge.openTailscaleDownload()}>
+          {tailscale?.installed === false && (
+            <a className="cx-link" href={DOWNLOAD} target="_blank" rel="noreferrer noopener">
               Open the Tailscale download page
-            </Button>
+            </a>
           )}
         </Step>
         <Step
           done={overTailnet}
-          title={
-            overTailnet
-              ? `Paired using ${machine}'s Tailscale address`
-              : `Pair using ${machine}'s Tailscale address`
-          }
+          doneTitle={`Paired using ${machine}'s Tailscale address`}
+          todoTitle={`Pair using ${machine}'s Tailscale address`}
         >
           {!overTailnet && (
             <p className="cx-meta">
@@ -107,7 +114,7 @@ export function TailscaleGuide({ onClose }: { onClose: () => void }) {
             </p>
           )}
         </Step>
-        <Step done={working} title="Check it works" />
+        <Step done={working} doneTitle="Check it works" todoTitle="Check it works" />
       </ol>
       {working && tailnet !== null && (
         <p className="ts-address">

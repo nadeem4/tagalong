@@ -49,7 +49,12 @@ export function createBrainSetup(
 
 export function registerBrainLinkIpc(
   handle: IpcHandle,
-  deps: { brain: { url: string; link: BrainStatus }; setup: BrainSetup },
+  deps: {
+    brain: { url: string; link: BrainStatus };
+    setup: BrainSetup;
+    /** Dial the brain again now (Home's Try now, for a brain that is not answering). */
+    reconnect: () => void;
+  },
 ): void {
   const { brain, setup } = deps;
   handle(IPC.brainLink, () => ({
@@ -62,4 +67,5 @@ export function registerBrainLinkIpc(
   handle(IPC.brainSetupRetry, () =>
     setup.state === 'failed' || brain.link === 'offline' ? setup.retry() : undefined,
   );
+  handle(IPC.brainReconnect, () => deps.reconnect());
 }

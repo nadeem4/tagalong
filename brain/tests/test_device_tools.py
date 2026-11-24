@@ -8,7 +8,7 @@ from brain.device_tools import device_tools
 from brain.devices import Devices
 from brain.identity import load_or_create_identity
 from brain.pairing import Pairing
-from brain.protocol import RpcError
+from brain.protocol import ErrorCode, RpcError
 from brain.store.db import open_db
 
 NOW = "2026-11-21T00:00:00Z"
@@ -50,8 +50,9 @@ async def test_revoking_an_unknown_device_says_so(rig):
 
 async def test_pair_make_refuses_a_remote_device_kind_when_the_network_is_off(tmp_path):
     rig = Rig(tmp_path, network=False)
-    with pytest.raises(RpcError):
+    with pytest.raises(RpcError) as refused:
         await rig.run("pair_make", {"kind": "desktop"})
+    assert refused.value.code == ErrorCode.network_off
     assert (await rig.run("pair_make", {"kind": "browser"}))["qr"]
 
 

@@ -15,7 +15,6 @@ function setup(
 ) {
   const ipc = fakeIpc();
   const calls: [string, object | undefined][] = [];
-  const opened: string[] = [];
   registerDevicesIpc(ipc.handle, {
     brain: {
       call: (tool: string, input?: object) => {
@@ -29,15 +28,8 @@ function setup(
     },
     runTailscale: () =>
       tailscale === 'missing' ? Promise.reject(new Error('ENOENT')) : Promise.resolve(tailscale),
-    openExternal: (url) => {
-      opened.push(url);
-      return Promise.resolve();
-    },
-    reconnect: () => {
-      calls.push(['reconnect', undefined]);
-    },
   });
-  return { ...ipc, calls, opened };
+  return { ...ipc, calls };
 }
 
 const device = (id: string, name: string, kind: string) => ({
@@ -78,13 +70,5 @@ describe('registerDevicesIpc', () => {
     expect(await signedOut.invoke(IPC.tailscaleState)).toEqual({ installed: true, ip: null });
     const missing = setup(() => text({}), 'missing');
     expect(await missing.invoke(IPC.tailscaleState)).toEqual({ installed: false, ip: null });
-  });
-
-  it('opens only the Tailscale download page, and reconnect dials the brain again', async () => {
-    const { invoke, opened, calls } = setup(() => text({}));
-    await invoke(IPC.tailscaleDownload);
-    await invoke(IPC.brainReconnect);
-    expect(opened).toEqual(['https://tailscale.com/download']);
-    expect(calls).toEqual([['reconnect', undefined]]);
   });
 });

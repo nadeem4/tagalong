@@ -1,20 +1,29 @@
 /**
  * One paired computer, browser or AI tool on Devices: its name and standing, with Rename in
- * place and a Revoke that asks first. Contains DeviceRowItem.
+ * place and a Revoke that asks first, in the row, as Remove does on Connections. Contains
+ * DeviceRowItem.
  */
 import { useState } from 'react';
 import { Button } from '../controls/button';
-import { seenWords, dayWords } from '../shapes';
 import type { DeviceRow } from '../shapes';
+import { dayLabel, time } from './approval-history';
 import { Place, StandingLabel } from './place-row';
 
-const KIND_WORDS: Record<string, string> = {
-  desktop: 'Desktop',
-  browser: 'Browser',
-  node: 'Computer',
-  mcp_client: "Reads and adds to Scout's memory",
+const KINDS: Record<string, { tile: string; label: string }> = {
+  desktop: { tile: 'PC', label: 'Desktop' },
+  browser: { tile: 'C', label: 'Browser' },
+  node: { tile: 'PC', label: 'Computer' },
+  mcp_client: { tile: 'AI', label: "Reads and adds to Scout's memory" },
 };
-const TILE: Record<string, string> = { desktop: 'PC', browser: 'C', node: 'PC', mcp_client: 'AI' };
+const OTHER = { tile: 'PC', label: 'Device' };
+
+const when = (iso: string): string => `${dayLabel(iso)}, ${time(iso)}`;
+
+function seenWords(device: DeviceRow, online: boolean): string {
+  if (online) return 'Online now';
+  if (device.lastSeen === null) return 'Not seen yet';
+  return `Last seen ${when(device.lastSeen)}`;
+}
 
 export function DeviceRowItem({
   device,
@@ -32,14 +41,10 @@ export function DeviceRowItem({
   const [mode, setMode] = useState<'view' | 'rename' | 'revoke'>('view');
   const [draft, setDraft] = useState(device.name);
   const aiTool = device.kind === 'mcp_client';
+  const kind = KINDS[device.kind] ?? OTHER;
   const meta = aiTool
-    ? `${KIND_WORDS['mcp_client']} · ${device.lastSeen === null ? 'not used yet' : `last used ${seenWords(device.lastSeen)}`}`
-    : `${KIND_WORDS[device.kind] ?? 'Device'} · paired ${dayWords(device.pairedAt)}`;
-  const words = online
-    ? 'Online now'
-    : device.lastSeen === null
-      ? 'Not seen yet'
-      : `Last seen ${seenWords(device.lastSeen)}`;
+    ? `${kind.label} · ${device.lastSeen === null ? 'not used yet' : `last used ${when(device.lastSeen)}`}`
+    : `${kind.label} · paired ${dayLabel(device.pairedAt)}`;
 
   const save = async (): Promise<void> => {
     const name = draft.trim();
@@ -50,7 +55,7 @@ export function DeviceRowItem({
   return (
     <li className="cx-item">
       <Place
-        tile={TILE[device.kind] ?? 'PC'}
+        tile={kind.tile}
         name={
           mode === 'rename' ? (
             <input
@@ -71,8 +76,11 @@ export function DeviceRowItem({
         chips={[...(fresh ? ['New'] : []), ...(aiTool ? ['Memory'] : [])]}
         purpose={meta}
       >
-        <StandingLabel standing={online ? 'connected' : 'not-set-up'} words={words} />
-        {mode === 'rename' ? (
+        <StandingLabel
+          standing={online ? 'connected' : 'not-set-up'}
+          words={seenWords(device, online)}
+        />
+        {mode === 'rename' && (
           <>
             <Button variant="primary" onClick={() => void save()}>
               Save
@@ -81,7 +89,26 @@ export function DeviceRowItem({
               Cancel
             </Button>
           </>
-        ) : (
+        )}
+        {mode === 'revoke' && (
+          <>
+            <Button
+              variant="danger"
+              aria-label={`Yes, revoke ${device.name}`}
+              onClick={() => void onRevoke()}
+            >
+              Yes, revoke
+            </Button>
+            <Button
+              variant="secondary"
+              aria-label={`Keep ${device.name}`}
+              onClick={() => setMode('view')}
+            >
+              Keep
+            </Button>
+          </>
+        )}
+        {mode === 'view' && (
           <>
             <Button
               variant="secondary"
@@ -99,19 +126,11 @@ export function DeviceRowItem({
         )}
       </Place>
       {mode === 'revoke' && (
-        <div className="dv-confirm" role="alert">
-          <span>
-            {aiTool
-              ? `Revoke ${device.name}? It can no longer read or add to Scout's memory. What it already added stays; remove it under What Scout remembers.`
-              : `Revoke ${device.name}? It stops working right away and loses access to Scout. You can pair it again with a new code.`}
-          </span>
-          <Button variant="quiet" onClick={() => setMode('view')}>
-            Keep it
-          </Button>
-          <Button variant="danger" onClick={() => void onRevoke()}>
-            Revoke
-          </Button>
-        </div>
+        <p role="alert" className="tg-note cx-row__note">
+          {aiTool
+            ? `Revoke ${device.name}? It can no longer read or add to Scout's memory. What it already added stays; remove it under What Scout remembers.`
+            : `Revoke ${device.name}? It stops working right away and loses access to Scout. You can pair it again with a new code.`}
+        </p>
       )}
     </li>
   );

@@ -9,6 +9,7 @@ export * from './apps';
 export * from './bodies';
 export * from './context';
 export * from './devices';
+export * from './tailscale';
 export * from './echo';
 export * from './know-me';
 export * from './events';

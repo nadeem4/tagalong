@@ -4,7 +4,7 @@
  * fingerprint and device token only when the brain accepts. Also makes the code another device
  * pairs with. Contains pairWithLink and registerPairIpc.
  */
-import { pairOverSocket, parsePairLink } from '@tagalong/contract';
+import { ErrorCode, RpcError, pairOverSocket, parsePairLink } from '@tagalong/contract';
 import { IPC } from '../../shared/ipc';
 import type { FoundBrain, PairOffer, PairOutcome } from '@tagalong/ui/shapes';
 import { callJson } from '../brain/call-json';
@@ -73,9 +73,8 @@ export function registerPairIpc(
       };
       return { link: made.link, expiresAt: made.expires_at, qr: made.qr };
     } catch (error) {
-      throw new Error(String(error).includes('Network access is off') ? 'network_off' : 'failed', {
-        cause: error,
-      });
+      const off = error instanceof RpcError && error.code === ErrorCode.network_off;
+      throw new Error(off ? 'network_off' : 'failed', { cause: error });
     }
   });
   handle(IPC.pairForget, () => {

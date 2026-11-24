@@ -6,7 +6,7 @@
  * version update does (`stopBrain`, never for a brain the person started themselves).
  * A start failure only logs: the client retries.
  */
-import { spawn as nodeSpawn } from 'node:child_process';
+import { execFile, spawn as nodeSpawn } from 'node:child_process';
 import type { ChildProcess, SpawnOptions } from 'node:child_process';
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync } from 'node:fs';
 import { connect } from 'node:net';
@@ -230,6 +230,18 @@ export function runTagalong(
     child.stderr?.on('data', collect);
     child.once('error', (error) => resolve({ code: 1, out: error.message }));
     child.once('exit', (code) => resolve({ code: code ?? 1, out }));
+  });
+}
+
+/** `tailscale ip -4`; rejects when there is no tailscale command, so a missing install reads apart from a signed-out one. */
+export function runTailscale(
+  exec: typeof execFile = execFile,
+): Promise<{ code: number; out: string }> {
+  return new Promise((resolve, reject) => {
+    exec('tailscale', ['ip', '-4'], { timeout: 5000, windowsHide: true }, (error, stdout) => {
+      if (error !== null && (error as NodeJS.ErrnoException).code === 'ENOENT') reject(error);
+      else resolve({ code: error === null ? 0 : 1, out: stdout });
+    });
   });
 }
 

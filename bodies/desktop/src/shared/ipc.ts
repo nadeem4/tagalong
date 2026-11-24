@@ -153,7 +153,6 @@ export const IPC = {
   devicesRevoke: 'tagalong:devices:revoke',
   brainReconnect: 'tagalong:brain:reconnect',
   tailscaleState: 'tagalong:tailscale:state',
-  tailscaleDownload: 'tagalong:tailscale:download',
   pairMake: 'tagalong:pair:make',
   // Making this PC the brain: the logon service that keeps it running without the window.
   brainServiceInstall: 'tagalong:brain-service:install',

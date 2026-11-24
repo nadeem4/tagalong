@@ -35,6 +35,7 @@ export const ErrorCode = {
   tool_failed: -32007,
   over_limit: -32008,
   unauthorized: -32009,
+  network_off: -32010,
 } as const;
 
 const errorCodes: readonly number[] = Object.values(ErrorCode);

@@ -50,6 +50,7 @@ class ErrorCode(IntEnum):
     tool_failed = -32007
     over_limit = -32008
     unauthorized = -32009
+    network_off = -32010
 
 
 class RpcError(Exception):

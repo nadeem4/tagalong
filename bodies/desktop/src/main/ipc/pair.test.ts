@@ -1,4 +1,5 @@
 /** Tests for pairing the desktop with a brain from a link, on a fake pinned socket. */
+import { ErrorCode, RpcError } from '@tagalong/contract';
 import { describe, expect, it } from 'vitest';
 import { IPC } from '../../shared/ipc';
 import type { PinnedSocket } from '../brain/pinned-socket';
@@ -122,6 +123,15 @@ describe('pairWithLink', () => {
   });
 });
 
+/** What a handler that never pairs is given; making a code touches none of it. */
+const unused: PairDeps = {
+  link: { canSeal: () => true, saveRemote: () => undefined, forget: () => undefined },
+  openSocket: () => {
+    throw new Error('no socket expected');
+  },
+  log: () => undefined,
+};
+
 describe('registerPairIpc', () => {
   it('restarts the brain client after a successful pairing, not after a failed one', async () => {
     const { deps } = setup((s) => {
@@ -144,11 +154,10 @@ describe('registerPairIpc', () => {
   });
 
   it('makes a pairing code on this PC’s brain and hands the page the link, expiry and QR but not the secret', async () => {
-    const { deps } = setup(() => undefined);
     const asked: { tool: string; input: unknown }[] = [];
     const ipc = fakeIpc();
     registerPairIpc(ipc.handle, {
-      ...deps,
+      ...unused,
       deviceName: 'My PC',
       brain: {
         call: async (tool, input) => {
@@ -178,14 +187,12 @@ describe('registerPairIpc', () => {
   });
 
   it('says network_off when the brain will not make a code for other devices', async () => {
-    const { deps } = setup(() => undefined);
     const ipc = fakeIpc();
     registerPairIpc(ipc.handle, {
-      ...deps,
+      ...unused,
       deviceName: 'My PC',
       brain: {
-        call: () =>
-          Promise.reject(new Error('Network access is off, so only the browser add-on can pair.')),
+        call: () => Promise.reject(new RpcError(ErrorCode.network_off, 'any words at all')),
       },
       discover: async () => [],
       reconnect: () => undefined,

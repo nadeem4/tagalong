@@ -5,7 +5,6 @@
  * Electron itself: they move windows, read the screen or open things through the shell.
  */
 
-import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -68,6 +67,7 @@ import {
   realLaunch,
   realRestartService,
   realRunTagalong,
+  runTailscale,
   realSpawnNode,
   realStop,
   startsNoProcesses,
@@ -467,6 +467,7 @@ async function start(): Promise<void> {
   const run = brainRun();
   brainControl = createBrainStatus({
     brain,
+    paired: () => link.paired() !== null,
     ours: ownBuild({
       packaged: run.packaged !== undefined,
       appVersion: run.appVersion,
@@ -1140,20 +1141,14 @@ function registerIpc(): void {
   });
   registerDevicesIpc(handle, {
     brain: required().brain,
-    runTailscale: () =>
-      new Promise((resolve, reject) => {
-        // An e2e run starts no process, so Tailscale reads as not installed.
-        if (startsNoProcesses(process.env)) return reject(new Error('ENOENT'));
-        execFile('tailscale', ['ip', '-4'], { timeout: 5000 }, (error, stdout) => {
-          if (error !== null && (error as NodeJS.ErrnoException).code === 'ENOENT') reject(error);
-          else resolve({ code: error === null ? 0 : 1, out: stdout });
-        });
-      }),
-    openExternal: (url) => shell.openExternal(url),
-    reconnect: redial,
+    runTailscale,
   });
   registerBrainServiceIpc(handle, { run: (args) => realRunTagalong(brainRun(), args) });
-  registerBrainLinkIpc(handle, { brain: required().brain, setup: brainSetup });
+  registerBrainLinkIpc(handle, {
+    brain: required().brain,
+    setup: brainSetup,
+    reconnect: redial,
+  });
   if (brainControl !== null) registerBrainStatusIpc(handle, brainControl);
   registerSettingsIpc(handle, {
     settingsStore: () => required().settingsStore,

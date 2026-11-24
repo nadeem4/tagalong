@@ -450,7 +450,6 @@ export interface HostBridge {
   reconnectBrain(): Promise<void>;
   /** What the desktop finds of Tailscale on this PC; no call leaves the machine. */
   tailscaleState(): Promise<TailscaleState>;
-  openTailscaleDownload(): Promise<void>;
   /**
    * How Scout reads the screen on this PC, as the brain's reading_status answer (JSON text; read
    * it with readingRowsOf). Changes arrive as `changed reading`. Rejects while the brain is away.

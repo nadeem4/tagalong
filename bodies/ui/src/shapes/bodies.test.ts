@@ -37,12 +37,13 @@ describe('parseBodiesState', () => {
     expect(state.whatsapp).toMatchObject({ enabled: false, complete: false, port: 47322 });
   });
 
-  it('keeps the id of a body row', () => {
-    expect(parseBodiesState(WIRE).bodies.map((b) => b.id)).toEqual([
-      'desktop-a1b2c3',
-      'browser',
-      'whatsapp',
-    ]);
+  it('keeps the id of a body row, and the paired device behind it when there is one', () => {
+    const state = parseBodiesState({
+      ...WIRE,
+      bodies: [{ ...WIRE.bodies[0]!, device_id: 'dev-1' }, ...WIRE.bodies.slice(1)],
+    });
+    expect(state.bodies.map((b) => b.id)).toEqual(['desktop-a1b2c3', 'browser', 'whatsapp']);
+    expect(state.bodies.map((b) => b.device_id)).toEqual(['dev-1', undefined, undefined]);
   });
 
   it('rejects a state with a missing field', () => {

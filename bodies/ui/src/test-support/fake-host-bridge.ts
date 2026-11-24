@@ -718,10 +718,6 @@ export function createFakeHostBridge(
     tailscaleState() {
       return Promise.resolve({ ...fake.tailscale });
     },
-    openTailscaleDownload() {
-      brainActions.push('open-tailscale');
-      return Promise.resolve();
-    },
     usageSummary() {
       return Promise.resolve({ spentUsd: 0, limitUsd: null });
     },

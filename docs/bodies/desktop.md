@@ -864,19 +864,22 @@ pictures")`: `IPC.askScout` (`ipc/ask-scout.ts`) brings the companion up and sen
 Home's Devices page (`bodies/ui/src/home/devices-view.tsx`, nav label Devices with a "New" badge, after
 Connections; `ipc/devices.ts` and `ipc/bodies.ts`) lists the paired devices from the brain's `devices_list`
 (`parseDevices` in `ui/src/shapes/devices.ts` drops revoked ones and sets AI tools, kind `mcp_client`, apart).
-Each row (`device-row.tsx`) renames in place (Enter saves, Escape cancels) and revokes after a confirm line
-(`device_rename`, `device_revoke`; the confirm for an AI tool says what it added stays). It shows Online now
-when a connected body has the same name and kind. A device that appears on a later read gets a New chip and a
+Each row (`device-row.tsx`) renames in place (Enter saves, Escape cancels) and revokes after an in-row confirm (Yes, revoke or Keep, as Remove on Connections;
+`device_rename`, `device_revoke`; the confirm for an AI tool says what it added stays). "Last seen" reuses the
+locale-aware day and clock words of the approval history. It shows Online now
+when a connected body carries the device's id (`device_id` on the brain's `bodies_status` rows). A device that appears on a later read gets a New chip and a
 "paired" line. **Pair a device** opens the pair dialog on `pairMake`; with network access off the brain refuses
-and the desktop answers `network_off`, so the dialog offers **Let other devices connect**, which runs
+with the `network_off` error code (the desktop maps the code, not the words), so the dialog offers **Let other devices connect**, which runs
 `tagalong service install` (per-user, no admin prompt). With nothing paired an empty card offers Pair a device
-and **Reach Scout away from home**, the Tailscale guide (`tailscale-guide.tsx`): a step is done when `tailscale
-ip -4` returns an address (`ipc/devices.ts` runs it through an injected runner; no `tailscale` on the PATH
-means Install Tailscale first, whose button opens only https://tailscale.com/download) or the brain answers
-at its tailnet name. The brain card on Overview has four states: a local service, a local brain that is not a
+and **Reach Scout away from home**, the Tailscale guide (`tailscale-guide.tsx`): the guide opens at once, takes the brain card as a prop and fills in as answers arrive. A step is done when
+`tailscale ip -4` returns an address (`runTailscale` in `brain/launch.ts`, injected into `ipc/devices.ts`;
+no `tailscale` on the PATH means Install Tailscale first, with an ordinary link to https://tailscale.com/download
+that the window-open handler sends to the browser) or the brain answers at its tailnet name. It looks again
+when the window regains focus and on **Check again**, with no polling. The brain card on Overview has four states: a local service, a local brain that is not a
 service yet ("Make this Scout's brain"), a remote brain (machine name, no restart, "Use a different brain")
-and an unreachable remote brain (Try now, Away from home?); the desktop remembers where the brain last said it
-runs so an unreachable remote brain still reads as remote. Besides the paired devices the page lists the
+and an unreachable remote brain (Try now, Away from home?); one `BrainCard` renders both (a remote brain only drops what this PC cannot do). The desktop calls the brain
+remote when the pinned link is paired or the brain said so, so an unreachable remote brain still reads as
+remote. `IPC.brainReconnect` is registered once, in `ipc/brain-link.ts`. Besides the paired devices the page lists the
 places you can talk to Scout: **This PC** (Desktop), **This PC** (Desktop), the **Chrome
 add-on** (Connected or Not set up, with a "Get the add-on" button that opens the tour at its Browser step,
 step 8) and **WhatsApp**, each with a purpose line and Connected, Not set up or Offline (WhatsApp is

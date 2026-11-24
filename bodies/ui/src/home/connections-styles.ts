@@ -174,11 +174,8 @@ export const CONNECTIONS_CSS = `
 :is(.home, .wt) .cx-input--area { height: auto; min-height: 72px; padding: 8px 12px; resize: vertical; white-space: pre; }
 :is(.home, .wt) .cx-code { ${typeCss('small')}; background: ${themedColor.panelTile}; padding: ${t.space.xxs}px ${t.space.sm}px; border-radius: ${t.radius.sm}px; color: ${themedColor.panelText}; }
 :is(.home, .wt) .cx-form__actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-:is(.home, .wt) .home-head.dv-head { flex-direction: row; display: flex; align-items: flex-start; justify-content: space-between; gap: ${t.space.lg}px; }
 :is(.home, .wt) .dv-joined { margin: 0 0 ${t.space.lg}px; padding: ${t.space.md}px ${t.space.lg}px; border-radius: ${t.radius.card}px; background: ${themedColor.okFill}; color: ${themedColor.okInk}; }
 :is(.home, .wt) .dv-empty__actions { display: flex; flex-wrap: wrap; gap: ${t.space.md}px; }
-:is(.home, .wt) .dv-confirm { display: flex; align-items: center; flex-wrap: wrap; gap: ${t.space.md}px; margin: ${t.space.md}px 0; padding: ${t.space.md}px ${t.space.lg}px; border-radius: ${t.radius.card}px; background: ${themedColor.errFill}; color: ${themedColor.errInk}; }
-:is(.home, .wt) .dv-confirm > span { flex: 1; min-width: 240px; }
 :is(.home, .wt) .ts-head { display: flex; align-items: center; gap: ${t.space.md}px; }
 :is(.home, .wt) .ts-head .tg-card__label { margin: 0; margin-right: auto; }
 :is(.home, .wt) .ts-steps { list-style: none; margin: ${t.space.lg}px 0 0; padding: 0; display: flex; flex-direction: column; gap: ${t.space.lg}px; }

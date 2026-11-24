@@ -48,35 +48,3 @@ export function parseDevices(json: unknown): DevicesState {
     aiTools: live.filter((d) => d.kind === 'mcp_client'),
   };
 }
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-/** "14 Nov", in the viewer's time zone. */
-export const dayWords = (iso: string): string => {
-  const at = new Date(iso);
-  return `${at.getDate()} ${MONTHS[at.getMonth()]}`;
-};
-
-/** "today, 18:02", "yesterday, 18:02" or "14 Nov": when a device was last seen. */
-export function seenWords(iso: string, now: number = Date.now()): string {
-  const at = new Date(iso);
-  const midnight = new Date(now).setHours(0, 0, 0, 0);
-  const clock = `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
-  if (at.getTime() >= midnight) return `today, ${clock}`;
-  if (at.getTime() >= midnight - 86_400_000) return `yesterday, ${clock}`;
-  return dayWords(iso);
-}
-
-/** What `tailscale ip -4` found on this PC: not installed, installed but signed out, or its address. */
-export interface TailscaleState {
-  installed: boolean;
-  ip: string | null;
-}
-
-/** The host part of a brain address when it is a Tailscale one (100.64.0.0/10 or `*.ts.net`), else null. */
-export function tailnetHost(addr: string): string | null {
-  const host = addr.replace(/:\d+$/, '');
-  return /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d+\.\d+$/.test(host) || host.endsWith('.ts.net')
-    ? host
-    : null;
-}

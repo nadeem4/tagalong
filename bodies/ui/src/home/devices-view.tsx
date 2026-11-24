@@ -16,11 +16,11 @@ import type {
 import { Button } from '../controls/button';
 import { Toggle } from '../controls/toggle';
 import { useHostBridge } from '../host-bridge';
-import { PairDialog } from '../pair/pair-dialog';
-import { PAIR_CSS } from '../pair/pair-styles';
+import { HostPairDialog } from '../pair/host-pair-dialog';
 import { DeviceRowItem } from './device-row';
 import { Place, StandingLabel } from './place-row';
 import { TailscaleGuide } from './tailscale-guide';
+import { useBrainCard } from './use-brain-card';
 import type { Standing } from './place-row';
 
 // The tour's Browser step is where the add-on's folder and its load-unpacked steps are shown.
@@ -80,12 +80,12 @@ const EMPTY: Record<WhatsAppField, string> = {
 
 export function DevicesView({ reach = false }: { reach?: boolean }) {
   const bridge = useHostBridge();
+  const { card } = useBrainCard();
   const formId = useId();
   const [state, setState] = useState<BodiesState | null>(null);
   const [paired, setPaired] = useState<DevicesState | null>(null);
   const known = useRef<Set<string> | null>(null);
   const [fresh, setFresh] = useState<Set<string>>(new Set());
-  const [joined, setJoined] = useState<string | null>(null);
   const [pairing, setPairing] = useState(false);
   const [guide, setGuide] = useState(reach);
   const [failed, setFailed] = useState(false);
@@ -104,7 +104,6 @@ export function DevicesView({ reach = false }: { reach?: boolean }) {
           const added = all.filter((device) => !before.has(device.id));
           if (added.length > 0) {
             setFresh((now) => new Set([...now, ...added.map((device) => device.id)]));
-            setJoined(added[0]!.name);
           }
         }
         setFailed(false);
@@ -115,6 +114,10 @@ export function DevicesView({ reach = false }: { reach?: boolean }) {
         console.error('could not read bodies', error);
         setFailed(true);
       });
+  }, [bridge]);
+
+  const refreshDevices = useCallback(() => {
+    void bridge.devicesState().then(setPaired, () => undefined);
   }, [bridge]);
 
   useEffect(() => {
@@ -142,7 +145,7 @@ export function DevicesView({ reach = false }: { reach?: boolean }) {
   };
 
   const head = (
-    <div className="home-head dv-head">
+    <div className="home-head home-head--row">
       <div>
         <h1 className="home-title">Devices</h1>
         <p>Everything that can talk to Scout, and where its brain lives.</p>
@@ -169,45 +172,32 @@ export function DevicesView({ reach = false }: { reach?: boolean }) {
   const connected = (kind: 'desktop' | 'browser' | 'whatsapp'): boolean =>
     state.bodies.find((body) => body.kind === kind)?.connected === true;
   const wa = state.whatsapp;
-  const kindOf = (device: { kind: string }): 'desktop' | 'browser' =>
-    device.kind === 'browser' ? 'browser' : 'desktop';
-  const isOnline = (name: string, kind: 'desktop' | 'browser'): boolean =>
-    state.bodies.some((body) => body.kind === kind && body.connected && body.name === name);
-  // An online body that is not a paired device (this PC, the add-on) keeps its own row.
+  // A body that is a paired device shows as that device's row; the rest (this PC, the add-on, and
+  // the offline row the brain keeps for a kind with none online) keep their own.
+  const isOnline = (device: DeviceRow): boolean =>
+    state.bodies.some((body) => body.connected && body.device_id === device.id);
   const unpaired = (kind: 'desktop' | 'browser') =>
-    state.bodies.filter(
-      (body) =>
-        body.kind === kind &&
-        body.connected &&
-        !paired.devices.some((device) => kindOf(device) === kind && device.name === body.name),
-    );
-  const hasPaired = (kind: 'desktop' | 'browser') =>
-    paired.devices.some((device) => kindOf(device) === kind);
-  // With none online and none paired of a kind, one row says so.
-  const bodiesOf = (kind: 'desktop' | 'browser') => {
-    const online = unpaired(kind);
-    if (online.length > 0) return online;
-    return hasPaired(kind) ? [] : [null];
-  };
+    state.bodies.filter((body) => body.kind === kind && body.device_id === undefined);
   const whatsapp: Standing = connected('whatsapp')
     ? 'connected'
     : wa.complete
       ? 'offline'
       : 'not-set-up';
   const nothingPaired = paired.devices.length === 0 && paired.aiTools.length === 0;
+  const joined = [...paired.devices, ...paired.aiTools].find((device) => fresh.has(device.id));
   const itemFor = (device: DeviceRow) => (
     <DeviceRowItem
       key={device.id}
       device={device}
-      online={device.kind !== 'mcp_client' && isOnline(device.name, kindOf(device))}
+      online={isOnline(device)}
       fresh={fresh.has(device.id)}
       onRename={async (name) => {
         await bridge.renameDevice(device.id, name);
-        refresh();
+        refreshDevices();
       }}
       onRevoke={async () => {
         await bridge.revokeDevice(device.id);
-        refresh();
+        refreshDevices();
       }}
     />
   );
@@ -224,21 +214,13 @@ export function DevicesView({ reach = false }: { reach?: boolean }) {
 
   return (
     <>
-      <style>{PAIR_CSS}</style>
       {head}
-      {joined !== null && (
+      {joined !== undefined && (
         <p className="dv-joined" role="status">
-          {joined} is paired. It can now talk to Scout.
+          {joined.name} is paired. It can now talk to Scout.
         </p>
       )}
-      {pairing && (
-        <PairDialog
-          make={bridge.pairMake}
-          copyText={bridge.copyText}
-          enableNetwork={async () => (await bridge.installBrainService()).ok}
-          onClose={() => setPairing(false)}
-        />
-      )}
+      {pairing && <HostPairDialog host={bridge} onClose={() => setPairing(false)} />}
       {nothingPaired && (
         <section className="tg-card dv-empty" aria-label="Only this computer so far">
           <h2 className="tg-card__label">Only this computer so far</h2>
@@ -256,31 +238,31 @@ export function DevicesView({ reach = false }: { reach?: boolean }) {
           </div>
         </section>
       )}
-      {guide && <TailscaleGuide onClose={() => setGuide(false)} />}
+      {guide && <TailscaleGuide card={card} onClose={() => setGuide(false)} />}
       <section className="tg-card" aria-label="Computers and browsers">
         <ul className="cx-list">
           {paired.devices.map(itemFor)}
-          {bodiesOf('desktop').map((desktop) => (
-            <li className="cx-item" key={desktop?.id ?? 'offline'}>
+          {unpaired('desktop').map((desktop) => (
+            <li className="cx-item" key={desktop.id}>
               <Place
                 tile="PC"
-                name={desktop?.name ?? 'This PC'}
+                name={desktop.connected ? desktop.name : 'This PC'}
                 chips={['Desktop']}
                 purpose="Scout sits on your screen, reads what you point it at and talks out loud."
               >
-                <StandingLabel standing={desktop !== null ? 'connected' : 'offline'} />
+                <StandingLabel standing={desktop.connected ? 'connected' : 'offline'} />
               </Place>
             </li>
           ))}
-          {bodiesOf('browser').map((browser) => (
-            <li className="cx-item" key={browser?.id ?? 'not-set-up'}>
+          {unpaired('browser').map((browser) => (
+            <li className="cx-item" key={browser.id}>
               <Place
                 tile="C"
-                name={browser?.name ?? 'Chrome add-on'}
+                name={browser.connected ? browser.name : 'Chrome add-on'}
                 purpose="Scout reads the page you are on, and you can talk to it from the toolbar."
               >
-                <StandingLabel standing={browser !== null ? 'connected' : 'not-set-up'} />
-                {browser === null && (
+                <StandingLabel standing={browser.connected ? 'connected' : 'not-set-up'} />
+                {!browser.connected && (
                   <Button
                     variant="secondary"
                     onClick={() => void bridge.openWalkthrough(BROWSER_STEP)}
