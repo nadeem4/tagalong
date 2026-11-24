@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { HostBridge } from '../host-bridge';
 import type { VoiceDownload } from '../shapes';
-import { themeTokens as t, typeCss } from '../theme/tokens';
+import { themeTokens as t, themedColor, typeCss } from '../theme/tokens';
 
 export type VoiceDownloadHost = Pick<HostBridge, 'voiceDownload' | 'fetchVoice' | 'onBrainChanged'>;
 
@@ -65,8 +65,8 @@ export function VoiceDownloadLine({ host }: { host: VoiceDownloadHost }) {
 
 const VDL_CSS = `
 .tg-vdl { margin-top: 8px; }
-.tg-vdl__text { ${typeCss('small')}; margin: 0 0 6px; color: ${t.color.panelMuted}; }
-.tg-vdl__bar { height: 4px; border-radius: ${t.radius.pill}px; background: ${t.color.panelTile}; overflow: hidden; }
-.tg-vdl__fill { height: 100%; background: ${t.color.okDot}; }
-.tg-vdl__retry { all: unset; cursor: pointer; font-weight: 600; text-decoration: underline; color: ${t.color.panelText}; }
+.tg-vdl__text { ${typeCss('small')}; margin: 0 0 6px; color: ${themedColor.panelMuted}; }
+.tg-vdl__bar { height: 4px; border-radius: ${t.radius.pill}px; background: ${themedColor.panelTile}; overflow: hidden; }
+.tg-vdl__fill { height: 100%; background: ${themedColor.okDot}; }
+.tg-vdl__retry { all: unset; cursor: pointer; font-weight: 600; text-decoration: underline; color: ${themedColor.panelText}; }
 `;

@@ -4,7 +4,7 @@
  * variables, not props: `:root` is the light page, `.on-navy` the navy chrome, so the focus
  * ring is navy on light and gold on navy without any wiring.
  */
-import { themeTokens as t, typeCss } from '../theme/tokens';
+import { themeTokens as t, themedColor, typeCss } from '../theme/tokens';
 
 export const CONTROLS_CSS = `
 :root {
@@ -32,14 +32,14 @@ export const CONTROLS_CSS = `
 .tg-wordmark { font-family: ${t.font.wordmark}; font-weight: ${t.fontWeight.wordmark}; }
 /* The one card box: Home panels, Settings sections and the tour's cards wear it, and a page adds only its layout. */
 .tg-card {
-  padding: ${t.space.xl}px ${t.space.xxl}px; background: ${t.color.card};
-  border: 1px solid ${t.color.panelLine}; border-radius: ${t.radius.card}px;
+  padding: ${t.space.xl}px ${t.space.xxl}px; background: ${themedColor.card};
+  border: 1px solid ${themedColor.panelLine}; border-radius: ${t.radius.card}px;
 }
 
 .tg-toggle {
   position: relative; flex: none; width: ${t.size.toggleW}px; height: ${t.size.toggleH}px; padding: 0;
   border: 1px solid var(--tg-ctl-line); border-radius: ${t.radius.pill}px;
-  background: ${t.color.scrollbarThumb}; color: ${t.color.panelText}; cursor: pointer;
+  background: ${themedColor.scrollbarThumb}; color: ${themedColor.panelText}; cursor: pointer;
   font-family: ${t.font.ui}; ${typeCss('caption')};
   transition: background 120ms;
 }
@@ -50,7 +50,7 @@ export const CONTROLS_CSS = `
 .tg-toggle[aria-checked='true'] .tg-toggle__word { right: auto; left: 7px; }
 .tg-toggle__knob {
   position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%;
-  background: ${t.color.keycapFill}; box-shadow: 0 1px 2px ${t.color.line}; transition: transform 120ms;
+  background: ${themedColor.keycapFill}; box-shadow: 0 1px 2px ${t.color.line}; transition: transform 120ms;
 }
 .tg-toggle[aria-checked='true'] .tg-toggle__knob { transform: translateX(${t.size.toggleW - t.size.toggleH}px); }
 
@@ -88,8 +88,8 @@ export const CONTROLS_CSS = `
 .tg-shortcut { display: inline-flex; align-items: center; gap: ${t.space.xs}px; white-space: nowrap; }
 .tg-keycap {
   display: inline-block; min-width: 24px; padding: 2px ${t.space.md}px; text-align: center;
-  border: 1px solid ${t.color.keycapLine}; border-bottom-width: 2px; border-radius: ${t.radius.sm}px;
-  background: ${t.color.keycapFill}; color: ${t.color.keycapInk};
+  border: 1px solid ${themedColor.keycapLine}; border-bottom-width: 2px; border-radius: ${t.radius.sm}px;
+  background: ${themedColor.keycapFill}; color: ${themedColor.keycapInk};
   font-family: ${t.font.ui}; ${typeCss('small')}; font-weight: ${t.fontWeight.semibold};
 }
 
@@ -108,7 +108,7 @@ export const CONTROLS_CSS = `
   appearance: none; width: 18px; height: 18px; margin-top: -${t.space.sm}px; border-radius: 50%;
   background: ${t.color.gold}; border: 2px solid ${t.color.goldInk};
 }
-.tg-slider input[type='range']:hover::-webkit-slider-thumb { background: ${t.color.keycapFill}; }
+.tg-slider input[type='range']:hover::-webkit-slider-thumb { background: ${themedColor.keycapFill}; }
 
 .tg-money { display: flex; flex-direction: column; gap: ${t.space.xs}px; }
 .tg-money > label { color: var(--tg-ctl-muted); ${typeCss('small')}; }
@@ -120,7 +120,7 @@ export const CONTROLS_CSS = `
   background: var(--tg-ctl-bg); color: var(--tg-ctl-ink);
   font-family: ${t.font.ui}; ${typeCss('bodyLead')};
 }
-.tg-money .tg-money__row input[type='text'][aria-invalid='true'] { border: 2px solid ${t.color.errInk}; }
+.tg-money .tg-money__row input[type='text'][aria-invalid='true'] { border: 2px solid ${themedColor.errInk}; }
 .tg-money .tg-button {
   width: ${t.size.control}px; padding: 0; color: var(--tg-ctl-ink); border-color: var(--tg-ctl-muted);
 }
@@ -133,7 +133,7 @@ export const CONTROLS_CSS = `
 .tg-mictest { display: flex; flex-direction: column; gap: ${t.space.sm}px; }
 .tg-mictest__row { display: flex; align-items: center; gap: ${t.space.lg}px; }
 .tg-mictest__help { margin: 0; color: var(--tg-ctl-muted); ${typeCss('small')}; }
-.tg-mictest__error { margin: 0; color: ${t.color.errInk}; ${typeCss('small')}; }
+.tg-mictest__error { margin: 0; color: ${themedColor.errInk}; ${typeCss('small')}; }
 .tg-sr-only {
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap; border: 0;
@@ -152,8 +152,8 @@ export const CONTROLS_CSS = `
 .tg-button--secondary:hover:not(:disabled) { border-color: var(--tg-ctl-muted); }
 .tg-button--quiet { background: transparent; color: var(--tg-ctl-muted); }
 .tg-button--quiet:hover:not(:disabled) { color: var(--tg-ctl-ink); background: var(--tg-ctl-bg); }
-.tg-button--danger { background: ${t.color.errFill}; border-color: ${t.color.errInk}; color: ${t.color.errInk}; }
-.tg-button--danger:hover:not(:disabled) { background: ${t.color.errInk}; color: ${t.color.errFill}; }
+.tg-button--danger { background: ${themedColor.errFill}; border-color: ${themedColor.errInk}; color: ${themedColor.errInk}; }
+.tg-button--danger:hover:not(:disabled) { background: ${themedColor.errInk}; color: ${themedColor.errFill}; }
 
 .tg-keyfield { display: flex; flex-direction: column; gap: ${t.space.sm}px; }
 .tg-keyfield__label { color: var(--tg-ctl-ink); ${typeCss('body')}; font-weight: ${t.fontWeight.semibold}; }
@@ -167,21 +167,21 @@ export const CONTROLS_CSS = `
   font-family: ${t.font.ui}; ${typeCss('bodyLead')};
 }
 .tg-keyfield #tg-api-key:focus-visible { outline: ${t.size.focusRing}px solid var(--tg-focus); outline-offset: ${t.size.focusOffset}px; }
-.tg-keyfield[data-state='valid'] #tg-api-key { border-color: ${t.color.okInk}; }
-.tg-keyfield #tg-api-key[aria-invalid='true'] { border: 2px solid ${t.color.errInk}; }
+.tg-keyfield[data-state='valid'] #tg-api-key { border-color: ${themedColor.okInk}; }
+.tg-keyfield #tg-api-key[aria-invalid='true'] { border: 2px solid ${themedColor.errInk}; }
 .tg-keyfield__box .tg-keyfield__show {
   position: absolute; top: 50%; right: ${t.space.xs}px; transform: translateY(-50%);
   height: 28px; padding: 0 ${t.space.md}px;
 }
 .tg-keyfield__row > .tg-button { height: ${t.size.fieldHeight}px; }
 .tg-keyfield__status { min-height: 20px; }
-.tg-keyfield[data-state='invalid'] .tg-keyfield__status { color: ${t.color.errInk}; font-weight: ${t.fontWeight.semibold}; }
-.tg-keyfield[data-state='valid'] .tg-keyfield__status { color: ${t.color.okInk}; }
+.tg-keyfield[data-state='invalid'] .tg-keyfield__status { color: ${themedColor.errInk}; font-weight: ${t.fontWeight.semibold}; }
+.tg-keyfield[data-state='valid'] .tg-keyfield__status { color: ${themedColor.okInk}; }
 /* Daily limit: what it is on the left, the amount and Set in one row on the right, today's spend
    under them. The steppers sit inside the amount's border. */
 .tg-limitfield {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: ${t.space.lg}px 32px; align-items: start;
-  padding-top: ${t.space.xl}px; border-top: 1px solid ${t.color.panelLine};
+  padding-top: ${t.space.xl}px; border-top: 1px solid ${themedColor.panelLine};
 }
 .tg-limitfield__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; max-width: 46ch; }
 .tg-limitfield__title { color: var(--tg-ctl-ink); ${typeCss('bodyLead')}; font-weight: ${t.fontWeight.semibold}; }
@@ -192,29 +192,29 @@ export const CONTROLS_CSS = `
   border: 1px solid var(--tg-ctl-line); border-radius: ${t.radius.sm}px; background: var(--tg-ctl-bg);
 }
 .tg-limitfield .tg-money__row:focus-within { outline: ${t.size.focusRing}px solid var(--tg-focus); outline-offset: ${t.size.focusOffset}px; }
-.tg-limitfield .tg-money__row:has(input[aria-invalid='true']) { border: 2px solid ${t.color.errInk}; }
+.tg-limitfield .tg-money__row:has(input[aria-invalid='true']) { border: 2px solid ${themedColor.errInk}; }
 .tg-limitfield .tg-money__prefix { padding: 0 2px 0 ${t.space.lg}px; }
 .tg-limitfield .tg-money .tg-money__row input[type='text'] {
   width: 64px; height: 100%; padding: 0 ${t.space.md}px 0 2px; border: 0; border-radius: 0; outline: none;
   font-weight: ${t.fontWeight.semibold}; font-variant-numeric: tabular-nums;
 }
 .tg-limitfield .tg-money .tg-money__row .tg-button {
-  width: 32px; height: 100%; border: 0; border-left: 1px solid ${t.color.panelLine}; border-radius: 0;
+  width: 32px; height: 100%; border: 0; border-left: 1px solid ${themedColor.panelLine}; border-radius: 0;
 }
 .tg-limitfield .tg-error, .tg-limitfield .tg-saved {
   display: flex; align-items: center; gap: ${t.space.sm}px; margin: 0; ${typeCss('small')}; font-weight: ${t.fontWeight.semibold};
 }
-.tg-limitfield .tg-error { color: ${t.color.errInk}; }
-.tg-limitfield .tg-saved { color: ${t.color.okInk}; }
+.tg-limitfield .tg-error { color: ${themedColor.errInk}; }
+.tg-limitfield .tg-saved { color: ${themedColor.okInk}; }
 .tg-limitfield .tg-icon { width: 14px; height: 14px; flex: none; }
 .tg-money .tg-button .tg-icon { width: 14px; height: 14px; }
 .tg-spend { width: 100%; display: flex; flex-direction: column; gap: ${t.space.sm}px; }
 .tg-spend__top { display: flex; justify-content: space-between; gap: ${t.space.lg}px; ${typeCss('small')}; font-variant-numeric: tabular-nums; }
 .tg-spend__top strong { color: var(--tg-ctl-ink); font-weight: ${t.fontWeight.semibold}; }
 .tg-spend__top span { color: var(--tg-ctl-muted); }
-.tg-spendmeter { height: 6px; border-radius: ${t.radius.sm}px; background: ${t.color.panelTile}; overflow: hidden; }
+.tg-spendmeter { height: 6px; border-radius: ${t.radius.sm}px; background: ${themedColor.panelTile}; overflow: hidden; }
 .tg-spendmeter > i { display: block; height: 100%; border-radius: ${t.radius.sm}px; background: var(--tg-ctl-ink); }
 .tg-spendmeter--full > i { background: ${t.color.warnBar}; }
-.tg-spend .tg-spend__full { margin: 0; color: ${t.color.warnInk}; ${typeCss('small')}; font-weight: ${t.fontWeight.semibold}; }
+.tg-spend .tg-spend__full { margin: 0; color: ${themedColor.warnInk}; ${typeCss('small')}; font-weight: ${t.fontWeight.semibold}; }
 .tg-spent { margin: 4px 0 0; color: var(--tg-ctl-muted); ${typeCss('small')}; font-variant-numeric: tabular-nums; }
 `;

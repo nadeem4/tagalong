@@ -7,7 +7,7 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { HostBridge } from '../host-bridge';
 import type { ModelState } from '../shapes';
-import { themeTokens as t, typeCss } from '../theme/tokens';
+import { themeTokens as t, themedColor, typeCss } from '../theme/tokens';
 
 export type ModelHost = Pick<HostBridge, 'modelState' | 'setModel' | 'onBrainChanged'>;
 
@@ -259,53 +259,53 @@ function Check() {
 const MODEL_CSS = `
 .tg-model__row {
   display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 12px 32px; align-items: start;
-  padding: 16px 0 2px; border-top: 1px solid ${t.color.panelLine};
+  padding: 16px 0 2px; border-top: 1px solid ${themedColor.panelLine};
 }
 .tg-model__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding-top: 8px; }
 .tg-model__labelrow { display: flex; align-items: center; gap: ${t.space.lg}px; }
-.tg-model__label { ${typeCss('body')};font-weight:600; color: ${t.color.panelText}; }
-.tg-model__note { ${typeCss('body')}; color: ${t.color.panelMuted}; max-width: 46ch; }
+.tg-model__label { ${typeCss('body')};font-weight:600; color: ${themedColor.panelText}; }
+.tg-model__note { ${typeCss('body')}; color: ${themedColor.panelMuted}; max-width: 46ch; }
 .tg-model__msg { display: flex; align-items: center; gap: 6px; ${typeCss('small')};font-weight:600; }
-.tg-model__msg--ok { color: ${t.color.okInk}; }
-.tg-model__msg--err { color: ${t.color.errInk}; }
+.tg-model__msg--ok { color: ${themedColor.okInk}; }
+.tg-model__msg--err { color: ${themedColor.errInk}; }
 .tg-model__check { width: 16px; height: 16px; flex: none; }
 .tg-model__ctl { position: relative; }
 .tg-model__sel {
   position: relative; box-sizing: border-box; width: 100%; height: 36px; display: flex; align-items: center;
-  gap: 8px; padding: 0 ${t.space.lg}px 0 12px; border: 1px solid ${t.color.keycapLine}; border-radius: ${t.radius.sm}px;
-  background: ${t.color.card}; box-shadow: 0 1px 1px rgba(18, 22, 43, 0.04); font-family: ${t.font.ui};
-  ${typeCss('bodyLead')}; color: ${t.color.panelText};
+  gap: 8px; padding: 0 ${t.space.lg}px 0 12px; border: 1px solid ${themedColor.keycapLine}; border-radius: ${t.radius.sm}px;
+  background: ${themedColor.card}; box-shadow: 0 1px 1px rgba(18, 22, 43, 0.04); font-family: ${t.font.ui};
+  ${typeCss('bodyLead')}; color: ${themedColor.panelText};
 }
 .tg-model__sel--live { cursor: pointer; }
 .tg-model__sel--live:focus-visible { outline: 2px solid ${t.color.focusOnLight}; outline-offset: 2px; }
-.tg-model__sel.is-open { border-color: ${t.color.panelText}; }
-.tg-model__sel.is-open .tg-model__chev { transform: rotate(180deg); color: ${t.color.panelText}; }
+.tg-model__sel.is-open { border-color: ${themedColor.panelText}; }
+.tg-model__sel.is-open .tg-model__chev { transform: rotate(180deg); color: ${themedColor.panelText}; }
 .tg-model__sel[aria-disabled='true'] {
-  background: ${t.color.disabledFill}; border-color: ${t.color.panelLine}; box-shadow: none; color: ${t.color.dim}; cursor: default;
+  background: ${themedColor.disabledFill}; border-color: ${themedColor.panelLine}; box-shadow: none; color: ${t.color.dim}; cursor: default;
 }
-.tg-model__sel[aria-disabled='true'] .tg-model__chev { color: ${t.color.disabledChev}; }
+.tg-model__sel[aria-disabled='true'] .tg-model__chev { color: ${themedColor.disabledChev}; }
 .tg-model__value { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 6px; white-space: nowrap; overflow: hidden; }
 .tg-model__name { flex: none; }
-.tg-model__line { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: ${t.color.panelMuted}; ${typeCss('body')}; }
+.tg-model__line { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: ${themedColor.panelMuted}; ${typeCss('body')}; }
 .tg-model__line::before { content: '\\00B7'; margin-right: 6px; }
-.tg-model__chev { width: 16px; height: 16px; flex: none; color: ${t.color.panelMuted}; }
+.tg-model__chev { width: 16px; height: 16px; flex: none; color: ${themedColor.panelMuted}; }
 .tg-model__list {
   position: absolute; z-index: 2; top: 42px; left: 0; right: 0; list-style: none; margin: 0; padding: 4px;
-  display: flex; flex-direction: column; gap: 2px; background: ${t.color.card}; border: 1px solid ${t.color.panelLine};
+  display: flex; flex-direction: column; gap: 2px; background: ${themedColor.card}; border: 1px solid ${themedColor.panelLine};
   border-radius: ${t.radius.card}px; box-shadow: 0 1px 2px rgba(18, 22, 43, 0.08), 0 12px 32px -8px rgba(18, 22, 43, 0.24);
 }
 .tg-model__list li {
   display: grid; grid-template-columns: minmax(0, 1fr) 16px; align-items: center; gap: ${t.space.lg}px;
   min-height: 52px; padding: 8px ${t.space.lg}px 8px 12px; border-radius: ${t.radius.sm}px; cursor: pointer;
 }
-.tg-model__list li.is-active { background: ${t.color.panelTile}; }
+.tg-model__list li.is-active { background: ${themedColor.panelTile}; }
 .tg-model__opt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.tg-model__optname { display: flex; align-items: center; gap: 8px; ${typeCss('bodyLead')};font-weight:600; color: ${t.color.panelText}; }
-.tg-model__optline { ${typeCss('small')}; color: ${t.color.panelMuted}; }
-.tg-model__tick { width: 16px; height: 16px; color: ${t.color.panelText}; }
+.tg-model__optname { display: flex; align-items: center; gap: 8px; ${typeCss('bodyLead')};font-weight:600; color: ${themedColor.panelText}; }
+.tg-model__optline { ${typeCss('small')}; color: ${themedColor.panelMuted}; }
+.tg-model__tick { width: 16px; height: 16px; color: ${themedColor.panelText}; }
 .tg-model__chip {
   display: inline-flex; align-items: center; height: 18px; padding: 0 ${t.space.md}px; border-radius: ${t.radius.pill}px; flex: none;
-  background: ${t.color.panelTile}; color: ${t.color.chipFreeInk}; ${typeCss('caption')};
+  background: ${themedColor.panelTile}; color: ${themedColor.chipFreeInk}; ${typeCss('caption')};
 }
-.tg-model__list li.is-active .tg-model__chip { background: ${t.color.card}; }
+.tg-model__list li.is-active .tg-model__chip { background: ${themedColor.card}; }
 `;

@@ -290,6 +290,10 @@ A cool ink-navy family and a cool off-white family, one warm gold, and a few sig
 
 **Every colour is a token.** Each colour named below lives in `themeTokens.color` (`bodies/ui/src/theme/tokens.ts`); no style sheet or component holds a hex literal. The three CSS-only files (the desktop `app.css`, the browser `popup.css`, and its `mic.html` and `permission.html`) declare their colours as CSS variables on `:root`, and a test in each package checks every value against the token. `style-audit.test.ts` fails on any other hex.
 
+### Dark theme
+
+Both themes ship: every screen on Home and the tour follows the system's `prefers-color-scheme` through one set of tokens, with no in-app switch. The light-page colours that change are the `themedColor` keys in tokens.ts (`panel`, `panelText`, `panelMuted`, `panelLine`, `panelTile`, `card`, `link`, the ok, warn, err and rec chips, the control, keycap and disabled fills, `scrollbarThumb`), each with a dark value from the approved mockups: panel `#0F1325`, card `#171C36`, text `#E9ECF5`, muted `#A3AAC4`, line `#2A3152`, tile `#222845`, link `#A9BCF5`. Gold, the navy chrome and the gold focus ring stay as they are; the focus ring is gold in dark. A new screen takes its light-page colours from `themedColor`, never `themeTokens.color`, and is checked in both. Settings and the bubble stay light and navy until they are moved over.
+
 ### Primary
 
 - **Gold** (gold): the primary button fill (`Button` primary, `bubble-primary`), a switch that is on, a pressed day toggle, the pressed mic, the Working tag, the listening dot, the speaking bars, the hand-off working dot, text selection and the focus ring on navy surfaces only. Ink on gold is always **Gold Ink** (gold-ink).

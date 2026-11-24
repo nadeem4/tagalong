@@ -1,6 +1,6 @@
 /** Tests for CONTROLS_CSS: focus ring variable per surface, 11px floor, colours from tokens. */
 import { describe, expect, it } from 'vitest';
-import { themeTokens as t } from '../theme/tokens';
+import { themeTokens as t, themedColor } from '../theme/tokens';
 import { CONTROLS_CSS } from './controls-styles';
 
 describe('CONTROLS_CSS', () => {
@@ -32,7 +32,7 @@ describe('CONTROLS_CSS', () => {
 
   it('keeps the valid key field border rule as one intact selector', () => {
     expect(CONTROLS_CSS).toContain(
-      `.tg-keyfield[data-state='valid'] #tg-api-key { border-color: ${t.color.okInk}; }`,
+      `.tg-keyfield[data-state='valid'] #tg-api-key { border-color: ${themedColor.okInk}; }`,
     );
   });
 

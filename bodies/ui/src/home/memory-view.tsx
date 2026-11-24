@@ -11,7 +11,7 @@ import { useHostBridge } from '../host-bridge';
 import { Button } from '../controls/button';
 import { KnowMeFlow } from '../know-me/know-me-flow';
 import { MemoryTimeline, deleteLabel, sourceLabel } from './memory-timeline';
-import { themeTokens as t, typeCss } from '../theme/tokens';
+import { themeTokens as t, themedColor, typeCss } from '../theme/tokens';
 
 const KIND_LABELS: Record<MemoryEntry['kind'], string> = {
   fact: 'Fact',
@@ -31,16 +31,16 @@ const CSS = `
 }
 .memory-row {
   display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: start;
-  gap: ${t.space.lg}px; padding: ${t.space.lg}px 0; border-top: 1px solid ${t.color.panelLine};
-  color: ${t.color.panelText};
+  gap: ${t.space.lg}px; padding: ${t.space.lg}px 0; border-top: 1px solid ${themedColor.panelLine};
+  color: ${themedColor.panelText};
 }
 .memory-row__text { ${typeCss('bodyLead')}; overflow-wrap: anywhere; min-width: 0; }
-.memory-row__date { padding-top: 3px; ${typeCss('small')}; color: ${t.color.panelMuted}; }
+.memory-row__date { padding-top: 3px; ${typeCss('small')}; color: ${themedColor.panelMuted}; }
 .memory-portrait p { margin: 0; max-width: 62ch; ${typeCss('bodyLead')}; overflow-wrap: anywhere; }
 .memory-portrait p + p { margin-top: ${t.space.lg}px; }
 .memory-head-actions { margin-top: ${t.space.md}px; }
 .memory-row .tg-chip { justify-self: start; white-space: nowrap; }
-.memory-covered { margin-top: ${t.space.lg}px; ${typeCss('small')}; color: ${t.color.panelMuted}; }
+.memory-covered { margin-top: ${t.space.lg}px; ${typeCss('small')}; color: ${themedColor.panelMuted}; }
 .memory-covered p { margin: 0; }
 `;
 

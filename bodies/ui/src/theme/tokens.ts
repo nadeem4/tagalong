@@ -164,3 +164,70 @@ export function typeCss(role: TypeRole): string {
   const { size, line, weight } = themeTokens.type[role];
   return `font-size:${size}px;line-height:${line}px;font-weight:${weight}`;
 }
+
+/**
+ * The light-page colours that change with the system's dark setting, and their dark values
+ * (the navy-family counterpart in the approved mockups). Gold, the navy chrome and the
+ * status bar stay as they are in both.
+ */
+const darkSurface = {
+  panel: '#0F1325',
+  panelText: '#E9ECF5',
+  panelMuted: '#A3AAC4',
+  panelLine: '#2A3152',
+  panelTile: '#222845',
+  scrollbarThumb: '#2E3558',
+  link: '#A9BCF5',
+  okFill: '#17301F',
+  okInk: '#9ADBA6',
+  okDot: '#7DD87F',
+  warnFill: '#33280E',
+  warnInk: '#F2D48A',
+  warnLine: '#5C4A1A',
+  errFill: '#3A1D2A',
+  errInk: '#FFB4C0',
+  card: '#171C36',
+  controlFill: '#1A1F3A',
+  keycapFill: '#1A1F3A',
+  keycapLine: '#3A4270',
+  keycapInk: '#E9ECF5',
+  chipFree: '#222845',
+  chipFreeInk: '#C9CEE0',
+  disabledInk: '#6B7290',
+  disabledFill: '#222845',
+  disabledChev: '#3A4270',
+  recFill: '#222B52',
+  recInk: '#C4D2FA',
+} as const;
+
+type SurfaceKey = keyof typeof darkSurface;
+
+/**
+ * The same colours as CSS: `var(--tg-name, light)`. Under `.home` and `.wt` the variable
+ * follows the system; anywhere else (Settings, the bubble) it is unset and the light value applies.
+ */
+export const themedColor = Object.fromEntries(
+  (Object.keys(darkSurface) as SurfaceKey[]).map((k) => [
+    k,
+    `var(--tg-${k}, ${themeTokens.color[k]})`,
+  ]),
+) as Record<SurfaceKey, string>;
+
+const surfaceVars = (values: Record<SurfaceKey, string>): string =>
+  (Object.keys(darkSurface) as SurfaceKey[]).map((k) => `--tg-${k}: ${values[k]};`).join(' ');
+
+/** Defines the variables for Home and the tour: light by default, dark when the system is. */
+export const THEME_CSS = `
+.home, .wt { ${surfaceVars(themeTokens.color)} color-scheme: light; }
+@media (prefers-color-scheme: dark) {
+  .home, .wt {
+    ${surfaceVars(darkSurface)}
+    --tg-focus: ${themeTokens.color.focusOnNavy};
+    --tg-ctl-bg: ${darkSurface.controlFill};
+    --tg-ctl-line: ${darkSurface.keycapLine};
+    --tg-ctl-ink: ${darkSurface.panelText};
+    --tg-ctl-muted: ${darkSurface.panelMuted};
+    color-scheme: dark;
+  }
+}
+`;

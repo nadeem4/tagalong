@@ -4,7 +4,7 @@
  * running install, so the two never drift. Presentational: the caller owns the state.
  * Contains InstallCard, subjectOf, INSTALL_CARD_CSS and the InstallSubject and InstallView types.
  */
-import { themeTokens as t, typeCss } from '../theme/tokens';
+import { themeTokens as t, themedColor, typeCss } from '../theme/tokens';
 import { Icon } from './icons';
 
 export interface InstallSubject {
@@ -382,11 +382,11 @@ export const INSTALL_CARD_CSS = `
   font-family: ${t.font.ui}; ${typeCss('body')};
 }
 .sc--light {
-  --sc-bg: ${t.color.controlFill}; --sc-line: ${t.color.panelLine}; --sc-text: ${t.color.panelText};
-  --sc-muted: ${t.color.panelMuted}; --sc-soft: ${t.color.panelMuted}; --sc-tile: ${t.color.panelTile};
-  --sc-ok: ${t.color.okInk}; --sc-okfill: ${t.color.okFill}; --sc-errfill: ${t.color.errFill};
-  --sc-errink: ${t.color.errInk}; --sc-link: ${t.color.link}; --sc-warnfill: ${t.color.warnFill};
-  --sc-warnline: #E6CF8A; --sc-warnink: ${t.color.warnInk};
+  --sc-bg: ${themedColor.controlFill}; --sc-line: ${themedColor.panelLine}; --sc-text: ${themedColor.panelText};
+  --sc-muted: ${themedColor.panelMuted}; --sc-soft: ${themedColor.panelMuted}; --sc-tile: ${themedColor.panelTile};
+  --sc-ok: ${themedColor.okInk}; --sc-okfill: ${themedColor.okFill}; --sc-errfill: ${themedColor.errFill};
+  --sc-errink: ${themedColor.errInk}; --sc-link: ${themedColor.link}; --sc-warnfill: ${themedColor.warnFill};
+  --sc-warnline: #E6CF8A; --sc-warnink: ${themedColor.warnInk};
 }
 /* The renderer's old global ul/li rules (flex, margin-bottom, pre-wrap) must not reach the card. */
 .sc ul { flex: none; overflow: visible; }
@@ -408,7 +408,7 @@ export const INSTALL_CARD_CSS = `
 }
 .sc-chip--ok { background: var(--sc-okfill); color: var(--sc-ok); }
 .sc-chip--gold { background: rgba(242, 193, 78, 0.16); color: var(--sc-gold); }
-.sc--light .sc-chip--gold { color: ${t.color.warnInk}; background: ${t.color.warnFill}; }
+.sc--light .sc-chip--gold { color: ${themedColor.warnInk}; background: ${themedColor.warnFill}; }
 .sc-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; ${typeCss('body')}; }
 .sc-steps li { display: flex; align-items: center; gap: 8px; color: var(--sc-muted); }
 .sc-steps li.is-done, .sc-steps li.is-now { color: var(--sc-text); }

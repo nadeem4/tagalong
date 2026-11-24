@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { Pet } from '../shapes';
 import { HostBridgeProvider } from '../host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
+import { themeTokens } from '../theme/tokens';
 import { HomeView, type HomeHost, type HomePage } from './home-view';
 
 const SCOUT: Pet = {
@@ -35,6 +36,19 @@ function renderHome(
 }
 
 describe('HomeView', () => {
+  it('draws the dark colours when the system is dark, and the light ones otherwise', async () => {
+    renderHome(createFakeHostBridge({ pets: [SCOUT] }));
+    await screen.findByRole('navigation', { name: 'Tagalong' });
+    const css = [...document.querySelectorAll('style')].map((s) => s.textContent).join(' ');
+    const dark = /@media \(prefers-color-scheme: dark\) \{\s*\.home, \.wt \{([^}]*)\}/.exec(
+      css,
+    )?.[1];
+    expect(dark).toContain('--tg-panel: #0F1325');
+    expect(dark).toContain('color-scheme: dark');
+    expect(css).toContain(`.home, .wt { --tg-panel: ${themeTokens.color.panel};`);
+    expect(css).toMatch(/\.home \{[^}]*background: var\(--tg-panel,/);
+  });
+
   it('is one window: Scout and the pages the brain feeds', async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     const nav = await screen.findByRole('navigation', { name: 'Tagalong' });

@@ -9,7 +9,7 @@ import { Select } from '../controls/select';
 import type { HostBridge } from '../host-bridge';
 import { finalOptions, liveOptions } from '../shapes';
 import type { SttState } from '../shapes';
-import { themeTokens as t, typeCss } from '../theme/tokens';
+import { themeTokens as t, themedColor, typeCss } from '../theme/tokens';
 
 export type VoiceModelsHost = Pick<HostBridge, 'sttState' | 'setStt' | 'onBrainChanged'>;
 
@@ -123,21 +123,21 @@ export function VoiceModelsField({
 // Text sits on the type roles; the chip dot uses the green status token, grey when no card.
 const STT_CSS = `
 .tg-stt__head { display: flex; justify-content: space-between; align-items: flex-start; gap: ${t.space.lg}px; }
-.tg-stt__title { ${typeCss('bodyLead')}; font-weight: 600; margin: 0; color: ${t.color.panelText}; }
-.tg-stt__lead { ${typeCss('body')}; margin: 2px 0 0; color: ${t.color.panelMuted}; }
+.tg-stt__title { ${typeCss('bodyLead')}; font-weight: 600; margin: 0; color: ${themedColor.panelText}; }
+.tg-stt__lead { ${typeCss('body')}; margin: 2px 0 0; color: ${themedColor.panelMuted}; }
 .tg-stt__chip {
   display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 ${t.space.lg}px; flex: none;
-  border-radius: ${t.radius.pill}px; background: ${t.color.panelTile}; color: ${t.color.panelText}; ${typeCss('small')};
+  border-radius: ${t.radius.pill}px; background: ${themedColor.panelTile}; color: ${themedColor.panelText}; ${typeCss('small')};
 }
-.tg-stt__chip.is-none { color: ${t.color.panelMuted}; }
-.tg-stt__dot { width: 8px; height: 8px; border-radius: 50%; background: ${t.color.okDot}; }
-.tg-stt__chip.is-none .tg-stt__dot { background: ${t.color.panelMuted}; }
+.tg-stt__chip.is-none { color: ${themedColor.panelMuted}; }
+.tg-stt__dot { width: 8px; height: 8px; border-radius: 50%; background: ${themedColor.okDot}; }
+.tg-stt__chip.is-none .tg-stt__dot { background: ${themedColor.panelMuted}; }
 .tg-stt__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: ${t.space.lg}px 24px; margin-top: 16px; }
 .tg-stt__col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .tg-stt__labelrow { display: flex; align-items: center; gap: 6px; }
-.tg-stt__label { ${typeCss('body')}; font-weight: 600; color: ${t.color.panelText}; }
+.tg-stt__label { ${typeCss('body')}; font-weight: 600; color: ${themedColor.panelText}; }
 .tg-stt__msg { min-height: 20px; margin-top: 8px; ${typeCss('small')}; font-weight: 600; }
-.tg-stt__ok { color: ${t.color.okInk}; }
-.tg-stt__err { color: ${t.color.errInk}; }
-.tg-stt__foot { margin-top: 8px; padding-top: 16px; border-top: 1px solid ${t.color.panelLine}; }
+.tg-stt__ok { color: ${themedColor.okInk}; }
+.tg-stt__err { color: ${themedColor.errInk}; }
+.tg-stt__foot { margin-top: 8px; padding-top: 16px; border-top: 1px solid ${themedColor.panelLine}; }
 `;
