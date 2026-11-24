@@ -17,9 +17,11 @@ interface NodeRunnerOptions {
   /** The node's body id, unique to this install. */
   nodeId: string;
   spawn: (env: NodeJS.ProcessEnv) => NodeChild;
+  /** TAGALONG_START_BRAIN=0: the app starts no processes of its own (the e2e suites run so). */
+  disabled?: boolean;
 }
 
-export function createNodeRunner({ link, nodeId, spawn }: NodeRunnerOptions): {
+export function createNodeRunner({ link, nodeId, spawn, disabled = false }: NodeRunnerOptions): {
   sync(): void;
   stop(): void;
 } {
@@ -32,6 +34,7 @@ export function createNodeRunner({ link, nodeId, spawn }: NodeRunnerOptions): {
   };
 
   const sync = (): void => {
+    if (disabled) return;
     const paired = link.paired();
     const token = paired === null ? null : link.token();
     if (paired === null || token === null) return stop();

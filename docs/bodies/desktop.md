@@ -256,7 +256,7 @@ is detached. Its output is appended to `<TAGALONG_HOME>/brain.log`
 (default `~/.tagalong/brain.log`), not `tagalong.log`. If something already answers, or the address
 is remote, it spawns nothing. The desktop never stops the brain, so it keeps running after quit;
 `uv run tagalong stop` ends it. If `uv` is missing or the child exits, it logs one line and does not respawn; the
-client keeps retrying. `TAGALONG_START_BRAIN=0` turns the spawn off.
+client keeps retrying. `TAGALONG_START_BRAIN=0` turns the spawn off, and also the node beside a remote brain (`node/runner.ts`).
 
 Packaged, the first run installs the brain: `resources\uv\uv.exe sync --frozen --no-dev` runs
 first (argv, no shell, output in `brain.log`, no timeout), then

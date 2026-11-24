@@ -1063,12 +1063,12 @@ test('BAU1 where the brain lives and pairing, light and dark', async () => {
     await tour.getByRole('button', { name: 'Pair', exact: true }).click();
     await expect(tour.getByText('Paired with 127.0.0.2')).toBeVisible({ timeout: 30_000 });
     await shoot('success');
-    await tour.getByRole('button', { name: 'Next' }).click();
-    await tour.getByRole('button', { name: 'Next' }).click();
-    await tour.getByRole('button', { name: 'Next' }).click();
-    await tour.getByRole('button', { name: 'Next' }).click();
-    await tour.getByRole('button', { name: 'Next' }).click();
-    await expect(tour.getByRole('heading', { name: /Voice|voice|talk/i }).first()).toBeVisible();
+    for (let at = 0; at < 5; at += 1) {
+      await tour.getByRole('button', { name: /^(Get started|Next)$/ }).click();
+    }
+    await expect(tour.getByRole('listitem').filter({ hasText: 'Voice' })).toContainText(
+      'On 127.0.0.2',
+    );
     await shoot('voice-on-remote');
   } finally {
     await done();

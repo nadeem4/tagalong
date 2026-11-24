@@ -456,6 +456,7 @@ async function start(): Promise<void> {
   nodeRunner = createNodeRunner({
     link,
     nodeId: bodyId.replace(/^desktop-/, 'node-'),
+    disabled: process.env.TAGALONG_START_BRAIN === '0',
     spawn: (env) => realSpawnNode(brainRun(), env),
   });
   nodeRunner.sync();
