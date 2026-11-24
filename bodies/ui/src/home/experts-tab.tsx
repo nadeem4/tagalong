@@ -14,6 +14,7 @@ import { CheckCard } from './check-card';
 import { ExpertsGroup, FailLine, InstallingCard } from './experts-group';
 import { useOutcomes, type Outcome } from './outcome';
 import type { UpdatesControls } from './updates-bar';
+import type { RunsOnModel } from './use-runs-on';
 
 function ExpertItem({
   item,
@@ -106,8 +107,10 @@ export function ExpertsTab({
   onAddAnyway,
   updates,
   answered,
+  runsOn,
 }: {
   updates: UpdatesControls | null;
+  runsOn: RunsOnModel | null;
   setup: SetupOverview;
   /** Counts the times the brain said a setup moved on; a row's card line clears with it. */
   answered: number;
@@ -156,6 +159,7 @@ export function ExpertsTab({
         failedId={failed?.expert ?? null}
         onAct={(id) => void track(id, onAct(id))}
         updates={updates}
+        runsOn={runsOn}
       />
       {items.length > 0 && (
         <section className="tg-card" aria-label="Add an expert">

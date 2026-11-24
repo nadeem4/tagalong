@@ -5,7 +5,7 @@
  * Contains ConnectionRow, STATUS_WORDS, STATUS_DOT, STATUS_CHIP and SAME_MACHINE.
  */
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { AppInfo, UpdateRow } from '../shapes';
 import { Button } from '../controls/button';
 import { Toggle } from '../controls/toggle';
@@ -55,6 +55,8 @@ export function ConnectionRow({
   onRemove,
   update,
   onUpdate,
+  runsOn,
+  waitingFor,
 }: {
   app: AppInfo;
   /** Who made it, when the brain says; null shows no chip. */
@@ -62,6 +64,10 @@ export function ConnectionRow({
   /** Its version line and update state, when the brain has said; Update presses call onUpdate. */
   update?: UpdateRow | undefined;
   onUpdate?: () => void;
+  /** The Runs on control, when Scout has more than one machine to run it on. */
+  runsOn?: ReactNode;
+  /** The place its row waits on when that place is not connected, e.g. `This PC`. */
+  waitingFor?: string | null;
   onSwitch: () => void;
   onRestart: () => void;
   onSignIn: () => void;
@@ -129,14 +135,22 @@ export function ConnectionRow({
           </span>
           {/* A healthy app's status gives way to its update words, as in the mockup. */}
           {!(updateShown && app.status === 'connected') && (
-            <span className="cx-status">
-              <span className={STATUS_DOT[app.status]} aria-hidden="true" />
-              {waiting ? 'Waiting for the browser' : STATUS_WORDS[app.status]}
+            <span className={waitingFor ? 'cx-status cx-status--warn' : 'cx-status'}>
+              <span
+                className={waitingFor ? 'home-dot home-dot--warn' : STATUS_DOT[app.status]}
+                aria-hidden="true"
+              />
+              {waitingFor
+                ? `Waiting for ${waitingFor}`
+                : waiting
+                  ? 'Waiting for the browser'
+                  : STATUS_WORDS[app.status]}
             </span>
           )}
           {update !== undefined && onUpdate !== undefined && (
             <UpdateSide row={update} onUpdate={onUpdate} />
           )}
+          {runsOn}
           <Toggle checked={app.enabled} onChange={onSwitch} label={`Scout can use ${name}`} />
         </div>
       </section>

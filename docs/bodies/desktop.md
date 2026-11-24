@@ -861,6 +861,8 @@ pictures")`: `IPC.askScout` (`ipc/ask-scout.ts`) brings the companion up and sen
   `approveTool` IPC (`ipc/connections.ts`) calls it and swallows only `not_found` (the ask already closed), because that card goes with its closed frame.
   Any other refusal (the brain offline) rejects back to the bubble, which keeps the card up to click again; only the person's click answers an ask. The bubble is brought up when an ask opens.
 
+The brain's question "Where should {app} run: on the brain, or on {body}?" (the Ask me placement) shows as its own card, `WhereCard` in `bodies/ui/src/connector-confirm.tsx`: one button per place and **Remember my choice for {app}**, which calls `setPlacement` (IPC `placementsSet`, `ipc/placements.ts`) before the answer goes. Home's Connections rows call `placementsList` and `placementsSet` for the **Runs on** control, shown only when the brain is on another machine.
+
 Home's Devices page (`bodies/ui/src/home/devices-view.tsx`, nav label Devices with a "New" badge, after
 Connections; `ipc/devices.ts` and `ipc/bodies.ts`) lists the paired devices from the brain's `devices_list`
 (`parseDevices` in `ui/src/shapes/devices.ts` drops revoked ones and sets AI tools, kind `mcp_client`, apart).

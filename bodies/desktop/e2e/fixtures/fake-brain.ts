@@ -100,6 +100,8 @@ export interface FakeBrain {
   permissionSets: { tool: string; mode: string }[];
   /** Every loops call the page made, in order: `set gmail on`, `forget l1`, `wipe`. */
   loopCalls: string[];
+  /** Every `placement_set` call, in order: `app files body`, `app files both prefer=brain`. */
+  placementCalls: string[];
   /** Replace the timers `timers_state` answers (snake_case rows) and tell the bodies `changed: timers`. */
   setTimers(rows: Record<string, unknown>[]): void;
   /** Every timer id Home sent to `timer_cancel`, in order. */
@@ -506,6 +508,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   // Home's loops: one mail app, off at first. Turning it on "reads" one mail into a held loop,
   // as the brain's first poll would; forget and wipe edit the list.
   const loopCalls: string[] = [];
+  const placementCalls: string[] = [];
+  const placements: Record<string, unknown>[] = [];
   let timers: Record<string, unknown>[] = [];
   const timerCancels: string[] = [];
   const taskStops: string[] = [];
@@ -940,6 +944,15 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
               body: 'Running 15 minutes late to the design review, sorry.',
             },
           });
+        } else if (msg.params?.text?.includes('where ask')) {
+          // The brain asking where an app runs, as its question ask: no tool, two places.
+          finish();
+          notify('ask', {
+            id: 'w1',
+            state: 'open',
+            text: 'Where should Files run: on the brain, or on this-pc?',
+            options: ['Brain', 'this-pc'],
+          });
         } else if (msg.params?.text?.includes('choose')) {
           // Scout's own choice: no tool, no confirm, one recommended option.
           finish();
@@ -1042,6 +1055,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         const params = msg.params as {
           tool?: string;
           input?: {
+            body_id?: string;
+            prefer?: string;
             tool?: string;
             mode?: string;
             job?: string;
@@ -1425,6 +1440,24 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           notify('changed', { what: 'approvals' });
         } else if (params.tool === 'brain_status' && options.brainStatus !== undefined) {
           value = options.brainStatus;
+        } else if (params.tool === 'placement_list') {
+          value = { placements };
+        } else if (params.tool === 'placement_set') {
+          const i = params.input ?? {};
+          placementCalls.push(
+            `${String(i.kind)} ${String(i.id)} ${String(i.mode)}${i.prefer ? ` prefer=${String(i.prefer)}` : ''}`,
+          );
+          const row = {
+            kind: i.kind,
+            id: i.id,
+            mode: i.mode,
+            body_id: i.body_id ?? null,
+            prefer: i.prefer ?? null,
+          };
+          const at = placements.findIndex((p) => p.kind === row.kind && p.id === row.id);
+          if (at >= 0) placements[at] = row;
+          else placements.push(row);
+          value = { ok: true };
         } else if (params.tool === 'devices_list') {
           value = {
             devices: pairedDevices.map((d) => ({
@@ -1643,6 +1676,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     answers,
     permissionSets,
     loopCalls,
+    placementCalls,
     timerCancels,
     taskStops,
     updateCalls,

@@ -1239,3 +1239,99 @@ test('BAU2 devices, the brain card and the Tailscale guide, light and dark', asy
     rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
 });
+
+test('BAU3 Runs on control and the Ask me card, light and dark', async () => {
+  test.setTimeout(300_000);
+  const dir = shotDir('bau3');
+  mkdirSync(dir, { recursive: true });
+  const both = async (page: Page, name: string, target?: Locator): Promise<void> => {
+    for (const scheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await settled(page);
+      await (target ?? page).screenshot({ path: join(dir, `${name}-${scheme}.png`) });
+    }
+  };
+  const open = async (options: Parameters<typeof startFakeBrain>[0]) => {
+    const launched = await launchShot(options);
+    await (await launched.find('avatar')).evaluate(() => window.tagalongHost.openSettings());
+    const home = await launched.find('home');
+    await home.getByRole('button', { name: 'Connections' }).click();
+    return { ...launched, home };
+  };
+  const remote = {
+    hasKey: true,
+    brainStatus: { ...REMOTE_BRAIN, started_by: 'service', local: false, host: 'mini-pc' },
+  };
+
+  const two = await open(remote);
+  try {
+    const files = two.home.getByRole('region', { name: 'Files' });
+    const control = files.getByRole('button', { name: 'Runs on, Files: mini-pc' });
+    await expect(control).toBeVisible({ timeout: 30_000 });
+    await both(two.home, 'apps');
+    await control.click();
+    await two.home.getByRole('button', { name: /^Both/ }).click();
+    await expect(two.home.getByRole('button', { name: /^Try this PC first/ })).toBeVisible();
+    await both(two.home, 'control-open');
+    await two.home.keyboard.press('Escape');
+    await two.home.getByRole('button', { name: /^This PC/ }).count();
+    two.brain.setScene({
+      apps: [
+        {
+          id: 'files',
+          name: 'Files',
+          transport: 'stdio',
+          auth: 'none',
+          enabled: true,
+          status: 'error',
+          error: 'Files runs on this PC, which is not connected right now.',
+          tools: [],
+        },
+      ],
+    });
+    await files.getByRole('button', { name: /^Runs on, Files/ }).click();
+    await two.home.getByRole('button', { name: /^This PC/ }).click();
+    await expect(files).toContainText('Waiting for This PC', { timeout: 15_000 });
+    await both(two.home, 'waiting', files);
+    two.brain.setScene({
+      setup: {
+        progress: null,
+        experts: [
+          { id: 'claude-acp', name: 'Claude Code', version: '2.0.0', state: 'ready', tested: true },
+        ],
+      },
+    });
+    await two.home.getByRole('tab', { name: 'Experts' }).click();
+    await expect(two.home.getByRole('button', { name: /^Runs on, / }).first()).toBeVisible({
+      timeout: 15_000,
+    });
+    await both(two.home, 'experts');
+  } finally {
+    await two.done();
+  }
+
+  const one = await open({ hasKey: true });
+  try {
+    await expect(one.home.getByRole('region', { name: 'Files' })).toBeVisible({ timeout: 30_000 });
+    await expect(one.home.getByRole('button', { name: /^Runs on, / })).toHaveCount(0);
+    await both(one.home, 'one-machine');
+  } finally {
+    await one.done();
+  }
+
+  const ask = await launchShot(remote);
+  try {
+    await (await ask.find('avatar')).evaluate(() => window.tagalongHost.togglePanel());
+    const panel = await ask.find('panel');
+    const field = panel.getByLabel(/^Ask /);
+    await field.waitFor({ state: 'visible', timeout: 30_000 });
+    await field.fill('please where ask');
+    await field.press('Enter');
+    const card = panel.getByRole('region', { name: 'Where should Files run?' });
+    await expect(card).toBeVisible({ timeout: 30_000 });
+    await card.getByRole('checkbox').check();
+    await both(panel, 'ask-me');
+  } finally {
+    await ask.done();
+  }
+});

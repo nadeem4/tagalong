@@ -55,6 +55,7 @@ import { createNodeRunner } from './node/runner';
 import { registerPairIpc } from './ipc/pair';
 import { registerBrainServiceIpc, waitForRestart } from './ipc/brain-service';
 import { registerDevicesIpc } from './ipc/devices';
+import { registerPlacementsIpc } from './ipc/placements';
 import { startingGate } from './brain/starting-gate';
 import { homedir, hostname, userInfo } from 'node:os';
 import { connectAiTool } from './tools/connect-ai-tool';
@@ -1143,6 +1144,10 @@ function registerIpc(): void {
   registerDevicesIpc(handle, {
     brain: required().brain,
     runTailscale,
+  });
+  registerPlacementsIpc(handle, {
+    brain: required().brain,
+    thisPcNode: readOrMakeBodyId(required().settingsStore).replace(/^desktop-/, 'node-'),
   });
   registerBrainServiceIpc(handle, {
     run: (args) => realRunTagalong(brainRun(), args),

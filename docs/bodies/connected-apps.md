@@ -389,6 +389,8 @@ A stdio app, or an http app with no sign-in, a `url_secret` key, a bearer token 
 
 A placement is not a permission: a call on a node still goes through the Toolbox gate first, so the rule is keyed by app and tool and is the same wherever the app runs. Home reads and sets placements with `placement_list` and `placement_set`; setting an app's placement restarts it. Scout cannot move an app.
 
+Home shows the placement as a **Runs on** control on each Apps and Experts row (`home/runs-on.tsx`, wired by `use-runs-on.ts`; the desktop's `ipc/placements.ts` calls `placement_list` and `placement_set`). Its choices are the brain machine (`brain`), This PC (`body`, the desktop's own node), Both with a "try first" pick (`both`, prefer `body` or `brain`) and Ask me each time (`both`, prefer `ask`); `shapes/placements.ts` maps between the two. It shows only when the brain card says the brain is on another machine (`local: false`), so a one-machine setup looks as before. An app placed on This PC whose node is away reads "Waiting for This PC" on its row (the "not connected right now" error line). The Ask me ask reaches the bubble as the question ask `Where should {app} run: on the brain, or on {body}?` with the two places as options; the card (`WhereCard` in `connector-confirm.tsx`) adds **Remember my choice for {app}**, which sets the row to the chosen place before answering. Not shown yet: a locked This-PC-only row (no such row exists), and "installed on one place" for experts (the brain keeps no per-machine install state).
+
 ## On a job's timeline
 
 When Scout calls an app's tool while working for a job (a wake about it, or after it handed work

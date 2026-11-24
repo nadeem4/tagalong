@@ -4,11 +4,23 @@
  * before community) and "Add it yourself" for anything not listed. "Your apps" also carries the
  * updates header and switches (updates-bar.tsx). Contains AppsTab.
  */
-import type { AppAddParams, AppInfo, AppRow } from '../shapes';
+import { placeKey, type AppAddParams, type AppInfo, type AppRow } from '../shapes';
 import { AppSearch } from './app-search';
 import { ConnectionRow } from './connection-row';
 import type { Outcome } from './outcome';
+import { PlaceControl } from './runs-on';
+import type { RunsOnModel } from './use-runs-on';
 import { UpdatesBar, rowUpdate, type UpdatesControls } from './updates-bar';
+
+const OFF_PLACE = /is not connected right now\.$/;
+
+// An app placed on this PC whose node is away: its row says what it waits on, not "Not working".
+function waitingFor(runsOn: RunsOnModel | null, app: AppInfo): string | null {
+  const place = runsOn?.state.places[placeKey('app', app.id)];
+  return place?.mode === 'body' && app.status === 'error' && OFF_PLACE.test(app.error)
+    ? 'This PC'
+    : null;
+}
 
 export function AppsTab({
   apps,
@@ -25,8 +37,11 @@ export function AppsTab({
   onAddApp,
   updates,
   answered,
+  runsOn,
 }: {
   apps: AppInfo[];
+  /** Where each app runs; null on a one-machine setup, so no row has the control. */
+  runsOn: RunsOnModel | null;
   /** The brain's updates, null when it could not say: the card then has no update words. */
   updates: UpdatesControls | null;
   /** Ids of the installed apps that are Official; null when the brain could not say, so no groups. */
@@ -54,6 +69,8 @@ export function AppsTab({
       onRemove={() => onRemove(app)}
       update={rowUpdate(updates, 'app', app.id)}
       onUpdate={() => updates?.onUpdate('app', app.id)}
+      runsOn={<PlaceControl model={runsOn} kind="app" id={app.id} name={app.name} />}
+      waitingFor={waitingFor(runsOn, app)}
     />
   );
   const official = officialIds === null ? [] : apps.filter((app) => officialIds.has(app.id));

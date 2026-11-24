@@ -8,6 +8,7 @@ import type {
   AppInfo,
   BodiesState,
   DevicesState,
+  PlacementsState,
   PairOffer,
   TailscaleState,
   LoopsState,
@@ -30,6 +31,7 @@ import type {
   TurnEvent,
   WhatsAppChange,
 } from '../shapes';
+import { placeKey } from '../shapes';
 import type {
   ApprovalCounts,
   ApprovalRow,
@@ -134,6 +136,10 @@ export interface FakeHostBridge extends HostBridge {
   readonly brainActions: readonly string[];
   /** The paired devices and AI tools; rename and revoke edit them. A test may swap them. */
   devices: DevicesState;
+  /** Where each app and expert runs; setPlacement edits it. */
+  placements: PlacementsState;
+  /** Every setPlacement, in order: `kind:id mode`. */
+  readonly placementCalls: readonly string[];
   /** Every rename and revoke, in order: `rename id name`, `revoke id`. */
   readonly deviceCalls: readonly string[];
   /** Every text copied. */
@@ -301,6 +307,7 @@ export function createFakeHostBridge(
     /** Scout's brain card; defaults to a running brain the desktop started, up to date. */
     brainCard?: BrainCard;
     devices?: DevicesState;
+    placements?: PlacementsState;
     tailscale?: TailscaleState;
   } = {},
 ): FakeHostBridge {
@@ -337,6 +344,7 @@ export function createFakeHostBridge(
   let setupRetries = 0;
   const brainActions: string[] = [];
   const deviceCalls: string[] = [];
+  const placementCalls: string[] = [];
   const copied: string[] = [];
   const activityCalls: [string, number][] = [];
   const reportCalls: [string, string][] = [];
@@ -672,6 +680,21 @@ export function createFakeHostBridge(
     pairError: undefined,
     serviceOutcome: { ok: true },
     tailscale: options.tailscale ?? { installed: false, ip: null },
+    placements: options.placements ?? { thisPc: 'node-this', places: {} },
+    placementCalls,
+    placementsState() {
+      return Promise.resolve(structuredClone(fake.placements));
+    },
+    setPlacement(kind, id, place) {
+      placementCalls.push(
+        `${kind}:${id} ${place.mode}${place.prefer === null ? '' : ` ${place.prefer}`}`,
+      );
+      fake.placements = {
+        ...fake.placements,
+        places: { ...fake.placements.places, [placeKey(kind, id)]: place },
+      };
+      return Promise.resolve();
+    },
     devicesState() {
       return Promise.resolve(structuredClone(fake.devices));
     },

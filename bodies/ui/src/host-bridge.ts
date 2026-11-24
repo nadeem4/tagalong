@@ -21,6 +21,8 @@ import type {
   ModelState,
   PairOffer,
   Pet,
+  Place,
+  PlacementsState,
   TailscaleState,
   SttState,
   TtsState,
@@ -445,6 +447,10 @@ export interface HostBridge {
   renameDevice(id: string, name: string): Promise<void>;
   /** Cuts a paired device or AI tool off at once; rejects when the brain refuses. */
   revokeDevice(id: string): Promise<void>;
+  /** Where each app and expert runs, and this PC's node id; rejects while the brain is away. */
+  placementsState(): Promise<PlacementsState>;
+  /** Moves an app or expert; the brain restarts an app it moves. Rejects when the brain refuses. */
+  setPlacement(kind: 'app' | 'expert', id: string, place: Place): Promise<void>;
   /** A fresh pairing code on this PC's brain. Rejects with `network_off` while the brain does not listen beyond this PC. */
   pairMake(): Promise<PairOffer>;
   copyText(text: string): Promise<void>;
