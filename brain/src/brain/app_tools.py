@@ -266,6 +266,7 @@ def app_home_tools(
                     "status": status.state,
                     "error": status.error,
                     "waiting_on": status.waiting_on or None,
+                    "waiting_on_name": status.waiting_on and bodies.name(status.waiting_on) or None,
                     "tools": tools,
                 }
             )

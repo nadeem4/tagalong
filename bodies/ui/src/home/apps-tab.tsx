@@ -12,6 +12,14 @@ import { PlaceControl } from './runs-on';
 import type { RunsOnModel } from './use-runs-on';
 import { UpdatesBar, rowUpdate, type UpdatesControls } from './updates-bar';
 
+/** Who an app waits for: This PC when the node is this one, else the name the brain remembers. */
+const waitingFor = (app: AppInfo, runsOn: RunsOnModel | null): string | undefined =>
+  app.waiting_on == null
+    ? undefined
+    : app.waiting_on === runsOn?.state.thisPc
+      ? 'This PC'
+      : (app.waiting_on_name ?? 'another PC');
+
 export function AppsTab({
   apps,
   officialIds,
@@ -60,7 +68,7 @@ export function AppsTab({
       update={rowUpdate(updates, 'app', app.id)}
       onUpdate={() => updates?.onUpdate('app', app.id)}
       runsOn={<PlaceControl model={runsOn} kind="app" id={app.id} name={app.name} />}
-      waitingFor={app.waiting_on != null ? runsOn?.nameOf(app.waiting_on) : undefined}
+      waitingFor={waitingFor(app, runsOn)}
     />
   );
   const official = officialIds === null ? [] : apps.filter((app) => officialIds.has(app.id));

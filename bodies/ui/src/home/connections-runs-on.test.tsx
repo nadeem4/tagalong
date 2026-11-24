@@ -108,17 +108,19 @@ describe('Runs on on Connections rows', () => {
     await waitFor(() => expect(row).toHaveTextContent('Waiting for This PC'));
   });
 
-  it('names another body a row waits on, by the name the brain gives it', async () => {
+  it('names another node a row waits on, by the name the brain remembers', async () => {
     open({
       brainCard: REMOTE,
-      apps: [app('gmail', 'Gmail', { status: 'error', waiting_on: 'desktop-laptop' })],
-      bodies: {
-        bodies: [{ id: 'desktop-laptop', kind: 'desktop', name: 'Laptop', connected: false }],
-        whatsapp: { enabled: false, set: {} as never, complete: false, state: 'off', port: 0 },
-      },
+      apps: [
+        app('gmail', 'Gmail', {
+          status: 'error',
+          waiting_on: 'node-laptop',
+          waiting_on_name: 'Laptop',
+        }),
+      ],
     });
     const row = await screen.findByRole('region', { name: 'Gmail' });
-    await waitFor(() => expect(row).toHaveTextContent('Waiting for Laptop'));
+    expect(row).toHaveTextContent('Waiting for Laptop');
     expect(row).toHaveTextContent('Laptop is off. Gmail jobs wait and start when it is back.');
   });
 

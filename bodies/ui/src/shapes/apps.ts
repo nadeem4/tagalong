@@ -37,6 +37,7 @@ export const AppInfo = z.object({
   error: z.string(),
   /** The node body id it is placed on and waiting for; null when it waits on nothing. */
   waiting_on: z.string().nullable().optional(),
+  waiting_on_name: z.string().nullable().optional(),
   /** Where it runs: `url` for http, `command` and `args` for stdio. Never env, headers or tokens. */
   url: z.string().optional(),
   command: z.string().optional(),

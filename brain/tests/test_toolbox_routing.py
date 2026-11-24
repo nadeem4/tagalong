@@ -145,9 +145,11 @@ async def test_an_app_placed_on_a_node_that_is_offline_says_so_plainly(make):
 async def test_an_app_waiting_on_an_offline_node_names_it_in_its_listing(make, tmp_path):
     rig = await make(Placement("body", "pc"), node_online=False)
     assert rig.apps.status("fake").waiting_on == "pc"
+    rig.node.connect()
+    rig.bodies.disconnect("pc", rig.node)
     home = app_home_tools(rig.apps, rig.memory, TokenFile(tmp_path), lambda *_: None, rig.bodies)
     row = json.loads(await {s.name: h for s, h in home}["list_apps"]({}))["apps"][0]
-    assert row["waiting_on"] == "pc"
+    assert (row["waiting_on"], row["waiting_on_name"]) == ("pc", "Laptop")
 
 
 async def test_prefer_body_falls_back_to_the_brain_when_the_node_is_offline(make):
