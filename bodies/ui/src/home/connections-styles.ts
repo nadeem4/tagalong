@@ -84,7 +84,7 @@ export const CONNECTIONS_CSS = `
 :is(.home, .wt) .cx-check__lead { color: ${themedColor.panelText}; ${typeCss('bodyLead')}; font-weight: 600; }
 :is(.home, .wt) .cx-check__foot { display: flex; align-items: center; gap: ${t.space.lg}px; flex-wrap: wrap; }
 :is(.home, .wt) .cx-check__foot p { flex: 1 1 260px; margin: 0; color: ${themedColor.warnInk}; ${typeCss('small')}; }
-:is(.home, .wt) .cx-check .tg-button--secondary { background: transparent; border-color: rgba(92, 70, 0, .35); color: ${themedColor.warnInk}; }
+:is(.home, .wt) .cx-check .tg-button--secondary { background: transparent; border-color: ${themedColor.warnLine}; color: ${themedColor.warnInk}; }
 :is(.home, .wt) .cx-link {
   display: inline-flex; align-items: center; gap: 4px; color: ${themedColor.link}; font-weight: 600;
   text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px;

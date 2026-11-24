@@ -76,8 +76,8 @@ describe('design tokens', () => {
   });
 
   it('rings focus navy on light and gold on navy, each readable on its surface', () => {
-    expect(color.focusOnLight).not.toBe(color.focusOnNavy);
-    expect(contrast(color.focusOnLight, color.panel)).toBeGreaterThanOrEqual(3);
+    expect(color.focusRing).not.toBe(color.focusOnNavy);
+    expect(contrast(color.focusRing, color.panel)).toBeGreaterThanOrEqual(3);
     expect(contrast(color.focusOnNavy, color.page)).toBeGreaterThanOrEqual(3);
   });
 

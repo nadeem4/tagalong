@@ -7,12 +7,12 @@
 import { themeTokens as t, themedColor, typeCss } from '../theme/tokens';
 
 export const CONTROLS_CSS = `
-:root {
-  --tg-focus: ${t.color.focusOnLight};
-  --tg-ctl-bg: ${t.color.controlFill};
-  --tg-ctl-line: ${t.color.keycapLine};
-  --tg-ctl-ink: ${t.color.panelText};
-  --tg-ctl-muted: ${t.color.panelMuted};
+:root, .home, .wt {
+  --tg-focus: ${themedColor.focusRing};
+  --tg-ctl-bg: ${themedColor.controlFill};
+  --tg-ctl-line: ${themedColor.keycapLine};
+  --tg-ctl-ink: ${themedColor.panelText};
+  --tg-ctl-muted: ${themedColor.panelMuted};
 }
 .on-navy {
   --tg-focus: ${t.color.focusOnNavy};

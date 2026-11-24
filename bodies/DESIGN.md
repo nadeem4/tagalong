@@ -292,7 +292,7 @@ A cool ink-navy family and a cool off-white family, one warm gold, and a few sig
 
 ### Dark theme
 
-Both themes ship: every screen on Home and the tour follows the system's `prefers-color-scheme` through one set of tokens, with no in-app switch. The light-page colours that change are the `themedColor` keys in tokens.ts (`panel`, `panelText`, `panelMuted`, `panelLine`, `panelTile`, `card`, `link`, the ok, warn, err and rec chips, the control, keycap and disabled fills, `scrollbarThumb`), each with a dark value from the approved mockups: panel `#0F1325`, card `#171C36`, text `#E9ECF5`, muted `#A3AAC4`, line `#2A3152`, tile `#222845`, link `#A9BCF5`. Gold, the navy chrome and the gold focus ring stay as they are; the focus ring is gold in dark. A new screen takes its light-page colours from `themedColor`, never `themeTokens.color`, and is checked in both. Settings and the bubble stay light and navy until they are moved over.
+Both themes ship: every screen on Home and the tour follows the system's `prefers-color-scheme` through one set of tokens, with no in-app switch. Each light-page colour that changes is declared once, as light and dark values, in the `themed` table in `bodies/ui/src/theme/tokens.ts`; style sheets read it through `themedColor`, never `themeTokens.color`, and `style-audit.test.ts` fails on a bypass. Gold, the navy chrome and the spend bar stay the same in both. A new screen uses `themedColor` and is checked in both themes. The Settings window and the bubble define no dark variables, so they keep the light page and the navy.
 
 ### Primary
 

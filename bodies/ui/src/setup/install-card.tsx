@@ -386,7 +386,7 @@ export const INSTALL_CARD_CSS = `
   --sc-muted: ${themedColor.panelMuted}; --sc-soft: ${themedColor.panelMuted}; --sc-tile: ${themedColor.panelTile};
   --sc-ok: ${themedColor.okInk}; --sc-okfill: ${themedColor.okFill}; --sc-errfill: ${themedColor.errFill};
   --sc-errink: ${themedColor.errInk}; --sc-link: ${themedColor.link}; --sc-warnfill: ${themedColor.warnFill};
-  --sc-warnline: #E6CF8A; --sc-warnink: ${themedColor.warnInk};
+  --sc-warnline: ${themedColor.warnLine}; --sc-warnink: ${themedColor.warnInk};
 }
 /* The renderer's old global ul/li rules (flex, margin-bottom, pre-wrap) must not reach the card. */
 .sc ul { flex: none; overflow: visible; }

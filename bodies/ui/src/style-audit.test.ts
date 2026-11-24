@@ -14,7 +14,7 @@ import { CONTROLS_CSS } from './controls/controls-styles';
 import { CONNECTIONS_CSS } from './home/connections-styles';
 import { HOME_CSS } from './home/home-styles';
 import { SETTINGS_CSS } from './settings/settings-styles';
-import { themeTokens } from './theme/tokens';
+import { themeTokens, themedColor } from './theme/tokens';
 import { WALKTHROUGH_CSS } from './walkthrough/walkthrough-styles';
 
 const uiSrc = import.meta.dirname;
@@ -69,6 +69,17 @@ function offenders(test: (css: string) => string[]): string[] {
 }
 
 describe('style audit', () => {
+  it('draws every dark-capable colour through themedColor, so dark cannot be bypassed', () => {
+    const keys = Object.keys(themedColor).join('|');
+    const direct = new RegExp(String.raw`\b(?:t|themeTokens)\.color\.(?:${keys})\b`, 'g');
+    // The dock window and the pet's own art sit on no themed page.
+    const exempt = /[\\/](dock-pet|status-mark|scout-mark)\.tsx/;
+    const hits = sources
+      .filter(([name]) => !exempt.test(name))
+      .flatMap(([name, text]) => (text.match(direct) ?? []).map((m) => `${name}: ${m}`));
+    expect(hits).toEqual([]);
+  });
+
   it('has no capitals', () => {
     expect(offenders((css) => css.match(/text-transform:\s*uppercase/g) ?? [])).toEqual([]);
   });

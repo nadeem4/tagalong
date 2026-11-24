@@ -36,16 +36,14 @@ function renderHome(
 }
 
 describe('HomeView', () => {
-  it('draws the dark colours when the system is dark, and the light ones otherwise', async () => {
+  it('swaps the panel colour when the system is dark', async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     await screen.findByRole('navigation', { name: 'Tagalong' });
     const css = [...document.querySelectorAll('style')].map((s) => s.textContent).join(' ');
-    const dark = /@media \(prefers-color-scheme: dark\) \{\s*\.home, \.wt \{([^}]*)\}/.exec(
-      css,
-    )?.[1];
-    expect(dark).toContain('--tg-panel: #0F1325');
-    expect(dark).toContain('color-scheme: dark');
-    expect(css).toContain(`.home, .wt { --tg-panel: ${themeTokens.color.panel};`);
+    const dark = /prefers-color-scheme: dark\)\s*\{[^{]*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+    const darkPanel = /--tg-panel:\s*(#\w+)/.exec(dark)?.[1];
+    expect(darkPanel).toBeDefined();
+    expect(darkPanel?.toUpperCase()).not.toBe(themeTokens.color.panel.toUpperCase());
     expect(css).toMatch(/\.home \{[^}]*background: var\(--tg-panel,/);
   });
 

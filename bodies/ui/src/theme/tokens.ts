@@ -2,8 +2,58 @@
  * Design tokens shared by Home, Settings, the bubble and the dock: colours, fonts, the seven
  * type roles, spacing and radii. Contains themeTokens and typeCss.
  */
+
+/**
+ * Every colour that changes with the system's dark setting, declared once as light and dark.
+ * `themeTokens.color` takes the light values; `themedColor` and THEME_CSS carry both. Gold, the
+ * navy chrome and the spend bar stay the same in both themes.
+ */
+const themed = {
+  panel: { light: '#F6F7FB', dark: '#0F1325' },
+  panelText: { light: '#12162B', dark: '#E9ECF5' },
+  panelMuted: { light: '#5A6178', dark: '#A3AAC4' },
+  panelLine: { light: '#E0E3EC', dark: '#2A3152' },
+  panelTile: { light: '#E6E9F2', dark: '#222845' },
+  scrollbarThumb: { light: '#CDD2DE', dark: '#2E3558' },
+  link: { light: '#3D4A8A', dark: '#A9BCF5' },
+  okFill: { light: '#E3F1E6', dark: '#17301F' },
+  okInk: { light: '#1F5A2E', dark: '#9ADBA6' },
+  okDot: { light: '#2F9E44', dark: '#7DD87F' },
+  warnFill: { light: '#FFF4D6', dark: '#33280E' },
+  warnInk: { light: '#5C4600', dark: '#F2D48A' },
+  warnLine: { light: '#EED79A', dark: '#5C4A1A' },
+  errFill: { light: '#FDE7E5', dark: '#3A1D2A' },
+  errInk: { light: '#8A1C12', dark: '#FFB4C0' },
+  card: { light: '#FFFFFF', dark: '#171C36' },
+  controlFill: { light: '#FFFFFF', dark: '#1A1F3A' },
+  keycapFill: { light: '#FFFFFF', dark: '#1A1F3A' },
+  keycapLine: { light: '#C9CEDC', dark: '#3A4270' },
+  keycapInk: { light: '#12162B', dark: '#E9ECF5' },
+  chipFree: { light: '#E6E9F2', dark: '#222845' },
+  chipFreeInk: { light: '#4A5168', dark: '#C9CEE0' },
+  disabledInk: { light: '#8A90A6', dark: '#6B7290' },
+  disabledFill: { light: '#EEF0F5', dark: '#222845' },
+  disabledChev: { light: '#B4B9C9', dark: '#3A4270' },
+  recFill: { light: '#DCE4FA', dark: '#222B52' },
+  recInk: { light: '#24326B', dark: '#C4D2FA' },
+  disabledText: { light: '#6B7290', dark: '#8A92B0' },
+  /** Focus ring: navy on the light page, gold on the dark one (and on navy surfaces in both). */
+  focusRing: { light: '#12162B', dark: '#F2C14E' },
+};
+
+type ThemedKey = keyof typeof themed;
+const themedKeys = Object.keys(themed) as ThemedKey[];
+
+function themedSide(side: 'light' | 'dark'): Record<ThemedKey, string> {
+  return Object.fromEntries(themedKeys.map((k) => [k, themed[k][side]])) as Record<
+    ThemedKey,
+    string
+  >;
+}
+
 export const themeTokens = {
   color: {
+    ...themedSide('light'),
     // The dark chrome: top bars, side menus and the bubble.
     page: '#12162B',
     text: '#E9ECF5',
@@ -19,40 +69,9 @@ export const themeTokens = {
     /** Sky blue: the job log's edit lines (the bubble hard-codes the same blue). */
     sky: '#7CB8F2',
     goldInk: '#12162B',
-    /** Focus ring: navy on light surfaces, gold on navy ones. */
-    focusOnLight: '#12162B',
     focusOnNavy: '#F2C14E',
-    /** Fill of fields and secondary buttons on the light page. */
-    controlFill: '#FFFFFF',
-    /** Keycaps (a shortcut key drawn as a key). */
-    keycapFill: '#FFFFFF',
-    keycapLine: '#C9CEDC',
-    keycapInk: '#12162B',
-    chipFree: '#E6E9F2',
-    chipFreeInk: '#4A5168',
-    // The light page.
-    panel: '#F6F7FB',
-    panelText: '#12162B',
-    panelMuted: '#5A6178',
-    panelLine: '#E0E3EC',
-    panelTile: '#E6E9F2',
-    scrollbarThumb: '#CDD2DE',
-    /** A link on the light panel. */
-    link: '#3D4A8A',
-    /** Status chips and messages on the light panel: done, needs attention, failed. */
-    okFill: '#E3F1E6',
-    okInk: '#1F5A2E',
-    okDot: '#2F9E44',
-    warnFill: '#FFF4D6',
-    warnInk: '#5C4600',
-    /** The border of a warning chip or message. */
-    warnLine: '#EED79A',
     /** A filled bar that has reached its limit (the spend meter). */
     warnBar: '#B7791F',
-    errFill: '#FDE7E5',
-    errInk: '#8A1C12',
-    /** The surface of a card on the light page. */
-    card: '#FFFFFF',
     /** The lighter tile on navy: chips, hovers, the job bar's track. */
     tileNavy: '#222845',
     /** Secondary text on navy, between text and textMuted. */
@@ -63,17 +82,12 @@ export const themeTokens = {
     codeBg: '#0E1124',
     /** A quiet mark on navy: the dock's idle tag, a disabled step. */
     dim: '#6B7290',
-    /** Text of a disabled primary button on the light page. */
-    disabledInk: '#8A90A6',
     /** A warning word on navy. */
     warnOnNavy: '#F2D48A',
     /** An error on navy: its fill, text and link. */
     errNavyFill: '#3A1D2A',
     errNavyInk: '#FFB4C0',
     errNavyLink: '#FFD9DF',
-    /** The Recommended tag. */
-    recFill: '#DCE4FA',
-    recInk: '#24326B',
     /** The dock's listening dot, and the brighter dot while it hears you. */
     listening: '#7DD87F',
     hearing: '#B8F5B9',
@@ -81,8 +95,6 @@ export const themeTokens = {
     healthOk: '#7FD1A4',
     healthBad: '#FF8A9A',
     okOnNavy: '#8FD19E',
-    disabledFill: '#EEF0F5',
-    disabledChev: '#B4B9C9',
     /** The shared renderer sheet (app.css) and its slate. */
     slateInk: '#0F172A',
     slateMuted: '#64748B',
@@ -166,68 +178,20 @@ export function typeCss(role: TypeRole): string {
 }
 
 /**
- * The light-page colours that change with the system's dark setting, and their dark values
- * (the navy-family counterpart in the approved mockups). Gold, the navy chrome and the
- * status bar stay as they are in both.
- */
-const darkSurface = {
-  panel: '#0F1325',
-  panelText: '#E9ECF5',
-  panelMuted: '#A3AAC4',
-  panelLine: '#2A3152',
-  panelTile: '#222845',
-  scrollbarThumb: '#2E3558',
-  link: '#A9BCF5',
-  okFill: '#17301F',
-  okInk: '#9ADBA6',
-  okDot: '#7DD87F',
-  warnFill: '#33280E',
-  warnInk: '#F2D48A',
-  warnLine: '#5C4A1A',
-  errFill: '#3A1D2A',
-  errInk: '#FFB4C0',
-  card: '#171C36',
-  controlFill: '#1A1F3A',
-  keycapFill: '#1A1F3A',
-  keycapLine: '#3A4270',
-  keycapInk: '#E9ECF5',
-  chipFree: '#222845',
-  chipFreeInk: '#C9CEE0',
-  disabledInk: '#6B7290',
-  disabledFill: '#222845',
-  disabledChev: '#3A4270',
-  recFill: '#222B52',
-  recInk: '#C4D2FA',
-} as const;
-
-type SurfaceKey = keyof typeof darkSurface;
-
-/**
  * The same colours as CSS: `var(--tg-name, light)`. Under `.home` and `.wt` the variable
  * follows the system; anywhere else (Settings, the bubble) it is unset and the light value applies.
  */
 export const themedColor = Object.fromEntries(
-  (Object.keys(darkSurface) as SurfaceKey[]).map((k) => [
-    k,
-    `var(--tg-${k}, ${themeTokens.color[k]})`,
-  ]),
-) as Record<SurfaceKey, string>;
+  themedKeys.map((k) => [k, `var(--tg-${k}, ${themed[k].light})`]),
+) as Record<ThemedKey, string>;
 
-const surfaceVars = (values: Record<SurfaceKey, string>): string =>
-  (Object.keys(darkSurface) as SurfaceKey[]).map((k) => `--tg-${k}: ${values[k]};`).join(' ');
+const declarations = (side: 'light' | 'dark'): string =>
+  themedKeys.map((k) => `--tg-${k}: ${themed[k][side]};`).join(' ');
 
-/** Defines the variables for Home and the tour: light by default, dark when the system is. */
+/** Defines the dark variables for Home and the tour; the light values are the var() fallbacks. */
 export const THEME_CSS = `
-.home, .wt { ${surfaceVars(themeTokens.color)} color-scheme: light; }
+.home, .wt { color-scheme: light; }
 @media (prefers-color-scheme: dark) {
-  .home, .wt {
-    ${surfaceVars(darkSurface)}
-    --tg-focus: ${themeTokens.color.focusOnNavy};
-    --tg-ctl-bg: ${darkSurface.controlFill};
-    --tg-ctl-line: ${darkSurface.keycapLine};
-    --tg-ctl-ink: ${darkSurface.panelText};
-    --tg-ctl-muted: ${darkSurface.panelMuted};
-    color-scheme: dark;
-  }
+  .home, .wt { ${declarations('dark')} color-scheme: dark; }
 }
 `;

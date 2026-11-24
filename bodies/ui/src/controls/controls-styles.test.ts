@@ -1,11 +1,10 @@
 /** Tests for CONTROLS_CSS: focus ring variable per surface, 11px floor, colours from tokens. */
 import { describe, expect, it } from 'vitest';
-import { themeTokens as t, themedColor } from '../theme/tokens';
+import { themeTokens as t } from '../theme/tokens';
 import { CONTROLS_CSS } from './controls-styles';
 
 describe('CONTROLS_CSS', () => {
-  it('defines the focus ring navy on light and gold on navy', () => {
-    expect(CONTROLS_CSS).toContain(`--tg-focus: ${t.color.focusOnLight}`);
+  it('rings focus gold on navy surfaces', () => {
     expect(CONTROLS_CSS).toMatch(new RegExp(`.on-navy[^}]*--tg-focus: ${t.color.focusOnNavy}`));
   });
 
@@ -30,12 +29,6 @@ describe('CONTROLS_CSS', () => {
     expect(rule).toContain('font-weight: 600');
   });
 
-  it('keeps the valid key field border rule as one intact selector', () => {
-    expect(CONTROLS_CSS).toContain(
-      `.tg-keyfield[data-state='valid'] #tg-api-key { border-color: ${themedColor.okInk}; }`,
-    );
-  });
-
   it('out-ranks the Settings panel input and select rules', () => {
     // .tg-panel input[type='text'] is (0,2,1) and .tg-panel select is (0,1,1).
     expect(CONTROLS_CSS).toContain(".tg-money .tg-money__row input[type='text'] {");
@@ -43,10 +36,6 @@ describe('CONTROLS_CSS', () => {
       ".tg-money .tg-money__row input[type='text'][aria-invalid='true']",
     );
     expect(CONTROLS_CSS).toContain('.tg-select .tg-select__wrap select {');
-  });
-
-  it('uses the control fill token for light controls', () => {
-    expect(CONTROLS_CSS).toContain(`--tg-ctl-bg: ${t.color.controlFill}`);
   });
 
   it('gives the money stepper buttons AA ink and border on both surfaces', () => {

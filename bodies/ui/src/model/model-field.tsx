@@ -277,11 +277,11 @@ const MODEL_CSS = `
   ${typeCss('bodyLead')}; color: ${themedColor.panelText};
 }
 .tg-model__sel--live { cursor: pointer; }
-.tg-model__sel--live:focus-visible { outline: 2px solid ${t.color.focusOnLight}; outline-offset: 2px; }
+.tg-model__sel--live:focus-visible { outline: 2px solid var(--tg-focus); outline-offset: 2px; }
 .tg-model__sel.is-open { border-color: ${themedColor.panelText}; }
 .tg-model__sel.is-open .tg-model__chev { transform: rotate(180deg); color: ${themedColor.panelText}; }
 .tg-model__sel[aria-disabled='true'] {
-  background: ${themedColor.disabledFill}; border-color: ${themedColor.panelLine}; box-shadow: none; color: ${t.color.dim}; cursor: default;
+  background: ${themedColor.disabledFill}; border-color: ${themedColor.panelLine}; box-shadow: none; color: ${themedColor.disabledText}; cursor: default;
 }
 .tg-model__sel[aria-disabled='true'] .tg-model__chev { color: ${themedColor.disabledChev}; }
 .tg-model__value { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 6px; white-space: nowrap; overflow: hidden; }
