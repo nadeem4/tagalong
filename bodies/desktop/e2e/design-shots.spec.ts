@@ -896,7 +896,7 @@ test('E2 places states', async () => {
       },
     },
     async (home) => {
-      await expect(home.getByText('Connected').first()).toBeVisible({ timeout: 30_000 });
+      await expect(home.getByText('Online').first()).toBeVisible({ timeout: 30_000 });
       await home.screenshot({ path: join(dir, 'all-connected.png') });
     },
   );
@@ -1117,7 +1117,11 @@ test('BAU2 devices, the brain card and the Tailscale guide, light and dark', asy
   const rows = await open(
     {
       hasKey: true,
-      bodies: { connected: ['desktop', 'browser'], deviceIds: { browser: 'd2' } },
+      bodies: {
+        connected: ['desktop', 'browser'],
+        deviceIds: { browser: 'd2' },
+        whatsappSet: ALL_FIVE.slice(0, 3),
+      },
       brainStatus: { ...status('service', false), local: true, host: 'mini-pc', network: true },
       devices: [
         { id: 'd1', name: 'Desktop', kind: 'desktop' },
@@ -1130,6 +1134,9 @@ test('BAU2 devices, the brain card and the Tailscale guide, light and dark', asy
   try {
     await expect(rows.home.getByText('Chrome on laptop')).toBeVisible({ timeout: 30_000 });
     await both(rows.home, 'devices');
+    await rows.home.getByRole('button', { name: 'Set up' }).click();
+    await expect(rows.home.getByLabel(/Access token/)).toBeVisible();
+    await both(rows.home, 'whatsapp');
     await rows.home.getByRole('button', { name: 'Revoke' }).first().click();
     await both(rows.home, 'revoke-confirm');
     await rows.home.getByRole('button', { name: 'Keep it' }).click();
@@ -1137,7 +1144,7 @@ test('BAU2 devices, the brain card and the Tailscale guide, light and dark', asy
     await both(rows.home, 'rename');
     await rows.home.keyboard.press('Escape');
     rows.brain.pairDevice({ id: 'd4', name: "Nadeem's phone", kind: 'desktop' });
-    await expect(rows.home.getByRole('status')).toContainText("Nadeem's phone is paired");
+    await expect(rows.home.locator('.dv-joined')).toContainText("Nadeem's phone is paired");
     await both(rows.home, 'joined');
   } finally {
     await rows.done();

@@ -116,7 +116,7 @@ flowchart LR
   nav --> ov["Overview<br/>(Scout card, BrainCard, WhereThingsRun, SpendCard)"]
   nav --> tk["Tasks<br/>(TasksView, Now card)"]
   nav --> cn["Connections<br/>(ConnectionsPanel: apps, experts)"]
-  nav --> pl["Devices<br/>(DevicesView: paired devices, AI tools, this computer, Chrome add-on)"]
+  nav --> pl["Devices<br/>(DevicesView: paired devices, AI tools, this computer, Chrome add-on, WhatsApp)"]
   nav --> ap["Approvals<br/>(ApprovalsView: preferences, ask history)"]
   nav --> mem["What Scout remembers<br/>(MemoryView)"]
   nav --> st["Settings<br/>(the host's form, PermissionsPanel)"]
@@ -882,10 +882,14 @@ remote when the pinned link is paired or the brain said so, so an unreachable re
 remote. `IPC.brainReconnect` is registered once, in `ipc/brain-link.ts`. Besides the paired devices the page lists the
 places you can talk to Scout: this computer's Desktop row (chips "Scout's brain", with a gold dot on its icon, when the brain runs here, and "This computer") and the **Chrome
 add-on** (Online or Not set up, with a "Get the add-on" button that opens the tour at its Browser step,
-step 8), each with a purpose line. WhatsApp has no setup card on Devices (the `setWhatsApp` call and its
-strict zod check in `ipc/bodies.ts` stay for it) and rebuild every error from fixed text with no
+step 8), each with a purpose line. Below the lists a **Messaging** card (`whatsapp-card.tsx`) holds **WhatsApp**, Online, Offline (its five values are saved but it is not connected) or Not set up. WhatsApp's setup sits under its row:
+five fields
+(access token, app secret, verify token as password inputs; phone number ID and your number as text), one
+`Toggle` named WhatsApp (disabled, with the reason, until all five are saved) and one Save. A saved value shows
+only the word Saved; Save sends only the fields typed and then clears them. A failure shows one fixed line;
+`ipc/bodies.ts` checks the argument with a strict zod shape and rebuilds every error from fixed text with no
 `cause`, so a pasted secret never comes back. The page reads again on `changed { what: "bodies" }`;
-if the brain cannot be read it says so in an alert. `e2e/design-shots.spec.ts` renders the page, the brain card states, the network-off dialog, a device just joined, inline rename and the guide against the fake brain's `bodies`, `pairNetworkOff` and `pairDevice` options. The Tailscale guide marks each step done, now or still to do, says "Found." on a step it detected and opens the download page with a boxed button.
+if the brain cannot be read it says so in an alert. `e2e/design-shots.spec.ts` renders the page, the brain card states, WhatsApp's setup, the network-off dialog, a device just joined, inline rename and the guide against the fake brain's `bodies`, `pairNetworkOff` and `pairDevice` options. The Tailscale guide marks each step done, now or still to do, says "Found." on a step it detected and opens the download page with a boxed button.
 See [whatsapp.md](whatsapp.md).
 
 `turn-events.ts` turns the validated notifications into the TurnEvents the renderer already

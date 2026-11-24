@@ -30,12 +30,15 @@ const BRAIN: BrainCard = {
   workRunning: false,
 };
 
-function stateWith(connected = ['desktop']): BodiesState {
+function stateWith(
+  connected = ['desktop'],
+  whatsapp: Partial<BodiesState['whatsapp']> = {},
+): BodiesState {
   return {
-    bodies: (['desktop', 'browser'] as const).map((kind) => ({
+    bodies: (['desktop', 'browser', 'whatsapp'] as const).map((kind) => ({
       id: kind,
       kind,
-      name: kind === 'desktop' ? 'This PC' : 'Chrome add-on',
+      name: kind === 'whatsapp' ? 'WhatsApp' : kind === 'desktop' ? 'This PC' : 'Chrome add-on',
       connected: connected.includes(kind),
     })),
     whatsapp: {
@@ -50,6 +53,7 @@ function stateWith(connected = ['desktop']): BodiesState {
       complete: false,
       state: 'off',
       port: 47322,
+      ...whatsapp,
     },
   };
 }
@@ -74,6 +78,22 @@ function open(
 
 /** The row for one place, found by its name. */
 const row = (name: string) => screen.getByText(name).closest('li') as HTMLElement;
+
+const SET_ALL = {
+  accessToken: true,
+  appSecret: true,
+  verifyToken: true,
+  phoneNumberId: true,
+  allowedNumber: true,
+};
+
+/** WhatsApp's setup is under its row; open it. */
+async function openSetup(): Promise<void> {
+  fireEvent.click(await screen.findByRole('button', { name: /^(Set up|Settings)$/ }));
+}
+
+const type = (label: RegExp, value: string) =>
+  fireEvent.change(screen.getByLabelText(label), { target: { value } });
 
 const LAPTOP = {
   id: 'd1',
@@ -107,7 +127,6 @@ describe('DevicesView', () => {
     expect(screen.getByText('Only this computer so far')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reach Scout away from home' })).toBeEnabled();
     expect(screen.getAllByRole('button', { name: 'Pair a device' })).toHaveLength(1);
-    expect(screen.queryByText('WhatsApp')).not.toBeInTheDocument();
   });
 
   it('counts the paired devices in each group', async () => {
@@ -255,6 +274,128 @@ describe('DevicesView', () => {
       fireEvent.click(within(screen.getByRole('alert')).getByRole('button', { name: 'Revoke' }));
       expect(await screen.findByText('Scout could not revoke Chrome on laptop.')).toBeVisible();
       expect(row('Chrome on laptop')).toBeInTheDocument();
+    });
+  });
+
+  describe('WhatsApp card', () => {
+    it('shows Not set up, then Offline once its values are saved, then Online when it is', async () => {
+      open();
+      await screen.findByText('WhatsApp');
+      expect(row('WhatsApp')).toHaveTextContent('Not set up');
+      cleanup();
+      open(stateWith(['desktop'], { set: SET_ALL, complete: true }));
+      await screen.findByText('WhatsApp');
+      expect(row('WhatsApp')).toHaveTextContent('Offline');
+      cleanup();
+      open(stateWith(['desktop', 'whatsapp'], { set: SET_ALL, complete: true, enabled: true }));
+      await screen.findByText('WhatsApp');
+      expect(row('WhatsApp')).toHaveTextContent('Online');
+    });
+
+    it('keeps the setup closed until Set up is pressed', async () => {
+      open();
+      await screen.findByText('WhatsApp');
+      expect(screen.queryByLabelText(/Access token/)).not.toBeInTheDocument();
+      await openSetup();
+      expect(screen.getByLabelText(/Access token/)).toBeInTheDocument();
+    });
+
+    it('shows a saved value as Saved and never its value', async () => {
+      open(stateWith(undefined, { set: { ...SET_ALL, verifyToken: false } }));
+      await openSetup();
+      const field = screen.getByLabelText(/Access token/);
+      expect(field).toHaveValue('');
+      expect(field).toHaveAttribute('type', 'password');
+      expect(field).toHaveAttribute('placeholder', 'Saved');
+      expect(screen.getByLabelText(/Verify token/)).toHaveAttribute('placeholder', '');
+    });
+
+    it('saves only the fields typed, then clears them', async () => {
+      const bridge = open();
+      await openSetup();
+      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+      type(/Access token/, ' EAAG-fake-token ');
+      type(/Your number/, '+44 7700 900123');
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() =>
+        expect(bridge.whatsappChanges).toEqual([
+          { accessToken: 'EAAG-fake-token', allowedNumber: '+44 7700 900123' },
+        ]),
+      );
+      await waitFor(() => expect(screen.getByLabelText(/Access token/)).toHaveValue(''));
+      expect(screen.getByLabelText(/Your number/)).toHaveValue('');
+      expect(screen.getByLabelText(/Access token/)).toHaveAttribute('placeholder', 'Saved');
+    });
+
+    it('marks the form busy while a save is in flight', async () => {
+      open();
+      await openSetup();
+      const form = screen.getByLabelText(/Access token/).closest('form')!;
+      expect(form).toHaveAttribute('aria-busy', 'false');
+      type(/Access token/, 'EAAG-fake-token');
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      expect(form).toHaveAttribute('aria-busy', 'true');
+      await waitFor(() => expect(form).toHaveAttribute('aria-busy', 'false'));
+    });
+
+    it('keeps the switch off, with the reason, until all five values are set', async () => {
+      open();
+      await openSetup();
+      expect(screen.getByRole('switch', { name: 'WhatsApp' })).toBeDisabled();
+      expect(
+        screen.getByText('WhatsApp is waiting for all five values. Save all five to switch it on.'),
+      ).toBeInTheDocument();
+    });
+
+    it('switches on through the brain', async () => {
+      const bridge = open(stateWith(undefined, { set: SET_ALL, complete: true }));
+      await openSetup();
+      const toggle = screen.getByRole('switch', { name: 'WhatsApp' });
+      expect(toggle).toBeEnabled();
+      fireEvent.click(toggle);
+      await waitFor(() => expect(bridge.whatsappChanges).toEqual([{ enabled: true }]));
+      await waitFor(() =>
+        expect(screen.getByRole('switch', { name: 'WhatsApp' })).toHaveAttribute(
+          'aria-checked',
+          'true',
+        ),
+      );
+    });
+
+    it('says the bridge state in plain words', async () => {
+      open(
+        stateWith(['desktop', 'whatsapp'], {
+          set: SET_ALL,
+          complete: true,
+          enabled: true,
+          state: 'running',
+        }),
+      );
+      await openSetup();
+      expect(screen.getByText('WhatsApp is running.')).toBeInTheDocument();
+    });
+
+    it('shows one fixed line when saving fails, and keeps what was typed', async () => {
+      const bridge = createFakeHostBridge({ bodies: stateWith() });
+      bridge.whatsappFails = 'Scout could not save: EAAG-fake-token';
+      render(
+        <HostBridgeProvider bridge={bridge}>
+          <DevicesView />
+        </HostBridgeProvider>,
+      );
+      await openSetup();
+      type(/Access token/, 'EAAG-fake-token');
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent('Scout could not save the WhatsApp settings.');
+      expect(document.body.textContent).not.toContain('Scout could not save:');
+      expect(screen.getByLabelText(/Access token/)).toHaveValue('EAAG-fake-token');
+    });
+
+    it('has just one Save in the setup, no Close', async () => {
+      open();
+      await openSetup();
+      expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     });
   });
 

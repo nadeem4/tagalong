@@ -1,6 +1,6 @@
 /**
- * The line icons on Devices rows: a computer, a laptop, a browser, an AI tool's terminal and
- * a phone. 16px strokes in the current colour, as in the mockup. Contains DeviceIcon.
+ * The line icons on Devices rows: a computer, a laptop, a browser, an AI tool's terminal, a
+ * phone and a chat bubble. 16px strokes in the current colour, as in the mockup. Contains DeviceIcon.
  */
 import type { ReactElement } from 'react';
 
@@ -29,6 +29,7 @@ const PATHS = {
       <path d="m5 7 2 1.5L5 10M8.5 10.5H11" />
     </>
   ),
+  chat: <path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" />,
   phone: (
     <>
       <rect x="4.5" y="1.8" width="7" height="12.4" rx="1.6" />

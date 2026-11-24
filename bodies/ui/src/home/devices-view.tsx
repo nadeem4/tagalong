@@ -1,7 +1,7 @@
 /**
  * Home's Devices page: this computer (marked when it holds Scout's brain), every paired computer
  * and browser, and the AI tools, each in its own group with a count (rename, revoke, pair
- * another), plus the browser add-on. The brain owns it all; this asks, then reads again when it
+ * another), plus the browser add-on and WhatsApp's card. The brain owns it all; this asks, then reads again when it
  * says `bodies` changed. Contains DevicesView.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -13,6 +13,7 @@ import { DeviceRowItem } from './device-row';
 import { Place, StandingLabel } from './place-row';
 import { TailscaleGuide } from './tailscale-guide';
 import { useBrainCard } from './use-brain-card';
+import { WhatsAppCard } from './whatsapp-card';
 
 // The tour's Browser step is where the add-on's folder and its load-unpacked steps are shown.
 const BROWSER_STEP = 8;
@@ -114,6 +115,7 @@ export function DevicesView({ reach = false }: { reach?: boolean }) {
     />
   );
   const holdsBrain = card?.local === true;
+  const whatsappUp = state.bodies.find((body) => body.kind === 'whatsapp')?.connected === true;
 
   return (
     <>
@@ -205,6 +207,7 @@ export function DevicesView({ reach = false }: { reach?: boolean }) {
           <ul className="cx-list">{paired.aiTools.map(itemFor)}</ul>
         </section>
       )}
+      <WhatsAppCard wa={state.whatsapp} connected={whatsappUp} onChanged={refresh} />
     </>
   );
 }
