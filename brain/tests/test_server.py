@@ -837,6 +837,7 @@ async def test_hello_lists_home_tools_as_contract_records(env):
         "edit_preference",
         "fetch_voice",
         "forget",
+        "forget_memories",
         "job_activity",
         "job_report",
         "key_status",
