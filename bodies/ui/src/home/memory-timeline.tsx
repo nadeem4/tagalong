@@ -7,7 +7,7 @@
 import type { MemoryEntry, TimelineFact, CategoryGroup } from '../shapes';
 import { buildTimeline } from '../shapes';
 import { Button } from '../controls/button';
-import { themeTokens as t, typeCss } from '../theme/tokens';
+import { themeTokens as t, themedColor, typeCss } from '../theme/tokens';
 
 const SOURCE_LABELS: Record<string, string> = {
   github: 'GitHub',
@@ -27,16 +27,16 @@ export function deleteLabel(text: string): string {
 }
 
 const CSS = `
-.mt-block { margin-top: ${t.space.xl}px; padding-left: ${t.space.xl}px; border-left: 2px solid ${t.color.panelLine}; }
-.mt-year { margin: 0; ${typeCss('title')}; color: ${t.color.panelText}; }
-.mt-quiet { margin: 0; ${typeCss('small')}; color: ${t.color.panelMuted}; }
-.mt-cat { margin: ${t.space.lg}px 0 ${t.space.xs}px; ${typeCss('caption')}; color: ${t.color.panelMuted}; }
+.mt-block { margin-top: ${t.space.xl}px; padding-left: ${t.space.xl}px; border-left: 2px solid ${themedColor.panelLine}; }
+.mt-year { margin: 0; ${typeCss('title')}; color: ${themedColor.panelText}; }
+.mt-quiet { margin: 0; ${typeCss('small')}; color: ${themedColor.panelMuted}; }
+.mt-cat { margin: ${t.space.lg}px 0 ${t.space.xs}px; ${typeCss('caption')}; color: ${themedColor.panelMuted}; }
 .mt-facts { list-style: none; margin: 0; padding: 0; }
-.mt-fact { padding: ${t.space.xs}px 0; color: ${t.color.panelText}; }
+.mt-fact { padding: ${t.space.xs}px 0; color: ${themedColor.panelText}; }
 .mt-fact summary { cursor: pointer; ${typeCss('bodyLead')}; }
 .mt-fact__text { overflow-wrap: anywhere; min-width: 0; }
-.mt-fact__range { margin-left: ${t.space.md}px; ${typeCss('small')}; color: ${t.color.panelMuted}; }
-.mt-fact__more { margin: ${t.space.xs}px 0 ${t.space.xs}px ${t.space.xl}px; ${typeCss('small')}; color: ${t.color.panelMuted}; overflow-wrap: anywhere; }
+.mt-fact__range { margin-left: ${t.space.md}px; ${typeCss('small')}; color: ${themedColor.panelMuted}; }
+.mt-fact__more { margin: ${t.space.xs}px 0 ${t.space.xs}px ${t.space.xl}px; ${typeCss('small')}; color: ${themedColor.panelMuted}; overflow-wrap: anywhere; }
 .mt-fact__more p { margin: 0 0 ${t.space.xs}px; }
 `;
 

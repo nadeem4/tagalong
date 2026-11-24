@@ -4,7 +4,7 @@
  * rule: anything bordered or filled that holds text keeps at least 8px inside (12 to 16 for
  * cards and message tiles); only keycaps and small pills are tighter. Contains CHAT_CSS.
  */
-import { themeTokens as t, typeCss } from './theme/tokens';
+import { themeTokens as t, themedColor, typeCss } from './theme/tokens';
 
 export const CHAT_CSS = `
 /* Who is talking: Scout's still tile and the name, only on lines Scout starts. */
@@ -58,7 +58,7 @@ export const CHAT_CSS = `
 .bubble-tip--up { top: auto; bottom: 40px; }
 .bubble-tip--up::before { top: auto; bottom: -5px; }
 .bubble-tgwrap:hover .bubble-tip, .bubble-tgwrap:focus-within .bubble-tip { display: block; }
-.bubble-tip-sub { display: block; margin-top: 2px; color: ${t.color.chipFreeInk}; }
+.bubble-tip-sub { display: block; margin-top: 2px; color: ${themedColor.chipFreeInk}; }
 
 /* Context chips: a pill with its remove button inside. Long names wrap, never cut. */
 .bubble-chip { min-height: 28px; padding: 0 8px 0 12px; }

@@ -1,7 +1,7 @@
 /** Tests for the design tokens: text and status colours meet 4.5:1 contrast. */
 
 import { describe, expect, it } from 'vitest';
-import { themeTokens, typeCss } from './tokens';
+import { themed, themeTokens, typeCss } from './tokens';
 
 /** WCAG relative luminance of a `#rrggbb` colour. */
 function luminance(hex: string): number {
@@ -25,12 +25,15 @@ describe('design tokens', () => {
     expect(contrast(color.text, color.mine)).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('keeps status chips, links and errors readable on the light page', () => {
-    expect(contrast(color.okInk, color.okFill)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(color.warnInk, color.warnFill)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(color.errInk, color.errFill)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(color.errInk, color.panel)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(color.link, color.panel)).toBeGreaterThanOrEqual(4.5);
+  it('keeps status chips, links and errors readable on the light and the dark page', () => {
+    for (const side of ['light', 'dark'] as const) {
+      const c = (key: keyof typeof themed): string => themed[key][side];
+      expect(contrast(c('okInk'), c('okFill')), `${side} ok`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(c('warnInk'), c('warnFill')), `${side} warn`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(c('errInk'), c('errFill')), `${side} err`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(c('errInk'), c('panel')), `${side} err on panel`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(c('link'), c('panel')), `${side} link`).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   it('keeps body text on the dark chrome at 4.5:1 or better', () => {
@@ -76,8 +79,8 @@ describe('design tokens', () => {
   });
 
   it('rings focus navy on light and gold on navy, each readable on its surface', () => {
-    expect(color.focusOnLight).not.toBe(color.focusOnNavy);
-    expect(contrast(color.focusOnLight, color.panel)).toBeGreaterThanOrEqual(3);
+    expect(color.focusRing).not.toBe(color.focusOnNavy);
+    expect(contrast(color.focusRing, color.panel)).toBeGreaterThanOrEqual(3);
     expect(contrast(color.focusOnNavy, color.page)).toBeGreaterThanOrEqual(3);
   });
 

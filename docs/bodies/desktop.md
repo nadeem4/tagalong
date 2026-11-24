@@ -370,6 +370,10 @@ The same call backs **Start brain** on the offline card, so it also runs when th
   appears at release. Always listening ignores it.
 - **Pets.** The desktop shows one fixed local Scout (`ipc/scout.ts`, `listPets`); the brain sends no pet list.
 
+### Dark theme
+
+Home and the tour follow the system's light or dark setting (`prefers-color-scheme`); there is no in-app switch. The light-page colours that change are `themedColor` in `bodies/ui/src/theme/tokens.ts`: each is `var(--tg-name, light hex)`, and `THEME_CSS` (included in `HOME_CSS` and `WALKTHROUGH_CSS`) defines the variables under `.home, .wt`, light by default and dark inside the media query. Settings and the bubble do not define the variables, so they keep the light values. Every screen added to Home or the tour uses `themedColor`, so it ships in both themes.
+
 ### Shared controls
 
 Every window draws its toggles, selects, sliders, money field, keycaps, buttons and the key field from `bodies/ui/src/controls/` (and `key/key-field.tsx`). Hosts inject `CONTROLS_CSS` beside their own sheet; the focus ring is navy on light surfaces and gold inside `.on-navy`, set by CSS variables rather than props. The renderer sheet `app.css` sets Onest on `body`, and the name "Scout" is Onest 600 everywhere (see bodies/DESIGN.md, Shared controls). Onest 400 and 600 is the only bundled typeface (`@fontsource/onest`): every size is one of seven roles in `themeTokens.type`, labels are sentence case, and `bodies/ui/src/style-audit.test.ts` fails on any other size, weight, capitals or letter spacing, any padding, margin or gap off the space scale, any radius that is not a radius token and any hex colour outside `tokens.ts`; every card is the one `.tg-card` box (see bodies/DESIGN.md, Typography).

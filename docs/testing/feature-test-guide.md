@@ -538,6 +538,16 @@ By hand:
 3. In the browser add-on's popup, with no pairing code saved the body shows offline and keeps redialing without sending a hello; run `uv run tagalong pair --kind browser`, type the code and press Pair: it redials at once and connects. A wrong code shows "That code did not work".
 4. `TAGALONG_NETWORK=1 uv run brain`: the log shows a second listener on 47323, and `brain_status` reports the certificate fingerprint.
 
+## Dark theme for Home and the tour (BAU0)
+
+Automated: `bodies/ui/src/home/home-view.test.tsx` (the dark variables are defined for `.home, .wt` under `prefers-color-scheme: dark`).
+
+By hand (`pnpm dev:desktop`):
+
+1. Set Windows to dark (Settings, Personalisation, Colours). **Expected:** Home (Overview, Connections, Memory) and the tour show navy-tinted panels with light text, gold buttons unchanged, and status chips, links and errors readable.
+2. Set Windows back to light. **Expected:** Home and the tour return to the off-white look with no restart of the brain.
+3. Open Settings and the bubble in dark Windows. **Expected:** unchanged (light settings, navy bubble).
+
 ## A desktop on a remote brain (BA3)
 
 Automated: `protocol/ts/src/pair-link.test.ts`; `protocol/ts/src/brain-client.test.ts`; the desktop's `src/main/brain/` (`pinned-socket`, `link-store`, `discover`, `launch`, `start` tests), `src/main/ipc/pair.test.ts` and `brain-status.test.ts`; `brain/tests/test_brain_status_host.py`, `test_pair_cli.py`; the browser's `src/pair.test.ts`.

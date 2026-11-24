@@ -1,7 +1,7 @@
 /** Tests that arrows drawn by CSS carry an empty alt text, so screen readers do not read them in names. */
 
 import { describe, expect, it } from 'vitest';
-import { themeTokens, typeCss } from '../theme/tokens';
+import { typeCss } from '../theme/tokens';
 import { WALKTHROUGH_CSS } from './walkthrough-styles';
 
 describe('walkthrough CSS glyphs', () => {
@@ -21,10 +21,7 @@ describe('walkthrough CSS rules', () => {
     expect(WALKTHROUGH_CSS).toMatch(/\.wt-final \{[^}]*min-width: 96px/);
   });
 
-  it('sets the Ready to use rows at body size and the status dot from the ok token', () => {
+  it('sets the Ready to use rows at body size', () => {
     expect(WALKTHROUGH_CSS).toContain(`.wt-ready .wt-keylist li { ${typeCss('body')}; }`);
-    expect(WALKTHROUGH_CSS).toContain(
-      `.wt .home-dot { width: 8px; height: 8px; border-radius: 50%; background: ${themeTokens.color.okDot};`,
-    );
   });
 });

@@ -987,3 +987,48 @@ test('K6 get to know me: tour step and Home portrait, light and dark', async () 
     await second.done();
   }
 });
+
+// Colour transitions run for 120 ms after the scheme flips; shoot once they are done.
+const settled = (page: Page): Promise<unknown> =>
+  page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
+
+test('BAU0 Home and the tour, light and dark', async () => {
+  test.setTimeout(180_000);
+  const dir = shotDir('bau0');
+  mkdirSync(dir, { recursive: true });
+  const first = await launchShot({ hasKey: true }, false);
+  try {
+    const tour = await first.find('walkthrough');
+    await expect(
+      tour.getByRole('heading', { name: 'One companion for everything you do' }),
+    ).toBeVisible();
+    for (const scheme of ['light', 'dark'] as const) {
+      await tour.emulateMedia({ colorScheme: scheme });
+      await settled(tour);
+      await tour.screenshot({ path: join(dir, `tour-step-1-${scheme}.png`) });
+    }
+  } finally {
+    await first.done();
+  }
+  const second = await launchShot({ hasKey: true });
+  try {
+    await (await second.find('avatar')).evaluate(() => window.tagalongHost.openSettings());
+    const home = await second.find('home');
+    await home.getByRole('button', { name: 'Overview', exact: true }).click();
+    await expect(home.getByRole('region', { name: "Scout's brain" })).toBeVisible();
+    for (const scheme of ['light', 'dark'] as const) {
+      await home.emulateMedia({ colorScheme: scheme });
+      await settled(home);
+      await home.screenshot({ path: join(dir, `home-overview-${scheme}.png`) });
+    }
+    await home.getByRole('button', { name: 'Connections' }).click();
+    await expect(home.getByRole('heading', { level: 1, name: 'Connections' })).toBeVisible();
+    for (const scheme of ['light', 'dark'] as const) {
+      await home.emulateMedia({ colorScheme: scheme });
+      await settled(home);
+      await home.screenshot({ path: join(dir, `home-connections-${scheme}.png`) });
+    }
+  } finally {
+    await second.done();
+  }
+});
