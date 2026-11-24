@@ -121,7 +121,6 @@ describe('MemoryTimeline', () => {
       fact({ text: 'Likes tea', source: 'chat' }),
       fact({ text: 'Plain fact' }),
     ]);
-    expect(screen.getAllByText('From Cursor')).toHaveLength(1);
     expect(
       within(screen.getByText('Uses pnpm').closest('summary')!).getByText('From Cursor'),
     ).toBeInTheDocument();

@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { Button, CopyButton } from '../controls';
 import type { PairOffer } from '../shapes/pairing';
+import { PairShell } from './pair-shell';
 import { QrImage } from './qr-image';
 
 interface PairDialogProps {
@@ -172,28 +173,16 @@ function PairCode({
 
 export function PairDialog({ make, copyText, onClose, enableNetwork }: PairDialogProps) {
   const [round, setRound] = useState(0);
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
   return (
-    <div className="pair-scrim">
-      <div className="pair-dialog" role="dialog" aria-modal="true" aria-label="Pair a device">
-        <h2>Pair a device</h2>
-        <PairCode
-          key={round}
-          make={make}
-          copyText={copyText}
-          onClose={onClose}
-          enableNetwork={enableNetwork}
-          onRetry={() => setRound((n) => n + 1)}
-        />
-      </div>
-    </div>
+    <PairShell title="Pair a device" onClose={onClose}>
+      <PairCode
+        key={round}
+        make={make}
+        copyText={copyText}
+        onClose={onClose}
+        enableNetwork={enableNetwork}
+        onRetry={() => setRound((n) => n + 1)}
+      />
+    </PairShell>
   );
 }

@@ -43,7 +43,7 @@ import type {
 } from '@tagalong/ui';
 import type {
   AiToolConnect,
-  AiToolLink,
+  AiToolLinkResult,
   BodiesState,
   DevicesState,
   PlacementsState,
@@ -168,7 +168,7 @@ const bridge: PreloadBridge = {
   pairMake: () => ipcRenderer.invoke(IPC.pairMake) as Promise<PairOffer>,
   aiToolConnect: (tool) => ipcRenderer.invoke(IPC.aiToolConnect, tool) as Promise<AiToolConnect>,
   aiToolLink: (tool, personal) =>
-    ipcRenderer.invoke(IPC.aiToolLink, tool, personal) as Promise<AiToolLink>,
+    ipcRenderer.invoke(IPC.aiToolLink, tool, personal) as Promise<AiToolLinkResult>,
   installBrainService: () =>
     ipcRenderer.invoke(IPC.brainServiceInstall) as Promise<BrainServiceOutcome>,
   forgetBrain: () => ipcRenderer.invoke(IPC.pairForget) as Promise<void>,

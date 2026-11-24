@@ -8,6 +8,8 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { ErrorCode, RpcError, type Part } from '@tagalong/contract';
+import { AI_TOOLS, bridgeArgv } from '@tagalong/ui/shapes';
+import type { AiToolId } from '@tagalong/ui/shapes';
 
 export interface RunResult {
   code: number;
@@ -41,19 +43,13 @@ export interface ConnectDeps {
   budgetMs?: number;
 }
 
-const LABELS = { 'claude-code': 'Claude Code', codex: 'Codex', cursor: 'Cursor' } as const;
-type AiTool = keyof typeof LABELS;
+const LABELS: Record<string, string> = Object.fromEntries(
+  AI_TOOLS.map((tool) => [tool.id, tool.label]),
+);
+type AiTool = AiToolId;
 const CLI = { 'claude-code': 'claude', codex: 'codex' } as const;
 
-// `cmd /c` because Windows tools cannot start the `.cmd` that puts `tagalong` on the path.
-const bridge = (name: string): string[] => [
-  'cmd',
-  '/c',
-  'tagalong',
-  'memory-mcp',
-  '--client',
-  name,
-];
+const bridge = bridgeArgv;
 
 // What an AI tool sends first, then one real read: it makes the bridge dial the brain with the token.
 const PROBE = [

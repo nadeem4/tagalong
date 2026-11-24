@@ -9,7 +9,7 @@ import type { ReactNode } from 'react';
 import type {
   AiToolConnect,
   AiToolId,
-  AiToolLink,
+  AiToolLinkResult,
   AppAddParams,
   AppsList,
   BodiesState,
@@ -460,8 +460,8 @@ export interface HostBridge {
   pairMake(): Promise<PairOffer>;
   /** Sets Claude Code, Codex or Cursor up to use Scout's memory on this PC; never rejects for a refusal. */
   aiToolConnect(tool: AiToolId): Promise<AiToolConnect>;
-  /** A one-time link for an AI tool to pair with by hand. Rejects with `network_off` while the brain does not listen beyond this PC. */
-  aiToolLink(tool: AiToolId, personal: boolean): Promise<AiToolLink>;
+  /** A one-time link for an AI tool to pair with by hand; `network_off` while the brain does not listen beyond this PC. */
+  aiToolLink(tool: AiToolId, personal: boolean): Promise<AiToolLinkResult>;
   copyText(text: string): Promise<void>;
   /** Registers the brain to start at sign-in with network access on; no administrator prompt. */
   installBrainService(): Promise<{ ok: true } | { ok: false; detail: string }>;

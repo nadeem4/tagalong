@@ -1479,6 +1479,19 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           value = { ok: true };
         } else if (params.tool === 'forget_memories') {
           const source = String(params.input?.source);
+          if (!source.startsWith('mcp:')) {
+            socket.send(
+              JSON.stringify({
+                jsonrpc: '2.0',
+                id: msg.id,
+                error: {
+                  code: ErrorCode.tool_failed,
+                  message: 'Only memories another AI tool added can be deleted by source.',
+                },
+              }),
+            );
+            return;
+          }
           const before = outsideMemories.length;
           outsideMemories = outsideMemories.filter((m) => m.source !== source);
           notify('changed', { what: 'memory' });

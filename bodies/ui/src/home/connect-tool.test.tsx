@@ -18,9 +18,10 @@ function open() {
 }
 
 describe('ConnectToolDialog', () => {
-  it.each(['Claude Code', 'Codex', 'Cursor'])('offers both ways for %s', (name) => {
+  it.each(['Claude Code', 'Codex', 'Cursor'])('offers both ways for %s, named for it', (name) => {
     open();
     fireEvent.click(screen.getByRole('button', { name: new RegExp(name) }));
+    expect(screen.getByText(`Scout adds itself to ${name}'s settings on this PC.`)).toBeVisible();
     expect(screen.getByRole('button', { name: 'Set it up' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Show me' })).toBeInTheDocument();
   });
@@ -48,33 +49,30 @@ describe('ConnectToolDialog', () => {
     await waitFor(() => expect(host.aiToolCalls).toEqual(['claude-code', 'claude-code']));
   });
 
-  it('shows the steps for the tool with the link hidden until asked, and copies the real one', async () => {
+  it('shows the steps for the tool with the link hidden until asked, and copies the real one either way', async () => {
     const { host } = open();
     fireEvent.click(screen.getByRole('button', { name: /Codex/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Show me' }));
     expect(await screen.findByText(/codex mcp add tagalong/)).toBeInTheDocument();
+    expect(host.aiToolCalls).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'Copy the pairing line' }));
+    await waitFor(() =>
+      expect(host.copied.at(-1)).toBe(
+        'tagalong memory-mcp --pair tagalong://pair?code=codex --client codex',
+      ),
+    );
     expect(screen.queryByText(/code=codex/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Show link' }));
-    expect(screen.getByText(/code=codex/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Copy the pairing line' }));
-    expect(host.copied.at(-1)).toBe(
-      'tagalong memory-mcp --pair tagalong://pair?code=codex --client codex',
-    );
-  });
-
-  it('copies the real link even while it is hidden', async () => {
-    const { host } = open();
-    fireEvent.click(screen.getByRole('button', { name: 'Show me' }));
-    await screen.findByText(/claude mcp add/);
-    expect(screen.queryByText(/code=claude-code/)).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Copy the pairing line' }));
-    expect(host.copied.at(-1)).toContain('code=claude-code');
+    expect(await screen.findByText(/code=codex/)).toBeInTheDocument();
+    expect(host.aiToolCalls).toEqual(['codex']);
   });
 
   it('makes a new link when the personal-memories switch is turned on', async () => {
     const { host } = open();
     fireEvent.click(screen.getByRole('button', { name: 'Show me' }));
     await screen.findByText(/claude mcp add/);
+    fireEvent.click(screen.getByRole('button', { name: 'Show link' }));
+    await screen.findByText(/code=claude-code/);
     fireEvent.click(screen.getByRole('switch', { name: 'Let it see personal memories' }));
     await waitFor(() => expect(host.aiToolCalls).toEqual(['claude-code', 'claude-code personal']));
   });
@@ -83,6 +81,7 @@ describe('ConnectToolDialog', () => {
     const { host } = open();
     host.aiToolLinkError = 'network_off';
     fireEvent.click(screen.getByRole('button', { name: 'Show me' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Show link' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Let other devices connect');
   });
 });

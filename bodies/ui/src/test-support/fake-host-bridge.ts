@@ -147,9 +147,9 @@ export interface FakeHostBridge extends HostBridge {
   readonly copied: readonly string[];
   /** Every aiToolConnect (`cursor`) and aiToolLink (`cursor personal`), in order. */
   readonly aiToolCalls: readonly string[];
-  /** How aiToolConnect ends, and what aiToolLink rejects with (`network_off`) when set. */
+  /** How aiToolConnect ends, and why aiToolLink says no (`network_off`) when set. */
   aiToolOutcome: AiToolConnect;
-  aiToolLinkError: string | undefined;
+  aiToolLinkError: 'network_off' | 'failed' | undefined;
   /** pairMake rejects with this message when set (`network_off`). */
   pairError: string | undefined;
   /** installBrainService answers this; `{ ok: false, detail }` is a refusal. */
@@ -527,6 +527,7 @@ export function createFakeHostBridge(
     forgetMemoriesFrom(source) {
       const before = fake.memories.length;
       fake.memories = fake.memories.filter((memory) => memory.source !== source);
+      fake.emitChanged('memory');
       return Promise.resolve(before - fake.memories.length);
     },
     deleteMemory(id) {
@@ -736,10 +737,10 @@ export function createFakeHostBridge(
     aiToolLink(tool, personal) {
       aiToolCalls.push(personal ? `${tool} personal` : tool);
       if (fake.aiToolLinkError !== undefined)
-        return Promise.reject(new Error(fake.aiToolLinkError));
+        return Promise.resolve({ ok: false, reason: fake.aiToolLinkError });
       return Promise.resolve({
+        ok: true,
         link: `tagalong://pair?code=${tool}${personal ? '-personal' : ''}`,
-        expiresAt: new Date(Date.now() + 600_000).toISOString(),
       });
     },
     pairMake() {

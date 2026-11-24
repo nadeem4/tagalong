@@ -154,10 +154,4 @@ describe('registerMemoryIpc', () => {
     expect(await invoke(IPC.forgetMemoriesFrom, 'mcp:cursor')).toBe(3);
     expect(calls).toEqual([['forget_memories', { source: 'mcp:cursor' }]]);
   });
-
-  it('will not delete by a source that is not an AI tool', async () => {
-    const { invoke, calls } = setup(() => text({ deleted: 9 }));
-    expect(await invoke(IPC.forgetMemoriesFrom, 'linkedin')).toBe(0);
-    expect(calls).toEqual([]);
-  });
 });

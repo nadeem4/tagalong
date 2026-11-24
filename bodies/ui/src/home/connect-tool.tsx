@@ -3,13 +3,14 @@
  * either Scout sets it up on this PC (working, connected or failed), or it shows the steps to
  * type, with the pairing link hidden until asked. Contains ConnectToolDialog.
  */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button, CopyButton, Toggle } from '../controls';
 import type { HostBridge } from '../host-bridge';
 import { Icon } from '../icons';
+import { PairShell } from '../pair/pair-shell';
 import { PAIR_CSS } from '../pair/pair-styles';
 import { AI_TOOLS, howToLines } from '../shapes';
-import type { AiToolId, AiToolLink } from '../shapes';
+import type { AiToolId } from '../shapes';
 import { themeTokens as t, themedColor, typeCss } from '../theme/tokens';
 import { DeviceIcon } from './device-icons';
 
@@ -41,6 +42,7 @@ const CSS = `
 `;
 
 type Host = Pick<HostBridge, 'aiToolConnect' | 'aiToolLink' | 'copyText'>;
+type Tool = (typeof AI_TOOLS)[number];
 type Phase =
   | { at: 'pick' }
   | { at: 'working' }
@@ -50,62 +52,91 @@ type Phase =
 
 const HIDDEN = '••••••••••••';
 
-function HowTo({ host, tool }: { host: Host; tool: AiToolId }) {
-  const label = AI_TOOLS.find((entry) => entry.id === tool)!.label;
+function titleOf(phase: Phase, tool: Tool): string {
+  switch (phase.at) {
+    case 'pick':
+      return 'Connect another AI tool';
+    case 'working':
+      return `Connecting ${tool.label}`;
+    case 'connected':
+      return `${tool.label} is connected`;
+    case 'failed':
+      return `Could not set up ${tool.label}`;
+    case 'howto':
+      return `Add Scout to ${tool.label}`;
+  }
+}
+
+/** The pairing link is made when it is first shown or copied, and again only if the switch moves after that. */
+function HowTo({ host, tool }: { host: Host; tool: Tool }) {
   const [personal, setPersonal] = useState(false);
   const [shown, setShown] = useState(false);
-  const [made, setMade] = useState<AiToolLink | 'network_off' | 'failed' | null>(null);
+  const [link, setLink] = useState<string | null>(null);
+  const [error, setError] = useState<'network_off' | 'failed' | null>(null);
 
-  useEffect(() => {
-    let live = true;
-    host.aiToolLink(tool, personal).then(
-      (link) => live && setMade(link),
-      (error: unknown) =>
-        live && setMade(String(error).includes('network_off') ? 'network_off' : 'failed'),
-    );
-    return () => {
-      live = false;
-    };
-  }, [host, tool, personal]);
+  const make = async (withPersonal: boolean): Promise<string | null> => {
+    const result = await host
+      .aiToolLink(tool.id, withPersonal)
+      .catch((): { ok: false; reason: 'failed' } => ({ ok: false, reason: 'failed' }));
+    setError(result.ok ? null : result.reason);
+    if (result.ok) setLink(result.link);
+    return result.ok ? result.link : null;
+  };
+  const ensure = (): Promise<string | null> =>
+    link === null ? make(personal) : Promise.resolve(link);
+  const flip = (on: boolean): void => {
+    setPersonal(on);
+    if (link === null) return;
+    setLink(null);
+    void make(on);
+  };
+  const copyPair = async (): Promise<void> => {
+    const made = await ensure();
+    if (made !== null) await host.copyText(howToLines(tool.id, made).pair);
+  };
+  const toggleLink = async (): Promise<void> => {
+    if (shown || (await ensure()) !== null) setShown(!shown);
+  };
 
-  if (made === 'network_off' || made === 'failed') {
-    return (
-      <p className="pair-alert pair-alert--err" role="alert">
-        {made === 'network_off'
-          ? 'Scout cannot make a link yet. Turn on "Let other devices connect" in Pair a device first, then try again.'
-          : 'Scout could not make a link. Check that the brain is running, then try again.'}
-      </p>
-    );
-  }
-  if (made === null) return <p className="ct-lead">Making a link…</p>;
-
-  const real = howToLines(tool, made.link);
-  const hidden = howToLines(tool, HIDDEN);
+  const { where, add, pair } = howToLines(tool.id, shown && link !== null ? link : HIDDEN);
   return (
     <>
       <p className="ct-lead">
-        Two steps, in a terminal on the PC that runs {label}
-        {real.where !== null && (
+        Two steps, in a terminal on the PC that runs {tool.label}
+        {where !== null && (
           <>
             {' '}
-            (the first goes in <span className="ct-file">{real.where}</span>)
+            (the first goes in <span className="ct-file">{where}</span>)
           </>
         )}
-        . Then restart {label}.
+        . Then restart {tool.label}.
       </p>
       <div className="ct-code">
-        <pre>{real.add}</pre>
-        <CopyButton text={real.add} copy={host.copyText} label="Copy the add step" />
+        <pre>{add}</pre>
+        <CopyButton text={add} copy={host.copyText} label="Copy the add step" />
       </div>
       <div className="ct-code">
-        <pre>{shown ? real.pair : hidden.pair}</pre>
+        <pre>{pair}</pre>
         <span className="ct-code__side">
-          <CopyButton text={real.pair} copy={host.copyText} label="Copy the pairing line" />
-          <Button variant="secondary" onClick={() => setShown((now) => !now)}>
+          <Button
+            variant="secondary"
+            aria-label="Copy the pairing line"
+            onClick={() => void copyPair().catch(() => undefined)}
+          >
+            Copy
+          </Button>
+          <Button variant="secondary" onClick={() => void toggleLink()}>
             {shown ? 'Hide link' : 'Show link'}
           </Button>
         </span>
       </div>
+      {error !== null && (
+        <p className="pair-alert pair-alert--err" role="alert">
+          {error === 'network_off'
+            ? 'Scout cannot make a link yet. Turn on "Let other devices connect" in Pair a device first, then try again.'
+            : 'Scout could not make a link. Check that the brain is running, then try again.'}
+        </p>
+      )}
       <div className="ct-switch">
         <span>
           <strong id="ct-personal">Let it see personal memories</strong>
@@ -115,10 +146,7 @@ function HowTo({ host, tool }: { host: Host; tool: AiToolId }) {
         </span>
         <Toggle
           checked={personal}
-          onChange={(on) => {
-            setMade(null);
-            setPersonal(on);
-          }}
+          onChange={flip}
           label="Let it see personal memories"
           describedBy="ct-personal"
         />
@@ -127,6 +155,136 @@ function HowTo({ host, tool }: { host: Host; tool: AiToolId }) {
         Keep the link private: it works once and anyone with it can add this tool. Revoke the tool
         in Devices any time.
       </p>
+    </>
+  );
+}
+
+function Pick({
+  tool,
+  onTool,
+  onSetUp,
+  onHowTo,
+  onClose,
+}: {
+  tool: Tool;
+  onTool: (id: AiToolId) => void;
+  onSetUp: () => void;
+  onHowTo: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <>
+      <p className="ct-lead">
+        The tool can then read Scout&apos;s memory and add to it. It cannot run your apps or see
+        your screen.
+      </p>
+      <div className="ct-tools" role="group" aria-label="Tool">
+        {AI_TOOLS.map((entry) => (
+          <button
+            key={entry.id}
+            type="button"
+            className="ct-tool"
+            aria-pressed={entry.id === tool.id}
+            onClick={() => onTool(entry.id)}
+          >
+            <DeviceIcon name="term" />
+            <strong>{entry.label}</strong>
+          </button>
+        ))}
+      </div>
+      <div className="ct-ways">
+        <div className="ct-way">
+          <h3>Set it up for me</h3>
+          <p>Scout adds itself to {tool.label}&apos;s settings on this PC.</p>
+          <Button variant="primary" onClick={onSetUp}>
+            Set it up
+          </Button>
+        </div>
+        <div className="ct-way">
+          <h3>Show me how</h3>
+          <p>Scout shows the two lines to run, in your own terminal or settings file.</p>
+          <Button variant="secondary" onClick={onHowTo}>
+            Show me
+          </Button>
+        </div>
+      </div>
+      <div className="ct-actions">
+        <Button variant="quiet" onClick={onClose}>
+          Cancel
+        </Button>
+      </div>
+    </>
+  );
+}
+
+function Working({ tool }: { tool: Tool }) {
+  return (
+    <>
+      <ol className="ct-steps" aria-busy="true">
+        <li>
+          <strong>Making a key for {tool.label}</strong>
+          <span className="ct-lead">Only this tool can use it. You can revoke it any time.</span>
+        </li>
+        <li>
+          <strong>Adding Scout to {tool.label}&apos;s settings</strong>
+          <span className="ct-file">{tool.file}</span>
+        </li>
+        <li>
+          <strong>Checking it can reach Scout&apos;s memory</strong>
+        </li>
+      </ol>
+      <div className="ct-busy" aria-hidden="true">
+        <i />
+      </div>
+    </>
+  );
+}
+
+function Connected({ tool, text, onDone }: { tool: Tool; text: string; onDone: () => void }) {
+  return (
+    <>
+      <p className="pair-alert pair-alert--ok" role="status">
+        <Icon name="check" /> {text}
+      </p>
+      <dl className="ct-facts">
+        <dt>Can do</dt>
+        <dd>Read memory, add to memory</dd>
+        <dt>Cannot do</dt>
+        <dd>Run your apps, see your screen, read personal memories</dd>
+        <dt>Next</dt>
+        <dd>Restart {tool.label} to pick it up.</dd>
+      </dl>
+      <div className="ct-actions">
+        <Button variant="primary" onClick={onDone} autoFocus>
+          Done
+        </Button>
+      </div>
+    </>
+  );
+}
+
+function Failed({
+  message,
+  onHowTo,
+  onRetry,
+}: {
+  message: string;
+  onHowTo: () => void;
+  onRetry: () => void;
+}) {
+  return (
+    <>
+      <p className="pair-alert pair-alert--err" role="alert">
+        <Icon name="err" /> {message}
+      </p>
+      <div className="ct-actions">
+        <Button variant="quiet" onClick={onHowTo}>
+          Show me how
+        </Button>
+        <Button variant="primary" onClick={onRetry}>
+          Try again
+        </Button>
+      </div>
     </>
   );
 }
@@ -141,21 +299,13 @@ export function ConnectToolDialog({
   /** The tool was connected: Devices reads its list again. */
   onDone: () => void;
 }) {
-  const [tool, setTool] = useState<AiToolId>('claude-code');
+  const [toolId, setToolId] = useState<AiToolId>('claude-code');
   const [phase, setPhase] = useState<Phase>({ at: 'pick' });
-  const info = AI_TOOLS.find((entry) => entry.id === tool)!;
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  const tool = AI_TOOLS.find((entry) => entry.id === toolId)!;
 
   const setUp = (): void => {
     setPhase({ at: 'working' });
-    void host.aiToolConnect(tool).then(
+    void host.aiToolConnect(toolId).then(
       (result) =>
         setPhase(
           result.ok
@@ -169,146 +319,35 @@ export function ConnectToolDialog({
         }),
     );
   };
-
-  let body;
-  let title = 'Connect another AI tool';
-  if (phase.at === 'pick') {
-    body = (
-      <>
-        <p className="ct-lead">
-          The tool can then read Scout&apos;s memory and add to it. It cannot run your apps or see
-          your screen.
-        </p>
-        <div className="ct-tools" role="group" aria-label="Tool">
-          {AI_TOOLS.map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              className="ct-tool"
-              aria-pressed={entry.id === tool}
-              onClick={() => setTool(entry.id)}
-            >
-              <DeviceIcon name="term" />
-              <strong>{entry.label}</strong>
-            </button>
-          ))}
-        </div>
-        <div className="ct-ways">
-          <div className="ct-way">
-            <h3>Set it up for me</h3>
-            <p>Scout adds itself to {info.label}&apos;s settings on this PC.</p>
-            <Button variant="primary" onClick={setUp}>
-              Set it up
-            </Button>
-          </div>
-          <div className="ct-way">
-            <h3>Show me how</h3>
-            <p>Scout shows the two lines to run, in your own terminal or settings file.</p>
-            <Button variant="secondary" onClick={() => setPhase({ at: 'howto' })}>
-              Show me
-            </Button>
-          </div>
-        </div>
-        <div className="ct-actions">
-          <Button variant="quiet" onClick={onClose}>
-            Cancel
-          </Button>
-        </div>
-      </>
-    );
-  } else if (phase.at === 'working') {
-    title = `Connecting ${info.label}`;
-    body = (
-      <>
-        <ol className="ct-steps" aria-busy="true">
-          <li>
-            <strong>Making a key for {info.label}</strong>
-            <span className="ct-lead">Only this tool can use it. You can revoke it any time.</span>
-          </li>
-          <li>
-            <strong>Adding Scout to {info.label}&apos;s settings</strong>
-            <span className="ct-file">{info.file}</span>
-          </li>
-          <li>
-            <strong>Checking it can reach Scout&apos;s memory</strong>
-          </li>
-        </ol>
-        <div className="ct-busy" aria-hidden="true">
-          <i />
-        </div>
-      </>
-    );
-  } else if (phase.at === 'connected') {
-    title = `${info.label} is connected`;
-    body = (
-      <>
-        <p className="pair-alert pair-alert--ok" role="status">
-          <Icon name="check" /> {phase.text}
-        </p>
-        <dl className="ct-facts">
-          <dt>Can do</dt>
-          <dd>Read memory, add to memory</dd>
-          <dt>Cannot do</dt>
-          <dd>Run your apps, see your screen, read personal memories</dd>
-          <dt>Next</dt>
-          <dd>Restart {info.label} to pick it up.</dd>
-        </dl>
-        <div className="ct-actions">
-          <Button variant="primary" onClick={onDone} autoFocus>
-            Done
-          </Button>
-        </div>
-      </>
-    );
-  } else if (phase.at === 'failed') {
-    title = `Could not set up ${info.label}`;
-    body = (
-      <>
-        <p className="pair-alert pair-alert--err" role="alert">
-          <Icon name="err" /> {phase.message}
-        </p>
-        <div className="ct-actions">
-          <Button variant="quiet" onClick={() => setPhase({ at: 'howto' })}>
-            Show me how
-          </Button>
-          <Button variant="primary" onClick={setUp}>
-            Try again
-          </Button>
-        </div>
-      </>
-    );
-  } else {
-    title = `Add Scout to ${info.label}`;
-    body = (
-      <>
-        <HowTo host={host} tool={tool} />
-        <div className="ct-actions">
-          <Button variant="quiet" onClick={() => setPhase({ at: 'pick' })}>
-            Back
-          </Button>
-          <Button variant="secondary" onClick={onClose}>
-            Done
-          </Button>
-        </div>
-      </>
-    );
-  }
+  const howTo = (): void => setPhase({ at: 'howto' });
 
   return (
     <>
       <style>{PAIR_CSS}</style>
       <style>{CSS}</style>
-      <div className="pair-scrim">
-        <div
-          className="pair-dialog"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Connect another AI tool"
-        >
-          <h2>{title}</h2>
-          {body}
-        </div>
-      </div>
+      <PairShell title={titleOf(phase, tool)} label="Connect another AI tool" onClose={onClose}>
+        {phase.at === 'pick' && (
+          <Pick tool={tool} onTool={setToolId} onSetUp={setUp} onHowTo={howTo} onClose={onClose} />
+        )}
+        {phase.at === 'working' && <Working tool={tool} />}
+        {phase.at === 'connected' && <Connected tool={tool} text={phase.text} onDone={onDone} />}
+        {phase.at === 'failed' && (
+          <Failed message={phase.message} onHowTo={howTo} onRetry={setUp} />
+        )}
+        {phase.at === 'howto' && (
+          <>
+            <HowTo host={host} tool={tool} />
+            <div className="ct-actions">
+              <Button variant="quiet" onClick={() => setPhase({ at: 'pick' })}>
+                Back
+              </Button>
+              <Button variant="secondary" onClick={onClose}>
+                Done
+              </Button>
+            </div>
+          </>
+        )}
+      </PairShell>
     </>
   );
 }

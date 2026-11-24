@@ -1392,6 +1392,7 @@ test('BAU4 connect another AI tool and memories by tool, light and dark', async 
   try {
     await connect(off.home);
     await dialog(off.home).getByRole('button', { name: 'Show me' }).click();
+    await dialog(off.home).getByRole('button', { name: 'Show link' }).click();
     await expect(dialog(off.home).getByRole('alert')).toBeVisible();
     await both(off.home, 'snippet-network-off');
   } finally {

@@ -35,7 +35,7 @@ describe('registerAiToolIpc', () => {
       ok: true,
       text: "Cursor is connected to Scout's memory.",
     });
-    expect(calls).toEqual([['connect_ai_tool', { tool: 'cursor' }, 90_000]]);
+    expect(calls).toEqual([['connect_ai_tool', { tool: 'cursor' }, 100_000]]);
   });
 
   it('hands back the reason when the brain refuses', async () => {
@@ -60,15 +60,18 @@ describe('registerAiToolIpc', () => {
       ),
     );
     expect(await invoke(IPC.aiToolLink, 'codex', true)).toEqual({
+      ok: true,
       link: 'tagalong://pair?c=1',
-      expiresAt: 'T',
     });
     expect(calls).toEqual([['mcp_client_make', { name: 'codex', personal: true }, undefined]]);
 
     const off = setup(() => {
       throw new RpcError(ErrorCode.network_off, 'off');
     });
-    await expect(off.invoke(IPC.aiToolLink, 'codex', false)).rejects.toThrow('network_off');
+    expect(await off.invoke(IPC.aiToolLink, 'codex', false)).toEqual({
+      ok: false,
+      reason: 'network_off',
+    });
   });
 
   it('refuses a tool it does not know', async () => {

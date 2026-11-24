@@ -5,8 +5,8 @@
  * source filter, and one tool's can be deleted together. Contains MemoryView.
  */
 
-import { useCallback, useEffect, useState } from 'react';
-import { buildTimeline, memorySourceLabel } from '../shapes';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { buildTimeline, isOutsideSource, memorySourceLabel } from '../shapes';
 import type { MemoryEntry } from '../shapes';
 import { useHostBridge } from '../host-bridge';
 import { Button } from '../controls/button';
@@ -49,14 +49,56 @@ const CSS = `
 `;
 
 const OWN = 'own';
+/** Scout learned it in chat (or the brain kept no source): not read from anywhere. */
 const own = (fact: MemoryEntry): boolean => !fact.source || fact.source === 'chat';
 const originOf = (fact: MemoryEntry): string => (own(fact) ? OWN : fact.source!);
 
 /** The sources a run of facts was read from, in the order first seen; chat is not a source. */
 function sourcesOf(facts: MemoryEntry[]): string[] {
   const seen = new Set<string>();
-  for (const f of facts) if (f.source && f.source !== 'chat') seen.add(sourceLabel(f.source));
+  for (const f of facts) if (!own(f)) seen.add(sourceLabel(f.source!));
   return [...seen];
+}
+
+/** One AI tool's memories: how many, and "delete them all" behind a confirm. */
+function ForgetFromTool({
+  tool,
+  count,
+  onForget,
+}: {
+  tool: string;
+  count: number;
+  onForget: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  if (!confirming) {
+    return (
+      <p className="memory-from">
+        <span>
+          {count} {count === 1 ? 'memory' : 'memories'} from {tool}
+        </span>
+        <Button variant="secondary" onClick={() => setConfirming(true)}>
+          Delete everything from this tool
+        </Button>
+      </p>
+    );
+  }
+  return (
+    <div role="alert" className="dv-confirm">
+      <span>
+        <strong>
+          Delete all {count} from {tool}?
+        </strong>{' '}
+        {tool} stays connected and can add new ones. This cannot be undone.
+      </span>
+      <Button variant="quiet" onClick={() => setConfirming(false)}>
+        Keep them
+      </Button>
+      <Button variant="danger" onClick={onForget}>
+        Delete them
+      </Button>
+    </div>
+  );
 }
 
 /**
@@ -71,7 +113,6 @@ export function MemoryView({ name }: { name: string }) {
   const [portrait, setPortrait] = useState<string | null>(null);
   const [knowOpen, setKnowOpen] = useState(false);
   const [origin, setOrigin] = useState<string | null>(null);
-  const [confirmForget, setConfirmForget] = useState(false);
 
   const refresh = useCallback(() => {
     // The portrait is a bonus: a failure to read it leaves the list as it was.
@@ -106,19 +147,20 @@ export function MemoryView({ name }: { name: string }) {
   const forgetFrom = (source: string): void => {
     void bridge
       .forgetMemoriesFrom(source)
-      .then(() => {
-        setConfirmForget(false);
-        setOrigin(null);
-        refresh();
-      })
       .catch((error: unknown) => console.error('could not delete a tool memories', error));
   };
 
-  const allFacts = (memories ?? []).filter((memory) => memory.kind === 'fact');
-  const origins = [...new Set(allFacts.map(originOf))];
-  const chosen = origin !== null && origins.includes(origin) ? origin : null;
-  const facts = chosen === null ? allFacts : allFacts.filter((f) => originOf(f) === chosen);
-  const chosenTool = chosen !== null && chosen !== OWN ? memorySourceLabel(chosen) : null;
+  const allFacts = useMemo(() => (memories ?? []).filter((m) => m.kind === 'fact'), [memories]);
+  const byOrigin = useMemo(() => {
+    const groups = new Map<string, MemoryEntry[]>();
+    for (const fact of allFacts) {
+      const key = originOf(fact);
+      groups.set(key, [...(groups.get(key) ?? []), fact]);
+    }
+    return groups;
+  }, [allFacts]);
+  const chosen = origin !== null && byOrigin.has(origin) ? origin : null;
+  const facts = chosen === null ? allFacts : byOrigin.get(chosen)!;
   const others = (memories ?? []).filter((memory) => memory.kind !== 'fact');
   const { covered } = buildTimeline(facts);
   const sources = sourcesOf(facts);
@@ -171,55 +213,32 @@ export function MemoryView({ name }: { name: string }) {
         <section className="tg-card" aria-label="Timeline">
           <h2 className="tg-card__label">Timeline</h2>
           {portrait === null && coveredLines}
-          {origins.length > 1 && (
+          {byOrigin.size > 1 && (
             <div className="memory-filter">
               <div className="apv-seg" role="group" aria-label="Filter memories">
-                {[null, ...origins].map((item) => (
+                {[null, ...byOrigin.keys()].map((item) => (
                   <button
                     key={item ?? 'all'}
                     type="button"
                     aria-pressed={chosen === item}
-                    onClick={() => {
-                      setOrigin(item);
-                      setConfirmForget(false);
-                    }}
+                    onClick={() => setOrigin(item)}
                   >
                     {item === null ? 'Everything' : item === OWN ? 'From Scout' : sourceLabel(item)}
                     <span className="apv-seg__n">
-                      {item === null
-                        ? allFacts.length
-                        : allFacts.filter((f) => originOf(f) === item).length}
+                      {item === null ? allFacts.length : byOrigin.get(item)!.length}
                     </span>
                   </button>
                 ))}
               </div>
             </div>
           )}
-          {chosenTool !== null && !confirmForget && (
-            <p className="memory-from">
-              <span>
-                {facts.length} {facts.length === 1 ? 'memory' : 'memories'} from {chosenTool}
-              </span>
-              <Button variant="secondary" onClick={() => setConfirmForget(true)}>
-                Delete everything from this tool
-              </Button>
-            </p>
-          )}
-          {chosenTool !== null && confirmForget && (
-            <div role="alert" className="dv-confirm">
-              <span>
-                <strong>
-                  Delete all {facts.length} from {chosenTool}?
-                </strong>{' '}
-                {chosenTool} stays connected and can add new ones. This cannot be undone.
-              </span>
-              <Button variant="quiet" onClick={() => setConfirmForget(false)}>
-                Keep them
-              </Button>
-              <Button variant="danger" onClick={() => forgetFrom(chosen!)}>
-                Delete them
-              </Button>
-            </div>
+          {chosen !== null && isOutsideSource(chosen) && (
+            <ForgetFromTool
+              key={chosen}
+              tool={memorySourceLabel(chosen)!}
+              count={facts.length}
+              onForget={() => forgetFrom(chosen)}
+            />
           )}
           <MemoryTimeline entries={facts} onDelete={remove} />
         </section>

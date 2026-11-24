@@ -76,9 +76,8 @@ export function registerMemoryIpc(handle: IpcHandle, deps: { brain: BrainCall })
       throw error;
     }
   });
-  // Only another tool's memories go by source; the rest are deleted one at a time.
+  // The brain refuses any source but an AI tool's, so a bad one rejects here.
   handle(IPC.forgetMemoriesFrom, async (_event, source: string) => {
-    if (!source.startsWith('mcp:')) return 0;
     const { deleted } = (await callJson(brain, 'forget_memories', { source })) as {
       deleted: number;
     };
