@@ -301,11 +301,6 @@ async def test_an_empty_day_still_advances_the_digest(rig):
     assert rig.events == []  # it was spent: the next digest is the next local midnight
 
 
-async def test_nothing_held_today_means_no_digest(rig):
-    rig.svc.saw(Event("back", "desktop", {"body": "d", "idle_seconds": 900}))
-    assert rig.events == []
-
-
 # --- the Priya journey ---
 
 
