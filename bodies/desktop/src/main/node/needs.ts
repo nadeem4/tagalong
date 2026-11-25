@@ -4,15 +4,17 @@
  * is the brain told to try again. Every fact the card shows (who asks, where the program is) is
  * read here, never taken from the brain's frame; the path comes from the same `tagalong` that
  * `allow` will use, so the card names the program that gets approved. Also lists and revokes
- * what is approved here.
+ * what is approved here. An app's web sign-in, which finishes on this PC, is in signin.ts.
  */
 import { NodeNeedsParams, type NodeNeedsOpen } from '@tagalong/contract';
 import type { ApprovedItem, NeedsYouItem } from '@tagalong/ui/shapes';
 import { z } from 'zod';
 import { lastLine } from '../last-line';
+import type { Listening, Redirect } from './loopback';
+import { createSignin } from './signin';
 
 interface Open {
-  frame: NodeNeedsOpen;
+  frame: Exclude<NodeNeedsOpen, { need: 'app_signin' }>;
   path: string | null;
   brain: BrainFacts;
   state: NeedsYouItem['state'];
@@ -29,7 +31,10 @@ export interface BrainFacts {
 export interface NeedsYouDeps {
   /** Runs `tagalong <args>` on this PC. */
   run: (args: string[]) => Promise<{ code: number; out: string }>;
-  answer: (id: string, outcome: 'done' | 'not_now') => Promise<void>;
+  answer: (id: string, outcome: 'done' | 'not_now', redirect?: Redirect) => Promise<void>;
+  /** Listens on this PC's loopback port for a web sign-in's one redirect. */
+  catchRedirect: (port: number) => Promise<Listening>;
+  openUrl: (url: string) => Promise<void>;
   /** The paired brain's name and identity. */
   brain: () => Promise<BrainFacts>;
   push: (items: NeedsYouItem[]) => void;
@@ -55,8 +60,15 @@ const words = (spec: {
 export function createNeedsYou(deps: NeedsYouDeps) {
   const open = new Map<string, Open>();
   const arriving = new Set<string>();
-  const list = (): NeedsYouItem[] =>
-    [...open.values()].map(({ frame, path, brain, state, bubble, failure }) => ({
+  const signins = createSignin({
+    answer: deps.answer,
+    catchRedirect: deps.catchRedirect,
+    openUrl: deps.openUrl,
+    brain: deps.brain,
+    changed: () => changed(),
+  });
+  const list = (): NeedsYouItem[] => [
+    ...[...open.values()].map(({ frame, path, brain, state, bubble, failure }) => ({
       id: frame.id,
       need: frame.need,
       brain: brain.name,
@@ -67,7 +79,9 @@ export function createNeedsYou(deps: NeedsYouDeps) {
       state,
       failure,
       bubble,
-    }));
+    })),
+    ...signins.list(),
+  ];
   const changed = (): void => deps.push(list());
 
   const whichPath = async (command: string | undefined): Promise<string | null> => {
@@ -97,10 +111,12 @@ export function createNeedsYou(deps: NeedsYouDeps) {
       if (!parsed.success) return false;
       const frame = parsed.data;
       if (frame.state === 'closed') {
+        signins.close(frame.id);
         arriving.delete(frame.id);
         if (open.delete(frame.id)) changed();
         return false;
       }
+      if (frame.need === 'app_signin') return signins.open(frame);
       arriving.add(frame.id);
       const [path, brain] = await Promise.all([whichPath(frame.spec.command), deps.brain()]);
       if (!arriving.delete(frame.id)) return false;
@@ -110,6 +126,7 @@ export function createNeedsYou(deps: NeedsYouDeps) {
     },
 
     async act(id: string): Promise<{ error?: string }> {
+      if (signins.owns(id)) return signins.act(id);
       const need = open.get(id);
       if (need === undefined) return {};
       need.state = 'working';
@@ -131,6 +148,7 @@ export function createNeedsYou(deps: NeedsYouDeps) {
     },
 
     async notNow(id: string): Promise<void> {
+      if (signins.owns(id)) return signins.notNow(id);
       const need = open.get(id);
       if (need === undefined) return;
       need.bubble = false;

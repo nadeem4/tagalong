@@ -50,6 +50,10 @@ An app that needs a key must not hand it to the brain. The person types it on th
 
 The values live in `allowlist.json` beside the entry, written owner-only through the brain's one private-file writer (mode 0600; on Windows icacls removes inherited access and grants only the current user). Approving the same entry again after an update keeps them unless new ones are typed. A spec never carries a secret: the brain sends only the command and args, or the URL, so no frame, log or brain database row holds one (`brain/tests/test_node_secrets.py` captures every frame, decoded). A server that echoes the query back in a message cannot leak it either: the relay replaces each secret value, raw and percent-encoded, with `[secret]` in every line it sends the brain. A line to the relay that is not a JSON-RPC message is answered with an error for its id, and a line over 8 MiB ends the pipe. An app placed on a node ignores the brain's own copies of its keys.
 
+## Signing in an app that stays on the brain
+
+`sign_in_app` from a desktop that is not on the brain's machine (`Bodies.is_local` is false) does not ask that desktop to run `open_url`: the app's redirect goes to `http://127.0.0.1:<port>/callback`, and that address would be the brain's own. Instead a `RemoteSignin` (`node_needs.py`, chosen by `app_tools.signin_channel`; the local case is `BrowserSignin` in `app_oauth.py`, both a `SigninChannel`) asks it with `node_needs` `need: "app_signin"` carrying the app's name, the authorize `url` and the `port` the brain registered (picked by binding and releasing a free one, since nothing listens on the brain). The desktop (`main/node/signin.ts`, `loopback.ts`) opens the page in this PC's browser, listens on that port on this PC, and answers `node_answered { id, outcome: "done", code, state, iss? }`; the brain gives the code to the SDK, which checks `state` and exchanges it, so the tokens are saved on the brain only (`FileTokenStorage`) and no later frame carries one. A wrong `state` fails the sign-in with nothing saved; a need is answered once, so a later answer for it is ignored; `not_now` ends the sign-in and closes the need. The card says the sign-in is kept on the brain, and says so if the brain does not confirm within 30 seconds of the code (Try again sends the same code). `brain/tests/test_app_signin_relay.py` covers this against the fake OAuth server.
+
 ## Signing in on the node
 
 An http app with a sign-in runs on a node once the person has signed in there:
@@ -73,7 +77,7 @@ The relay (`node/relay.py`) sends the bearer, or uses the stored OAuth tokens (r
 ## Not supported yet
 
 - Other AI tools on the person's PC reach a remote brain's memory without a node: `tagalong memory-mcp` (BA11) dials the brain itself over the same pinned `wss` link a body uses, as an `mcp_client` (see [Memory for other AI tools](../data/memory.md#memory-for-other-ai-tools)).
-- An app that stays on a remote brain cannot sign in from the person's PC: the node would have to forward the OAuth code to the brain, which needs a new contract frame and has no design yet. Sign in on the machine the brain runs on, or place the app on the node.
+- An app that stays on a remote brain signs in through the desktop: see [Signing in an app that stays on the brain](#signing-in-an-app-that-stays-on-the-brain).
 - The brain does not install an expert on a node: the job fails with the line to run there. The card shows no folder, because an allow-list entry is per program, not per folder. Both the toolbox's use (an app's stdio MCP server, [Where an app runs](../bodies/connected-apps.md#where-an-app-runs)) and the expert host's use ([Where an expert runs](experts.md#where-an-expert-runs)) go over a pipe.
 
 The node reuses the desktop's device token under body id `node-xxxxxx`, so it cannot be revoked apart from the desktop and its device kind is `desktop`.

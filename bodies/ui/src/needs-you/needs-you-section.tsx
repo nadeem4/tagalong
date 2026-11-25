@@ -12,6 +12,7 @@ const META = {
   failed: (item: NeedsYouItem) => item.failure ?? 'It did not finish.',
   working: (item: NeedsYouItem) => WORDS[item.need].working,
   waiting: (item: NeedsYouItem) => WORDS[item.need].meta(item),
+  done: (item: NeedsYouItem) => WORDS[item.need].allowed(item),
 };
 
 function Row({ item }: { item: NeedsYouItem }) {
@@ -26,16 +27,18 @@ function Row({ item }: { item: NeedsYouItem }) {
           {META[item.state](item)}
         </span>
       </div>
-      <div className="needs-row__act">
-        <Button variant="primary" disabled={working} onClick={() => void act(item.id)}>
-          {item.state === 'failed' ? 'Try again' : words.does}
-        </Button>
-        {item.bubble && (
-          <Button variant="quiet" disabled={working} onClick={() => void notNow(item.id)}>
-            Not now
+      {item.state !== 'done' && (
+        <div className="needs-row__act">
+          <Button variant="primary" disabled={working} onClick={() => void act(item.id)}>
+            {item.state === 'failed' ? 'Try again' : words.does}
           </Button>
-        )}
-      </div>
+          {item.bubble && (
+            <Button variant="quiet" disabled={working} onClick={() => void notNow(item.id)}>
+              Not now
+            </Button>
+          )}
+        </div>
+      )}
     </li>
   );
 }

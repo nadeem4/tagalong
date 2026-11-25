@@ -5,10 +5,13 @@
  */
 import { z } from 'zod';
 
+/** How long a finished request's last line stays before it goes. */
+export const DONE_HOLD_MS = 7_000;
+
 /** One request in Home's "Needs you on this PC"; `bubble` is false once the person said not now. */
 export const NeedsYouItem = z.object({
   id: z.string(),
-  need: z.enum(['approve', 'signin']),
+  need: z.enum(['approve', 'signin', 'app_signin']),
   /** The brain's name, with the pairing's short code in identity. */
   brain: z.string(),
   /** The brain's certificate as a short code, so two brains of one name differ. */
@@ -18,7 +21,7 @@ export const NeedsYouItem = z.object({
   /** Where the program is on this PC, or null when it is an address. */
   path: z.string().nullable(),
   expert: z.string().optional(),
-  state: z.enum(['waiting', 'working', 'failed']),
+  state: z.enum(['waiting', 'working', 'failed', 'done']),
   failure: z.string().optional(),
   bubble: z.boolean(),
 });

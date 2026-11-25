@@ -20,7 +20,13 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 
-from brain.app_oauth import FileTokenStorage, LoopbackCallback, OAuthError, make_provider
+from brain.app_oauth import (
+    BrowserSignin,
+    FileTokenStorage,
+    LoopbackCallback,
+    OAuthError,
+    make_provider,
+)
 from brain.apps import AppError, AppRow, Apps
 from brain.bodies import Bodies
 from brain.memory import Memory
@@ -328,7 +334,7 @@ async def test_sign_in_saves_tokens_and_connects(rig):
 
     await rig.apps.start()
     await rig.state("needs-sign-in")
-    await rig.apps.sign_in("notes", open_url)
+    await rig.apps.sign_in("notes", BrowserSignin(open_url))
     assert rig.apps.status("notes").state == "connecting"  # returns at once
     await rig.state("connected")
     assert len(opened) == 1
@@ -341,7 +347,7 @@ async def test_sign_in_saves_tokens_and_connects(rig):
 async def test_sign_in_works_when_the_server_sends_iss(tmp_path, iss_oauth_server):
     r = Rig(tmp_path, iss_oauth_server)
     try:
-        await r.apps.sign_in("notes", _browser)
+        await r.apps.sign_in("notes", BrowserSignin(_browser))
         await r.state("connected")
     finally:
         await r.apps.shutdown()
@@ -350,7 +356,7 @@ async def test_sign_in_works_when_the_server_sends_iss(tmp_path, iss_oauth_serve
 async def test_sign_in_is_refused_when_the_iss_is_wrong(tmp_path, bad_iss_oauth_server):
     r = Rig(tmp_path, bad_iss_oauth_server)
     try:
-        await r.apps.sign_in("notes", _browser)
+        await r.apps.sign_in("notes", BrowserSignin(_browser))
         await r.state("needs-sign-in")
         assert await FileTokenStorage(tmp_path, "notes").get_tokens() is None
     finally:
@@ -358,7 +364,7 @@ async def test_sign_in_is_refused_when_the_iss_is_wrong(tmp_path, bad_iss_oauth_
 
 
 async def test_saved_tokens_connect_after_restart_without_a_browser(rig):
-    await rig.apps.sign_in("notes", _browser)
+    await rig.apps.sign_in("notes", BrowserSignin(_browser))
     await rig.state("connected")
     await rig.apps.shutdown()
 
@@ -415,7 +421,7 @@ async def test_state_mismatch_is_rejected(rig):
         redirect = parse_qs(urlparse(url).query)["redirect_uri"][0]
         await asyncio.to_thread(_get, f"{redirect}?code=fake-code&state=wrong")
 
-    await rig.apps.sign_in("notes", open_url)
+    await rig.apps.sign_in("notes", BrowserSignin(open_url))
     await rig.state("needs-sign-in")
     assert await FileTokenStorage(rig.data, "notes").get_tokens() is None
     assert "wrong" not in rig.apps.status("notes").error
@@ -428,7 +434,7 @@ async def test_abandoned_sign_in_ends_needs_sign_in(tmp_path, oauth_server):
         async def open_url(url):
             pass  # the user never finishes
 
-        await r.apps.sign_in("notes", open_url)
+        await r.apps.sign_in("notes", BrowserSignin(open_url))
         await r.state("needs-sign-in")
         # the listener's own wording, not the outer connect timeout's
         assert "not finished" in r.apps.status("notes").error
@@ -440,7 +446,7 @@ async def test_a_refused_address_ends_needs_sign_in_with_its_reason(rig):
     async def refusing(url):
         raise OAuthError("The sign-in address was not https, so it was not opened.")
 
-    await rig.apps.sign_in("notes", refusing)
+    await rig.apps.sign_in("notes", BrowserSignin(refusing))
     await rig.state("needs-sign-in")
     assert "not https" in rig.apps.status("notes").error
 
@@ -466,7 +472,7 @@ async def test_sign_in_refuses_an_app_without_oauth(tmp_path):
         raise AssertionError("no browser")
 
     with pytest.raises(Exception, match="does not use sign-in"):
-        await apps.sign_in("plain", never)
+        await apps.sign_in("plain", BrowserSignin(never))
 
 
 async def _revoke(url: str) -> None:
@@ -483,7 +489,7 @@ async def test_a_401_mid_session_flips_to_needs_sign_in_without_a_browser(rig):
         opened.append(url)
         await _browser(url)
 
-    await rig.apps.sign_in("notes", open_url)
+    await rig.apps.sign_in("notes", BrowserSignin(open_url))
     await rig.state("connected")
     await _revoke(rig.url)
     with pytest.raises(AppError, match="Sign in to Notes again"):
@@ -493,10 +499,10 @@ async def test_a_401_mid_session_flips_to_needs_sign_in_without_a_browser(rig):
 
 
 async def test_a_dropped_signed_in_connection_is_an_error_not_a_sign_in_failure(rig):
-    await rig.apps.sign_in("notes", _browser)
+    await rig.apps.sign_in("notes", BrowserSignin(_browser))
     await rig.state("connected")
     slot = rig.apps._slots["notes"]
-    assert slot.open_url is None  # the sign-in is over once connected
+    assert slot.signin is None  # the sign-in is over once connected
     rig.apps._drop(slot)  # as a closed connection would
     await rig.state("error")
     assert "closed" in rig.apps.status("notes").error

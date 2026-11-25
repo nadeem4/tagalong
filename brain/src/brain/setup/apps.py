@@ -20,6 +20,7 @@ from functools import partial
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from brain.app_oauth import BrowserSignin
 from brain.app_tools import browser_opener, save_app
 from brain.apps import AppError, Apps, OpenUrl, TokenFile
 from brain.bodies import Bodies
@@ -304,7 +305,7 @@ def app_setup_tools(
             open_url = (opener or partial(browser_opener, bodies))(row.id)
             if open_url is not None:
                 try:
-                    await apps.sign_in(row.id, open_url)
+                    await apps.sign_in(row.id, BrowserSignin(open_url))
                 except AppError as err:
                     return fail("refused", str(err), id=row.id)
                 watch(row.id, row.name, task)

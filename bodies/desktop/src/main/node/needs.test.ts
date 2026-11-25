@@ -2,8 +2,9 @@
  * Tests for the requests a remote brain leaves on this PC: what the card shows, what a click runs,
  * what "not now" keeps, and the approved list.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { NeedsYouItem } from '@tagalong/ui/shapes';
+import type { Redirect } from './loopback';
 import { createNeedsYou } from './needs';
 
 const open = (over: object = {}) => ({
@@ -25,6 +26,12 @@ function rig(
 ) {
   const calls: string[][] = [];
   const answers: Array<[string, string]> = [];
+  const redirects: Array<Redirect | undefined> = [];
+  const listened: number[] = [];
+  const opened: string[] = [];
+  const closed: number[] = [];
+  const caught: Array<(redirect: Redirect) => void> = [];
+  const brainAnswers = { fail: false };
   const pushed: NeedsYouItem[][] = [];
   const needs = createNeedsYou({
     run: async (args) => {
@@ -36,11 +43,35 @@ function rig(
       calls.push(args);
       return run(args);
     },
-    answer: async (id, outcome) => void answers.push([id, outcome]),
+    answer: async (id, outcome, redirect) => {
+      if (brainAnswers.fail) throw new Error('offline');
+      answers.push([id, outcome]);
+      redirects.push(redirect);
+    },
+    catchRedirect: async (port) => {
+      listened.push(port);
+      return {
+        port,
+        redirect: new Promise<Redirect>((resolve) => caught.push(resolve)),
+        close: () => void closed.push(port),
+      };
+    },
+    openUrl: async (url) => void opened.push(url),
     brain: async () => ({ name: 'mini-pc', identity: '4F2A-91C0' }),
     push: (items) => void pushed.push(items),
   });
-  return { needs, calls, answers, pushed };
+  return {
+    needs,
+    calls,
+    answers,
+    pushed,
+    redirects,
+    listened,
+    opened,
+    closed,
+    caught,
+    brainAnswers,
+  };
 }
 
 describe('needs you on this PC', () => {
@@ -144,5 +175,133 @@ describe('needs you on this PC', () => {
     ]);
     await needs.revoke('k1');
     expect(calls.at(-1)).toEqual(['node', 'revoke', 'k1']);
+  });
+
+  describe('an app sign-in that finishes on this PC', () => {
+    const signin = (over: object = {}) => ({
+      seq: 1,
+      id: 'a1',
+      state: 'open',
+      need: 'app_signin',
+      app: 'Gmail',
+      url: 'https://accounts.example/authorize?state=s1',
+      port: 53211,
+      ...over,
+    });
+    const settle = () => new Promise((resolve) => setImmediate(resolve));
+    afterEach(() => vi.useRealTimers());
+
+    it('opens the page here, listens on the port the brain registered, and names the app', async () => {
+      const { needs, listened, opened } = rig();
+      expect(await needs.frame(signin())).toBe(true);
+      await vi.waitFor(() =>
+        expect(opened).toEqual(['https://accounts.example/authorize?state=s1']),
+      );
+      expect(listened).toEqual([53211]);
+      expect(needs.list()).toEqual([
+        expect.objectContaining({
+          id: 'a1',
+          need: 'app_signin',
+          brain: 'mini-pc',
+          what: 'Gmail',
+          path: null,
+          state: 'waiting',
+        }),
+      ]);
+    });
+
+    it('sends only the code, state and issuer to the brain, then shows it done and lets it go', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout'] });
+      const { needs, answers, redirects, closed, caught } = rig();
+      await needs.frame(signin());
+      caught[0]?.({ code: 'c1', state: 's1', iss: 'https://accounts.example' });
+      await settle();
+      expect(needs.list()[0]?.state).toBe('done');
+      expect(answers).toEqual([['a1', 'done']]);
+      expect(redirects).toEqual([{ code: 'c1', state: 's1', iss: 'https://accounts.example' }]);
+      expect(closed).toEqual([53211]);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(needs.list()).toEqual([]);
+    });
+
+    it('says the brain did not answer after 30 seconds, and Try again sends the same code', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout'] });
+      const { needs, answers, redirects, caught, brainAnswers } = rig();
+      brainAnswers.fail = true;
+      await needs.frame(signin());
+      caught[0]?.({ code: 'c1', state: 's1' });
+      await vi.advanceTimersByTimeAsync(31_000);
+      expect(needs.list()[0]).toMatchObject({
+        state: 'failed',
+        failure:
+          'The sign-in page sent you back, but mini-pc did not answer. Nothing was saved. Check mini-pc is on, then try again.',
+      });
+      brainAnswers.fail = false;
+      expect(await needs.act('a1')).toEqual({});
+      expect(needs.list()[0]?.state).toBe('done');
+      expect(answers).toEqual([['a1', 'done']]);
+      expect(redirects).toEqual([{ code: 'c1', state: 's1' }]);
+    });
+
+    it('a frame replayed on reconnect neither listens again nor reopens the page', async () => {
+      const { needs, listened, opened } = rig();
+      await needs.frame(signin());
+      await vi.waitFor(() => expect(opened).toHaveLength(1));
+      expect(await needs.frame(signin())).toBe(false);
+      await settle();
+      expect(listened).toEqual([53211]);
+      expect(opened).toHaveLength(1);
+    });
+
+    it('Open it again opens the same page, not a new sign-in', async () => {
+      const { needs, opened } = rig();
+      await needs.frame(signin());
+      await vi.waitFor(() => expect(opened).toHaveLength(1));
+      await needs.act('a1');
+      expect(opened).toEqual(Array(2).fill('https://accounts.example/authorize?state=s1'));
+    });
+
+    it('refuses a page that is not https, without opening or listening', async () => {
+      const { needs, answers, listened, opened } = rig();
+      expect(await needs.frame(signin({ url: 'file:///C:/x' }))).toBe(false);
+      expect(answers).toEqual([['a1', 'not_now']]);
+      expect(listened).toEqual([]);
+      expect(opened).toEqual([]);
+    });
+
+    it('not now stops listening and tells the brain', async () => {
+      const { needs, answers, closed } = rig();
+      await needs.frame(signin());
+      await needs.notNow('a1');
+      expect(answers).toEqual([['a1', 'not_now']]);
+      expect(closed).toEqual([53211]);
+    });
+
+    it('a redirect that arrives after not now is not sent to the brain', async () => {
+      const { needs, answers, caught } = rig();
+      await needs.frame(signin());
+      await needs.notNow('a1');
+      caught[0]?.({ code: 'late', state: 's1' });
+      await settle();
+      expect(answers).toEqual([['a1', 'not_now']]);
+    });
+
+    it('a closed frame stops listening and removes it', async () => {
+      const { needs, closed } = rig();
+      await needs.frame(signin());
+      await needs.frame({ seq: 2, id: 'a1', state: 'closed', reason: 'timeout' });
+      expect(closed).toEqual([53211]);
+      expect(needs.list()).toEqual([]);
+    });
+
+    it('the brain closing it after the code arrived does not hide the done line', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout'] });
+      const { needs, caught } = rig();
+      await needs.frame(signin());
+      caught[0]?.({ code: 'c1', state: 's1' });
+      await settle();
+      await needs.frame({ seq: 2, id: 'a1', state: 'closed', reason: 'answered' });
+      expect(needs.list()[0]?.state).toBe('done');
+    });
   });
 });

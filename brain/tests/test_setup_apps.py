@@ -221,7 +221,7 @@ class FakeApps:
     async def restart(self, app_id):
         self.restarted.append(app_id)
 
-    async def sign_in(self, app_id, open_url):
+    async def sign_in(self, app_id, channel):
         self.signed_in.append(app_id)
         self.state = "connecting"  # the person has to finish in the browser
 

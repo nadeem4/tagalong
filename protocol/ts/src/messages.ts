@@ -424,13 +424,21 @@ const nodeNeedsOpen = {
   seq: z.number().int().min(1),
   id: Id,
   state: z.literal('open'),
-  node: Id,
-  spec: PipeSpec,
 };
-// Signing in is for a named expert; approving a program names none.
+const nodeNeedsOnNode = { ...nodeNeedsOpen, node: Id, spec: PipeSpec };
+// Signing in is for a named expert; approving a program names none. An app that stays on the
+// brain asks for its web sign-in to finish on this PC: `url` is the page to open and `port`
+// the loopback port its redirect returns to.
 export const NodeNeedsOpen = z.union([
-  z.object({ ...nodeNeedsOpen, need: z.literal('approve'), expert: Id.optional() }),
-  z.object({ ...nodeNeedsOpen, need: z.literal('signin'), expert: Id }),
+  z.object({ ...nodeNeedsOnNode, need: z.literal('approve'), expert: Id.optional() }),
+  z.object({ ...nodeNeedsOnNode, need: z.literal('signin'), expert: Id }),
+  z.object({
+    ...nodeNeedsOpen,
+    need: z.literal('app_signin'),
+    app: z.string().min(1),
+    url: z.string().url(),
+    port: z.number().int().min(1).max(65535),
+  }),
 ]);
 export type NodeNeedsOpen = z.infer<typeof NodeNeedsOpen>;
 
@@ -445,7 +453,15 @@ export type NodeNeedsClosed = z.infer<typeof NodeNeedsClosed>;
 export const NodeNeedsParams = z.union([NodeNeedsOpen, NodeNeedsClosed]);
 export type NodeNeedsParams = z.infer<typeof NodeNeedsParams>;
 
-export const NodeAnsweredParams = z.object({ id: Id, outcome: z.enum(['done', 'not_now']) });
+// A finished app sign-in carries the one-time `code` and the `state` it came back with; `iss`
+// is the issuer when the server sent one. They are the only parts of a sign-in that travel.
+export const NodeAnsweredParams = z.object({
+  id: Id,
+  outcome: z.enum(['done', 'not_now']),
+  code: z.string().min(1).optional(),
+  state: z.string().optional(),
+  iss: z.string().optional(),
+});
 export type NodeAnsweredParams = z.infer<typeof NodeAnsweredParams>;
 
 export const bodyToBrain = {

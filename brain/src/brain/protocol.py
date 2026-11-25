@@ -610,20 +610,37 @@ class FolderCheckResult(Model):
 NOT_INSTALLED = "That command is not installed on this machine."
 
 
-class NodeNeedsOpen(Model):
+class _NodeNeedsOpen(Model):
     seq: Seq
     id: Id
     state: Literal["open"]
+
+
+class _NodeNeedsOnNode(_NodeNeedsOpen):
     node: Id
-    need: Literal["approve", "signin"]
     spec: PipeSpec
+
+
+class NodeNeedsApprove(_NodeNeedsOnNode):
+    need: Literal["approve"]
     expert: Id | None = None
 
-    @model_validator(mode="after")
-    def _expert_for_signin(self) -> "NodeNeedsOpen":
-        if self.need != "approve" and self.expert is None:
-            raise ValueError("signin names an expert")
-        return self
+
+class NodeNeedsSignin(_NodeNeedsOnNode):
+    need: Literal["signin"]
+    expert: Id
+
+
+class NodeNeedsAppSignin(_NodeNeedsOpen):
+    need: Literal["app_signin"]
+    app: str = Field(min_length=1)
+    url: str
+    port: int = Field(ge=1, le=65535)
+
+
+NodeNeedsOpen = Annotated[
+    NodeNeedsApprove | NodeNeedsSignin | NodeNeedsAppSignin, Field(discriminator="need")
+]
 
 
 class NodeNeedsClosed(Model):
@@ -642,6 +659,9 @@ class NodeNeedsParams(
 class NodeAnsweredParams(Model):
     id: Id
     outcome: Literal["done", "not_now"]
+    code: str | None = Field(default=None, min_length=1)
+    state: str | None = None
+    iss: str | None = None
 
 
 # Method name -> (params model, result model or None for notifications).

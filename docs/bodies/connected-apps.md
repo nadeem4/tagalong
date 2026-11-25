@@ -136,9 +136,11 @@ flowchart TD
   they refresh before they expire. Removing the app deletes the file.
 - **Later 401**: a 401 in a live session flips the app to `needs-sign-in` ("Sign in to X again.").
 - **Guard**: the brain only follows https addresses, or http to loopback.
-- **Same machine**: the browser opens, and the callback lands, on the machine the brain runs on. A
-  brain on another machine cannot finish a sign-in from this desktop. An app placed on a node signs
-  in on that node instead: `tagalong node signin <url>` there.
+- **Same machine**: the browser opens, and the callback lands, on the machine the brain runs on.
+  From a desktop on another PC the sign-in finishes on that PC instead: the desktop opens the page,
+  catches the redirect on its own loopback and sends the brain only the one-time code, so the tokens
+  stay on the brain ([Signing in an app that stays on the brain](../brain/node.md#signing-in-an-app-that-stays-on-the-brain)).
+  An app placed on a node signs in on that node instead: `tagalong node signin <url>` there.
 
 ### Read, change and locked
 

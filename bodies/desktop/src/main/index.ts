@@ -123,6 +123,7 @@ import { SCOUT_ID, registerScoutIpc } from './ipc/scout';
 import { fromWindow, type IpcHandle } from './ipc/handle';
 import { registerKnowMeIpc } from './ipc/know-me';
 import { registerNeedsYouIpc } from './ipc/needs-you';
+import { listenForRedirect } from './node/loopback';
 import { createNeedsYou } from './node/needs';
 import { registerAiToolIpc } from './ipc/ai-tools';
 import { registerMemoryIpc } from './ipc/memory';
@@ -218,7 +219,9 @@ const brainRun = (): RealLaunch => ({
 /** What a remote brain waits on from this PC; its cards and Home's list come from here. */
 const needsYou = createNeedsYou({
   run: (args) => realRunTagalong(brainRun(), args),
-  answer: (id, outcome) => required().brain.nodeAnswered(id, outcome),
+  answer: (id, outcome, redirect) => required().brain.nodeAnswered(id, outcome, redirect),
+  catchRedirect: listenForRedirect,
+  openUrl: (url) => shell.openExternal(url),
   brain: async () => {
     const card = await brainControl?.card();
     const paired = desktop?.link.paired();

@@ -48,6 +48,32 @@ describe('NeedsYouBubble', () => {
     expect(await screen.findByRole('button', { name: 'Sign in' })).toBeTruthy();
   });
 
+  describe('an app sign-in that finishes on this PC', () => {
+    const SIGNIN: NeedsYouItem = {
+      ...ITEM,
+      id: 'a1',
+      need: 'app_signin',
+      what: 'Gmail',
+      path: null,
+    };
+
+    it('says the sign-in is kept on the brain and offers to open the page again', async () => {
+      const bridge = shown(<NeedsYouBubble />, { needsYou: [SIGNIN] });
+      expect(await screen.findByText('Finish signing in to Gmail.')).toBeTruthy();
+      expect(screen.getByText(/kept on mini-pc, not here/)).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'Open it again' }));
+      expect(bridge.needsYouActs).toEqual(['a1']);
+    });
+
+    it('says it is signed in on the brain once the brain has the code', async () => {
+      shown(<NeedsYouBubble />, { needsYou: [{ ...SIGNIN, state: 'done' }] });
+      expect(
+        await screen.findByText('Gmail is signed in on mini-pc. You can close the browser tab.'),
+      ).toBeTruthy();
+      expect(screen.queryByRole('button')).toBeNull();
+    });
+  });
+
   it('shows why a run failed and offers it again', async () => {
     shown(<NeedsYouBubble />, {
       needsYou: [{ ...ITEM, state: 'failed', failure: 'Access is denied.' }],

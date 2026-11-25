@@ -3298,11 +3298,13 @@ By hand, on a packaged install (not run in automation):
 
 Needs a real second machine (not run in automation): pair from a PC other than the brain's, with the brain's network listener on, and repeat steps 3 to 6.
 
-## Needs you on this PC (BAU5a)
+## Needs you on this PC (BAU5a, BAU5b)
 
 Automated: `brain/tests/test_node_needs.py` (approve then retry, a missing tool fails the job with the line to run there, not now keeps the request, only the asked desktop counts, node offline closes, timeout, replaced, at most two asks per pipe), `brain/tests/test_cli.py` (`node which` prints the path `node allow` records), `test_protocol.py` (a sign-in names an expert; install is not a need), `bodies/desktop/src/main/node/needs.test.ts`, `bodies/ui/src/needs-you/needs-you.test.tsx`, and `bodies/desktop/e2e/needs-you.spec.ts` (Not now keeps it in Home and tells the brain; Allow runs the real `tagalong node allow` against a throwaway home, then the brain is told to go on).
 
 By hand (real second machine, once): pair a desktop to a brain on another machine and ask Scout for a job that uses an expert placed on this PC. **Expected:** the bubble shows "Needs you here" with the program's path on this PC and the brain's name with its short code; **Not now** says the job waits and the question stays in Home > Overview > Needs you on this PC, with the pet tagged "Needs you"; **Allow** adds a line under Home > Devices > Approved on this PC and the job goes on; **Revoke** asks, then removes it, and the next job asks again. With the expert not installed the job fails saying to run `tagalong install <expert>` on that PC; signed out, **Sign in** opens the browser.
+
+BAU5b, an app's web sign-in (`brain/tests/test_app_signin_relay.py`: the code finishes the sign-in and no frame carries a token, a wrong state is refused, a request is answered once, not now ends it; `test_app_home_tools.py`: `sign_in_app` from another PC relays; `main/node/needs.test.ts` and `loopback.test.ts`; `needs-you.test.tsx`; and `e2e/needs-you.spec.ts`, where the test is the browser and the code reaches the fake brain). By hand (real second machine, once): from a desktop paired to a brain on another machine, press Sign in on a connected app that uses a web sign-in. **Expected:** your browser opens the app's sign-in page; the bubble says "Finish signing in to <app>" and that the sign-in is kept on the brain; after you say yes in the browser it says "<app> is signed in on <brain>" and the app connects. With the brain switched off right after the browser redirect, the card says the brain did not answer and Try again works once it is back.
 
 ## Connect an AI tool from Home, and memories by tool (BAU4)
 

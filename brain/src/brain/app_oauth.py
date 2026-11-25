@@ -11,7 +11,7 @@ import os
 import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 from urllib.parse import parse_qs, urlparse
 
 from mcp.client.auth import OAuthClientProvider
@@ -178,6 +178,36 @@ class LoopbackCallback:
             self._done.set_exception(OAuthError("The sign-in sent back no code."))
         else:
             self._done.set_result((code, state, iss))
+
+
+class SigninChannel(Protocol):
+    """Where one sign-in happens: `start` returns the redirect address to register, `open_url`
+    shows the person the page, `wait` returns the code, state and issuer that come back."""
+
+    async def start(self) -> str: ...
+
+    async def open_url(self, url: str) -> None: ...
+
+    async def wait(self, timeout: float) -> tuple[str, str, str | None]: ...
+
+    def close(self) -> None: ...
+
+
+class BrowserSignin:
+    """A sign-in on the brain's own machine: a browser there, the redirect on its loopback."""
+
+    def __init__(self, open_url: Callable[[str], Awaitable[None]]) -> None:
+        self.open_url = open_url
+        self._callback = LoopbackCallback()
+
+    async def start(self) -> str:
+        return await self._callback.start()
+
+    async def wait(self, timeout: float) -> tuple[str, str, str | None]:
+        return await self._callback.wait(timeout)
+
+    def close(self) -> None:
+        self._callback.close()
 
 
 def _may_open(url: str) -> bool:
