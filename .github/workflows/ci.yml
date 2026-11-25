@@ -161,6 +161,14 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # The desktop runs the person's own `tagalong` through `uv run --no-sync`, which the
+      # needs-you suite exercises for real, so the brain's environment has to exist.
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Brain environment
+        run: uv sync --locked
+        working-directory: brain
+
       # The unit tests that skip themselves off Windows: the real PowerShell transport and
       # recogniser.
       - name: Windows-only unit tests

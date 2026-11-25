@@ -46,6 +46,7 @@ def test_other_args_are_refused(allowlist, exe):
 def test_another_command_is_refused(allowlist, exe, tmp_path):
     other = tmp_path / "other.exe"
     other.write_bytes(b"binary one")
+    other.chmod(0o755)
     allowlist.allow(spec(exe))
     assert allowlist.permits(spec(other)) is None
 
