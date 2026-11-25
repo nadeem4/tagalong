@@ -141,7 +141,11 @@ describe('registerVoiceIpc', () => {
       mime: 'audio/wav',
       data: 'UklGRg==',
     });
-    expect(brain.call).toHaveBeenCalledWith('speak_sample', { voice: 'piper-alan', speed: 0.95 });
+    expect(brain.call).toHaveBeenCalledWith(
+      'speak_sample',
+      { voice: 'piper-alan', speed: 0.95 },
+      undefined,
+    );
   });
 
   it('gives back null when the brain has no voice to sample', async () => {
@@ -158,7 +162,7 @@ describe('registerVoiceIpc', () => {
       { type: 'text', text: JSON.stringify({ mime: 'audio/wav', data: 'AA==' }) },
     ]);
     await invoke(IPC.speakSample, 5, '1.5');
-    expect(brain.call).toHaveBeenCalledWith('speak_sample', { voice: '5', speed: 1.5 });
+    expect(brain.call).toHaveBeenCalledWith('speak_sample', { voice: '5', speed: 1.5 }, undefined);
     brain.call.mockClear();
     expect(await invoke(IPC.speakSample, 'piper-alan', 'fast')).toBeNull();
     expect(brain.call).not.toHaveBeenCalled();

@@ -1,11 +1,12 @@
 /**
  * Home's "What Scout remembers" page: a summary card (the portrait, the years it covers and
  * where it was read), the facts as a year-by-year timeline, and the preferences and
- * conversation summaries as a flat list, each with Delete. Contains MemoryView.
+ * conversation summaries as a flat list, each with Delete. Facts another AI tool added carry a
+ * source filter, and one tool's can be deleted together. Contains MemoryView.
  */
 
-import { useCallback, useEffect, useState } from 'react';
-import { buildTimeline } from '../shapes';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { buildTimeline, isOutsideSource, memorySourceLabel } from '../shapes';
 import type { MemoryEntry } from '../shapes';
 import { useHostBridge } from '../host-bridge';
 import { Button } from '../controls/button';
@@ -42,13 +43,64 @@ const CSS = `
 .memory-row .tg-chip { justify-self: start; white-space: nowrap; }
 .memory-covered { margin-top: ${t.space.lg}px; ${typeCss('small')}; color: ${themedColor.panelMuted}; }
 .memory-covered p { margin: 0; }
+.memory-filter { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: ${t.space.md}px; margin: ${t.space.md}px 0; }
+.memory-filter + .dv-confirm { margin-top: 0; }
+.memory-from { display: flex; align-items: center; justify-content: space-between; gap: ${t.space.lg}px; margin: 0 0 ${t.space.md}px; ${typeCss('small')}; color: ${themedColor.panelMuted}; }
 `;
+
+const OWN = 'own';
+/** Scout learned it in chat (or the brain kept no source): not read from anywhere. */
+const own = (fact: MemoryEntry): boolean => !fact.source || fact.source === 'chat';
+const originOf = (fact: MemoryEntry): string => (own(fact) ? OWN : fact.source!);
 
 /** The sources a run of facts was read from, in the order first seen; chat is not a source. */
 function sourcesOf(facts: MemoryEntry[]): string[] {
   const seen = new Set<string>();
-  for (const f of facts) if (f.source && f.source !== 'chat') seen.add(sourceLabel(f.source));
+  for (const f of facts) if (!own(f)) seen.add(sourceLabel(f.source!));
   return [...seen];
+}
+
+/** One AI tool's memories: how many, and "delete them all" behind a confirm. */
+function ForgetFromTool({
+  tool,
+  count,
+  onForget,
+}: {
+  tool: string;
+  count: number;
+  onForget: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const noun = count === 1 ? 'memory' : 'memories';
+  if (!confirming) {
+    return (
+      <p className="memory-from">
+        <span>
+          {count} {noun} from {tool}
+        </span>
+        <Button variant="secondary" onClick={() => setConfirming(true)}>
+          Delete everything from this tool
+        </Button>
+      </p>
+    );
+  }
+  return (
+    <div role="alert" className="dv-confirm">
+      <span>
+        <strong>
+          Delete {count} {noun} from {tool}?
+        </strong>{' '}
+        They are removed from Scout for good. {tool} stays connected and can add new ones; revoke it
+        in Devices if you want that to stop.
+      </span>
+      <Button variant="quiet" onClick={() => setConfirming(false)}>
+        Keep them
+      </Button>
+      <Button variant="danger" onClick={onForget}>
+        Delete {count} {noun}
+      </Button>
+    </div>
+  );
 }
 
 /**
@@ -62,6 +114,7 @@ export function MemoryView({ name }: { name: string }) {
   const [failed, setFailed] = useState(false);
   const [portrait, setPortrait] = useState<string | null>(null);
   const [knowOpen, setKnowOpen] = useState(false);
+  const [origin, setOrigin] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     // The portrait is a bonus: a failure to read it leaves the list as it was.
@@ -93,7 +146,23 @@ export function MemoryView({ name }: { name: string }) {
       .catch((error: unknown) => console.error('could not delete a memory', error));
   };
 
-  const facts = (memories ?? []).filter((memory) => memory.kind === 'fact');
+  const forgetFrom = (source: string): void => {
+    void bridge
+      .forgetMemoriesFrom(source)
+      .catch((error: unknown) => console.error('could not delete a tool memories', error));
+  };
+
+  const allFacts = useMemo(() => (memories ?? []).filter((m) => m.kind === 'fact'), [memories]);
+  const byOrigin = useMemo(() => {
+    const groups = new Map<string, MemoryEntry[]>();
+    for (const fact of allFacts) {
+      const key = originOf(fact);
+      groups.set(key, [...(groups.get(key) ?? []), fact]);
+    }
+    return groups;
+  }, [allFacts]);
+  const chosen = origin !== null && byOrigin.has(origin) ? origin : null;
+  const facts = chosen === null ? allFacts : byOrigin.get(chosen)!;
   const others = (memories ?? []).filter((memory) => memory.kind !== 'fact');
   const { covered } = buildTimeline(facts);
   const sources = sourcesOf(facts);
@@ -146,6 +215,33 @@ export function MemoryView({ name }: { name: string }) {
         <section className="tg-card" aria-label="Timeline">
           <h2 className="tg-card__label">Timeline</h2>
           {portrait === null && coveredLines}
+          {(byOrigin.size > 1 || [...byOrigin.keys()].some(isOutsideSource)) && (
+            <div className="memory-filter">
+              <div className="apv-seg" role="group" aria-label="Filter memories">
+                {[null, ...byOrigin.keys()].map((item) => (
+                  <button
+                    key={item ?? 'all'}
+                    type="button"
+                    aria-pressed={chosen === item}
+                    onClick={() => setOrigin(item)}
+                  >
+                    {item === null ? 'Everything' : item === OWN ? 'From Scout' : sourceLabel(item)}
+                    <span className="apv-seg__n">
+                      {item === null ? allFacts.length : byOrigin.get(item)!.length}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {chosen !== null && isOutsideSource(chosen) && (
+            <ForgetFromTool
+              key={chosen}
+              tool={memorySourceLabel(chosen)!}
+              count={facts.length}
+              onForget={() => forgetFrom(chosen)}
+            />
+          )}
           <MemoryTimeline entries={facts} onDelete={remove} />
         </section>
       )}

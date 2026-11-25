@@ -87,6 +87,10 @@ def redeem_pair_code(
     return None if row is None else (bool(row[0]), row[1])
 
 
+def delete_unused_codes(db: sqlite3.Connection, kind: str, name: str) -> None:
+    db.execute("DELETE FROM pair_codes WHERE kind=? AND name=? AND used_at IS NULL", (kind, name))
+
+
 def delete_expired_codes(db: sqlite3.Connection, now: str) -> None:
     db.execute("DELETE FROM pair_codes WHERE expires_at<=?", (now,))
 

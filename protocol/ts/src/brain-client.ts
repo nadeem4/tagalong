@@ -218,11 +218,12 @@ export class BrainClient {
 
   /**
    * Runs one of the brain's own tools for Home (list_memories, spend_today, ...) and resolves
-   * with its output parts. Rejects BrainOffline when not online, RpcError on a brain error.
+   * with its output parts. Rejects BrainOffline when not online, RpcError on a brain error. A
+   * tool that works longer than 30 s (connect_ai_tool) names its own wait.
    */
-  call(tool: string, input: Record<string, unknown> = {}): Promise<Part[]> {
+  call(tool: string, input: Record<string, unknown> = {}, timeoutMs?: number): Promise<Part[]> {
     if (this.status !== 'online') return Promise.reject(new BrainOffline());
-    return this.request('call', { tool, input }).then((r) => {
+    return this.request('call', { tool, input }, timeoutMs).then((r) => {
       const parsed = CallResult.safeParse(r);
       if (!parsed.success) throw new Error('brain sent bad call result');
       return parsed.data.output;
@@ -345,8 +346,8 @@ export class BrainClient {
     this.pending.clear();
   }
 
-  private request(method: string, params: unknown): Promise<unknown> {
-    return new Promise((resolve, reject) => this.send(method, params, resolve, reject));
+  private request(method: string, params: unknown, timeoutMs?: number): Promise<unknown> {
+    return new Promise((resolve, reject) => this.send(method, params, resolve, reject, timeoutMs));
   }
 
   private send(
@@ -354,12 +355,13 @@ export class BrainClient {
     params: unknown,
     resolve: (result: unknown) => void,
     reject: (error: Error) => void,
+    timeoutMs = REQUEST_TIMEOUT_MS,
   ): void {
     const id = `${this.options.body.id}-${this.nextId++}`;
     const timer = setTimeout(() => {
       this.pending.delete(id);
       reject(new Error(`${method} timed out`));
-    }, REQUEST_TIMEOUT_MS);
+    }, timeoutMs);
     this.pending.set(id, { resolve, reject, timer });
     this.socket?.send(JSON.stringify({ jsonrpc: '2.0', id, method, params }));
   }

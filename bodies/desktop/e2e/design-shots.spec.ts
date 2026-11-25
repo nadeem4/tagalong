@@ -1336,3 +1336,113 @@ test('BAU3 Runs on control and the Ask me card, light and dark', async () => {
     await ask.done();
   }
 });
+
+test('BAU4 connect another AI tool and memories by tool, light and dark', async () => {
+  test.setTimeout(300_000);
+  const dir = shotDir('bau4');
+  mkdirSync(dir, { recursive: true });
+  const both = async (page: Page, name: string, target?: Locator): Promise<void> => {
+    for (const scheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await settled(page);
+      await (target ?? page).screenshot({ path: join(dir, `${name}-${scheme}.png`) });
+    }
+  };
+  const open = async (options: Parameters<typeof startFakeBrain>[0], page: RegExp) => {
+    const launched = await launchShot(options);
+    await (await launched.find('avatar')).evaluate(() => window.tagalongHost.openSettings());
+    const home = await launched.find('home');
+    await home.getByRole('navigation').getByRole('button', { name: page }).click();
+    return { ...launched, home };
+  };
+  const dialog = (home: Page): Locator =>
+    home.getByRole('dialog', { name: 'Connect another AI tool' });
+  const connect = async (home: Page): Promise<void> => {
+    await home.getByRole('button', { name: 'Connect another AI tool' }).click();
+    await expect(dialog(home)).toBeVisible();
+  };
+
+  const devices = await open({ hasKey: true }, /^Devices/);
+  try {
+    await expect(devices.home.getByText('Only this computer so far')).toBeVisible({
+      timeout: 30_000,
+    });
+    await connect(devices.home);
+    await both(devices.home, 'dialog-choices');
+    await dialog(devices.home)
+      .getByRole('button', { name: /Cursor/ })
+      .click();
+    await dialog(devices.home).getByRole('button', { name: 'Set it up' }).click();
+    await expect(dialog(devices.home)).toContainText('Cursor is connected');
+    await both(devices.home, 'connected');
+    await devices.home.getByRole('button', { name: 'Done' }).click();
+    await expect(devices.home.getByRole('region', { name: 'AI tools' })).toContainText('Cursor');
+    await both(devices.home, 'ai-tools-list');
+    await connect(devices.home);
+    await dialog(devices.home).getByRole('button', { name: 'Show me' }).click();
+    await expect(dialog(devices.home)).toContainText('claude mcp add');
+    await both(devices.home, 'snippet');
+    await dialog(devices.home).getByRole('button', { name: 'Show link' }).click();
+    await both(devices.home, 'snippet-link-shown');
+  } finally {
+    await devices.done();
+  }
+
+  const off = await open({ hasKey: true, pairNetworkOff: true }, /^Devices/);
+  try {
+    await connect(off.home);
+    await dialog(off.home).getByRole('button', { name: 'Show me' }).click();
+    await dialog(off.home).getByRole('button', { name: 'Show link' }).click();
+    await expect(dialog(off.home).getByRole('alert')).toBeVisible();
+    await both(off.home, 'snippet-network-off');
+  } finally {
+    await off.done();
+  }
+
+  const working = await open({ hasKey: true, aiToolHangs: true }, /^Devices/);
+  try {
+    await connect(working.home);
+    await dialog(working.home).getByRole('button', { name: 'Set it up' }).click();
+    await expect(dialog(working.home)).toContainText('Connecting Claude Code');
+    await both(working.home, 'working');
+  } finally {
+    await working.done();
+  }
+
+  const failed = await open(
+    { hasKey: true, aiToolError: 'Claude Code is not installed on this PC.' },
+    /^Devices/,
+  );
+  try {
+    await connect(failed.home);
+    await dialog(failed.home).getByRole('button', { name: 'Set it up' }).click();
+    await expect(dialog(failed.home).getByRole('alert')).toBeVisible();
+    await both(failed.home, 'failed');
+  } finally {
+    await failed.done();
+  }
+
+  const memory = await open(
+    {
+      hasKey: true,
+      devices: [{ id: 'd3', name: 'cursor', kind: 'mcp_client' }],
+      outsideMemories: [
+        { id: 'o1', text: 'Uses pnpm workspaces', source: 'mcp:cursor' },
+        { id: 'o2', text: 'Prefers small PRs', source: 'mcp:cursor' },
+        { id: 'o3', text: 'Writes Rust on weekends', source: 'mcp:codex' },
+      ],
+    },
+    /^What Scout remembers/,
+  );
+  try {
+    await expect(memory.home.getByText('Uses pnpm workspaces')).toBeVisible({ timeout: 30_000 });
+    await both(memory.home, 'timeline-chips');
+    await memory.home.getByRole('button', { name: /^Cursor/ }).click();
+    await both(memory.home, 'timeline-filtered');
+    await memory.home.getByRole('button', { name: 'Delete everything from this tool' }).click();
+    await expect(memory.home.getByRole('alert')).toBeVisible();
+    await both(memory.home, 'delete-by-source');
+  } finally {
+    await memory.done();
+  }
+});

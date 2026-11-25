@@ -82,6 +82,12 @@ export interface FakeBrainOptions {
   };
   /** `pair_make` answers network_off, the way a brain that does not listen yet does. */
   pairNetworkOff?: boolean;
+  /** Memories other AI tools added (`source` is `mcp:<tool>`); `forget_memories` removes them by source. */
+  outsideMemories?: { id: string; text: string; source: string }[];
+  /** `connect_ai_tool` answers with this error text instead of connecting. */
+  aiToolError?: string;
+  /** `connect_ai_tool` never answers, so a screenshot can catch it working. */
+  aiToolHangs?: boolean;
   /** The paired devices `devices_list` answers; rename and revoke change this list as the real brain does. */
   devices?: { id: string; name: string; kind: string; lastSeen?: string | null }[];
 }
@@ -580,6 +586,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   const keyCalls = { attempts: 0 };
   const removedPreferences: number[] = [];
   const pairedDevices = (options.devices ?? []).map((d) => ({ ...d }));
+  let outsideMemories = (options.outsideMemories ?? []).map((m) => ({ ...m }));
   const preferences: Record<string, unknown>[] = [
     { ...DEFAULT_PREFERENCE },
     { ...TEST_PREFERENCE },
@@ -1068,6 +1075,9 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             id?: number;
             filter?: string;
             usd?: number;
+            source?: string;
+            name?: string;
+            personal?: boolean;
             model?: string;
             voice?: string;
             approved?: boolean;
@@ -1366,6 +1376,13 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
                     },
                   ]
                 : []),
+              ...outsideMemories.map((m) => ({
+                id: m.id,
+                kind: 'fact',
+                text: m.text,
+                at: '2026-10-27T11:00:00Z',
+                source: m.source,
+              })),
               { id: 'm1', kind: 'summary', text: LONG_FACT, at: '2026-10-27T10:00:00Z' },
               { id: 'm2', kind: 'fact', text: 'Prefers green tea', at: '2026-10-26T10:00:00Z' },
               {
@@ -1460,6 +1477,60 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           else placements.push(row);
           notify('changed', { what: 'placements' });
           value = { ok: true };
+        } else if (params.tool === 'forget_memories') {
+          const source = String(params.input?.source);
+          if (!source.startsWith('mcp:')) {
+            socket.send(
+              JSON.stringify({
+                jsonrpc: '2.0',
+                id: msg.id,
+                error: {
+                  code: ErrorCode.tool_failed,
+                  message: 'Only memories another AI tool added can be deleted by source.',
+                },
+              }),
+            );
+            return;
+          }
+          const before = outsideMemories.length;
+          outsideMemories = outsideMemories.filter((m) => m.source !== source);
+          notify('changed', { what: 'memory' });
+          value = { deleted: before - outsideMemories.length };
+        } else if (params.tool === 'connect_ai_tool') {
+          if (options.aiToolError !== undefined) {
+            socket.send(
+              JSON.stringify({
+                jsonrpc: '2.0',
+                id: msg.id,
+                error: { code: ErrorCode.tool_failed, message: options.aiToolError },
+              }),
+            );
+            return;
+          }
+          const tool = String(params.input?.tool);
+          if (options.aiToolHangs === true) return;
+          if (!pairedDevices.some((d) => d.name === tool)) {
+            pairedDevices.push({ id: `ai-${tool}`, name: tool, kind: 'mcp_client' });
+          }
+          notify('changed', { what: 'bodies' });
+          value = `${tool === 'claude-code' ? 'Claude Code' : tool[0]!.toUpperCase() + tool.slice(1)} can now ask Scout what it remembers and add notes to it.`;
+        } else if (params.tool === 'mcp_client_make') {
+          if (options.pairNetworkOff === true) {
+            socket.send(
+              JSON.stringify({
+                jsonrpc: '2.0',
+                id: msg.id,
+                error: { code: ErrorCode.network_off, message: 'network_off' },
+              }),
+            );
+            return;
+          }
+          value = {
+            name: String(params.input?.name),
+            link: `tagalong://pair?addr=100.64.0.7:47323&fp=ab&code=e2e-${String(params.input?.name)}`,
+            expires_at: new Date(Date.now() + 600_000).toISOString(),
+            personal: params.input?.personal === true,
+          };
         } else if (params.tool === 'devices_list') {
           value = {
             devices: pairedDevices.map((d) => ({
@@ -1654,7 +1725,9 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           value = { tool: params.input?.tool, mode: params.input?.mode };
           notify('changed', { what: 'permissions' });
         }
-        const output = [{ type: 'text', text: JSON.stringify(value) }];
+        const output = [
+          { type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value) },
+        ];
         socket.send(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { output } }));
       } else if (msg.method === 'answer') {
         const ask = String(msg.params?.ask);

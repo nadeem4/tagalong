@@ -122,6 +122,7 @@ import { forwardConnectionsChanged, registerConnectionIpc } from './ipc/connecti
 import { SCOUT_ID, registerScoutIpc } from './ipc/scout';
 import { fromWindow, type IpcHandle } from './ipc/handle';
 import { registerKnowMeIpc } from './ipc/know-me';
+import { registerAiToolIpc } from './ipc/ai-tools';
 import { registerMemoryIpc } from './ipc/memory';
 import { registerApprovalsIpc } from './ipc/approvals';
 import { registerJobsIpc } from './ipc/jobs';
@@ -1113,6 +1114,7 @@ function registerIpc(thisPcNode: string): void {
     },
   });
   registerMemoryIpc(handle, { brain: required().brain });
+  registerAiToolIpc(handle, { brain: required().brain });
   registerKnowMeIpc(handle, {
     brain: required().brain,
     // The run's status goes to every window: the tour and Home may both show it.

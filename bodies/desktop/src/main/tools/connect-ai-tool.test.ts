@@ -84,7 +84,7 @@ describe('connect_ai_tool', () => {
         'claude-code',
       ],
     });
-    expect(JSON.stringify(out)).toContain('read the memory list');
+    expect(JSON.stringify(out)).toContain('can now ask Scout what it remembers');
   });
 
   it('adds Codex with its own command', async () => {

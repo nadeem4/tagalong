@@ -47,6 +47,7 @@ export const IPC = {
   restartConnection: 'tagalong:connections:restart',
   listMemories: 'tagalong:memory:list',
   deleteMemory: 'tagalong:memory:delete',
+  forgetMemoriesFrom: 'tagalong:memory:forget-source',
   getPortrait: 'tagalong:memory:portrait',
   knowMeSources: 'tagalong:know-me:sources',
   knowMeStart: 'tagalong:know-me:start',
@@ -157,6 +158,8 @@ export const IPC = {
   brainReconnect: 'tagalong:brain:reconnect',
   tailscaleState: 'tagalong:tailscale:state',
   pairMake: 'tagalong:pair:make',
+  aiToolConnect: 'tagalong:ai-tool:connect',
+  aiToolLink: 'tagalong:ai-tool:link',
   // Making this PC the brain: the logon service that keeps it running without the window.
   brainServiceInstall: 'tagalong:brain-service:install',
   brainServiceRemove: 'tagalong:brain-service:remove',

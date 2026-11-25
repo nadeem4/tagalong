@@ -5,10 +5,12 @@
  * says `bodies` changed. Contains DevicesView.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { aiToolLabel } from '../shapes';
 import type { BodiesState, DeviceRow, DevicesState } from '../shapes';
 import { Button } from '../controls/button';
 import { useHostBridge } from '../host-bridge';
 import { Icon } from '../icons';
+import { ConnectToolDialog } from './connect-tool';
 import { HostPairDialog } from '../pair/host-pair-dialog';
 import { DeviceRowItem } from './device-row';
 import { Place, StandingLabel } from './place-row';
@@ -30,6 +32,7 @@ export function DevicesView({ reach = false }: { reach?: boolean }) {
   const known = useRef<Set<string> | null>(null);
   const [fresh, setFresh] = useState<Set<string>>(new Set());
   const [pairing, setPairing] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [guide, setGuide] = useState(reach);
   const [failed, setFailed] = useState(false);
 
@@ -124,10 +127,21 @@ export function DevicesView({ reach = false }: { reach?: boolean }) {
       {joined !== undefined && (
         <p className="dv-joined" role="status">
           <Icon name="check" />
-          {joined.name} is paired. It can now talk to Scout.
+          {joined.kind === 'mcp_client' ? aiToolLabel(joined.name) : joined.name} is paired. It can
+          now talk to Scout.
         </p>
       )}
       {pairing && <HostPairDialog host={bridge} onClose={() => setPairing(false)} />}
+      {connecting && (
+        <ConnectToolDialog
+          host={bridge}
+          onClose={() => setConnecting(false)}
+          onDone={() => {
+            setConnecting(false);
+            refreshDevices();
+          }}
+        />
+      )}
       {nothingPaired(paired) && (
         <section className="tg-card dv-empty" aria-label="Only this computer so far">
           <h2 className="tg-card__label">Only this computer so far</h2>
@@ -198,17 +212,23 @@ export function DevicesView({ reach = false }: { reach?: boolean }) {
           ))}
         </ul>
       </section>
-      {paired.aiTools.length > 0 && (
-        <section className="tg-card" aria-labelledby="dv-ai">
-          <div className="dv-group">
-            <h2 id="dv-ai" className="tg-card__label">
-              AI tools
-            </h2>
-            <span className="cx-meta">{paired.aiTools.length} paired</span>
-          </div>
-          <ul className="cx-list">{paired.aiTools.map(itemFor)}</ul>
-        </section>
-      )}
+      <section className="tg-card" aria-labelledby="dv-ai">
+        <div className="dv-group">
+          <h2 id="dv-ai" className="tg-card__label">
+            AI tools
+          </h2>
+          <span className="cx-meta">{paired.aiTools.length} paired</span>
+          <Button variant="secondary" onClick={() => setConnecting(true)}>
+            Connect another AI tool
+          </Button>
+        </div>
+        {paired.aiTools.length === 0 && (
+          <p className="home-note">
+            Claude Code, Codex or Cursor can read what Scout remembers and add to it.
+          </p>
+        )}
+        <ul className="cx-list">{paired.aiTools.map(itemFor)}</ul>
+      </section>
       <WhatsAppCard wa={state.whatsapp} connected={whatsappUp} onChanged={refresh} />
     </>
   );

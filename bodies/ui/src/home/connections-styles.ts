@@ -176,6 +176,7 @@ export const CONNECTIONS_CSS = `
 :is(.home, .wt) .cx-form__actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 :is(.home, .wt) .dv-group { display: flex; align-items: baseline; gap: ${t.space.md}px; margin-bottom: ${t.space.sm}px; }
 :is(.home, .wt) .dv-group .tg-card__label { margin: 0; }
+:is(.home, .wt) .dv-group .tg-button { margin-left: auto; align-self: center; }
 :is(.home, .wt) .dv-tile { position: relative; }
 :is(.home, .wt) .dv-tile__brain { position: absolute; right: -3px; top: -3px; width: 12px; height: 12px; border-radius: 50%; background: ${t.color.gold}; border: 2px solid ${themedColor.panel}; }
 :is(.home, .wt) .cx-runs { position: relative; }

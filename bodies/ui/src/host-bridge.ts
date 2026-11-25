@@ -7,6 +7,9 @@
 import { createContext, createElement, useContext } from 'react';
 import type { ReactNode } from 'react';
 import type {
+  AiToolConnect,
+  AiToolId,
+  AiToolLinkResult,
   AppAddParams,
   AppsList,
   BodiesState,
@@ -361,6 +364,8 @@ export interface HostBridge {
    */
   listMemories(): Promise<MemoryEntry[]>;
   deleteMemory(id: string): Promise<boolean>;
+  /** Deletes every memory one AI tool added (its `mcp:<tool>` source); resolves how many went. */
+  forgetMemoriesFrom(source: string): Promise<number>;
   /** Scout's portrait of the person, written by get to know me; null before there is one. */
   getPortrait(): Promise<string | null>;
   /** The sources get to know me can read, and what each needs from the person. */
@@ -453,6 +458,10 @@ export interface HostBridge {
   setPlacement(kind: 'app' | 'expert', id: string, place: Place): Promise<void>;
   /** A fresh pairing code on this PC's brain. Rejects with `network_off` while the brain does not listen beyond this PC. */
   pairMake(): Promise<PairOffer>;
+  /** Sets Claude Code, Codex or Cursor up to use Scout's memory on this PC; never rejects for a refusal. */
+  aiToolConnect(tool: AiToolId): Promise<AiToolConnect>;
+  /** A one-time link for an AI tool to pair with by hand; `network_off` while the brain does not listen beyond this PC. */
+  aiToolLink(tool: AiToolId, personal: boolean): Promise<AiToolLinkResult>;
   copyText(text: string): Promise<void>;
   /** Registers the brain to start at sign-in with network access on; no administrator prompt. */
   installBrainService(): Promise<{ ok: true } | { ok: false; detail: string }>;

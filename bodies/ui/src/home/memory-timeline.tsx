@@ -5,7 +5,7 @@
  */
 
 import type { MemoryEntry, TimelineFact, CategoryGroup } from '../shapes';
-import { buildTimeline } from '../shapes';
+import { buildTimeline, memorySourceLabel } from '../shapes';
 import { Button } from '../controls/button';
 import { themeTokens as t, themedColor, typeCss } from '../theme/tokens';
 
@@ -18,7 +18,7 @@ const cap = (word: string): string => word.charAt(0).toUpperCase() + word.slice(
 
 /** Where a fact was read, in words; chat facts have no source line. */
 export function sourceLabel(source: string): string {
-  return SOURCE_LABELS[source] ?? cap(source);
+  return memorySourceLabel(source) ?? SOURCE_LABELS[source] ?? cap(source);
 }
 
 /** A delete button's name: the memory's start, so a long one stays a short name. */
@@ -36,6 +36,7 @@ const CSS = `
 .mt-fact summary { cursor: pointer; ${typeCss('bodyLead')}; }
 .mt-fact__text { overflow-wrap: anywhere; min-width: 0; }
 .mt-fact__range { margin-left: ${t.space.md}px; ${typeCss('small')}; color: ${themedColor.panelMuted}; }
+.mt-fact__chip { margin-left: ${t.space.md}px; white-space: nowrap; }
 .mt-fact__more { margin: ${t.space.xs}px 0 ${t.space.xs}px ${t.space.xl}px; ${typeCss('small')}; color: ${themedColor.panelMuted}; overflow-wrap: anywhere; }
 .mt-fact__more p { margin: 0 0 ${t.space.xs}px; }
 `;
@@ -43,13 +44,16 @@ const CSS = `
 function FactRow({ fact, onDelete }: { fact: TimelineFact; onDelete(id: string): void }) {
   const { entry, range } = fact;
   const asked = entry.visibility === 'asked';
-  const meta = entry.source && entry.source !== 'chat' ? [sourceLabel(entry.source)] : [];
+  const tool = entry.source ? memorySourceLabel(entry.source) : null;
+  const meta =
+    entry.source && entry.source !== 'chat' && tool === null ? [sourceLabel(entry.source)] : [];
   return (
     <li>
       <details className="mt-fact">
         <summary>
           <span className="mt-fact__text">{entry.text}</span>
           {range !== null && <span className="mt-fact__range">{range}</span>}
+          {tool !== null && <span className="tg-chip mt-fact__chip">From {tool}</span>}
           {asked && <span className="mt-fact__range">only if asked</span>}
         </summary>
         <div className="mt-fact__more">
