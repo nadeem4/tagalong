@@ -606,7 +606,7 @@ class FolderCheckResult(Model):
     exists: bool
 
 
-# What the node answers when the command is not on its machine: the brain's cue to offer an install.
+# What the node answers when the command is not on its machine.
 NOT_INSTALLED = "That command is not installed on this machine."
 
 
@@ -615,14 +615,14 @@ class NodeNeedsOpen(Model):
     id: Id
     state: Literal["open"]
     node: Id
-    need: Literal["approve", "install", "signin"]
+    need: Literal["approve", "signin"]
     spec: PipeSpec
     expert: Id | None = None
 
     @model_validator(mode="after")
-    def _expert_for_install_and_signin(self) -> "NodeNeedsOpen":
+    def _expert_for_signin(self) -> "NodeNeedsOpen":
         if self.need != "approve" and self.expert is None:
-            raise ValueError(f"{self.need} names an expert")
+            raise ValueError("signin names an expert")
         return self
 
 

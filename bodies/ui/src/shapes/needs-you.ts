@@ -8,7 +8,7 @@ import { z } from 'zod';
 /** One request in Home's "Needs you on this PC"; `bubble` is false once the person said not now. */
 export const NeedsYouItem = z.object({
   id: z.string(),
-  need: z.enum(['approve', 'install', 'signin']),
+  need: z.enum(['approve', 'signin']),
   /** The brain that is asking, from the pairing. */
   brain: z.string(),
   /** The brain's certificate as a short code, so two brains of one name differ. */

@@ -77,7 +77,6 @@ from brain.mind.prompt import (
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Call, Model, run_turn
 from brain.models import DEFAULT_MODEL_ID
-from brain.node_needs import NodeNeeds
 from brain.offers import Offers, OfferSettings
 from brain.open_item_runner import AskRunner
 from brain.open_items import OpenItems
@@ -190,8 +189,8 @@ class Session:
         memory: Memory,
         *,
         events: EventLog,
+        make_run: Callable[..., ExpertRun],
         now: Callable[[], datetime] = lambda: datetime.now().astimezone(),
-        make_run: Callable[..., ExpertRun] | None = None,
         experts: Callable[[], list[InstalledExpert]] | None = None,
         apps: Apps | None = None,
         before_job: Callable[[], Awaitable[None]] | None = None,
@@ -252,10 +251,6 @@ class Session:
         work.sweep(work_keep_days)
         outputs.prune(outputs_keep)
         notify = bodies.notify
-        # main passes the installed experts and the quiet threshold; the defaults keep tests short.
-        # Only tests take this default: it has no bodies, so every job stays on the brain and
-        # nothing ever asks. main passes the hosts, built with the NodeNeeds that bodies answer to.
-        make_run = make_run or ExpertHosts(needs=NodeNeeds(bodies))
         # Built first: the questions and the timers emit through it. It only calls back into the
         # session once an event arrives, by which time the rest of __init__ has run.
         questions = ScoutQuestions(

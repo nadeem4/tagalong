@@ -40,13 +40,7 @@ describe('NeedsYouBubble', () => {
     expect(await screen.findByText(/Allowed\. mini-pc can run claude-agent-acp/)).toBeTruthy();
   });
 
-  it('says Install for a missing expert and Sign in for a signed-out one', async () => {
-    shown(<NeedsYouBubble />, {
-      needsYou: [{ ...ITEM, need: 'install', expert: 'claude-code', path: null }],
-    });
-    expect(await screen.findByText('Claude Code is not on this PC yet.')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Install' })).toBeTruthy();
-    cleanup();
+  it('says Sign in for a signed-out expert', async () => {
     shown(<NeedsYouBubble />, {
       needsYou: [{ ...ITEM, need: 'signin', expert: 'claude-code', path: null }],
     });

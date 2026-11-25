@@ -42,14 +42,6 @@ export const WORDS: Record<NeedsYouItem['need'], NeedWords> = {
     does: 'Allow',
     meta: askedBy,
   },
-  install: {
-    title: (i) => `Install ${expertName(i.expert)} on this PC`,
-    head: (i) => `${expertName(i.expert)} is not on this PC yet.`,
-    allowed: (i) => `${expertName(i.expert)} is installed on this PC. Starting the job now.`,
-    working: 'Installing…',
-    does: 'Install',
-    meta: askedBy,
-  },
   signin: {
     title: (i) => `Sign in to ${expertName(i.expert)}`,
     head: (i) => `${expertName(i.expert)} needs you to sign in on this PC.`,

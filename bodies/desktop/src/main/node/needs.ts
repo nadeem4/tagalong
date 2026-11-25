@@ -1,5 +1,5 @@
 /**
- * What a remote brain waits on from this PC: approve a program, install an expert, sign one in.
+ * What a remote brain waits on from this PC: approve a program, sign an expert in.
  * The brain only asks; the person's yes runs this PC's own `tagalong` command here, and only then
  * is the brain told to try again. Every fact the card shows (who asks, where the program is) is
  * read here, never taken from the brain's frame; the path comes from the same `tagalong` that
@@ -80,7 +80,7 @@ export function createNeedsYou(deps: NeedsYouDeps) {
   const command = ({ frame }: Open): string[] | null => {
     if (frame.need !== 'approve') {
       if (frame.expert.startsWith('-')) return null;
-      return [frame.need === 'install' ? 'install' : 'login', frame.expert];
+      return ['login', frame.expert];
     }
     const { command: program = '', args = [], url } = frame.spec;
     if (url !== undefined) return ['node', 'allow', '--url', url];

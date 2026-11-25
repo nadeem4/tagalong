@@ -80,16 +80,11 @@ describe('needs you on this PC', () => {
     expect(calls).toEqual([['node', 'allow', '--url', 'https://mcp.example/x']]);
   });
 
-  it('install and sign-in run the expert commands', async () => {
+  it('sign-in runs the expert login command', async () => {
     const { needs, calls } = rig();
-    await needs.frame(open({ id: 'i', need: 'install' }));
     await needs.frame(open({ id: 's', need: 'signin' }));
-    await needs.act('i');
     await needs.act('s');
-    expect(calls).toEqual([
-      ['install', 'claude-code'],
-      ['login', 'claude-code'],
-    ]);
+    expect(calls).toEqual([['login', 'claude-code']]);
   });
 
   it('a failed command keeps the request, with the last line of why, and tells the brain nothing', async () => {
@@ -118,7 +113,7 @@ describe('needs you on this PC', () => {
   it('refuses to run a request whose program or expert looks like an option', async () => {
     const { needs, calls, answers } = rig();
     await needs.frame(open({ spec: { command: '--version' } }));
-    await needs.frame(open({ id: 'i', need: 'install', expert: '-y' }));
+    await needs.frame(open({ id: 'i', need: 'signin', expert: '-y' }));
     expect(await needs.act('n1')).toEqual({ error: 'This PC will not run that.' });
     expect(await needs.act('i')).toEqual({ error: 'This PC will not run that.' });
     expect(calls).toEqual([]);

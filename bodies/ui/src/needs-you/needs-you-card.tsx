@@ -1,31 +1,17 @@
 /**
- * The bubble's card for a remote brain's request on this PC: approve a program, install an
- * expert, or sign one in. Every fact on it comes from this PC; nothing runs until the person
+ * The bubble's card for a remote brain's request on this PC: approve a program or
+ * sign an expert in. Every fact on it comes from this PC; nothing runs until the person
  * clicks. Contains NeedsYouCard (one request) and NeedsYouBubble (the first open one, and the
  * line after a choice).
  */
 import { useEffect, useState } from 'react';
 import type { NeedsYouItem } from '../shapes';
 import { useNeedsActions, useNeedsYou } from './use-needs-you';
-import { PUT_OFF, WORDS, brainFirst, brainLabel, expertName } from './words';
+import { PUT_OFF, WORDS, brainFirst, brainLabel } from './words';
 
 const HOLD_MS = 7_000;
 
 function Facts({ item }: { item: NeedsYouItem }) {
-  if (item.need === 'install') {
-    return (
-      <dl className="card-rows">
-        <div>
-          <dt>Installs</dt>
-          <dd>{expertName(item.expert)}, from Tagalong&rsquo;s registry.</dd>
-        </div>
-        <div>
-          <dt>Then</dt>
-          <dd>It signs in with your own account, on this PC.</dd>
-        </div>
-      </dl>
-    );
-  }
   if (item.need === 'signin') {
     return (
       <dl className="card-rows">

@@ -1,4 +1,4 @@
-"""What a node cannot do for itself: be approved, have a tool installed, have it signed in. The
+"""What a node cannot do for itself: be approved, or have a tool signed in. The
 brain only asks. It tells the desktop beside the node (the one on the same device token) what it
 is waiting for and acts on the person's answer from that desktop alone. The yes itself is written
 on the node's machine by the person's own CLI, so nothing here touches the node's list.
@@ -18,7 +18,7 @@ log = logging.getLogger("brain")
 
 _ASKS_PER_PIPE = 2
 
-type Need = Literal["approve", "install", "signin"]
+type Need = Literal["approve", "signin"]
 
 
 @dataclass
@@ -38,19 +38,23 @@ class NodeNeeds:
         self._open: dict[str, _Open] = {}
 
     async def open_pipe(self, node: str, spec: PipeSpec, *, expert: str | None = None) -> Pipe:
-        """Open a pipe on the node; when it refuses for want of an install or a yes, ask the
-        person at the desktop beside it and try again after each answer (an install is usually
-        followed by the yes)."""
+        """Open a pipe on the node; when it refuses for want of a yes, ask the person at the
+        desktop beside it and try again after each answer. A program the node does not have
+        fails with the line to run on that machine."""
         asks = 0
         while True:
             try:
                 return await self._bodies.open_pipe(node, spec)
             except RpcError as err:
-                need = _need_for(err, expert)
-                if need is None or asks == _ASKS_PER_PIPE:
+                if err.code == ErrorCode.not_installed and expert is not None:
+                    raise RpcError(
+                        ErrorCode.not_installed,
+                        f"{expert} is not installed on {node}; run tagalong install {expert} there",
+                    ) from err
+                if err.code != ErrorCode.denied or asks == _ASKS_PER_PIPE:
                     raise
                 asks += 1
-                if not await self._ask(node, need, spec, expert):
+                if not await self._ask(node, "approve", spec, expert):
                     raise
 
     async def sign_in(self, node: str, spec: PipeSpec, expert: str) -> bool:
@@ -111,11 +115,3 @@ class NodeNeeds:
         for need_id, entry in list(self._open.items()):
             if body_id in (entry.node, entry.desktop):
                 self._close(need_id, "gone")
-
-
-def _need_for(err: RpcError, expert: str | None) -> Need | None:
-    if err.code == ErrorCode.denied:
-        return "approve"
-    if err.code == ErrorCode.not_installed and expert is not None:
-        return "install"
-    return None

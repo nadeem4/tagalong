@@ -367,11 +367,11 @@ describe('node_needs frames', () => {
   const sample = (name: string): unknown =>
     (JSON.parse(readFileSync(join(examples, name), 'utf8')) as { params: unknown }).params;
   it('parses an open request for each need and the closing frame', () => {
-    const needs = ['', '.install', '.signin'].map(
+    const needs = ['', '.signin'].map(
       (kind) =>
         NodeNeedsParams.parse(sample(`brain.node_needs.params${kind}.json`)) as NodeNeedsOpen,
     );
-    expect(needs.map((n) => n.need)).toEqual(['approve', 'install', 'signin']);
+    expect(needs.map((n) => n.need)).toEqual(['approve', 'signin']);
     expect(NodeNeedsParams.parse(sample('brain.node_needs.params.closed.json'))).toMatchObject({
       state: 'closed',
       reason: 'answered',
@@ -382,11 +382,13 @@ describe('node_needs frames', () => {
     expect(NodeNeedsParams.safeParse({ ...open, need: 'reboot' }).success).toBe(false);
     expect(NodeAnsweredParams.safeParse({ id: 'n1', outcome: 'allow_always' }).success).toBe(false);
   });
-  it('refuses an install or sign-in that names no expert', () => {
-    const { expert: _expert, ...bare } = sample('brain.node_needs.params.install.json') as {
+  it('refuses a sign-in that names no expert, and an install request', () => {
+    const { expert: _expert, ...bare } = sample('brain.node_needs.params.signin.json') as {
       expert: string;
     };
     expect(NodeNeedsParams.safeParse(bare).success).toBe(false);
-    expect(NodeNeedsParams.safeParse({ ...bare, need: 'signin' }).success).toBe(false);
+    expect(NodeNeedsParams.safeParse({ ...bare, need: 'install', expert: 'e' }).success).toBe(
+      false,
+    );
   });
 });

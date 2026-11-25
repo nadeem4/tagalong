@@ -1447,7 +1447,7 @@ test('BAU4 connect another AI tool and memories by tool, light and dark', async 
   }
 });
 
-test('BAU5a needs you on this PC: approve, install, sign in, light and dark', async () => {
+test('BAU5a needs you on this PC: approve and sign in, light and dark', async () => {
   test.setTimeout(400_000);
   const dir = shotDir('bau5a');
   mkdirSync(dir, { recursive: true });
@@ -1495,24 +1495,18 @@ test('BAU5a needs you on this PC: approve, install, sign in, light and dark', as
     await both(home, 'home-section');
 
     launched.brain.sendNodeNeeds(
-      ask('i1', 'install', { command: 'claude-agent-acp' }, 'claude-code'),
-    );
-    await expect(card).toContainText('Claude Code is not on this PC yet.', { timeout: 30_000 });
-    await both(panel, 'install-card');
-    launched.brain.sendNodeNeeds({ id: 'i1', state: 'closed', reason: 'gone' });
-    launched.brain.sendNodeNeeds(
       ask('s1', 'signin', { command: 'claude-agent-acp' }, 'claude-code'),
     );
     await expect(card).toContainText('needs you to sign in on this PC', { timeout: 30_000 });
     await both(panel, 'signin-card');
     launched.brain.sendNodeNeeds({ id: 's1', state: 'closed', reason: 'gone' });
-    launched.brain.sendNodeNeeds(ask('f1', 'install', { command: 'x' }, 'no-such-expert'));
-    await expect(card).toContainText('No Such Expert is not on this PC yet.', {
+    launched.brain.sendNodeNeeds(ask('f1', 'signin', { command: 'x' }, 'no-such-expert'));
+    await expect(card).toContainText('No Such Expert needs you to sign in', {
       timeout: 30_000,
     });
-    await card.getByRole('button', { name: 'Install' }).click();
+    await card.getByRole('button', { name: 'Sign in' }).click();
     await expect(card.getByRole('alert')).toBeVisible({ timeout: 120_000 });
-    await both(panel, 'install-failed');
+    await both(panel, 'signin-failed');
     launched.brain.sendNodeNeeds({ id: 'f1', state: 'closed', reason: 'gone' });
 
     await section.getByRole('button', { name: 'Allow' }).click();

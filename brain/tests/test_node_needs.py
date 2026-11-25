@@ -102,21 +102,12 @@ async def test_another_body_cannot_answer_for_the_desktop(rig):
     task.cancel()
 
 
-async def test_a_missing_tool_asks_for_an_install_and_a_node_with_no_desktop_just_fails(
-    rig, tmp_path
-):
-    bodies, node, desk, _, needs = rig
+async def test_a_missing_tool_fails_the_job_with_the_line_to_run_there(rig):
+    _, _, desk, _, needs = rig
     missing = PipeSpec(command="no-such-tool-xyz")
-    task = asyncio.create_task(needs.open_pipe("pc", missing, expert="codex-acp"))
-    await settle()
-    assert desk.needs()[0]["need"] == "install"
-    task.cancel()
-
-    lonely = FakeNode(bodies, tmp_path / "solo", body_id="solo")
-    lonely.connect()
-    with pytest.raises(RpcError):
-        await needs.open_pipe("solo", missing)
-    await lonely.aclose()
+    with pytest.raises(RpcError, match="codex-acp is not installed on pc; run tagalong install"):
+        await needs.open_pipe("pc", missing, expert="codex-acp")
+    assert desk.needs() == []
 
 
 async def test_the_node_ignores_frames_that_would_edit_its_list(tmp_path):
