@@ -545,6 +545,10 @@ def test_node_allow_and_which_take_an_expert_by_id_and_resolve_its_install_here(
     assert allowlist.permits(PipeSpec(command=str(exe), args=["--acp"])) == str(exe)
     assert rig.go("node", "allow", "--expert", "nope") == 1
     assert "tagalong install nope" in rig.text
+    assert rig.go("node", "allow", "--expert", "claude-acp", "python") == 1
+    assert rig.go("node", "allow", "--expert", "claude-acp", "--url", "https://x.example/mcp") == 1
+    assert rig.go("node", "which", "--expert", "claude-acp", "python") == 1
+    assert "not both" in rig.text
 
 
 def test_node_list_shows_each_approval_without_its_secrets_and_revoke_removes_one(tmp_path):

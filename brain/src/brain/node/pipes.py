@@ -22,7 +22,7 @@ from brain.node.allowlist import Allowlist, NotInstalled, oauth_storage
 from brain.node.relay import HttpRelay
 from brain.node.signin import stored_auth
 from brain.protocol import NOT_INSTALLED, ErrorCode, PipeSpec, RpcError
-from brain.setup.store import ExpertStore
+from brain.setup.store import ExpertStore, InstalledExpert, prepend_to_path
 
 CHUNK = 65_536
 
@@ -110,8 +110,10 @@ class Pipes:
     async def open(self, pipe: str, spec: PipeSpec) -> None:
         if pipe in self._open:
             raise RpcError(ErrorCode.invalid_params, "That pipe is already open.")
+        first = None
         if spec.expert is not None:
-            spec = self._installed(spec.expert)
+            found = self._installed(spec.expert)
+            spec, first = found.pipe_spec(), found.private_node_dir()
         try:
             path = self._allowlist.permits(spec)
         except NotInstalled:
@@ -135,16 +137,19 @@ class Pipes:
                     bearer=secrets.bearer,
                 )
             else:
-                child = await self._spawn(path, spec.args, secrets.env)
+                env = dict(secrets.env)
+                if first is not None:
+                    env["PATH"] = prepend_to_path(os.environ, first)
+                child = await self._spawn(path, spec.args, env)
         except OSError as err:
             raise RpcError(ErrorCode.tool_failed, f"Could not start it: {err}") from None
         self._open[pipe] = (child, asyncio.create_task(self._relay(pipe, child)))
 
-    def _installed(self, expert: str) -> PipeSpec:
+    def _installed(self, expert: str) -> InstalledExpert:
         found = self._experts.get(expert)
         if found is None:
             raise RpcError(ErrorCode.not_installed, NOT_INSTALLED)
-        return found.pipe_spec()
+        return found
 
     def write(self, pipe: str, data: str) -> None:
         entry = self._open.get(pipe)

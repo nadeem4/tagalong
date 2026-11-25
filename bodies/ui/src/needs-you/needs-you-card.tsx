@@ -7,9 +7,9 @@
  */
 import { useEffect, useState } from 'react';
 import { Icon } from '../setup/icons';
-import { DONE_HOLD_MS, type NeedsYouItem } from '../shapes';
+import { DONE_HOLD_MS, expertName, type NeedsYouItem } from '../shapes';
 import { useNeedsActions, useNeedsYou } from './use-needs-you';
-import { PUT_OFF, WORDS, brainFirst, brainLabel, expertName, target } from './words';
+import { PUT_OFF, WORDS, brainFirst, brainLabel, target } from './words';
 
 function Facts({ item }: { item: NeedsYouItem }) {
   if (item.need === 'app_signin') {

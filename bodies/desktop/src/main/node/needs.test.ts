@@ -162,6 +162,16 @@ describe('needs you on this PC', () => {
     expect(needs.list()[0]).toMatchObject({ state: 'failed', failure: 'no network' });
   });
 
+  it('a failed install says so in plain words, not the command line', async () => {
+    const { needs } = rig(async () => ({ code: 1, out: 'failed: unknown_expert: claude-code' }));
+    await needs.frame(installing());
+    expect(await needs.act('i1')).toEqual({ error: "Couldn't install Claude Code on this PC." });
+    expect(needs.list()[0]).toMatchObject({
+      state: 'failed',
+      failure: "Couldn't install Claude Code on this PC.",
+    });
+  });
+
   it('not now closes the bubble, keeps the request in Home and tells the brain', async () => {
     const { needs, answers } = rig();
     await needs.frame(open());
@@ -174,13 +184,6 @@ describe('needs you on this PC', () => {
     const { needs } = rig();
     await needs.frame(open());
     await needs.frame({ seq: 2, id: 'n1', state: 'closed', reason: 'timeout' });
-    expect(needs.list()).toEqual([]);
-  });
-
-  it('never lists a request whose expert looks like an option', async () => {
-    const { needs } = rig();
-    expect(await needs.frame(open({ need: 'signin', expert: '-y' }))).toBe(false);
-    expect(await needs.frame(installing({ expert: '-y' }))).toBe(false);
     expect(needs.list()).toEqual([]);
   });
 

@@ -377,6 +377,8 @@ async def _node_signin(url: str, node_dir: Path, allowlist: Allowlist, node_sign
 
 
 def _with_expert_command(args, experts: ExpertStore):
+    if args.command is not None or getattr(args, "url", None) is not None:
+        raise _Fail("Give --expert, or a command or --url, not both.")
     found = experts.get(args.expert)
     if found is None:
         raise _Fail(f"{args.expert} is not installed here; run `tagalong install {args.expert}`.")

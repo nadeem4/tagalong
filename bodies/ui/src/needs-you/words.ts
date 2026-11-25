@@ -1,14 +1,6 @@
 /** The words for each kind of request, shared by the bubble card and Home's rows. */
-import { AI_TOOLS, aiToolLabel } from '../shapes/ai-tools';
+import { expertName } from '../shapes/ai-tools';
 import type { NeedsYouItem } from '../shapes';
-
-/** `claude-code` reads "Claude Code"; an id the app does not know is title-cased. */
-export const expertName = (id: string | undefined): string => {
-  if (id === undefined) return 'The expert';
-  return AI_TOOLS.some((tool) => tool.id === id)
-    ? aiToolLabel(id)
-    : id.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-};
 
 /** A brain's name opening a sentence: only the unnamed fallback needs a capital. */
 export const brainFirst = (name: string): string => (name === 'your brain' ? 'Your brain' : name);

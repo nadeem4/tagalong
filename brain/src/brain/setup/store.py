@@ -6,7 +6,7 @@ and a corrupt file is kept as `.bad` and read as empty, so a bad file never bloc
 
 import json
 import os
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Literal
@@ -27,8 +27,16 @@ class InstalledExpert:
     # None for an expert that needs no Node (a binary, a custom command).
     node: Literal["private", "system"] | None = None
 
+    def private_node_dir(self) -> Path | None:
+        # Its own scripts call `node`, so this dir goes first on the child's PATH.
+        return Path(self.command[0]).parent if self.node == "private" else None
+
     def pipe_spec(self) -> PipeSpec:
         return PipeSpec(command=self.command[0], args=self.command[1:])
+
+
+def prepend_to_path(env: Mapping[str, str], first: Path) -> str:
+    return str(first) + os.pathsep + env.get("PATH", "")
 
 
 def _row(raw: dict) -> InstalledExpert:

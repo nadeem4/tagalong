@@ -147,7 +147,12 @@ test('An install asked for here shows the expert by name and fails in place when
   const card = panel.getByRole('region', { name: 'Needs you on this PC' });
   await expect(card).toContainText('is not on this PC yet', { timeout: 30_000 });
   await card.getByRole('button', { name: 'Install' }).click();
-  await expect(card.getByRole('alert')).toBeVisible({ timeout: 120_000 });
+  await expect(card.getByRole('alert')).toContainText(
+    "Couldn't install No Such Expert on this PC.",
+    {
+      timeout: 120_000,
+    },
+  );
   await expect(card.getByRole('button', { name: 'Try again' })).toBeVisible();
   expect(brain.nodeAnswers).toHaveLength(before);
 });

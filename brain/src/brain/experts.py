@@ -38,6 +38,7 @@ from brain.pipes import Pipe
 from brain.placements import Choose, Placements, Unavailable, resolve_placement
 from brain.protocol import ErrorCode, PipeSpec, RpcError
 from brain.setup.env import expert_env
+from brain.setup.store import prepend_to_path
 
 _NO_MESSAGE = object()
 # Tells the adapter to send a command's output and exit code as structured `_meta` (Claude
@@ -208,9 +209,7 @@ class ExpertHosts:
 
     def __call__(self, expert, *, host: str = "brain", **callbacks) -> "ExpertRun":
         # A private Node's dir goes first on the child's PATH so the adapter's own scripts find it.
-        path_first = (
-            Path(expert.command[0]).parent if expert.node == "private" and host == "brain" else None
-        )
+        path_first = expert.private_node_dir() if host == "brain" else None
         # A reinstall with a new command is a new host; so is the same expert on another machine.
         key = (expert.id, tuple(expert.command), host)
         adapter = self._hosts.get(key)
@@ -369,7 +368,7 @@ class ExpertHost:
         # Explicit env: ours, minus the keys that would switch this expert off the user's login.
         env = expert_env(self._expert_id, os.environ)
         if self._path_first is not None:
-            env["PATH"] = str(self._path_first) + os.pathsep + env.get("PATH", "")
+            env["PATH"] = prepend_to_path(env, self._path_first)
         conn, self.process = await self._stack.enter_async_context(
             acp.spawn_agent_process(
                 _Client(self),

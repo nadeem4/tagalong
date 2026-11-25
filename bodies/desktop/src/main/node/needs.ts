@@ -7,7 +7,7 @@
  * what is approved here. An app's web sign-in, which finishes on this PC, is in signin.ts.
  */
 import { NodeNeedsParams, type NodeNeedsOpen } from '@tagalong/contract';
-import type { ApprovedItem, NeedsYouItem } from '@tagalong/ui/shapes';
+import { expertName, type ApprovedItem, type NeedsYouItem } from '@tagalong/ui/shapes';
 import { z } from 'zod';
 import { lastLine } from '../last-line';
 import type { Listening, Redirect } from './loopback';
@@ -146,7 +146,10 @@ export function createNeedsYou(deps: NeedsYouDeps) {
         args === null ? { code: 1, out: 'This PC will not run that.' } : await deps.run(args);
       if (done.code !== 0) {
         need.state = 'failed';
-        need.failure = lastLine(done.out) || 'It did not finish.';
+        need.failure =
+          need.frame.need === 'install'
+            ? `Couldn't install ${expertName(need.frame.expert)} on this PC.`
+            : lastLine(done.out) || 'It did not finish.';
         changed();
         return { error: need.failure };
       }

@@ -112,6 +112,17 @@ async def test_an_expert_spec_starts_this_machines_own_install_of_it(node):
     assert node.started == [(str(node.exe), ["--acp"])]
 
 
+async def test_a_private_node_install_puts_its_node_first_on_the_childs_path(node):
+    node.experts.add(
+        InstalledExpert(
+            "claude-acp", "Claude Code", "1", [str(node.exe)], "registry", None, node="private"
+        )
+    )
+    node.allowlist.allow(node.spec())
+    await node.pipes.open("k1", PipeSpec(expert="claude-acp"))
+    assert node.envs[0]["PATH"].startswith(str(node.exe.parent) + os.pathsep)
+
+
 async def test_an_expert_this_machine_lacks_is_not_installed_and_one_not_approved_is_denied(node):
     with pytest.raises(RpcError) as missing:
         await node.pipes.open("k1", PipeSpec(expert="claude-acp"))
