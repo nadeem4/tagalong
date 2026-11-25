@@ -1,14 +1,15 @@
 /**
- * The bubble's card for a remote brain's request on this PC: approve a program, sign an expert
- * in or finish an app's web sign-in. Every fact on it comes from this PC; approving and signing
- * an expert in run nothing until the person clicks. Contains NeedsYouCard (one request) and
- * NeedsYouBubble (the first open one, and the line after a choice).
+ * The bubble's card for a remote brain's request on this PC: approve a program, install an
+ * expert, sign one in or finish an app's web sign-in. Every fact on it comes from this PC;
+ * approving, installing and signing in run nothing until the person clicks. Contains
+ * NeedsYouCard (one request) and NeedsYouBubble (the first open one, and the line after a
+ * choice).
  */
 import { useEffect, useState } from 'react';
 import { Icon } from '../setup/icons';
-import { DONE_HOLD_MS, type NeedsYouItem } from '../shapes';
+import { DONE_HOLD_MS, expertName, type NeedsYouItem } from '../shapes';
 import { useNeedsActions, useNeedsYou } from './use-needs-you';
-import { PUT_OFF, WORDS, brainFirst, brainLabel } from './words';
+import { PUT_OFF, WORDS, brainFirst, brainLabel, target } from './words';
 
 function Facts({ item }: { item: NeedsYouItem }) {
   if (item.need === 'app_signin') {
@@ -17,6 +18,20 @@ function Facts({ item }: { item: NeedsYouItem }) {
         {item.what}'s page opened in your browser. When you say yes there, it returns to this PC,
         and I pass it straight to {item.brain}. The sign-in is kept on {item.brain}, not here.
       </p>
+    );
+  }
+  if (item.need === 'install') {
+    return (
+      <dl className="card-rows">
+        <div>
+          <dt>Installs</dt>
+          <dd>{expertName(item.expert)}</dd>
+        </div>
+        <div>
+          <dt>Then</dt>
+          <dd>It signs in with your own login on this PC.</dd>
+        </div>
+      </dl>
     );
   }
   if (item.need === 'signin') {
@@ -34,7 +49,7 @@ function Facts({ item }: { item: NeedsYouItem }) {
       <div>
         <dt>What runs</dt>
         <dd>
-          {item.what}
+          {target(item)}
           <small>{item.path === null ? 'Not found on this PC.' : item.path}</small>
         </dd>
       </div>

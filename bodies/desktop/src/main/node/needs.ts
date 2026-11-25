@@ -1,5 +1,5 @@
 /**
- * What a remote brain waits on from this PC: approve a program, sign an expert in.
+ * What a remote brain waits on from this PC: approve a program, install an expert, sign one in.
  * The brain only asks; the person's yes runs this PC's own `tagalong` command here, and only then
  * is the brain told to try again. Every fact the card shows (who asks, where the program is) is
  * read here, never taken from the brain's frame; the path comes from the same `tagalong` that
@@ -7,7 +7,7 @@
  * what is approved here. An app's web sign-in, which finishes on this PC, is in signin.ts.
  */
 import { NodeNeedsParams, type NodeNeedsOpen } from '@tagalong/contract';
-import type { ApprovedItem, NeedsYouItem } from '@tagalong/ui/shapes';
+import { expertName, type ApprovedItem, type NeedsYouItem } from '@tagalong/ui/shapes';
 import { z } from 'zod';
 import { lastLine } from '../last-line';
 import type { Listening, Redirect } from './loopback';
@@ -55,7 +55,9 @@ const words = (spec: {
   command?: string | undefined;
   args?: string[] | undefined;
   url?: string | undefined;
-}): string => spec.url ?? [spec.command ?? '', ...(spec.args ?? [])].join(' ').trim();
+  expert?: string | undefined;
+}): string =>
+  spec.url ?? spec.expert ?? [spec.command ?? '', ...(spec.args ?? [])].join(' ').trim();
 
 export function createNeedsYou(deps: NeedsYouDeps) {
   const open = new Map<string, Open>();
@@ -73,7 +75,7 @@ export function createNeedsYou(deps: NeedsYouDeps) {
       need: frame.need,
       brain: brain.name,
       identity: brain.identity,
-      what: words(frame.spec),
+      what: frame.need === 'install' ? frame.expert : words(frame.spec),
       path,
       expert: frame.expert,
       state,
@@ -84,19 +86,18 @@ export function createNeedsYou(deps: NeedsYouDeps) {
   ];
   const changed = (): void => deps.push(list());
 
-  const whichPath = async (command: string | undefined): Promise<string | null> => {
-    if (command === undefined) return null;
-    const done = await deps.run(['node', 'which', command]);
+  const whichPath = async (args: string[] | null): Promise<string | null> => {
+    if (args === null) return null;
+    const done = await deps.run(['node', 'which', ...args]);
     return done.code === 0 ? lastLine(done.out) : null;
   };
 
   /** What to run for a request, or null when the brain asked for something this PC will not run. */
   const command = ({ frame }: Open): string[] | null => {
-    if (frame.need !== 'approve') {
-      if (frame.expert.startsWith('-')) return null;
-      return ['login', frame.expert];
-    }
-    const { command: program = '', args = [], url } = frame.spec;
+    if (frame.need === 'install') return ['install', frame.expert, '--yes'];
+    if (frame.need === 'signin') return ['login', frame.expert];
+    const { command: program = '', args = [], url, expert } = frame.spec;
+    if (expert !== undefined) return ['node', 'allow', '--expert', expert];
     if (url !== undefined) return ['node', 'allow', '--url', url];
     if (program.startsWith('-')) return null;
     return ['node', 'allow', program, ...(args.length > 0 ? ['--', ...args] : [])];
@@ -118,7 +119,15 @@ export function createNeedsYou(deps: NeedsYouDeps) {
       }
       if (frame.need === 'app_signin') return signins.open(frame);
       arriving.add(frame.id);
-      const [path, brain] = await Promise.all([whichPath(frame.spec.command), deps.brain()]);
+      const lookup =
+        frame.need === 'install'
+          ? null
+          : frame.spec.expert !== undefined
+            ? ['--expert', frame.spec.expert]
+            : frame.spec.command === undefined
+              ? null
+              : [frame.spec.command];
+      const [path, brain] = await Promise.all([whichPath(lookup), deps.brain()]);
       if (!arriving.delete(frame.id)) return false;
       open.set(frame.id, { frame, path, brain, state: 'waiting', bubble: true });
       changed();
@@ -137,7 +146,10 @@ export function createNeedsYou(deps: NeedsYouDeps) {
         args === null ? { code: 1, out: 'This PC will not run that.' } : await deps.run(args);
       if (done.code !== 0) {
         need.state = 'failed';
-        need.failure = lastLine(done.out) || 'It did not finish.';
+        need.failure =
+          need.frame.need === 'install'
+            ? `Couldn't install ${expertName(need.frame.expert)} on this PC.`
+            : lastLine(done.out) || 'It did not finish.';
         changed();
         return { error: need.failure };
       }

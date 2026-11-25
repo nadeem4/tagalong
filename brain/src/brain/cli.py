@@ -116,6 +116,9 @@ def _parser() -> argparse.ArgumentParser:
     allow.add_argument("args", nargs=argparse.REMAINDER, help="its arguments, after --")
     allow.add_argument("--url", help="an HTTP MCP server's exact address, instead of a command")
     allow.add_argument(
+        "--expert", help="an installed expert, by id: the command this machine installed for it"
+    )
+    allow.add_argument(
         "--secret-env",
         action="append",
         default=[],
@@ -133,7 +136,8 @@ def _parser() -> argparse.ArgumentParser:
         help="a bearer token for the URL, typed here and kept on this machine",
     )
     which = node.add_parser("which", help="where a command is on this machine, as `allow` finds it")
-    which.add_argument("command")
+    which.add_argument("command", nargs="?")
+    which.add_argument("--expert", help="an installed expert, by id")
     node.add_parser("list", help="what the brain may run here, as JSON, without secrets")
     revoke = node.add_parser("revoke", help="stop letting the brain run one listed command")
     revoke.add_argument("key", help="its key from `node list`")
@@ -372,8 +376,20 @@ async def _node_signin(url: str, node_dir: Path, allowlist: Allowlist, node_sign
     out(f"Signed in. The brain may now open {url}; it never sees the sign-in.")
 
 
+def _with_expert_command(args, experts: ExpertStore):
+    if args.command is not None or getattr(args, "url", None) is not None:
+        raise _Fail("Give --expert, or a command or --url, not both.")
+    found = experts.get(args.expert)
+    if found is None:
+        raise _Fail(f"{args.expert} is not installed here; run `tagalong install {args.expert}`.")
+    spec = found.pipe_spec()
+    return argparse.Namespace(**{**vars(args), "command": spec.command, "args": spec.args})
+
+
 async def _node(args, home: Path, env, run_node, node_signin, secret, out) -> None:
     allowlist = Allowlist(home / "node" / "allowlist.json")
+    if args.sub in ("allow", "which") and args.expert is not None:
+        args = _with_expert_command(args, ExpertStore(home))
     if args.sub == "allow":
         _node_allow(args, allowlist, secret, out)
         return
@@ -398,7 +414,7 @@ async def _node(args, home: Path, env, run_node, node_signin, secret, out) -> No
     if missing:
         raise _Fail(f"A node needs {', '.join(missing)}; the desktop sets them when it starts one.")
     try:
-        await run_node(env, allowlist)
+        await run_node(env, allowlist, ExpertStore(home))
     except HelloRefused as err:
         raise _Fail(f"The brain refused this node ({err}). Pair this device again.") from None
 

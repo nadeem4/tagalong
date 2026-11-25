@@ -1,0 +1,5 @@
+{
+  "jsonrpc": "2.0",
+  "method": "pipe_open",
+  "params": { "pipe": "k1", "spec": { "expert": "claude-acp", "command": "claude-agent-acp" } }
+}

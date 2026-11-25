@@ -84,6 +84,8 @@ class Model(BaseModel):
 
 
 Id = str
+# An id handed to a command line (`tagalong install <id>`), so it can never read as a flag.
+ExpertId = Annotated[str, Field(pattern=r"^[^-]")]
 Input = dict[str, Any]
 # Handshake seqs may be 0 (nothing seen yet); a notification's seq starts at 1.
 HandshakeSeq = Annotated[int, Field(ge=0)]
@@ -567,19 +569,21 @@ class KnowMeStatusParams(Model):
 
 # Node pipes: the brain asks a node (a body on another machine) to run an allowed command and
 # relays its stdin and stdout as raw bytes. The node refuses any spec its own allow-list lacks.
-# A spec names a command, or the exact URL of an HTTP MCP server the node relays to. Secrets are
-# never part of it: the node adds the ones its person entered there.
+# A spec names a command, the exact URL of an HTTP MCP server the node relays to, or an expert by
+# id that the node maps to its own install. Secrets are never part of it: the node adds the ones
+# its person entered there.
 class PipeSpec(Model):
     command: Annotated[str, Field(min_length=1)] | None = None
     args: list[str] = []
     url: Annotated[str, Field(min_length=1)] | None = None
+    expert: ExpertId | None = None
 
     @model_validator(mode="after")
     def _one_target(self) -> "PipeSpec":
-        if (self.command is None) == (self.url is None):
-            raise ValueError("a spec names a command or a url, one of them.")
-        if self.url is not None and self.args:
-            raise ValueError("a url spec takes no args.")
+        if [self.command, self.url, self.expert].count(None) != 2:
+            raise ValueError("a spec names a command, a url or an expert, one of them.")
+        if self.command is None and self.args:
+            raise ValueError("only a command spec takes args.")
         return self
 
 
@@ -623,12 +627,18 @@ class _NodeNeedsOnNode(_NodeNeedsOpen):
 
 class NodeNeedsApprove(_NodeNeedsOnNode):
     need: Literal["approve"]
-    expert: Id | None = None
+    expert: ExpertId | None = None
 
 
 class NodeNeedsSignin(_NodeNeedsOnNode):
     need: Literal["signin"]
-    expert: Id
+    expert: ExpertId
+
+
+class NodeNeedsInstall(_NodeNeedsOpen):
+    node: Id
+    need: Literal["install"]
+    expert: ExpertId
 
 
 class NodeNeedsAppSignin(_NodeNeedsOpen):
@@ -639,7 +649,8 @@ class NodeNeedsAppSignin(_NodeNeedsOpen):
 
 
 NodeNeedsOpen = Annotated[
-    NodeNeedsApprove | NodeNeedsSignin | NodeNeedsAppSignin, Field(discriminator="need")
+    NodeNeedsApprove | NodeNeedsSignin | NodeNeedsInstall | NodeNeedsAppSignin,
+    Field(discriminator="need"),
 ]
 
 

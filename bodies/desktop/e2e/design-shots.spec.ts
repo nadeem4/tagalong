@@ -1599,3 +1599,43 @@ test('BAU5b finish an app sign-in on this PC, light, dark and failed', async () 
     await launched.done();
   }
 });
+
+test('BAU5c install an expert on this PC, card, working and failed', async () => {
+  test.setTimeout(180_000);
+  const dir = shotDir('bau5c');
+  mkdirSync(dir, { recursive: true });
+  const launched = await launchShot({
+    hasKey: true,
+    brainStatus: { ...REMOTE_BRAIN, started_by: 'service', local: false, host: 'mini-pc' },
+  });
+  try {
+    await expect.poll(() => launched.brain.hellos, { timeout: 30_000 }).toBeGreaterThan(0);
+    const panel = await launched.find('panel');
+    const card = panel.getByRole('region', { name: 'Needs you on this PC' });
+    launched.brain.sendNodeNeeds({
+      id: 'i1',
+      state: 'open',
+      node: 'node-1',
+      need: 'install',
+      expert: 'no-such-expert',
+    });
+    await expect(card).toContainText('is not on this PC yet', { timeout: 30_000 });
+    await expect(card.getByRole('button', { name: 'Install' })).toBeInViewport({ ratio: 1 });
+    const shoot = async (name: string): Promise<void> => {
+      for (const scheme of ['light', 'dark'] as const) {
+        await panel.emulateMedia({ colorScheme: scheme });
+        await settled(panel);
+        await panel.screenshot({ path: join(dir, `${name}-${scheme}.png`) });
+      }
+    };
+    await shoot('card');
+    await card.getByRole('button', { name: 'Install' }).click();
+    await expect(card).toContainText('Installing');
+    await shoot('working');
+    await expect(card.getByRole('alert')).toBeVisible({ timeout: 120_000 });
+    await expect(card.getByRole('button', { name: 'Try again' })).toBeInViewport({ ratio: 1 });
+    await shoot('failed');
+  } finally {
+    await launched.done();
+  }
+});

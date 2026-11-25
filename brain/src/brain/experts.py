@@ -38,6 +38,7 @@ from brain.pipes import Pipe
 from brain.placements import Choose, Placements, Unavailable, resolve_placement
 from brain.protocol import ErrorCode, PipeSpec, RpcError
 from brain.setup.env import expert_env
+from brain.setup.store import prepend_to_path
 
 _NO_MESSAGE = object()
 # Tells the adapter to send a command's output and exit code as structured `_meta` (Claude
@@ -138,14 +139,6 @@ async def kill_tree(process: asyncio.subprocess.Process) -> None:
     await process.wait()
 
 
-def _quoted(part: str) -> str:
-    """The node's own shell is often Windows', where a space or one of `&()^|<>"` needs double
-    quotes."""
-    if not any(c in part for c in ' &()^|<>"'):
-        return part
-    return '"' + part.replace('"', '\\"') + '"'
-
-
 class ExpertHosts:
     """The Jobs factory: one ExpertHost per installed expert, a session handle per job."""
 
@@ -195,15 +188,13 @@ class ExpertHosts:
     def _open_pipe(self, where: str, expert) -> Callable[[PipeSpec], Awaitable[Pipe]]:
         async def open_pipe(spec: PipeSpec) -> Pipe:
             try:
-                return await self._needs.open_pipe(where, spec, expert=expert.id)
+                return await self._needs.open_pipe(where, spec)
             except RpcError as err:
                 name = self._bodies.name(where)
                 if err.code == ErrorCode.denied:
-                    approve = f"tagalong node allow {_quoted(spec.command)}"
-                    if spec.args:
-                        approve += " -- " + " ".join(_quoted(a) for a in spec.args)
                     raise ExpertError(
-                        f"{expert.name} is not approved on {name}. On that machine run: {approve}"
+                        f"{expert.name} is not approved on {name}. "
+                        f"On that machine run: tagalong node allow --expert {expert.id}"
                     ) from None
                 raise ExpertError(
                     f"{expert.name} could not start on {name}: {err.message}"
@@ -214,14 +205,11 @@ class ExpertHosts:
     def _sign_in(self, host: str, expert) -> Callable[[], Awaitable[bool]] | None:
         if host == "brain":
             return None
-        spec = PipeSpec(command=expert.command[0], args=expert.command[1:])
-        return lambda: self._needs.sign_in(host, spec, expert.id)
+        return lambda: self._needs.sign_in(host, expert.id)
 
     def __call__(self, expert, *, host: str = "brain", **callbacks) -> "ExpertRun":
         # A private Node's dir goes first on the child's PATH so the adapter's own scripts find it.
-        path_first = (
-            Path(expert.command[0]).parent if expert.node == "private" and host == "brain" else None
-        )
+        path_first = expert.private_node_dir() if host == "brain" else None
         # A reinstall with a new command is a new host; so is the same expert on another machine.
         key = (expert.id, tuple(expert.command), host)
         adapter = self._hosts.get(key)
@@ -380,7 +368,7 @@ class ExpertHost:
         # Explicit env: ours, minus the keys that would switch this expert off the user's login.
         env = expert_env(self._expert_id, os.environ)
         if self._path_first is not None:
-            env["PATH"] = str(self._path_first) + os.pathsep + env.get("PATH", "")
+            env["PATH"] = prepend_to_path(env, self._path_first)
         conn, self.process = await self._stack.enter_async_context(
             acp.spawn_agent_process(
                 _Client(self),
@@ -396,9 +384,7 @@ class ExpertHost:
 
     async def _connect_pipe(self):
         """The adapter runs on a node; its stdout and stdin are the pipe's two directions."""
-        self._pipe = pipe = await self._open_pipe(
-            PipeSpec(command=self._command[0], args=self._command[1:])
-        )
+        self._pipe = pipe = await self._open_pipe(PipeSpec(expert=self._expert_id))
         reader = asyncio.StreamReader()
 
         async def pump() -> None:

@@ -13,6 +13,7 @@ from brain.node.allowlist import Allowlist
 from brain.node.main import HelloRefused, run_node
 from brain.node.pipes import Pipes, spawn_process
 from brain.protocol import ErrorCode, PipeSpec, RpcError
+from brain.setup.store import ExpertStore, InstalledExpert
 
 
 class FakeChild:
@@ -73,7 +74,10 @@ class Setup:
             self.children.append(child)
             return child
 
-        self.pipes = Pipes(self.allowlist, lambda m, p: self.sent.append((m, p)), spawn, relay)
+        self.experts = ExpertStore(tmp_path)
+        self.pipes = Pipes(
+            self.allowlist, lambda m, p: self.sent.append((m, p)), self.experts, spawn, relay
+        )
 
     def spec(self, *args: str) -> PipeSpec:
         return PipeSpec(command=str(self.exe), args=list(args))
@@ -93,6 +97,41 @@ async def test_an_approved_spec_starts_the_child_with_its_args(node):
     node.allowlist.allow(node.spec("--stdio"))
     await node.pipes.open("k1", node.spec("--stdio"))
     assert node.started == [(str(node.exe), ["--stdio"])]
+
+
+def installed(node: Setup, *args: str) -> None:
+    node.experts.add(
+        InstalledExpert("claude-acp", "Claude Code", "1", [str(node.exe), *args], "registry", None)
+    )
+
+
+async def test_an_expert_spec_starts_this_machines_own_install_of_it(node):
+    installed(node, "--acp")
+    node.allowlist.allow(node.spec("--acp"))
+    await node.pipes.open("k1", PipeSpec(expert="claude-acp"))
+    assert node.started == [(str(node.exe), ["--acp"])]
+
+
+async def test_a_private_node_install_puts_its_node_first_on_the_childs_path(node):
+    node.experts.add(
+        InstalledExpert(
+            "claude-acp", "Claude Code", "1", [str(node.exe)], "registry", None, node="private"
+        )
+    )
+    node.allowlist.allow(node.spec())
+    await node.pipes.open("k1", PipeSpec(expert="claude-acp"))
+    assert node.envs[0]["PATH"].startswith(str(node.exe.parent) + os.pathsep)
+
+
+async def test_an_expert_this_machine_lacks_is_not_installed_and_one_not_approved_is_denied(node):
+    with pytest.raises(RpcError) as missing:
+        await node.pipes.open("k1", PipeSpec(expert="claude-acp"))
+    assert missing.value.code == ErrorCode.not_installed
+    installed(node)
+    with pytest.raises(RpcError) as unapproved:
+        await node.pipes.open("k1", PipeSpec(expert="claude-acp"))
+    assert unapproved.value.code == ErrorCode.denied
+    assert node.started == []
 
 
 async def test_a_child_that_exits_closes_the_pipe_with_its_code(node):
@@ -143,7 +182,9 @@ async def test_a_spawned_child_does_not_inherit_the_nodes_link_token(monkeypatch
         raise HelloRefused("revoked")
 
     with pytest.raises(HelloRefused):
-        await run_node(os.environ, Allowlist(Path("unused.json")), dial=refused)
+        await run_node(
+            os.environ, Allowlist(Path("unused.json")), ExpertStore(Path("unused")), dial=refused
+        )
     child = await spawn_process(
         sys.executable, ["-c", "import os; print(sorted(k for k in os.environ if 'NODE' in k))"], {}
     )

@@ -1,7 +1,8 @@
-"""What a node cannot do for itself: be approved, or have a tool signed in. The
-brain only asks. It tells the desktop beside the node (the one on the same device token) what it
-is waiting for and acts on the person's answer from that desktop alone. The yes itself is written
-on the node's machine by the person's own CLI, so nothing here touches the node's list.
+"""What a node cannot do for itself: be approved, have an expert installed, or have a tool
+signed in. The brain only asks. It tells the desktop beside the node (the one on the same device
+token) what it is waiting for and acts on the person's answer from that desktop alone. The yes
+itself is written on the node's machine by the person's own CLI, so nothing here touches the
+node's list.
 
 An app that stays on the brain asks too: its web sign-in returns to the desktop's PC, so the
 desktop catches the redirect and sends back only the one-time code.
@@ -24,7 +25,7 @@ log = logging.getLogger("brain")
 _ASKS_PER_PIPE = 2
 _EXCHANGE_S = 25  # under the desktop's own wait for the brain
 
-type Need = Literal["approve", "signin", "app_signin"]
+type Need = Literal["approve", "install", "signin", "app_signin"]
 
 
 @dataclass
@@ -83,35 +84,46 @@ class RemoteSignin:
         pass
 
 
+def _unanswered(err: RpcError, need: Need, node: str, spec: PipeSpec) -> RpcError:
+    if need != "install":
+        return err
+    return RpcError(
+        ErrorCode.not_installed,
+        f"{spec.expert} is not installed on {node}; run tagalong install {spec.expert} there",
+    )
+
+
 class NodeNeeds:
     def __init__(self, bodies: Bodies, wait_s: float = 600.0) -> None:
         self._bodies = bodies
         self._wait_s = wait_s
         self._open: dict[str, _Open] = {}
 
-    async def open_pipe(self, node: str, spec: PipeSpec, *, expert: str | None = None) -> Pipe:
-        """Open a pipe on the node; when it refuses for want of a yes, ask the person at the
-        desktop beside it and try again after each answer. A program the node does not have
-        fails with the line to run on that machine."""
+    async def open_pipe(self, node: str, spec: PipeSpec) -> Pipe:
+        """Open a pipe on the node; when it refuses for want of a yes, or for want of an expert's
+        install, ask the person at the desktop beside it and try again after each answer. A
+        refusal the person does not clear stands, with the line to run on that machine."""
         asks = 0
         while True:
             try:
                 return await self._bodies.open_pipe(node, spec)
             except RpcError as err:
-                if err.code == ErrorCode.not_installed and expert is not None:
-                    raise RpcError(
-                        ErrorCode.not_installed,
-                        f"{expert} is not installed on {node}; run tagalong install {expert} there",
-                    ) from err
-                if err.code != ErrorCode.denied or asks == _ASKS_PER_PIPE:
+                if err.code == ErrorCode.denied:
+                    need: Need = "approve"
+                elif err.code == ErrorCode.not_installed and spec.expert is not None:
+                    need = "install"
+                else:
                     raise
                 asks += 1
-                if not await self._ask_node(node, "approve", spec, expert):
-                    raise
+                if asks > _ASKS_PER_PIPE or not await self._ask_node(node, need, spec):
+                    final = _unanswered(err, need, node, spec)
+                    if final is err:
+                        raise
+                    raise final from err
 
-    async def sign_in(self, node: str, spec: PipeSpec, expert: str) -> bool:
+    async def sign_in(self, node: str, expert: str) -> bool:
         """Ask for a sign-in on the node's machine; true once the person has done it."""
-        return await self._ask_node(node, "signin", spec, expert)
+        return await self._ask_node(node, "signin", PipeSpec(expert=expert))
 
     async def answered(self, body_id: str, answer: NodeAnsweredParams) -> None:
         """A desktop's reply. Only the desktop the question went to is heard; "not now" fails the
@@ -143,13 +155,15 @@ class NodeNeeds:
             if entry.key == (desktop, "app_signin", app) and not entry.exchanged.done():
                 entry.exchanged.set_result(error)
 
-    async def _ask_node(self, node: str, need: Need, spec: PipeSpec, expert: str | None) -> bool:
+    async def _ask_node(self, node: str, need: Need, spec: PipeSpec) -> bool:
         desktop = self._bodies.beside(node)
         if desktop is None:
             return False
-        fields: dict[str, Any] = {"node": node, "spec": spec.model_dump(exclude_none=True)}
-        if expert is not None:
-            fields["expert"] = expert
+        fields: dict[str, Any] = {"node": node}
+        if need != "install":
+            fields["spec"] = spec.model_dump(exclude_none=True)
+        if spec.expert is not None:
+            fields["expert"] = spec.expert
         key = (node, need, spec.model_dump_json())
         return await self.ask(desktop, need, fields, key=key) is not None
 

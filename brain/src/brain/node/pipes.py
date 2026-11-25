@@ -1,7 +1,8 @@
 """The node's pipes: one allowed command (or HTTP MCP relay) per pipe, its stdin and stdout
 relayed to the brain as base64 `pipe_data`. The spec is checked against the allow-list before
-anything starts; the secrets the person entered here are added to the child or the URL on this
-machine only. The brain keeps all the protocol logic (ACP, MCP) and the node only moves bytes.
+anything starts (an expert spec is first mapped to this machine's own install of it); the
+secrets the person entered here are added to the child or the URL on this machine only. The
+brain keeps all the protocol logic (ACP, MCP) and the node only moves bytes.
 """
 
 import asyncio
@@ -21,6 +22,7 @@ from brain.node.allowlist import Allowlist, NotInstalled, oauth_storage
 from brain.node.relay import HttpRelay
 from brain.node.signin import stored_auth
 from brain.protocol import NOT_INSTALLED, ErrorCode, PipeSpec, RpcError
+from brain.setup.store import ExpertStore, InstalledExpert, prepend_to_path
 
 CHUNK = 65_536
 
@@ -94,6 +96,7 @@ class Pipes:
         self,
         allowlist: Allowlist,
         send: Send,
+        experts: ExpertStore,
         spawn: Spawn = spawn_process,
         connect_url: ConnectUrl = HttpRelay,
     ) -> None:
@@ -101,11 +104,16 @@ class Pipes:
         self._send = send
         self._spawn = spawn
         self._connect_url = connect_url
+        self._experts = experts
         self._open: dict[str, tuple[Child, asyncio.Task]] = {}
 
     async def open(self, pipe: str, spec: PipeSpec) -> None:
         if pipe in self._open:
             raise RpcError(ErrorCode.invalid_params, "That pipe is already open.")
+        first = None
+        if spec.expert is not None:
+            found = self._installed(spec.expert)
+            spec, first = found.pipe_spec(), found.private_node_dir()
         try:
             path = self._allowlist.permits(spec)
         except NotInstalled:
@@ -129,10 +137,19 @@ class Pipes:
                     bearer=secrets.bearer,
                 )
             else:
-                child = await self._spawn(path, spec.args, secrets.env)
+                env = dict(secrets.env)
+                if first is not None:
+                    env["PATH"] = prepend_to_path(os.environ, first)
+                child = await self._spawn(path, spec.args, env)
         except OSError as err:
             raise RpcError(ErrorCode.tool_failed, f"Could not start it: {err}") from None
         self._open[pipe] = (child, asyncio.create_task(self._relay(pipe, child)))
+
+    def _installed(self, expert: str) -> InstalledExpert:
+        found = self._experts.get(expert)
+        if found is None:
+            raise RpcError(ErrorCode.not_installed, NOT_INSTALLED)
+        return found
 
     def write(self, pipe: str, data: str) -> None:
         entry = self._open.get(pipe)

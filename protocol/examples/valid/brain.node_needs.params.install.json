@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "method": "node_needs",
+  "params": {
+    "seq": 15,
+    "id": "n4",
+    "state": "open",
+    "node": "node-4f2a91",
+    "need": "install",
+    "expert": "claude-acp"
+  }
+}

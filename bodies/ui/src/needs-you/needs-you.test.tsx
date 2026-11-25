@@ -48,6 +48,34 @@ describe('NeedsYouBubble', () => {
     expect(await screen.findByRole('button', { name: 'Sign in' })).toBeTruthy();
   });
 
+  it('offers to install an expert by its name, says what comes after, and runs nothing until Install', async () => {
+    const bridge = shown(<NeedsYouBubble />, {
+      needsYou: [
+        {
+          ...ITEM,
+          id: 'i1',
+          need: 'install',
+          what: 'claude-code',
+          expert: 'claude-code',
+          path: null,
+        },
+      ],
+    });
+    expect(await screen.findByText('Claude Code is not on this PC yet.')).toBeTruthy();
+    expect(screen.getByText(/signs in with your own login/i)).toBeTruthy();
+    expect(bridge.needsYouActs).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'Install' }));
+    expect(bridge.needsYouActs).toEqual(['i1']);
+    expect(await screen.findByText(/Claude Code is installed on this PC/)).toBeTruthy();
+  });
+
+  it('names an expert by its display name when approving it', async () => {
+    shown(<NeedsYouBubble />, {
+      needsYou: [{ ...ITEM, what: 'claude-code', expert: 'claude-code' }],
+    });
+    expect(await screen.findByText(/wants to run Claude Code here/)).toBeTruthy();
+  });
+
   describe('an app sign-in that finishes on this PC', () => {
     const SIGNIN: NeedsYouItem = {
       ...ITEM,

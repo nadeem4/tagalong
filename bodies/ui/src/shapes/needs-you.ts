@@ -11,7 +11,7 @@ export const DONE_HOLD_MS = 7_000;
 /** One request in Home's "Needs you on this PC"; `bubble` is false once the person said not now. */
 export const NeedsYouItem = z.object({
   id: z.string(),
-  need: z.enum(['approve', 'signin', 'app_signin']),
+  need: z.enum(['approve', 'install', 'signin', 'app_signin']),
   /** The brain's name, with the pairing's short code in identity. */
   brain: z.string(),
   /** The brain's certificate as a short code, so two brains of one name differ. */
