@@ -8,7 +8,7 @@ and the samples in `examples/` follow it, and a change here comes first. The sam
 
 - Bodies talk only to the brain, never to each other.
 - The contract carries facts and the model's own words, never canned lines. Every word Scout says comes from the model; a turn may end with no reply at all.
-- The twenty-seven messages below (fourteen body to brain, thirteen brain to body; `cancel` is one in each direction) do not change when a body, tool, expert or Home screen is added. Beyond these, new things arrive as tools, event names or `changed` names. Fifteen carry the conversation, nine carry voice and two carry get to know me.
+- The thirty-five messages below (seventeen body to brain, eighteen brain to body; `cancel`, `pipe_data` and `pipe_close` are each one in both directions) do not change when a body, tool, expert or Home screen is added. Beyond these, new things arrive as tools, event names or `changed` names. Sixteen carry the conversation, nine carry voice, two carry get to know me and eight carry a node's work.
 - Single user, but never an open door: every `hello` carries a `token` the brain checks before anything else, and a brain reached over the network is encrypted and pinned by its certificate fingerprint. There are no accounts.
 
 ## Transport

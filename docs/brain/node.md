@@ -4,9 +4,12 @@ A node is a small process on a body's machine that runs commands for the brain w
 
 - [How it connects](#how-it-connects)
 - [The allow-list](#the-allow-list)
+- [Asking the person](#asking-the-person-node_needs)
 - [Pipes](#pipes)
+- [Secrets stay on the node](#secrets-stay-on-the-node)
+- [Signing in an app that stays on the brain](#signing-in-an-app-that-stays-on-the-brain)
+- [Signing in on the node](#signing-in-on-the-node)
 - [Running one](#running-one)
-- [Not in this slice](#not-in-this-slice)
 
 ## How it connects
 
@@ -34,6 +37,8 @@ Each entry records when it was allowed (`at`). `tagalong node list` prints the e
 ## Asking the person (`node_needs`)
 
 `NodeNeeds` (`brain/node_needs.py`) wraps `Bodies.open_pipe` for experts and apps. A `denied` asks `approve`; a `not_installed` for an expert asks `install` (the frame carries the expert id and no spec), and a click runs `tagalong install <expert> --yes` on this PC, then answers `done` and the brain tries again; with `not_now` the job fails with "<expert> is not installed on <node>; run tagalong install <expert> there". A `not_installed` for a plain command fails at once with no question. An ACP sign-in failure (-32000) on a node host asks `signin`; `signin` frames always name the expert. After the desktop answers `done` the pipe is tried again, at most twice per pipe, then the original error stands. `not_now` fails the job now and leaves the request open so Home still lists it. A new ask with the same node, need and spec closes the older one as `replaced`. The desktop side is `bodies/desktop/src/main/node/needs.ts`; sign-in runs `tagalong login <expert>`. See [protocol](../../protocol/README.md).
+
+The card shows no folder, because an allow-list entry is per program, not per folder. Both the toolbox's use (an app's stdio MCP server, [Where an app runs](../bodies/connected-apps.md#where-an-app-runs)) and the expert host's use ([Where an expert runs](experts.md#where-an-expert-runs)) go over a pipe.
 
 A hash covers the file the command resolves to, not what that file goes on to load: approving `npx` approves `npx` running anything. Approve the program that is the tool.
 
@@ -74,11 +79,5 @@ The relay (`node/relay.py`) sends the bearer, or uses the stored OAuth tokens (r
 - `tagalong node run`: connect and serve; needs the four `TAGALONG_NODE_*` variables (the desktop sets them).
 
 `brain.node` imports nothing of the voice models (`brain/tests/test_node_imports.py`).
-
-## Not supported yet
-
-- Other AI tools on the person's PC reach a remote brain's memory without a node: `tagalong memory-mcp` (BA11) dials the brain itself over the same pinned `wss` link a body uses, as an `mcp_client` (see [Memory for other AI tools](../data/memory.md#memory-for-other-ai-tools)).
-- An app that stays on a remote brain signs in through the desktop: see [Signing in an app that stays on the brain](#signing-in-an-app-that-stays-on-the-brain).
-- The brain does not install an expert on a node; it asks, and the person installs it there from the card (`tagalong install <id>`), after which the job goes on. The card shows no folder, because an allow-list entry is per program, not per folder. Both the toolbox's use (an app's stdio MCP server, [Where an app runs](../bodies/connected-apps.md#where-an-app-runs)) and the expert host's use ([Where an expert runs](experts.md#where-an-expert-runs)) go over a pipe.
 
 The node reuses the desktop's device token under body id `node-xxxxxx`, so it cannot be revoked apart from the desktop and its device kind is `desktop`.

@@ -71,4 +71,4 @@ export const WORDS: Record<NeedsYouItem['need'], NeedWords> = {
 };
 
 export const PUT_OFF =
-  'Okay, I have not run anything. The job waits, and the question is in Home under Needs you on this PC.';
+  'Okay, I have not run anything. The job stops; the question stays in Home under Needs you on this PC.';
