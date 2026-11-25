@@ -436,7 +436,7 @@ export const NodeNeedsOpen = z.union([
     ...nodeNeedsOpen,
     need: z.literal('app_signin'),
     app: z.string().min(1),
-    url: z.string().url(),
+    url: z.string().url().startsWith('https://'),
     port: z.number().int().min(1).max(65535),
   }),
 ]);

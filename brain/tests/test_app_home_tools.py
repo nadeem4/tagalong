@@ -335,11 +335,9 @@ async def test_sign_in_app_opens_the_page_through_the_body(rig, signs_in):
 async def test_sign_in_app_from_another_pc_finishes_on_that_pc(rig, signs_in):
     oauth_row(rig)
     elsewhere = Principal("device:d1", "d", "desktop", False, "d1")
-    peer = body_with_tools(rig.bodies, principal=elsewhere)
+    body_with_tools(rig.bodies, principal=elsewhere)
     await rig.call("sign_in_app", {"id": "gh"})
     assert isinstance(signs_in["channel"], RemoteSignin)
-    await signs_in["channel"].open_url("https://auth.example/authorize?x=1")
-    assert peer.used == []
 
 
 async def test_sign_in_app_without_a_body_that_can_open_urls(rig, signs_in):

@@ -190,6 +190,9 @@ class SigninChannel(Protocol):
 
     async def wait(self, timeout: float) -> tuple[str, str, str | None]: ...
 
+    def finished(self, error: str | None) -> None:
+        """The sign-in ended: `error` is None once connected, else why it did not."""
+
     def close(self) -> None: ...
 
 
@@ -205,6 +208,9 @@ class BrowserSignin:
 
     async def wait(self, timeout: float) -> tuple[str, str, str | None]:
         return await self._callback.wait(timeout)
+
+    def finished(self, error: str | None) -> None:
+        pass
 
     def close(self) -> None:
         self._callback.close()

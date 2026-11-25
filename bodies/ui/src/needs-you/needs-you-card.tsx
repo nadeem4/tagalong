@@ -12,15 +12,10 @@ import { PUT_OFF, WORDS, brainFirst, brainLabel } from './words';
 function Facts({ item }: { item: NeedsYouItem }) {
   if (item.need === 'app_signin') {
     return (
-      <dl className="card-rows">
-        <div>
-          <dt>How</dt>
-          <dd>
-            The sign-in page opened in your browser. When you say yes there, it returns to this PC
-            and I pass it straight to {item.brain}. The sign-in is kept on {item.brain}, not here.
-          </dd>
-        </div>
-      </dl>
+      <p className="card-brief">
+        {item.what}'s page opened in your browser. When you say yes there, it returns to this PC,
+        and I pass it straight to {item.brain}. The sign-in is kept on {item.brain}, not here.
+      </p>
     );
   }
   if (item.need === 'signin') {
@@ -67,6 +62,23 @@ export function NeedsYouCard({
   onNotNow: () => void;
 }) {
   const working = item.state === 'working';
+  // The page is already open, so opening it again sits first and as quietly as Not now.
+  const again = item.need === 'app_signin' && item.state !== 'failed';
+  const act = (
+    <button
+      type="button"
+      className={again ? 'bubble-quiet' : 'bubble-primary'}
+      disabled={working}
+      onClick={onAct}
+    >
+      {item.state === 'failed' ? 'Try again' : WORDS[item.need].does}
+    </button>
+  );
+  const notNow = (
+    <button type="button" className="bubble-quiet" disabled={working} onClick={onNotNow}>
+      Not now
+    </button>
+  );
   return (
     <section className="card" aria-label="Needs you on this PC">
       <div className="card-head">
@@ -75,7 +87,7 @@ export function NeedsYouCard({
       </div>
       <Facts item={item} />
       {item.state === 'waiting' && WORDS[item.need].waiting !== undefined && (
-        <p className="card-brief">{WORDS[item.need].waiting}</p>
+        <p className="card-brief">{WORDS[item.need].waiting?.(item)}</p>
       )}
       {working && <p className="card-brief">{WORDS[item.need].working}</p>}
       {item.state === 'failed' && (
@@ -83,16 +95,14 @@ export function NeedsYouCard({
           {item.failure}
         </p>
       )}
-      <p className="card-brief">
-        Only you can say yes, here on this PC. {brainFirst(item.brain)} cannot do it for you.
-      </p>
+      {item.need !== 'app_signin' && (
+        <p className="card-brief">
+          Only you can say yes, here on this PC. {brainFirst(item.brain)} cannot do it for you.
+        </p>
+      )}
       <div className="card-actions">
-        <button type="button" className="bubble-quiet" disabled={working} onClick={onNotNow}>
-          Not now
-        </button>
-        <button type="button" className="bubble-primary" disabled={working} onClick={onAct}>
-          {item.state === 'failed' ? 'Try again' : WORDS[item.need].does}
-        </button>
+        {again ? act : notNow}
+        {again ? notNow : act}
       </div>
     </section>
   );

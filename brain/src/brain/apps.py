@@ -14,7 +14,7 @@ import os
 import re
 import shutil
 import socket
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Callable, Mapping
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -58,7 +58,6 @@ SLUG_MAX = 24
 TRANSPORTS = ("stdio", "http")
 AUTHS = ("none", "token", "oauth")
 _LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
-OpenUrl = Callable[[str], Awaitable[None]]  # opens the sign-in page; the body decides how
 _ENV_REF = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
 SECRET_PARAMS = frozenset(
     {"token", "access_token", "api_key", "apikey", "key", "secret", "password", "auth", "sig"}
@@ -637,6 +636,8 @@ class Apps:
                     await session.initialize()
                     tools = await self._list(session)
                 slot.session, slot.tools = session, tools
+                if slot.signin:
+                    slot.signin.finished(None)
                 slot.signin = None  # the sign-in is over; later 401s never reopen a browser
                 self._set(slot, "connected")
                 while True:
@@ -669,7 +670,9 @@ class Apps:
                 self._set(slot, "needs-sign-in", str(root))
             elif slot.signin:  # a sign-in that failed, was refused or was abandoned
                 known = isinstance(root, OAuthError | TimeoutError)
-                self._set(slot, "needs-sign-in", _plain(exc) if known else "The sign-in failed.")
+                why = _plain(exc) if known else "The sign-in failed."
+                self._set(slot, "needs-sign-in", why)
+                slot.signin.finished(why)
             elif not isinstance(root, AppError) and (signin := self.node_signin_line(slot.row.id)):
                 self._set(slot, "error", signin)
             else:

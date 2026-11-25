@@ -32,6 +32,7 @@ function rig(
   const closed: number[] = [];
   const caught: Array<(redirect: Redirect) => void> = [];
   const brainAnswers = { fail: false };
+  const portTaken = { yes: false };
   const pushed: NeedsYouItem[][] = [];
   const needs = createNeedsYou({
     run: async (args) => {
@@ -49,6 +50,7 @@ function rig(
       redirects.push(redirect);
     },
     catchRedirect: async (port) => {
+      if (portTaken.yes) throw new Error('EADDRINUSE');
       listened.push(port);
       return {
         port,
@@ -71,6 +73,7 @@ function rig(
     closed,
     caught,
     brainAnswers,
+    portTaken,
   };
 }
 
@@ -234,13 +237,23 @@ describe('needs you on this PC', () => {
       expect(needs.list()[0]).toMatchObject({
         state: 'failed',
         failure:
-          'The sign-in page sent you back, but mini-pc did not answer. Nothing was saved. Check mini-pc is on, then try again.',
+          'Gmail sent you back, but mini-pc did not accept it. Nothing was saved. Check mini-pc is on and try again, or press Not now and ask Scout to sign in again.',
       });
       brainAnswers.fail = false;
       expect(await needs.act('a1')).toEqual({});
       expect(needs.list()[0]?.state).toBe('done');
       expect(answers).toEqual([['a1', 'done']]);
       expect(redirects).toEqual([{ code: 'c1', state: 's1' }]);
+    });
+
+    it('says to press Not now and ask again when this PC cannot listen on the port', async () => {
+      const { needs, portTaken } = rig();
+      portTaken.yes = true;
+      await needs.frame(signin());
+      await vi.waitFor(() => expect(needs.list()[0]?.state).toBe('failed'));
+      expect(needs.list()[0]?.failure).toBe(
+        'This PC could not listen for the sign-in on port 53211. Press Not now, then ask Scout to sign in again to get a new port.',
+      );
     });
 
     it('a frame replayed on reconnect neither listens again nor reopens the page', async () => {
@@ -261,12 +274,12 @@ describe('needs you on this PC', () => {
       expect(opened).toEqual(Array(2).fill('https://accounts.example/authorize?state=s1'));
     });
 
-    it('refuses a page that is not https, without opening or listening', async () => {
-      const { needs, answers, listened, opened } = rig();
-      expect(await needs.frame(signin({ url: 'file:///C:/x' }))).toBe(false);
-      expect(answers).toEqual([['a1', 'not_now']]);
-      expect(listened).toEqual([]);
-      expect(opened).toEqual([]);
+    it('not now with the brain offline still drops the card', async () => {
+      const { needs, brainAnswers } = rig();
+      await needs.frame(signin());
+      brainAnswers.fail = true;
+      await needs.notNow('a1');
+      expect(needs.list()).toEqual([]);
     });
 
     it('not now stops listening and tells the brain', async () => {

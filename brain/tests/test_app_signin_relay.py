@@ -15,7 +15,7 @@ from brain.apps import AppRow, Apps
 from brain.bodies import Bodies
 from brain.memory import Memory
 from brain.node_needs import NodeNeeds, RemoteSignin
-from brain.protocol import NodeAnsweredParams
+from brain.protocol import NodeAnsweredParams, RpcError
 from tests.test_app_oauth import _serve
 from tests.test_node_needs import Desk, settle
 
@@ -72,7 +72,14 @@ def done(frame, code, state_):
     return NodeAnsweredParams(id=frame["id"], outcome="done", code=code, state=state_)
 
 
-async def test_the_desktop_finishes_the_sign_in_and_the_tokens_stay_on_the_brain(rig):
+def exchanges(frame_url: str) -> int:
+    parts = urlparse(frame_url)
+    conn = http.client.HTTPConnection(parts.hostname, parts.port, timeout=5)
+    conn.request("GET", "/exchanged")
+    return json.loads(conn.getresponse().read())["count"]
+
+
+async def test_the_desktop_is_answered_once_the_tokens_are_saved_and_a_replay_is_refused(rig):
     apps, needs, desk, data = rig
     await start_sign_in(apps, needs)
     frame = await asked(desk)
@@ -81,32 +88,39 @@ async def test_the_desktop_finishes_the_sign_in_and_the_tokens_stay_on_the_brain
     assert redirect == f"http://127.0.0.1:{frame['port']}/callback"
 
     code, state_ = await asyncio.to_thread(authorize, frame["url"])
-    needs.answered("desk", done(frame, code, state_))
-    await state(apps, "connected")
-
+    await needs.answered("desk", done(frame, code, state_))
     saved = await FileTokenStorage(data, "notes").get_tokens()
     assert saved is not None and saved.access_token == "good-token"
+    await state(apps, "connected")
     await settle()
     assert "good-token" not in json.dumps(desk.frames)
     assert desk.needs()[-1]["state"] == "closed"
 
+    with pytest.raises(RpcError):
+        await needs.answered("desk", done(frame, code, state_))
+    assert await asyncio.to_thread(exchanges, frame["url"]) == 1
 
-async def test_a_code_for_the_wrong_state_is_refused_and_a_request_is_answered_once(rig):
+
+async def test_a_code_for_the_wrong_state_is_refused_to_the_desktop_and_nothing_is_saved(rig):
     apps, needs, desk, data = rig
     await start_sign_in(apps, needs)
     frame = await asked(desk)
-    code, state_ = await asyncio.to_thread(authorize, frame["url"])
-    needs.answered("desk", done(frame, code, "someone-elses"))
-    await state(apps, "needs-sign-in")
-    needs.answered("desk", done(frame, code, state_))
-    await settle()
+    code, _ = await asyncio.to_thread(authorize, frame["url"])
+    with pytest.raises(RpcError):
+        await needs.answered("desk", done(frame, code, "someone-elses"))
     assert apps.status("notes").state == "needs-sign-in"
     assert await FileTokenStorage(data, "notes").get_tokens() is None
+
+
+async def test_an_answer_for_a_request_the_brain_no_longer_holds_is_refused(rig):
+    _, needs, _, _ = rig
+    with pytest.raises(RpcError):
+        await needs.answered("desk", NodeAnsweredParams(id="gone", outcome="done"))
 
 
 async def test_not_now_ends_the_sign_in(rig):
     apps, needs, desk, _ = rig
     await start_sign_in(apps, needs)
     frame = await asked(desk)
-    needs.answered("desk", NodeAnsweredParams(id=frame["id"], outcome="not_now"))
+    await needs.answered("desk", NodeAnsweredParams(id=frame["id"], outcome="not_now"))
     await state(apps, "needs-sign-in")

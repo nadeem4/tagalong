@@ -634,7 +634,7 @@ class NodeNeedsSignin(_NodeNeedsOnNode):
 class NodeNeedsAppSignin(_NodeNeedsOpen):
     need: Literal["app_signin"]
     app: str = Field(min_length=1)
-    url: str
+    url: str = Field(pattern=r"^https://")
     port: int = Field(ge=1, le=65535)
 
 

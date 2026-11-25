@@ -70,7 +70,7 @@ export function createSignin(deps: SigninDeps) {
       const { name } = s.brain;
       fail(
         s,
-        `The sign-in page sent you back, but ${name} did not answer. Nothing was saved. Check ${name} is on, then try again.`,
+        `${s.frame.app} sent you back, but ${name} did not accept it. Nothing was saved. Check ${name} is on and try again, or press Not now and ask Scout to sign in again.`,
       );
       return { error: s.failure ?? '' };
     }
@@ -109,7 +109,7 @@ export function createSignin(deps: SigninDeps) {
     } catch {
       fail(
         s,
-        `This PC could not listen for the sign-in on port ${port}. Close what uses it and try again.`,
+        `This PC could not listen for the sign-in on port ${port}. Press Not now, then ask Scout to sign in again to get a new port.`,
       );
     }
   };
@@ -133,10 +133,6 @@ export function createSignin(deps: SigninDeps) {
     /** True when the request is now open here, so the caller can bring the card up. */
     async open(frame: AppSignin): Promise<boolean> {
       if (open.has(frame.id) || arriving.has(frame.id)) return false;
-      if (new URL(frame.url).protocol !== 'https:') {
-        await deps.answer(frame.id, 'not_now');
-        return false;
-      }
       arriving.add(frame.id);
       const brain = await deps.brain();
       if (!arriving.delete(frame.id)) return false;
@@ -174,7 +170,8 @@ export function createSignin(deps: SigninDeps) {
       if (s === undefined) return;
       drop(s);
       deps.changed();
-      await deps.answer(id, 'not_now');
+      // The request is already gone here: an offline brain, or one that dropped it, has nothing to add.
+      await deps.answer(id, 'not_now').catch(() => undefined);
     },
   };
 }

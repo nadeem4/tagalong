@@ -3,6 +3,7 @@
 Serves the fake MCP app at /mcp behind a bearer check, plus discovery metadata, dynamic client
 registration, authorize (redirects straight back with a code) and token (code and refresh grants).
 The refresh token "bad" is always refused, so tests can reach the full sign-in path.
+`GET /exchanged` says how many codes the token endpoint has traded.
 With a second argument `iss` it behaves like Notion: it advertises RFC 9207 support and sends
 `iss` on the redirect.
 """
@@ -24,6 +25,7 @@ CODE = "fake-code"
 def build(port: int, mode: str = "none") -> object:
     base = f"http://127.0.0.1:{port}"
     mcp_app = server.streamable_http_app()
+    exchanges = [0]
 
     async def resource_metadata(_: Request) -> Response:
         return JSONResponse({"resource": f"{base}/mcp", "authorization_servers": [base]})
@@ -61,6 +63,7 @@ def build(port: int, mode: str = "none") -> object:
         form = await request.form()
         if form.get("grant_type") == "authorization_code" and form.get("code") == CODE:
             access, refresh = "good-token", "r1"
+            exchanges[0] += 1
         elif form.get("grant_type") == "refresh_token" and form.get("refresh_token") != "bad":
             access, refresh = "refreshed-token", "r2"
         else:
@@ -74,6 +77,9 @@ def build(port: int, mode: str = "none") -> object:
             }
         )
 
+    async def exchanged(_: Request) -> Response:
+        return JSONResponse({"count": exchanges[0]})
+
     async def revoke(_: Request) -> Response:
         GOOD_TOKENS.clear()  # every token is refused from now on, like a server-side sign-out
         return Response(status_code=204)
@@ -81,6 +87,7 @@ def build(port: int, mode: str = "none") -> object:
     api = Starlette(
         routes=[
             Route("/revoke", revoke, methods=["POST"]),
+            Route("/exchanged", exchanged),
             Route("/.well-known/oauth-protected-resource/mcp", resource_metadata),
             Route("/.well-known/oauth-protected-resource", resource_metadata),
             Route("/.well-known/oauth-authorization-server", as_metadata),

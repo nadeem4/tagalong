@@ -218,13 +218,6 @@ def signin_channel(needs: NodeNeeds, bodies: Bodies, body_id: str, row: AppRow) 
     return RemoteSignin(needs, body_id, row.name)
 
 
-def browser_opener(bodies: Bodies, app_id: str) -> Callable[[str], Awaitable[None]] | None:
-    """How a sign-in reaches a browser: an online body that can open a web page runs the
-    open_url; None when no such body is online."""
-    body_id = browser_body(bodies)
-    return None if body_id is None else opener_on(bodies, body_id, app_id)
-
-
 def app_home_tools(
     apps: Apps, memory: "Memory", tokens: TokenFile, notify: Notify, bodies: Bodies
 ) -> list[tuple[ToolSpec, Handler]]:

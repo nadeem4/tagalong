@@ -15,12 +15,15 @@ from pathlib import Path
 import pytest
 from mcp.types import Tool
 
+from brain.app_oauth import BrowserSignin
 from brain.app_tools import save_app
 from brain.apps import AppError, AppRow, AppStatus, TokenFile
+from brain.auth import LOCAL, Principal
 from brain.bodies import Bodies
 from brain.events import Event
 from brain.memory import Memory
 from brain.mind.turn import Call
+from brain.node_needs import RemoteSignin
 from brain.open_items import OpenItems
 from brain.permission import (
     Engine,
@@ -31,7 +34,7 @@ from brain.permission import (
     resolve_mode,
     stored_auto_rules,
 )
-from brain.protocol import RpcError
+from brain.protocol import Body, RpcError
 from brain.setup import install as install_mod
 from brain.setup.apps import app_params, app_setup_tools
 from brain.setup.facts import Machine, NodePaths, ToolVersion, node_paths
@@ -215,6 +218,8 @@ class FakeApps:
     def __init__(self):
         self.restarted: list[str] = []
         self.signed_in: list[str] = []
+        self.channel = None
+        self.needs = None
         self.state, self.error = "connected", ""
         self.tool_names = ["create_event", "list_events"]
 
@@ -223,6 +228,7 @@ class FakeApps:
 
     async def sign_in(self, app_id, channel):
         self.signed_in.append(app_id)
+        self.channel = channel
         self.state = "connecting"  # the person has to finish in the browser
 
     def status(self, app_id):
@@ -253,12 +259,16 @@ async def no_fetch(url):
     yield b""
 
 
-async def opens(url):
-    pass
+class Desk:
+    def send(self, frame):
+        pass
+
+    def close(self):
+        pass
 
 
 class Rig:
-    def __init__(self, tmp_path, mach, env=None, browser=False):
+    def __init__(self, tmp_path, mach, env=None, browser=False, principal=LOCAL):
         self.home = tmp_path
         self.memory = Memory(tmp_path / "t.db")
         self.apps = FakeApps()
@@ -291,8 +301,12 @@ class Rig:
             self.events.append,
             self.items,
             wait_s=0.0,
-            opener=lambda app_id: opens if browser else None,
         )
+        if browser:
+            open_url = Tool(name="open_url", description="d", input_schema={"type": "object"})
+            self.bodies.connect(
+                Body(id="desktop", kind="desktop", name="d"), [open_url], Desk(), None, principal
+            )
         (((self.spec, self.handler),), self.stop_watches) = tools
 
     async def run(self, app_id="acme/notes"):
@@ -441,6 +455,19 @@ async def test_remote_entry_starts_sign_in_through_apps_when_a_browser_is_there(
     assert r.apps.signed_in == ["cloud"] and out["status"] == "signing_in"
     (row,) = r.memory.list_apps()
     assert (row.transport, row.auth) == ("http", "oauth")
+
+
+async def test_a_sign_in_from_a_desktop_on_another_pc_finishes_on_that_pc(rig):
+    elsewhere = Principal("device:d1", "d", "desktop", False, "d1")
+    r = rig(browser=True, principal=elsewhere)
+    await r.run("acme/cloud")
+    assert isinstance(r.apps.channel, RemoteSignin)
+
+
+async def test_a_sign_in_from_a_desktop_on_the_brains_pc_opens_its_browser(rig):
+    r = rig(browser=True)
+    await r.run("acme/cloud")
+    assert isinstance(r.apps.channel, BrowserSignin)
 
 
 async def test_remote_entry_without_a_browser_connects_and_says_so(rig):

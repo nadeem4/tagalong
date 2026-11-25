@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "method": "node_needs",
+  "params": {
+    "seq": 15,
+    "id": "n4",
+    "state": "open",
+    "need": "app_signin",
+    "app": "Gmail",
+    "url": "http://accounts.example.com/authorize?client_id=c1&state=s1&redirect_uri=http%3A%2F%2F127.0.0.1%3A53211%2Fcallback",
+    "port": 53211
+  }
+}

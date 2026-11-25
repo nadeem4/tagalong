@@ -1528,7 +1528,7 @@ test('BAU5a needs you on this PC: approve and sign in, light and dark', async ()
   }
 });
 
-test('BAU5b finish an app sign-in on this PC, light and dark', async () => {
+test('BAU5b finish an app sign-in on this PC, light, dark and failed', async () => {
   test.setTimeout(120_000);
   const dir = shotDir('bau5b');
   mkdirSync(dir, { recursive: true });
@@ -1564,6 +1564,25 @@ test('BAU5b finish an app sign-in on this PC, light and dark', async () => {
       await panel.emulateMedia({ colorScheme: scheme });
       await settled(panel);
       await panel.screenshot({ path: join(dir, `done-${scheme}.png`) });
+    }
+    launched.brain.refuseNodeAnswers = true;
+    const again = await freePort();
+    launched.brain.sendNodeNeeds({
+      id: 'g2',
+      state: 'open',
+      need: 'app_signin',
+      app: 'Gmail',
+      url: `https://accounts.example/authorize?state=s2&redirect_uri=http%3A%2F%2F127.0.0.1%3A${again}%2Fcallback`,
+      port: again,
+    });
+    await expect(card).toContainText('Waiting for Gmail', { timeout: 30_000 });
+    await fetch(`http://127.0.0.1:${again}/callback?code=spent&state=s2`);
+    await expect(card.getByRole('alert')).toContainText('did not accept it', { timeout: 30_000 });
+    await expect(card.getByRole('button', { name: 'Try again' })).toBeInViewport({ ratio: 1 });
+    for (const scheme of ['light', 'dark'] as const) {
+      await panel.emulateMedia({ colorScheme: scheme });
+      await settled(panel);
+      await panel.screenshot({ path: join(dir, `failed-${scheme}.png`) });
     }
   } finally {
     await launched.done();

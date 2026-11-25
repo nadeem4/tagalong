@@ -65,6 +65,30 @@ describe('NeedsYouBubble', () => {
       expect(bridge.needsYouActs).toEqual(['a1']);
     });
 
+    it('is a plain card: names the app, opens first, and leaves out the yes-here line', async () => {
+      shown(<NeedsYouBubble />, { needsYou: [SIGNIN] });
+      expect(await screen.findByText('Waiting for Gmail.')).toBeTruthy();
+      expect(screen.getByText(/Gmail's page opened in your browser/)).toBeTruthy();
+      expect(screen.queryByText('How')).toBeNull();
+      expect(screen.queryByText(/Only you can say yes/)).toBeNull();
+      const buttons = screen.getAllByRole('button').map((b) => b.textContent);
+      expect(buttons).toEqual(['Open it again', 'Not now']);
+    });
+
+    it('shows why it failed and offers Try again', async () => {
+      shown(<NeedsYouBubble />, {
+        needsYou: [
+          {
+            ...SIGNIN,
+            state: 'failed',
+            failure: 'Gmail sent you back, but mini-pc did not accept it.',
+          },
+        ],
+      });
+      expect((await screen.findByRole('alert')).textContent).toContain('did not accept it');
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+    });
+
     it('says it is signed in on the brain once the brain has the code', async () => {
       shown(<NeedsYouBubble />, { needsYou: [{ ...SIGNIN, state: 'done' }] });
       expect(

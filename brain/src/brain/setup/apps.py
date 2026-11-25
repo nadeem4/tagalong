@@ -16,13 +16,11 @@ import logging
 import os
 import shutil
 from collections.abc import Awaitable, Callable, Mapping
-from functools import partial
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from brain.app_oauth import BrowserSignin
-from brain.app_tools import browser_opener, save_app
-from brain.apps import AppError, Apps, OpenUrl, TokenFile
+from brain.app_tools import browser_body, save_app, signin_channel
+from brain.apps import AppError, Apps, TokenFile
 from brain.bodies import Bodies
 from brain.events import Event
 from brain.memory import Memory
@@ -205,7 +203,6 @@ def app_setup_tools(
     items: OpenItems,
     wait_s: float = CONNECT_WAIT_S,
     sign_in_wait_s: float = SIGN_IN_WAIT_S,
-    opener: Callable[[str], OpenUrl | None] | None = None,
     claim: Claim = no_task,
 ) -> tuple[list[tuple[ToolSpec, Handler]], Callable[[], Awaitable[None]]]:
     """The tools, and a `stop_watches` that cancels pending connect watches at shutdown (a
@@ -302,10 +299,10 @@ def app_setup_tools(
             "official": is_official_app(entry.id),
         }
         if row.auth == "oauth":
-            open_url = (opener or partial(browser_opener, bodies))(row.id)
-            if open_url is not None:
+            body_id = browser_body(bodies)
+            if body_id is not None:
                 try:
-                    await apps.sign_in(row.id, BrowserSignin(open_url))
+                    await apps.sign_in(row.id, signin_channel(apps.needs, bodies, body_id, row))
                 except AppError as err:
                     return fail("refused", str(err), id=row.id)
                 watch(row.id, row.name, task)

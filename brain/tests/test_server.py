@@ -19,7 +19,7 @@ from brain.auth import Authenticator
 from brain.bodies import Bodies
 from brain.memory import Memory
 from brain.mind.turn import Final
-from brain.protocol import NodeAnsweredParams
+from brain.protocol import ErrorCode, NodeAnsweredParams, RpcError
 from brain.server import start_server
 from brain.sessions import Session
 from brain.tools import KeySettings
@@ -105,14 +105,22 @@ async def test_hello_ok(env):
 async def test_node_answered_reaches_the_brain_with_the_body_that_sent_it(env):
     bodies, url = env
     heard = []
-    bodies.on_node_answered = lambda body_id, params: heard.append((body_id, params))
+
+    async def on_answer(body_id, params):
+        heard.append((body_id, params))
+        if params.id == "gone":
+            raise RpcError(ErrorCode.not_found, "That request is no longer open.")
+
+    bodies.on_node_answered = on_answer
     async with connect(url) as ws:
         await call(ws, hello())
         reply = await call(ws, request("node_answered", {"id": "n1", "outcome": "done"}))
         assert reply["result"] == {}
+        refused = await call(ws, request("node_answered", {"id": "gone", "outcome": "done"}, 4))
+        assert refused["error"]["code"] == ErrorCode.not_found
         bad = await call(ws, request("node_answered", {"id": "n1", "outcome": "always"}, 3))
         assert bad["error"]["code"] == -32602
-    assert heard == [("desktop", NodeAnsweredParams(id="n1", outcome="done"))]
+    assert heard[0] == ("desktop", NodeAnsweredParams(id="n1", outcome="done"))
 
 
 async def test_hello_result_carries_version_and_build(tmp_path):

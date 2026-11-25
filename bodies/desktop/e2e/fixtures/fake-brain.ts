@@ -154,6 +154,8 @@ export interface FakeBrain {
   knowStarts: Record<string, unknown>[];
   /** Every `node_answered` params the desktop sent, in order. */
   nodeAnswers: NodeAnsweredParams[];
+  /** While true the brain refuses every `node_answered`, as it does for a request it no longer holds. */
+  refuseNodeAnswers: boolean;
   /** The brain asks this PC for something: an open `node_needs` frame (pass `state: 'closed'` to close one). */
   sendNodeNeeds(params: Record<string, unknown>): void;
   /** Every app id the desktop sent to `setup_app`, in order (the tour's Connect). */
@@ -529,6 +531,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   // Get to know me: every `know_me_start` params, and whether a run has finished (it then has facts).
   const knowStarts: Record<string, unknown>[] = [];
   const nodeAnswers: NodeAnsweredParams[] = [];
+  const refusals = { nodeAnswers: false };
   let knowDone = false;
   const expertSetups: string[] = [];
   const expertApprovals: unknown[] = [];
@@ -1037,7 +1040,17 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
         } else finish();
       } else if (msg.method === 'node_answered') {
         nodeAnswers.push({ ...(msg.params as NodeAnsweredParams) });
-        socket.send(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: {} }));
+        socket.send(
+          JSON.stringify(
+            refusals.nodeAnswers
+              ? {
+                  jsonrpc: '2.0',
+                  id: msg.id,
+                  error: { code: ErrorCode.not_found, message: 'That request is no longer open.' },
+                }
+              : { jsonrpc: '2.0', id: msg.id, result: {} },
+          ),
+        );
       } else if (msg.method === 'know_me_start') {
         knowStarts.push({ ...msg.params });
         socket.send(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { joined: false } }));
@@ -1866,6 +1879,12 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     stops,
     knowStarts,
     nodeAnswers,
+    get refuseNodeAnswers() {
+      return refusals.nodeAnswers;
+    },
+    set refuseNodeAnswers(on) {
+      refusals.nodeAnswers = on;
+    },
     sendNodeNeeds: (params) => {
       for (const socket of sockets) {
         socket.send(
