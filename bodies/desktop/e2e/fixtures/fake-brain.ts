@@ -27,7 +27,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import type { AddressInfo } from 'node:net';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { ErrorCode } from '@tagalong/contract';
+import { ErrorCode, type NodeAnsweredParams } from '@tagalong/contract';
 import { E2E_LOCAL_TOKEN } from './launch-env';
 import { ownBuild } from '../../src/main/brain/build-id';
 
@@ -153,7 +153,9 @@ export interface FakeBrain {
   /** Every `know_me_start` params the desktop sent, in order. */
   knowStarts: Record<string, unknown>[];
   /** Every `node_answered` params the desktop sent, in order. */
-  nodeAnswers: { id: string; outcome: string }[];
+  nodeAnswers: NodeAnsweredParams[];
+  /** How the brain meets `node_answered`: accepts it, refuses it as it does an id it no longer holds, or never replies. */
+  nodeAnswerMode: 'ok' | 'refuse' | 'silent';
   /** The brain asks this PC for something: an open `node_needs` frame (pass `state: 'closed'` to close one). */
   sendNodeNeeds(params: Record<string, unknown>): void;
   /** Every app id the desktop sent to `setup_app`, in order (the tour's Connect). */
@@ -528,7 +530,8 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
   const stops: string[] = [];
   // Get to know me: every `know_me_start` params, and whether a run has finished (it then has facts).
   const knowStarts: Record<string, unknown>[] = [];
-  const nodeAnswers: { id: string; outcome: string }[] = [];
+  const nodeAnswers: NodeAnsweredParams[] = [];
+  const answering = { mode: 'ok' as 'ok' | 'refuse' | 'silent' };
   let knowDone = false;
   const expertSetups: string[] = [];
   const expertApprovals: unknown[] = [];
@@ -1036,8 +1039,23 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
           );
         } else finish();
       } else if (msg.method === 'node_answered') {
-        nodeAnswers.push({ ...(msg.params as { id: string; outcome: string }) });
-        socket.send(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: {} }));
+        nodeAnswers.push({ ...(msg.params as NodeAnsweredParams) });
+        if (answering.mode !== 'silent') {
+          socket.send(
+            JSON.stringify(
+              answering.mode === 'refuse'
+                ? {
+                    jsonrpc: '2.0',
+                    id: msg.id,
+                    error: {
+                      code: ErrorCode.not_found,
+                      message: 'That request is no longer open.',
+                    },
+                  }
+                : { jsonrpc: '2.0', id: msg.id, result: {} },
+            ),
+          );
+        }
       } else if (msg.method === 'know_me_start') {
         knowStarts.push({ ...msg.params });
         socket.send(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { joined: false } }));
@@ -1866,6 +1884,12 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
     stops,
     knowStarts,
     nodeAnswers,
+    get nodeAnswerMode() {
+      return answering.mode;
+    },
+    set nodeAnswerMode(mode) {
+      answering.mode = mode;
+    },
     sendNodeNeeds: (params) => {
       for (const socket of sockets) {
         socket.send(

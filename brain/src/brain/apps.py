@@ -14,7 +14,7 @@ import os
 import re
 import shutil
 import socket
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Callable, Mapping
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -36,9 +36,9 @@ from mcp.types import (
 
 from brain.app_oauth import (
     FileTokenStorage,
-    LoopbackCallback,
     NeedsSignIn,
     OAuthError,
+    SigninChannel,
     make_provider,
 )
 from brain.pipes import mcp_streams
@@ -58,7 +58,6 @@ SLUG_MAX = 24
 TRANSPORTS = ("stdio", "http")
 AUTHS = ("none", "token", "oauth")
 _LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
-OpenUrl = Callable[[str], Awaitable[None]]  # opens the sign-in page; the body decides how
 _ENV_REF = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
 SECRET_PARAMS = frozenset(
     {"token", "access_token", "api_key", "apikey", "key", "secret", "password", "auth", "sig"}
@@ -286,7 +285,7 @@ class _Slot:
     relist: bool = False
     dropped: bool = False  # the connection closed; the app task then tears down
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)  # serialises stop and restart
-    open_url: OpenUrl | None = None  # set only while a sign-in the user asked for is running
+    signin: SigninChannel | None = None  # set only while a sign-in the user asked for is running
     signed_out: bool = False  # the server refused our sign-in mid-session
     settled: asyncio.Event = field(default_factory=asyncio.Event)  # first connect try is over
     location: str = "brain"  # where its session runs: the brain or a node's body id
@@ -345,7 +344,7 @@ class Apps:
     ) -> None:
         self._placements = placements
         self._bodies = bodies  # the nodes an app may be placed on
-        self._needs = needs
+        self.needs = needs
         self._memory = memory
         self._notify = notify
         self._env = env
@@ -455,7 +454,7 @@ class Apps:
         except AppError:
             pass
 
-    async def sign_in(self, app_id: str, open_url: OpenUrl) -> None:
+    async def sign_in(self, app_id: str, channel: SigninChannel) -> None:
         """Start a browser sign-in in the background; the outcome shows as the app's state."""
         row = next((r for r in self._memory.list_apps() if r.id == app_id), None)
         if row is None:
@@ -464,10 +463,10 @@ class Apps:
             raise AppError(f"{row.name} does not use sign-in.")
         if self._data_dir is None:
             raise AppError("Sign-in is not set up in this brain.")
-        await self._relaunch(app_id, open_url)
+        await self._relaunch(app_id, channel)
 
     async def _relaunch(
-        self, app_id: str, open_url: OpenUrl | None = None, where: str | None = None
+        self, app_id: str, signin: SigninChannel | None = None, where: str | None = None
     ) -> None:
         row = next((r for r in self._memory.list_apps() if r.id == app_id), None)
         old = self._slots.get(app_id)
@@ -477,9 +476,9 @@ class Apps:
             self._forget_oauth(app_id)  # a removed app leaves no tokens behind
             raise AppError(f"no app {app_id}.")
         if old is None:
-            if open_url:
+            if signin:
                 self._forget_oauth(app_id)
-            self._launch(row, open_url, where)
+            self._launch(row, signin, where)
             return
         async with old.lock:  # shared by every slot of this app, so re-read the current one
             current = self._slots[app_id]
@@ -490,9 +489,9 @@ class Apps:
             ):
                 return  # a call before this one already moved it
             await self._stop(current)
-            if open_url:  # a fresh sign-in starts clean: the old client id has the old port
+            if signin:  # a fresh sign-in starts clean: the old client id has the old port
                 self._forget_oauth(app_id)
-            self._launch(row, open_url, where)
+            self._launch(row, signin, where)
 
     def secret_values(self) -> list[str]:
         """Every stored app secret, for masking; url_query params also count one by one."""
@@ -586,14 +585,14 @@ class Apps:
         return AppError(message)
 
     def _launch(
-        self, row: AppRow, open_url: OpenUrl | None = None, where: str | None = None
+        self, row: AppRow, signin: SigninChannel | None = None, where: str | None = None
     ) -> None:
         old = self._slots.get(row.id)
         slot = _Slot(
             row,
             tools=old.tools if old else [],
             lock=old.lock if old else asyncio.Lock(),
-            open_url=open_url,
+            signin=signin,
         )
         self._slots[row.id] = slot
         if not row.enabled:
@@ -630,14 +629,14 @@ class Apps:
                 # The listener waits signin_timeout for the person; the connect steps around it
                 # still need their own time, and its "not finished" message must win the race.
                 limit = self._connect_timeout
-                if slot.open_url:
+                if slot.signin:
                     limit += self._signin_timeout
                 async with asyncio.timeout(limit):
                     session = await self._connect(stack, slot)
                     await session.initialize()
                     tools = await self._list(session)
                 slot.session, slot.tools = session, tools
-                slot.open_url = None  # the sign-in is over; later 401s never reopen a browser
+                slot.signin = None  # the sign-in is over; later 401s never reopen a browser
                 self._set(slot, "connected")
                 while True:
                     try:
@@ -667,9 +666,11 @@ class Apps:
             root = root_cause(exc)
             if isinstance(root, NeedsSignIn):
                 self._set(slot, "needs-sign-in", str(root))
-            elif slot.open_url:  # a sign-in that failed, was refused or was abandoned
+            elif slot.signin:  # a sign-in that failed, was refused or was abandoned
                 known = isinstance(root, OAuthError | TimeoutError)
-                self._set(slot, "needs-sign-in", _plain(exc) if known else "The sign-in failed.")
+                why = _plain(exc) if known else "The sign-in failed."
+                self._set(slot, "needs-sign-in", why)
+                slot.signin.finished(why)
             elif not isinstance(root, AppError) and (signin := self.node_signin_line(slot.row.id)):
                 self._set(slot, "error", signin)
             else:
@@ -739,7 +740,7 @@ class Apps:
         else:
             spec = PipeSpec(url=row.config["url"])
         try:
-            pipe = await self._needs.open_pipe(slot.location, spec)
+            pipe = await self.needs.open_pipe(slot.location, spec)
         except RpcError as err:
             if signin := self.node_signin_line(row.id):
                 raise AppError(signin) from None
@@ -759,32 +760,36 @@ class Apps:
         row = slot.row
         if self._data_dir is None:
             raise OAuthError("Sign-in is not set up in this brain.")
-        storage = FileTokenStorage(self._data_dir, row.id)
-        listener: LoopbackCallback | None = None
+
+        def saved() -> None:
+            # The code was traded and the tokens are on disk; the desktop need not wait for the app.
+            if slot.signin:
+                slot.signin.finished(None)
+
+        storage = FileTokenStorage(self._data_dir, row.id, saved)
         redirect_uri = "http://127.0.0.1/callback"  # unused unless a sign-in was asked for
-        if slot.open_url is None:
+        if slot.signin is None:
             if await storage.get_tokens() is None:
                 raise NeedsSignIn("Sign in to connect.")
         else:
-            listener = LoopbackCallback()
-            redirect_uri = await listener.start()
-            stack.callback(listener.close)
+            redirect_uri = await slot.signin.start()
+            stack.callback(slot.signin.close)
 
-        # Read slot.open_url at call time: once connected it is cleared, so a later 401 can
-        # never open a browser the user did not ask for or reuse a finished listener.
+        # Check slot.signin at call time: once connected it is cleared, so a later 401 can
+        # never open a browser the user did not ask for or reuse a finished channel.
         def lost() -> NeedsSignIn:
             slot.signed_out = True
             return NeedsSignIn(f"Sign in to {row.name} again.")
 
         async def open_url(url: str) -> None:
-            if slot.open_url is None:
+            if slot.signin is None:
                 raise lost()
-            await slot.open_url(url)
+            await slot.signin.open_url(url)
 
         async def wait() -> tuple[str, str, str | None]:
-            if slot.open_url is None or listener is None:
+            if slot.signin is None:
                 raise lost()
-            return await listener.wait(self._signin_timeout)
+            return await slot.signin.wait(self._signin_timeout)
 
         return make_provider(row, storage, redirect_uri, open_url, wait)
 

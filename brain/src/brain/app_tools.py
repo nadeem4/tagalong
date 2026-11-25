@@ -23,6 +23,7 @@ from mcp.types import (
     Tool,
 )
 
+from brain.app_oauth import BrowserSignin, SigninChannel
 from brain.apps import (
     AUTHS,
     TRANSPORTS,
@@ -35,6 +36,7 @@ from brain.apps import (
 )
 from brain.bodies import Bodies
 from brain.mind.turn import Call
+from brain.node_needs import NodeNeeds, RemoteSignin
 from brain.permission import Tier, tier
 from brain.placements import Choose, Unavailable
 from brain.protocol import LIMITS, ErrorCode, RpcError
@@ -194,20 +196,26 @@ async def save_app(
     return row
 
 
-def browser_opener(bodies: Bodies, app_id: str) -> Callable[[str], Awaitable[None]] | None:
-    """How a sign-in reaches a browser: an online body that can open a web page runs the
-    open_url; None when no such body is online."""
-    body_id = next(
+def browser_body(bodies: Bodies) -> str | None:
+    """An online body that can open a web page, for a sign-in."""
+    return next(
         (b for b in bodies.online_ids() if any(t.name == "open_url" for t in bodies.tools(b))),
         None,
     )
-    if body_id is None:
-        return None
 
+
+def opener_on(bodies: Bodies, body_id: str, app_id: str) -> Callable[[str], Awaitable[None]]:
     async def open_url(url: str) -> None:
         await bodies.use(body_id, f"sign-in-{app_id}", "open_url", {"url": url})
 
     return open_url
+
+
+def signin_channel(needs: NodeNeeds, bodies: Bodies, body_id: str, row: AppRow) -> SigninChannel:
+    """A body on another PC cannot reach the brain's own loopback, so its sign-in finishes there."""
+    if bodies.is_local(body_id):
+        return BrowserSignin(opener_on(bodies, body_id, row.id))
+    return RemoteSignin(needs, body_id, row.name)
 
 
 def app_home_tools(
@@ -318,11 +326,11 @@ def app_home_tools(
             raise refuse(f"Turn {row.name} on before signing in.")
         if line := apps.node_signin_line(app_id):
             raise refuse(line)
-        open_url = browser_opener(bodies, app_id)
-        if open_url is None:
+        body_id = browser_body(bodies)
+        if body_id is None:
             raise refuse("Open Tagalong on the machine the brain runs on to sign in.")
         try:
-            await apps.sign_in(app_id, open_url)
+            await apps.sign_in(app_id, signin_channel(apps.needs, bodies, body_id, row))
         except AppError as exc:
             raise refuse(str(exc)) from None
         return json.dumps({"id": app_id, "status": "connecting"})

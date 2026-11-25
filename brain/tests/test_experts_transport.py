@@ -110,7 +110,7 @@ async def test_an_expert_the_node_refuses_asks_the_desktop_and_a_not_now_keeps_t
         await asyncio.sleep(0)
     (frame,) = desk.needs()
     assert frame["expert"] == "other" and frame["need"] == "approve"
-    needs.answered("desk", NodeAnsweredParams(id=frame["id"], outcome="not_now"))
+    await needs.answered("desk", NodeAnsweredParams(id=frame["id"], outcome="not_now"))
     with pytest.raises(ExpertError) as err:
         await starting
     assert str(err.value).startswith("Other is not approved on Laptop. On that machine run: ")

@@ -3,6 +3,9 @@
 Serves the fake MCP app at /mcp behind a bearer check, plus discovery metadata, dynamic client
 registration, authorize (redirects straight back with a code) and token (code and refresh grants).
 The refresh token "bad" is always refused, so tests can reach the full sign-in path.
+`GET /exchanged` says how many codes the token endpoint has traded.
+With the argument `app-down` the app answers 503 even with a good token, so a sign-in saves its
+tokens and then fails to connect.
 With a second argument `iss` it behaves like Notion: it advertises RFC 9207 support and sends
 `iss` on the redirect.
 """
@@ -24,6 +27,7 @@ CODE = "fake-code"
 def build(port: int, mode: str = "none") -> object:
     base = f"http://127.0.0.1:{port}"
     mcp_app = server.streamable_http_app()
+    exchanges = [0]
 
     async def resource_metadata(_: Request) -> Response:
         return JSONResponse({"resource": f"{base}/mcp", "authorization_servers": [base]})
@@ -41,7 +45,7 @@ def build(port: int, mode: str = "none") -> object:
                 "token_endpoint_auth_methods_supported": ["none"],
                 **(
                     {"authorization_response_iss_parameter_supported": True}
-                    if mode != "none"
+                    if mode in ("iss", "bad-iss")
                     else {}
                 ),
             }
@@ -53,7 +57,11 @@ def build(port: int, mode: str = "none") -> object:
 
     async def authorize(request: Request) -> Response:
         q = request.query_params
-        extra = {"iss": base if mode == "iss" else "http://evil.example"} if mode != "none" else {}
+        extra = (
+            {"iss": base if mode == "iss" else "http://evil.example"}
+            if mode in ("iss", "bad-iss")
+            else {}
+        )
         back = urlencode({"code": CODE, "state": q["state"], **extra})
         return RedirectResponse(f"{q['redirect_uri']}?{back}", status_code=302)
 
@@ -61,6 +69,7 @@ def build(port: int, mode: str = "none") -> object:
         form = await request.form()
         if form.get("grant_type") == "authorization_code" and form.get("code") == CODE:
             access, refresh = "good-token", "r1"
+            exchanges[0] += 1
         elif form.get("grant_type") == "refresh_token" and form.get("refresh_token") != "bad":
             access, refresh = "refreshed-token", "r2"
         else:
@@ -74,6 +83,9 @@ def build(port: int, mode: str = "none") -> object:
             }
         )
 
+    async def exchanged(_: Request) -> Response:
+        return JSONResponse({"count": exchanges[0]})
+
     async def revoke(_: Request) -> Response:
         GOOD_TOKENS.clear()  # every token is refused from now on, like a server-side sign-out
         return Response(status_code=204)
@@ -81,6 +93,7 @@ def build(port: int, mode: str = "none") -> object:
     api = Starlette(
         routes=[
             Route("/revoke", revoke, methods=["POST"]),
+            Route("/exchanged", exchanged),
             Route("/.well-known/oauth-protected-resource/mcp", resource_metadata),
             Route("/.well-known/oauth-protected-resource", resource_metadata),
             Route("/.well-known/oauth-authorization-server", as_metadata),
@@ -100,6 +113,8 @@ def build(port: int, mode: str = "none") -> object:
                 challenge = f'Bearer resource_metadata="{url}"'
                 denied = Response(status_code=401, headers={"WWW-Authenticate": challenge})
                 await denied(scope, receive, send)
+            elif mode == "app-down":
+                await Response(status_code=503)(scope, receive, send)
             else:
                 await mcp_app(scope, receive, send)
         else:

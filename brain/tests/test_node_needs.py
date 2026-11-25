@@ -73,7 +73,7 @@ async def test_a_yes_makes_the_brain_try_the_pipe_once_more(rig):
     task = asyncio.create_task(needs.open_pipe("pc", SPEC))
     await settle()
     node.allowlist.allow(SPEC)  # what the person's click on the desktop does, on that machine
-    needs.answered("desk", NodeAnsweredParams(id=desk.needs()[0]["id"], outcome="done"))
+    await needs.answered("desk", NodeAnsweredParams(id=desk.needs()[0]["id"], outcome="done"))
     pipe = await asyncio.wait_for(task, 5)
     assert node.opened == [SPEC, SPEC]
     assert desk.needs()[-1]["state"] == "closed" and desk.needs()[-1]["reason"] == "answered"
@@ -84,7 +84,7 @@ async def test_not_now_fails_the_job_with_the_refusal_and_keeps_the_request_open
     bodies, node, desk, _, needs = rig
     task = asyncio.create_task(needs.open_pipe("pc", SPEC))
     await settle()
-    needs.answered("desk", NodeAnsweredParams(id=desk.needs()[0]["id"], outcome="not_now"))
+    await needs.answered("desk", NodeAnsweredParams(id=desk.needs()[0]["id"], outcome="not_now"))
     with pytest.raises(RpcError) as err:
         await task
     assert err.value.code == ErrorCode.denied
@@ -96,7 +96,10 @@ async def test_another_body_cannot_answer_for_the_desktop(rig):
     bodies, node, desk, elsewhere, needs = rig
     task = asyncio.create_task(needs.open_pipe("pc", SPEC))
     await settle()
-    needs.answered("other-desk", NodeAnsweredParams(id=desk.needs()[0]["id"], outcome="done"))
+    with pytest.raises(RpcError):
+        await needs.answered(
+            "other-desk", NodeAnsweredParams(id=desk.needs()[0]["id"], outcome="done")
+        )
     await settle()
     assert not task.done()
     task.cancel()
@@ -166,7 +169,7 @@ async def test_a_pipe_asks_at_most_twice_then_the_refusal_stands(rig):
     for _ in range(2):
         await settle()
         opened = [f for f in desk.needs() if f["state"] == "open"]
-        needs.answered("desk", NodeAnsweredParams(id=opened[-1]["id"], outcome="done"))
+        await needs.answered("desk", NodeAnsweredParams(id=opened[-1]["id"], outcome="done"))
     with pytest.raises(RpcError) as err:
         await asyncio.wait_for(task, 5)
     assert err.value.code == ErrorCode.denied

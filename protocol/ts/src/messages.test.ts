@@ -367,11 +367,11 @@ describe('node_needs frames', () => {
   const sample = (name: string): unknown =>
     (JSON.parse(readFileSync(join(examples, name), 'utf8')) as { params: unknown }).params;
   it('parses an open request for each need and the closing frame', () => {
-    const needs = ['', '.signin'].map(
+    const needs = ['', '.signin', '.app-signin'].map(
       (kind) =>
         NodeNeedsParams.parse(sample(`brain.node_needs.params${kind}.json`)) as NodeNeedsOpen,
     );
-    expect(needs.map((n) => n.need)).toEqual(['approve', 'signin']);
+    expect(needs.map((n) => n.need)).toEqual(['approve', 'signin', 'app_signin']);
     expect(NodeNeedsParams.parse(sample('brain.node_needs.params.closed.json'))).toMatchObject({
       state: 'closed',
       reason: 'answered',
@@ -381,6 +381,14 @@ describe('node_needs frames', () => {
     const open = sample('brain.node_needs.params.json') as object;
     expect(NodeNeedsParams.safeParse({ ...open, need: 'reboot' }).success).toBe(false);
     expect(NodeAnsweredParams.safeParse({ id: 'n1', outcome: 'allow_always' }).success).toBe(false);
+  });
+  it('carries the code and state of a finished app sign-in, and refuses one without a port', () => {
+    const answer = sample('body.node_answered.params.code.json');
+    expect(NodeAnsweredParams.parse(answer)).toMatchObject({ code: 'one-time-code', state: 's1' });
+    const { port: _port, ...bare } = sample('brain.node_needs.params.app-signin.json') as {
+      port: number;
+    };
+    expect(NodeNeedsParams.safeParse(bare).success).toBe(false);
   });
   it('refuses a sign-in that names no expert, and an install request', () => {
     const { expert: _expert, ...bare } = sample('brain.node_needs.params.signin.json') as {

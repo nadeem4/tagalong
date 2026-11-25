@@ -191,6 +191,14 @@ async def _handler(
                     calls.add(task)
                     task.add_done_callback(calls.discard)
                 continue
+            if method == "node_answered":
+                if "id" in message:  # its answer waits for a sign-in's code to be traded
+                    task = asyncio.create_task(
+                        _node_answered(message, req_id, body_id, peer, bodies)
+                    )
+                    calls.add(task)
+                    task.add_done_callback(calls.discard)
+                continue
             if method == "speech_state":  # a notification: a bad shape is dropped
                 if bodies.is_current(body_id, peer):
                     _speech_state(message, body_id, session)
@@ -474,6 +482,28 @@ async def _say(message: dict, req_id: Any, body_id: str, peer: _Peer, session: S
     peer.send(reply)
 
 
+async def _node_answered(
+    message: dict, req_id: Any, body_id: str, peer: _Peer, bodies: Bodies
+) -> None:
+    """A desktop's answer to a node_needs. An app sign-in is answered once its code has been
+    traded, so this runs in its own task; a request the brain no longer holds is refused."""
+    try:
+        answered = NodeAnsweredParams.model_validate(message.get("params"))
+        if bodies.on_node_answered is not None and bodies.is_current(body_id, peer):
+            await bodies.on_node_answered(body_id, answered)
+        reply = _result(req_id, {})
+    except ValueError as exc:  # ValidationError is a ValueError
+        reply = _error(req_id, ErrorCode.invalid_params, str(exc))
+    except RpcError as exc:
+        reply = _error(req_id, exc.code, str(exc))
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        log.exception("handler failed for node_answered")
+        reply = _error(req_id, ErrorCode.internal_error, "Internal error")
+    peer.send(reply)
+
+
 def _voice(
     method: str, message: dict, req_id: Any, body_id: str, session: Session, listening: set[str]
 ) -> str | None:
@@ -545,14 +575,6 @@ def _dispatch(
             return _error(req_id, ErrorCode.invalid_params, str(exc))
         except RpcError as exc:
             return _error(req_id, exc.code, str(exc))
-        return _result(req_id, {})
-    if method == "node_answered":
-        try:
-            answered = NodeAnsweredParams.model_validate(message.get("params"))
-        except ValidationError as exc:
-            return _error(req_id, ErrorCode.invalid_params, str(exc))
-        if bodies.on_node_answered is not None and bodies.is_current(body_id, peer):
-            bodies.on_node_answered(body_id, answered)
         return _result(req_id, {})
     if method == "cancel":
         try:

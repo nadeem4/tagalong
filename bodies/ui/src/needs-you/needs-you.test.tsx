@@ -48,6 +48,68 @@ describe('NeedsYouBubble', () => {
     expect(await screen.findByRole('button', { name: 'Sign in' })).toBeTruthy();
   });
 
+  describe('an app sign-in that finishes on this PC', () => {
+    const SIGNIN: NeedsYouItem = {
+      ...ITEM,
+      id: 'a1',
+      need: 'app_signin',
+      what: 'Gmail',
+      path: null,
+    };
+
+    it('says the sign-in is kept on the brain and offers to open the page again', async () => {
+      const bridge = shown(<NeedsYouBubble />, { needsYou: [SIGNIN] });
+      expect(await screen.findByText('Finish signing in to Gmail.')).toBeTruthy();
+      expect(screen.getByText(/kept on mini-pc, not here/)).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'Open it again' }));
+      expect(bridge.needsYouActs).toEqual(['a1']);
+    });
+
+    it('is a plain card: names the app, opens first, and leaves out the yes-here line', async () => {
+      shown(<NeedsYouBubble />, { needsYou: [SIGNIN] });
+      expect(await screen.findByText('Waiting for Gmail.')).toBeTruthy();
+      expect(screen.getByText(/Gmail's page opened in your browser/)).toBeTruthy();
+      expect(screen.queryByText('How')).toBeNull();
+      expect(screen.queryByText(/Only you can say yes/)).toBeNull();
+      const buttons = screen.getAllByRole('button').map((b) => b.textContent);
+      expect(buttons).toEqual(['Open it again', 'Not now']);
+    });
+
+    it('after the brain refused, shows its reason in the alert with Not now only', async () => {
+      shown(<NeedsYouBubble />, {
+        needsYou: [
+          { ...SIGNIN, state: 'failed', failure: 'The sign-in was refused.', canRetry: false },
+        ],
+      });
+      expect((await screen.findByRole('alert')).textContent).toContain('The sign-in was refused.');
+      expect(screen.queryByText(/page opened in your browser/)).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+      expect(screen.getByRole('button', { name: 'Not now' })).toBeTruthy();
+    });
+
+    it('shows why it failed and offers Try again', async () => {
+      shown(<NeedsYouBubble />, {
+        needsYou: [
+          {
+            ...SIGNIN,
+            state: 'failed',
+            failure: 'Gmail sent you back, but mini-pc did not accept it.',
+          },
+        ],
+      });
+      expect((await screen.findByRole('alert')).textContent).toContain('did not accept it');
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+    });
+
+    it('says it is signed in on the brain once the brain has the code', async () => {
+      shown(<NeedsYouBubble />, { needsYou: [{ ...SIGNIN, state: 'done' }] });
+      expect(
+        await screen.findByText('Gmail is signed in on mini-pc. You can close the browser tab.'),
+      ).toBeTruthy();
+      expect(screen.queryByRole('button')).toBeNull();
+    });
+  });
+
   it('shows why a run failed and offers it again', async () => {
     shown(<NeedsYouBubble />, {
       needsYou: [{ ...ITEM, state: 'failed', failure: 'Access is denied.' }],

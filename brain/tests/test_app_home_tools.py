@@ -12,11 +12,11 @@ from event_log import make_session
 from brain import main
 from brain.app_tools import AppSource, app_home_tools
 from brain.apps import AppRow, Apps, TokenFile
-from brain.auth import LOCAL
+from brain.auth import LOCAL, Principal
 from brain.bodies import Bodies
 from brain.memory import Memory
 from brain.mind.turn import Call
-from brain.node_needs import NodeNeeds
+from brain.node_needs import NodeNeeds, RemoteSignin
 from brain.protocol import Body, RpcError, Tool
 
 FAKE = str(Path(__file__).parent / "fake_mcp_server.py")
@@ -295,10 +295,10 @@ class OpenPeer:
         pass
 
 
-def body_with_tools(bodies, tools=("open_url",)):
+def body_with_tools(bodies, tools=("open_url",), principal=LOCAL):
     peer = OpenPeer(bodies)
     decl = [Tool(name=n, description="d", input_schema={"type": "object"}) for n in tools]
-    bodies.connect(Body(id="desktop", kind="desktop", name="d"), decl, peer, None, LOCAL)
+    bodies.connect(Body(id="desktop", kind="desktop", name="d"), decl, peer, None, principal)
     return peer
 
 
@@ -310,11 +310,11 @@ def oauth_row(rig, enabled=True):
 
 @pytest.fixture
 def signs_in(rig, monkeypatch):
-    """Replaces Apps.sign_in with a recorder; its open_url is the callable the tool built."""
+    """Replaces Apps.sign_in with a recorder; its channel is the one the tool built."""
     got = {}
 
-    async def fake(app_id, open_url):
-        got["id"], got["open_url"] = app_id, open_url
+    async def fake(app_id, channel):
+        got["id"], got["channel"] = app_id, channel
 
     monkeypatch.setattr(rig.apps, "sign_in", fake)
     return got
@@ -326,10 +326,18 @@ async def test_sign_in_app_opens_the_page_through_the_body(rig, signs_in):
     out = await rig.call("sign_in_app", {"id": "gh"})
     assert out == {"id": "gh", "status": "connecting"}
     assert signs_in["id"] == "gh"
-    await signs_in["open_url"]("https://auth.example/authorize?x=1")
+    await signs_in["channel"].open_url("https://auth.example/authorize?x=1")
     assert [(u["tool"], u["input"]) for u in peer.used] == [
         ("open_url", {"url": "https://auth.example/authorize?x=1"})
     ]
+
+
+async def test_sign_in_app_from_another_pc_finishes_on_that_pc(rig, signs_in):
+    oauth_row(rig)
+    elsewhere = Principal("device:d1", "d", "desktop", False, "d1")
+    body_with_tools(rig.bodies, principal=elsewhere)
+    await rig.call("sign_in_app", {"id": "gh"})
+    assert isinstance(signs_in["channel"], RemoteSignin)
 
 
 async def test_sign_in_app_without_a_body_that_can_open_urls(rig, signs_in):

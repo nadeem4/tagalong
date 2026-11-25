@@ -17,7 +17,7 @@ import logging
 import time
 import uuid
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -172,7 +172,7 @@ class Bodies:
         # A body that was current has gone, so what waited on it can end.
         self.on_gone: Callable[[str], None] | None = None
         # A desktop's answer to a node_needs request.
-        self.on_node_answered: Callable[[str, NodeAnsweredParams], None] | None = None
+        self.on_node_answered: Callable[[str, NodeAnsweredParams], Awaitable[None]] | None = None
 
     def name(self, body_id: str) -> str:
         """The name a body declared, even after it left; its id if it never connected."""

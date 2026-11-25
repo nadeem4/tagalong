@@ -1527,3 +1527,75 @@ test('BAU5a needs you on this PC: approve and sign in, light and dark', async ()
     await launched.done();
   }
 });
+
+test('BAU5b finish an app sign-in on this PC, light, dark and failed', async () => {
+  test.setTimeout(120_000);
+  const dir = shotDir('bau5b');
+  mkdirSync(dir, { recursive: true });
+  const launched = await launchShot({
+    hasKey: true,
+    brainStatus: { ...REMOTE_BRAIN, started_by: 'service', local: false, host: 'mini-pc' },
+  });
+  try {
+    await expect.poll(() => launched.brain.hellos, { timeout: 30_000 }).toBeGreaterThan(0);
+    const panel = await launched.find('panel');
+    const card = panel.getByRole('region', { name: 'Needs you on this PC' });
+    const port = await freePort();
+    launched.brain.sendNodeNeeds({
+      id: 'g1',
+      state: 'open',
+      need: 'app_signin',
+      app: 'Gmail',
+      url: `https://accounts.example/authorize?state=s1&redirect_uri=http%3A%2F%2F127.0.0.1%3A${port}%2Fcallback`,
+      port,
+    });
+    await expect(card).toContainText('Finish signing in to Gmail', { timeout: 30_000 });
+    await expect(card.getByText('kept on')).toBeVisible();
+    await expect(card.getByRole('button', { name: 'Open it again' })).toBeInViewport({ ratio: 1 });
+    await expect(card.getByText('Finish signing in to Gmail')).toBeInViewport({ ratio: 1 });
+    for (const scheme of ['light', 'dark'] as const) {
+      await panel.emulateMedia({ colorScheme: scheme });
+      await settled(panel);
+      await panel.screenshot({ path: join(dir, `card-${scheme}.png`) });
+    }
+    await fetch(`http://127.0.0.1:${port}/callback?code=one-time&state=s1`);
+    await expect(panel.getByText(/Gmail is signed in on/)).toBeVisible({ timeout: 30_000 });
+    for (const scheme of ['light', 'dark'] as const) {
+      await panel.emulateMedia({ colorScheme: scheme });
+      await settled(panel);
+      await panel.screenshot({ path: join(dir, `done-${scheme}.png`) });
+    }
+    const askAgain = async (id: string, mode: 'refuse' | 'silent'): Promise<void> => {
+      launched.brain.nodeAnswerMode = mode;
+      const again = await freePort();
+      launched.brain.sendNodeNeeds({
+        id,
+        state: 'open',
+        need: 'app_signin',
+        app: 'Gmail',
+        url: `https://accounts.example/authorize?state=${id}&redirect_uri=http%3A%2F%2F127.0.0.1%3A${again}%2Fcallback`,
+        port: again,
+      });
+      await expect(card).toContainText('Waiting for Gmail', { timeout: 30_000 });
+      await fetch(`http://127.0.0.1:${again}/callback?code=spent&state=${id}`);
+      await expect(card.getByRole('alert')).toBeVisible({ timeout: 45_000 });
+    };
+    const shoot = async (name: string): Promise<void> => {
+      for (const scheme of ['light', 'dark'] as const) {
+        await panel.emulateMedia({ colorScheme: scheme });
+        await settled(panel);
+        await panel.screenshot({ path: join(dir, `${name}-${scheme}.png`) });
+      }
+    };
+    await askAgain('g2', 'silent');
+    await expect(card.getByRole('button', { name: 'Try again' })).toBeInViewport({ ratio: 1 });
+    await shoot('failed');
+    await card.getByRole('button', { name: 'Not now' }).click();
+    await askAgain('g3', 'refuse');
+    await expect(card.getByRole('alert')).toContainText('no longer open');
+    await expect(card.getByRole('button', { name: 'Try again' })).toHaveCount(0);
+    await shoot('refused');
+  } finally {
+    await launched.done();
+  }
+});

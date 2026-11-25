@@ -27,6 +27,8 @@ interface NeedWords {
   /** What the person is told once they have said yes. */
   allowed: (item: NeedsYouItem) => string;
   working: string;
+  /** Shown on the card while it waits on something outside this PC. */
+  waiting?: (item: NeedsYouItem) => string;
   /** The button that does it. */
   does: string;
   /** The row's second line while it waits. */
@@ -50,6 +52,15 @@ export const WORDS: Record<NeedsYouItem['need'], NeedWords> = {
     working: 'Waiting for you to finish in the browser.',
     does: 'Sign in',
     meta: askedBy,
+  },
+  app_signin: {
+    title: (i) => `Finish signing in to ${i.what}`,
+    head: (i) => `Finish signing in to ${i.what}.`,
+    allowed: (i) => `${i.what} is signed in on ${i.brain}. You can close the browser tab.`,
+    working: 'Passing it on…',
+    waiting: (i) => `Waiting for ${i.what}.`,
+    does: 'Open it again',
+    meta: () => 'Waiting for the sign-in page in your browser.',
   },
 };
 
