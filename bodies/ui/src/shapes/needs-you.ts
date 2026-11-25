@@ -9,13 +9,13 @@ import { z } from 'zod';
 export const NeedsYouItem = z.object({
   id: z.string(),
   need: z.enum(['approve', 'signin']),
-  /** The brain that is asking, from the pairing. */
+  /** The brain's name, with the pairing's short code in identity. */
   brain: z.string(),
   /** The brain's certificate as a short code, so two brains of one name differ. */
   identity: z.string().optional(),
   /** The program or address in question, as the person reads it. */
   what: z.string(),
-  /** Where the program is on this PC, or null when it is not there (an install) or is an address. */
+  /** Where the program is on this PC, or null when it is an address. */
   path: z.string().nullable(),
   expert: z.string().optional(),
   state: z.enum(['waiting', 'working', 'failed']),

@@ -34,6 +34,7 @@ describe('NeedsYouBubble', () => {
   it('shows the path this PC resolved and runs nothing until Allow is clicked', async () => {
     const bridge = shown(<NeedsYouBubble />, { needsYou: [ITEM] });
     expect(await screen.findByText('C:\\tools\\claude-agent-acp.exe')).toBeTruthy();
+    expect(screen.getByText(/mini-pc \(4F2A-91C0\)/)).toBeTruthy();
     expect(bridge.needsYouActs).toEqual([]);
     fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
     expect(bridge.needsYouActs).toEqual(['n1']);
