@@ -11,6 +11,8 @@ export const NeedsYouItem = z.object({
   need: z.enum(['approve', 'install', 'signin']),
   /** The brain that is asking, from the pairing. */
   brain: z.string(),
+  /** The brain's certificate as a short code, so two brains of one name differ. */
+  identity: z.string().optional(),
   /** The program or address in question, as the person reads it. */
   what: z.string(),
   /** Where the program is on this PC, or null when it is not there (an install) or is an address. */

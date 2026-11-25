@@ -534,3 +534,16 @@ def test_answer_check_back_only_with_not_now():
     assert answer.model_validate({"ask": "a", "option": "not_now", "check_back_at": at})
     with pytest.raises(ValidationError):
         answer.model_validate({"ask": "a", "option": "allow", "check_back_at": at})
+
+
+def test_an_install_or_sign_in_request_names_an_expert():
+    from pydantic import ValidationError
+
+    from brain.protocol import NodeNeedsOpen
+
+    frame = {"seq": 1, "id": "n", "state": "open", "node": "pc", "spec": {"command": "x"}}
+    assert NodeNeedsOpen.model_validate({**frame, "need": "approve"}).expert is None
+    for need in ("install", "signin"):
+        with pytest.raises(ValidationError):
+            NodeNeedsOpen.model_validate({**frame, "need": need})
+        assert NodeNeedsOpen.model_validate({**frame, "need": need, "expert": "e"}).expert == "e"

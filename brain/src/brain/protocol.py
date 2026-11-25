@@ -619,6 +619,12 @@ class NodeNeedsOpen(Model):
     spec: PipeSpec
     expert: Id | None = None
 
+    @model_validator(mode="after")
+    def _expert_for_install_and_signin(self) -> "NodeNeedsOpen":
+        if self.need != "approve" and self.expert is None:
+            raise ValueError(f"{self.need} names an expert")
+        return self
+
 
 class NodeNeedsClosed(Model):
     seq: Seq

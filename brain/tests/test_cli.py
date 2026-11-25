@@ -517,6 +517,19 @@ def test_node_allow_approves_a_command_for_this_machine_only(tmp_path):
     assert allowlist.permits(PipeSpec(command=str(exe))) is None
 
 
+def test_node_which_prints_the_path_that_allow_records(tmp_path):
+    rig = Rig(tmp_path)
+    exe = rig.home / "expert.exe"
+    exe.write_bytes(b"binary")
+    exe.chmod(0o755)
+    assert rig.go("node", "which", str(exe)) == 0
+    shown = rig.text.strip()
+    assert rig.go("node", "allow", str(exe)) == 0
+    listed = Allowlist(rig.home / "node" / "allowlist.json").listing()
+    assert listed[0]["path"] == shown
+    assert rig.go("node", "which", str(rig.home / "missing.exe")) == 1
+
+
 def test_node_list_shows_each_approval_without_its_secrets_and_revoke_removes_one(tmp_path):
     rig = Rig(tmp_path)
     exe = rig.home / "expert.exe"

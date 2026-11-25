@@ -5,9 +5,8 @@
  */
 import type { NeedsYouItem } from '../shapes';
 import { Button } from '../controls/button';
-import { cap } from '../text';
 import { useNeedsActions } from './use-needs-you';
-import { WORDS } from './words';
+import { WORDS, brainFirst } from './words';
 
 const META = {
   failed: (item: NeedsYouItem) => item.failure ?? 'It did not finish.',
@@ -52,8 +51,8 @@ export function NeedsYouSection({ items }: { items: NeedsYouItem[] }) {
         <span className="cx-meta">{items.length} waiting</span>
       </div>
       <p>
-        {cap(items[0]?.brain ?? '')} asked for {items.length === 1 ? 'this' : 'these'}. Nothing runs
-        here until you say yes, on this PC.
+        {brainFirst(items[0]?.brain ?? '')} asked for {items.length === 1 ? 'this' : 'these'}.
+        Nothing runs here until you say yes, on this PC.
       </p>
       <ul className="cx-list">
         {items.map((item) => (

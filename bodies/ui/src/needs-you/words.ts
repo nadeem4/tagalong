@@ -10,8 +10,14 @@ export const expertName = (id: string | undefined): string => {
     : id.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
+/** A brain's name opening a sentence: only the unnamed fallback needs a capital. */
+export const brainFirst = (name: string): string => (name === 'your brain' ? 'Your brain' : name);
+
+export const brainLabel = (item: NeedsYouItem): string =>
+  item.identity === undefined ? item.brain : `${item.brain} (${item.identity})`;
+
 const askedBy = (item: NeedsYouItem): string =>
-  `Asked by ${item.brain}${item.path === null ? '' : ` · ${item.path}`}`;
+  `Asked by ${brainLabel(item)}${item.path === null ? '' : ` · ${item.path}`}`;
 
 interface NeedWords {
   /** The row's title in Home. */

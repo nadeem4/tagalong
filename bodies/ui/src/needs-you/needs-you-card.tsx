@@ -6,9 +6,8 @@
  */
 import { useEffect, useState } from 'react';
 import type { NeedsYouItem } from '../shapes';
-import { cap } from '../text';
 import { useNeedsActions, useNeedsYou } from './use-needs-you';
-import { PUT_OFF, WORDS, expertName } from './words';
+import { PUT_OFF, WORDS, brainFirst, brainLabel, expertName } from './words';
 
 const HOLD_MS = 7_000;
 
@@ -48,12 +47,13 @@ function Facts({ item }: { item: NeedsYouItem }) {
       </div>
       <div>
         <dt>Asked by</dt>
-        <dd>{item.brain}</dd>
+        <dd>{brainLabel(item)}</dd>
       </div>
       <div>
         <dt>If you allow</dt>
         <dd>
-          {cap(item.brain)} may run it whenever Scout needs it. You can take that back in Devices.
+          {brainFirst(item.brain)} may run it whenever Scout needs it. You can take that back in
+          Devices.
         </dd>
       </div>
     </dl>
@@ -84,7 +84,7 @@ export function NeedsYouCard({
         </p>
       )}
       <p className="card-brief">
-        Only you can say yes, here on this PC. {cap(item.brain)} cannot do it for you.
+        Only you can say yes, here on this PC. {brainFirst(item.brain)} cannot do it for you.
       </p>
       <div className="card-actions">
         <button type="button" className="bubble-quiet" disabled={working} onClick={onNotNow}>

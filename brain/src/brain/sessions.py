@@ -253,6 +253,8 @@ class Session:
         outputs.prune(outputs_keep)
         notify = bodies.notify
         # main passes the installed experts and the quiet threshold; the defaults keep tests short.
+        # Only tests take this default: it has no bodies, so every job stays on the brain and
+        # nothing ever asks. main passes the hosts, built with the NodeNeeds that bodies answer to.
         make_run = make_run or ExpertHosts(needs=NodeNeeds(bodies))
         # Built first: the questions and the timers emit through it. It only calls back into the
         # session once an event arrives, by which time the rest of __init__ has run.

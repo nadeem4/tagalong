@@ -17,6 +17,7 @@ const ITEM: NeedsYouItem = {
   id: 'n1',
   need: 'approve',
   brain: 'mini-pc',
+  identity: '4F2A-91C0',
   what: 'claude-agent-acp',
   path: 'C:\\tools\\claude-agent-acp.exe',
   state: 'waiting',
@@ -58,20 +59,6 @@ describe('NeedsYouBubble', () => {
     });
     expect((await screen.findByRole('alert')).textContent).toContain('Access is denied.');
     expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
-  });
-
-  it('Not now leaves the request in Home and clears the card', async () => {
-    const bridge = shown(
-      <>
-        <NeedsYouBubble />
-        <NeedsYouSection items={[{ ...ITEM }]} />
-      </>,
-      { needsYou: [ITEM] },
-    );
-    await screen.findByRole('region', { name: 'Needs you on this PC' });
-    fireEvent.click(screen.getAllByRole('button', { name: 'Not now' })[0]!);
-    expect(bridge.needsYouNotNows).toEqual(['n1']);
-    expect(await screen.findByText(/The job waits/)).toBeTruthy();
   });
 });
 

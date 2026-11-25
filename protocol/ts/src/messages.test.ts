@@ -382,4 +382,11 @@ describe('node_needs frames', () => {
     expect(NodeNeedsParams.safeParse({ ...open, need: 'reboot' }).success).toBe(false);
     expect(NodeAnsweredParams.safeParse({ id: 'n1', outcome: 'allow_always' }).success).toBe(false);
   });
+  it('refuses an install or sign-in that names no expert', () => {
+    const { expert: _expert, ...bare } = sample('brain.node_needs.params.install.json') as {
+      expert: string;
+    };
+    expect(NodeNeedsParams.safeParse(bare).success).toBe(false);
+    expect(NodeNeedsParams.safeParse({ ...bare, need: 'signin' }).success).toBe(false);
+  });
 });

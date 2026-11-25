@@ -27,7 +27,7 @@ class NotInstalled(Exception):
     pass
 
 
-def _resolve(command: str) -> Path | None:
+def resolve(command: str) -> Path | None:
     found = shutil.which(command)
     return Path(found).resolve() if found else None
 
@@ -72,7 +72,7 @@ class Allowlist:
             entry: dict = {"url": spec.url}
         else:
             command = spec.command or ""
-            exe = _resolve(command)
+            exe = resolve(command)
             digest = _sha256(exe) if exe else None
             if exe is None or digest is None:
                 raise NotRunnable(f"{command} is not a program on this machine.")

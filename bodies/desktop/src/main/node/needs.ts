@@ -2,30 +2,36 @@
  * What a remote brain waits on from this PC: approve a program, install an expert, sign one in.
  * The brain only asks; the person's yes runs this PC's own `tagalong` command here, and only then
  * is the brain told to try again. Every fact the card shows (who asks, where the program is) is
- * read here, never taken from the brain's frame. Also lists and revokes what is approved here.
+ * read here, never taken from the brain's frame; the path comes from the same `tagalong` that
+ * `allow` will use, so the card names the program that gets approved. Also lists and revokes
+ * what is approved here.
  */
 import { NodeNeedsParams, type NodeNeedsOpen } from '@tagalong/contract';
 import type { ApprovedItem, NeedsYouItem } from '@tagalong/ui/shapes';
-import { existsSync } from 'node:fs';
-import { delimiter, join } from 'node:path';
 import { z } from 'zod';
 import { lastLine } from '../last-line';
 
 interface Open {
   frame: NodeNeedsOpen;
+  path: string | null;
+  brain: BrainFacts;
   state: NeedsYouItem['state'];
   bubble: boolean;
   failure?: string;
+}
+
+export interface BrainFacts {
+  name: string;
+  /** The paired brain's certificate as a short code, to tell two brains of one name apart. */
+  identity?: string | undefined;
 }
 
 export interface NeedsYouDeps {
   /** Runs `tagalong <args>` on this PC. */
   run: (args: string[]) => Promise<{ code: number; out: string }>;
   answer: (id: string, outcome: 'done' | 'not_now') => Promise<void>;
-  /** The full path of a program on this PC's PATH, or null. */
-  resolve: (command: string) => string | null;
-  /** The paired brain's name. */
-  brain: () => string;
+  /** The paired brain's name and identity. */
+  brain: () => Promise<BrainFacts>;
   push: (items: NeedsYouItem[]) => void;
 }
 
@@ -40,19 +46,6 @@ const Listed = z.array(
   }),
 );
 
-/** Where `command` is on this PC's PATH, the way a shell would find it, or null. */
-export function onPath(command: string, env: NodeJS.ProcessEnv): string | null {
-  const dirs = (env.PATH ?? env.Path ?? '').split(delimiter).filter(Boolean);
-  const exts = ['', ...(env.PATHEXT ?? '.EXE;.CMD;.BAT').split(';')];
-  for (const dir of dirs) {
-    for (const ext of exts) {
-      const full = join(dir, command + ext);
-      if (existsSync(full)) return full;
-    }
-  }
-  return null;
-}
-
 const words = (spec: {
   command?: string | undefined;
   args?: string[] | undefined;
@@ -61,18 +54,15 @@ const words = (spec: {
 
 export function createNeedsYou(deps: NeedsYouDeps) {
   const open = new Map<string, Open>();
-  const found = new Map<string, string | null>();
-  const where = (command: string): string | null => {
-    if (!found.has(command)) found.set(command, deps.resolve(command));
-    return found.get(command) ?? null;
-  };
+  const arriving = new Set<string>();
   const list = (): NeedsYouItem[] =>
-    [...open.values()].map(({ frame, state, bubble, failure }) => ({
+    [...open.values()].map(({ frame, path, brain, state, bubble, failure }) => ({
       id: frame.id,
       need: frame.need,
-      brain: deps.brain(),
+      brain: brain.name,
+      identity: brain.identity,
       what: words(frame.spec),
-      path: frame.spec.command === undefined ? null : where(frame.spec.command),
+      path,
       expert: frame.expert,
       state,
       failure,
@@ -80,27 +70,43 @@ export function createNeedsYou(deps: NeedsYouDeps) {
     }));
   const changed = (): void => deps.push(list());
 
-  const command = ({ frame }: Open): string[] => {
-    if (frame.need === 'install') return ['install', frame.expert ?? ''];
-    if (frame.need === 'signin') return ['login', frame.expert ?? ''];
+  const whichPath = async (command: string | undefined): Promise<string | null> => {
+    if (command === undefined) return null;
+    const done = await deps.run(['node', 'which', command]);
+    return done.code === 0 ? lastLine(done.out) : null;
+  };
+
+  /** What to run for a request, or null when the brain asked for something this PC will not run. */
+  const command = ({ frame }: Open): string[] | null => {
+    if (frame.need !== 'approve') {
+      if (frame.expert.startsWith('-')) return null;
+      return [frame.need === 'install' ? 'install' : 'login', frame.expert];
+    }
     const { command: program = '', args = [], url } = frame.spec;
     if (url !== undefined) return ['node', 'allow', '--url', url];
+    if (program.startsWith('-')) return null;
     return ['node', 'allow', program, ...(args.length > 0 ? ['--', ...args] : [])];
   };
 
   return {
     list,
 
-    frame(raw: unknown): void {
+    /** Resolves true when the request is now open here, so the caller can bring the card up. */
+    async frame(raw: unknown): Promise<boolean> {
       const parsed = NodeNeedsParams.safeParse(raw);
-      if (!parsed.success) return;
+      if (!parsed.success) return false;
       const frame = parsed.data;
       if (frame.state === 'closed') {
+        arriving.delete(frame.id);
         if (open.delete(frame.id)) changed();
-        return;
+        return false;
       }
-      open.set(frame.id, { frame, state: 'waiting', bubble: true });
+      arriving.add(frame.id);
+      const [path, brain] = await Promise.all([whichPath(frame.spec.command), deps.brain()]);
+      if (!arriving.delete(frame.id)) return false;
+      open.set(frame.id, { frame, path, brain, state: 'waiting', bubble: true });
       changed();
+      return true;
     },
 
     async act(id: string): Promise<{ error?: string }> {
@@ -109,7 +115,9 @@ export function createNeedsYou(deps: NeedsYouDeps) {
       need.state = 'working';
       delete need.failure;
       changed();
-      const done = await deps.run(command(need));
+      const args = command(need);
+      const done =
+        args === null ? { code: 1, out: 'This PC will not run that.' } : await deps.run(args);
       if (done.code !== 0) {
         need.state = 'failed';
         need.failure = lastLine(done.out) || 'It did not finish.';
@@ -117,7 +125,6 @@ export function createNeedsYou(deps: NeedsYouDeps) {
         return { error: need.failure };
       }
       open.delete(id);
-      found.clear();
       changed();
       await deps.answer(id, 'done');
       return {};

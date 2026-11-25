@@ -420,15 +420,18 @@ export type FolderCheckResult = z.infer<typeof FolderCheckResult>;
 
 // A node cannot approve, install or sign in for itself: the brain tells the desktop beside it what
 // it is waiting for and the person answers on that PC. `node` is the node's body id.
-export const NodeNeedsOpen = z.object({
+const nodeNeedsOpen = {
   seq: z.number().int().min(1),
   id: Id,
   state: z.literal('open'),
   node: Id,
-  need: z.enum(['approve', 'install', 'signin']),
   spec: PipeSpec,
-  expert: Id.optional(),
-});
+};
+// Installing or signing in is for a named expert; approving a program names none.
+export const NodeNeedsOpen = z.union([
+  z.object({ ...nodeNeedsOpen, need: z.literal('approve'), expert: Id.optional() }),
+  z.object({ ...nodeNeedsOpen, need: z.enum(['install', 'signin']), expert: Id }),
+]);
 export type NodeNeedsOpen = z.infer<typeof NodeNeedsOpen>;
 
 export const NodeNeedsClosed = z.object({

@@ -2,12 +2,9 @@
  * Tests for the requests a remote brain leaves on this PC: what the card shows, what a click runs,
  * what "not now" keeps, and the approved list.
  */
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { NeedsYouItem } from '@tagalong/ui/shapes';
-import { createNeedsYou, onPath } from './needs';
+import { createNeedsYou } from './needs';
 
 const open = (over: object = {}) => ({
   seq: 1,
@@ -31,22 +28,25 @@ function rig(
   const pushed: NeedsYouItem[][] = [];
   const needs = createNeedsYou({
     run: async (args) => {
+      if (args[1] === 'which') {
+        return args[2] === 'claude-agent-acp'
+          ? { code: 0, out: 'C:\\tools\\claude-agent-acp.cmd\n' }
+          : { code: 1, out: 'not a program' };
+      }
       calls.push(args);
       return run(args);
     },
     answer: async (id, outcome) => void answers.push([id, outcome]),
-    resolve: (command) =>
-      command === 'claude-agent-acp' ? 'C:\\tools\\claude-agent-acp.cmd' : null,
-    brain: () => 'mini-pc',
+    brain: async () => ({ name: 'mini-pc', identity: '4F2A-91C0' }),
     push: (items) => void pushed.push(items),
   });
   return { needs, calls, answers, pushed };
 }
 
 describe('needs you on this PC', () => {
-  it('shows what this PC resolves and who is asking, not text from the frame', () => {
+  it('shows what this PC resolves and who is asking, not text from the frame', async () => {
     const { needs, pushed } = rig();
-    needs.frame(
+    await needs.frame(
       open({ spec: { command: 'claude-agent-acp', args: [] }, brain: 'evil', path: 'C:\\x' }),
     );
     expect(needs.list()).toEqual([
@@ -54,6 +54,7 @@ describe('needs you on this PC', () => {
         id: 'n1',
         need: 'approve',
         brain: 'mini-pc',
+        identity: '4F2A-91C0',
         what: 'claude-agent-acp',
         path: 'C:\\tools\\claude-agent-acp.cmd',
         state: 'waiting',
@@ -65,7 +66,7 @@ describe('needs you on this PC', () => {
 
   it('allow runs the allow command with the exact program and arguments, then tells the brain', async () => {
     const { needs, calls, answers } = rig();
-    needs.frame(open({ spec: { command: 'claude-agent-acp', args: ['--stdio', 'a b'] } }));
+    await needs.frame(open({ spec: { command: 'claude-agent-acp', args: ['--stdio', 'a b'] } }));
     expect(await needs.act('n1')).toEqual({});
     expect(calls).toEqual([['node', 'allow', 'claude-agent-acp', '--', '--stdio', 'a b']]);
     expect(answers).toEqual([['n1', 'done']]);
@@ -74,15 +75,15 @@ describe('needs you on this PC', () => {
 
   it('allow of an address uses --url', async () => {
     const { needs, calls } = rig();
-    needs.frame(open({ spec: { url: 'https://mcp.example/x' } }));
+    await needs.frame(open({ spec: { url: 'https://mcp.example/x' } }));
     await needs.act('n1');
     expect(calls).toEqual([['node', 'allow', '--url', 'https://mcp.example/x']]);
   });
 
   it('install and sign-in run the expert commands', async () => {
     const { needs, calls } = rig();
-    needs.frame(open({ id: 'i', need: 'install' }));
-    needs.frame(open({ id: 's', need: 'signin' }));
+    await needs.frame(open({ id: 'i', need: 'install' }));
+    await needs.frame(open({ id: 's', need: 'signin' }));
     await needs.act('i');
     await needs.act('s');
     expect(calls).toEqual([
@@ -93,7 +94,7 @@ describe('needs you on this PC', () => {
 
   it('a failed command keeps the request, with the last line of why, and tells the brain nothing', async () => {
     const { needs, answers } = rig(async () => ({ code: 1, out: 'starting\nno network' }));
-    needs.frame(open());
+    await needs.frame(open());
     expect(await needs.act('n1')).toEqual({ error: 'no network' });
     expect(answers).toEqual([]);
     expect(needs.list()[0]).toMatchObject({ state: 'failed', failure: 'no network' });
@@ -101,17 +102,27 @@ describe('needs you on this PC', () => {
 
   it('not now closes the bubble, keeps the request in Home and tells the brain', async () => {
     const { needs, answers } = rig();
-    needs.frame(open());
+    await needs.frame(open());
     await needs.notNow('n1');
     expect(answers).toEqual([['n1', 'not_now']]);
     expect(needs.list()[0]).toMatchObject({ bubble: false, state: 'waiting' });
   });
 
-  it('a closed frame removes the request', () => {
+  it('a closed frame removes the request', async () => {
     const { needs } = rig();
-    needs.frame(open());
-    needs.frame({ seq: 2, id: 'n1', state: 'closed', reason: 'timeout' });
+    await needs.frame(open());
+    await needs.frame({ seq: 2, id: 'n1', state: 'closed', reason: 'timeout' });
     expect(needs.list()).toEqual([]);
+  });
+
+  it('refuses to run a request whose program or expert looks like an option', async () => {
+    const { needs, calls, answers } = rig();
+    await needs.frame(open({ spec: { command: '--version' } }));
+    await needs.frame(open({ id: 'i', need: 'install', expert: '-y' }));
+    expect(await needs.act('n1')).toEqual({ error: 'This PC will not run that.' });
+    expect(await needs.act('i')).toEqual({ error: 'This PC will not run that.' });
+    expect(calls).toEqual([]);
+    expect(answers).toEqual([]);
   });
 
   it('lists what is approved here, and revokes one by its key', async () => {
@@ -138,16 +149,5 @@ describe('needs you on this PC', () => {
     ]);
     await needs.revoke('k1');
     expect(calls.at(-1)).toEqual(['node', 'revoke', 'k1']);
-  });
-});
-
-describe('onPath', () => {
-  it('finds a program the way the shell would, trying the PATHEXT endings', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'needs-'));
-    writeFileSync(join(dir, 'claude-agent-acp.cmd'), '');
-    expect(onPath('claude-agent-acp', { PATH: dir, PATHEXT: '.exe;.cmd' })).toBe(
-      join(dir, 'claude-agent-acp.cmd'),
-    );
-    expect(onPath('nothing-here', { PATH: dir, PATHEXT: '.exe;.cmd' })).toBeNull();
   });
 });

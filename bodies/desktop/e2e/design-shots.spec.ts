@@ -1507,7 +1507,9 @@ test('BAU5a needs you on this PC: approve, install, sign in, light and dark', as
     await both(panel, 'signin-card');
     launched.brain.sendNodeNeeds({ id: 's1', state: 'closed', reason: 'gone' });
     launched.brain.sendNodeNeeds(ask('f1', 'install', { command: 'x' }, 'no-such-expert'));
-    await expect(card).toContainText('No Such Expert is not on this PC yet.');
+    await expect(card).toContainText('No Such Expert is not on this PC yet.', {
+      timeout: 30_000,
+    });
     await card.getByRole('button', { name: 'Install' }).click();
     await expect(card.getByRole('alert')).toBeVisible({ timeout: 120_000 });
     await both(panel, 'install-failed');

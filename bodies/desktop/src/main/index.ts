@@ -123,7 +123,7 @@ import { SCOUT_ID, registerScoutIpc } from './ipc/scout';
 import { fromWindow, type IpcHandle } from './ipc/handle';
 import { registerKnowMeIpc } from './ipc/know-me';
 import { registerNeedsYouIpc } from './ipc/needs-you';
-import { createNeedsYou, onPath } from './node/needs';
+import { createNeedsYou } from './node/needs';
 import { registerAiToolIpc } from './ipc/ai-tools';
 import { registerMemoryIpc } from './ipc/memory';
 import { registerApprovalsIpc } from './ipc/approvals';
@@ -201,7 +201,6 @@ const required = (): Desktop => {
 let brainStatus: BrainStatus = 'connecting';
 /** Runs the node while this desktop is paired to a remote brain. */
 let nodeRunner: ReturnType<typeof createNodeRunner> | null = null;
-/** Sends one message to every open window. */
 const broadcast = (channel: string, payload?: unknown): void => {
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) window.webContents.send(channel, payload);
@@ -220,10 +219,11 @@ const brainRun = (): RealLaunch => ({
 const needsYou = createNeedsYou({
   run: (args) => realRunTagalong(brainRun(), args),
   answer: (id, outcome) => required().brain.nodeAnswered(id, outcome),
-  resolve: (command) => onPath(command, process.env),
-  brain: () => {
+  brain: async () => {
+    const card = await brainControl?.card();
     const paired = desktop?.link.paired();
-    return ((paired && pairedAddr(paired)) ?? 'your brain').replace(/:\d+$/, '');
+    const addr = ((paired && pairedAddr(paired)) ?? 'your brain').replace(/:\d+$/, '');
+    return { name: card?.host ?? addr, identity: card?.identity };
   },
   push: (items) => broadcast(IPC.needsYouEvent, items),
 });
@@ -437,8 +437,9 @@ async function start(): Promise<void> {
       }
       // A remote brain needs something from this PC: the card says what, and only a click runs it.
       if (method === 'node_needs') {
-        needsYou.frame(params);
-        if ((params as { state?: string }).state === 'open') bringUpBubble(false);
+        void needsYou.frame(params).then((opened) => {
+          if (opened) bringUpBubble(false);
+        });
       }
       // Heard words, the voice's status and spoken sentences: the voice bridge sends them on.
       desktop?.voiceBridge.onNotification(method, params);

@@ -132,3 +132,52 @@ async def test_the_node_ignores_frames_that_would_edit_its_list(tmp_path):
     assert rig.allowlist._entries() == before
     assert rig.replies("r1")["error"]["code"] == ErrorCode.method_not_found
     await rig.finish()
+
+
+def closed_reasons(desk: Desk) -> list[str]:
+    return [f["reason"] for f in desk.needs() if f["state"] == "closed"]
+
+
+async def test_a_node_that_goes_offline_closes_its_request(rig):
+    bodies, node, desk, _, needs = rig
+    task = asyncio.create_task(needs.open_pipe("pc", SPEC))
+    await settle()
+    needs.node_gone("pc")
+    with pytest.raises(RpcError):
+        await task
+    assert closed_reasons(desk) == ["gone"]
+
+
+async def test_an_unanswered_request_times_out_and_the_job_fails(rig):
+    bodies, node, desk, _, _ = rig
+    needs = NodeNeeds(bodies, wait_s=0.05)
+    with pytest.raises(RpcError) as err:
+        await needs.open_pipe("pc", SPEC)
+    assert err.value.code == ErrorCode.denied
+    assert closed_reasons(desk) == ["timeout"]
+
+
+async def test_the_same_ask_again_replaces_the_older_one(rig):
+    bodies, node, desk, _, needs = rig
+    first = asyncio.create_task(needs.open_pipe("pc", SPEC))
+    await settle()
+    second = asyncio.create_task(needs.open_pipe("pc", SPEC))
+    await settle()
+    assert closed_reasons(desk) == ["replaced"]
+    assert len(desk.needs()) == 3
+    first.cancel()
+    second.cancel()
+
+
+async def test_a_pipe_asks_at_most_twice_then_the_refusal_stands(rig):
+    bodies, node, desk, _, needs = rig
+    task = asyncio.create_task(needs.open_pipe("pc", SPEC))
+    for _ in range(2):
+        await settle()
+        opened = [f for f in desk.needs() if f["state"] == "open"]
+        needs.answered("desk", NodeAnsweredParams(id=opened[-1]["id"], outcome="done"))
+    with pytest.raises(RpcError) as err:
+        await asyncio.wait_for(task, 5)
+    assert err.value.code == ErrorCode.denied
+    assert len([f for f in desk.needs() if f["state"] == "open"]) == 2
+    assert node.opened == [SPEC, SPEC, SPEC]
