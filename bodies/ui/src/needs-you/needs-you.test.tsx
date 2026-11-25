@@ -1,0 +1,108 @@
+/**
+ * Tests for the remote-brain request UI: the bubble card, Home's section, the approved list on
+ * Devices and the dock tag. Run against the fake host bridge.
+ */
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
+import { HostBridgeProvider } from '../host-bridge';
+import type { NeedsYouItem } from '../shapes';
+import { createFakeHostBridge } from '../test-support/fake-host-bridge';
+import { ApprovedOnThisPc } from './approved-list';
+import { NeedsYouBubble } from './needs-you-card';
+import { NeedsYouSection } from './needs-you-section';
+
+afterEach(cleanup);
+
+const ITEM: NeedsYouItem = {
+  id: 'n1',
+  need: 'approve',
+  brain: 'mini-pc',
+  what: 'claude-agent-acp',
+  path: 'C:\\tools\\claude-agent-acp.exe',
+  state: 'waiting',
+  bubble: true,
+};
+
+function shown(ui: React.ReactNode, options: Parameters<typeof createFakeHostBridge>[0]) {
+  const bridge = createFakeHostBridge(options);
+  render(<HostBridgeProvider bridge={bridge}>{ui}</HostBridgeProvider>);
+  return bridge;
+}
+
+describe('NeedsYouBubble', () => {
+  it('shows the path this PC resolved and runs nothing until Allow is clicked', async () => {
+    const bridge = shown(<NeedsYouBubble />, { needsYou: [ITEM] });
+    expect(await screen.findByText('C:\\tools\\claude-agent-acp.exe')).toBeTruthy();
+    expect(bridge.needsYouActs).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'Allow' }));
+    expect(bridge.needsYouActs).toEqual(['n1']);
+    expect(await screen.findByText(/Allowed\. mini-pc can run claude-agent-acp/)).toBeTruthy();
+  });
+
+  it('says Install for a missing expert and Sign in for a signed-out one', async () => {
+    shown(<NeedsYouBubble />, {
+      needsYou: [{ ...ITEM, need: 'install', expert: 'claude-code', path: null }],
+    });
+    expect(await screen.findByText('Claude Code is not on this PC yet.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Install' })).toBeTruthy();
+    cleanup();
+    shown(<NeedsYouBubble />, {
+      needsYou: [{ ...ITEM, need: 'signin', expert: 'claude-code', path: null }],
+    });
+    expect(await screen.findByRole('button', { name: 'Sign in' })).toBeTruthy();
+  });
+
+  it('shows why a run failed and offers it again', async () => {
+    shown(<NeedsYouBubble />, {
+      needsYou: [{ ...ITEM, state: 'failed', failure: 'Access is denied.' }],
+    });
+    expect((await screen.findByRole('alert')).textContent).toContain('Access is denied.');
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+  });
+
+  it('Not now leaves the request in Home and clears the card', async () => {
+    const bridge = shown(
+      <>
+        <NeedsYouBubble />
+        <NeedsYouSection />
+      </>,
+      { needsYou: [ITEM] },
+    );
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Not now' }))[0]!);
+    expect(bridge.needsYouNotNows).toEqual(['n1']);
+    expect(await screen.findByText(/The job waits/)).toBeTruthy();
+  });
+});
+
+describe('NeedsYouSection', () => {
+  it('lists every waiting request with a count, and nothing when there are none', async () => {
+    shown(<NeedsYouSection />, {
+      needsYou: [ITEM, { ...ITEM, id: 'n2', bubble: false, what: 'gh' }],
+    });
+    expect(await screen.findByText('2 waiting')).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: 'Allow' })).toHaveLength(2);
+    cleanup();
+    const { container } = render(
+      <HostBridgeProvider bridge={createFakeHostBridge({ needsYou: [] })}>
+        <NeedsYouSection />
+      </HostBridgeProvider>,
+    );
+    await waitFor(() => expect(container.textContent).toBe(''));
+  });
+});
+
+describe('ApprovedOnThisPc', () => {
+  it('asks before revoking, and revokes by key', async () => {
+    const bridge = shown(<ApprovedOnThisPc />, {
+      approved: [{ key: 'abc123', what: 'claude-agent-acp', path: 'C:\\tools\\a.exe' }],
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Revoke' }));
+    expect(bridge.approved).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Keep it' }));
+    expect(bridge.approved).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke' }));
+    await waitFor(() => expect(bridge.approved).toHaveLength(0));
+    expect(await screen.findByText(/Nothing is approved yet/)).toBeTruthy();
+  });
+});

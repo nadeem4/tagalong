@@ -44,6 +44,7 @@ from brain.protocol import (
     KnowMeStartResult,
     ListenParams,
     MicParams,
+    NodeAnsweredParams,
     PairParams,
     PairResult,
     RpcError,
@@ -544,6 +545,14 @@ def _dispatch(
             return _error(req_id, ErrorCode.invalid_params, str(exc))
         except RpcError as exc:
             return _error(req_id, exc.code, str(exc))
+        return _result(req_id, {})
+    if method == "node_answered":
+        try:
+            answered = NodeAnsweredParams.model_validate(message.get("params"))
+        except ValidationError as exc:
+            return _error(req_id, ErrorCode.invalid_params, str(exc))
+        if bodies.on_node_answered is not None and bodies.is_current(body_id, peer):
+            bodies.on_node_answered(body_id, answered.model_dump())
         return _result(req_id, {})
     if method == "cancel":
         try:

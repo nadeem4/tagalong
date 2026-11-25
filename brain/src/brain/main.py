@@ -49,6 +49,7 @@ from brain.memory_mcp import memory_client_tools
 from brain.mind.turn import AnthropicModel
 from brain.models import chosen as chosen_model
 from brain.models import model_name
+from brain.node_needs import NodeNeeds
 from brain.offers import OfferSettings
 from brain.open_items import OpenItems
 from brain.pairing import LOOPBACK_KINDS, NETWORK_KINDS, build_pairing
@@ -153,6 +154,7 @@ async def _run() -> None:
     why_pick = WhyPick(reader_model, reader_budget, config.data_dir)
     experts = ExpertStore(config.data_dir)
     tokens = TokenFile(config.data_dir)
+    needs = NodeNeeds(bodies)
     apps = Apps(
         memory,
         bodies.notify,
@@ -161,6 +163,7 @@ async def _run() -> None:
         data_dir=config.data_dir,
         placements=Placements(memory.db),
         bodies=bodies,
+        needs=needs,
     )
     local_token = load_or_create_local_token(config.data_dir)
     identity = load_or_create_identity(config.data_dir)
@@ -301,6 +304,7 @@ async def _run() -> None:
             quiet_s=config.job_quiet_min * 60,
             placements=Placements(memory.db),
             bodies=bodies,
+            needs=needs,
         ),
         experts=lambda: all_experts(experts, config.expert_cmd),
         apps=apps,

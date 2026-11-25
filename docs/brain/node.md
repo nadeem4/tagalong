@@ -27,7 +27,13 @@ flowchart LR
 
 The allow-list is the security boundary. It lives in `<TAGALONG_HOME>/node/allowlist.json` on the node's machine and holds entries of `command`, `args`, the resolved file `path` and the file's `sha256`, or of an exact `url` (an HTTP MCP server). A `pipe_open` for a URL runs only when an entry has that same address character for character; no command runs for it. A `pipe_open` runs only when an entry matches the spec exactly (same command, same args in the same order), the command resolves to the same file, and that file still hashes to the recorded value. Anything else gets `denied` and nothing starts, even from a genuine brain with a valid token. A file that was updated or swapped no longer matches until the person approves it again. A damaged list file permits nothing. The node starts the command as found on the path, not the file a link points to, so a venv's `python` link still finds its venv; the hash is checked on the target.
 
-Only the person on the node's machine adds an entry: `tagalong node allow <command> [-- args...]` there records the current hash, and `tagalong node allow --url <address>` approves one exact address. The brain has no message that adds or changes an entry. The list is per machine and not synced.
+Only the person on the node's machine adds an entry, in one of two ways. From a terminal there: `tagalong node allow <command> [-- args...]` records the current hash, and `tagalong node allow --url <address>` approves one exact address. Or from the desktop: when a pipe is `denied`, the brain sends `node_needs` (`need: approve`) to the desktop that runs the node, which shows a card ("Needs you here") with the program as this PC resolves it and, on **Allow**, runs that same `tagalong node allow` command itself. The brain has no message that adds or changes an entry; it only asks, and a click on this PC does the writing. If nobody answers in 10 minutes, or the node goes offline, the request closes and the job keeps the old line (`X is not approved on <name>. On that machine run: tagalong node allow ...`). The list is per machine and not synced.
+
+Each entry records when it was allowed (`at`). `tagalong node list` prints the entries as JSON (command, args or url, resolved path, `at`, a `key`; never a secret) and `tagalong node revoke <key>` removes one (exit 1 for an unknown key). Home > Devices shows them as **Approved on this PC** with a Revoke per line when the brain is not on this PC.
+
+## Asking the person (`node_needs`)
+
+`NodeNeeds` (`brain/node_needs.py`) wraps `Bodies.open_pipe` for experts and apps. A `denied` asks `approve`; a `tool_failed` `NOT_INSTALLED` (the node found no such program) with an expert id asks `install`; an ACP sign-in failure (-32000) on a node host asks `signin`. After the desktop answers `done` the pipe is tried again, at most twice per pipe, then the original error stands. `not_now` fails the job now and leaves the request open so Home still lists it. A new ask with the same node, need and spec closes the older one as `replaced`. The desktop side is `bodies/desktop/src/main/node/needs.ts`; install runs `tagalong install <expert>`, sign-in `tagalong login <expert>`. See [protocol](../../protocol/README.md).
 
 A hash covers the file the command resolves to, not what that file goes on to load: approving `npx` approves `npx` running anything. Approve the program that is the tool.
 
@@ -58,6 +64,7 @@ The relay (`node/relay.py`) sends the bearer, or uses the stored OAuth tokens (r
 - `tagalong node allow <command> [-- args...]`: approve a command on this machine; `--secret-env NAME` (repeatable) types a secret for it here.
 - `tagalong node allow --url <address> [--url-secret]`: approve an HTTP MCP server's exact address, with an optional secret query typed here. An address that already carries a secret (a `key=` style query or `user:pass@`) is refused: give the secret with `--url-secret`.
 - `tagalong node allow --url <address> --bearer`: as above, with a bearer token typed here.
+- `tagalong node list` and `tagalong node revoke <key>`: show and remove what is approved on this machine.
 - `tagalong node signin <address>`: sign in to an OAuth app on this machine ([Signing in on the node](#signing-in-on-the-node)).
 - `tagalong node run`: connect and serve; needs the four `TAGALONG_NODE_*` variables (the desktop sets them).
 
@@ -67,6 +74,6 @@ The relay (`node/relay.py`) sends the bearer, or uses the stored OAuth tokens (r
 
 - Other AI tools on the person's PC reach a remote brain's memory without a node: `tagalong memory-mcp` (BA11) dials the brain itself over the same pinned `wss` link a body uses, as an `mcp_client` (see [Memory for other AI tools](../data/memory.md#memory-for-other-ai-tools)).
 - An app that stays on a remote brain cannot sign in from the person's PC: the node would have to forward the OAuth code to the brain, which needs a new contract frame and has no design yet. Sign in on the machine the brain runs on, or place the app on the node.
-- The brain does not install an expert on a node: it runs the expert's installed command there once the person has approved it. Both the toolbox's use (an app's stdio MCP server, [Where an app runs](../bodies/connected-apps.md#where-an-app-runs)) and the expert host's use ([Where an expert runs](experts.md#where-an-expert-runs)) go over a pipe.
+- The brain does not install an expert on a node by itself: the person's click on the install card runs `tagalong install` on that machine. The card shows no folder, because an allow-list entry is per program, not per folder. Both the toolbox's use (an app's stdio MCP server, [Where an app runs](../bodies/connected-apps.md#where-an-app-runs)) and the expert host's use ([Where an expert runs](experts.md#where-an-expert-runs)) go over a pipe.
 
 The node reuses the desktop's device token under body id `node-xxxxxx`, so it cannot be revoked apart from the desktop and its device kind is `desktop`.

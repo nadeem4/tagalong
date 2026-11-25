@@ -10,6 +10,7 @@ from the command line.
 import argparse
 import asyncio
 import getpass
+import json
 import os
 import re
 import sys
@@ -131,6 +132,9 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="a bearer token for the URL, typed here and kept on this machine",
     )
+    node.add_parser("list", help="what the brain may run here, as JSON, without secrets")
+    revoke = node.add_parser("revoke", help="stop letting the brain run one listed command")
+    revoke.add_argument("key", help="its key from `node list`")
     signin = node.add_parser(
         "signin", help="sign in to an OAuth app here, on the machine running it"
     )
@@ -370,6 +374,14 @@ async def _node(args, home: Path, env, run_node, node_signin, secret, out) -> No
     allowlist = Allowlist(home / "node" / "allowlist.json")
     if args.sub == "allow":
         _node_allow(args, allowlist, secret, out)
+        return
+    if args.sub == "list":
+        out(json.dumps(allowlist.listing()))
+        return
+    if args.sub == "revoke":
+        if not allowlist.revoke(args.key):
+            raise _Fail("Nothing on this machine's list has that key.")
+        out("Revoked. The brain can no longer run it here.")
         return
     if args.sub == "signin":
         await _node_signin(args.url, home / "node", allowlist, node_signin, out)

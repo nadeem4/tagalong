@@ -122,6 +122,8 @@ import { forwardConnectionsChanged, registerConnectionIpc } from './ipc/connecti
 import { SCOUT_ID, registerScoutIpc } from './ipc/scout';
 import { fromWindow, type IpcHandle } from './ipc/handle';
 import { registerKnowMeIpc } from './ipc/know-me';
+import { registerNeedsYouIpc } from './ipc/needs-you';
+import { createNeedsYou, onPath } from './node/needs';
 import { registerAiToolIpc } from './ipc/ai-tools';
 import { registerMemoryIpc } from './ipc/memory';
 import { registerApprovalsIpc } from './ipc/approvals';
@@ -203,6 +205,21 @@ const brainRun = (): RealLaunch => ({
   packaged: app.isPackaged ? { uv: join(process.resourcesPath, 'uv', 'uv.exe') } : undefined,
   appVersion: app.getVersion(),
   remote: () => desktop?.link.paired() != null,
+});
+/** What a remote brain waits on from this PC; its cards and Home's list come from here. */
+const needsYou = createNeedsYou({
+  run: (args) => realRunTagalong(brainRun(), args),
+  answer: (id, outcome) => desktop?.brain.nodeAnswered(id, outcome) ?? Promise.resolve(),
+  resolve: (command) => onPath(command, process.env),
+  brain: () => {
+    const paired = desktop?.link.paired();
+    return (paired?.lastGood ?? paired?.addrs[0] ?? 'your brain').replace(/:\d+$/, '');
+  },
+  push: (items) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send(IPC.needsYouEvent, items);
+    }
+  },
 });
 /** The status marks, set before the first launch; the launch can report before that. */
 let startingMarks: StatusMarks | null = null;
@@ -417,6 +434,11 @@ async function start(): Promise<void> {
             window.webContents.send(IPC.approvedEvent, { ...(params as object), cameUp });
           }
         }
+      }
+      // A remote brain needs something from this PC: the card says what, and only a click runs it.
+      if (method === 'node_needs') {
+        needsYou.frame(params);
+        if ((params as { state?: string }).state === 'open') bringUpBubble(false);
       }
       // Heard words, the voice's status and spoken sentences: the voice bridge sends them on.
       desktop?.voiceBridge.onNotification(method, params);
@@ -1124,6 +1146,7 @@ function registerIpc(thisPcNode: string): void {
       }
     },
   });
+  registerNeedsYouIpc(handle, { needs: needsYou });
   registerPermissionsIpc(handle, { brain: required().brain });
   registerLoopsIpc(handle, { brain: required().brain });
   registerTimersIpc(handle, { brain: required().brain });

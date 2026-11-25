@@ -32,6 +32,7 @@ import { wantsHealthCheck } from './health-ask';
 import { healthHeadline, healthRows } from './health';
 import type { HealthRow } from './health';
 import { HealthCard } from './health-card';
+import { NeedsYouBubble } from './needs-you/needs-you-card';
 import { themeTokens as t, typeCss } from './theme/tokens';
 import { stopStatus } from './stop-status';
 
@@ -850,6 +851,7 @@ export function CompanionBubble({
       {installs.length > 0 &&
         !installsInReply &&
         (expanded ? <ScoutReply>{installCards}</ScoutReply> : installCards)}
+      <NeedsYouBubble />
       {confirm !== null && (
         <ConnectorConfirmCard
           key={confirm.approvalId}

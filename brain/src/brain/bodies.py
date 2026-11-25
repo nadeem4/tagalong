@@ -25,6 +25,7 @@ from typing import Any, Protocol
 from brain.auth import Principal
 from brain.pipes import Pipe
 from brain.protocol import (
+    BODY_DESKTOP,
     BODY_WHATSAPP,
     LIMITS,
     Body,
@@ -167,6 +168,10 @@ class Bodies:
         # Session sets this: (body id, seconds it was away, None if unknown) so a wake that
         # waited for a body can start and a long absence can be noticed.
         self.on_connect: Callable[[str, float | None], None] | None = None
+        # Session sets this: a body that was current has gone, so what waited on it can end.
+        self.on_gone: Callable[[str], None] | None = None
+        # A desktop's answer to a node_needs request: (body id, raw params).
+        self.on_node_answered: Callable[[str, Any], None] | None = None
 
     def name(self, body_id: str) -> str:
         """The name a body declared, even after it left; its id if it never connected."""
@@ -225,6 +230,8 @@ class Bodies:
             del self._online[body_id]
             self._offline_at[body_id] = self._clock()
             self._end_pipes(body_id)
+            if self.on_gone is not None:
+                self.on_gone(body_id)
         self._fail_pending(peer)
         return was_current
 
@@ -245,6 +252,21 @@ class Bodies:
     def device_id(self, body_id: str) -> str | None:
         online = self._online.get(body_id)
         return online.device_id if online else None
+
+    def beside(self, node_id: str) -> str | None:
+        """The online desktop paired with the same device as this node: the one screen that may
+        answer for it, since the node runs on that desktop's token."""
+        node = self._online.get(node_id)
+        if node is None or node.device_id is None:
+            return None
+        return next(
+            (
+                body_id
+                for body_id, other in self._online.items()
+                if other.device_id == node.device_id and other.body.kind == BODY_DESKTOP
+            ),
+            None,
+        )
 
     def online(self) -> list[Body]:
         return [o.body for o in self._online.values()]

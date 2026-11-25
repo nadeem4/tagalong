@@ -25,6 +25,9 @@ import { SpendCard } from './spend-card';
 import { BrainCard } from './brain-card';
 import { UpdateBanner } from './update-banner';
 import { LINK, WhereThingsRun } from './where-things-run';
+import { NeedsYouSection } from '../needs-you/needs-you-section';
+import { NEEDS_CSS } from '../needs-you/needs-you-styles';
+import { useNeedsYou } from '../needs-you/use-needs-you';
 
 export type HomePage =
   'overview' | 'tasks' | 'connections' | 'devices' | 'approvals' | 'memory' | 'settings';
@@ -67,6 +70,7 @@ export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps)
   const [page, setPage] = useState<HomePage>(asked ?? 'overview');
   const [pets, setPets] = useState<Pet[]>([]);
   const [reach, setReach] = useState(false);
+  const waiting = useNeedsYou().length;
 
   const [lastAsked, setLastAsked] = useState(asked);
   if (asked !== lastAsked) {
@@ -92,6 +96,7 @@ export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps)
       <style>{SETTINGS_CSS}</style>
       <style>{HOME_CSS}</style>
       <style>{CONNECTIONS_CSS}</style>
+      <style>{NEEDS_CSS}</style>
       <nav aria-label="Tagalong" className="home-nav on-navy">
         <div className="home-nav__who">
           <span className="home-nav__tile">
@@ -111,6 +116,11 @@ export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps)
             onClick={() => go(item.id)}
           >
             {item.label(name)}
+            {item.id === 'overview' && waiting > 0 && (
+              <span className="home-nav__badge" aria-label={`${waiting} waiting`}>
+                {waiting}
+              </span>
+            )}
             {(item.id === 'tasks' || item.id === 'devices') && (
               <span className="home-nav__badge" aria-hidden="true">
                 New
@@ -205,6 +215,7 @@ function Overview({
         <h1 className="home-title">Overview</h1>
         <p>Everything {name} is doing for you.</p>
       </div>
+      <NeedsYouSection />
       <div className="tg-cards">
         <section className="tg-card" aria-label={name}>
           <h2 className="tg-card__label">{name}</h2>

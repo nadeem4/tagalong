@@ -418,6 +418,33 @@ export type FolderCheckParams = z.infer<typeof FolderCheckParams>;
 export const FolderCheckResult = z.object({ exists: z.boolean() });
 export type FolderCheckResult = z.infer<typeof FolderCheckResult>;
 
+// A node cannot approve, install or sign in for itself: the brain tells the desktop beside it what
+// it is waiting for and the person answers on that PC. `node` is the node's body id.
+export const NodeNeedsOpen = z.object({
+  seq: z.number().int().min(1),
+  id: Id,
+  state: z.literal('open'),
+  node: Id,
+  need: z.enum(['approve', 'install', 'signin']),
+  spec: PipeSpec,
+  expert: Id.optional(),
+});
+export type NodeNeedsOpen = z.infer<typeof NodeNeedsOpen>;
+
+export const NodeNeedsClosed = z.object({
+  seq: z.number().int().min(1),
+  id: Id,
+  state: z.literal('closed'),
+  reason: z.enum(['answered', 'timeout', 'gone', 'replaced']),
+});
+export type NodeNeedsClosed = z.infer<typeof NodeNeedsClosed>;
+
+export const NodeNeedsParams = z.union([NodeNeedsOpen, NodeNeedsClosed]);
+export type NodeNeedsParams = z.infer<typeof NodeNeedsParams>;
+
+export const NodeAnsweredParams = z.object({ id: Id, outcome: z.enum(['done', 'not_now']) });
+export type NodeAnsweredParams = z.infer<typeof NodeAnsweredParams>;
+
 export const bodyToBrain = {
   hello: { params: HelloParams, result: HelloResult },
   pair: { params: PairParams, result: PairResult },
@@ -435,6 +462,7 @@ export const bodyToBrain = {
   know_me_start: { params: KnowMeStartParams, result: KnowMeStartResult },
   pipe_data: { params: PipeDataParams },
   pipe_close: { params: PipeCloseParams },
+  node_answered: { params: NodeAnsweredParams, result: EmptyResult },
 } satisfies Record<string, MethodSchemas>;
 
 export const brainToBody = {
@@ -455,6 +483,7 @@ export const brainToBody = {
   pipe_data: { params: PipeDataParams },
   pipe_close: { params: PipeCloseParams },
   folder_check: { params: FolderCheckParams, result: FolderCheckResult },
+  node_needs: { params: NodeNeedsParams },
 } satisfies Record<string, MethodSchemas>;
 
 export type BodyToBrainMethod = keyof typeof bodyToBrain;

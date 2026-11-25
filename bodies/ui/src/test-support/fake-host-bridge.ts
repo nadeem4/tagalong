@@ -19,8 +19,10 @@ import type {
   UpdateResult,
   UpdatesState,
   Pet,
+  ApprovedItem,
   KnowMeInput,
   KnowMeStatus,
+  NeedsYouItem,
   KnowSourceInfo,
   MemoryEntry,
   ModelState,
@@ -68,6 +70,15 @@ export interface FakeHostBridge extends HostBridge {
   readonly knowStatusListeners: number;
   /** Pushes a run status to every onKnowMeStatus subscriber. */
   emitKnowStatus(status: KnowMeStatus): void;
+  /** The remote brain's open requests on this PC; a test swaps them and calls emitNeedsYou. */
+  needsYou: NeedsYouItem[];
+  emitNeedsYou(): void;
+  /** Ids passed to needsYouAct / needsYouNotNow, and keys passed to approvedRevoke, in order. */
+  readonly needsYouActs: readonly string[];
+  readonly needsYouNotNows: readonly string[];
+  readonly revoked: readonly string[];
+  /** What this PC lets the brain run; approvedRevoke edits it. */
+  approved: ApprovedItem[];
   /** Home's Permissions rows; setPermission edits them, a test may swap them. */
   permissions: PermissionRow[];
   /** Home's Permissions groups, in order; derived from the rows' `group` when a test sets none. */
@@ -277,6 +288,12 @@ export function createFakeHostBridge(
     knowSources?: KnowSourceInfo[];
     /** Makes knowMeStart reject with this sentence. */
     knowStartError?: string;
+    /** The remote brain's open requests on this PC. */
+    needsYou?: NeedsYouItem[];
+    /** Makes needsYouAct reject with this sentence. */
+    needsYouActError?: string;
+    /** What this PC lets the brain run. */
+    approved?: ApprovedItem[];
     /** Home's Permissions rows. */
     permissions?: PermissionRow[];
     /** The groups those rows sit in; one per distinct `group`, titled by it, when left out. */
@@ -321,6 +338,10 @@ export function createFakeHostBridge(
   const changedHandlers = new Set<(what: string) => void>();
   const knowHandlers = new Set<(status: KnowMeStatus) => void>();
   const knowStarts: KnowMeInput[] = [];
+  const needsYouHandlers = new Set<(items: NeedsYouItem[]) => void>();
+  const needsYouActs: string[] = [];
+  const needsYouNotNows: string[] = [];
+  const revoked: string[] = [];
   const approvedHandlers = new Set<
     (n: { tool: string; text: string; preference: string; cameUp?: boolean }) => void
   >();
@@ -488,6 +509,46 @@ export function createFakeHostBridge(
     memories: [...(options.memories ?? [])],
     portrait: options.portrait ?? null,
     knowStarts,
+    needsYou: structuredClone(options.needsYou ?? []),
+    approved: structuredClone(options.approved ?? []),
+    needsYouActs,
+    needsYouNotNows,
+    revoked,
+    emitNeedsYou() {
+      for (const handler of [...needsYouHandlers]) handler(structuredClone(fake.needsYou));
+    },
+    needsYouList() {
+      return Promise.resolve(structuredClone(fake.needsYou));
+    },
+    needsYouAct(id) {
+      needsYouActs.push(id);
+      if (options.needsYouActError !== undefined) {
+        return Promise.reject(new Error(options.needsYouActError));
+      }
+      fake.needsYou = fake.needsYou.filter((item) => item.id !== id);
+      fake.emitNeedsYou();
+      return Promise.resolve();
+    },
+    needsYouNotNow(id) {
+      needsYouNotNows.push(id);
+      for (const item of fake.needsYou) if (item.id === id) item.bubble = false;
+      fake.emitNeedsYou();
+      return Promise.resolve();
+    },
+    onNeedsYou(handler) {
+      needsYouHandlers.add(handler);
+      return () => {
+        needsYouHandlers.delete(handler);
+      };
+    },
+    approvedList() {
+      return Promise.resolve(structuredClone(fake.approved));
+    },
+    approvedRevoke(key) {
+      revoked.push(key);
+      fake.approved = fake.approved.filter((item) => item.key !== key);
+      return Promise.resolve();
+    },
     get knowStatusListeners() {
       return knowHandlers.size;
     },

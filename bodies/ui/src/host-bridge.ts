@@ -17,8 +17,10 @@ import type {
   DevicesState,
   FixTarget,
   LoopsState,
+  ApprovedItem,
   KnowMeInput,
   KnowMeStatus,
+  NeedsYouItem,
   KnowSourceInfo,
   MemoryEntry,
   ModelState,
@@ -378,6 +380,17 @@ export interface HostBridge {
   knowMeStart(input: KnowMeInput): Promise<{ joined: boolean }>;
   /** Progress of the run this window started or joined; returns the unsubscribe function. */
   onKnowMeStatus(listener: (status: KnowMeStatus) => void): () => void;
+  /** What a remote brain waits on from this PC (approve, install, sign in); empty with a local brain. */
+  needsYouList(): Promise<NeedsYouItem[]>;
+  /** Runs the person's yes on this PC; rejects with a plain sentence when it did not finish. */
+  needsYouAct(id: string): Promise<void>;
+  /** Not now: the card leaves the bubble, the request stays in Home. */
+  needsYouNotNow(id: string): Promise<void>;
+  /** The open requests whenever they change; returns the unsubscribe function. */
+  onNeedsYou(listener: (items: NeedsYouItem[]) => void): () => void;
+  /** What this PC lets the brain run, read from this PC's own list. */
+  approvedList(): Promise<ApprovedItem[]>;
+  approvedRevoke(key: string): Promise<void>;
   /** The brain's key facts (never the key); rejects while the brain is away. */
   keyStatus(): Promise<KeyStatus>;
   /** Hands the pasted key to the brain once and keeps no copy; resolves how the check ended. */

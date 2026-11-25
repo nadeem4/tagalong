@@ -101,6 +101,19 @@ async def test_hello_ok(env):
         assert [b.id for b in bodies.online()] == ["desktop"]
 
 
+async def test_node_answered_reaches_the_brain_with_the_body_that_sent_it(env):
+    bodies, url = env
+    heard = []
+    bodies.on_node_answered = lambda body_id, params: heard.append((body_id, params))
+    async with connect(url) as ws:
+        await call(ws, hello())
+        reply = await call(ws, request("node_answered", {"id": "n1", "outcome": "done"}))
+        assert reply["result"] == {}
+        bad = await call(ws, request("node_answered", {"id": "n1", "outcome": "always"}, 3))
+        assert bad["error"]["code"] == -32602
+    assert heard == [("desktop", {"id": "n1", "outcome": "done"})]
+
+
 async def test_hello_result_carries_version_and_build(tmp_path):
     bodies = Bodies()
     session = make_session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))

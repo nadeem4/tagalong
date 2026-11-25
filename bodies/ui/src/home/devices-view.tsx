@@ -10,6 +10,7 @@ import type { BodiesState, DeviceRow, DevicesState } from '../shapes';
 import { Button } from '../controls/button';
 import { useHostBridge } from '../host-bridge';
 import { Icon } from '../icons';
+import { ApprovedOnThisPc } from '../needs-you/approved-list';
 import { ConnectToolDialog } from './connect-tool';
 import { HostPairDialog } from '../pair/host-pair-dialog';
 import { DeviceRowItem } from './device-row';
@@ -229,6 +230,7 @@ export function DevicesView({ reach = false }: { reach?: boolean }) {
         )}
         <ul className="cx-list">{paired.aiTools.map(itemFor)}</ul>
       </section>
+      {card !== null && !card.local && <ApprovedOnThisPc />}
       <WhatsAppCard wa={state.whatsapp} connected={whatsappUp} onChanged={refresh} />
     </>
   );

@@ -1,0 +1,5 @@
+{
+  "jsonrpc": "2.0",
+  "method": "node_needs",
+  "params": { "seq": 15, "id": "n1", "state": "closed", "reason": "answered" }
+}

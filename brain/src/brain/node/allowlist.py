@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import shutil
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
 
@@ -72,6 +73,7 @@ class Allowlist:
             if exe is None or digest is None:
                 raise NotRunnable(f"{command} is not a program on this machine.")
             entry = {"command": command, "args": spec.args, "path": str(exe), "sha256": digest}
+        entry["at"] = prior.get("at") or datetime.now(UTC).isoformat(timespec="seconds")
         if env:
             entry["secret_env"] = env
         if query:
@@ -80,6 +82,20 @@ class Allowlist:
             entry["bearer"] = token
         entries.append(entry)
         self._write(entries)
+
+    def listing(self) -> list[dict]:
+        """Each approval as the person sees it: a key to revoke it by, what it allows and when;
+        never the secrets kept with it."""
+        shown = ("command", "args", "url", "path", "at")
+        return [{"key": _key(e), **{k: e[k] for k in shown if k in e}} for e in self._entries()]
+
+    def revoke(self, key: str) -> bool:
+        entries = self._entries()
+        kept = [e for e in entries if _key(e) != key]
+        if len(kept) == len(entries):
+            return False
+        self._write(kept)
+        return True
 
     def secrets(self, spec: PipeSpec) -> Secrets:
         entry = next((e for e in self._entries() if _same_spec(e, spec)), {})
@@ -124,6 +140,11 @@ class Allowlist:
         except (OSError, ValueError):
             return []
         return [e for e in data if isinstance(e, dict)] if isinstance(data, list) else []
+
+
+def _key(entry: dict) -> str:
+    spec = [entry.get("command"), entry.get("args", []), entry.get("url")]
+    return hashlib.sha256(json.dumps(spec).encode()).hexdigest()[:16]
 
 
 def _same_spec(entry: dict, spec: PipeSpec) -> bool:

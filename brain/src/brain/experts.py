@@ -33,6 +33,7 @@ from acp.schema import (
 )
 
 from brain.bodies import Bodies
+from brain.node_needs import NodeNeeds
 from brain.pipes import Pipe
 from brain.placements import Choose, Placements, Unavailable, resolve_placement
 from brain.protocol import ErrorCode, PipeSpec, RpcError
@@ -157,9 +158,11 @@ class ExpertHosts:
         clock: Callable[[], float] = time.monotonic,
         placements: Placements | None = None,
         bodies: Bodies | None = None,
+        needs: NodeNeeds | None = None,
     ) -> None:
         self._placements = placements
         self._bodies = bodies
+        self._needs = needs
         self._idle_s = idle_s
         self._quiet_s = quiet_s
         # One sleep seam serves both the hosts' idle timers and the runs' quiet sleepers,
@@ -192,6 +195,8 @@ class ExpertHosts:
     def _open_pipe(self, where: str, expert) -> Callable[[PipeSpec], Awaitable[Pipe]]:
         async def open_pipe(spec: PipeSpec) -> Pipe:
             try:
+                if self._needs is not None:
+                    return await self._needs.open_pipe(where, spec, expert=expert.id)
                 return await self._bodies.open_pipe(where, spec)
             except RpcError as err:
                 name = self._bodies.name(where)
@@ -207,6 +212,12 @@ class ExpertHosts:
                 ) from None
 
         return open_pipe
+
+    def _sign_in(self, host: str, expert) -> Callable[[], Awaitable[bool]] | None:
+        if host == "brain" or self._needs is None:
+            return None
+        spec = PipeSpec(command=expert.command[0], args=expert.command[1:])
+        return lambda: self._needs.sign_in(host, spec, expert.id)
 
     def __call__(self, expert, *, host: str = "brain", **callbacks) -> "ExpertRun":
         # A private Node's dir goes first on the child's PATH so the adapter's own scripts find it.
@@ -224,6 +235,7 @@ class ExpertHosts:
                 idle_s=self._idle_s,
                 sleep=self._sleep,
                 open_pipe=None if host == "brain" else self._open_pipe(host, expert),
+                sign_in=self._sign_in(host, expert),
             )
         return ExpertRun(
             host=adapter,
@@ -248,6 +260,9 @@ class ExpertHosts:
                 await self.bridge.shutdown()
 
 
+AUTH_REQUIRED = -32000  # ACP's code for an adapter whose login is missing
+
+
 class ExpertHost:
     """One adapter process for one expert, shared by its sessions.
 
@@ -269,8 +284,11 @@ class ExpertHost:
         startup_timeout: float = 60.0,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         open_pipe: Callable[[PipeSpec], Awaitable[Pipe]] | None = None,
+        sign_in: Callable[[], Awaitable[bool]] | None = None,
     ) -> None:
         self._open_pipe = open_pipe  # None: the adapter is a local child process
+        # Asks the person to sign in where the adapter runs; true once they have.
+        self.sign_in = sign_in
         self._command = command
         self._expert_id = expert_id
         self._path_first = path_first
@@ -424,7 +442,12 @@ class ExpertHost:
                 except acp.RequestError:  # the adapter no longer has it: start over
                     run.fresh_reason = "session could not be loaded"
         if session is None:
-            session = await self.conn.new_session(cwd=str(folder), mcp_servers=servers)
+            try:
+                session = await self.conn.new_session(cwd=str(folder), mcp_servers=servers)
+            except acp.RequestError as err:
+                if err.code != AUTH_REQUIRED or self.sign_in is None or not await self.sign_in():
+                    raise
+                session = await self.conn.new_session(cwd=str(folder), mcp_servers=servers)
             run.session_id = session.session_id
         self._sessions[run.session_id] = run
         modes = session.modes.available_modes if session.modes else []

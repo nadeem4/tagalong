@@ -246,4 +246,11 @@ describe('moods', () => {
       expect(screen.getByTestId('scout-gather')).toHaveAttribute('data-state', 'failed');
     });
   });
+
+  it('tags the pet with how many requests wait on this PC, and no tag when none do', () => {
+    const { rerender } = render(<DockPet pet={SCOUT} mood="idle" needsYou={2} />);
+    expect(screen.getByTestId('needs-you-tag').textContent).toBe('Needs you · 2');
+    rerender(<DockPet pet={SCOUT} mood="idle" needsYou={0} />);
+    expect(screen.queryByTestId('needs-you-tag')).toBeNull();
+  });
 });

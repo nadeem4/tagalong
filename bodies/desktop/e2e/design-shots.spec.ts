@@ -1446,3 +1446,88 @@ test('BAU4 connect another AI tool and memories by tool, light and dark', async 
     await memory.done();
   }
 });
+
+test('BAU5a needs you on this PC: approve, install, sign in, light and dark', async () => {
+  test.setTimeout(400_000);
+  const dir = shotDir('bau5a');
+  mkdirSync(dir, { recursive: true });
+  const both = async (page: Page, name: string, target?: Locator): Promise<void> => {
+    for (const scheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await settled(page);
+      await (target ?? page).screenshot({ path: join(dir, `${name}-${scheme}.png`) });
+    }
+  };
+  const ask = (id: string, need: string, spec: Record<string, unknown>, expert?: string) => ({
+    id,
+    state: 'open',
+    node: 'node-1',
+    need,
+    spec,
+    ...(expert === undefined ? {} : { expert }),
+  });
+  const launched = await launchShot({
+    hasKey: true,
+    brainStatus: { ...REMOTE_BRAIN, started_by: 'service', local: false, host: 'mini-pc' },
+  });
+  try {
+    await expect.poll(() => launched.brain.hellos, { timeout: 30_000 }).toBeGreaterThan(0);
+    const avatar = await launched.find('avatar');
+    const panel = await launched.find('panel');
+    const card = panel.getByRole('region', { name: 'Needs you on this PC' });
+
+    launched.brain.sendNodeNeeds(ask('a1', 'approve', { command: 'python', args: ['-V'] }));
+    await expect(card).toContainText('wants to run python -V here', { timeout: 30_000 });
+    await both(panel, 'approve-card');
+    await both(avatar, 'dock-tag');
+    await card.getByRole('button', { name: 'Not now' }).click();
+    await expect(panel.getByText(/The job waits/)).toBeVisible();
+    await both(panel, 'approve-not-now');
+
+    await avatar.evaluate(() => window.tagalongHost.openSettings());
+    const home = await launched.find('home');
+    await home
+      .getByRole('navigation')
+      .getByRole('button', { name: /^Overview/ })
+      .click();
+    const section = home.getByRole('region', { name: 'Needs you on this PC' });
+    await expect(section).toBeVisible();
+    await both(home, 'home-section');
+
+    launched.brain.sendNodeNeeds(
+      ask('i1', 'install', { command: 'claude-agent-acp' }, 'claude-code'),
+    );
+    await expect(card).toContainText('Claude Code is not on this PC yet.', { timeout: 30_000 });
+    await both(panel, 'install-card');
+    launched.brain.sendNodeNeeds({ id: 'i1', state: 'closed', reason: 'gone' });
+    launched.brain.sendNodeNeeds(
+      ask('s1', 'signin', { command: 'claude-agent-acp' }, 'claude-code'),
+    );
+    await expect(card).toContainText('needs you to sign in on this PC', { timeout: 30_000 });
+    await both(panel, 'signin-card');
+    launched.brain.sendNodeNeeds({ id: 's1', state: 'closed', reason: 'gone' });
+    launched.brain.sendNodeNeeds(ask('f1', 'install', { command: 'x' }, 'no-such-expert'));
+    await expect(card).toContainText('no-such-expert'.replace(/-/g, ' '), { ignoreCase: true });
+    await card.getByRole('button', { name: 'Install' }).click();
+    await expect(card.getByRole('alert')).toBeVisible({ timeout: 120_000 });
+    await both(panel, 'install-failed');
+    launched.brain.sendNodeNeeds({ id: 'f1', state: 'closed', reason: 'gone' });
+
+    await section.getByRole('button', { name: 'Allow' }).click();
+    await expect(section).toHaveCount(0, { timeout: 120_000 });
+    await home
+      .getByRole('navigation')
+      .getByRole('button', { name: /^Devices/ })
+      .click();
+    const approved = home.getByRole('region', { name: 'Approved on this PC' });
+    await expect(approved).toContainText('python -V', { timeout: 30_000 });
+    await both(home, 'approved-list', approved);
+    await approved.getByRole('button', { name: 'Revoke' }).click();
+    await both(home, 'revoke-confirm', approved);
+    await approved.getByRole('button', { name: 'Revoke' }).last().click();
+    await expect(approved).toContainText('Nothing is approved yet', { timeout: 60_000 });
+    await both(home, 'approved-empty', approved);
+  } finally {
+    await launched.done();
+  }
+});

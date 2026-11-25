@@ -50,6 +50,8 @@ export interface DockPetProps {
   listening?: ListeningDot | undefined;
   /** The top status mark (a problem, progress or a hint), as a tag at the bottom centre. */
   status?: StatusMarkValue | null;
+  /** Requests a remote brain has open on this PC; a gold tag counts them while any wait. */
+  needsYou?: number;
 }
 
 export type ListeningDot = 'on' | 'paused' | 'hearing' | 'follow-up';
@@ -118,7 +120,14 @@ function isTagged(mood: DockMood): mood is TaggedMood {
  * (seeing, working), plus the sight-paused and listening marks, which show in every mood.
  * The mascot's props (a laptop, a lightbulb) say the rest; it blinks and breathes on its own.
  */
-export function DockPet({ pet, mood, sightPaused = false, listening, status }: DockPetProps) {
+export function DockPet({
+  pet,
+  mood,
+  sightPaused = false,
+  listening,
+  status,
+  needsYou = 0,
+}: DockPetProps) {
   // The Paused mark takes the top while sight is off: the two would overlap in 96 px, and the
   // pose and the label still say what Scout is doing.
   // `listening` is also the mood while speech is heard on the mic (Always listening): that is
@@ -196,6 +205,28 @@ export function DockPet({ pet, mood, sightPaused = false, listening, status }: D
           }}
         >
           Paused
+        </span>
+      )}
+      {needsYou > 0 && (
+        <span
+          data-testid="needs-you-tag"
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            padding: `${t.space.xxs}px ${t.space.hair}px`,
+            borderRadius: 999,
+            background: t.color.gold,
+            color: t.color.goldInk,
+            fontFamily: t.font.ui,
+            fontSize: t.dockTag,
+            lineHeight: `${t.dockTag + 2}px`,
+            fontWeight: t.fontWeight.semibold,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Needs you · {needsYou}
         </span>
       )}
       {status != null && <StatusMark mark={status} variant="tag" />}
