@@ -7,7 +7,6 @@
     "state": "open",
     "node": "node-4f2a91",
     "need": "install",
-    "spec": { "expert": "claude-acp" },
     "expert": "claude-acp"
   }
 }

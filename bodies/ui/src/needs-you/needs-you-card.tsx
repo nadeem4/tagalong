@@ -1,8 +1,9 @@
 /**
  * The bubble's card for a remote brain's request on this PC: approve a program, install an
  * expert, sign one in or finish an app's web sign-in. Every fact on it comes from this PC;
- * approving, installing and signing in run nothing until the person clicks. Contains NeedsYouCard (one request) and
- * NeedsYouBubble (the first open one, and the line after a choice).
+ * approving, installing and signing in run nothing until the person clicks. Contains
+ * NeedsYouCard (one request) and NeedsYouBubble (the first open one, and the line after a
+ * choice).
  */
 import { useEffect, useState } from 'react';
 import { Icon } from '../setup/icons';

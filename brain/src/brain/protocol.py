@@ -84,6 +84,8 @@ class Model(BaseModel):
 
 
 Id = str
+# An id handed to a command line (`tagalong install <id>`), so it can never read as a flag.
+ExpertId = Annotated[str, Field(pattern=r"^[^-]")]
 Input = dict[str, Any]
 # Handshake seqs may be 0 (nothing seen yet); a notification's seq starts at 1.
 HandshakeSeq = Annotated[int, Field(ge=0)]
@@ -574,7 +576,7 @@ class PipeSpec(Model):
     command: Annotated[str, Field(min_length=1)] | None = None
     args: list[str] = []
     url: Annotated[str, Field(min_length=1)] | None = None
-    expert: Id | None = None
+    expert: ExpertId | None = None
 
     @model_validator(mode="after")
     def _one_target(self) -> "PipeSpec":
@@ -625,17 +627,18 @@ class _NodeNeedsOnNode(_NodeNeedsOpen):
 
 class NodeNeedsApprove(_NodeNeedsOnNode):
     need: Literal["approve"]
-    expert: Id | None = None
+    expert: ExpertId | None = None
 
 
 class NodeNeedsSignin(_NodeNeedsOnNode):
     need: Literal["signin"]
-    expert: Id
+    expert: ExpertId
 
 
-class NodeNeedsInstall(_NodeNeedsOnNode):
+class NodeNeedsInstall(_NodeNeedsOpen):
+    node: Id
     need: Literal["install"]
-    expert: Id
+    expert: ExpertId
 
 
 class NodeNeedsAppSignin(_NodeNeedsOpen):

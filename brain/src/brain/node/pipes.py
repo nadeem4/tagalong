@@ -144,7 +144,7 @@ class Pipes:
         found = self._experts.get(expert)
         if found is None:
             raise RpcError(ErrorCode.not_installed, NOT_INSTALLED)
-        return PipeSpec(command=found.command[0], args=found.command[1:])
+        return found.pipe_spec()
 
     def write(self, pipe: str, data: str) -> None:
         entry = self._open.get(pipe)

@@ -75,7 +75,7 @@ export function createNeedsYou(deps: NeedsYouDeps) {
       need: frame.need,
       brain: brain.name,
       identity: brain.identity,
-      what: words(frame.spec),
+      what: frame.need === 'install' ? frame.expert : words(frame.spec),
       path,
       expert: frame.expert,
       state,
@@ -86,28 +86,18 @@ export function createNeedsYou(deps: NeedsYouDeps) {
   ];
   const changed = (): void => deps.push(list());
 
-  const whichPath = async (spec: {
-    command?: string | undefined;
-    expert?: string | undefined;
-  }): Promise<string | null> => {
-    const target =
-      spec.expert !== undefined ? ['--expert', spec.expert] : spec.command && [spec.command];
-    if (!target) return null;
-    const done = await deps.run(['node', 'which', ...target]);
+  const whichPath = async (args: string[] | null): Promise<string | null> => {
+    if (args === null) return null;
+    const done = await deps.run(['node', 'which', ...args]);
     return done.code === 0 ? lastLine(done.out) : null;
   };
 
   /** What to run for a request, or null when the brain asked for something this PC will not run. */
   const command = ({ frame }: Open): string[] | null => {
-    if (frame.need !== 'approve') {
-      if (frame.expert.startsWith('-')) return null;
-      return frame.need === 'install'
-        ? ['install', frame.expert, '--yes']
-        : ['login', frame.expert];
-    }
+    if (frame.need === 'install') return ['install', frame.expert, '--yes'];
+    if (frame.need === 'signin') return ['login', frame.expert];
     const { command: program = '', args = [], url, expert } = frame.spec;
-    if (expert !== undefined)
-      return expert.startsWith('-') ? null : ['node', 'allow', '--expert', expert];
+    if (expert !== undefined) return ['node', 'allow', '--expert', expert];
     if (url !== undefined) return ['node', 'allow', '--url', url];
     if (program.startsWith('-')) return null;
     return ['node', 'allow', program, ...(args.length > 0 ? ['--', ...args] : [])];
@@ -129,10 +119,15 @@ export function createNeedsYou(deps: NeedsYouDeps) {
       }
       if (frame.need === 'app_signin') return signins.open(frame);
       arriving.add(frame.id);
-      const [path, brain] = await Promise.all([
-        frame.need === 'install' ? null : whichPath(frame.spec),
-        deps.brain(),
-      ]);
+      const lookup =
+        frame.need === 'install'
+          ? null
+          : frame.spec.expert !== undefined
+            ? ['--expert', frame.spec.expert]
+            : frame.spec.command === undefined
+              ? null
+              : [frame.spec.command];
+      const [path, brain] = await Promise.all([whichPath(lookup), deps.brain()]);
       if (!arriving.delete(frame.id)) return false;
       open.set(frame.id, { frame, path, brain, state: 'waiting', bubble: true });
       changed();

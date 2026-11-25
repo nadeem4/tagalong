@@ -376,15 +376,18 @@ async def _node_signin(url: str, node_dir: Path, allowlist: Allowlist, node_sign
     out(f"Signed in. The brain may now open {url}; it never sees the sign-in.")
 
 
+def _with_expert_command(args, experts: ExpertStore):
+    found = experts.get(args.expert)
+    if found is None:
+        raise _Fail(f"{args.expert} is not installed here; run `tagalong install {args.expert}`.")
+    spec = found.pipe_spec()
+    return argparse.Namespace(**{**vars(args), "command": spec.command, "args": spec.args})
+
+
 async def _node(args, home: Path, env, run_node, node_signin, secret, out) -> None:
     allowlist = Allowlist(home / "node" / "allowlist.json")
     if args.sub in ("allow", "which") and args.expert is not None:
-        found = ExpertStore(home).get(args.expert)
-        if found is None:
-            raise _Fail(
-                f"{args.expert} is not installed here; run `tagalong install {args.expert}`."
-            )
-        args.command, args.args = found.command[0], found.command[1:]
+        args = _with_expert_command(args, ExpertStore(home))
     if args.sub == "allow":
         _node_allow(args, allowlist, secret, out)
         return

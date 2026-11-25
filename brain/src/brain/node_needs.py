@@ -84,6 +84,15 @@ class RemoteSignin:
         pass
 
 
+def _unanswered(err: RpcError, need: Need, node: str, spec: PipeSpec) -> RpcError:
+    if need != "install":
+        return err
+    return RpcError(
+        ErrorCode.not_installed,
+        f"{spec.expert} is not installed on {node}; run tagalong install {spec.expert} there",
+    )
+
+
 class NodeNeeds:
     def __init__(self, bodies: Bodies, wait_s: float = 600.0) -> None:
         self._bodies = bodies
@@ -107,13 +116,10 @@ class NodeNeeds:
                     raise
                 asks += 1
                 if asks > _ASKS_PER_PIPE or not await self._ask_node(node, need, spec):
-                    if need == "install":
-                        raise RpcError(
-                            ErrorCode.not_installed,
-                            f"{spec.expert} is not installed on {node}; "
-                            f"run tagalong install {spec.expert} there",
-                        ) from err
-                    raise
+                    final = _unanswered(err, need, node, spec)
+                    if final is err:
+                        raise
+                    raise final from err
 
     async def sign_in(self, node: str, expert: str) -> bool:
         """Ask for a sign-in on the node's machine; true once the person has done it."""
@@ -153,7 +159,9 @@ class NodeNeeds:
         desktop = self._bodies.beside(node)
         if desktop is None:
             return False
-        fields: dict[str, Any] = {"node": node, "spec": spec.model_dump(exclude_none=True)}
+        fields: dict[str, Any] = {"node": node}
+        if need != "install":
+            fields["spec"] = spec.model_dump(exclude_none=True)
         if spec.expert is not None:
             fields["expert"] = spec.expert
         key = (node, need, spec.model_dump_json())

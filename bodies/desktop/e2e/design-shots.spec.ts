@@ -1618,7 +1618,6 @@ test('BAU5c install an expert on this PC, card, working and failed', async () =>
       node: 'node-1',
       need: 'install',
       expert: 'no-such-expert',
-      spec: { expert: 'no-such-expert' },
     });
     await expect(card).toContainText('is not on this PC yet', { timeout: 30_000 });
     await expect(card.getByRole('button', { name: 'Install' })).toBeInViewport({ ratio: 1 });

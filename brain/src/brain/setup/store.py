@@ -11,6 +11,7 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Literal
 
+from brain.protocol import PipeSpec
 from brain.setup.paths import experts_file
 
 
@@ -25,6 +26,9 @@ class InstalledExpert:
     # Which Node the command runs on, so a later change of the system Node can be re-checked;
     # None for an expert that needs no Node (a binary, a custom command).
     node: Literal["private", "system"] | None = None
+
+    def pipe_spec(self) -> PipeSpec:
+        return PipeSpec(command=self.command[0], args=self.command[1:])
 
 
 def _row(raw: dict) -> InstalledExpert:

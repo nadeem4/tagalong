@@ -539,14 +539,20 @@ def test_answer_check_back_only_with_not_now():
 def test_a_sign_in_or_install_request_names_an_expert():
     from pydantic import TypeAdapter, ValidationError
 
-    from brain.protocol import NodeNeedsOpen
+    from brain.protocol import NodeNeedsOpen, PipeSpec
 
     opened = TypeAdapter(NodeNeedsOpen)
     frame = {"seq": 1, "id": "n", "state": "open", "node": "pc", "spec": {"command": "x"}}
+    bare = {k: v for k, v in frame.items() if k != "spec"}
     assert opened.validate_python({**frame, "need": "approve"}).expert is None
     with pytest.raises(ValidationError):
         opened.validate_python({**frame, "need": "signin"})
     assert opened.validate_python({**frame, "need": "signin", "expert": "e"}).expert == "e"
     with pytest.raises(ValidationError):
-        opened.validate_python({**frame, "need": "install"})
-    assert opened.validate_python({**frame, "need": "install", "expert": "e"}).need == "install"
+        opened.validate_python({**bare, "need": "install"})
+    assert opened.validate_python({**bare, "need": "install", "expert": "e"}).need == "install"
+    for need, base in (("signin", frame), ("install", bare)):
+        with pytest.raises(ValidationError):
+            opened.validate_python({**base, "need": need, "expert": "-y"})
+    with pytest.raises(ValidationError):
+        PipeSpec(expert="-y")

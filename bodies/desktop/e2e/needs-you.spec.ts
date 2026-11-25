@@ -142,7 +142,6 @@ test('An install asked for here shows the expert by name and fails in place when
     node: 'node-1',
     need: 'install',
     expert: 'no-such-expert',
-    spec: { expert: 'no-such-expert' },
   });
   const panel = await windowFor('panel');
   const card = panel.getByRole('region', { name: 'Needs you on this PC' });

@@ -399,6 +399,14 @@ describe('node_needs frames', () => {
       expect(NodeNeedsParams.safeParse(bare).success).toBe(false);
     }
   });
+  it('refuses an expert id that starts with a dash, wherever one is named', () => {
+    const spec = { expert: '-y' };
+    expect(PipeSpec.safeParse(spec).success).toBe(false);
+    for (const kind of ['.signin', '.install']) {
+      const frame = sample(`brain.node_needs.params${kind}.json`) as object;
+      expect(NodeNeedsParams.safeParse({ ...frame, expert: '-y' }).success).toBe(false);
+    }
+  });
   it('takes an expert as a pipe spec only alone', () => {
     const open = sample('brain.pipe_open.params.expert.json') as { spec: object };
     expect(PipeSpec.parse(open.spec)).toEqual({ args: [], expert: 'claude-acp' });

@@ -8,6 +8,8 @@ import { z, type ZodType } from 'zod';
 import { Body, Part, Tool } from './shapes.js';
 
 const Id = z.string();
+// An id handed to a command line (`tagalong install <id>`), so it can never read as a flag.
+const ExpertId = z.string().regex(/^[^-]/);
 // last_seq and the hello seq may be 0 (nothing seen yet); every notification seq starts at 1.
 const HandshakeSeq = z.int().min(0);
 const Seq = z.int().min(1);
@@ -395,7 +397,7 @@ export const PipeSpec = z
     command: z.string().min(1).optional(),
     args: z.array(z.string()).default([]),
     url: z.string().min(1).optional(),
-    expert: Id.optional(),
+    expert: ExpertId.optional(),
   })
   .refine(
     (spec) =>
@@ -430,13 +432,14 @@ const nodeNeedsOpen = {
   state: z.literal('open'),
 };
 const nodeNeedsOnNode = { ...nodeNeedsOpen, node: Id, spec: PipeSpec };
-// Signing in and installing are for a named expert; approving a program names none. An app that stays on the
-// brain asks for its web sign-in to finish on this PC: `url` is the page to open and `port`
-// the loopback port its redirect returns to.
+// Signing in and installing are for a named expert (an install has no spec: the expert is all
+// it is about); approving a program names none. An app that stays on the brain asks for its
+// web sign-in to finish on this PC: `url` is the page to open and `port` the loopback port its
+// redirect returns to.
 export const NodeNeedsOpen = z.union([
-  z.object({ ...nodeNeedsOnNode, need: z.literal('approve'), expert: Id.optional() }),
-  z.object({ ...nodeNeedsOnNode, need: z.literal('signin'), expert: Id }),
-  z.object({ ...nodeNeedsOnNode, need: z.literal('install'), expert: Id }),
+  z.object({ ...nodeNeedsOnNode, need: z.literal('approve'), expert: ExpertId.optional() }),
+  z.object({ ...nodeNeedsOnNode, need: z.literal('signin'), expert: ExpertId }),
+  z.object({ ...nodeNeedsOpen, node: Id, need: z.literal('install'), expert: ExpertId }),
   z.object({
     ...nodeNeedsOpen,
     need: z.literal('app_signin'),

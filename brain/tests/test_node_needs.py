@@ -129,7 +129,7 @@ async def test_a_missing_expert_asks_to_install_once_and_the_job_goes_on_after_d
     await settle()
     (frame,) = desk.needs()
     assert frame["need"] == "install" and frame["expert"] == "claude-acp"
-    assert PipeSpec.model_validate(frame["spec"]) == EXPERT
+    assert "spec" not in frame
     node.experts.add(INSTALLED)  # what `tagalong install` does on that machine
     await needs.answered("desk", NodeAnsweredParams(id=frame["id"], outcome="done"))
     pipe = await asyncio.wait_for(task, 5)

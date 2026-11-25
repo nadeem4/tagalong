@@ -19,6 +19,16 @@ const open = (over: object = {}) => ({
   ...over,
 });
 
+const installing = (over: object = {}) => ({
+  seq: 1,
+  id: 'i1',
+  state: 'open',
+  node: 'node-1',
+  need: 'install',
+  expert: 'claude-code',
+  ...over,
+});
+
 function rig(
   run: (args: string[]) => Promise<{ code: number; out: string }> = async () => ({
     code: 0,
@@ -38,7 +48,8 @@ function rig(
   const needs = createNeedsYou({
     run: async (args) => {
       if (args[1] === 'which') {
-        return args[2] === 'claude-agent-acp' || args[3] === 'claude-code'
+        const target = args.slice(2).join(' ');
+        return target === 'claude-agent-acp' || target === '--expert claude-code'
           ? { code: 0, out: 'C:\\tools\\claude-agent-acp.cmd\n' }
           : { code: 1, out: 'not a program' };
       }
@@ -122,7 +133,7 @@ describe('needs you on this PC', () => {
 
   it('install runs the install command for the expert, then tells the brain', async () => {
     const { needs, calls, answers } = rig();
-    await needs.frame(open({ id: 'i1', need: 'install', spec: { expert: 'claude-code' } }));
+    await needs.frame(installing());
     expect(needs.list()[0]).toMatchObject({ need: 'install', expert: 'claude-code', path: null });
     expect(await needs.act('i1')).toEqual({});
     expect(calls).toEqual([['install', 'claude-code', '--yes']]);
@@ -166,14 +177,17 @@ describe('needs you on this PC', () => {
     expect(needs.list()).toEqual([]);
   });
 
-  it('refuses to run a request whose program or expert looks like an option', async () => {
+  it('never lists a request whose expert looks like an option', async () => {
+    const { needs } = rig();
+    expect(await needs.frame(open({ need: 'signin', expert: '-y' }))).toBe(false);
+    expect(await needs.frame(installing({ expert: '-y' }))).toBe(false);
+    expect(needs.list()).toEqual([]);
+  });
+
+  it('refuses to run a request whose program looks like an option', async () => {
     const { needs, calls, answers } = rig();
     await needs.frame(open({ spec: { command: '--version' } }));
-    await needs.frame(open({ id: 'i', need: 'signin', expert: '-y' }));
-    await needs.frame(open({ id: 'j', need: 'install', expert: '-y', spec: { expert: '-y' } }));
     expect(await needs.act('n1')).toEqual({ error: 'This PC will not run that.' });
-    expect(await needs.act('i')).toEqual({ error: 'This PC will not run that.' });
-    expect(await needs.act('j')).toEqual({ error: 'This PC will not run that.' });
     expect(calls).toEqual([]);
     expect(answers).toEqual([]);
   });
