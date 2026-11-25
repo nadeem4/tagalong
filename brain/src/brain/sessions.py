@@ -253,7 +253,7 @@ class Session:
         outputs.prune(outputs_keep)
         notify = bodies.notify
         # main passes the installed experts and the quiet threshold; the defaults keep tests short.
-        make_run = make_run or ExpertHosts(bodies=bodies, needs=NodeNeeds(bodies))
+        make_run = make_run or ExpertHosts(needs=NodeNeeds(bodies))
         # Built first: the questions and the timers emit through it. It only calls back into the
         # session once an event arrives, by which time the rest of __init__ has run.
         questions = ScoutQuestions(
