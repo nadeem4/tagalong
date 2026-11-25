@@ -27,6 +27,7 @@ from brain.protocol import (
     PipeOpenParams,
     RpcError,
 )
+from brain.setup.store import ExpertStore
 
 log = logging.getLogger("node")
 HELLO_ID = "h1"
@@ -44,8 +45,11 @@ class Socket(Protocol):
 
 
 class NodeSession:
-    def __init__(self, allowlist: Allowlist, spawn: Spawn = spawn_process) -> None:
+    def __init__(
+        self, allowlist: Allowlist, experts: ExpertStore, spawn: Spawn = spawn_process
+    ) -> None:
         self._allowlist = allowlist
+        self._experts = experts
         self._spawn = spawn
 
     async def run(self, ws: Socket, token: str, body_id: str, name: str) -> None:
@@ -58,7 +62,7 @@ class NodeSession:
             while (frame := await out.get()) is not None:
                 await ws.send(frame)
 
-        pipes = Pipes(self._allowlist, notify, self._spawn)
+        pipes = Pipes(self._allowlist, notify, self._experts, self._spawn)
         writer = asyncio.create_task(drain())
         out.put_nowait(request(HELLO_ID, "hello", hello_params(token, body_id, "node", name)))
         try:
@@ -123,13 +127,14 @@ def _parse(raw: str | bytes) -> dict[str, Any] | None:
 async def run_node(
     env: MutableMapping[str, str],
     allowlist: Allowlist,
+    experts: ExpertStore,
     dial: Callable[[str, str], Awaitable[Any]] = connect_pinned,
 ) -> None:
     """Stay connected until the brain refuses this node's token. The link variables are taken
     out of `env` so no child process inherits the token."""
     addr, fingerprint = env.pop("TAGALONG_NODE_ADDR"), env.pop("TAGALONG_NODE_FP")
     token, body_id = env.pop("TAGALONG_NODE_TOKEN"), env.pop("TAGALONG_NODE_ID")
-    session = NodeSession(allowlist)
+    session = NodeSession(allowlist, experts)
     while True:
         try:
             ws = await dial(addr, fingerprint)

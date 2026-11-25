@@ -19,6 +19,7 @@ from brain.bodies import Bodies
 from brain.jobs import JobError
 from brain.placements import Placement
 from brain.protocol import PipeSpec
+from brain.setup.store import InstalledExpert
 
 NODE_FOLDER = "/only/on/the/node"
 
@@ -28,6 +29,9 @@ def setup(make_rig, tmp_path):  # noqa: F811
     bodies = Bodies()
     node = FakeNode(bodies, tmp_path)
     node.allowlist.allow(PipeSpec(command=sys.executable, args=[str(AGENT)]))
+    node.experts.add(
+        InstalledExpert("claude-acp", "Claude", "1", [sys.executable, str(AGENT)], "registry", None)
+    )
     node.folders.add(NODE_FOLDER)
     node.connect()
 

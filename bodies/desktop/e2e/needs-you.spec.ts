@@ -2,7 +2,8 @@
  * A remote brain's request on this PC, on the fake brain: the card names what this PC resolved,
  * Not now keeps the request in Home and tells the brain, and Allow runs this PC's own
  * `tagalong node allow` (against a throwaway home) before the brain is told to go on. An app
- * sign-in is caught on this PC's loopback and only its one-time code is sent.
+ * sign-in is caught on this PC's loopback and only its one-time code is sent. An install runs this
+ * PC's own `tagalong install`; one that cannot finish stays on the card and tells the brain nothing.
  */
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -131,4 +132,23 @@ test('An app sign-in finishes on this PC: the code reaches the brain, nothing el
   await expect(
     panel.getByText(/Gmail is signed in on .* You can close the browser tab\./),
   ).toBeVisible();
+});
+
+test('An install asked for here shows the expert by name and fails in place when it cannot install', async () => {
+  const before = brain.nodeAnswers.length;
+  brain.sendNodeNeeds({
+    id: 'i1',
+    state: 'open',
+    node: 'node-1',
+    need: 'install',
+    expert: 'no-such-expert',
+    spec: { expert: 'no-such-expert' },
+  });
+  const panel = await windowFor('panel');
+  const card = panel.getByRole('region', { name: 'Needs you on this PC' });
+  await expect(card).toContainText('is not on this PC yet', { timeout: 30_000 });
+  await card.getByRole('button', { name: 'Install' }).click();
+  await expect(card.getByRole('alert')).toBeVisible({ timeout: 120_000 });
+  await expect(card.getByRole('button', { name: 'Try again' })).toBeVisible();
+  expect(brain.nodeAnswers).toHaveLength(before);
 });

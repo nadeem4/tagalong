@@ -567,19 +567,21 @@ class KnowMeStatusParams(Model):
 
 # Node pipes: the brain asks a node (a body on another machine) to run an allowed command and
 # relays its stdin and stdout as raw bytes. The node refuses any spec its own allow-list lacks.
-# A spec names a command, or the exact URL of an HTTP MCP server the node relays to. Secrets are
-# never part of it: the node adds the ones its person entered there.
+# A spec names a command, the exact URL of an HTTP MCP server the node relays to, or an expert by
+# id that the node maps to its own install. Secrets are never part of it: the node adds the ones
+# its person entered there.
 class PipeSpec(Model):
     command: Annotated[str, Field(min_length=1)] | None = None
     args: list[str] = []
     url: Annotated[str, Field(min_length=1)] | None = None
+    expert: Id | None = None
 
     @model_validator(mode="after")
     def _one_target(self) -> "PipeSpec":
-        if (self.command is None) == (self.url is None):
-            raise ValueError("a spec names a command or a url, one of them.")
-        if self.url is not None and self.args:
-            raise ValueError("a url spec takes no args.")
+        if [self.command, self.url, self.expert].count(None) != 2:
+            raise ValueError("a spec names a command, a url or an expert, one of them.")
+        if self.command is None and self.args:
+            raise ValueError("only a command spec takes args.")
         return self
 
 
@@ -631,6 +633,11 @@ class NodeNeedsSignin(_NodeNeedsOnNode):
     expert: Id
 
 
+class NodeNeedsInstall(_NodeNeedsOnNode):
+    need: Literal["install"]
+    expert: Id
+
+
 class NodeNeedsAppSignin(_NodeNeedsOpen):
     need: Literal["app_signin"]
     app: str = Field(min_length=1)
@@ -639,7 +646,8 @@ class NodeNeedsAppSignin(_NodeNeedsOpen):
 
 
 NodeNeedsOpen = Annotated[
-    NodeNeedsApprove | NodeNeedsSignin | NodeNeedsAppSignin, Field(discriminator="need")
+    NodeNeedsApprove | NodeNeedsSignin | NodeNeedsInstall | NodeNeedsAppSignin,
+    Field(discriminator="need"),
 ]
 
 

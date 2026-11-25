@@ -138,14 +138,6 @@ async def kill_tree(process: asyncio.subprocess.Process) -> None:
     await process.wait()
 
 
-def _quoted(part: str) -> str:
-    """The node's own shell is often Windows', where a space or one of `&()^|<>"` needs double
-    quotes."""
-    if not any(c in part for c in ' &()^|<>"'):
-        return part
-    return '"' + part.replace('"', '\\"') + '"'
-
-
 class ExpertHosts:
     """The Jobs factory: one ExpertHost per installed expert, a session handle per job."""
 
@@ -195,15 +187,13 @@ class ExpertHosts:
     def _open_pipe(self, where: str, expert) -> Callable[[PipeSpec], Awaitable[Pipe]]:
         async def open_pipe(spec: PipeSpec) -> Pipe:
             try:
-                return await self._needs.open_pipe(where, spec, expert=expert.id)
+                return await self._needs.open_pipe(where, spec)
             except RpcError as err:
                 name = self._bodies.name(where)
                 if err.code == ErrorCode.denied:
-                    approve = f"tagalong node allow {_quoted(spec.command)}"
-                    if spec.args:
-                        approve += " -- " + " ".join(_quoted(a) for a in spec.args)
                     raise ExpertError(
-                        f"{expert.name} is not approved on {name}. On that machine run: {approve}"
+                        f"{expert.name} is not approved on {name}. "
+                        f"On that machine run: tagalong node allow --expert {expert.id}"
                     ) from None
                 raise ExpertError(
                     f"{expert.name} could not start on {name}: {err.message}"
@@ -214,8 +204,7 @@ class ExpertHosts:
     def _sign_in(self, host: str, expert) -> Callable[[], Awaitable[bool]] | None:
         if host == "brain":
             return None
-        spec = PipeSpec(command=expert.command[0], args=expert.command[1:])
-        return lambda: self._needs.sign_in(host, spec, expert.id)
+        return lambda: self._needs.sign_in(host, expert.id)
 
     def __call__(self, expert, *, host: str = "brain", **callbacks) -> "ExpertRun":
         # A private Node's dir goes first on the child's PATH so the adapter's own scripts find it.
@@ -396,9 +385,7 @@ class ExpertHost:
 
     async def _connect_pipe(self):
         """The adapter runs on a node; its stdout and stdin are the pipe's two directions."""
-        self._pipe = pipe = await self._open_pipe(
-            PipeSpec(command=self._command[0], args=self._command[1:])
-        )
+        self._pipe = pipe = await self._open_pipe(PipeSpec(expert=self._expert_id))
         reader = asyncio.StreamReader()
 
         async def pump() -> None:

@@ -530,6 +530,23 @@ def test_node_which_prints_the_path_that_allow_records(tmp_path):
     assert rig.go("node", "which", str(rig.home / "missing.exe")) == 1
 
 
+def test_node_allow_and_which_take_an_expert_by_id_and_resolve_its_install_here(tmp_path):
+    rig = Rig(tmp_path)
+    exe = rig.home / "expert.exe"
+    exe.write_bytes(b"binary")
+    exe.chmod(0o755)
+    ExpertStore(rig.home).add(
+        InstalledExpert("claude-acp", "Claude Code", "1", [str(exe), "--acp"], "registry", None)
+    )
+    assert rig.go("node", "which", "--expert", "claude-acp") == 0
+    assert rig.text.strip() == str(exe.resolve())
+    assert rig.go("node", "allow", "--expert", "claude-acp") == 0
+    allowlist = Allowlist(rig.home / "node" / "allowlist.json")
+    assert allowlist.permits(PipeSpec(command=str(exe), args=["--acp"])) == str(exe)
+    assert rig.go("node", "allow", "--expert", "nope") == 1
+    assert "tagalong install nope" in rig.text
+
+
 def test_node_list_shows_each_approval_without_its_secrets_and_revoke_removes_one(tmp_path):
     rig = Rig(tmp_path)
     exe = rig.home / "expert.exe"
@@ -569,7 +586,7 @@ def test_node_run_without_its_link_says_what_is_missing(tmp_path):
 def test_node_run_stops_when_the_brain_refuses_its_token(tmp_path):
     rig = Rig(tmp_path)
 
-    async def refused(env, allowlist):
+    async def refused(env, allowlist, experts):
         raise HelloRefused("Unknown or revoked token")
 
     env = {k: "x" for k in ("TAGALONG_NODE_ADDR", "TAGALONG_NODE_FP", "TAGALONG_NODE_TOKEN")}
@@ -583,7 +600,7 @@ def test_node_run_does_not_load_the_data_dir_env_file(tmp_path):
     (rig.home / ".env").write_text("ANTHROPIC_API_KEY=sk-secret\n", encoding="utf-8")
     seen: dict[str, str] = {}
 
-    async def capture(env, allowlist):
+    async def capture(env, allowlist, experts):
         seen.update(env)
 
     env = {k: "x" for k in ("TAGALONG_NODE_ADDR", "TAGALONG_NODE_FP", "TAGALONG_NODE_TOKEN")}

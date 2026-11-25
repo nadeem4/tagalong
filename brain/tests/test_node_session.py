@@ -12,6 +12,7 @@ import pytest
 from brain.node.allowlist import Allowlist
 from brain.node.main import HelloRefused, NodeSession
 from brain.protocol import ErrorCode, PipeSpec
+from brain.setup.store import ExpertStore
 from tests.test_node_pipes import FakeChild, LingeringChild
 
 
@@ -55,7 +56,7 @@ class Rig:
             self.children.append(child)
             return child
 
-        self.session = NodeSession(self.allowlist, spawn)
+        self.session = NodeSession(self.allowlist, ExpertStore(tmp_path), spawn)
         self.task: asyncio.Task | None = None
 
     def start(self) -> None:

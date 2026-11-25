@@ -1,5 +1,5 @@
 /**
- * What a remote brain waits on from this PC: approve a program, sign an expert in.
+ * What a remote brain waits on from this PC: approve a program, install an expert, sign one in.
  * The brain only asks; the person's yes runs this PC's own `tagalong` command here, and only then
  * is the brain told to try again. Every fact the card shows (who asks, where the program is) is
  * read here, never taken from the brain's frame; the path comes from the same `tagalong` that
@@ -55,7 +55,9 @@ const words = (spec: {
   command?: string | undefined;
   args?: string[] | undefined;
   url?: string | undefined;
-}): string => spec.url ?? [spec.command ?? '', ...(spec.args ?? [])].join(' ').trim();
+  expert?: string | undefined;
+}): string =>
+  spec.url ?? spec.expert ?? [spec.command ?? '', ...(spec.args ?? [])].join(' ').trim();
 
 export function createNeedsYou(deps: NeedsYouDeps) {
   const open = new Map<string, Open>();
@@ -84,9 +86,14 @@ export function createNeedsYou(deps: NeedsYouDeps) {
   ];
   const changed = (): void => deps.push(list());
 
-  const whichPath = async (command: string | undefined): Promise<string | null> => {
-    if (command === undefined) return null;
-    const done = await deps.run(['node', 'which', command]);
+  const whichPath = async (spec: {
+    command?: string | undefined;
+    expert?: string | undefined;
+  }): Promise<string | null> => {
+    const target =
+      spec.expert !== undefined ? ['--expert', spec.expert] : spec.command && [spec.command];
+    if (!target) return null;
+    const done = await deps.run(['node', 'which', ...target]);
     return done.code === 0 ? lastLine(done.out) : null;
   };
 
@@ -94,9 +101,13 @@ export function createNeedsYou(deps: NeedsYouDeps) {
   const command = ({ frame }: Open): string[] | null => {
     if (frame.need !== 'approve') {
       if (frame.expert.startsWith('-')) return null;
-      return ['login', frame.expert];
+      return frame.need === 'install'
+        ? ['install', frame.expert, '--yes']
+        : ['login', frame.expert];
     }
-    const { command: program = '', args = [], url } = frame.spec;
+    const { command: program = '', args = [], url, expert } = frame.spec;
+    if (expert !== undefined)
+      return expert.startsWith('-') ? null : ['node', 'allow', '--expert', expert];
     if (url !== undefined) return ['node', 'allow', '--url', url];
     if (program.startsWith('-')) return null;
     return ['node', 'allow', program, ...(args.length > 0 ? ['--', ...args] : [])];
@@ -118,7 +129,10 @@ export function createNeedsYou(deps: NeedsYouDeps) {
       }
       if (frame.need === 'app_signin') return signins.open(frame);
       arriving.add(frame.id);
-      const [path, brain] = await Promise.all([whichPath(frame.spec.command), deps.brain()]);
+      const [path, brain] = await Promise.all([
+        frame.need === 'install' ? null : whichPath(frame.spec),
+        deps.brain(),
+      ]);
       if (!arriving.delete(frame.id)) return false;
       open.set(frame.id, { frame, path, brain, state: 'waiting', bubble: true });
       changed();

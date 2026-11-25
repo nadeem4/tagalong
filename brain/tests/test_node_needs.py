@@ -13,7 +13,8 @@ from brain.auth import Principal
 from brain.bodies import Bodies
 from brain.node_needs import NodeNeeds
 from brain.protocol import Body, ErrorCode, NodeAnsweredParams, PipeSpec, RpcError
-from tests.fake_node import FakeNode
+from brain.setup.store import InstalledExpert
+from tests.fake_node import FAKE, FakeNode
 
 
 class Desk:
@@ -54,16 +55,25 @@ async def settle() -> None:
 
 
 SPEC = PipeSpec(command=sys.executable, args=["--version"])
+EXPERT = PipeSpec(expert="claude-acp")
+INSTALLED = InstalledExpert(
+    "claude-acp", "Claude Code", "1", [sys.executable, FAKE], "registry", None
+)
 
 
 async def test_a_refused_pipe_asks_the_desktop_beside_the_node_and_no_other(rig):
     bodies, node, desk, elsewhere, needs = rig
-    task = asyncio.create_task(needs.open_pipe("pc", SPEC, expert="claude-acp"))
+    node.experts.add(
+        InstalledExpert(
+            "claude-acp", "Claude Code", "1", [sys.executable, "--version"], "registry", None
+        )
+    )
+    task = asyncio.create_task(needs.open_pipe("pc", EXPERT))
     await settle()
     (frame,) = desk.needs()
     assert frame["state"] == "open" and frame["need"] == "approve"
     assert frame["node"] == "pc" and frame["expert"] == "claude-acp"
-    assert PipeSpec.model_validate(frame["spec"]) == SPEC
+    assert PipeSpec.model_validate(frame["spec"]) == EXPERT
     assert elsewhere.needs() == []
     task.cancel()
 
@@ -105,12 +115,37 @@ async def test_another_body_cannot_answer_for_the_desktop(rig):
     task.cancel()
 
 
-async def test_a_missing_tool_fails_the_job_with_the_line_to_run_there(rig):
+async def test_a_missing_program_fails_with_no_question(rig):
     _, _, desk, _, needs = rig
-    missing = PipeSpec(command="no-such-tool-xyz")
-    with pytest.raises(RpcError, match="codex-acp is not installed on pc; run tagalong install"):
-        await needs.open_pipe("pc", missing, expert="codex-acp")
+    with pytest.raises(RpcError) as err:
+        await needs.open_pipe("pc", PipeSpec(command="no-such-tool-xyz"))
+    assert err.value.code == ErrorCode.not_installed
     assert desk.needs() == []
+
+
+async def test_a_missing_expert_asks_to_install_once_and_the_job_goes_on_after_done(rig):
+    _, node, desk, _, needs = rig
+    task = asyncio.create_task(needs.open_pipe("pc", EXPERT))
+    await settle()
+    (frame,) = desk.needs()
+    assert frame["need"] == "install" and frame["expert"] == "claude-acp"
+    assert PipeSpec.model_validate(frame["spec"]) == EXPERT
+    node.experts.add(INSTALLED)  # what `tagalong install` does on that machine
+    await needs.answered("desk", NodeAnsweredParams(id=frame["id"], outcome="done"))
+    pipe = await asyncio.wait_for(task, 5)
+    assert node.opened == [EXPERT, EXPERT]
+    assert [f["need"] for f in desk.needs() if f["state"] == "open"] == ["install"]
+    pipe.close()
+
+
+async def test_not_now_to_an_install_fails_the_job_with_the_line_to_run_there(rig):
+    _, node, desk, _, needs = rig
+    task = asyncio.create_task(needs.open_pipe("pc", EXPERT))
+    await settle()
+    await needs.answered("desk", NodeAnsweredParams(id=desk.needs()[0]["id"], outcome="not_now"))
+    with pytest.raises(RpcError, match="claude-acp is not installed on pc; run tagalong install"):
+        await task
+    assert node.opened == [EXPERT]
 
 
 async def test_the_node_ignores_frames_that_would_edit_its_list(tmp_path):

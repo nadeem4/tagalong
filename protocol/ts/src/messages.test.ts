@@ -21,6 +21,7 @@ import {
   NodeAnsweredParams,
   NodeNeedsParams,
   type NodeNeedsOpen,
+  PipeSpec,
   ListenParams,
   ReadAloudEventData,
   ReadingEventData,
@@ -367,11 +368,11 @@ describe('node_needs frames', () => {
   const sample = (name: string): unknown =>
     (JSON.parse(readFileSync(join(examples, name), 'utf8')) as { params: unknown }).params;
   it('parses an open request for each need and the closing frame', () => {
-    const needs = ['', '.signin', '.app-signin'].map(
+    const needs = ['', '.signin', '.app-signin', '.install'].map(
       (kind) =>
         NodeNeedsParams.parse(sample(`brain.node_needs.params${kind}.json`)) as NodeNeedsOpen,
     );
-    expect(needs.map((n) => n.need)).toEqual(['approve', 'signin', 'app_signin']);
+    expect(needs.map((n) => n.need)).toEqual(['approve', 'signin', 'app_signin', 'install']);
     expect(NodeNeedsParams.parse(sample('brain.node_needs.params.closed.json'))).toMatchObject({
       state: 'closed',
       reason: 'answered',
@@ -390,13 +391,17 @@ describe('node_needs frames', () => {
     };
     expect(NodeNeedsParams.safeParse(bare).success).toBe(false);
   });
-  it('refuses a sign-in that names no expert, and an install request', () => {
-    const { expert: _expert, ...bare } = sample('brain.node_needs.params.signin.json') as {
-      expert: string;
-    };
-    expect(NodeNeedsParams.safeParse(bare).success).toBe(false);
-    expect(NodeNeedsParams.safeParse({ ...bare, need: 'install', expert: 'e' }).success).toBe(
-      false,
-    );
+  it('refuses a sign-in or an install that names no expert', () => {
+    for (const kind of ['.signin', '.install']) {
+      const { expert: _expert, ...bare } = sample(`brain.node_needs.params${kind}.json`) as {
+        expert: string;
+      };
+      expect(NodeNeedsParams.safeParse(bare).success).toBe(false);
+    }
+  });
+  it('takes an expert as a pipe spec only alone', () => {
+    const open = sample('brain.pipe_open.params.expert.json') as { spec: object };
+    expect(PipeSpec.parse(open.spec)).toEqual({ args: [], expert: 'claude-acp' });
+    expect(PipeSpec.safeParse({ ...open.spec, command: 'claude' }).success).toBe(false);
   });
 });

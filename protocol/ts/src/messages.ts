@@ -388,18 +388,22 @@ export interface MethodSchemas {
 }
 
 // Node pipes: the brain asks a node to run an allowed command and relays its stdin and stdout.
-// A spec names a command or the exact URL of an HTTP MCP server the node relays to; never a secret.
+// A spec names a command, the exact URL of an HTTP MCP server the node relays to, or an expert
+// by id that the node maps to its own install; never a secret.
 export const PipeSpec = z
   .object({
     command: z.string().min(1).optional(),
     args: z.array(z.string()).default([]),
     url: z.string().min(1).optional(),
+    expert: Id.optional(),
   })
-  .refine((spec) => (spec.command === undefined) !== (spec.url === undefined), {
-    message: 'a spec names a command or a url, one of them',
-  })
-  .refine((spec) => spec.url === undefined || spec.args.length === 0, {
-    message: 'a url spec takes no args',
+  .refine(
+    (spec) =>
+      [spec.command, spec.url, spec.expert].filter((target) => target !== undefined).length === 1,
+    { message: 'a spec names a command, a url or an expert, one of them' },
+  )
+  .refine((spec) => spec.command !== undefined || spec.args.length === 0, {
+    message: 'only a command spec takes args',
   });
 export type PipeSpec = z.infer<typeof PipeSpec>;
 
@@ -426,12 +430,13 @@ const nodeNeedsOpen = {
   state: z.literal('open'),
 };
 const nodeNeedsOnNode = { ...nodeNeedsOpen, node: Id, spec: PipeSpec };
-// Signing in is for a named expert; approving a program names none. An app that stays on the
+// Signing in and installing are for a named expert; approving a program names none. An app that stays on the
 // brain asks for its web sign-in to finish on this PC: `url` is the page to open and `port`
 // the loopback port its redirect returns to.
 export const NodeNeedsOpen = z.union([
   z.object({ ...nodeNeedsOnNode, need: z.literal('approve'), expert: Id.optional() }),
   z.object({ ...nodeNeedsOnNode, need: z.literal('signin'), expert: Id }),
+  z.object({ ...nodeNeedsOnNode, need: z.literal('install'), expert: Id }),
   z.object({
     ...nodeNeedsOpen,
     need: z.literal('app_signin'),

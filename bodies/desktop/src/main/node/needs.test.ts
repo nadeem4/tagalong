@@ -38,7 +38,7 @@ function rig(
   const needs = createNeedsYou({
     run: async (args) => {
       if (args[1] === 'which') {
-        return args[2] === 'claude-agent-acp'
+        return args[2] === 'claude-agent-acp' || args[3] === 'claude-code'
           ? { code: 0, out: 'C:\\tools\\claude-agent-acp.cmd\n' }
           : { code: 1, out: 'not a program' };
       }
@@ -109,6 +109,26 @@ describe('needs you on this PC', () => {
     expect(needs.list()).toEqual([]);
   });
 
+  it("allow of an expert names it by id and shows this PC's own install of it", async () => {
+    const { needs, calls } = rig();
+    await needs.frame(open({ spec: { expert: 'claude-code' } }));
+    expect(needs.list()[0]).toMatchObject({
+      what: 'claude-code',
+      path: 'C:\\tools\\claude-agent-acp.cmd',
+    });
+    await needs.act('n1');
+    expect(calls).toEqual([['node', 'allow', '--expert', 'claude-code']]);
+  });
+
+  it('install runs the install command for the expert, then tells the brain', async () => {
+    const { needs, calls, answers } = rig();
+    await needs.frame(open({ id: 'i1', need: 'install', spec: { expert: 'claude-code' } }));
+    expect(needs.list()[0]).toMatchObject({ need: 'install', expert: 'claude-code', path: null });
+    expect(await needs.act('i1')).toEqual({});
+    expect(calls).toEqual([['install', 'claude-code', '--yes']]);
+    expect(answers).toEqual([['i1', 'done']]);
+  });
+
   it('allow of an address uses --url', async () => {
     const { needs, calls } = rig();
     await needs.frame(open({ spec: { url: 'https://mcp.example/x' } }));
@@ -150,8 +170,10 @@ describe('needs you on this PC', () => {
     const { needs, calls, answers } = rig();
     await needs.frame(open({ spec: { command: '--version' } }));
     await needs.frame(open({ id: 'i', need: 'signin', expert: '-y' }));
+    await needs.frame(open({ id: 'j', need: 'install', expert: '-y', spec: { expert: '-y' } }));
     expect(await needs.act('n1')).toEqual({ error: 'This PC will not run that.' });
     expect(await needs.act('i')).toEqual({ error: 'This PC will not run that.' });
+    expect(await needs.act('j')).toEqual({ error: 'This PC will not run that.' });
     expect(calls).toEqual([]);
     expect(answers).toEqual([]);
   });

@@ -16,6 +16,10 @@ export const brainFirst = (name: string): string => (name === 'your brain' ? 'Yo
 export const brainLabel = (item: NeedsYouItem): string =>
   item.identity === undefined ? item.brain : `${item.brain} (${item.identity})`;
 
+/** What a request is about: an expert by its name, else the program or address as given. */
+export const target = (item: NeedsYouItem): string =>
+  item.expert === undefined ? item.what : expertName(item.expert);
+
 const askedBy = (item: NeedsYouItem): string =>
   `Asked by ${brainLabel(item)}${item.path === null ? '' : ` · ${item.path}`}`;
 
@@ -37,11 +41,21 @@ interface NeedWords {
 
 export const WORDS: Record<NeedsYouItem['need'], NeedWords> = {
   approve: {
-    title: (i) => `Run ${i.what}`,
-    head: (i) => `Scout on ${i.brain} wants to run ${i.what} here.`,
-    allowed: (i) => `Allowed. ${i.brain} can run ${i.what}. Starting the job now.`,
+    title: (i) => `Run ${target(i)}`,
+    head: (i) => `Scout on ${i.brain} wants to run ${target(i)} here.`,
+    allowed: (i) => `Allowed. ${i.brain} can run ${target(i)}. Starting the job now.`,
     working: 'Allowing it…',
     does: 'Allow',
+    meta: askedBy,
+  },
+  install: {
+    title: (i) => `Install ${expertName(i.expert)}`,
+    head: (i) => `${expertName(i.expert)} is not on this PC yet.`,
+    allowed: (i) =>
+      `${expertName(i.expert)} is installed on this PC. Running the job for ${i.brain}.`,
+    working: 'Installing. This can take a few minutes.',
+    waiting: (i) => `${brainFirst(i.brain)} wants it here. Install it?`,
+    does: 'Install',
     meta: askedBy,
   },
   signin: {

@@ -12,6 +12,7 @@ from brain.bodies import Bodies
 from brain.node.allowlist import Allowlist
 from brain.node.pipes import Child, Pipes, spawn_process
 from brain.protocol import Body, PipeSpec, RpcError
+from brain.setup.store import ExpertStore
 
 FAKE = str(Path(__file__).parent / "fake_mcp_server.py")
 
@@ -28,7 +29,8 @@ class FakeNode:
         self._children: list[Child] = []
         # every frame to or from the brain, pipe_data bodies also decoded, and the pipe_open replies
         self.frames: list[str] = []
-        self.pipes = Pipes(self.allowlist, self._to_brain, self._spawn)
+        self.experts = ExpertStore(tmp_path)
+        self.pipes = Pipes(self.allowlist, self._to_brain, self.experts, self._spawn)
         self.opened: list[PipeSpec] = []
         self.folders: set[str] = set()
         self._tasks: set[asyncio.Task] = set()

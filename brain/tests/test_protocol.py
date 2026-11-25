@@ -536,7 +536,7 @@ def test_answer_check_back_only_with_not_now():
         answer.model_validate({"ask": "a", "option": "allow", "check_back_at": at})
 
 
-def test_a_sign_in_request_names_an_expert():
+def test_a_sign_in_or_install_request_names_an_expert():
     from pydantic import TypeAdapter, ValidationError
 
     from brain.protocol import NodeNeedsOpen
@@ -548,4 +548,5 @@ def test_a_sign_in_request_names_an_expert():
         opened.validate_python({**frame, "need": "signin"})
     assert opened.validate_python({**frame, "need": "signin", "expert": "e"}).expert == "e"
     with pytest.raises(ValidationError):
-        opened.validate_python({**frame, "need": "install", "expert": "e"})
+        opened.validate_python({**frame, "need": "install"})
+    assert opened.validate_python({**frame, "need": "install", "expert": "e"}).need == "install"
