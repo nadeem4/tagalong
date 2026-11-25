@@ -5,6 +5,7 @@
  * NeedsYouBubble (the first open one, and the line after a choice).
  */
 import { useEffect, useState } from 'react';
+import { Icon } from '../setup/icons';
 import { DONE_HOLD_MS, type NeedsYouItem } from '../shapes';
 import { useNeedsActions, useNeedsYou } from './use-needs-you';
 import { PUT_OFF, WORDS, brainFirst, brainLabel } from './words';
@@ -63,7 +64,8 @@ export function NeedsYouCard({
 }) {
   const working = item.state === 'working';
   // The page is already open, so opening it again sits first and as quietly as Not now.
-  const again = item.need === 'app_signin' && item.state !== 'failed';
+  const failed = item.state === 'failed';
+  const again = item.need === 'app_signin' && !failed;
   const act = (
     <button
       type="button"
@@ -71,7 +73,7 @@ export function NeedsYouCard({
       disabled={working}
       onClick={onAct}
     >
-      {item.state === 'failed' ? 'Try again' : WORDS[item.need].does}
+      {failed ? 'Try again' : WORDS[item.need].does}
     </button>
   );
   const notNow = (
@@ -85,15 +87,16 @@ export function NeedsYouCard({
         <p className="bubble-text">{WORDS[item.need].head(item)}</p>
         <span className="card-chip">Needs you here</span>
       </div>
-      <Facts item={item} />
+      {!(item.need === 'app_signin' && failed) && <Facts item={item} />}
       {item.state === 'waiting' && WORDS[item.need].waiting !== undefined && (
         <p className="card-brief">{WORDS[item.need].waiting?.(item)}</p>
       )}
       {working && <p className="card-brief">{WORDS[item.need].working}</p>}
-      {item.state === 'failed' && (
-        <p className="card-brief" role="alert">
-          {item.failure}
-        </p>
+      {failed && (
+        <div className="bubble-error" role="alert">
+          <Icon name="error" />
+          <span>{item.failure}</span>
+        </div>
       )}
       {item.need !== 'app_signin' && (
         <p className="card-brief">
@@ -102,7 +105,7 @@ export function NeedsYouCard({
       )}
       <div className="card-actions">
         {again ? act : notNow}
-        {again ? notNow : act}
+        {again ? notNow : item.canRetry !== false && act}
       </div>
     </section>
   );

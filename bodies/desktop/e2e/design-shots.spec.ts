@@ -1565,25 +1565,36 @@ test('BAU5b finish an app sign-in on this PC, light, dark and failed', async () 
       await settled(panel);
       await panel.screenshot({ path: join(dir, `done-${scheme}.png`) });
     }
-    launched.brain.refuseNodeAnswers = true;
-    const again = await freePort();
-    launched.brain.sendNodeNeeds({
-      id: 'g2',
-      state: 'open',
-      need: 'app_signin',
-      app: 'Gmail',
-      url: `https://accounts.example/authorize?state=s2&redirect_uri=http%3A%2F%2F127.0.0.1%3A${again}%2Fcallback`,
-      port: again,
-    });
-    await expect(card).toContainText('Waiting for Gmail', { timeout: 30_000 });
-    await fetch(`http://127.0.0.1:${again}/callback?code=spent&state=s2`);
-    await expect(card.getByRole('alert')).toContainText('did not accept it', { timeout: 30_000 });
+    const askAgain = async (id: string, mode: 'refuse' | 'silent'): Promise<void> => {
+      launched.brain.nodeAnswerMode = mode;
+      const again = await freePort();
+      launched.brain.sendNodeNeeds({
+        id,
+        state: 'open',
+        need: 'app_signin',
+        app: 'Gmail',
+        url: `https://accounts.example/authorize?state=${id}&redirect_uri=http%3A%2F%2F127.0.0.1%3A${again}%2Fcallback`,
+        port: again,
+      });
+      await expect(card).toContainText('Waiting for Gmail', { timeout: 30_000 });
+      await fetch(`http://127.0.0.1:${again}/callback?code=spent&state=${id}`);
+      await expect(card.getByRole('alert')).toBeVisible({ timeout: 45_000 });
+    };
+    const shoot = async (name: string): Promise<void> => {
+      for (const scheme of ['light', 'dark'] as const) {
+        await panel.emulateMedia({ colorScheme: scheme });
+        await settled(panel);
+        await panel.screenshot({ path: join(dir, `${name}-${scheme}.png`) });
+      }
+    };
+    await askAgain('g2', 'silent');
     await expect(card.getByRole('button', { name: 'Try again' })).toBeInViewport({ ratio: 1 });
-    for (const scheme of ['light', 'dark'] as const) {
-      await panel.emulateMedia({ colorScheme: scheme });
-      await settled(panel);
-      await panel.screenshot({ path: join(dir, `failed-${scheme}.png`) });
-    }
+    await shoot('failed');
+    await card.getByRole('button', { name: 'Not now' }).click();
+    await askAgain('g3', 'refuse');
+    await expect(card.getByRole('alert')).toContainText('no longer open');
+    await expect(card.getByRole('button', { name: 'Try again' })).toHaveCount(0);
+    await shoot('refused');
   } finally {
     await launched.done();
   }

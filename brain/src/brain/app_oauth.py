@@ -45,8 +45,11 @@ class NeedsSignIn(OAuthError):
 class FileTokenStorage:
     """The SDK's `TokenStorage` over `data_dir/app-oauth/<app_id>.json`, owner-only if honoured."""
 
-    def __init__(self, data_dir: Path | str, app_id: str) -> None:
+    def __init__(
+        self, data_dir: Path | str, app_id: str, on_saved: Callable[[], None] | None = None
+    ) -> None:
         self._path = Path(data_dir) / "app-oauth" / f"{app_id}.json"
+        self._on_saved = on_saved
 
     @property
     def path(self) -> Path:
@@ -97,6 +100,8 @@ class FileTokenStorage:
                 "saved_at": time.time(),
             }
         )
+        if self._on_saved:
+            self._on_saved()
 
     async def get_client_info(self) -> OAuthClientInformationFull | None:
         try:

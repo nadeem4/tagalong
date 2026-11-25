@@ -636,8 +636,6 @@ class Apps:
                     await session.initialize()
                     tools = await self._list(session)
                 slot.session, slot.tools = session, tools
-                if slot.signin:
-                    slot.signin.finished(None)
                 slot.signin = None  # the sign-in is over; later 401s never reopen a browser
                 self._set(slot, "connected")
                 while True:
@@ -762,7 +760,13 @@ class Apps:
         row = slot.row
         if self._data_dir is None:
             raise OAuthError("Sign-in is not set up in this brain.")
-        storage = FileTokenStorage(self._data_dir, row.id)
+
+        def saved() -> None:
+            # The code was traded and the tokens are on disk; the desktop need not wait for the app.
+            if slot.signin:
+                slot.signin.finished(None)
+
+        storage = FileTokenStorage(self._data_dir, row.id, saved)
         redirect_uri = "http://127.0.0.1/callback"  # unused unless a sign-in was asked for
         if slot.signin is None:
             if await storage.get_tokens() is None:

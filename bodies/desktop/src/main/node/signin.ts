@@ -3,7 +3,7 @@
  * in this PC's browser, the redirect is caught on this PC's loopback, and only the one-time code
  * goes to the brain. Holds those requests apart from the approve and sign-in ones in needs.ts.
  */
-import type { NodeNeedsOpen } from '@tagalong/contract';
+import { RpcError, type NodeNeedsOpen } from '@tagalong/contract';
 import { DONE_HOLD_MS, type NeedsYouItem } from '@tagalong/ui/shapes';
 import type { Listening, Redirect } from './loopback';
 
@@ -17,6 +17,7 @@ interface Signin {
   state: NeedsYouItem['state'];
   bubble: boolean;
   failure?: string;
+  canRetry?: boolean;
   listening?: Listening;
   redirect?: Redirect;
   hold?: ReturnType<typeof setTimeout>;
@@ -58,14 +59,21 @@ export function createSignin(deps: SigninDeps) {
     const answered = await Promise.race([
       deps.answer(s.frame.id, 'done', s.redirect).then(
         () => true,
-        () => false,
+        (err: unknown) => (err instanceof RpcError ? err : false),
       ),
-      new Promise<boolean>((resolve) => {
+      new Promise<false>((resolve) => {
         timer = setTimeout(resolve, BRAIN_ANSWER_MS, false);
       }),
     ]);
     clearTimeout(timer);
     if (open.get(s.frame.id) !== s) return {};
+    if (answered instanceof RpcError) {
+      // The brain closed the request when it refused, so the same code cannot be sent again.
+      delete s.redirect;
+      s.canRetry = false;
+      fail(s, answered.message);
+      return { error: s.failure ?? '' };
+    }
     if (!answered) {
       const { name } = s.brain;
       fail(
@@ -127,6 +135,7 @@ export function createSignin(deps: SigninDeps) {
         path: null,
         state: s.state,
         failure: s.failure,
+        canRetry: s.canRetry,
         bubble: s.bubble,
       })),
 
@@ -154,7 +163,7 @@ export function createSignin(deps: SigninDeps) {
 
     async act(id: string): Promise<{ error?: string }> {
       const s = open.get(id);
-      if (s === undefined) return {};
+      if (s === undefined || s.canRetry === false) return {};
       if (s.redirect !== undefined) return sendCode(s);
       if (s.listening === undefined) {
         s.state = 'waiting';

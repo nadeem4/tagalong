@@ -75,6 +75,18 @@ describe('NeedsYouBubble', () => {
       expect(buttons).toEqual(['Open it again', 'Not now']);
     });
 
+    it('after the brain refused, shows its reason in the alert with Not now only', async () => {
+      shown(<NeedsYouBubble />, {
+        needsYou: [
+          { ...SIGNIN, state: 'failed', failure: 'The sign-in was refused.', canRetry: false },
+        ],
+      });
+      expect((await screen.findByRole('alert')).textContent).toContain('The sign-in was refused.');
+      expect(screen.queryByText(/page opened in your browser/)).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+      expect(screen.getByRole('button', { name: 'Not now' })).toBeTruthy();
+    });
+
     it('shows why it failed and offers Try again', async () => {
       shown(<NeedsYouBubble />, {
         needsYou: [

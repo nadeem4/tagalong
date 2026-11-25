@@ -143,7 +143,8 @@ export function createNeedsYou(deps: NeedsYouDeps) {
       }
       open.delete(id);
       changed();
-      await deps.answer(id, 'done');
+      // The brain may have closed the request while the command ran; the card is gone either way.
+      await deps.answer(id, 'done').catch(() => undefined);
       return {};
     },
 
@@ -153,7 +154,7 @@ export function createNeedsYou(deps: NeedsYouDeps) {
       if (need === undefined) return;
       need.bubble = false;
       changed();
-      await deps.answer(id, 'not_now');
+      await deps.answer(id, 'not_now').catch(() => undefined);
     },
 
     async approved(): Promise<ApprovedItem[]> {

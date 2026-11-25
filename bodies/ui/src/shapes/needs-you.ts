@@ -23,6 +23,8 @@ export const NeedsYouItem = z.object({
   expert: z.string().optional(),
   state: z.enum(['waiting', 'working', 'failed', 'done']),
   failure: z.string().optional(),
+  /** False once the brain has refused and closed the request, so only Not now is left. */
+  canRetry: z.boolean().optional(),
   bubble: z.boolean(),
 });
 export type NeedsYouItem = z.infer<typeof NeedsYouItem>;

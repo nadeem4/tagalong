@@ -4,6 +4,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { NeedsYouItem } from '@tagalong/ui/shapes';
+import { RpcError } from '@tagalong/contract';
 import type { Redirect } from './loopback';
 import { createNeedsYou } from './needs';
 
@@ -31,7 +32,7 @@ function rig(
   const opened: string[] = [];
   const closed: number[] = [];
   const caught: Array<(redirect: Redirect) => void> = [];
-  const brainAnswers = { fail: false };
+  const brainAnswers = { fail: false, refuse: false };
   const portTaken = { yes: false };
   const pushed: NeedsYouItem[][] = [];
   const needs = createNeedsYou({
@@ -46,6 +47,7 @@ function rig(
     },
     answer: async (id, outcome, redirect) => {
       if (brainAnswers.fail) throw new Error('offline');
+      if (brainAnswers.refuse) throw new RpcError(-32004, 'That request is no longer open.');
       answers.push([id, outcome]);
       redirects.push(redirect);
     },
@@ -180,6 +182,14 @@ describe('needs you on this PC', () => {
     expect(calls.at(-1)).toEqual(['node', 'revoke', 'k1']);
   });
 
+  it('a click that races a request the brain already closed does not reject', async () => {
+    const { needs, brainAnswers } = rig();
+    await needs.frame(open());
+    brainAnswers.refuse = true;
+    await expect(needs.act('n1')).resolves.toEqual({});
+    await expect(needs.notNow('n1')).resolves.toBeUndefined();
+  });
+
   describe('an app sign-in that finishes on this PC', () => {
     const signin = (over: object = {}) => ({
       seq: 1,
@@ -244,6 +254,20 @@ describe('needs you on this PC', () => {
       expect(needs.list()[0]?.state).toBe('done');
       expect(answers).toEqual([['a1', 'done']]);
       expect(redirects).toEqual([{ code: 'c1', state: 's1' }]);
+    });
+
+    it('when the brain refuses the code it shows the reason with no Try again and drops the code', async () => {
+      const { needs, answers, caught, brainAnswers } = rig();
+      brainAnswers.refuse = true;
+      await needs.frame(signin());
+      caught[0]?.({ code: 'c1', state: 'bad' });
+      await vi.waitFor(() => expect(needs.list()[0]?.state).toBe('failed'));
+      expect(needs.list()[0]).toMatchObject({
+        failure: 'That request is no longer open.',
+        canRetry: false,
+      });
+      expect(await needs.act('a1')).toEqual({});
+      expect(answers).toEqual([]);
     });
 
     it('says to press Not now and ask again when this PC cannot listen on the port', async () => {
