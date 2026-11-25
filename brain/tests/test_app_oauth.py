@@ -22,7 +22,9 @@ from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 
 from brain.app_oauth import FileTokenStorage, LoopbackCallback, OAuthError, make_provider
 from brain.apps import AppError, AppRow, Apps
+from brain.bodies import Bodies
 from brain.memory import Memory
+from brain.node_needs import NodeNeeds
 
 FAKE_OAUTH = str(Path(__file__).parent / "fake_oauth_server.py")
 
@@ -290,6 +292,7 @@ class Rig:
             connect_timeout=15,
             signin_timeout=signin_timeout,
             data_dir=data_dir,
+            needs=NodeNeeds(Bodies()),
         )
 
     async def state(self, want, timeout=15.0):
@@ -457,7 +460,7 @@ async def test_sign_in_refuses_an_app_without_oauth(tmp_path):
     memory.add_app(
         AppRow("plain", "Plain", "http", {"url": "http://127.0.0.1:1/mcp"}, "none", True)
     )
-    apps = Apps(memory, lambda m, p: None, {}, data_dir=tmp_path)
+    apps = Apps(memory, lambda m, p: None, {}, data_dir=tmp_path, needs=NodeNeeds(Bodies()))
 
     async def never(url):
         raise AssertionError("no browser")

@@ -4,7 +4,7 @@
  * Contains DockPet, DockMood and DOCK_MOODS. Used by the desktop avatar window.
  */
 
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { STATUS_WORDS } from './shapes';
 import type { Pet, StatusMark as StatusMarkValue } from './shapes';
 import { StatusMark } from './status-mark';
@@ -115,6 +115,19 @@ function isTagged(mood: DockMood): mood is TaggedMood {
   return mood in TAGS;
 }
 
+/** The small rounded tags on the dock: small and tucked into a corner, clear of the mascot's props. */
+const PILL: CSSProperties = {
+  position: 'absolute',
+  padding: `${t.space.xxs}px ${t.space.hair}px`,
+  borderRadius: 999,
+  color: t.color.goldInk,
+  fontFamily: t.font.ui,
+  fontSize: t.dockTag,
+  lineHeight: `${t.dockTag + 2}px`,
+  fontWeight: t.fontWeight.semibold,
+  whiteSpace: 'nowrap',
+};
+
 /**
  * The companion on the dock: the live mascot in a mood and a small tag for what it is doing
  * (seeing, working), plus the sight-paused and listening marks, which show in every mood.
@@ -140,9 +153,13 @@ export function DockPet({
   const gathering = gather !== 'idle';
   const hearing = mood === 'listening' && listening === 'hearing';
   const tag = isTagged(mood) && !sightPaused && !hearing ? TAGS[mood] : undefined;
-  const label = `${pet.name} ${hearing ? 'is listening' : WORDS[mood]}${sightPaused ? ', sight paused' : ''}${
-    listening === undefined || hearing ? '' : `, ${LISTENING[listening].words}`
-  }${status == null ? '' : `, ${STATUS_WORDS[status.id].detail}`}`;
+  const parts = [
+    `${pet.name} ${hearing ? 'is listening' : WORDS[mood]}`,
+    sightPaused ? 'sight paused' : '',
+    listening === undefined || hearing ? '' : LISTENING[listening].words,
+    status == null ? '' : STATUS_WORDS[status.id].detail,
+  ];
+  const label = parts.filter(Boolean).join(', ');
   return (
     <span
       role="img"
@@ -166,24 +183,7 @@ export function DockPet({
       )}
 
       {tag !== undefined && (
-        <span
-          data-testid="dock-tag"
-          style={{
-            position: 'absolute',
-            top: 4,
-            right: 0,
-            // Small and tucked into the corner, so it stays clear of the mascot's props.
-            padding: `${t.space.xxs}px ${t.space.hair}px`,
-            borderRadius: 999,
-            background: tag.color,
-            color: t.color.goldInk,
-            fontFamily: t.font.ui,
-            fontSize: t.dockTag,
-            lineHeight: `${t.dockTag + 2}px`,
-            fontWeight: t.fontWeight.semibold,
-            whiteSpace: 'nowrap',
-          }}
-        >
+        <span data-testid="dock-tag" style={{ ...PILL, top: 4, right: 0, background: tag.color }}>
           {tag.text}
         </span>
       )}
@@ -191,18 +191,7 @@ export function DockPet({
         <span
           data-testid="paused-eye"
           title="Sight is paused — Tagalong cannot see your screen"
-          style={{
-            position: 'absolute',
-            top: 4,
-            left: 12,
-            padding: '2px 6px',
-            borderRadius: 999,
-            background: t.color.dim,
-            color: t.color.text,
-            fontSize: t.type.caption.size,
-            lineHeight: `${t.type.caption.line}px`,
-            fontWeight: t.fontWeight.semibold,
-          }}
+          style={{ ...PILL, top: 4, left: 12, background: t.color.dim, color: t.color.text }}
         >
           Paused
         </span>
@@ -211,19 +200,11 @@ export function DockPet({
         <span
           data-testid="needs-you-tag"
           style={{
-            position: 'absolute',
+            ...PILL,
             bottom: 0,
             left: '50%',
             transform: 'translateX(-50%)',
-            padding: `${t.space.xxs}px ${t.space.hair}px`,
-            borderRadius: 999,
             background: t.color.gold,
-            color: t.color.goldInk,
-            fontFamily: t.font.ui,
-            fontSize: t.dockTag,
-            lineHeight: `${t.dockTag + 2}px`,
-            fontWeight: t.fontWeight.semibold,
-            whiteSpace: 'nowrap',
           }}
         >
           Needs you · {needsYou}

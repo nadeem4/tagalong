@@ -158,7 +158,7 @@ class ExpertHosts:
         clock: Callable[[], float] = time.monotonic,
         placements: Placements | None = None,
         bodies: Bodies | None = None,
-        needs: NodeNeeds | None = None,
+        needs: NodeNeeds,
     ) -> None:
         self._placements = placements
         self._bodies = bodies
@@ -195,9 +195,7 @@ class ExpertHosts:
     def _open_pipe(self, where: str, expert) -> Callable[[PipeSpec], Awaitable[Pipe]]:
         async def open_pipe(spec: PipeSpec) -> Pipe:
             try:
-                if self._needs is not None:
-                    return await self._needs.open_pipe(where, spec, expert=expert.id)
-                return await self._bodies.open_pipe(where, spec)
+                return await self._needs.open_pipe(where, spec, expert=expert.id)
             except RpcError as err:
                 name = self._bodies.name(where)
                 if err.code == ErrorCode.denied:
@@ -214,7 +212,7 @@ class ExpertHosts:
         return open_pipe
 
     def _sign_in(self, host: str, expert) -> Callable[[], Awaitable[bool]] | None:
-        if host == "brain" or self._needs is None:
+        if host == "brain":
             return None
         spec = PipeSpec(command=expert.command[0], args=expert.command[1:])
         return lambda: self._needs.sign_in(host, spec, expert.id)

@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '../controls/button';
 import { ScoutMark } from '../scout-mark';
+import { cap } from '../text';
 import type { KnowMeStatus, KnowSourceInfo, MemoryEntry } from '../shapes';
 import { KNOW_ME_CSS } from './know-me-styles';
 
@@ -18,7 +19,6 @@ const SOURCE_LABELS: Record<string, string> = {
 /** The tags the brain writes, in the order a person thinks of them; any other tag follows. */
 const TAG_ORDER = ['work', 'skills', 'projects', 'interests', 'personal'];
 
-const cap = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
 const sourceLabel = (source: string | undefined): string =>
   source === undefined ? '' : (SOURCE_LABELS[source] ?? cap(source));
 const tagOf = (fact: MemoryEntry): string => fact.tag ?? 'other';

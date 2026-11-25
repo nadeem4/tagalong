@@ -155,6 +155,8 @@ async def _run() -> None:
     experts = ExpertStore(config.data_dir)
     tokens = TokenFile(config.data_dir)
     needs = NodeNeeds(bodies)
+    bodies.on_gone = needs.node_gone
+    bodies.on_node_answered = needs.answered
     apps = Apps(
         memory,
         bodies.notify,

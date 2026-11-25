@@ -39,6 +39,7 @@ describe('shapes', () => {
       over_limit: -32008,
       unauthorized: -32009,
       network_off: -32010,
+      not_installed: -32011,
     });
   });
 

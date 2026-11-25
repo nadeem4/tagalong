@@ -552,7 +552,7 @@ def _dispatch(
         except ValidationError as exc:
             return _error(req_id, ErrorCode.invalid_params, str(exc))
         if bodies.on_node_answered is not None and bodies.is_current(body_id, peer):
-            bodies.on_node_answered(body_id, answered.model_dump())
+            bodies.on_node_answered(body_id, answered)
         return _result(req_id, {})
     if method == "cancel":
         try:

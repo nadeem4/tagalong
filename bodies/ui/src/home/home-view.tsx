@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { Pet } from '../shapes';
+import type { NeedsYouItem, Pet } from '../shapes';
 import { useHostBridge } from '../host-bridge';
 import { ScoutGlyph } from '../scout-mark';
 import { Button } from '../controls/button';
@@ -70,7 +70,8 @@ export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps)
   const [page, setPage] = useState<HomePage>(asked ?? 'overview');
   const [pets, setPets] = useState<Pet[]>([]);
   const [reach, setReach] = useState(false);
-  const waiting = useNeedsYou().length;
+  const needs = useNeedsYou();
+  const waiting = needs.length;
 
   const [lastAsked, setLastAsked] = useState(asked);
   if (asked !== lastAsked) {
@@ -137,6 +138,7 @@ export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps)
             <Overview
               companion={companion}
               host={host}
+              needs={needs}
               onAway={() => {
                 go('devices');
                 setReach(true);
@@ -163,10 +165,12 @@ export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps)
 function Overview({
   companion,
   host,
+  needs,
   onAway,
 }: {
   companion: Pet | undefined;
   host: HomeHost;
+  needs: NeedsYouItem[];
   onAway: () => void;
 }) {
   const [status, setStatus] = useState<{ text: string; ok: boolean }>({ text: 'Ready', ok: true });
@@ -215,7 +219,7 @@ function Overview({
         <h1 className="home-title">Overview</h1>
         <p>Everything {name} is doing for you.</p>
       </div>
-      <NeedsYouSection />
+      <NeedsYouSection items={needs} />
       <div className="tg-cards">
         <section className="tg-card" aria-label={name}>
           <h2 className="tg-card__label">{name}</h2>

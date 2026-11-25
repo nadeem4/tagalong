@@ -7,6 +7,7 @@ import { useState } from 'react';
 import type { PreferenceRow } from '../host-bridge';
 import { Button } from '../controls/button';
 import { failure } from '../failure';
+import { shortDate } from '../text';
 
 interface Props {
   /** Null until a read succeeds: then nothing is claimed, not even "none yet". */
@@ -16,11 +17,8 @@ interface Props {
   onEdit(id: number, sentence: string): Promise<void>;
 }
 
-const day = (iso: string): string =>
-  new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric' });
-
 const dayAndTime = (iso: string): string =>
-  `${day(iso)}, ${new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  `${shortDate(iso)}, ${new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 
 export function PreferencesList({ preferences, onRemove, onEdit }: Props) {
   const [editing, setEditing] = useState<number | null>(null);
@@ -108,7 +106,7 @@ export function PreferencesList({ preferences, onRemove, onEdit }: Props) {
                   <q className="apv-pref__sentence">{pref.sentence}</q>
                   <span className="apv-pref__meta">
                     <span>
-                      Agreed <b>{day(pref.createdAt)}</b>
+                      Agreed <b>{shortDate(pref.createdAt)}</b>
                     </span>
                     <span>
                       Used <b>{pref.useCount === 1 ? '1 time' : `${pref.useCount} times`}</b>

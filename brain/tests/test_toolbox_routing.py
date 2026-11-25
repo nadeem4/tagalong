@@ -16,6 +16,7 @@ from brain.apps import AppRow, Apps, TokenFile
 from brain.bodies import Bodies
 from brain.memory import Memory
 from brain.mind.turn import Call
+from brain.node_needs import NodeNeeds
 from brain.permission import Engine, Person, StandingRule, stored_auto_rules
 from brain.placements import Placement, Placements
 from brain.protocol import ErrorCode, RpcError
@@ -48,7 +49,12 @@ class Rig:
         if placement is not None:
             self.placements.set("app", "fake", placement)
         self.apps = Apps(
-            self.memory, lambda *_: None, {}, placements=self.placements, bodies=self.bodies
+            self.memory,
+            lambda *_: None,
+            {},
+            placements=self.placements,
+            bodies=self.bodies,
+            needs=NodeNeeds(self.bodies),
         )
         self.where_asked: list[tuple[str, str]] = []
         self.pick_body = True

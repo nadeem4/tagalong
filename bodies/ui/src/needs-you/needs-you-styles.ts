@@ -1,4 +1,7 @@
-/** The rows of Home's "Needs you on this PC" and "Approved on this PC": a title and its facts, then buttons. */
+/**
+ * The rows of Home's "Needs you on this PC" and "Approved on this PC": a title and its facts,
+ * then buttons.
+ */
 import { themeTokens as t, themedColor, typeCss } from '../theme/tokens';
 
 export const NEEDS_CSS = `

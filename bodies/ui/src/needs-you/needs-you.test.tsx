@@ -64,11 +64,12 @@ describe('NeedsYouBubble', () => {
     const bridge = shown(
       <>
         <NeedsYouBubble />
-        <NeedsYouSection />
+        <NeedsYouSection items={[{ ...ITEM }]} />
       </>,
       { needsYou: [ITEM] },
     );
-    fireEvent.click((await screen.findAllByRole('button', { name: 'Not now' }))[0]!);
+    await screen.findByRole('region', { name: 'Needs you on this PC' });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Not now' })[0]!);
     expect(bridge.needsYouNotNows).toEqual(['n1']);
     expect(await screen.findByText(/The job waits/)).toBeTruthy();
   });
@@ -76,18 +77,12 @@ describe('NeedsYouBubble', () => {
 
 describe('NeedsYouSection', () => {
   it('lists every waiting request with a count, and nothing when there are none', async () => {
-    shown(<NeedsYouSection />, {
-      needsYou: [ITEM, { ...ITEM, id: 'n2', bubble: false, what: 'gh' }],
-    });
+    shown(<NeedsYouSection items={[ITEM, { ...ITEM, id: 'n2', bubble: false, what: 'gh' }]} />, {});
     expect(await screen.findByText('2 waiting')).toBeTruthy();
     expect(screen.getAllByRole('button', { name: 'Allow' })).toHaveLength(2);
     cleanup();
-    const { container } = render(
-      <HostBridgeProvider bridge={createFakeHostBridge({ needsYou: [] })}>
-        <NeedsYouSection />
-      </HostBridgeProvider>,
-    );
-    await waitFor(() => expect(container.textContent).toBe(''));
+    const { container } = render(<NeedsYouSection items={[]} />);
+    expect(container.textContent).toBe('');
   });
 });
 

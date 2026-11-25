@@ -30,6 +30,7 @@ from brain.protocol import (
     LIMITS,
     Body,
     ErrorCode,
+    NodeAnsweredParams,
     PipeCloseParams,
     PipeDataParams,
     PipeSpec,
@@ -168,10 +169,10 @@ class Bodies:
         # Session sets this: (body id, seconds it was away, None if unknown) so a wake that
         # waited for a body can start and a long absence can be noticed.
         self.on_connect: Callable[[str, float | None], None] | None = None
-        # Session sets this: a body that was current has gone, so what waited on it can end.
+        # A body that was current has gone, so what waited on it can end.
         self.on_gone: Callable[[str], None] | None = None
-        # A desktop's answer to a node_needs request: (body id, raw params).
-        self.on_node_answered: Callable[[str, Any], None] | None = None
+        # A desktop's answer to a node_needs request.
+        self.on_node_answered: Callable[[str, NodeAnsweredParams], None] | None = None
 
     def name(self, body_id: str) -> str:
         """The name a body declared, even after it left; its id if it never connected."""

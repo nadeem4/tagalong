@@ -17,6 +17,7 @@ from brain.bodies import Bodies
 from brain.memory import Memory
 from brain.node.allowlist import oauth_storage
 from brain.node.signin import sign_in
+from brain.node_needs import NodeNeeds
 from brain.placements import Placement, Placements
 from brain.protocol import PipeSpec, RpcError
 from tests.fake_node import FakeNode
@@ -47,7 +48,9 @@ async def rig(tmp_path):
     node.connect()
     placements = Placements(memory.db)
     placements.set("app", "notes", Placement("body", "pc"))
-    apps = Apps(memory, lambda *_: None, {}, placements=placements, bodies=bodies)
+    apps = Apps(
+        memory, lambda *_: None, {}, placements=placements, bodies=bodies, needs=NodeNeeds(bodies)
+    )
     yield apps, node, memory, tmp_path / "node"
     await apps.shutdown()
     await node.aclose()

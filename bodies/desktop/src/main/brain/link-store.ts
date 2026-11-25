@@ -15,6 +15,9 @@ export interface SecretBox {
 
 export type PairedLink = BrainLink & { fp: string };
 
+/** The address to dial: the one that worked last, else the first the pairing gave. */
+export const pairedAddr = (link: PairedLink): string | undefined => link.lastGood ?? link.addrs[0];
+
 export class LinkStore {
   constructor(
     private readonly settings: SettingsStore,

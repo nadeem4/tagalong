@@ -16,6 +16,7 @@ from types import SimpleNamespace
 import pytest
 from fake_clock import FakeClock
 
+from brain.bodies import Bodies
 from brain.experts import (
     ExpertError,
     ExpertHost,
@@ -24,6 +25,7 @@ from brain.experts import (
     Question,
     kill_tree,
 )
+from brain.node_needs import NodeNeeds
 
 AGENT = Path(__file__).parent / "fake_acp_agent.py"
 
@@ -427,7 +429,7 @@ def test_the_factory_puts_a_private_nodes_dir_first_and_leaves_others_alone(tmp_
         expert = InstalledExpert(
             "x", "x", "1", [str(tmp_path / "n" / "node.exe")], "registry", True, node
         )
-        return ExpertHosts()(
+        return ExpertHosts(needs=NodeNeeds(Bodies()))(
             expert, on_permission=None, on_question=None, on_progress=None, on_end=None
         )
 

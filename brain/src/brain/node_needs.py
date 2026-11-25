@@ -10,11 +10,9 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from pydantic import ValidationError
-
 from brain.bodies import Bodies
 from brain.pipes import Pipe
-from brain.protocol import NOT_INSTALLED, ErrorCode, NodeAnsweredParams, PipeSpec, RpcError
+from brain.protocol import ErrorCode, NodeAnsweredParams, PipeSpec, RpcError
 
 log = logging.getLogger("brain")
 
@@ -38,33 +36,30 @@ class NodeNeeds:
         self._bodies = bodies
         self._wait_s = wait_s
         self._open: dict[str, _Open] = {}
-        bodies.on_gone = self._node_gone
-        bodies.on_node_answered = self.answered
 
     async def open_pipe(self, node: str, spec: PipeSpec, *, expert: str | None = None) -> Pipe:
         """Open a pipe on the node; when it refuses for want of an install or a yes, ask the
         person at the desktop beside it and try again after each answer (an install is usually
         followed by the yes)."""
-        for _ in range(_ASKS_PER_PIPE):
+        asks = 0
+        while True:
             try:
                 return await self._bodies.open_pipe(node, spec)
             except RpcError as err:
                 need = _need_for(err, expert)
-                if need is None or not await self._ask(node, need, spec, expert):
+                if need is None or asks == _ASKS_PER_PIPE:
                     raise
-        return await self._bodies.open_pipe(node, spec)
+                asks += 1
+                if not await self._ask(node, need, spec, expert):
+                    raise
 
     async def sign_in(self, node: str, spec: PipeSpec, expert: str) -> bool:
         """Ask for a sign-in on the node's machine; true once the person has done it."""
         return await self._ask(node, "signin", spec, expert)
 
-    def answered(self, body_id: str, params: Any) -> None:
+    def answered(self, body_id: str, answer: NodeAnsweredParams) -> None:
         """A desktop's reply. Only the desktop the question went to is heard; "not now" fails the
         job waiting on it and leaves the question open, a yes ends it."""
-        try:
-            answer = NodeAnsweredParams.model_validate(params)
-        except ValidationError:
-            return
         entry = self._open.get(answer.id)
         if entry is None or entry.desktop != body_id:
             return
@@ -112,7 +107,7 @@ class NodeNeeds:
             entry.desktop, "node_needs", {"id": need_id, "state": "closed", "reason": reason}
         )
 
-    def _node_gone(self, body_id: str) -> None:
+    def node_gone(self, body_id: str) -> None:
         for need_id, entry in list(self._open.items()):
             if body_id in (entry.node, entry.desktop):
                 self._close(need_id, "gone")
@@ -121,6 +116,6 @@ class NodeNeeds:
 def _need_for(err: RpcError, expert: str | None) -> Need | None:
     if err.code == ErrorCode.denied:
         return "approve"
-    if err.code == ErrorCode.tool_failed and err.message == NOT_INSTALLED and expert is not None:
+    if err.code == ErrorCode.not_installed and expert is not None:
         return "install"
     return None

@@ -4,21 +4,18 @@
  * is the brain told to try again. Every fact the card shows (who asks, where the program is) is
  * read here, never taken from the brain's frame. Also lists and revokes what is approved here.
  */
-import { NodeNeedsParams } from '@tagalong/contract';
+import { NodeNeedsParams, type NodeNeedsOpen } from '@tagalong/contract';
 import type { ApprovedItem, NeedsYouItem } from '@tagalong/ui/shapes';
 import { existsSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { z } from 'zod';
-
-interface Spec {
-  command?: string | undefined;
-  args?: string[] | undefined;
-  url?: string | undefined;
-}
+import { lastLine } from '../last-line';
 
 interface Open {
-  item: NeedsYouItem;
-  spec: Spec;
+  frame: NodeNeedsOpen;
+  state: NeedsYouItem['state'];
+  bubble: boolean;
+  failure?: string;
 }
 
 export interface NeedsYouDeps {
@@ -56,22 +53,39 @@ export function onPath(command: string, env: NodeJS.ProcessEnv): string | null {
   return null;
 }
 
-const lastLine = (out: string): string => out.trim().split('\n').at(-1) ?? 'It did not finish.';
-const words = (spec: Spec): string =>
-  spec.url ?? [spec.command ?? '', ...(spec.args ?? [])].join(' ').trim();
+const words = (spec: {
+  command?: string | undefined;
+  args?: string[] | undefined;
+  url?: string | undefined;
+}): string => spec.url ?? [spec.command ?? '', ...(spec.args ?? [])].join(' ').trim();
 
 export function createNeedsYou(deps: NeedsYouDeps) {
   const open = new Map<string, Open>();
-  const list = (): NeedsYouItem[] => [...open.values()].map((o) => o.item);
+  const found = new Map<string, string | null>();
+  const where = (command: string): string | null => {
+    if (!found.has(command)) found.set(command, deps.resolve(command));
+    return found.get(command) ?? null;
+  };
+  const list = (): NeedsYouItem[] =>
+    [...open.values()].map(({ frame, state, bubble, failure }) => ({
+      id: frame.id,
+      need: frame.need,
+      brain: deps.brain(),
+      what: words(frame.spec),
+      path: frame.spec.command === undefined ? null : where(frame.spec.command),
+      expert: frame.expert,
+      state,
+      failure,
+      bubble,
+    }));
   const changed = (): void => deps.push(list());
 
-  const command = (need: Open): string[] => {
-    const { item, spec } = need;
-    if (item.need === 'install') return ['install', item.expert ?? ''];
-    if (item.need === 'signin') return ['login', item.expert ?? ''];
-    if (spec.url !== undefined) return ['node', 'allow', '--url', spec.url];
-    const args = spec.args ?? [];
-    return ['node', 'allow', spec.command ?? '', ...(args.length > 0 ? ['--', ...args] : [])];
+  const command = ({ frame }: Open): string[] => {
+    if (frame.need === 'install') return ['install', frame.expert ?? ''];
+    if (frame.need === 'signin') return ['login', frame.expert ?? ''];
+    const { command: program = '', args = [], url } = frame.spec;
+    if (url !== undefined) return ['node', 'allow', '--url', url];
+    return ['node', 'allow', program, ...(args.length > 0 ? ['--', ...args] : [])];
   };
 
   return {
@@ -85,37 +99,25 @@ export function createNeedsYou(deps: NeedsYouDeps) {
         if (open.delete(frame.id)) changed();
         return;
       }
-      const spec: Spec = frame.spec;
-      open.set(frame.id, {
-        spec,
-        item: {
-          id: frame.id,
-          need: frame.need,
-          brain: deps.brain(),
-          what: words(spec),
-          path: spec.command === undefined ? null : deps.resolve(spec.command),
-          ...(frame.expert === undefined ? {} : { expert: frame.expert }),
-          state: 'waiting',
-          bubble: true,
-        },
-      });
+      open.set(frame.id, { frame, state: 'waiting', bubble: true });
       changed();
     },
 
     async act(id: string): Promise<{ error?: string }> {
       const need = open.get(id);
       if (need === undefined) return {};
-      need.item = { ...need.item, state: 'working' };
-      delete need.item.failure;
+      need.state = 'working';
+      delete need.failure;
       changed();
       const done = await deps.run(command(need));
       if (done.code !== 0) {
-        const failure = lastLine(done.out);
-        need.item = { ...need.item, state: 'failed', failure };
+        need.state = 'failed';
+        need.failure = lastLine(done.out) || 'It did not finish.';
         changed();
-        return { error: failure };
+        return { error: need.failure };
       }
       open.delete(id);
+      found.clear();
       changed();
       await deps.answer(id, 'done');
       return {};
@@ -124,7 +126,7 @@ export function createNeedsYou(deps: NeedsYouDeps) {
     async notNow(id: string): Promise<void> {
       const need = open.get(id);
       if (need === undefined) return;
-      need.item = { ...need.item, bubble: false };
+      need.bubble = false;
       changed();
       await deps.answer(id, 'not_now');
     },
@@ -137,8 +139,8 @@ export function createNeedsYou(deps: NeedsYouDeps) {
       return rows.data.map((r) => ({
         key: r.key,
         what: words(r),
-        ...(r.path === undefined ? {} : { path: r.path }),
-        ...(r.at === undefined ? {} : { at: r.at }),
+        path: r.path,
+        at: r.at,
       }));
     },
 

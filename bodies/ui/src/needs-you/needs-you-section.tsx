@@ -5,41 +5,34 @@
  */
 import type { NeedsYouItem } from '../shapes';
 import { Button } from '../controls/button';
-import { useHostBridge } from '../host-bridge';
-import { useNeedsYou } from './use-needs-you';
-import { DO, WORKING, title, upFirst } from './words';
+import { cap } from '../text';
+import { useNeedsActions } from './use-needs-you';
+import { WORDS } from './words';
+
+const META = {
+  failed: (item: NeedsYouItem) => item.failure ?? 'It did not finish.',
+  working: (item: NeedsYouItem) => WORDS[item.need].working,
+  waiting: (item: NeedsYouItem) => WORDS[item.need].meta(item),
+};
 
 function Row({ item }: { item: NeedsYouItem }) {
-  const bridge = useHostBridge();
+  const { act, notNow } = useNeedsActions();
   const working = item.state === 'working';
-  const meta =
-    item.state === 'failed'
-      ? (item.failure ?? 'It did not finish.')
-      : working
-        ? WORKING[item.need]
-        : `Asked by ${item.brain}${item.path === null ? '' : ` · ${item.path}`}`;
+  const words = WORDS[item.need];
   return (
     <li className="cx-item needs-row">
       <div className="needs-row__body">
-        <span className="needs-row__title">{title(item)}</span>
+        <span className="needs-row__title">{words.title(item)}</span>
         <span className="cx-meta" role={item.state === 'failed' ? 'alert' : undefined}>
-          {meta}
+          {META[item.state](item)}
         </span>
       </div>
       <div className="needs-row__act">
-        <Button
-          variant="primary"
-          disabled={working}
-          onClick={() => void bridge.needsYouAct(item.id).catch(() => undefined)}
-        >
-          {item.state === 'failed' ? 'Try again' : DO[item.need]}
+        <Button variant="primary" disabled={working} onClick={() => void act(item.id)}>
+          {item.state === 'failed' ? 'Try again' : words.does}
         </Button>
         {item.bubble && (
-          <Button
-            variant="quiet"
-            disabled={working}
-            onClick={() => void bridge.needsYouNotNow(item.id)}
-          >
+          <Button variant="quiet" disabled={working} onClick={() => void notNow(item.id)}>
             Not now
           </Button>
         )}
@@ -48,8 +41,7 @@ function Row({ item }: { item: NeedsYouItem }) {
   );
 }
 
-export function NeedsYouSection() {
-  const items = useNeedsYou();
+export function NeedsYouSection({ items }: { items: NeedsYouItem[] }) {
   if (items.length === 0) return null;
   return (
     <section className="tg-card" aria-labelledby="needs-you-title">
@@ -60,8 +52,8 @@ export function NeedsYouSection() {
         <span className="cx-meta">{items.length} waiting</span>
       </div>
       <p>
-        {upFirst(items[0]?.brain ?? '')} asked for {items.length === 1 ? 'this' : 'these'}. Nothing
-        runs here until you say yes, on this PC.
+        {cap(items[0]?.brain ?? '')} asked for {items.length === 1 ? 'this' : 'these'}. Nothing runs
+        here until you say yes, on this PC.
       </p>
       <ul className="cx-list">
         {items.map((item) => (

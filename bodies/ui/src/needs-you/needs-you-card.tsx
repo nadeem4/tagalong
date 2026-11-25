@@ -6,9 +6,9 @@
  */
 import { useEffect, useState } from 'react';
 import type { NeedsYouItem } from '../shapes';
-import { useHostBridge } from '../host-bridge';
-import { useNeedsYou } from './use-needs-you';
-import { ALLOWED, DO, PUT_OFF, WORKING, expertName, upFirst } from './words';
+import { cap } from '../text';
+import { useNeedsActions, useNeedsYou } from './use-needs-you';
+import { PUT_OFF, WORDS, expertName } from './words';
 
 const HOLD_MS = 7_000;
 
@@ -53,19 +53,12 @@ function Facts({ item }: { item: NeedsYouItem }) {
       <div>
         <dt>If you allow</dt>
         <dd>
-          {upFirst(item.brain)} may run it whenever Scout needs it. You can take that back in
-          Devices.
+          {cap(item.brain)} may run it whenever Scout needs it. You can take that back in Devices.
         </dd>
       </div>
     </dl>
   );
 }
-
-const HEAD: Record<NeedsYouItem['need'], (item: NeedsYouItem) => string> = {
-  approve: (i) => `Scout on ${i.brain} wants to run ${i.what} here.`,
-  install: (i) => `${expertName(i.expert)} is not on this PC yet.`,
-  signin: (i) => `${expertName(i.expert)} needs you to sign in on this PC.`,
-};
 
 export function NeedsYouCard({
   item,
@@ -80,25 +73,25 @@ export function NeedsYouCard({
   return (
     <section className="card" aria-label="Needs you on this PC">
       <div className="card-head">
-        <p className="bubble-text">{HEAD[item.need](item)}</p>
+        <p className="bubble-text">{WORDS[item.need].head(item)}</p>
         <span className="card-chip">Needs you here</span>
       </div>
       <Facts item={item} />
-      {working && <p className="card-brief">{WORKING[item.need]}</p>}
+      {working && <p className="card-brief">{WORDS[item.need].working}</p>}
       {item.state === 'failed' && (
         <p className="card-brief" role="alert">
           {item.failure}
         </p>
       )}
       <p className="card-brief">
-        Only you can say yes, here on this PC. {upFirst(item.brain)} cannot do it for you.
+        Only you can say yes, here on this PC. {cap(item.brain)} cannot do it for you.
       </p>
       <div className="card-actions">
         <button type="button" className="bubble-quiet" disabled={working} onClick={onNotNow}>
           Not now
         </button>
         <button type="button" className="bubble-primary" disabled={working} onClick={onAct}>
-          {item.state === 'failed' ? 'Try again' : DO[item.need]}
+          {item.state === 'failed' ? 'Try again' : WORDS[item.need].does}
         </button>
       </div>
     </section>
@@ -106,7 +99,7 @@ export function NeedsYouCard({
 }
 
 export function NeedsYouBubble() {
-  const bridge = useHostBridge();
+  const { act, notNow } = useNeedsActions();
   const items = useNeedsYou();
   const [said, setSaid] = useState<string | null>(null);
   const item = items.find((i) => i.bubble);
@@ -128,13 +121,10 @@ export function NeedsYouBubble() {
     <NeedsYouCard
       item={item}
       onAct={() => {
-        bridge.needsYouAct(item.id).then(
-          () => setSaid(ALLOWED(item)),
-          () => undefined,
-        );
+        void act(item.id).then((ok) => ok && setSaid(WORDS[item.need].allowed(item)));
       }}
       onNotNow={() => {
-        void bridge.needsYouNotNow(item.id).then(() => setSaid(PUT_OFF));
+        void notNow(item.id).then(() => setSaid(PUT_OFF));
       }}
     />
   );

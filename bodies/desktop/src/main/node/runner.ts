@@ -4,7 +4,7 @@
  * goes back to the brain on this PC. The pairing reaches the node through its environment (the
  * token must not show in a process list) and the node's own allow-list decides what may run.
  */
-import type { LinkStore } from '../brain/link-store';
+import { pairedAddr, type LinkStore } from '../brain/link-store';
 
 export interface NodeChild {
   kill(): void;
@@ -38,7 +38,7 @@ export function createNodeRunner({ link, nodeId, spawn, disabled = false }: Node
     const paired = link.paired();
     const token = paired === null ? null : link.token();
     if (paired === null || token === null) return stop();
-    const addr = paired.lastGood ?? paired.addrs[0];
+    const addr = pairedAddr(paired);
     if (addr === undefined) return stop();
     const key = JSON.stringify([addr, paired.fp, token]);
     if (running?.key === key) return;

@@ -6,13 +6,10 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ApprovedItem } from '../shapes';
 import { Button } from '../controls/button';
 import { useHostBridge } from '../host-bridge';
+import { shortDate } from '../text';
 
-const day = (iso: string | undefined): string => {
-  const at = iso === undefined ? null : new Date(iso);
-  return at === null || Number.isNaN(at.getTime())
-    ? ''
-    : ` · allowed ${at.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`;
-};
+const allowedOn = (iso: string | undefined): string =>
+  iso === undefined || Number.isNaN(new Date(iso).getTime()) ? '' : ` · allowed ${shortDate(iso)}`;
 
 export function ApprovedOnThisPc() {
   const bridge = useHostBridge();
@@ -75,7 +72,7 @@ export function ApprovedOnThisPc() {
                   <>
                     <div className="needs-row__body">
                       <span className="needs-row__title">{item.what}</span>
-                      <span className="cx-meta">{`${item.path ?? 'An address'}${day(item.at)}`}</span>
+                      <span className="cx-meta">{`${item.path ?? 'An address'}${allowedOn(item.at)}`}</span>
                     </div>
                     <Button variant="quiet" onClick={() => setAsking(item.key)}>
                       Revoke

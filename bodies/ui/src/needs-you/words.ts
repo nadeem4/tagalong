@@ -1,39 +1,59 @@
 /** The words for each kind of request, shared by the bubble card and Home's rows. */
+import { AI_TOOLS, aiToolLabel } from '../shapes/ai-tools';
 import type { NeedsYouItem } from '../shapes';
 
-/** `claude-code` reads "Claude Code". */
-export const expertName = (id: string | undefined): string =>
-  (id ?? 'The expert').replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-
-/** A brain's name starts a sentence: `your brain` reads `Your brain`. */
-export const upFirst = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
-
-export const WORKING: Record<NeedsYouItem['need'], string> = {
-  approve: 'Allowing it…',
-  install: 'Installing…',
-  signin: 'Waiting for you to finish in the browser.',
+/** `claude-code` reads "Claude Code"; an id the app does not know is title-cased. */
+export const expertName = (id: string | undefined): string => {
+  if (id === undefined) return 'The expert';
+  return AI_TOOLS.some((tool) => tool.id === id)
+    ? aiToolLabel(id)
+    : id.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
-export const DO: Record<NeedsYouItem['need'], string> = {
-  approve: 'Allow',
-  install: 'Install',
-  signin: 'Sign in',
-};
+const askedBy = (item: NeedsYouItem): string =>
+  `Asked by ${item.brain}${item.path === null ? '' : ` · ${item.path}`}`;
 
-/** One line saying what the request is, for Home's rows. */
-export function title(item: NeedsYouItem): string {
-  if (item.need === 'install') return `Install ${expertName(item.expert)} on this PC`;
-  if (item.need === 'signin') return `Sign in to ${expertName(item.expert)}`;
-  return `Run ${item.what}`;
+interface NeedWords {
+  /** The row's title in Home. */
+  title: (item: NeedsYouItem) => string;
+  /** The bubble card's heading. */
+  head: (item: NeedsYouItem) => string;
+  /** What the person is told once they have said yes. */
+  allowed: (item: NeedsYouItem) => string;
+  working: string;
+  /** The button that does it. */
+  does: string;
+  /** The row's second line while it waits. */
+  meta: (item: NeedsYouItem) => string;
 }
 
-/** What the person is told once they have chosen. */
-export const ALLOWED = (item: NeedsYouItem): string =>
-  item.need === 'approve'
-    ? `Allowed. ${item.brain} can run ${item.what}. Starting the job now.`
-    : item.need === 'install'
-      ? `${expertName(item.expert)} is installed on this PC. Starting the job now.`
-      : `Signed in to ${expertName(item.expert)} on this PC. Running the job for ${item.brain}.`;
+export const WORDS: Record<NeedsYouItem['need'], NeedWords> = {
+  approve: {
+    title: (i) => `Run ${i.what}`,
+    head: (i) => `Scout on ${i.brain} wants to run ${i.what} here.`,
+    allowed: (i) => `Allowed. ${i.brain} can run ${i.what}. Starting the job now.`,
+    working: 'Allowing it…',
+    does: 'Allow',
+    meta: askedBy,
+  },
+  install: {
+    title: (i) => `Install ${expertName(i.expert)} on this PC`,
+    head: (i) => `${expertName(i.expert)} is not on this PC yet.`,
+    allowed: (i) => `${expertName(i.expert)} is installed on this PC. Starting the job now.`,
+    working: 'Installing…',
+    does: 'Install',
+    meta: askedBy,
+  },
+  signin: {
+    title: (i) => `Sign in to ${expertName(i.expert)}`,
+    head: (i) => `${expertName(i.expert)} needs you to sign in on this PC.`,
+    allowed: (i) =>
+      `Signed in to ${expertName(i.expert)} on this PC. Running the job for ${i.brain}.`,
+    working: 'Waiting for you to finish in the browser.',
+    does: 'Sign in',
+    meta: askedBy,
+  },
+};
 
 export const PUT_OFF =
   'Okay, I have not run anything. The job waits, and the question is in Home under Needs you on this PC.';

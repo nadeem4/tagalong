@@ -19,6 +19,7 @@ from brain.auth import Authenticator
 from brain.bodies import Bodies
 from brain.memory import Memory
 from brain.mind.turn import Final
+from brain.protocol import NodeAnsweredParams
 from brain.server import start_server
 from brain.sessions import Session
 from brain.tools import KeySettings
@@ -111,7 +112,7 @@ async def test_node_answered_reaches_the_brain_with_the_body_that_sent_it(env):
         assert reply["result"] == {}
         bad = await call(ws, request("node_answered", {"id": "n1", "outcome": "always"}, 3))
         assert bad["error"]["code"] == -32602
-    assert heard == [("desktop", {"id": "n1", "outcome": "done"})]
+    assert heard == [("desktop", NodeAnsweredParams(id="n1", outcome="done"))]
 
 
 async def test_hello_result_carries_version_and_build(tmp_path):

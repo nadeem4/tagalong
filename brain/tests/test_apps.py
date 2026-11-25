@@ -15,7 +15,9 @@ from pathlib import Path
 import pytest
 
 from brain.apps import AppError, AppRow, Apps, TokenFile, expand_env, slug_for, validate_app
+from brain.bodies import Bodies
 from brain.memory import Memory
+from brain.node_needs import NodeNeeds
 from brain.store.db import load_migrations
 
 FAKE = str(Path(__file__).parent / "fake_mcp_server.py")
@@ -240,6 +242,7 @@ class Rig:
             connect_timeout=connect_timeout,
             ping_interval=ping_interval,
             tokens=tokens,
+            needs=NodeNeeds(Bodies()),
         )
 
     async def up(self, app_id, state="connected"):

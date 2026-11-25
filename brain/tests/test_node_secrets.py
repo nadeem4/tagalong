@@ -13,6 +13,7 @@ import pytest
 from brain.apps import AppRow, Apps
 from brain.bodies import Bodies
 from brain.memory import Memory
+from brain.node_needs import NodeNeeds
 from brain.placements import Placement, Placements
 from brain.protocol import PipeSpec
 from tests.fake_node import FAKE, FakeNode
@@ -29,7 +30,9 @@ async def rig(tmp_path):
     node.connect()
     placements = Placements(memory.db)
     placements.set("app", "fake", Placement("body", "pc"))
-    apps = Apps(memory, lambda *_: None, {}, placements=placements, bodies=bodies)
+    apps = Apps(
+        memory, lambda *_: None, {}, placements=placements, bodies=bodies, needs=NodeNeeds(bodies)
+    )
 
     async def run(row: AppRow) -> Apps:
         memory.add_app(row)

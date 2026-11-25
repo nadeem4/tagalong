@@ -23,6 +23,10 @@ class NotRunnable(Exception):
     pass
 
 
+class NotInstalled(Exception):
+    pass
+
+
 def _resolve(command: str) -> Path | None:
     found = shutil.which(command)
     return Path(found).resolve() if found else None
@@ -109,12 +113,12 @@ class Allowlist:
 
     def permits(self, spec: PipeSpec) -> str | None:
         """The file to run (or the url to relay to) when an entry matches the spec and the file
-        is unchanged."""
+        is unchanged. A command that is not on the path at all raises NotInstalled."""
         if spec.url is not None:
             return spec.url if any(_same_spec(e, spec) for e in self._entries()) else None
         found = shutil.which(spec.command or "")
         if found is None:
-            return None
+            raise NotInstalled(spec.command)
         exe = Path(found).resolve()
         digest = _sha256(exe)
         for entry in self._entries():

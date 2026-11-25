@@ -338,9 +338,10 @@ class Apps:
         tokens: TokenFile | None = None,
         data_dir: Path | str | None = None,
         signin_timeout: float = 300,
+        *,
         placements: Placements | None = None,
         bodies: "Bodies | None" = None,
-        needs: "NodeNeeds | None" = None,
+        needs: "NodeNeeds",
     ) -> None:
         self._placements = placements
         self._bodies = bodies  # the nodes an app may be placed on
@@ -738,10 +739,7 @@ class Apps:
         else:
             spec = PipeSpec(url=row.config["url"])
         try:
-            if self._needs is not None:
-                pipe = await self._needs.open_pipe(slot.location, spec)
-            else:
-                pipe = await self._bodies.open_pipe(slot.location, spec)
+            pipe = await self._needs.open_pipe(slot.location, spec)
         except RpcError as err:
             if signin := self.node_signin_line(row.id):
                 raise AppError(signin) from None
