@@ -43,13 +43,11 @@ export interface ConnectDeps {
   budgetMs?: number;
 }
 
-const LABELS: Record<string, string> = Object.fromEntries(
-  AI_TOOLS.map((tool) => [tool.id, tool.label]),
-);
-type AiTool = AiToolId;
+const LABELS = Object.fromEntries(AI_TOOLS.map((tool) => [tool.id, tool.label])) as Record<
+  AiToolId,
+  string
+>;
 const CLI = { 'claude-code': 'claude', codex: 'codex' } as const;
-
-const bridge = bridgeArgv;
 
 // What an AI tool sends first, then one real read: it makes the bridge dial the brain with the token.
 const PROBE = [
@@ -109,7 +107,7 @@ export function connectAiTool(
         'connect_ai_tool needs a known tool and a token',
       );
     }
-    const known = tool as AiTool;
+    const known = tool as AiToolId;
     const deadline = Date.now() + (deps.budgetMs ?? CONNECT_BUDGET_MS);
 
     // The handler cannot be aborted, so no command may run past the deadline: each gets what is
@@ -166,7 +164,7 @@ export function connectAiTool(
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw unreadable;
       }
-      const [command, ...args] = bridge('cursor');
+      const [command, ...args] = bridgeArgv('cursor');
       config.mcpServers = { ...config.mcpServers, tagalong: { command, args } };
       await mkdir(dirname(deps.cursorConfig), { recursive: true });
       await writeFile(deps.cursorConfig, JSON.stringify(config, null, 2), 'utf8');
@@ -182,7 +180,14 @@ export function connectAiTool(
       }
       // Connecting again replaces the entry, so an old one is removed first (it may not exist).
       await run(cli, ['mcp', 'remove', 'tagalong', ...scope]);
-      const added = await run(cli, ['mcp', 'add', ...scope, 'tagalong', '--', ...bridge(known)]);
+      const added = await run(cli, [
+        'mcp',
+        'add',
+        ...scope,
+        'tagalong',
+        '--',
+        ...bridgeArgv(known),
+      ]);
       if (added.code !== 0) {
         const why = (added.stderr || added.stdout).trim().slice(0, 300);
         throw failed(
@@ -209,7 +214,7 @@ export function connectAiTool(
     }
     const label = LABELS[known];
     const text = reached
-      ? `${label} is connected to Scout's memory: the bridge started and read the memory list.`
+      ? `${label} can now ask Scout what it remembers and add notes to it.`
       : reached === false
         ? `${label} is set up, but the bridge could not reach Scout's brain. Check that the brain is running, then try again.`
         : `${label} is set up, but the bridge did not answer. If Tagalong was only just installed, open a new terminal window and try ${label} again.`;

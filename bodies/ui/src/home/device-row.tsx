@@ -5,6 +5,7 @@
  */
 import { useState } from 'react';
 import { Button } from '../controls/button';
+import { aiToolLabel } from '../shapes';
 import type { DeviceRow } from '../shapes';
 import { dayLabel, time } from './approval-history';
 import type { DeviceIconName } from './device-icons';
@@ -42,6 +43,7 @@ export function DeviceRowItem({
   const [draft, setDraft] = useState(device.name);
   const [failed, setFailed] = useState<string | null>(null);
   const aiTool = device.kind === 'mcp_client';
+  const shown = aiTool ? aiToolLabel(device.name) : device.name;
   const kind = KINDS[device.kind] ?? KINDS['node']!;
   const meta = aiTool
     ? `${kind.label} · ${device.lastSeen === null ? 'not used yet' : `last used ${when(device.lastSeen)}`}`
@@ -85,7 +87,7 @@ export function DeviceRowItem({
               }}
             />
           ) : (
-            device.name
+            shown
           )
         }
         chips={[
@@ -118,7 +120,7 @@ export function DeviceRowItem({
       {mode === 'revoke' && (
         <div role="alert" className="dv-confirm">
           <span>
-            <strong>Revoke {device.name}?</strong>{' '}
+            <strong>Revoke {shown}?</strong>{' '}
             {aiTool
               ? "It can no longer read or add to Scout's memory. What it already added stays; remove it under What Scout remembers."
               : 'It stops working right away and loses access to Scout. You can pair it again with a new code.'}
@@ -128,7 +130,7 @@ export function DeviceRowItem({
           </Button>
           <Button
             variant="danger"
-            onClick={() => void attempt(onRevoke, `Scout could not revoke ${device.name}.`)}
+            onClick={() => void attempt(onRevoke, `Scout could not revoke ${shown}.`)}
           >
             Revoke
           </Button>

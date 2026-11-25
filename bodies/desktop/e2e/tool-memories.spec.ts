@@ -67,10 +67,10 @@ test('deleting everything from one tool removes its memories and leaves it conne
   await expect(home.getByText('Writes Rust on weekends')).toHaveCount(0);
   await home.getByRole('button', { name: 'Delete everything from this tool' }).click();
   await expect(home.getByRole('alert')).toContainText('Cursor stays connected');
-  await home.getByRole('button', { name: 'Delete them' }).click();
+  await home.getByRole('button', { name: /^Delete \d+ memor/ }).click();
   await expect(home.getByText('Uses pnpm workspaces')).toHaveCount(0);
   await expect(home.getByText('Writes Rust on weekends')).toBeVisible();
 
   await nav.getByRole('button', { name: /^Devices/ }).click();
-  await expect(home.getByRole('region', { name: 'AI tools' })).toContainText('cursor');
+  await expect(home.getByRole('region', { name: 'AI tools' })).toContainText('Cursor');
 });

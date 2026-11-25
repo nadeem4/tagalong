@@ -16,9 +16,7 @@ export async function callText(
   input: Record<string, unknown> = {},
   timeoutMs?: number,
 ): Promise<string> {
-  const parts = await (timeoutMs === undefined
-    ? brain.call(tool, input)
-    : brain.call(tool, input, timeoutMs));
+  const parts = await brain.call(tool, input, timeoutMs);
   const part = parts.find((p) => p.type === 'text');
   return part?.type === 'text' ? part.text : '';
 }

@@ -30,10 +30,12 @@ function setup(answer: (tool: string, input?: object) => unknown) {
 
 describe('registerAiToolIpc', () => {
   it('connects a tool, waiting longer than a usual call', async () => {
-    const { invoke, calls } = setup(() => text("Cursor is connected to Scout's memory."));
+    const { invoke, calls } = setup(() =>
+      text('Cursor can now ask Scout what it remembers and add notes to it.'),
+    );
     expect(await invoke(IPC.aiToolConnect, 'cursor')).toEqual({
       ok: true,
-      text: "Cursor is connected to Scout's memory.",
+      text: 'Cursor can now ask Scout what it remembers and add notes to it.',
     });
     expect(calls).toEqual([['connect_ai_tool', { tool: 'cursor' }, 100_000]]);
   });

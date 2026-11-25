@@ -337,6 +337,15 @@ describe('MemoryView, get to know me', () => {
       expect(screen.queryByRole('group', { name: 'Filter memories' })).toBeNull();
     });
 
+    it('still offers to delete by tool when every memory came from that one tool', async () => {
+      renderView(createFakeHostBridge({ memories: [CURSOR] }));
+      await screen.findByText('Uses pnpm');
+      fireEvent.click(screen.getByRole('button', { name: /^Cursor/ }));
+      expect(
+        screen.getByRole('button', { name: 'Delete everything from this tool' }),
+      ).toBeInTheDocument();
+    });
+
     it('deletes everything from one tool after a confirm, and keeps the rest', async () => {
       const bridge = createFakeHostBridge({ memories: [CURSOR, CODEX, OWN] });
       renderView(bridge);
@@ -348,7 +357,7 @@ describe('MemoryView, get to know me', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Keep them' }));
       expect(bridge.memories).toHaveLength(3);
       fireEvent.click(screen.getByRole('button', { name: 'Delete everything from this tool' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Delete them' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Delete 1 memory' }));
       await waitFor(() => expect(screen.queryByText('Uses pnpm')).toBeNull());
       expect(bridge.memories.map((m) => m.id)).toEqual(['x1', 'o1']);
       expect(screen.getByText('Writes Rust')).toBeInTheDocument();

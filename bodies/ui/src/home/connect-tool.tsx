@@ -38,6 +38,8 @@ const CSS = `
 .ct-switch strong { ${typeCss('bodyLead')}; font-weight: ${t.fontWeight.semibold}; }
 .ct-busy { height: 4px; border-radius: ${t.radius.sm}px; background: ${themedColor.panelTile}; overflow: hidden; }
 .ct-busy > i { display: block; width: 40%; height: 100%; background: ${t.color.gold}; }
+.pair-dialog .ct-alert { flex-direction: row; align-items: flex-start; gap: ${t.space.sm}px; }
+.ct-alert > svg { flex: none; }
 .ct-actions { display: flex; justify-content: flex-end; gap: ${t.space.sm}px; }
 `;
 
@@ -243,8 +245,9 @@ function Working({ tool }: { tool: Tool }) {
 function Connected({ tool, text, onDone }: { tool: Tool; text: string; onDone: () => void }) {
   return (
     <>
-      <p className="pair-alert pair-alert--ok" role="status">
-        <Icon name="check" /> {text}
+      <p className="pair-alert pair-alert--ok ct-alert" role="status">
+        <Icon name="check" />
+        <span>{text}</span>
       </p>
       <dl className="ct-facts">
         <dt>Can do</dt>
@@ -274,8 +277,9 @@ function Failed({
 }) {
   return (
     <>
-      <p className="pair-alert pair-alert--err" role="alert">
-        <Icon name="err" /> {message}
+      <p className="pair-alert pair-alert--err ct-alert" role="alert">
+        <Icon name="err" />
+        <span>{message}</span>
       </p>
       <div className="ct-actions">
         <Button variant="quiet" onClick={onHowTo}>

@@ -1,7 +1,7 @@
 /**
  * Claude Code, Codex and Cursor as Scout can connect them: their names, the line or block each
  * takes to add Scout's memory by hand, and what an outside memory's source reads as. React-free.
- * Contains AI_TOOLS, bridgeArgv, howToLines, isOutsideSource, memorySourceLabel and the connect result shapes.
+ * Contains AI_TOOLS, aiToolLabel, bridgeArgv, howToLines, isOutsideSource, memorySourceLabel and the connect result shapes.
  */
 
 export type AiToolId = 'claude-code' | 'codex' | 'cursor';
@@ -60,6 +60,9 @@ export const isOutsideSource = (source: string): boolean => source.startsWith('m
 /** The tool an outside memory came from, in words; null for any other source. */
 export function memorySourceLabel(source: string): string | null {
   if (!isOutsideSource(source)) return null;
-  const name = source.slice('mcp:'.length);
-  return AI_TOOLS.find((tool) => tool.id === name)?.label ?? name;
+  return aiToolLabel(source.slice('mcp:'.length));
 }
+
+/** A tool's id in words ("claude-code" reads "Claude Code"); a name it does not know stays as given. */
+export const aiToolLabel = (name: string): string =>
+  AI_TOOLS.find((tool) => tool.id === name)?.label ?? name;

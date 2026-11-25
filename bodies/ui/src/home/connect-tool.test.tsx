@@ -29,11 +29,16 @@ describe('ConnectToolDialog', () => {
   it('sets the chosen tool up and says what it can and cannot do', async () => {
     const { host, onDone } = open();
     fireEvent.click(screen.getByRole('button', { name: /Cursor/ }));
-    host.aiToolOutcome = { ok: true, text: "Cursor is connected to Scout's memory." };
+    host.aiToolOutcome = {
+      ok: true,
+      text: 'Cursor can now ask Scout what it remembers and add notes to it.',
+    };
     fireEvent.click(screen.getByRole('button', { name: 'Set it up' }));
     expect(screen.getByRole('heading', { name: 'Connecting Cursor' })).toBeInTheDocument();
     expect(await screen.findByRole('heading', { name: 'Cursor is connected' })).toBeInTheDocument();
-    expect(screen.getByText("Cursor is connected to Scout's memory.")).toBeInTheDocument();
+    expect(
+      screen.getByText('Cursor can now ask Scout what it remembers and add notes to it.'),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Run your apps, see your screen/)).toBeInTheDocument();
     expect(host.aiToolCalls).toEqual(['cursor']);
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));

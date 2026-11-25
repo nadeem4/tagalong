@@ -71,11 +71,12 @@ function ForgetFromTool({
   onForget: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
+  const noun = count === 1 ? 'memory' : 'memories';
   if (!confirming) {
     return (
       <p className="memory-from">
         <span>
-          {count} {count === 1 ? 'memory' : 'memories'} from {tool}
+          {count} {noun} from {tool}
         </span>
         <Button variant="secondary" onClick={() => setConfirming(true)}>
           Delete everything from this tool
@@ -87,15 +88,16 @@ function ForgetFromTool({
     <div role="alert" className="dv-confirm">
       <span>
         <strong>
-          Delete all {count} from {tool}?
+          Delete {count} {noun} from {tool}?
         </strong>{' '}
-        {tool} stays connected and can add new ones. This cannot be undone.
+        They are removed from Scout for good. {tool} stays connected and can add new ones; revoke it
+        in Devices if you want that to stop.
       </span>
       <Button variant="quiet" onClick={() => setConfirming(false)}>
         Keep them
       </Button>
       <Button variant="danger" onClick={onForget}>
-        Delete them
+        Delete {count} {noun}
       </Button>
     </div>
   );
@@ -213,7 +215,7 @@ export function MemoryView({ name }: { name: string }) {
         <section className="tg-card" aria-label="Timeline">
           <h2 className="tg-card__label">Timeline</h2>
           {portrait === null && coveredLines}
-          {byOrigin.size > 1 && (
+          {(byOrigin.size > 1 || [...byOrigin.keys()].some(isOutsideSource)) && (
             <div className="memory-filter">
               <div className="apv-seg" role="group" aria-label="Filter memories">
                 {[null, ...byOrigin.keys()].map((item) => (

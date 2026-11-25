@@ -64,6 +64,8 @@ class Pairing:
     def make_code(self, kind: str = "desktop", personal: bool = False, name: str = "") -> PairOffer:
         now = self._now()
         store.delete_expired_codes(self._db, now)
+        if name:
+            store.delete_unused_codes(self._db, kind, name)
         secret = (
             f"{secrets.randbelow(10**6):06d}" if kind == "browser" else secrets.token_urlsafe(24)
         )

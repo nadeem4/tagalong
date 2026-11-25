@@ -111,7 +111,7 @@ const CHROME = {
 };
 const CURSOR = {
   id: 'd3',
-  name: 'Cursor',
+  name: 'cursor',
   kind: 'mcp_client',
   pairedAt: '2026-11-15T09:00:00Z',
   lastSeen: null,
@@ -267,6 +267,14 @@ describe('DevicesView', () => {
         "Nadeem's phone is paired. It can now talk to Scout.",
       );
       expect(row("Nadeem's phone")).toHaveTextContent('New');
+    });
+
+    it('names a newly connected AI tool, not its id', async () => {
+      const bridge = open(stateWith(), { devices: [], aiTools: [] });
+      await screen.findByText('This PC');
+      bridge.devices = { devices: [], aiTools: [{ ...CURSOR, name: 'claude-code' }] };
+      act(() => bridge.emitChanged('bodies'));
+      expect(await screen.findByRole('status')).toHaveTextContent('Claude Code is paired.');
     });
 
     it('Pair a device opens the pairing dialog with a fresh code', async () => {

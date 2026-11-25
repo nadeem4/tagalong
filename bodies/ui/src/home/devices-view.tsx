@@ -5,6 +5,7 @@
  * says `bodies` changed. Contains DevicesView.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { aiToolLabel } from '../shapes';
 import type { BodiesState, DeviceRow, DevicesState } from '../shapes';
 import { Button } from '../controls/button';
 import { useHostBridge } from '../host-bridge';
@@ -126,7 +127,8 @@ export function DevicesView({ reach = false }: { reach?: boolean }) {
       {joined !== undefined && (
         <p className="dv-joined" role="status">
           <Icon name="check" />
-          {joined.name} is paired. It can now talk to Scout.
+          {joined.kind === 'mcp_client' ? aiToolLabel(joined.name) : joined.name} is paired. It can
+          now talk to Scout.
         </p>
       )}
       {pairing && <HostPairDialog host={bridge} onClose={() => setPairing(false)} />}

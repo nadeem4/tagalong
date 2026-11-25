@@ -1513,7 +1513,7 @@ export async function startFakeBrain(options: FakeBrainOptions = {}): Promise<Fa
             pairedDevices.push({ id: `ai-${tool}`, name: tool, kind: 'mcp_client' });
           }
           notify('changed', { what: 'bodies' });
-          value = `${tool} is connected to Scout's memory.`;
+          value = `${tool === 'claude-code' ? 'Claude Code' : tool[0]!.toUpperCase() + tool.slice(1)} can now ask Scout what it remembers and add notes to it.`;
         } else if (params.tool === 'mcp_client_make') {
           if (options.pairNetworkOff === true) {
             socket.send(

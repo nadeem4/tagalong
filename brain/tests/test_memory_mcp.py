@@ -321,6 +321,21 @@ async def test_home_makes_a_link_that_pairs_a_client_and_lists_and_revokes_it(tm
     assert devices.verify(token) is None
 
 
+async def test_a_new_link_for_a_tool_cancels_its_earlier_unused_one(tmp_path):
+    devices, pairing, handlers = home_tools(tmp_path)
+
+    async def code(personal):
+        made = json.loads(
+            await handlers["mcp_client_make"]({"name": "cursor", "personal": personal})
+        )
+        return parse_qs(urlparse(made["link"]).query)["code"][0]
+
+    first, second = await code(True), await code(False)
+    assert pairing.redeem(first, "cursor", "mcp_client", kinds=NETWORK_KINDS) is None
+    _, token = pairing.redeem(second, "cursor", "mcp_client", kinds=NETWORK_KINDS)
+    assert devices.verify(token).personal is False
+
+
 async def test_home_makes_no_link_while_the_network_is_off(tmp_path):
     devices, _, handlers = home_tools(tmp_path, network=False)
     with pytest.raises(RpcError) as refused:

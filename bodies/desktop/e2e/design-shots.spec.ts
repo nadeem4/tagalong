@@ -1376,7 +1376,7 @@ test('BAU4 connect another AI tool and memories by tool, light and dark', async 
     await expect(dialog(devices.home)).toContainText('Cursor is connected');
     await both(devices.home, 'connected');
     await devices.home.getByRole('button', { name: 'Done' }).click();
-    await expect(devices.home.getByRole('region', { name: 'AI tools' })).toContainText('cursor');
+    await expect(devices.home.getByRole('region', { name: 'AI tools' })).toContainText('Cursor');
     await both(devices.home, 'ai-tools-list');
     await connect(devices.home);
     await dialog(devices.home).getByRole('button', { name: 'Show me' }).click();
