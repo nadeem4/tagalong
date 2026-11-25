@@ -525,6 +525,15 @@ describe('BrainClient', () => {
     await expect(client.answerWith('a1', 'Edit')).rejects.toBeInstanceOf(BrainOffline);
   });
 
+  it('nodeAnswered tells the brain what the person chose for a node request', async () => {
+    const { client, s } = await online();
+    const sent = client.nodeAnswered('n1', 'done');
+    const frame = s.sent.at(-1)!;
+    expect(frame).toMatchObject({ method: 'node_answered', params: { id: 'n1', outcome: 'done' } });
+    s.receive({ jsonrpc: '2.0', id: frame.id, result: {} });
+    await expect(sent).resolves.toBeUndefined();
+  });
+
   it('answer rejects BrainOffline when the brain is not online', async () => {
     const { client } = setup();
     await expect(client.answer('a1', 'deny')).rejects.toBeInstanceOf(BrainOffline);

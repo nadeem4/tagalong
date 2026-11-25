@@ -51,6 +51,7 @@ class ErrorCode(IntEnum):
     over_limit = -32008
     unauthorized = -32009
     network_off = -32010
+    not_installed = -32011
 
 
 class RpcError(Exception):
@@ -605,6 +606,44 @@ class FolderCheckResult(Model):
     exists: bool
 
 
+# What the node answers when the command is not on its machine.
+NOT_INSTALLED = "That command is not installed on this machine."
+
+
+class NodeNeedsOpen(Model):
+    seq: Seq
+    id: Id
+    state: Literal["open"]
+    node: Id
+    need: Literal["approve", "signin"]
+    spec: PipeSpec
+    expert: Id | None = None
+
+    @model_validator(mode="after")
+    def _expert_for_signin(self) -> "NodeNeedsOpen":
+        if self.need != "approve" and self.expert is None:
+            raise ValueError("signin names an expert")
+        return self
+
+
+class NodeNeedsClosed(Model):
+    seq: Seq
+    id: Id
+    state: Literal["closed"]
+    reason: Literal["answered", "timeout", "gone", "replaced"]
+
+
+class NodeNeedsParams(
+    RootModel[Annotated[NodeNeedsOpen | NodeNeedsClosed, Field(discriminator="state")]]
+):
+    model_config = ConfigDict(strict=True, frozen=True)
+
+
+class NodeAnsweredParams(Model):
+    id: Id
+    outcome: Literal["done", "not_now"]
+
+
 # Method name -> (params model, result model or None for notifications).
 type MethodMap = dict[str, tuple[type[BaseModel], type[BaseModel] | None]]
 
@@ -625,6 +664,7 @@ BODY_TO_BRAIN: MethodMap = {
     "know_me_start": (KnowMeStartParams, KnowMeStartResult),
     "pipe_data": (PipeDataParams, None),
     "pipe_close": (PipeCloseParams, None),
+    "node_answered": (NodeAnsweredParams, EmptyResult),
 }
 
 BRAIN_TO_BODY: MethodMap = {
@@ -645,4 +685,5 @@ BRAIN_TO_BODY: MethodMap = {
     "pipe_data": (PipeDataParams, None),
     "pipe_close": (PipeCloseParams, None),
     "folder_check": (FolderCheckParams, FolderCheckResult),
+    "node_needs": (NodeNeedsParams, None),
 }

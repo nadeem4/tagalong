@@ -18,6 +18,9 @@ import {
   KnowMeStartParams,
   KnowMeStartResult,
   KnowMeStatusParams,
+  NodeAnsweredParams,
+  NodeNeedsParams,
+  type NodeNeedsOpen,
   ListenParams,
   ReadAloudEventData,
   ReadingEventData,
@@ -57,6 +60,7 @@ describe('method maps', () => {
       | 'hush'
       | 'speech_state'
       | 'know_me_start'
+      | 'node_answered'
       | 'pipe_data'
       | 'pipe_close'
     >();
@@ -80,6 +84,7 @@ describe('method maps', () => {
       | 'pipe_data'
       | 'pipe_close'
       | 'folder_check'
+      | 'node_needs'
     >();
   });
 });
@@ -353,6 +358,36 @@ describe('task cards', () => {
       AnswerParams.safeParse({ ask: 'a1', option: 'not_now', check_back_at: at }).success,
     ).toBe(true);
     expect(AnswerParams.safeParse({ ask: 'a1', option: 'allow', check_back_at: at }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe('node_needs frames', () => {
+  const sample = (name: string): unknown =>
+    (JSON.parse(readFileSync(join(examples, name), 'utf8')) as { params: unknown }).params;
+  it('parses an open request for each need and the closing frame', () => {
+    const needs = ['', '.signin'].map(
+      (kind) =>
+        NodeNeedsParams.parse(sample(`brain.node_needs.params${kind}.json`)) as NodeNeedsOpen,
+    );
+    expect(needs.map((n) => n.need)).toEqual(['approve', 'signin']);
+    expect(NodeNeedsParams.parse(sample('brain.node_needs.params.closed.json'))).toMatchObject({
+      state: 'closed',
+      reason: 'answered',
+    });
+  });
+  it('refuses a need the brain has no word for, and an unknown outcome', () => {
+    const open = sample('brain.node_needs.params.json') as object;
+    expect(NodeNeedsParams.safeParse({ ...open, need: 'reboot' }).success).toBe(false);
+    expect(NodeAnsweredParams.safeParse({ id: 'n1', outcome: 'allow_always' }).success).toBe(false);
+  });
+  it('refuses a sign-in that names no expert, and an install request', () => {
+    const { expert: _expert, ...bare } = sample('brain.node_needs.params.signin.json') as {
+      expert: string;
+    };
+    expect(NodeNeedsParams.safeParse(bare).success).toBe(false);
+    expect(NodeNeedsParams.safeParse({ ...bare, need: 'install', expert: 'e' }).success).toBe(
       false,
     );
   });

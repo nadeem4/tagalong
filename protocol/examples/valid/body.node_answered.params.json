@@ -1,0 +1,6 @@
+{
+  "jsonrpc": "2.0",
+  "id": "d1-9",
+  "method": "node_answered",
+  "params": { "id": "n1", "outcome": "done" }
+}

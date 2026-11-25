@@ -17,8 +17,11 @@ FAKE = str(Path(__file__).parent / "fake_mcp_server.py")
 
 
 class FakeNode:
-    def __init__(self, bodies: Bodies, tmp_path: Path, body_id: str = "pc") -> None:
+    def __init__(
+        self, bodies: Bodies, tmp_path: Path, body_id: str = "pc", device_id: str | None = None
+    ) -> None:
         self.bodies = bodies
+        self.device_id = device_id
         self.body_id = body_id
         self.allowlist = Allowlist(tmp_path / "allowlist.json")
         self.allowlist.allow(PipeSpec(command=sys.executable, args=[FAKE]))
@@ -46,7 +49,8 @@ class FakeNode:
 
     def connect(self) -> None:
         body = Body(id=self.body_id, kind="node", name="Laptop", display=False)
-        self.bodies.connect(body, [], self, None, Principal("device:pc", "Laptop", "node", False))
+        principal = Principal("device:pc", "Laptop", "node", False, self.device_id)
+        self.bodies.connect(body, [], self, None, principal)
 
     def _to_brain(self, method: str, params: dict) -> None:
         self._record(json.dumps({"method": method, "params": params}), params)

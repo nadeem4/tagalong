@@ -7,6 +7,7 @@
 import type { MemoryEntry, TimelineFact, CategoryGroup } from '../shapes';
 import { buildTimeline, memorySourceLabel } from '../shapes';
 import { Button } from '../controls/button';
+import { cap } from '../text';
 import { themeTokens as t, themedColor, typeCss } from '../theme/tokens';
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -14,7 +15,6 @@ const SOURCE_LABELS: Record<string, string> = {
   linkedin: 'LinkedIn',
   web: 'The web',
 };
-const cap = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
 
 /** Where a fact was read, in words; chat facts have no source line. */
 export function sourceLabel(source: string): string {

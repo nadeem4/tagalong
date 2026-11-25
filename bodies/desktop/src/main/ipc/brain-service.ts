@@ -4,6 +4,7 @@
  * started first), which is what turns its network listener on. The service itself is the brain's (service.py);
  * this only asks for it and passes the command's answer on.
  */
+import { lastLine } from '../last-line';
 import { IPC } from '../../shared/ipc';
 import type { BrainServiceOutcome, BrainServiceState } from '../../shared/ipc';
 import type { IpcHandle } from './handle';
@@ -21,7 +22,6 @@ export interface BrainServiceDeps {
 }
 
 const RESTART_FAILED = 'Scout could not restart the brain to turn network access on.';
-const lastLine = (out: string): string => out.trim().split('\n').at(-1) ?? '';
 
 /**
  * Waits for the link to leave `online` and return, so the old brain's still-open link is never

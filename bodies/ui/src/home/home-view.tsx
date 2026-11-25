@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { Pet } from '../shapes';
+import type { NeedsYouItem, Pet } from '../shapes';
 import { useHostBridge } from '../host-bridge';
 import { ScoutGlyph } from '../scout-mark';
 import { Button } from '../controls/button';
@@ -25,6 +25,9 @@ import { SpendCard } from './spend-card';
 import { BrainCard } from './brain-card';
 import { UpdateBanner } from './update-banner';
 import { LINK, WhereThingsRun } from './where-things-run';
+import { NeedsYouSection } from '../needs-you/needs-you-section';
+import { NEEDS_CSS } from '../needs-you/needs-you-styles';
+import { useNeedsYou } from '../needs-you/use-needs-you';
 
 export type HomePage =
   'overview' | 'tasks' | 'connections' | 'devices' | 'approvals' | 'memory' | 'settings';
@@ -67,6 +70,8 @@ export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps)
   const [page, setPage] = useState<HomePage>(asked ?? 'overview');
   const [pets, setPets] = useState<Pet[]>([]);
   const [reach, setReach] = useState(false);
+  const needs = useNeedsYou();
+  const waiting = needs.length;
 
   const [lastAsked, setLastAsked] = useState(asked);
   if (asked !== lastAsked) {
@@ -92,6 +97,7 @@ export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps)
       <style>{SETTINGS_CSS}</style>
       <style>{HOME_CSS}</style>
       <style>{CONNECTIONS_CSS}</style>
+      <style>{NEEDS_CSS}</style>
       <nav aria-label="Tagalong" className="home-nav on-navy">
         <div className="home-nav__who">
           <span className="home-nav__tile">
@@ -111,6 +117,11 @@ export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps)
             onClick={() => go(item.id)}
           >
             {item.label(name)}
+            {item.id === 'overview' && waiting > 0 && (
+              <span className="home-nav__badge" aria-label={`${waiting} waiting`}>
+                {waiting}
+              </span>
+            )}
             {(item.id === 'tasks' || item.id === 'devices') && (
               <span className="home-nav__badge" aria-hidden="true">
                 New
@@ -127,6 +138,7 @@ export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps)
             <Overview
               companion={companion}
               host={host}
+              needs={needs}
               onAway={() => {
                 go('devices');
                 setReach(true);
@@ -153,10 +165,12 @@ export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps)
 function Overview({
   companion,
   host,
+  needs,
   onAway,
 }: {
   companion: Pet | undefined;
   host: HomeHost;
+  needs: NeedsYouItem[];
   onAway: () => void;
 }) {
   const [status, setStatus] = useState<{ text: string; ok: boolean }>({ text: 'Ready', ok: true });
@@ -205,6 +219,7 @@ function Overview({
         <h1 className="home-title">Overview</h1>
         <p>Everything {name} is doing for you.</p>
       </div>
+      <NeedsYouSection items={needs} />
       <div className="tg-cards">
         <section className="tg-card" aria-label={name}>
           <h2 className="tg-card__label">{name}</h2>

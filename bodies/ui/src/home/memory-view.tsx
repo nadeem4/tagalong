@@ -10,6 +10,7 @@ import { buildTimeline, isOutsideSource, memorySourceLabel } from '../shapes';
 import type { MemoryEntry } from '../shapes';
 import { useHostBridge } from '../host-bridge';
 import { Button } from '../controls/button';
+import { shortDate } from '../text';
 import { KnowMeFlow } from '../know-me/know-me-flow';
 import { MemoryTimeline, deleteLabel, sourceLabel } from './memory-timeline';
 import { themeTokens as t, themedColor, typeCss } from '../theme/tokens';
@@ -19,10 +20,6 @@ const KIND_LABELS: Record<MemoryEntry['kind'], string> = {
   preference: 'Preference',
   summary: 'Conversation summary',
 };
-
-function day(iso: string): string {
-  return new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short' });
-}
 
 const CSS = `
 /* One grid for the list, rows on its subgrid: every row's text starts at the same left edge. */
@@ -260,7 +257,7 @@ export function MemoryView({ name }: { name: string }) {
                 <li key={memory.id} className="memory-row">
                   <span className="tg-chip">{KIND_LABELS[memory.kind]}</span>
                   <span className="memory-row__text">{memory.text}</span>
-                  <span className="memory-row__date home-time">{day(memory.createdAt)}</span>
+                  <span className="memory-row__date home-time">{shortDate(memory.createdAt)}</span>
                   <Button
                     variant="quiet"
                     aria-label={deleteLabel(memory.text)}

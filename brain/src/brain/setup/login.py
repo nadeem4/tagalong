@@ -27,7 +27,7 @@ from acp.schema import (
 )
 
 from brain.events import Event
-from brain.experts import kill_tree
+from brain.experts import AUTH_REQUIRED, kill_tree
 from brain.open_items import OpenItem, OpenItems
 from brain.setup.env import expert_env
 from brain.setup.flights import Flights
@@ -37,7 +37,6 @@ from brain.setup.terminal import NoTerminal, OpenTerminal
 
 LOGIN_TIMEOUT_S = 600.0
 CHECK_TIMEOUT_S = 60.0
-AUTH_REQUIRED = -32000
 # Subscription browser methods, by the ids the adapters use (20a spike).
 _BROWSER_IDS = ("chat-gpt",)
 

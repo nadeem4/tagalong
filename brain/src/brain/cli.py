@@ -10,6 +10,7 @@ from the command line.
 import argparse
 import asyncio
 import getpass
+import json
 import os
 import re
 import sys
@@ -35,7 +36,7 @@ from brain.memory import Memory
 from brain.memory_bridge import BridgeError
 from brain.memory_bridge import pair_with_link as real_pair_memory
 from brain.memory_bridge import serve as real_serve_memory
-from brain.node.allowlist import Allowlist, NotRunnable
+from brain.node.allowlist import Allowlist, NotRunnable, resolve
 from brain.node.main import HelloRefused
 from brain.node.main import run_node as real_run_node
 from brain.node.signin import browser_sign_in
@@ -131,6 +132,11 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="a bearer token for the URL, typed here and kept on this machine",
     )
+    which = node.add_parser("which", help="where a command is on this machine, as `allow` finds it")
+    which.add_argument("command")
+    node.add_parser("list", help="what the brain may run here, as JSON, without secrets")
+    revoke = node.add_parser("revoke", help="stop letting the brain run one listed command")
+    revoke.add_argument("key", help="its key from `node list`")
     signin = node.add_parser(
         "signin", help="sign in to an OAuth app here, on the machine running it"
     )
@@ -370,6 +376,20 @@ async def _node(args, home: Path, env, run_node, node_signin, secret, out) -> No
     allowlist = Allowlist(home / "node" / "allowlist.json")
     if args.sub == "allow":
         _node_allow(args, allowlist, secret, out)
+        return
+    if args.sub == "which":
+        found = resolve(args.command)
+        if found is None:
+            raise _Fail(f"{args.command} is not a program on this machine.")
+        out(str(found))
+        return
+    if args.sub == "list":
+        out(json.dumps(allowlist.listing()))
+        return
+    if args.sub == "revoke":
+        if not allowlist.revoke(args.key):
+            raise _Fail("Nothing on this machine's list has that key.")
+        out("Revoked. The brain can no longer run it here.")
         return
     if args.sub == "signin":
         await _node_signin(args.url, home / "node", allowlist, node_signin, out)

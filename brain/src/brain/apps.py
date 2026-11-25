@@ -48,6 +48,7 @@ from brain.protocol import PipeSpec, RpcError
 if TYPE_CHECKING:
     from brain.bodies import Bodies
     from brain.memory import Memory
+    from brain.node_needs import NodeNeeds
 
 log = logging.getLogger("brain")
 
@@ -337,11 +338,14 @@ class Apps:
         tokens: TokenFile | None = None,
         data_dir: Path | str | None = None,
         signin_timeout: float = 300,
+        *,
         placements: Placements | None = None,
         bodies: "Bodies | None" = None,
+        needs: "NodeNeeds",
     ) -> None:
         self._placements = placements
         self._bodies = bodies  # the nodes an app may be placed on
+        self._needs = needs
         self._memory = memory
         self._notify = notify
         self._env = env
@@ -735,7 +739,7 @@ class Apps:
         else:
             spec = PipeSpec(url=row.config["url"])
         try:
-            pipe = await self._bodies.open_pipe(slot.location, spec)
+            pipe = await self._needs.open_pipe(slot.location, spec)
         except RpcError as err:
             if signin := self.node_signin_line(row.id):
                 raise AppError(signin) from None

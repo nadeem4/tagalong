@@ -49,7 +49,7 @@ import { createChatSync } from './brain/chat-sync';
 import { createTurnEvents } from './brain/turn-events';
 import { startBrain } from './brain/start';
 import { bonjourBrowse, discoverBrains } from './brain/discover';
-import { LinkStore } from './brain/link-store';
+import { LinkStore, pairedAddr } from './brain/link-store';
 import { pinnedSocket } from './brain/pinned-socket';
 import { createNodeRunner } from './node/runner';
 import { registerPairIpc } from './ipc/pair';
@@ -122,6 +122,8 @@ import { forwardConnectionsChanged, registerConnectionIpc } from './ipc/connecti
 import { SCOUT_ID, registerScoutIpc } from './ipc/scout';
 import { fromWindow, type IpcHandle } from './ipc/handle';
 import { registerKnowMeIpc } from './ipc/know-me';
+import { registerNeedsYouIpc } from './ipc/needs-you';
+import { createNeedsYou } from './node/needs';
 import { registerAiToolIpc } from './ipc/ai-tools';
 import { registerMemoryIpc } from './ipc/memory';
 import { registerApprovalsIpc } from './ipc/approvals';
@@ -191,10 +193,19 @@ interface Desktop {
 }
 
 let desktop: Desktop | null = null;
+const required = (): Desktop => {
+  if (desktop === null) throw new Error('the desktop host is not ready yet');
+  return desktop;
+};
 /** The brain link as last reported, for the ask handler's choice of words. */
 let brainStatus: BrainStatus = 'connecting';
 /** Runs the node while this desktop is paired to a remote brain. */
 let nodeRunner: ReturnType<typeof createNodeRunner> | null = null;
+const broadcast = (channel: string, payload?: unknown): void => {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send(channel, payload);
+  }
+};
 /** Starts the brain (installing it first when packaged) and holds the setup state Home shows. */
 const brainRun = (): RealLaunch => ({
   brainDir: app.isPackaged
@@ -203,6 +214,18 @@ const brainRun = (): RealLaunch => ({
   packaged: app.isPackaged ? { uv: join(process.resourcesPath, 'uv', 'uv.exe') } : undefined,
   appVersion: app.getVersion(),
   remote: () => desktop?.link.paired() != null,
+});
+/** What a remote brain waits on from this PC; its cards and Home's list come from here. */
+const needsYou = createNeedsYou({
+  run: (args) => realRunTagalong(brainRun(), args),
+  answer: (id, outcome) => required().brain.nodeAnswered(id, outcome),
+  brain: async () => {
+    const card = await brainControl?.card();
+    const paired = desktop?.link.paired();
+    const addr = ((paired && pairedAddr(paired)) ?? 'your brain').replace(/:\d+$/, '');
+    return { name: card?.host ?? addr, identity: card?.identity };
+  },
+  push: (items) => broadcast(IPC.needsYouEvent, items),
 });
 /** The status marks, set before the first launch; the launch can report before that. */
 let startingMarks: StatusMarks | null = null;
@@ -217,9 +240,7 @@ const brainSetup = createBrainSetup(
       onStarting: startingGates.next(),
     }),
   () => {
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) window.webContents.send(IPC.brainChangedEvent, 'link');
-    }
+    broadcast(IPC.brainChangedEvent, 'link');
   },
 );
 /** Scout's brain card and the version check; set once the brain client exists. */
@@ -316,9 +337,7 @@ async function start(): Promise<void> {
   // first second listening is on.
   const listening = new AlwaysListening(settings.listening.always);
   const statusMarks = new StatusMarks((top) => {
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) window.webContents.send(IPC.statusMarkEvent, top);
-    }
+    broadcast(IPC.statusMarkEvent, top);
   });
   startingMarks = statusMarks;
   // "Listening" on Scout for a few seconds: the mark, not a spoken line, says it is on.
@@ -371,7 +390,7 @@ async function start(): Promise<void> {
         const paired = link.paired();
         return paired === null
           ? { addr: localBrainAddr(process.env), fingerprint: null }
-          : { addr: paired.lastGood ?? paired.addrs[0] ?? '', fingerprint: paired.fp };
+          : { addr: pairedAddr(paired) ?? '', fingerprint: paired.fp };
       },
       run: runCommand,
       // The installer's PATH entry reaches this process only after a restart, so the check
@@ -403,9 +422,7 @@ async function start(): Promise<void> {
             console.warn(`the waiting brain restart failed: ${String(error)}`);
           });
         }
-        for (const window of BrowserWindow.getAllWindows()) {
-          if (!window.isDestroyed()) window.webContents.send(IPC.brainChangedEvent, what);
-        }
+        broadcast(IPC.brainChangedEvent, what);
       }
       // Scout approved an ask under a preference: every window may tell the person once.
       if (method === 'approved') {
@@ -417,6 +434,12 @@ async function start(): Promise<void> {
             window.webContents.send(IPC.approvedEvent, { ...(params as object), cameUp });
           }
         }
+      }
+      // A remote brain needs something from this PC: the card says what, and only a click runs it.
+      if (method === 'node_needs') {
+        void needsYou.frame(params).then((opened) => {
+          if (opened) bringUpBubble(false);
+        });
       }
       // Heard words, the voice's status and spoken sentences: the voice bridge sends them on.
       desktop?.voiceBridge.onNotification(method, params);
@@ -451,9 +474,7 @@ async function start(): Promise<void> {
       }
       watchOffline(status);
       // Home's "Where things run" shows the link; it reads it again when it changes.
-      for (const window of BrowserWindow.getAllWindows()) {
-        if (!window.isDestroyed()) window.webContents.send(IPC.brainChangedEvent, 'link');
-      }
+      broadcast(IPC.brainChangedEvent, 'link');
     },
   });
 
@@ -487,9 +508,7 @@ async function start(): Promise<void> {
     copy: (text) => clipboard.writeText(text),
     log: (line) => console.warn(line),
     onChange: () => {
-      for (const window of BrowserWindow.getAllWindows()) {
-        if (!window.isDestroyed()) window.webContents.send(IPC.brainChangedEvent, 'link');
-      }
+      broadcast(IPC.brainChangedEvent, 'link');
     },
   });
 
@@ -528,9 +547,7 @@ async function start(): Promise<void> {
     voiceBridge: createVoiceBridge({
       brain,
       send: (channel, payload) => {
-        for (const window of BrowserWindow.getAllWindows()) {
-          if (!window.isDestroyed()) window.webContents.send(channel, payload);
-        }
+        broadcast(channel, payload);
       },
       sendToPanel: (channel, payload) => {
         const panel = desktop?.panel;
@@ -565,9 +582,7 @@ async function start(): Promise<void> {
 
   // Every window that shows Always listening follows this one state. Only `on` is saved.
   listening.onChange((state) => {
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) window.webContents.send(IPC.listeningEvent, state);
-    }
+    broadcast(IPC.listeningEvent, state);
   });
   listening.onChange(
     saveListening({
@@ -757,9 +772,7 @@ function applyHotkeys(settings: Settings): string | null {
   // Broadcast rather than wait for the next getHostView. The panel may already be open,
   // and a window still showing a problem the user has just fixed is the same kind of lie
   // as never showing it at all.
-  for (const window of BrowserWindow.getAllWindows()) {
-    if (!window.isDestroyed()) window.webContents.send(IPC.hotkeyProblemEvent, desktop.hotkeyError);
-  }
+  broadcast(IPC.hotkeyProblemEvent, desktop.hotkeyError);
   return desktop.hotkeyError;
 }
 
@@ -789,9 +802,7 @@ function talkPressed(): void {
 
 /** The stop key: every window that is speaking stops at once and drops what it had queued. */
 function stopVoice(): void {
-  for (const window of BrowserWindow.getAllWindows()) {
-    if (!window.isDestroyed()) window.webContents.send(IPC.stopVoiceEvent);
-  }
+  broadcast(IPC.stopVoiceEvent);
 }
 
 /** Turn notifications drive the UI, and main is the only thing holding the socket. */
@@ -1031,11 +1042,6 @@ async function noteActiveWindow(current: Desktop): Promise<ContextSnapshot | nul
  * or open things through the shell.
  */
 function registerIpc(thisPcNode: string): void {
-  const required = (): Desktop => {
-    if (desktop === null) throw new Error('the desktop host is not ready yet');
-    return desktop;
-  };
-
   const handle: IpcHandle = (channel, listener) =>
     ipcMain.handle(channel, listener as (event: unknown, ...args: unknown[]) => unknown);
 
@@ -1080,18 +1086,14 @@ function registerIpc(thisPcNode: string): void {
     settingsStore: () => required().settingsStore,
     onSaved: (saved) => {
       required().settings = saved;
-      for (const window of BrowserWindow.getAllWindows()) {
-        if (!window.isDestroyed()) window.webContents.send(IPC.settingsChangedEvent, saved);
-      }
+      broadcast(IPC.settingsChangedEvent, saved);
     },
   });
   registerWalkthroughIpc(handle, {
     save: (patch) => {
       const saved = required().settingsStore.set(patch);
       required().settings = saved;
-      for (const window of BrowserWindow.getAllWindows()) {
-        if (!window.isDestroyed()) window.webContents.send(IPC.settingsChangedEvent, saved);
-      }
+      broadcast(IPC.settingsChangedEvent, saved);
     },
     open: (step) => openWalkthrough(step),
     close: () => {
@@ -1118,12 +1120,9 @@ function registerIpc(thisPcNode: string): void {
   registerKnowMeIpc(handle, {
     brain: required().brain,
     // The run's status goes to every window: the tour and Home may both show it.
-    broadcast: (channel, payload) => {
-      for (const window of BrowserWindow.getAllWindows()) {
-        if (!window.isDestroyed()) window.webContents.send(channel, payload);
-      }
-    },
+    broadcast,
   });
+  registerNeedsYouIpc(handle, { needs: needsYou });
   registerPermissionsIpc(handle, { brain: required().brain });
   registerLoopsIpc(handle, { brain: required().brain });
   registerTimersIpc(handle, { brain: required().brain });
@@ -1187,11 +1186,7 @@ function registerIpc(thisPcNode: string): void {
       applyHotkeys(settings);
     },
     applyVoice: (settings) => sendReadAloud(settings),
-    broadcast: (settings) => {
-      for (const window of BrowserWindow.getAllWindows()) {
-        if (!window.isDestroyed()) window.webContents.send(IPC.settingsChangedEvent, settings);
-      }
-    },
+    broadcast: (settings) => broadcast(IPC.settingsChangedEvent, settings),
   });
   registerVoiceIpc(handle, {
     bridge: required().voiceBridge,

@@ -36,6 +36,7 @@ export const ErrorCode = {
   over_limit: -32008,
   unauthorized: -32009,
   network_off: -32010,
+  not_installed: -32011,
 } as const;
 
 const errorCodes: readonly number[] = Object.values(ErrorCode);

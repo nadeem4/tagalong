@@ -6,8 +6,10 @@ from urllib.parse import quote
 import pytest
 
 from brain.apps import Apps, TokenFile
+from brain.bodies import Bodies
 from brain.guards import Guards, Hook, SaveCtx
 from brain.masking import Masker, mask_json, mask_message, mask_secrets
+from brain.node_needs import NodeNeeds
 
 
 def test_masks_an_exact_value():
@@ -185,7 +187,14 @@ def test_apps_secret_values_include_tokens_url_params_and_oauth(tmp_path):
     (oauth / "a1.json").write_text(
         json.dumps({"tokens": {"access_token": "acc-tok-123", "refresh_token": "ref-tok-456"}})
     )
-    apps = Apps(memory=None, notify=lambda *a: None, env={}, tokens=tokens, data_dir=tmp_path)
+    apps = Apps(
+        memory=None,
+        notify=lambda *a: None,
+        env={},
+        tokens=tokens,
+        data_dir=tmp_path,
+        needs=NodeNeeds(Bodies()),
+    )
     vals = apps.secret_values()
     for v in ("bearer-token-value", "env-secret-value", "plainvalue1", "user:p@ss word!"):
         assert v in vals

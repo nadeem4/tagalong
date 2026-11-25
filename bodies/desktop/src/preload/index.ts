@@ -17,8 +17,10 @@ import type {
   Pet,
   PetRemarkParams,
   StatusMark,
+  ApprovedItem,
   KnowMeInput,
   KnowMeStatus,
+  NeedsYouItem,
   KnowSourceInfo,
   MemoryEntry,
   TurnEvent,
@@ -141,6 +143,19 @@ const bridge: PreloadBridge = {
     ipcRenderer.on(IPC.knowMeStatusEvent, listener);
     return () => void ipcRenderer.off(IPC.knowMeStatusEvent, listener);
   },
+  needsYouList: () => ipcRenderer.invoke(IPC.needsYouList) as Promise<NeedsYouItem[]>,
+  needsYouAct: async (id: string) => {
+    const answer = (await ipcRenderer.invoke(IPC.needsYouAct, id)) as { error?: string };
+    if (answer.error !== undefined) throw new Error(answer.error);
+  },
+  needsYouNotNow: (id: string) => ipcRenderer.invoke(IPC.needsYouNotNow, id) as Promise<void>,
+  onNeedsYou: (handler: (items: NeedsYouItem[]) => void) => {
+    const listener = (_event: IpcRendererEvent, items: NeedsYouItem[]): void => handler(items);
+    ipcRenderer.on(IPC.needsYouEvent, listener);
+    return () => void ipcRenderer.off(IPC.needsYouEvent, listener);
+  },
+  approvedList: () => ipcRenderer.invoke(IPC.approvedList) as Promise<ApprovedItem[]>,
+  approvedRevoke: (key: string) => ipcRenderer.invoke(IPC.approvedRevoke, key) as Promise<void>,
   listPermissions: () =>
     ipcRenderer.invoke(IPC.listPermissions) as Promise<{
       groups: PermissionGroup[];

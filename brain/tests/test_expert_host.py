@@ -10,6 +10,7 @@ import json
 import sys
 from pathlib import Path
 
+import acp
 import pytest
 
 from brain.experts import ExpertError, ExpertHost, ExpertRun
@@ -299,3 +300,36 @@ async def test_initialize_advertises_terminal_meta(make_rig):
     await rig.run(Side()).start(rig.folder)
     init = next(f for f in rig.frames() if f.get("method") == "initialize")
     assert init["params"]["clientCapabilities"]["_meta"]["terminal_output"] is True
+
+
+async def test_a_signed_out_expert_waits_for_the_sign_in_then_starts(
+    make_rig, tmp_path, monkeypatch
+):
+    marker = tmp_path / "logged-in"
+    monkeypatch.setenv("FAKE_ACP_AUTH", "[]")
+    monkeypatch.setenv("FAKE_ACP_LOGIN_FILE", str(marker))
+    rig = make_rig()
+    asked = []
+
+    async def sign_in() -> bool:
+        asked.append(True)
+        marker.write_text("done")
+        return True
+
+    rig.host.sign_in = sign_in
+    run = rig.run(Side())
+    await run.start(rig.folder)
+    assert asked == [True] and run.session_id
+
+
+async def test_a_sign_in_the_person_puts_off_fails_the_start(make_rig, tmp_path, monkeypatch):
+    monkeypatch.setenv("FAKE_ACP_AUTH", "[]")
+    monkeypatch.setenv("FAKE_ACP_LOGIN_FILE", str(tmp_path / "never"))
+    rig = make_rig()
+
+    async def sign_in() -> bool:
+        return False
+
+    rig.host.sign_in = sign_in
+    with pytest.raises(acp.RequestError):
+        await rig.run(Side()).start(rig.folder)

@@ -41,7 +41,16 @@ function Avatar() {
   // Speech heard while listening all the time: the dot pulses. The words are never read here.
   const [hearing, setHearing] = useState(false);
   const [status, setStatus] = useState<StatusMark | null>(null);
+  const [needsYou, setNeedsYou] = useState(0);
   const [input] = useState(() => petInput(window.tagalongHost, send));
+
+  useEffect(() => {
+    window.tagalong.needsYouList().then(
+      (items) => setNeedsYou(items.length),
+      () => undefined,
+    );
+    return window.tagalong.onNeedsYou((items) => setNeedsYou(items.length));
+  }, []);
 
   useEffect(() => {
     window.tagalong
@@ -189,6 +198,7 @@ function Avatar() {
           sightPaused={sightPaused}
           listening={listeningDot(listening, hearing)}
           status={status}
+          needsYou={needsYou}
         />
       </button>
     </div>

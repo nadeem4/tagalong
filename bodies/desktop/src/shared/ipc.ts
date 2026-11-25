@@ -53,6 +53,14 @@ export const IPC = {
   knowMeStart: 'tagalong:know-me:start',
   // Progress of a get-to-know-me run: pushed to every window.
   knowMeStatusEvent: 'tagalong:know-me:status',
+  // What a remote brain waits on from this PC: the open requests, answering one, and the list of
+  // what this PC already lets it run. The open requests are pushed to every window.
+  needsYouList: 'tagalong:needs-you:list',
+  needsYouAct: 'tagalong:needs-you:act',
+  needsYouNotNow: 'tagalong:needs-you:not-now',
+  needsYouEvent: 'tagalong:needs-you:changed',
+  approvedList: 'tagalong:approved:list',
+  approvedRevoke: 'tagalong:approved:revoke',
   listPermissions: 'tagalong:permissions:list',
   setPermission: 'tagalong:permissions:set',
   loopsState: 'tagalong:loops:state',

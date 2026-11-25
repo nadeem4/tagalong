@@ -120,6 +120,7 @@ def test_error_codes():
         "over_limit": -32008,
         "unauthorized": -32009,
         "network_off": -32010,
+        "not_installed": -32011,
     }
 
 
@@ -533,3 +534,17 @@ def test_answer_check_back_only_with_not_now():
     assert answer.model_validate({"ask": "a", "option": "not_now", "check_back_at": at})
     with pytest.raises(ValidationError):
         answer.model_validate({"ask": "a", "option": "allow", "check_back_at": at})
+
+
+def test_a_sign_in_request_names_an_expert():
+    from pydantic import ValidationError
+
+    from brain.protocol import NodeNeedsOpen
+
+    frame = {"seq": 1, "id": "n", "state": "open", "node": "pc", "spec": {"command": "x"}}
+    assert NodeNeedsOpen.model_validate({**frame, "need": "approve"}).expert is None
+    with pytest.raises(ValidationError):
+        NodeNeedsOpen.model_validate({**frame, "need": "signin"})
+    assert NodeNeedsOpen.model_validate({**frame, "need": "signin", "expert": "e"}).expert == "e"
+    with pytest.raises(ValidationError):
+        NodeNeedsOpen.model_validate({**frame, "need": "install", "expert": "e"})

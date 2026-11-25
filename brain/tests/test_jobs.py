@@ -27,6 +27,7 @@ from brain.job_records import Job, JobPart, JobRecords
 from brain.jobs import RECHECK_AFTER_S, JobError, Jobs, job_note
 from brain.masking import Masker, mask_secrets
 from brain.memory import Memory
+from brain.node_needs import NodeNeeds
 from brain.open_items import OpenItemRefused, OpenItems
 from brain.permission import Decision, Engine, Grant, Person, SideCheckDecider
 from brain.placements import Placements
@@ -220,7 +221,11 @@ class Rig:
         self.gate = asyncio.Event()
         self.placements = Placements(self.memory.db)
         self.hosts = ExpertHosts(
-            300, sleep=lambda s: self.gate.wait(), bodies=bodies, placements=self.placements
+            300,
+            sleep=lambda s: self.gate.wait(),
+            bodies=bodies,
+            placements=self.placements,
+            needs=NodeNeeds(bodies),
         )
         self.records = JobRecords(
             WorkStore(self.memory.db, lambda: self.wall), self.memory.db, lambda: self.wall

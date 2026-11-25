@@ -17,10 +17,10 @@ from typing import Protocol
 import httpx2
 
 from brain.apps import merge_url_secret, url_secret_values
-from brain.node.allowlist import Allowlist, oauth_storage
+from brain.node.allowlist import Allowlist, NotInstalled, oauth_storage
 from brain.node.relay import HttpRelay
 from brain.node.signin import stored_auth
-from brain.protocol import ErrorCode, PipeSpec, RpcError
+from brain.protocol import NOT_INSTALLED, ErrorCode, PipeSpec, RpcError
 
 CHUNK = 65_536
 
@@ -106,7 +106,10 @@ class Pipes:
     async def open(self, pipe: str, spec: PipeSpec) -> None:
         if pipe in self._open:
             raise RpcError(ErrorCode.invalid_params, "That pipe is already open.")
-        path = self._allowlist.permits(spec)
+        try:
+            path = self._allowlist.permits(spec)
+        except NotInstalled:
+            raise RpcError(ErrorCode.not_installed, NOT_INSTALLED) from None
         if path is None:
             raise RpcError(ErrorCode.denied, "That is not on this node's list.")
         secrets = self._allowlist.secrets(spec)

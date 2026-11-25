@@ -253,6 +253,12 @@ export class BrainClient {
     return this.request('answer', params).then(() => undefined);
   }
 
+  /** The person's answer to a `node_needs` request, made on this PC. */
+  nodeAnswered(id: string, outcome: 'done' | 'not_now'): Promise<void> {
+    if (this.status !== 'online') return Promise.reject(new BrainOffline());
+    return this.request('node_answered', { id, outcome }).then(() => undefined);
+  }
+
   private setStatus(status: BrainStatus): void {
     if (this.status === status) return;
     this.status = status;

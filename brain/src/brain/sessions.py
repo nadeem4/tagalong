@@ -189,8 +189,8 @@ class Session:
         memory: Memory,
         *,
         events: EventLog,
+        make_run: Callable[..., ExpertRun],
         now: Callable[[], datetime] = lambda: datetime.now().astimezone(),
-        make_run: Callable[..., ExpertRun] | None = None,
         experts: Callable[[], list[InstalledExpert]] | None = None,
         apps: Apps | None = None,
         before_job: Callable[[], Awaitable[None]] | None = None,
@@ -251,8 +251,6 @@ class Session:
         work.sweep(work_keep_days)
         outputs.prune(outputs_keep)
         notify = bodies.notify
-        # main passes the installed experts and the quiet threshold; the defaults keep tests short.
-        make_run = make_run or ExpertHosts()
         # Built first: the questions and the timers emit through it. It only calls back into the
         # session once an event arrives, by which time the rest of __init__ has run.
         questions = ScoutQuestions(

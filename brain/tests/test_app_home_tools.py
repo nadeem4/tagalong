@@ -16,6 +16,7 @@ from brain.auth import LOCAL
 from brain.bodies import Bodies
 from brain.memory import Memory
 from brain.mind.turn import Call
+from brain.node_needs import NodeNeeds
 from brain.protocol import Body, RpcError, Tool
 
 FAKE = str(Path(__file__).parent / "fake_mcp_server.py")
@@ -34,8 +35,15 @@ async def rig(tmp_path):
     mem = Memory(tmp_path / "h.db")
     sent = []
     tokens = TokenFile(tmp_path)
-    apps = Apps(mem, lambda m, p: sent.append((m, p)), {}, connect_timeout=15, tokens=tokens)
     bodies = Bodies()
+    apps = Apps(
+        mem,
+        lambda m, p: sent.append((m, p)),
+        {},
+        connect_timeout=15,
+        tokens=tokens,
+        needs=NodeNeeds(bodies),
+    )
     handlers = {
         s.name: h
         for s, h in app_home_tools(apps, mem, tokens, lambda m, p: sent.append((m, p)), bodies)
