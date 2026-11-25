@@ -72,7 +72,7 @@ test('Not now keeps the request in Home and tells the brain', async () => {
   await expect(card).toContainText('wants to run python -V here', { timeout: 30_000 });
   await card.getByRole('button', { name: 'Not now' }).click();
   await expect.poll(() => brain.nodeAnswers).toEqual([{ id: 'n1', outcome: 'not_now' }]);
-  await expect(panel.getByText(/The job waits/)).toBeVisible();
+  await expect(panel.getByText(/The job stops/)).toBeVisible();
 
   const avatar = await windowFor('avatar');
   await avatar.evaluate(() => window.tagalongHost.openSettings());

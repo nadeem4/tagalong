@@ -41,6 +41,13 @@ describe('NeedsYouBubble', () => {
     expect(await screen.findByText(/Allowed\. mini-pc can run claude-agent-acp/)).toBeTruthy();
   });
 
+  it('Not now tells the brain and says the job stops', async () => {
+    const bridge = shown(<NeedsYouBubble />, { needsYou: [ITEM] });
+    fireEvent.click(await screen.findByRole('button', { name: 'Not now' }));
+    expect(bridge.needsYouNotNows).toEqual(['n1']);
+    expect(await screen.findByText(/I have not run anything\. The job stops\./)).toBeTruthy();
+  });
+
   it('says Sign in for a signed-out expert', async () => {
     shown(<NeedsYouBubble />, {
       needsYou: [{ ...ITEM, need: 'signin', expert: 'claude-code', path: null }],

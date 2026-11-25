@@ -1481,7 +1481,7 @@ test('BAU5a needs you on this PC: approve and sign in, light and dark', async ()
     await both(panel, 'approve-card');
     await both(avatar, 'dock-tag');
     await card.getByRole('button', { name: 'Not now' }).click();
-    await expect(panel.getByText(/The job waits/)).toBeVisible();
+    await expect(panel.getByText(/The job stops/)).toBeVisible();
     await both(panel, 'approve-not-now');
 
     await avatar.evaluate(() => window.tagalongHost.openSettings());
